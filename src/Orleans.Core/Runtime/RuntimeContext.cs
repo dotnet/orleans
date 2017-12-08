@@ -27,7 +27,7 @@ namespace Orleans.Runtime
             // Is there a better/safer way to identify worker threads? 
             if (context != null)
             {
-                // Currently only orleans own threads being initialized,
+                // Currently only orleans own threads are being initialized,
                 // but in perspective - this method will be called on external ones,
                 // so that mechanism of thread de-initialization will be needed.
                 return; 
@@ -51,7 +51,7 @@ namespace Orleans.Runtime
         internal static void ResetExecutionContext()
         {
             context.ActivationContext = null;
-            context.Scheduler = null; 
+            context.Scheduler = null;
         }
 
         public override string ToString()

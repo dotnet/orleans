@@ -26,7 +26,7 @@ namespace Orleans.Runtime
             }
         }
     }
-    
+
     internal abstract class ExecutorOptions
     {
         protected ExecutorOptions(

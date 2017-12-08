@@ -8,13 +8,13 @@ namespace Orleans.Runtime
     {
         private QueueTrackingStatistic queueTracking;
 
-        private readonly QueueWorkItemCallback[] RunningWorkItems;
-        private readonly BlockingCollection<QueueWorkItemCallback> workQueue;
-        private readonly ThreadPoolExecutorOptions executorOptions;
-
 #if TRACK_DETAILED_STATS
         internal protected ThreadTrackingStatistic threadTracking;
 #endif
+
+        private readonly QueueWorkItemCallback[] RunningWorkItems;
+        private readonly BlockingCollection<QueueWorkItemCallback> workQueue;
+        private readonly ThreadPoolExecutorOptions executorOptions;
 
         public ThreadPoolExecutor(ThreadPoolExecutorOptions options)
         {

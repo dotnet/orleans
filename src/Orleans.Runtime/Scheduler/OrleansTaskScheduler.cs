@@ -19,17 +19,24 @@ namespace Orleans.Runtime.Scheduler
         private readonly ILoggerFactory loggerFactory;
         private readonly ILogger taskWorkItemLogger;
         private readonly ConcurrentDictionary<ISchedulingContext, WorkItemGroup> workgroupDirectory; // work group directory
-        public readonly IExecutor executor;
+        public readonly IExecutor mainExecutor;
         public readonly IExecutor systemExecutor;
+
+        private readonly QueueTrackingStatistic mainQueueTracking;
+        private readonly QueueTrackingStatistic systemQueueTracking;
+
+        private readonly WaitCallback workItemExecutionCallback;
+
         private readonly CancellationTokenSource cancellationTokenSource;
         private bool applicationTurnsStopped;
-        
+
         internal static TimeSpan TurnWarningLengthThreshold { get; set; }
+
         // This is the maximum number of pending work items for a single activation before we write a warning log.
         internal LimitValue MaxPendingItemsLimit { get; private set; }
         internal TimeSpan DelayWarningThreshold { get; private set; }
         
-        public int RunQueueLength => executor.WorkQueueCount + systemExecutor.WorkQueueCount;
+        public int RunQueueLength => mainExecutor.WorkQueueCount + systemExecutor.WorkQueueCount;
 
         public static OrleansTaskScheduler CreateTestInstance(int maxActiveThreads, ICorePerformanceMetrics performanceMetrics, ILoggerFactory loggerFactory)
         {
@@ -65,23 +72,24 @@ namespace Orleans.Runtime.Scheduler
             applicationTurnsStopped = false;
             MaxPendingItemsLimit = maxPendingItemsLimit;
             workgroupDirectory = new ConcurrentDictionary<ISchedulingContext, WorkItemGroup>();
+            workItemExecutionCallback = WorkItemProcessor;
 
             IExecutor GetExecutor(string namePrefix, int degreeOfParalelism, bool drainAfterCancel)
             {
                 var executorName = namePrefix + "SchedulerExecutor";
                 return executorService.GetExecutor(new ThreadPoolExecutorOptions(
-                      executorName,
-                      GetType(),
-                      cancellationTokenSource.Token,
-                      loggerFactory.CreateLogger(executorName),
-                      degreeOfParalelism,
-                      drainAfterCancel,
-                      TurnWarningLengthThreshold,
-                      DelayWarningThreshold,
-                      GetWorkItemStatus));
+                    executorName,
+                    GetType(),
+                    cancellationTokenSource.Token,
+                    loggerFactory.CreateLogger(executorName),
+                    degreeOfParalelism,
+                    drainAfterCancel,
+                    turnWarningLengthThreshold,
+                    delayWarningThreshold,
+                    GetWorkItemStatus));
             }
 
-            executor = GetExecutor(string.Empty, maxActiveThreads, false);
+            mainExecutor = GetExecutor(string.Empty, maxActiveThreads, false);
             systemExecutor = GetExecutor("System", 1, true);
 
             this.taskWorkItemLogger = loggerFactory.CreateLogger<TaskWorkItem>();
@@ -91,6 +99,11 @@ namespace Orleans.Runtime.Scheduler
 
             if (!StatisticsCollector.CollectShedulerQueuesStats) return;
 
+            mainQueueTracking = new QueueTrackingStatistic("Scheduler.LevelOne.MainQueue");
+            systemQueueTracking = new QueueTrackingStatistic("Scheduler.LevelOne.SystemQueue");
+            mainQueueTracking.OnStartExecution();
+            systemQueueTracking.OnStartExecution();
+
             FloatValueStatistic.FindOrCreate(new StatisticName(StatisticNames.QUEUES_QUEUE_SIZE_AVERAGE_PER_QUEUE, "Scheduler.LevelTwo.Average"), () => AverageRunQueueLengthLevelTwo);
             FloatValueStatistic.FindOrCreate(new StatisticName(StatisticNames.QUEUES_ENQUEUED_PER_QUEUE, "Scheduler.LevelTwo.Average"), () => AverageEnqueuedLevelTwo);
             FloatValueStatistic.FindOrCreate(new StatisticName(StatisticNames.QUEUES_AVERAGE_ARRIVAL_RATE_PER_QUEUE, "Scheduler.LevelTwo.Average"), () => AverageArrivalRateLevelTwo);
@@ -99,7 +112,7 @@ namespace Orleans.Runtime.Scheduler
             FloatValueStatistic.FindOrCreate(new StatisticName(StatisticNames.QUEUES_AVERAGE_ARRIVAL_RATE_PER_QUEUE, "Scheduler.LevelTwo.Sum"), () => SumArrivalRateLevelTwo);
         }
 
-        public int WorkItemGroupCount { get { return workgroupDirectory.Count; } }
+        public int WorkItemGroupCount => workgroupDirectory.Count;
 
         private float AverageRunQueueLengthLevelTwo
         {
@@ -176,6 +189,10 @@ namespace Orleans.Runtime.Scheduler
         public void Stop()
         {
             cancellationTokenSource.Cancel();
+
+            if (!StatisticsCollector.CollectShedulerQueuesStats) return;
+            mainQueueTracking.OnStopExecution();
+            systemQueueTracking.OnStopExecution();
         }
 
         protected override IEnumerable<Task> GetScheduledTasks()
@@ -215,22 +232,11 @@ namespace Orleans.Runtime.Scheduler
 
         public void ScheduleExecution(IWorkItem todo)
         {
-            executor.QueueWorkItem(state =>
-            {
-                RuntimeContext.InitializeThread(this);
+            TrackWorkItemEnqueue(todo);
 
-                try
-                {
-                    RuntimeContext.SetExecutionContext(todo.SchedulingContext, this);
-                    todo.Execute();
-                }
-                finally
-                {
-                    RuntimeContext.ResetExecutionContext();
-                }
-            });
+            (todo.IsSystemPriority ? systemExecutor : mainExecutor).QueueWorkItem(workItemExecutionCallback, todo);
         }
-        
+
         // Enqueue a work item to a given context
         public void QueueWorkItem(IWorkItem workItem, ISchedulingContext context)
         {
@@ -397,7 +403,7 @@ namespace Orleans.Runtime.Scheduler
         // Returns true if healthy, false if not
         public bool CheckHealth(DateTime lastCheckTime)
         {
-            return executor.CheckHealth(lastCheckTime) && systemExecutor.CheckHealth(lastCheckTime);
+            return mainExecutor.CheckHealth(lastCheckTime) && systemExecutor.CheckHealth(lastCheckTime);
         }
 
         internal void PrintStatistics()
@@ -416,6 +422,60 @@ namespace Orleans.Runtime.Scheduler
             if (!detailed || !(item is IWorkItem workItem)) return string.Empty;
             return workItem is WorkItemGroup group ? string.Format("WorkItemGroup Details: {0}", group.DumpStatus()) : string.Empty;
         }
+        
+        private void WorkItemProcessor(object state)
+        {
+            var todo = (IWorkItem)state;
+
+            TrackWorkItemDequeue();
+
+            RuntimeContext.InitializeThread(this);
+
+            try
+            {
+                RuntimeContext.SetExecutionContext(todo.SchedulingContext, this);
+                todo.Execute();
+            }
+            finally
+            {
+                RuntimeContext.ResetExecutionContext();
+            }
+        }
+
+        private void TrackWorkItemEnqueue(IWorkItem todo)
+        {
+#if TRACK_DETAILED_STATS
+            if (StatisticsCollector.CollectGlobalShedulerStats)
+                SchedulerStatisticsGroup.OnWorkItemEnqueue();
+
+            QueueTrackingStatistic queueTracking;
+            int workItemsCount;
+
+            if (todo.IsSystemPriority)
+            {
+                queueTracking = systemQueueTracking;
+                workItemsCount = systemExecutor.WorkQueueCount;
+            }
+            else
+            {
+                queueTracking = mainQueueTracking;
+                workItemsCount = mainExecutor.WorkQueueCount;
+            }
+
+            if (StatisticsCollector.CollectShedulerQueuesStats)
+                queueTracking.OnEnQueueRequest(1, workItemsCount);
+#endif
+        }
+
+        private void TrackWorkItemDequeue()
+        {
+#if TRACK_DETAILED_STATS
+            if (StatisticsCollector.CollectGlobalShedulerStats)
+            {
+                SchedulerStatisticsGroup.OnWorkItemDequeue();
+            }
+#endif
+        }
 
         internal void DumpSchedulerStatus(bool alwaysOutput = true)
         {
@@ -431,10 +491,10 @@ namespace Orleans.Runtime.Scheduler
                 workgroupDirectory.Count,
                 applicationTurnsStopped ? "STOPPING" : "").AppendLine();
 
+            // todo: either remove or support 
             // sb.AppendLine("RunQueue:");
             // RunQueue.DumpStatus(sb); ?? - woun't work without additional costs
-
-            //Pool.DumpStatus(sb);
+            // Pool.DumpStatus(sb);
 
             foreach (var workgroup in workgroupDirectory.Values)
                 sb.AppendLine(workgroup.DumpStatus());

@@ -168,7 +168,7 @@ namespace Orleans.Runtime
         }
 
         internal static bool IsStarting { get; set; }
-        
+
         protected abstract ExecutorOptions GetExecutorOptions();
         
         protected void ExecutorFaultHandler(Exception ex, string executorExplanation)
