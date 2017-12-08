@@ -32,26 +32,14 @@ namespace Orleans.Runtime
             {
                 try
                 {
-                    CounterStatistic.SetOrleansManagedThread(); // do it before using CounterStatistic.
+                    CounterStatistic.SetOrleansManagedThread(); // must be called before using CounterStatistic.
+
                     TrackExecutionStart();
                     callback.Invoke(state);
                 }
                 catch (Exception exc)
                 {
-                    if (!executorOptions.CancellationToken.IsCancellationRequested) // If we're stopping, ignore exceptions
-                    {
-                        var explanation =
-                            $"Executor thread {executorOptions.Name} of {executorOptions.StageTypeName} stage encountered unexpected exception.";
-
-                        if (executorOptions.FaultHandler != null)
-                        {
-                            executorOptions.FaultHandler(exc, explanation);
-                        }
-                        else
-                        {
-                            executorOptions.Log.LogError(exc, explanation);
-                        }
-                    }
+                    HandleExecutionException(exc);
                 }
                 finally
                 {
@@ -71,12 +59,28 @@ namespace Orleans.Runtime
             return true;
         }
 
+        private void HandleExecutionException(Exception exc)
+        {
+            if (executorOptions.CancellationToken.IsCancellationRequested) return; // If we're stopping, ignore exceptions
+
+            var explanation =
+                $"Executor thread {executorOptions.Name} of {executorOptions.StageTypeName} stage encountered unexpected exception.";
+
+            if (executorOptions.FaultHandler != null)
+            {
+                executorOptions.FaultHandler(exc, explanation);
+            }
+            else
+            {
+                executorOptions.Log.LogError(exc, explanation);
+            }
+        }
+
         private void TrackExecutionStart()
         {
-            CounterStatistic.FindOrCreate(
-               new StatisticName(StatisticNames.RUNTIME_THREADS_ASYNC_AGENT_PERAGENTTYPE, executorOptions.StageTypeName))
-               .Increment();
             CounterStatistic.FindOrCreate(StatisticNames.RUNTIME_THREADS_ASYNC_AGENT_TOTAL_THREADS_CREATED).Increment();
+            CounterStatistic.FindOrCreate(
+                new StatisticName(StatisticNames.RUNTIME_THREADS_ASYNC_AGENT_PERAGENTTYPE, executorOptions.StageTypeName)).Increment();
 
             executorOptions.Log.Info(
                 $"Starting Executor {executorOptions.Name} for stage {executorOptions.StageTypeName} on managed thread {Thread.CurrentThread.ManagedThreadId}");
@@ -92,8 +96,7 @@ namespace Orleans.Runtime
         private void TrackExecutionStop()
         {
             CounterStatistic.FindOrCreate(
-                new StatisticName(StatisticNames.RUNTIME_THREADS_ASYNC_AGENT_PERAGENTTYPE, executorOptions.StageTypeName))
-                .DecrementBy(1);
+                new StatisticName(StatisticNames.RUNTIME_THREADS_ASYNC_AGENT_PERAGENTTYPE, executorOptions.StageTypeName)).DecrementBy(1);
 
             executorOptions.Log.Info(
                 ErrorCode.Runtime_Error_100328,
