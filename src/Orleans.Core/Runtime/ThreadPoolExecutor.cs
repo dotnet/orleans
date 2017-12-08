@@ -1,10 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime
 {
@@ -54,7 +50,7 @@ namespace Orleans.Runtime
                         options.StageType,
                         options.CancellationToken,
                         options.Log,
-                        options.OnFault))
+                        options.FaultHandler))
                     .QueueWorkItem(_ => ProcessQueue(executorWorkItemSlotIndex));
             }
         }

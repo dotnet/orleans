@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
@@ -41,7 +42,15 @@ namespace Orleans.Runtime
                     {
                         var explanation =
                             $"Executor thread {executorOptions.Name} of {executorOptions.StageTypeName} stage encountered unexpected exception.";
-                        executorOptions.OnFault?.Invoke(exc, explanation);
+
+                        if (executorOptions.FaultHandler != null)
+                        {
+                            executorOptions.FaultHandler(exc, explanation);
+                        }
+                        else
+                        {
+                            executorOptions.Log.LogError(exc, explanation);
+                        }
                     }
                 }
                 finally

@@ -1,9 +1,6 @@
 using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Threading;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
 {
@@ -33,7 +30,7 @@ namespace Orleans.Runtime
 
         protected override ExecutorOptions GetExecutorOptions()
         {
-            return new ThreadPoolExecutorOptions(Name, GetType(), Cts.Token, Log, drainAfterCancel: DrainAfterCancel, onFault: ExecutorFaultHandler);
+            return new ThreadPoolExecutorOptions(Name, GetType(), Cts.Token, Log, drainAfterCancel: DrainAfterCancel, faultHandler: ExecutorFaultHandler);
         }
 
         internal virtual bool DrainAfterCancel { get; } = false;

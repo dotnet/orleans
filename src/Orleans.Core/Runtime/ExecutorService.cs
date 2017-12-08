@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Threading;
 using Microsoft.Extensions.Logging;
-using Orleans.Messaging;
 
 namespace Orleans.Runtime
 {
@@ -12,10 +10,6 @@ namespace Orleans.Runtime
 
         int WorkQueueCount { get; }
     }
-
-    internal interface IStageAttribute { }
-
-    internal interface IQueueDrainable : IStageAttribute { }
 
     internal class ExecutorService
     {
@@ -40,26 +34,26 @@ namespace Orleans.Runtime
             Type stageType,
             CancellationToken cancellationToken, 
             ILogger log, 
-            ExecutorFaultHandler onFault)
+            ExecutorFaultHandler faultHandler)
         {
             Name = name;
             StageType = stageType;
             CancellationToken = cancellationToken;
             Log = log;
-            OnFault = onFault;
+            FaultHandler = faultHandler;
         }
 
         public string Name { get; }
 
         public Type StageType { get; }
 
-        public string StageTypeName => StageType.Name;  // rename to StageName.
+        public string StageTypeName => StageType.Name; 
 
         public CancellationToken CancellationToken { get; }
 
         public ILogger Log { get; }
 
-        public ExecutorFaultHandler OnFault { get; }
+        public ExecutorFaultHandler FaultHandler { get; }
     }
 
     internal class ThreadPoolExecutorOptions : ExecutorOptions
@@ -74,8 +68,8 @@ namespace Orleans.Runtime
             TimeSpan? workItemExecutionTimeTreshold = null,
             TimeSpan? delayWarningThreshold = null,
             WorkItemStatusProvider workItemStatusProvider = null,
-            ExecutorFaultHandler onFault = null)
-            : base(name, stageType, ct, log, onFault)
+            ExecutorFaultHandler faultHandler = null)
+            : base(name, stageType, ct, log, faultHandler)
         {
             DegreeOfParallelism = degreeOfParallelism;
             DrainAfterCancel = drainAfterCancel;
@@ -102,8 +96,8 @@ namespace Orleans.Runtime
             Type stageType,
             CancellationToken ct, 
             ILogger log, 
-            ExecutorFaultHandler onFault = null) 
-            : base(name, stageType, ct, log, onFault)
+            ExecutorFaultHandler faultHandler = null) 
+            : base(name, stageType, ct, log, faultHandler)
         {
         }
     }

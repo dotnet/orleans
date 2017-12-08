@@ -86,7 +86,6 @@ namespace Orleans.Runtime.Scheduler
 
             this.taskWorkItemLogger = loggerFactory.CreateLogger<TaskWorkItem>();
             logger.Info("Starting OrleansTaskScheduler with {0} Max Active application Threads and 1 system thread.", maxActiveThreads);
-         //   Pool = new WorkerPool(this, performanceMetrics, executorService, loggerFactory, maxActiveThreads, injectMoreWorkerThreads);
             IntValueStatistic.FindOrCreate(StatisticNames.SCHEDULER_WORKITEMGROUP_COUNT, () => WorkItemGroupCount);
             IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.QUEUES_QUEUE_SIZE_INSTANTANEOUS_PER_QUEUE, "Scheduler.LevelOne"), () => RunQueueLength);
 
