@@ -120,7 +120,9 @@ Add the <code>Microsoft.Orleans.Server</code> NuGet meta-package to the project.
             .UseConfiguration(config)
             // Add assemblies to scan for grains and serializers.
             // For more info read the Application Parts section
-            .AddApplicationPartsFromReferences(typeof(HelloGrain).Assembly)
+            .ConfigureApplicationParts(parts =&gt;
+                parts.AddApplicationPart(typeof(HelloGrain).Assembly)
+                     .WithReferences())
             // Configure logging with any logging framework that supports Microsoft.Extensions.Logging.
             // In this particular case it logs using the Microsoft.Extensions.Logging.Console package.
             .ConfigureLogging(logging =&gt; logging.AddConsole());
@@ -150,12 +152,26 @@ var builder = new ClientBuilder()
     .UseConfiguration(config)
     // Add assemblies to scan for grains interfaces and serializers.
     // For more info read the Application Parts section
-    .AddApplicationPartsFromReferences(typeof(IHello).Assembly)
+    .ConfigureApplicationParts(parts =&gt; parts.AddApplicationPart(typeof(IHello).Assembly))
     .ConfigureLogging(logging =&gt; logging.AddConsole())
 var client = builder.Build();
 await client.Connect();
 </code></pre><h2 id="application-parts">Application Parts</h2>
-<p>// TODO</p>
+<p>Orleans 2.0 does not perform automatic folder scanning to discover user assemblies and types. Instead, those assemblies are provided explicitly during the configuration stage. These assemblies are refered to as Application Parts. All Grains, Grain Interfaces, and Serializers are discovered using Application Parts.</p>
+<p>Application Parts are configured using an <code>IApplicationPartsManager</code>, which can be accessed using the <code>ConfigureApplicationParts</code> extension method on <code>IClientBuilder</code> and <code>ISiloHostBuilder</code>. The <code>ConfigureApplicationParts</code> method accepts a delegate, <code>Action&lt;IApplicationPartManager&gt;</code>.</p>
+<p>The following extension methods on <code>IApplicationPartManager</code> support common uses:</p>
+<ul>
+<li><code>AddApplicationPart(assembly)</code> a single assembly can be added using this extension method.</li>
+<li><code>AddFromAppDomain()</code> adds all assemblies currently loaded in the <code>AppDomain</code>.</li>
+<li><code>AddFromApplicationBaseDirectory()</code> loads and adds all assemblies in the current base path (see <code>AppDomain.BaseDirectory</code>).</li>
+</ul>
+<p>Assemblies added by the above methods can be supplemented using the following extension methods on their return type, <code>IApplicationPartManagerWithAssemblies</code>:</p>
+<ul>
+<li><code>WithReferences()</code> adds all referenced assemblies from the added parts. This immediately loads any transitively referenced assemblies. Assembly loading errors are ignored.</li>
+<li><code>WithCodeGeneration()</code> generates support code for the added parts and adds it to the part manager. Note that this requires the <code>Microsoft.Orleans.OrleansCodeGenerator</code> package to be installed, and is commonly referred to as runtime code generation.</li>
+</ul>
+<p>See the client and silo configuration sections above for examples.</p>
+<p>Type discovery requires that the provided Application Parts include specific attributes. Adding the build-time code generation package (<code>Microsoft.Orleans.OrleansCodeGenerator.Build</code>) to each project containing Grains, Grain Interfaces, or Serializers is the recommended approach for ensuring that these attributes are present. Build-time code generation only supports C#. For F#, Visual Basic, and other .NET languages, code can be generated during configuration time via the <code>WithCodeGeneration()</code> method described above.</p>
 <h2 id="logging-configuration">Logging Configuration</h2>
 <p>Orleans 2.0 uses the same logging abstractions as ASP.NET Core 2.0. For more information on how to use or configure logging, please read <a href="https://docs.microsoft.com/en-us/aspnet/core/fundamentals/logging/">https://docs.microsoft.com/en-us/aspnet/core/fundamentals/logging/</a></p>
 <p>For information on how to migrate the legacy logging configuration or use the legacy logging abstractions from 1.5 to 2.0, please read <a href="Migration1.5.html">Migration from Orleans 1.5 to 2.0</a></p>
