@@ -9,7 +9,7 @@ using GrainInterfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
-using Orleans.Hosting;
+using Orleans.Clustering.ServiceFabric;
 using Orleans.Runtime.Configuration;
 
 namespace StatelessCalculatorClient
@@ -29,10 +29,10 @@ namespace StatelessCalculatorClient
             builder.UseConfiguration(new ClientConfiguration());
 
             // Use Service Fabric for managing cluster membership.
-            builder.AddServiceFabricMembership(serviceName);
+            builder.UseServiceFabricClustering(serviceName);
 
             // Add the application assemblies.
-            builder.AddApplicationPart(typeof(ICalculatorGrain).Assembly);
+            builder.ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(ICalculatorGrain).Assembly));
 
             // Optional: configure logging.
             builder.ConfigureLogging(logging => logging.AddDebug());

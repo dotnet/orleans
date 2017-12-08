@@ -3,7 +3,7 @@ using System.Fabric;
 using Newtonsoft.Json;
 using Orleans.ServiceFabric;
 
-namespace Orleans.Membership.ServiceFabric.Utilities
+namespace Orleans.Clustering.ServiceFabric.Utilities
 {
     internal static class ResolvedServicePartitionExtensions
     {

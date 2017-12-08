@@ -44,7 +44,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.PowerShell", "src\O
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Streaming.EventHubs", "src\Azure\Orleans.Streaming.EventHubs\Orleans.Streaming.EventHubs.csproj", "{E6B25995-CDB0-4FAE-BA47-5E629812B300}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Membership.ServiceFabric", "src\Orleans.Membership.ServiceFabric\Orleans.Membership.ServiceFabric.csproj", "{3D1792C3-935E-4952-AFA1-4D32FEC557FA}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Clustering.ServiceFabric", "src\Orleans.Clustering.ServiceFabric\Orleans.Clustering.ServiceFabric.csproj", "{3D1792C3-935E-4952-AFA1-4D32FEC557FA}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansSQLUtils", "src\OrleansSQLUtils\OrleansSQLUtils.csproj", "{3CBF459A-C43F-40B7-8F96-2B44D55840C5}"
 EndProject

@@ -1,11 +1,11 @@
 ﻿using System;
 
-namespace Orleans.Membership.ServiceFabric
+namespace Orleans.Clustering.ServiceFabric
 {
     /// <summary>
     /// Options for Service Fabric cluster membership.
     /// </summary>
-    public class ServiceFabricMembershipOptions
+    public class ServiceFabricClusteringOptions
     {
         /// <summary>
         /// Gets or sets the period of time before unknown silos are considered dead.

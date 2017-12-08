@@ -5,10 +5,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Membership.ServiceFabric.Utilities;
+using Orleans.Clustering.ServiceFabric.Models;
+using Orleans.Clustering.ServiceFabric.Utilities;
 using Orleans.Runtime;
 
-namespace Orleans.Membership.ServiceFabric
+namespace Orleans.Clustering.ServiceFabric
 {
     /// <summary>
     /// Provides information about an Orleans cluster hosted on Service Fabric.

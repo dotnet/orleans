@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Fabric;
 using System.Threading;
 using System.Threading.Tasks;
-using GrainInterfaces;
+using Grains;
 using Microsoft.Extensions.Logging;
 using Microsoft.ServiceFabric.Services.Communication.Runtime;
 using Microsoft.ServiceFabric.Services.Runtime;
+using Orleans.Clustering.ServiceFabric;
+using Orleans;
 using Orleans.Hosting;
 using Orleans.Hosting.ServiceFabric;
 using Orleans.Runtime.Configuration;
@@ -35,8 +37,8 @@ namespace StatelessCalculatorService
             var listener = OrleansServiceListener.CreateStateless(
                 (serviceContext, builder) =>
                 {
-                    // Use Service Fabric for cluster membership.
-                    builder.AddServiceFabricMembership(serviceContext);
+                    // Optional: use Service Fabric for cluster membership.
+                    builder.UseServiceFabricClustering(serviceContext);
                     
                     // Optional: configure logging.
                     builder.ConfigureLogging(logging => logging.AddDebug());
@@ -52,10 +54,13 @@ namespace StatelessCalculatorService
                     builder.UseConfiguration(config);
 
                     // Add your application assemblies.
-                    builder.AddApplicationPart(typeof(ICalculatorGrain).Assembly);
-
-                    // Alternative: add all loadable assemblies in the current base path (see AppDomain.BaseDirectory).
-                    builder.AddApplicationPartsFromBasePath();
+                    builder.ConfigureApplicationParts(parts =>
+                    {
+                        parts.AddApplicationPart(typeof(CalculatorGrain).Assembly).WithReferences();
+                        
+                        // Alternative: add all loadable assemblies in the current base path (see AppDomain.BaseDirectory).
+                        parts.AddFromApplicationBaseDirectory();
+                    });
                 });
 
             return new[] { listener };
