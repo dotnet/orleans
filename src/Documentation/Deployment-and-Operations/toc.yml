@@ -10,3 +10,5 @@
   href: Using-Azure-Web-Apps.md
 - name: Docker Deployment
   href: Docker-Deployment.md
+- name: Service Fabric
+  href: Service-Fabric.md
