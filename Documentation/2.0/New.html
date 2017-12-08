@@ -86,6 +86,12 @@
 </li>
 <li><p>Overhaul of code generation. While mostly invisible for developer, code generation became much more robust in handling serialization of various possible types. Special handling is required for F# assemblies. See <a href="Codegen.html">Code generation</a> section for more details.</p>
 </li>
+<li><p>Created a <code>Microsoft.Orleans.Core.Abstractions</code> NuGet package and moved/refactored several types into it. Grain code would most likely need to reference only these abstractions, where as the silo host and client will reference more of Orleans packages. We plan to update this package less frequently.</p>
+</li>
+<li><p>Add support for Scoped services. This means that each grain activation gets its own scoped service provider, and Orleans registers a contextual <code>IGrainActivationContext</code> object that can be injected into <em>Transient</em> or <em>Scoped</em> service to get access to activation specific information and grain activation lifecycle events. This is similar to how ASP.NET Core 2.0 create a scoped context for each Request, but in the case of Orleans it applies to the entire lifectime of a grain activation. See <a href="https://docs.microsoft.com/en-us/aspnet/core/fundamentals/dependency-injection#service-lifetimes-and-registration-options">Service Lifetimes and Registration Options</a> in the ASP.NET Core documentation for more information about service lifetimes.</p>
+</li>
+<li><p>Migrated the logging infrastructure to use <code>Microsoft.Extensions.Logging</code> (same abstractions as ASP.NET Core 2.0).</p>
+</li>
 <li><p>2.0 includes a beta version of support for ACID distributed cross-grain transactions. The functionality will be ready for prototyping and development, and will graduate for production use sometime after 2.0 release. See <a href="Transactions.html">Transactions</a> for more details.</p>
 </li>
 </ul>

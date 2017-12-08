@@ -146,8 +146,13 @@ public class MyGrain&lt;MyGrainState&gt; ...
 </ul>
 <h3 id="adonet-storage-provider-sql-storage-provider">ADO.NET Storage Provider (SQL Storage Provider)</h3>
 <p>The ADO .NET Storage Provider allows you to store grain state in relational databases.
-Currently, SQL Server and MySQL/MariaDB are supported. PostgreSQL is a work in progress
-and not yet available.</p>
+Currently following databases are supported:</p>
+<ul>
+<li>SQL Server</li>
+<li>MySQL/MariaDB</li>
+<li>PostgreSQL</li>
+<li>Oracle</li>
+</ul>
 <p>First, install the base package:</p>
 <pre><code>Install-Package Microsoft.Orleans.OrleansSqlUtils
 </code></pre><p>Under the folder where the package gets installed alongside your project, you will
@@ -160,26 +165,41 @@ via XML configuration.</p>
 <table>
 <thead>
 <tr>
-<th></th>
-<th>SQL Server</th>
-<th>MySQL / MariaDB</th>
+<th>Database</th>
+<th>Script</th>
+<th>NuGet Package</th>
+<th>AdoInvariant</th>
+<th>Remarks</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Script</td>
-<td>SQLServer\CreateOrleansTables_SqlServer.sql</td>
-<td>MySql\CreateOrleansTables_MySql.sql</td>
-</tr>
-<tr>
-<td>NuGet Package</td>
+<td>SQL Server</td>
+<td><a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/CreateOrleansTables_SQLServer.sql">CreateOrleansTables_SQLServer.sql</a></td>
 <td><a href="https://www.nuget.org/packages/System.Data.SqlClient/">System.Data.SqlClient</a></td>
-<td><a href="https://www.nuget.org/packages/MySql.Data/">MySql.Data</a></td>
+<td>System.Data.SqlClient</td>
+<td></td>
 </tr>
 <tr>
-<td>AdoInvariant</td>
-<td>System.Data.SqlClient</td>
+<td>MySQL / MariaDB</td>
+<td><a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/CreateOrleansTables_MySQL.sql">CreateOrleansTables_MySQL.sql</a></td>
+<td><a href="https://www.nuget.org/packages/MySql.Data/">MySql.Data</a></td>
 <td>MySql.Data.MySqlClient</td>
+<td></td>
+</tr>
+<tr>
+<td>PostgreSQL</td>
+<td><a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/CreateOrleansTables_PostgreSQL.sql">CreateOrleansTables_PostgreSQL.sql</a></td>
+<td><a href="https://www.nuget.org/packages/Npgsql/">Npgsql</a></td>
+<td>Npgsql</td>
+<td></td>
+</tr>
+<tr>
+<td>Oracle</td>
+<td><a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/CreateOrleansTables_Oracle.sql">CreateOrleansTables_Oracle.sql</a></td>
+<td><a href="https://www.nuget.org/packages/Oracle.ManagedDataAccess/">ODP.net</a></td>
+<td>Oracle.DataAccess.Client</td>
+<td>No .net Core support</td>
 </tr>
 </tbody>
 </table>
