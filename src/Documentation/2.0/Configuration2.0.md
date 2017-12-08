@@ -61,7 +61,9 @@ public class Program
             .UseConfiguration(config)
             // Add assemblies to scan for grains and serializers.
             // For more info read the Application Parts section
-            .AddApplicationPartsFromReferences(typeof(HelloGrain).Assembly)
+            .ConfigureApplicationParts(parts =>
+                parts.AddApplicationPart(typeof(HelloGrain).Assembly)
+                     .WithReferences())
             // Configure logging with any logging framework that supports Microsoft.Extensions.Logging.
             // In this particular case it logs using the Microsoft.Extensions.Logging.Console package.
             .ConfigureLogging(logging => logging.AddConsole());
@@ -103,7 +105,7 @@ var builder = new ClientBuilder()
     .UseConfiguration(config)
     // Add assemblies to scan for grains interfaces and serializers.
     // For more info read the Application Parts section
-    .AddApplicationPartsFromReferences(typeof(IHello).Assembly)
+    .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IHello).Assembly))
     .ConfigureLogging(logging => logging.AddConsole())
 var client = builder.Build();
 await client.Connect();
@@ -111,7 +113,22 @@ await client.Connect();
 
 ## Application Parts
 
-// TODO
+Orleans 2.0 does not perform automatic folder scanning to discover user assemblies and types. Instead, those assemblies are provided explicitly during the configuration stage. These assemblies are refered to as Application Parts. All Grains, Grain Interfaces, and Serializers are discovered using Application Parts.
+
+Application Parts are configured using an `IApplicationPartsManager`, which can be accessed using the `ConfigureApplicationParts` extension method on `IClientBuilder` and `ISiloHostBuilder`. The `ConfigureApplicationParts` method accepts a delegate, `Action<IApplicationPartManager>`.
+
+The following extension methods on `IApplicationPartManager` support common uses:
+* `AddApplicationPart(assembly)` adds a single assembly can be added using the extension method.
+* `AddFromAppDomain()` adds all assemblies in the current `AppDomain`.
+* `AddFromApplicationBaseDirectory()` adds all assemblies in the current base path (see `AppDomain.BaseDirectory`).
+
+Assemblies added by the above methods can be supplemented using the following extension methods on their return type, `IApplicationPartManagerWithAssemblies`:
+* `WithReferences()` adds all referenced assemblies from the added parts. This immediately loads any transitively referenced assemblies. Assembly loading errors are ignored.
+* `WithCodeGeneration()` generates support code for the added parts and adds it to the part manager. Note that this requires the `Microsoft.Orleans.OrleansCodeGenerator` package to be installed.
+
+See the client and silo configuration sections above for examples.
+
+Type discovery requires that the provided Application Parts include specific attributes. Adding the build-time code generation package (`Microsoft.Orleans.OrleansCodeGenerator.Build`) to each project containing Grains, Grain Interfaces, or Serializers is the recommended approach for ensuring that these attributes are present. Build-time code generation only supports C#. For F#, Visual Basic, and other .NET languages, code can be generated during configuration time via the `WithCodeGeneration()` method described above.
 
 ## Logging Configuration
 
