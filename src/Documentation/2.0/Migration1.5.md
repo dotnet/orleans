@@ -18,35 +18,29 @@ Orleans 2.0 uses the same logging abstractions as ASP.NET Core 2.0. You can find
 
 In 1.5, logging configuration is done through `ClientConfiguration` and `NodeConfiguration`. You can configure `DefaultTraceLevel`, `TraceFileName`, `TraceFilePattern`, `TraceLevelOverrides`, `TraceToConsole`, `BulkMessageLimit`, `LogConsumers`, etc through it. In 2.0, logging configuration is consistent with ASP.NET Core 2.0 logging, which means most of the configuration is done through `Microsoft.Extensions.Logging.ILoggingBuilder`. 
 
-To configure `DefaultTraceLevel` and `TraceLevelOverrides`, you need to apply [log filtering](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/logging) to `ILoggingBuilder`. For example, to set trace level to 'Information' on your grain class `MyGrain`, you can use sample below, 
+To configure `DefaultTraceLevel` and `TraceLevelOverrides`, you need to apply [log filtering](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/logging) to `ILoggingBuilder`. For example, to set trace level to 'Debug' on orleans runtime, you can use sample below, 
 ```
-siloBuilder.AddLogging(builder=>builder.AddFilter(typeof(MyGrain).FullName, LogLevel.Information));
+siloBuilder.AddLogging(builder=>builder.AddFilter("Orleans", LogLevel.Debug));
 ```
-If you want to set a default minimum trace level to be Debug, use sample below
+You can configure log level for you application code in the same way. If you want to set a default minimum trace level to be Debug, use sample below
 ```
 siloBuilder.AddLogging(builder=>builder.SetMinimumLevel(LogLevel.Debug);
 ```
 For more information on log filtering, please see their docs on https://docs.microsoft.com/en-us/aspnet/core/fundamentals/logging;
 
-To configure TraceToConsole to be `true`, you need to add a `Microsoft.Extensions.Logging.Console.ConsoleLoggerProvider` to `ILoggingBuilder`. The same with `TraceFileName` and `TraceFilePattern`, if you want to log messages to a file, you need to add a `FileLoggerProvider` to `ILoggingBuilder` and configure the file name within `FileLoggerProvider`. Unfortuantely ASP.NET didn't provide a native `FileLoggerProvider` implementation yet, so you can eithter use a third-party file logger provider, or use our implementation of `FileLoggerProvider`, which preserve old logging format of orleans, or you can write your own implementation. 
+To configure TraceToConsole to be `true`, you need to reference `Microsoft.Extensions.Logging.Console` package and then use `AddConsole()` extension method on `ILoggingBuilder`. The same with `TraceFileName` and `TraceFilePattern`, if you want to log messages to a file, you need to use `AddFile("file name")` method on `ILoggingBuilder`.
 
-If you still want to use Message Bulking feature, You need to configure it through `ILoggingBuilder` as well. Message bulking feature lives in our `EventBulkingLoggerProvider` in `Microsoft.Orleans.Logging.Legacy` package. So you need to add dependency on that package first. And then configure it through `ILoggingBuilder` using the extension method below:
+If you still want to use Message Bulking feature, You need to configure it through `ILoggingBuilder` as well. Message bulking feature lives in `Microsoft.Orleans.Logging.Legacy` package. So you need to add dependency on that package first. And then configure it through `ILoggingBuilder`. Below is an example on how to configure it with `ISiloHostBuilder`
 ```
-        public static ILoggingBuilder AddMessageBulkingLoggerProvider<TDecoratedLoggerProvider>(this ILoggingBuilder builder, TDecoratedLoggerProvider provider, EventBulkingOptions eventBulkingOptions = null)
-            where TDecoratedLoggerProvider : ILoggerProvider
+       siloBuiler.AddLogging(builder => builder.AddMessageBulkingLoggerProvider(new FileLoggerProvider("mylog.log")));
 ```
-This method would apply message bulking feature to any `TDecoratedLoggerProvider` you choose.
-			
-If you still want to use `ILogConsumer`, with message bulking feaure alone side, you need to configure it through `ILoggingBuilder` as well. The support for `ILogConsumer` lives in `Microsoft.Orleans.Logging.Legacy` package. So you need to add dependency on that package first, and then configure Log consumers through extension method below: 
-```
-public static ILoggingBuilder AddLegacyOrleansLogging(
-            this ILoggingBuilder builder,
-            IEnumerable<ILogConsumer> logConsumers,
-            OrleansLoggerSeverityOverrides severityOverrides,
-            IPEndPoint ipEndPoint = null,
-            EventBulkingOptions eventBulkingOptions = null)
-```
-There's native `AddLogging` method on `IServiceCollection` provided by ASP.NET for you to configure [`ILoggingBuilder`](https://docs.microsoft.com/en-us/dotnet/api/microsoft.extensions.dependencyinjection.loggingservicecollectionextensions.addlogging?view=aspnetcore-2.0#Microsoft_Extensions_DependencyInjection_LoggingServiceCollectionExtensions_AddLogging_Microsoft_Extensions_DependencyInjection_IServiceCollection_System_Action_Microsoft_Extensions_Logging_ILoggingBuilder). We also wrap that method under extention method on `ISiloBuilder` and `IClientBuilder`. So you can call `AddLogging` method on silo builder and client builder as well to configure ILoggingBuilder. 
+This method would apply message bulking feature to the `FileLoggerProvider`, with default bulking config.
+
+Since we are going to eventually deprecate and remove LogConsumer feature support in the future, we highly encourage you to migrate off this feature as soon as possible. There's couple approaches you can take to migrate off. One option is to maintain your own `ILoggerProvider`, which creates `ILogger` who logs to all your existing log consumers. This is very similar to what we are doing in `Microsoft.Orleans.Logging.Legacy` package. You can take a look at `LegacyOrleansLoggerProvider` and borrow logic from it. Another option is replace your `ILogConsumer` with existing implementation 
+ of `ILoggerProvider` on nuget which provides identical or similar functionality, or implement your own `ILoggerProvider` which fits your specfic logging requirement. And configure those `ILoggerProvider`s with `ILoggingBuilder`.
+ 
+But if you cannot migrate off log consumer in the short term, you can still use it. The support for `ILogConsumer` lives in `Microsoft.Orleans.Logging.Legacy` package. So you need to add dependency on that package first, and then configure Log consumers through extension method `AddLegacyOrleansLogging` on `ILoggingBuilder`.
+There's native `AddLogging` method on `IServiceCollection` provided by ASP.NET for you to configure [`ILoggingBuilder`](https://docs.microsoft.com/en-us/dotnet/api/microsoft.extensions.dependencyinjection.loggingservicecollectionextensions.addlogging?view=aspnetcore-2.0#Microsoft_Extensions_DependencyInjection_LoggingServiceCollectionExtensions_AddLogging_Microsoft_Extensions_DependencyInjection_IServiceCollection_System_Action_Microsoft_Extensions_Logging_ILoggingBuilder). We also wrap that method under extension method on `ISiloHostBuilder` and `IClientBuilder`. So you can call `AddLogging` method on silo builder and client builder as well to configure `ILoggingBuilder`. 
 below is an example:
 ```
             var severityOverrides = new OrleansLoggerSeverityOverrides();
@@ -56,9 +50,7 @@ below is an example:
                 new LegacyFileLogConsumer($"{this.GetType().Name}.log")
             }, severityOverrides));
 ```
- 
- Since we are going to eventually deprecate and remove LogConsumer feature support in the future, we highly encourage you to migrate off this feature as soon as possible. There's couple approaches you can take to migrate off. One option is to maintain your own `ILoggerProvider`, which creates `ILogger` who logs to all your existing log consumers. This is very similar to what we are doing in `Microsoft.Orleans.Logging.Legacy` package. You can take a look at `LegacyOrleansLoggerProvider` and borrow logic from it. Another option is replace your `ILogConsumer` with existing implementation 
- of `ILoggerProvider` on nuget which provides identical or similar functionality, or implemente your own `ILoggerProvider` which fits your specfic logging requirement. And configure those ILoggerProviders with ILoggingBuilder.
+You can use this feature if you invested in custom implementation of `ILogConsumer` and cannot convert them to implementation of `ILoggerProvider` in the short term. 
  
 ` Logger GetLogger(string loggerName)` method on `Grain` base class and `IProviderRuntime`, and `Logger Log { get; }` method on IStorageProvider are still maintained as a deprecated feature in 2.0. You can still use it in your process of migrating off orleans legacy logging. But we recommend you to migrate off them as soon as possible.
  
