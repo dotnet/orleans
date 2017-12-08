@@ -296,6 +296,30 @@ namespace DefaultCluster.Tests.General
             });
         }
 
+        [Fact, TestCategory("BVT")]
+        public async Task ObserverTest_CreateObjectReference_ThrowsForInvalidArgumentTypes()
+        {
+            TestInitialize();
+
+            // Attempt to create an object reference to a Grain class.
+            await Assert.ThrowsAsync<ArgumentException>(() => this.Client.CreateObjectReference<ISimpleGrainObserver>(new DummyObserverGrain()));
+
+            // Attempt to create an object reference to an existing GrainReference.
+            var observer = new DummyObserver();
+            var reference = await this.Client.CreateObjectReference<ISimpleGrainObserver>(observer);
+            await Assert.ThrowsAsync<ArgumentException>(() => this.Client.CreateObjectReference<ISimpleGrainObserver>(reference));
+        }
+
+        private class DummyObserverGrain : Grain, ISimpleGrainObserver
+        {
+            public void StateChanged(int a, int b) { }
+        }
+
+        private class DummyObserver : ISimpleGrainObserver
+        {
+            public void StateChanged(int a, int b) { }
+        }
+
         internal class SimpleGrainObserver : ISimpleGrainObserver
         {
             readonly Action<int, int, AsyncResultHandle> action;

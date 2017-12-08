@@ -74,28 +74,28 @@
     <Content Include="DevTestServerConfiguration.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer.xml">
+    <Content Include="Serialization\ConfigurationTests\ClientConfigurationForSerializer.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer2.xml">
+    <Content Include="Serialization\ConfigurationTests\ClientConfigurationForSerializer2.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer3.xml">
+    <Content Include="Serialization\ConfigurationTests\ClientConfigurationForSerializer3.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer4.xml">
+    <Content Include="Serialization\ConfigurationTests\ClientConfigurationForSerializer4.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer5.xml">
+    <Content Include="Serialization\ConfigurationTests\ClientConfigurationForSerializer5.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer6.xml">
+    <Content Include="Serialization\ConfigurationTests\ClientConfigurationForSerializer6.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer7.xml">
+    <Content Include="Serialization\ConfigurationTests\ClientConfigurationForSerializer7.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer8.xml">
+    <Content Include="Serialization\ConfigurationTests\ClientConfigurationForSerializer8.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="..\..\src\SDK\OrleansConfiguration.xml">

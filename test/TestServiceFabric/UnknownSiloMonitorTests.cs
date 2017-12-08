@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Net;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Membership.ServiceFabric;
+using Orleans.Clustering.ServiceFabric;
 using Orleans.Runtime;
 using Xunit;
 using Xunit.Abstractions;
@@ -35,8 +35,8 @@ namespace TestServiceFabric
         public void SiloEventuallyBecomesDead()
         {
             var now = new[] { DateTime.UtcNow };
-            var options = new ServiceFabricMembershipOptions();
-            var monitor = new UnknownSiloMonitor(new OptionsWrapper<ServiceFabricMembershipOptions>(options), this.Logger)
+            var options = new ServiceFabricClusteringOptions();
+            var monitor = new UnknownSiloMonitor(new OptionsWrapper<ServiceFabricClusteringOptions>(options), this.Logger)
             {
                 GetDateTime = () => now[0]
             };
@@ -72,8 +72,8 @@ namespace TestServiceFabric
         public void SiloDeclaredDeadWhenSupersededOnSameEndpoint()
         {
             var now = new[] { DateTime.UtcNow };
-            var options = new ServiceFabricMembershipOptions();
-            var monitor = new UnknownSiloMonitor(new OptionsWrapper<ServiceFabricMembershipOptions>(options), this.Logger)
+            var options = new ServiceFabricClusteringOptions();
+            var monitor = new UnknownSiloMonitor(new OptionsWrapper<ServiceFabricClusteringOptions>(options), this.Logger)
             {
                 GetDateTime = () => now[0]
             };
@@ -117,8 +117,8 @@ namespace TestServiceFabric
         public void SiloNotDeclaredDeadWhenSupersededOnSameAddressDifferentPort()
         {
             var now = new[] { DateTime.UtcNow };
-            var options = new ServiceFabricMembershipOptions();
-            var monitor = new UnknownSiloMonitor(new OptionsWrapper<ServiceFabricMembershipOptions>(options), this.Logger)
+            var options = new ServiceFabricClusteringOptions();
+            var monitor = new UnknownSiloMonitor(new OptionsWrapper<ServiceFabricClusteringOptions>(options), this.Logger)
             {
                 GetDateTime = () => now[0]
             };

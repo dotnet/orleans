@@ -1,7 +1,7 @@
 using System;
 using System.Fabric;
 
-namespace Orleans.Membership.ServiceFabric
+namespace Orleans.Clustering.ServiceFabric.Models
 {
     internal interface IResolvedServicePartition
     {

@@ -3,12 +3,12 @@ using System.Fabric;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.ServiceFabric.Services.Client;
-using Orleans.Membership.ServiceFabric;
-using Orleans.Membership.ServiceFabric.Utilities;
+using Orleans.Clustering.ServiceFabric.Utilities;
+using Orleans.Hosting;
 using Orleans.Messaging;
 using Orleans.Runtime;
 
-namespace Orleans.Hosting
+namespace Orleans.Clustering.ServiceFabric
 {
     /// <summary>
     /// Extensions for hosting Orleans on Service Fabric.
@@ -21,11 +21,11 @@ namespace Orleans.Hosting
         /// <param name="builder">The host builder.</param>
         /// <param name="serviceContext">The Service Fabric service context.</param>
         /// <returns>The provided service collection.</returns>
-        public static ISiloHostBuilder AddServiceFabricMembership(
+        public static ISiloHostBuilder UseServiceFabricClustering(
             this ISiloHostBuilder builder,
             ServiceContext serviceContext)
         {
-            return builder.ConfigureServices(serviceCollection => serviceCollection.AddServiceFabricMembership(serviceContext));
+            return builder.ConfigureServices(serviceCollection => serviceCollection.UseServiceFabricClustering(serviceContext));
         }
 
         /// <summary>
@@ -34,7 +34,7 @@ namespace Orleans.Hosting
         /// <param name="serviceCollection">The service collection.</param>
         /// <param name="serviceContext">The Service Fabric service context.</param>
         /// <returns>The provided service collection.</returns>
-        public static IServiceCollection AddServiceFabricMembership(
+        public static IServiceCollection UseServiceFabricClustering(
             this IServiceCollection serviceCollection,
             ServiceContext serviceContext)
         {
@@ -50,11 +50,11 @@ namespace Orleans.Hosting
         /// <param name="clientBuilder">The client builder.</param>
         /// <param name="serviceName">The Service Fabric service name.</param>
         /// <returns>The provided client builder.</returns>
-        public static IClientBuilder AddServiceFabricMembership(
+        public static IClientBuilder UseServiceFabricClustering(
             this IClientBuilder clientBuilder,
             string serviceName)
         {
-            return clientBuilder.AddServiceFabricMembership(new Uri(serviceName));
+            return clientBuilder.UseServiceFabricClustering(new Uri(serviceName));
         }
 
         /// <summary>
@@ -63,7 +63,7 @@ namespace Orleans.Hosting
         /// <param name="clientBuilder">The client builder.</param>
         /// <param name="serviceName">The Service Fabric service name.</param>
         /// <returns>The provided client builder.</returns>
-        public static IClientBuilder AddServiceFabricMembership(
+        public static IClientBuilder UseServiceFabricClustering(
             this IClientBuilder clientBuilder,
             Uri serviceName)
         {

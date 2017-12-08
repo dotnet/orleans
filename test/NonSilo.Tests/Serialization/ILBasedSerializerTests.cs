@@ -1,14 +1,15 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.Linq;
+using System.Runtime.Serialization;
+using Orleans.Runtime;
+using Orleans.Serialization;
 using TestExtensions;
+using Xunit;
 
 namespace UnitTests.Serialization
 {
-    using System.Diagnostics.CodeAnalysis;
-
-    using Orleans.Serialization;
-
-    using Xunit;
-
     [TestCategory("BVT"), TestCategory("Serialization")]
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class ILSerializerTests
@@ -86,7 +87,7 @@ namespace UnitTests.Serialization
         /// Tests that <see cref="ILSerializerGenerator"/> does not serialize fields marked as [NonSerialized].
         /// </summary>
         [Fact]
-        public void ILSerialized_NonSerializedFields()
+        public void ILSerializer_NonSerializedFields()
         {
             var input = new FieldTest
             {
@@ -105,12 +106,223 @@ namespace UnitTests.Serialization
             {
                 StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
             };
-            var deserialized = (FieldTest)serializers.Deserialize(input.GetType(), reader);
+            var deserialized = (FieldTest) serializers.Deserialize(input.GetType(), reader);
 
             Assert.Equal(input.One, deserialized.One);
             Assert.Equal(input.Two, deserialized.Two);
             Assert.NotEqual(input.NonSerializedInt, deserialized.NonSerializedInt);
             Assert.Equal(default(int), deserialized.NonSerializedInt);
+        }
+
+        /// <summary>
+        /// Tests that <see cref="ILBasedSerializer"/> can correctly serialize objects which have serialization lifecycle hooks.
+        /// </summary>
+        [Fact]
+        public void ILSerializer_SerializesObjectWithHooks()
+        {
+            var input = new SimpleISerializableObject
+            {
+                Payload = "pyjamas"
+            };
+
+            // Verify that our behavior conforms to our expected behavior.
+            var result = SerializerLoop(input);
+            Assert.Equal(
+                new[]
+                {
+                    "default_ctor",
+                    "serializing",
+                    "serialized"
+                },
+                input.History);
+            Assert.Equal(2, input.Contexts.Count);
+            Assert.All(input.Contexts,
+                ctx => Assert.True(ctx.Context is ICopyContext || ctx.Context is ISerializationContext));
+
+            Assert.Equal(
+                new[]
+                {
+                    "default_ctor",
+                    "deserializing",
+                    "deserialized",
+                    "deserialization"
+                },
+                result.History);
+            Assert.Equal(input.Payload, result.Payload, StringComparer.Ordinal);
+            Assert.Equal(2, result.Contexts.Count);
+            Assert.All(result.Contexts, ctx => Assert.True(ctx.Context is IDeserializationContext));
+
+            // Verify that our behavior conforms to the behavior of BinaryFormatter.
+            var input2 = new SimpleISerializableObject
+            {
+                Payload = "pyjamas"
+            };
+
+            var result2 = (SimpleISerializableObject) BuiltInSerializerTests.DotNetSerializationLoop(
+                input2,
+                this.fixture.SerializationManager);
+
+            Assert.Equal(input2.History, input.History);
+            Assert.Equal(result2.History, result.History.Skip(1).ToList());
+        }
+
+        /// <summary>
+        /// Tests that <see cref="ILBasedSerializer"/> can correctly serialize structs which have serialization lifecycle hooks.
+        /// </summary>
+        [Fact]
+        public void ILSerializer_SerializesStructWithHooks()
+        {
+            var input = new SimpleISerializableStruct
+            {
+                Payload = "pyjamas"
+            };
+
+            // Verify that our behavior conforms to our expected behavior.
+            var result = SerializerLoop(input);
+            Assert.Equal(
+                new[]
+                {
+                    "deserializing",
+                    "deserialized",
+                    "deserialization"
+                },
+                result.History);
+            Assert.Equal(input.Payload, result.Payload, StringComparer.Ordinal);
+            Assert.Equal(2, result.Contexts.Count);
+            Assert.All(result.Contexts, ctx => Assert.True(ctx.Context is IDeserializationContext));
+
+            // Verify that our behavior conforms to the behavior of BinaryFormatter.
+            var input2 = new SimpleISerializableStruct
+            {
+                Payload = "pyjamas"
+            };
+
+            var result2 = (SimpleISerializableStruct) BuiltInSerializerTests.DotNetSerializationLoop(
+                input2,
+                this.fixture.SerializationManager);
+
+            Assert.Equal(input2.History, input.History);
+            Assert.Equal(result2.History, result.History);
+        }
+
+        private T SerializerLoop<T>(T input)
+        {
+            var serializer = new ILBasedSerializer(new CachedTypeResolver());
+            Assert.True(serializer.IsSupportedType(input.GetType()));
+            
+            var serializationContext =
+                new SerializationContext(this.fixture.SerializationManager)
+                {
+                    StreamWriter = new BinaryTokenStreamWriter()
+                };
+            serializer.Serialize(input, serializationContext, typeof(T));
+            var deserializationContext = new DeserializationContext(this.fixture.SerializationManager)
+            {
+                StreamReader = new BinaryTokenStreamReader(serializationContext.StreamWriter.ToBytes())
+            };
+
+            return (T) serializer.Deserialize(typeof(T), deserializationContext);
+        }
+
+        [Serializable]
+        public class SimpleISerializableObject : IDeserializationCallback
+        {
+            [NonSerialized]
+            private List<string> history;
+
+            [NonSerialized]
+            private List<StreamingContext> contexts;
+
+            public SimpleISerializableObject()
+            {
+                this.History.Add("default_ctor");
+            }
+            
+            public List<string> History => this.history ?? (this.history = new List<string>());
+            public List<StreamingContext> Contexts => this.contexts ?? (this.contexts = new List<StreamingContext>());
+
+            public string Payload { get; set; }
+            
+            [OnSerializing]
+            internal void OnSerializingMethod(StreamingContext context)
+            {
+                this.History.Add("serializing");
+                this.Contexts.Add(context);
+            }
+
+            [OnSerialized]
+            internal void OnSerializedMethod(StreamingContext context)
+            {
+                this.History.Add("serialized");
+                this.Contexts.Add(context);
+            }
+
+            [OnDeserializing]
+            internal void OnDeserializingMethod(StreamingContext context)
+            {
+                this.History.Add("deserializing");
+                this.Contexts.Add(context);
+            }
+
+            [OnDeserialized]
+            internal void OnDeserializedMethod(StreamingContext context)
+            {
+                this.History.Add("deserialized");
+                this.Contexts.Add(context);
+            }
+
+            void IDeserializationCallback.OnDeserialization(object sender)
+            {
+                this.History.Add("deserialization");
+            }
+        }
+
+        [Serializable]
+        public struct SimpleISerializableStruct : IDeserializationCallback
+        {
+            [NonSerialized]
+            private List<string> history;
+
+            [NonSerialized]
+            private List<StreamingContext> contexts;
+            
+            public List<string> History => this.history ?? (this.history = new List<string>());
+            public List<StreamingContext> Contexts => this.contexts ?? (this.contexts = new List<StreamingContext>());
+
+            public string Payload { get; set; }
+
+            [OnSerializing]
+            internal void OnSerializingMethod(StreamingContext context)
+            {
+                this.History.Add("serializing");
+                this.Contexts.Add(context);
+            }
+
+            [OnSerialized]
+            internal void OnSerializedMethod(StreamingContext context)
+            {
+                this.History.Add("serialized");
+                this.Contexts.Add(context);
+            }
+
+            [OnDeserializing]
+            internal void OnDeserializingMethod(StreamingContext context)
+            {
+                this.History.Add("deserializing");
+                this.Contexts.Add(context);
+            }
+
+            [OnDeserialized]
+            internal void OnDeserializedMethod(StreamingContext context)
+            {
+                this.History.Add("deserialized");
+                this.Contexts.Add(context);
+            }
+
+            void IDeserializationCallback.OnDeserialization(object sender)
+            {
+                this.History.Add("deserialization");
+            }
         }
 
         [SuppressMessage("ReSharper", "StyleCop.SA1401", Justification = "This is for testing purposes.")]

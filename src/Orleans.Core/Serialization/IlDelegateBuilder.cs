@@ -28,7 +28,7 @@ namespace Orleans.Serialization
                 name,
                 returnType,
                 parameterTypes,
-                typeof(ILDelegateBuilder<>).GetTypeInfo().Module,
+                typeof(ILDelegateBuilder<>).Module,
                 true);
             this.il = this.dynamicMethod.GetILGenerator();
         }
@@ -248,6 +248,16 @@ namespace Orleans.Serialization
         }
 
         /// <summary>
+        /// Calls the specified method.
+        /// </summary>
+        /// <param name="method">The method to call.</param>
+        public void Call(ConstructorInfo method)
+        {
+            if (method.IsFinal || !method.IsVirtual) this.il.Emit(OpCodes.Call, method);
+            else this.il.Emit(OpCodes.Callvirt, method);
+        }
+
+        /// <summary>
         /// Returns from the current method.
         /// </summary>
         public void Return() => this.il.Emit(OpCodes.Ret);
@@ -329,7 +339,7 @@ namespace Orleans.Serialization
         /// <param name="local">The local.</param>
         public void LoadLocalAsReference(Type type, Local local)
         {
-            if (type.GetTypeInfo().IsValueType)
+            if (type.IsValueType)
             {
                 this.LoadLocalAddress(local);
             }
@@ -345,7 +355,7 @@ namespace Orleans.Serialization
         /// <param name="type">The type.</param>
         public void BoxIfValueType(Type type)
         {
-            if (type.GetTypeInfo().IsValueType)
+            if (type.IsValueType)
             {
                 this.Box(type);
             }
@@ -357,7 +367,7 @@ namespace Orleans.Serialization
         /// <param name="type">The type.</param>
         public void CastOrUnbox(Type type)
         {
-            if (type.GetTypeInfo().IsValueType)
+            if (type.IsValueType)
             {
                 this.UnboxAny(type);
             }
@@ -376,7 +386,7 @@ namespace Orleans.Serialization
         public void CreateInstance(Type type, Local local, MethodInfo getUninitializedObject)
         {
             var constructorInfo = type.GetConstructor(Type.EmptyTypes);
-            if (type.GetTypeInfo().IsValueType)
+            if (type.IsValueType)
             {
                 this.LoadLocalAddress(local);
                 this.InitObject(type);

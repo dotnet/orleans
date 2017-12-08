@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Linq;
-using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Tester.Serialization;
@@ -13,7 +12,7 @@ namespace UnitTests.Serialization
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationProvider_LoadWithSingleProviderTest()
         {
-            var clientConfig = ClientConfiguration.LoadFromFile("SerializationTests\\ConfigurationTests\\ClientConfigurationForSerializer.xml");
+            var clientConfig = ClientConfiguration.LoadFromFile("Serialization\\ConfigurationTests\\ClientConfigurationForSerializer.xml");
             Assert.Single(clientConfig.SerializationProviders);
             Assert.Equal(typeof(FakeSerializer), clientConfig.SerializationProviders.First());
         }
@@ -21,14 +20,14 @@ namespace UnitTests.Serialization
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationProvider_LoadWithNoProvidersTest()
         {
-            var clientConfig = ClientConfiguration.LoadFromFile("SerializationTests\\ConfigurationTests\\ClientConfigurationForSerializer2.xml");
+            var clientConfig = ClientConfiguration.LoadFromFile("Serialization\\ConfigurationTests\\ClientConfigurationForSerializer2.xml");
             Assert.Empty(clientConfig.SerializationProviders);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationProvider_LoadWithDuplicateProviders()
         {
-            var clientConfig = ClientConfiguration.LoadFromFile("SerializationTests\\ConfigurationTests\\ClientConfigurationForSerializer3.xml");
+            var clientConfig = ClientConfiguration.LoadFromFile("Serialization\\ConfigurationTests\\ClientConfigurationForSerializer3.xml");
             Assert.Single(clientConfig.SerializationProviders);
             Assert.Contains(typeof(FakeSerializer), clientConfig.SerializationProviders);
         }
@@ -36,7 +35,7 @@ namespace UnitTests.Serialization
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationProvider_LoadWithMultipleProvider1()
         {
-            var clientConfig = ClientConfiguration.LoadFromFile("SerializationTests\\ConfigurationTests\\ClientConfigurationForSerializer5.xml");
+            var clientConfig = ClientConfiguration.LoadFromFile("Serialization\\ConfigurationTests\\ClientConfigurationForSerializer5.xml");
             Assert.Equal(2, clientConfig.SerializationProviders.Count);
             Assert.Contains(typeof(FakeSerializer), clientConfig.SerializationProviders);
             Assert.Contains(typeof(FakeExternalSerializer2), clientConfig.SerializationProviders);
@@ -45,19 +44,19 @@ namespace UnitTests.Serialization
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationProvider_LoadWithClassNotImplementingInterface()
         {
-            Assert.Throws<FormatException>(()=> ClientConfiguration.LoadFromFile("SerializationTests\\ConfigurationTests\\ClientConfigurationForSerializer6.xml"));
+            Assert.Throws<FormatException>(()=> ClientConfiguration.LoadFromFile("Serialization\\ConfigurationTests\\ClientConfigurationForSerializer6.xml"));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationProvider_LoadWithAbstractClass()
         {
-            Assert.Throws<FormatException>(() => ClientConfiguration.LoadFromFile("SerializationTests\\ConfigurationTests\\ClientConfigurationForSerializer7.xml"));
+            Assert.Throws<FormatException>(() => ClientConfiguration.LoadFromFile("Serialization\\ConfigurationTests\\ClientConfigurationForSerializer7.xml"));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationProvider_LoadWithInvalidConstructorClass()
         {
-            Assert.Throws<FormatException>(() => ClientConfiguration.LoadFromFile("SerializationTests\\ConfigurationTests\\ClientConfigurationForSerializer8.xml"));
+            Assert.Throws<FormatException>(() => ClientConfiguration.LoadFromFile("Serialization\\ConfigurationTests\\ClientConfigurationForSerializer8.xml"));
         }
     }
 

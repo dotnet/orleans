@@ -1,7 +1,7 @@
+using System.Reflection;
 using Orleans.Runtime.Configuration;
 using TestExtensions;
 using UnitTests.Grains;
-using System.Reflection;
 using Xunit;
 
 namespace UnitTests.Serialization

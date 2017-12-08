@@ -1,8 +1,11 @@
 using Microsoft.FSharp.Core;
+using Microsoft.FSharp.Collections;
 using Orleans.Serialization;
 using TestExtensions;
 using UnitTests.FSharpTypes;
 using Xunit;
+using System.Collections.Generic;
+using System;
 
 namespace UnitTests.Serialization
 {
@@ -54,5 +57,57 @@ namespace UnitTests.Serialization
         {
             RoundtripSerializationTest(RecordOfIntOption.Empty);
         }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
+        public void SerializationTests_FSharp_Single_Case_Union()
+        {
+            RoundtripSerializationTest(SingleCaseDU.ofInt(1));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
+        public void SerializationTests_FSharp_Discriminated_Union()
+        {
+
+            // discriminated union case with an array field
+            RoundtripSerializationTest(DiscriminatedUnion.emptyArray());
+            RoundtripSerializationTest(DiscriminatedUnion.nonEmptyArray());
+
+            // discriminated union case with an F# list field
+            RoundtripSerializationTest(DiscriminatedUnion.emptyList());
+            RoundtripSerializationTest(DiscriminatedUnion.nonEmptyList());
+
+            // discriminated union case with an F# set field
+            RoundtripSerializationTest(DiscriminatedUnion.emptySet());
+            RoundtripSerializationTest(DiscriminatedUnion.nonEmptySet());
+
+            // discriminated union case with an F# map  field
+            RoundtripSerializationTest(DiscriminatedUnion.emptyMap());
+            RoundtripSerializationTest(DiscriminatedUnion.nonEmptyMap());
+
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
+        public void SerializationTests_FSharp_Collections()
+        {
+            var elements = new List<int>() { 0, 1, 2 };
+
+            var mapElements = new List<Tuple<int, string>>(){
+                    new Tuple<int, string>(0, "zero"),
+                    new Tuple<int, string>(1, "one")
+                };
+
+            // F# list
+            RoundtripSerializationTest(ListModule.Empty<int>());
+            RoundtripSerializationTest(ListModule.OfSeq(elements));
+
+            // F# set
+            RoundtripSerializationTest(SetModule.Empty<int>());
+            RoundtripSerializationTest(SetModule.OfSeq(elements));
+
+            // F# map
+            RoundtripSerializationTest(MapModule.OfSeq(new List<Tuple<int,string>>()));
+            RoundtripSerializationTest(MapModule.OfSeq(mapElements));
+        }
+
     }
 }

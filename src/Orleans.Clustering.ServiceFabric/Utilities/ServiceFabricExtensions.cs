@@ -2,7 +2,7 @@ using System;
 using System.Fabric;
 using Microsoft.ServiceFabric.Services.Client;
 
-namespace Orleans.Membership.ServiceFabric.Utilities
+namespace Orleans.Clustering.ServiceFabric.Utilities
 {
     internal static class ServiceFabricExtensions
     {

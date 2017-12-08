@@ -1,12 +1,9 @@
-﻿using Orleans.Serialization;
-using Xunit;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Collections;
 using TestExtensions;
+using Xunit;
 
-namespace Tester.SerializationTests
+namespace UnitTests.Serialization
 {
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class SerializationTestsImmutableCollections

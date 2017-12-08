@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 
-namespace Orleans.Membership.ServiceFabric
+namespace Orleans.Clustering.ServiceFabric
 {
     /// <summary>
     /// Monitors cluster changes for information about silos which are defunct and have not been reported as functional by Service Fabric.
@@ -17,10 +17,10 @@ namespace Orleans.Membership.ServiceFabric
         /// Collection of unknown silos.
         /// </summary>
         private readonly ConcurrentDictionary<SiloAddress, DateTime> unknownSilos = new ConcurrentDictionary<SiloAddress, DateTime>();
-        private readonly ServiceFabricMembershipOptions options;
+        private readonly ServiceFabricClusteringOptions options;
         private readonly ILogger<UnknownSiloMonitor> log;
 
-        public UnknownSiloMonitor(IOptions<ServiceFabricMembershipOptions> options, ILogger<UnknownSiloMonitor> log)
+        public UnknownSiloMonitor(IOptions<ServiceFabricClusteringOptions> options, ILogger<UnknownSiloMonitor> log)
         {
             this.options = options.Value;
             this.log = log;
