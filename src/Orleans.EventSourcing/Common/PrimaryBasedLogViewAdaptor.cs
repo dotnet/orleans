@@ -190,6 +190,13 @@ namespace Orleans.EventSourcing.Common
             worker = new BatchWorkerFromDelegate(() => Work());
         }
 
+        // called after application enqueues work
+        private void NotifyBatchWorker()
+        {
+            LastPrimaryIssue.Nudge(); // resume retries if suspended after application inactivity
+            worker.Notify();
+        }
+
         /// <inheritdoc/>
         public virtual async Task PreOnActivate()
         {
@@ -214,7 +221,7 @@ namespace Orleans.EventSourcing.Common
 
             // start worker, if it has not already happened
             if (needInitialRead)
-                worker.Notify();
+                NotifyBatchWorker();
 
             Services.Log(Severity.Verbose2, "PostActivation Complete");
 
@@ -338,7 +345,7 @@ namespace Orleans.EventSourcing.Common
 
             SubmitInternal(DateTime.UtcNow, logEntry);
 
-            worker.Notify();
+            NotifyBatchWorker();
         }
 
         /// <inheritdoc />
@@ -356,7 +363,7 @@ namespace Orleans.EventSourcing.Common
             foreach (var e in logEntries)
                 SubmitInternal(time, e);
 
-            worker.Notify();
+            NotifyBatchWorker();
         }
 
         /// <inheritdoc />
@@ -373,7 +380,7 @@ namespace Orleans.EventSourcing.Common
 
             SubmitInternal(DateTime.UtcNow, logEntry, GetConfirmedVersion() + pending.Count, promise);
 
-            worker.Notify();
+            NotifyBatchWorker();
 
             return promise.Task;
         }
@@ -399,7 +406,7 @@ namespace Orleans.EventSourcing.Common
                 first = false;
             }
 
-            worker.Notify();
+            NotifyBatchWorker();
 
             return promise.Task;
         }
@@ -449,6 +456,8 @@ namespace Orleans.EventSourcing.Common
                 if (stats != null)
                     stats.EventCounters["TentativeViewCalled"]++;
 
+                LastPrimaryIssue.Nudge();
+
                 if (tentativeStateInternal == null)
                     CalculateTentativeState();
 
@@ -464,6 +473,8 @@ namespace Orleans.EventSourcing.Common
                 if (stats != null)
                     stats.EventCounters["ConfirmedViewCalled"]++;
 
+                LastPrimaryIssue.Nudge();
+
                 return LastConfirmedView();
             }
         }
@@ -475,6 +486,8 @@ namespace Orleans.EventSourcing.Common
             {
                 if (stats != null)
                     stats.EventCounters["ConfirmedVersionCalled"]++;
+
+                LastPrimaryIssue.Nudge();
 
                 return GetConfirmedVersion();
             }
@@ -489,6 +502,8 @@ namespace Orleans.EventSourcing.Common
         {
             var notificationMessage = payLoad as INotificationMessage;
 
+            LastPrimaryIssue.Nudge();
+
             if (notificationMessage != null)
             {
                 Services.Log(Severity.Verbose, "NotificationReceived v{0}", notificationMessage.Version);
@@ -496,7 +511,7 @@ namespace Orleans.EventSourcing.Common
                 OnNotificationReceived(notificationMessage);
 
                 // poke worker so it will process the notifications
-                worker.Notify();
+                NotifyBatchWorker();
 
                 return null;
             }
@@ -534,7 +549,7 @@ namespace Orleans.EventSourcing.Common
             {
                 needRefresh = true;
                 Services.Log(Severity.Verbose, "Refresh Because of Join");
-                worker.Notify();
+                NotifyBatchWorker();
             }
 
             if (notificationTracker != null)
@@ -781,6 +796,8 @@ namespace Orleans.EventSourcing.Common
             if (stats != null)
                 stats.EventCounters["SynchronizeNowCalled"]++;
 
+            LastPrimaryIssue.Nudge();
+
             Services.Log(Severity.Verbose, "SynchronizeNowStart");
 
             needRefresh = true;
@@ -794,6 +811,8 @@ namespace Orleans.EventSourcing.Common
         {
             get
             {
+                LastPrimaryIssue.Nudge();
+
                 return pending.Select(te => te.Entry);
             }
         }
@@ -803,6 +822,8 @@ namespace Orleans.EventSourcing.Common
         {
             if (stats != null)
                 stats.EventCounters["ConfirmSubmittedEntriesCalled"]++;
+
+            LastPrimaryIssue.Nudge();
 
             Services.Log(Severity.Verbose, "ConfirmSubmittedEntriesStart");
 

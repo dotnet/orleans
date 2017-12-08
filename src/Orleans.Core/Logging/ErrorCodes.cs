@@ -1042,7 +1042,8 @@ namespace Orleans
         LogConsistency_CaughtException = LogConsistencyBase + 2,
         LogConsistency_ProtocolError = LogConsistencyBase + 3,
         LogConsistency_ProtocolFatalError = LogConsistencyBase + 4,
-        
+        LogConsistency_ConnectionError = LogConsistencyBase + 5,
+
         // Note: individual Service Fabric error codes are defined in
         // Microsoft.Orleans.ServiceFabric.Utilities.ErrorCode.
         ServiceFabricBase = Runtime + 4400,

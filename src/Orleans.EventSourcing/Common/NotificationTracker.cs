@@ -170,10 +170,10 @@ namespace Orleans.EventSourcing.Common
                             break;
                         }
                 }
+                LastConnectionIssue.Nudge();
                 Notify();
             }
-
-
+            
 
             protected override async Task Work()
             {
@@ -205,8 +205,6 @@ namespace Orleans.EventSourcing.Common
                 }
                 catch (Exception e)
                 {
-                    tracker.services.Log(Severity.Info, "Could not send notification to cluster {0}: {1}", clusterId, e);
-
                     LastConnectionIssue.Record(
                         new NotificationFailed() { RemoteCluster = clusterId, Exception = e },
                         tracker.listener, tracker.services);

@@ -12,7 +12,6 @@ namespace Orleans.LogConsistency
     /// It is used both inside the protocol to track retry loops, and is made visible to users 
     /// who want to monitor their log-consistent grains for communication issues.
     /// </summary>
-    [Serializable]
     public abstract class ConnectionIssue
     {
         /// <summary>
@@ -31,37 +30,30 @@ namespace Orleans.LogConsistency
         public int NumberOfConsecutiveFailures { get; set; }
 
         /// <summary>
-        /// The delay we are waiting before the next retry
+        /// The connection is retried after the specified delay.
+        /// The application can change this property to customize the desired retry behavior.
         /// </summary>
-        public TimeSpan RetryDelay { get; set; }
+        public TimeSpan RetryAfter { get; set; }
 
         /// <summary>
-        /// Computes the retry delay based on the rest of the information. Is overridden by subclasses
-        /// that represent specific categories of issues.
+        /// If true, the connection is retried when there is activity.
+        /// The application can change this property to customize the desired retry behavior.
         /// </summary>
-        /// <param name="previous">The previously used retry delay</param>
-        /// <returns></returns>
-        public abstract TimeSpan ComputeRetryDelay(TimeSpan? previous);
+        public bool RetryOnActivity { get; set; }
+
+        /// <summary>
+        /// If this is set to a task, a retry is initiated after the task completes.
+        /// The application can set this property to initiate a retry at a suitable moment.
+        /// </summary>
+        public Task RetryWhen { get; set; }
+
+        /// <summary>
+        /// Subclasses implement this method to define a default policy
+        /// for specific categories of issues.
+        /// </summary>
+        public abstract void UpdateRetryParameters();
     }
 
-
-
-    /// <summary>
-    /// Represents information about notification failures encountered inside log consistency protocols.
-    /// </summary>
-    [Serializable]
-    public abstract class NotificationFailed : ConnectionIssue
-    {
-        /// <summary>
-        /// The clusterId of the remote cluster to which we had an issue when sending change notifications.
-        /// </summary>
-        public string RemoteClusterId { get; set; }
-
-        /// <summary>
-        /// The exception we caught, or null if the problem was not caused by an exception.
-        /// </summary>
-        public Exception Exception { get; set; }
-    }
 
 
 

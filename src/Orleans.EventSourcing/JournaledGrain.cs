@@ -229,23 +229,28 @@ namespace Orleans.EventSourcing
         }
 
         /// <summary>
-        /// Called when the underlying persistence or replication protocol is running into some sort of connection trouble.
-        /// <para>Override this to monitor the health of the log-consistency protocol and/or
-        /// to customize retry delays.
+        /// Called when the underlying log consistency protocol is running into connection issues (storage or remote clusters).
+        /// <para>By default, this method prints warnings to the log and allows periodic retries.
+        /// Override this method to add application-level monitoring and/or 
+        /// to customize retry behavior.
         /// Any exceptions thrown are caught and logged by the <see cref="ILogConsistencyProvider"/>.</para>
         /// </summary>
         /// <returns>The time to wait before retrying</returns>
         protected virtual void OnConnectionIssue(ConnectionIssue issue)
         {
+            GetLogger().Warn(Orleans.ErrorCode.LogConsistency_ConnectionError,
+                 $"observed connection issue: {issue} (tried {issue.NumberOfConsecutiveFailures} times, down for {issue.TimeStamp - issue.TimeOfFirstFailure})");
         }
 
         /// <summary>
         /// Called when a previously reported connection issue has been resolved.
-        /// <para>Override this to monitor the health of the log-consistency protocol. 
+        /// <para>Override this method when implementing application-level monitoring
         /// Any exceptions thrown are caught and logged by the <see cref="ILogConsistencyProvider"/>.</para>
         /// </summary>
         protected virtual void OnConnectionIssueResolved(ConnectionIssue issue)
         {
+            GetLogger().Warn(Orleans.ErrorCode.LogConsistency_ConnectionError,
+                 $"resolved connection issue : {issue} (tried {issue.NumberOfConsecutiveFailures} times, down for {issue.TimeStamp - issue.TimeOfFirstFailure})");
         }
 
 

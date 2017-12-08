@@ -233,13 +233,12 @@ namespace Orleans.EventSourcing.LogStorage
         /// <summary>
         /// Describes a connection issue that occurred when updating the primary storage.
         /// </summary>
-        [Serializable]
         public class UpdateLogStorageFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
             public override string ToString()
             {
-                return $"write entire log to storage failed: caught {Exception.GetType().Name}: {Exception.Message}";
+                return $"write event log to storage failed: caught {Exception.GetType().Name}: {Exception.Message}";
             }
         }
 
@@ -247,13 +246,12 @@ namespace Orleans.EventSourcing.LogStorage
         /// <summary>
         /// Describes a connection issue that occurred when reading from the primary storage.
         /// </summary>
-        [Serializable]
         public class ReadFromLogStorageFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
             public override string ToString()
             {
-                return $"read entire log from storage failed: caught {Exception.GetType().Name}: {Exception.Message}";
+                return $"read event log from storage failed: caught {Exception.GetType().Name}: {Exception.Message}";
             }
         }
 

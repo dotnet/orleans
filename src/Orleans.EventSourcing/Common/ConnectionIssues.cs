@@ -11,7 +11,6 @@ namespace Orleans.EventSourcing.Common
     /// <summary>
     /// Describes a connection issue that occurred when sending update notifications to remote instances.
     /// </summary>
-    [Serializable]
     public class NotificationFailed : ConnectionIssue
     {
         /// <summary> The destination cluster which we could not reach successfully. </summary>
@@ -21,18 +20,40 @@ namespace Orleans.EventSourcing.Common
         public Exception Exception { get; set; }
 
         /// <inheritdoc/>
-        public override TimeSpan ComputeRetryDelay(TimeSpan? previous)
+        public override void UpdateRetryParameters()
         {
-            if (NumberOfConsecutiveFailures < 3) return TimeSpan.FromMilliseconds(1);
-            else if (NumberOfConsecutiveFailures < 1000) return TimeSpan.FromSeconds(30);
-            else return TimeSpan.FromMinutes(1);
+            if (NumberOfConsecutiveFailures <= 2)
+            {
+                RetryAfter = TimeSpan.FromMilliseconds(100);
+                RetryOnActivity = false;
+            }
+            else if (NumberOfConsecutiveFailures <= 20)
+            {
+                RetryAfter = TimeSpan.FromSeconds(30);
+                RetryOnActivity = false;
+            }
+            else
+            {
+                // retry in 2-minute-intervals 
+                // but freeze after 20 minutes for 6 hours if there is no application activity
+
+                if (NumberOfConsecutiveFailures % 10 != 0)
+                {
+                    RetryAfter = TimeSpan.FromMinutes(2);
+                    RetryOnActivity = false;
+                }
+                else
+                {
+                    RetryAfter = TimeSpan.FromHours(6);
+                    RetryOnActivity = true;
+                }
+            }
         }
     }
 
     /// <summary>
     /// Describes a connection issue that occurred when communicating with primary storage.
     /// </summary>
-    [Serializable]
     public class PrimaryOperationFailed : ConnectionIssue
     {
         /// <summary>
@@ -41,28 +62,48 @@ namespace Orleans.EventSourcing.Common
         public Exception Exception { get; set; }
 
         /// <inheritdoc/>
-        public override TimeSpan ComputeRetryDelay(TimeSpan? previous)
+        public override void UpdateRetryParameters()
         {
-            // after first fail do not backoff yet... keep it at zero
-            if (previous == null)
+            // after first fail do not backoff yet... retry right away
+            if (NumberOfConsecutiveFailures <= 2)
             {
-                return TimeSpan.Zero;
+                RetryAfter = TimeSpan.FromMilliseconds(0);
+                RetryOnActivity = false;
             }
+            // for the next 20 failures do exponential backoff
+            else if (NumberOfConsecutiveFailures <= 20)
+            {
+                if (random == null)
+                    random = new Random();
 
-            var backoff = previous.Value.TotalMilliseconds;
+                var backoff = RetryAfter.TotalMilliseconds;
 
-            if (random == null)
-                random = new Random();
+                // grows exponentially up to slowpoll interval
+                if (backoff < slowpollinterval)
+                {
+                    backoff += random.Next(100);
+                    backoff = backoff * 1.8;
+                }
 
-            // grows exponentially up to slowpoll interval
-            if (previous.Value.TotalMilliseconds < slowpollinterval)
-                backoff = (int)((backoff + random.Next(5, 15)) * 1.5);
+                RetryAfter = TimeSpan.FromMilliseconds(backoff);
+                RetryOnActivity = false;
+            }
+            else
+            {
+                // retry in 2-minute-intervals 
+                // but freeze after 20 minutes for 6 hours if there is no application activity
 
-            // during slowpoll, slightly randomize
-            if (backoff > slowpollinterval)
-                backoff = slowpollinterval + random.Next(1, 200);
-
-            return TimeSpan.FromMilliseconds(backoff);
+                if (NumberOfConsecutiveFailures % 10 != 0)
+                {
+                    RetryAfter = TimeSpan.FromMinutes(1 + random.NextDouble());
+                    RetryOnActivity = false;
+                }
+                else
+                {
+                    RetryAfter = TimeSpan.FromHours(6);
+                    RetryOnActivity = true;
+                }
+            }
         }
 
 

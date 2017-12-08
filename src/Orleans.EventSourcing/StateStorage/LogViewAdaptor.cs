@@ -199,7 +199,6 @@ namespace Orleans.EventSourcing.StateStorage
         /// <summary>
         /// Describes a connection issue that occurred when updating the primary storage.
         /// </summary>
-        [Serializable]
         public class UpdateStateStorageFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
@@ -213,7 +212,6 @@ namespace Orleans.EventSourcing.StateStorage
         /// <summary>
         /// Describes a connection issue that occurred when reading from the primary storage.
         /// </summary>
-        [Serializable]
         public class ReadFromStateStorageFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
@@ -227,7 +225,6 @@ namespace Orleans.EventSourcing.StateStorage
         /// <summary>
         /// A notification message sent to remote instances after updating this grain in storage.
         /// </summary>
-        [Serializable]
         protected class UpdateNotificationMessage : INotificationMessage 
         {
             /// <inheritdoc/>

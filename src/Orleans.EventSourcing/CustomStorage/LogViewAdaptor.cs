@@ -263,7 +263,6 @@ namespace Orleans.EventSourcing.CustomStorage
         /// <summary>
         /// Describes a connection issue that occurred when updating the primary storage.
         /// </summary>
-        [Serializable]
         public class UpdatePrimaryFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
@@ -277,7 +276,6 @@ namespace Orleans.EventSourcing.CustomStorage
         /// <summary>
         /// Describes a connection issue that occurred when reading from the primary storage.
         /// </summary>
-        [Serializable]
         public class ReadFromPrimaryFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
