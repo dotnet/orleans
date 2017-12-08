@@ -24,7 +24,7 @@ namespace Orleans.Runtime
         {
             if (StatisticsCollector.CollectQueueStats)
             {
-                queueTracking = new QueueTrackingStatistic(options.StageName);
+                queueTracking = new QueueTrackingStatistic(options.Name);
             }
 
 #if TRACK_DETAILED_STATS
@@ -50,7 +50,7 @@ namespace Orleans.Runtime
                 var executorWorkItemSlotIndex = createThreadCount * padding;
                 new ThreadPerTaskExecutor(
                     new SingleThreadExecutorOptions(
-                        options.StageName + createThreadCount,
+                        options.Name + createThreadCount,
                         options.StageType,
                         options.CancellationToken,
                         options.Log,

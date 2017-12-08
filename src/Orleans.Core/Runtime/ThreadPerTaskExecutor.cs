@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Threading;
-using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
     internal class ThreadPerTaskExecutor : IExecutor
     {
         private readonly SingleThreadExecutorOptions executorOptions;
+
 #if TRACK_DETAILED_STATS
         internal protected ThreadTrackingStatistic threadTracking;
 #endif
@@ -40,7 +40,7 @@ namespace Orleans.Runtime
                     if (!executorOptions.CancellationToken.IsCancellationRequested) // If we're stopping, ignore exceptions
                     {
                         var explanation =
-                            $"Executor thread {executorOptions.StageName} of {executorOptions.StageName} stage encountered unexpected exception.";
+                            $"Executor thread {executorOptions.Name} of {executorOptions.StageTypeName} stage encountered unexpected exception.";
                         executorOptions.OnFault?.Invoke(exc, explanation);
                     }
                 }
@@ -51,7 +51,7 @@ namespace Orleans.Runtime
             })
             {
                 IsBackground = true,
-                Name = executorOptions.StageName
+                Name = executorOptions.Name
             }.Start();
         }
 
@@ -64,11 +64,14 @@ namespace Orleans.Runtime
 
         private void TrackExecutionStart()
         {
-            executorOptions.Log.Info(
-                $"Starting Executor {executorOptions.StageName} for stage {executorOptions.StageTypeName} on managed thread {Thread.CurrentThread.ManagedThreadId}");
-            CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.RUNTIME_THREADS_ASYNC_AGENT_PERAGENTTYPE, executorOptions.StageTypeName)).Increment();
+            CounterStatistic.FindOrCreate(
+               new StatisticName(StatisticNames.RUNTIME_THREADS_ASYNC_AGENT_PERAGENTTYPE, executorOptions.StageTypeName))
+               .Increment();
             CounterStatistic.FindOrCreate(StatisticNames.RUNTIME_THREADS_ASYNC_AGENT_TOTAL_THREADS_CREATED).Increment();
 
+            executorOptions.Log.Info(
+                $"Starting Executor {executorOptions.Name} for stage {executorOptions.StageTypeName} on managed thread {Thread.CurrentThread.ManagedThreadId}");
+            
 #if TRACK_DETAILED_STATS
                 if (StatisticsCollector.CollectThreadTimeTrackingStats)
                 {
@@ -79,11 +82,14 @@ namespace Orleans.Runtime
 
         private void TrackExecutionStop()
         {
-            CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.RUNTIME_THREADS_ASYNC_AGENT_PERAGENTTYPE, executorOptions.StageTypeName)).DecrementBy(1);
+            CounterStatistic.FindOrCreate(
+                new StatisticName(StatisticNames.RUNTIME_THREADS_ASYNC_AGENT_PERAGENTTYPE, executorOptions.StageTypeName))
+                .DecrementBy(1);
+
             executorOptions.Log.Info(
                 ErrorCode.Runtime_Error_100328,
                 "Stopping AsyncAgent {0} that runs on managed thread {1}",
-                executorOptions.StageName,
+                executorOptions.Name,
                 Thread.CurrentThread.ManagedThreadId);
 
 #if TRACK_DETAILED_STATS

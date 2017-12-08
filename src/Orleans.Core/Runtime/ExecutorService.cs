@@ -36,20 +36,20 @@ namespace Orleans.Runtime
     internal abstract class ExecutorOptions
     {
         protected ExecutorOptions(
-            string stageName,
+            string name,
             Type stageType,
             CancellationToken cancellationToken, 
             ILogger log, 
             ExecutorFaultHandler onFault)
         {
-            StageName = stageName;
+            Name = name;
             StageType = stageType;
             CancellationToken = cancellationToken;
             Log = log;
             OnFault = onFault;
         }
 
-        public string StageName { get; } // rename to Name.
+        public string Name { get; }
 
         public Type StageType { get; }
 
@@ -65,7 +65,7 @@ namespace Orleans.Runtime
     internal class ThreadPoolExecutorOptions : ExecutorOptions
     {
         public ThreadPoolExecutorOptions(
-            string stageName,
+            string name,
             Type stageType,
             CancellationToken ct,
             ILogger log,
@@ -75,7 +75,7 @@ namespace Orleans.Runtime
             TimeSpan? delayWarningThreshold = null,
             WorkItemStatusProvider workItemStatusProvider = null,
             ExecutorFaultHandler onFault = null)
-            : base(stageName, stageType, ct, log, onFault)
+            : base(name, stageType, ct, log, onFault)
         {
             DegreeOfParallelism = degreeOfParallelism;
             DrainAfterCancel = drainAfterCancel;
@@ -98,12 +98,12 @@ namespace Orleans.Runtime
     internal class SingleThreadExecutorOptions : ExecutorOptions
     {
         public SingleThreadExecutorOptions(
-            string stageName,
+            string name,
             Type stageType,
             CancellationToken ct, 
             ILogger log, 
             ExecutorFaultHandler onFault = null) 
-            : base(stageName, stageType, ct, log, onFault)
+            : base(name, stageType, ct, log, onFault)
         {
         }
     }
