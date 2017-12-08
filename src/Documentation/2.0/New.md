@@ -19,7 +19,7 @@ The most significant changes in 2.0 are as follows.
 
 * Overhaul of code generation. While mostly invisible for developer, code generation became much more robust in handling serialization of various possible types. Special handling is required for F# assemblies. See [Code generation](Codegen.md) section for more details.
 
-* Created a `Microsoft.Orleans.Core.Abstractions` NuGet package and moved/refactored several types into it. Grain code would most likely need to reference only these abstractions, where as the silo host and client will reference more of Orleans packages. We plan to rev and do breaking changes to this package less frequently.
+* Created a `Microsoft.Orleans.Core.Abstractions` NuGet package and moved/refactored several types into it. Grain code would most likely need to reference only these abstractions, where as the silo host and client will reference more of Orleans packages. We plan to update this package less frequently.
 
 * Add support for Scoped services. This means that each grain activation gets its own scoped service provider, and Orleans registers a contextual `IGrainActivationContext` object that can be injected into *Transient* or *Scoped* service to get access to activation specific information and grain activation lifecycle events. This is similar to how ASP.NET Core 2.0 create a scoped context for each Request, but in the case of Orleans it applies to the entire lifectime of a grain activation. See [Service Lifetimes and Registration Options](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/dependency-injection#service-lifetimes-and-registration-options) in the ASP.NET Core documentation for more information about service lifetimes.
 
