@@ -118,13 +118,13 @@ Orleans 2.0 does not perform automatic folder scanning to discover user assembli
 Application Parts are configured using an `IApplicationPartsManager`, which can be accessed using the `ConfigureApplicationParts` extension method on `IClientBuilder` and `ISiloHostBuilder`. The `ConfigureApplicationParts` method accepts a delegate, `Action<IApplicationPartManager>`.
 
 The following extension methods on `IApplicationPartManager` support common uses:
-* `AddApplicationPart(assembly)` adds a single assembly can be added using the extension method.
-* `AddFromAppDomain()` adds all assemblies in the current `AppDomain`.
-* `AddFromApplicationBaseDirectory()` adds all assemblies in the current base path (see `AppDomain.BaseDirectory`).
+* `AddApplicationPart(assembly)` a single assembly can be added using this extension method.
+* `AddFromAppDomain()` adds all assemblies currently loaded in the `AppDomain`.
+* `AddFromApplicationBaseDirectory()` loads and adds all assemblies in the current base path (see `AppDomain.BaseDirectory`).
 
 Assemblies added by the above methods can be supplemented using the following extension methods on their return type, `IApplicationPartManagerWithAssemblies`:
 * `WithReferences()` adds all referenced assemblies from the added parts. This immediately loads any transitively referenced assemblies. Assembly loading errors are ignored.
-* `WithCodeGeneration()` generates support code for the added parts and adds it to the part manager. Note that this requires the `Microsoft.Orleans.OrleansCodeGenerator` package to be installed.
+* `WithCodeGeneration()` generates support code for the added parts and adds it to the part manager. Note that this requires the `Microsoft.Orleans.OrleansCodeGenerator` package to be installed, and is commonly referred to as runtime code generation.
 
 See the client and silo configuration sections above for examples.
 
