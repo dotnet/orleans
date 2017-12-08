@@ -5,8 +5,8 @@ using System.Fabric.Query;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
-using Orleans.Membership.ServiceFabric;
-using Orleans.Membership.ServiceFabric.Utilities;
+using Orleans.Clustering.ServiceFabric;
+using Orleans.Clustering.ServiceFabric.Utilities;
 using Xunit;
 using Xunit.Abstractions;
 

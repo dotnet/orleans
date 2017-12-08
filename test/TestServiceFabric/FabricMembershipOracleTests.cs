@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Orleans.Membership.ServiceFabric;
+using Orleans.Clustering.ServiceFabric;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.ServiceFabric;
@@ -25,7 +25,7 @@ namespace TestServiceFabric
         private ITestOutputHelper Output { get; }
         private readonly FabricMembershipOracle oracle;
         private readonly UnknownSiloMonitor unknownSiloMonitor;
-        private readonly ServiceFabricMembershipOptions fabricMembershipOptions;
+        private readonly ServiceFabricClusteringOptions fabricClusteringOptions;
 
         public FabricMembershipOracleTests(ITestOutputHelper output)
         {
@@ -42,9 +42,9 @@ namespace TestServiceFabric
             globalConfig.MaxMultiClusterGateways = 2;
             globalConfig.ClusterId = "MegaGoodCluster";
 
-            this.fabricMembershipOptions = new ServiceFabricMembershipOptions();
+            this.fabricClusteringOptions = new ServiceFabricClusteringOptions();
             this.unknownSiloMonitor = new UnknownSiloMonitor(
-                new OptionsWrapper<ServiceFabricMembershipOptions>(this.fabricMembershipOptions),
+                new OptionsWrapper<ServiceFabricClusteringOptions>(this.fabricClusteringOptions),
                 new TestOutputLogger<UnknownSiloMonitor>(this.Output));
             this.oracle = new FabricMembershipOracle(
                 this.siloDetails,
@@ -234,7 +234,7 @@ namespace TestServiceFabric
             // The status should not have changed.
             Assert.Equal(SiloStatus.None, this.oracle.GetApproximateSiloStatus(unknownSilo1));
 
-            now[0] += this.fabricMembershipOptions.UnknownSiloRemovalPeriod + TimeSpan.FromMilliseconds(1);
+            now[0] += this.fabricClusteringOptions.UnknownSiloRemovalPeriod + TimeSpan.FromMilliseconds(1);
             this.resolver.Notify(silos);
             listener.WaitForVersion(5);
 

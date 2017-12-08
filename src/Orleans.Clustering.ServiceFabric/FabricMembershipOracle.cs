@@ -5,12 +5,12 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Membership.ServiceFabric.Utilities;
+using Orleans.Clustering.ServiceFabric.Utilities;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.ServiceFabric;
 
-namespace Orleans.Membership.ServiceFabric
+namespace Orleans.Clustering.ServiceFabric
 {
     /// <summary>
     /// Cluster membership implementation which uses Serivce Fabric's service discovery system.

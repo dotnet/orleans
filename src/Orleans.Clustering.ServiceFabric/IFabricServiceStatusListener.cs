@@ -1,6 +1,6 @@
 using Orleans.ServiceFabric;
 
-namespace Orleans.Membership.ServiceFabric
+namespace Orleans.Clustering.ServiceFabric
 {
     /// <summary>
     /// Listener for partition changes.

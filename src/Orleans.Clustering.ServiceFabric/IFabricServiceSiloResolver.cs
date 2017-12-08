@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 
-namespace Orleans.Membership.ServiceFabric
+namespace Orleans.Clustering.ServiceFabric
 {
     /// <summary>
     /// Service for resolving silos hosted on Service Fabric.

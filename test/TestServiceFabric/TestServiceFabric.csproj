@@ -19,7 +19,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\Orleans.Hosting.ServiceFabric\Orleans.Hosting.ServiceFabric.csproj" />
-    <ProjectReference Include="..\..\src\Orleans.Membership.ServiceFabric\Orleans.Membership.ServiceFabric.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Clustering.ServiceFabric\Orleans.Clustering.ServiceFabric.csproj" />
     <ProjectReference Include="..\TestExtensions\TestExtensions.csproj" />
   </ItemGroup>
 

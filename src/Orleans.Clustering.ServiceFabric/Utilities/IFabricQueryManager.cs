@@ -2,8 +2,9 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.ServiceFabric.Services.Client;
+using Orleans.Clustering.ServiceFabric.Models;
 
-namespace Orleans.Membership.ServiceFabric.Utilities
+namespace Orleans.Clustering.ServiceFabric.Utilities
 {
     internal interface IFabricQueryManager
     {

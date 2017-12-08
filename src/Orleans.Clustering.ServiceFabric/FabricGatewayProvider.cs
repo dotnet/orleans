@@ -5,12 +5,12 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Membership.ServiceFabric.Utilities;
+using Orleans.Clustering.ServiceFabric.Utilities;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.ServiceFabric;
 
-namespace Orleans.Membership.ServiceFabric
+namespace Orleans.Clustering.ServiceFabric
 {
     /// <summary>
     /// Gateway provider which reads gateway information from Service Fabric's naming service.
