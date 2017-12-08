@@ -171,6 +171,25 @@ namespace Orleans.Runtime
         
         protected abstract ExecutorOptions GetExecutorOptions();
         
+        protected void ExecutorFaultHandler(Exception ex, string executorExplanation)
+        {
+            State = ThreadState.Stopped;
+            LogExecutorError(ex, executorExplanation);
+
+            if (OnFault == FaultBehavior.RestartOnFault)
+            {
+                try
+                {
+                    Start();
+                }
+                catch (Exception exc)
+                {
+                    Log.Error(ErrorCode.Runtime_Error_100027, "Unable to restart AsynchAgent", exc);
+                    State = ThreadState.Stopped;
+                }
+            }
+        }
+
         private void EnsureExecutorInitialized()
         {
             if (executor == null)
@@ -178,6 +197,29 @@ namespace Orleans.Runtime
                 executor = executorService.GetExecutor(GetExecutorOptions());
             }
         }
+
+        private void LogExecutorError(Exception exc, string executorDetails)
+        {
+            var logMessagePrefix = executorDetails;
+            switch (OnFault)
+            {
+                case FaultBehavior.CrashOnFault:
+                    var logMessage = $"{logMessagePrefix} The process will be terminated.";
+                    Console.WriteLine(logMessage, exc);
+                    Log.Error(ErrorCode.Runtime_Error_100023, logMessage, exc);
+                    Log.Fail(ErrorCode.Runtime_Error_100024, logMessage);
+                    break;
+                case FaultBehavior.IgnoreFault:
+                    Log.Error(ErrorCode.Runtime_Error_100025, $"{logMessagePrefix} The executor will exit.", exc);
+                    break;
+                case FaultBehavior.RestartOnFault:
+                    Log.Error(ErrorCode.Runtime_Error_100026, $"{logMessagePrefix} The Stage will be restarted.", exc);
+                    break;
+                default:
+                    throw new NotImplementedException();
+            }
+        }
+
         private void ThrowIfDisposed()
         {
             if (disposed)

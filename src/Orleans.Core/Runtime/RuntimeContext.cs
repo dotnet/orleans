@@ -28,7 +28,8 @@ namespace Orleans.Runtime
             if (context != null)
             {
                 // Currently only orleans own threads being initialized,
-                // but in perspective - this method will be called on external ones
+                // but in perspective - this method will be called on external ones,
+                // so that mechanism of thread de-initialization will be needed.
                 return; 
             }
 

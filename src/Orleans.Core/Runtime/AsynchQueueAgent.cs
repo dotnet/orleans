@@ -33,7 +33,7 @@ namespace Orleans.Runtime
 
         protected override ExecutorOptions GetExecutorOptions()
         {
-            return new ThreadPoolExecutorOptions(GetType(), Name, Cts.Token, Log, drainAfterCancel: DrainAfterCancel);
+            return new ThreadPoolExecutorOptions(Name, GetType(), Cts.Token, Log, drainAfterCancel: DrainAfterCancel, onFault: RestartAction);
         }
 
         internal virtual bool DrainAfterCancel { get; } = false;

@@ -48,7 +48,13 @@ namespace Orleans.Runtime
             for (var createThreadCount = 0; createThreadCount < options.DegreeOfParallelism; createThreadCount++)
             {
                 var executorWorkItemSlotIndex = createThreadCount * padding;
-                new ThreadPerTaskExecutor(new SingleThreadExecutorOptions(options.StageName + createThreadCount, executorOptions.Log))
+                new ThreadPerTaskExecutor(
+                    new SingleThreadExecutorOptions(
+                        options.StageName + createThreadCount,
+                        options.StageType,
+                        options.CancellationToken,
+                        options.Log,
+                        options.OnFault))
                     .QueueWorkItem(_ => ProcessQueue(executorWorkItemSlotIndex));
             }
         }
@@ -60,7 +66,7 @@ namespace Orleans.Runtime
             if (callback == null) throw new ArgumentNullException(nameof(callback));
 
             var workItem = new QueueWorkItemCallback(
-                callback, 
+                callback,
                 state,
                 executorOptions.WorkItemExecutionTimeTreshold,
                 executorOptions.WorkItemStatusProvider);
@@ -147,7 +153,7 @@ namespace Orleans.Runtime
                 }
 #endif
         }
-        
+
         private void TrackRequestDequeue(QueueWorkItemCallback workItem)
         {
             // Capture the queue wait time for this task
@@ -207,12 +213,12 @@ namespace Orleans.Runtime
 
             private ITimeInterval timeInterval;
 
-            // lightweight execution time tracking 
+            // for lightweight execution time tracking 
             private DateTime executionStart;
-            
+
             public QueueWorkItemCallback(
-                WaitCallback callback, 
-                object state, 
+                WaitCallback callback,
+                object state,
                 TimeSpan executionTimeTreshold,
                 WorkItemStatusProvider statusProvider = null)
             {
@@ -263,7 +269,7 @@ namespace Orleans.Runtime
             {
                 if (timeInterval != null)
                 {
-                     return timeInterval.Elapsed > executionTimeTreshold;
+                    return timeInterval.Elapsed > executionTimeTreshold;
                 }
 
                 return false;

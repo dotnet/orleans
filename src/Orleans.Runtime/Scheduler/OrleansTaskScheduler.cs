@@ -70,8 +70,8 @@ namespace Orleans.Runtime.Scheduler
             {
                 var executorName = namePrefix + "SchedulerExecutor";
                 return executorService.GetExecutor(new ThreadPoolExecutorOptions(
-                      GetType(),
                       executorName,
+                      GetType(),
                       cancellationTokenSource.Token,
                       loggerFactory.CreateLogger(executorName),
                       degreeOfParalelism,

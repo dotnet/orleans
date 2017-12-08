@@ -35,44 +35,54 @@ namespace Orleans.Runtime
     
     internal abstract class ExecutorOptions
     {
-        protected ExecutorOptions(string stageName,
-            ILogger log)
+        protected ExecutorOptions(
+            string stageName,
+            Type stageType,
+            CancellationToken cancellationToken, 
+            ILogger log, 
+            ExecutorFaultHandler onFault)
         {
             StageName = stageName;
+            StageType = stageType;
+            CancellationToken = cancellationToken;
             Log = log;
+            OnFault = onFault;
         }
 
-        public string StageName { get; }
+        public string StageName { get; } // rename to Name.
+
+        public Type StageType { get; }
+
+        public string StageTypeName => StageType.Name;  // rename to StageName.
+
+        public CancellationToken CancellationToken { get; }
 
         public ILogger Log { get; }
+
+        public ExecutorFaultHandler OnFault { get; }
     }
 
     internal class ThreadPoolExecutorOptions : ExecutorOptions
     {
         public ThreadPoolExecutorOptions(
-            Type stageType,
             string stageName,
+            Type stageType,
             CancellationToken ct,
             ILogger log,
             int degreeOfParallelism = 1,
             bool drainAfterCancel = false,
             TimeSpan? workItemExecutionTimeTreshold = null,
             TimeSpan? delayWarningThreshold = null,
-            WorkItemStatusProvider workItemStatusProvider = null)
-            : base(stageName, log)
+            WorkItemStatusProvider workItemStatusProvider = null,
+            ExecutorFaultHandler onFault = null)
+            : base(stageName, stageType, ct, log, onFault)
         {
-            StageType = stageType;
-            CancellationToken = ct;
             DegreeOfParallelism = degreeOfParallelism;
             DrainAfterCancel = drainAfterCancel;
             WorkItemExecutionTimeTreshold = workItemExecutionTimeTreshold ?? TimeSpan.MaxValue;
             DelayWarningThreshold = delayWarningThreshold ?? TimeSpan.MaxValue;
             WorkItemStatusProvider = workItemStatusProvider;
         }
-
-        public Type StageType { get; }
-        
-        public CancellationToken CancellationToken { get; }
 
         public int DegreeOfParallelism { get; }
 
@@ -87,8 +97,16 @@ namespace Orleans.Runtime
 
     internal class SingleThreadExecutorOptions : ExecutorOptions
     {
-        public SingleThreadExecutorOptions(string stageName, ILogger log) : base(stageName, log)
+        public SingleThreadExecutorOptions(
+            string stageName,
+            Type stageType,
+            CancellationToken ct, 
+            ILogger log, 
+            ExecutorFaultHandler onFault = null) 
+            : base(stageName, stageType, ct, log, onFault)
         {
         }
     }
+
+    internal delegate void ExecutorFaultHandler(Exception ex, string executorExplanation);
 }

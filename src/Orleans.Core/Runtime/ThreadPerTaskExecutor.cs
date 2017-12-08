@@ -31,13 +31,22 @@ namespace Orleans.Runtime
             {
                 try
                 {
+                    CounterStatistic.SetOrleansManagedThread(); // do it before using CounterStatistic.
                     TrackExecutionStart();
                     callback.Invoke(state);
-                    TrackExecutionStop();
                 }
-                catch (Exception ex)
+                catch (Exception exc)
                 {
-                    executorOptions.Log.LogError(ex, $"Executor thread {Thread.CurrentThread.Name} encoundered unexpected exception.");
+                    if (!executorOptions.CancellationToken.IsCancellationRequested) // If we're stopping, ignore exceptions
+                    {
+                        var explanation =
+                            $"Executor thread {executorOptions.StageName} of {executorOptions.StageName} stage encountered unexpected exception.";
+                        executorOptions.OnFault?.Invoke(exc, explanation);
+                    }
+                }
+                finally
+                {
+                    TrackExecutionStop();
                 }
             })
             {
@@ -48,8 +57,18 @@ namespace Orleans.Runtime
 
         public int WorkQueueCount => 0;
 
+        public bool CheckHealth(DateTime lastCheckTime)
+        {
+            return true;
+        }
+
         private void TrackExecutionStart()
         {
+            executorOptions.Log.Info(
+                $"Starting Executor {executorOptions.StageName} for stage {executorOptions.StageTypeName} on managed thread {Thread.CurrentThread.ManagedThreadId}");
+            CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.RUNTIME_THREADS_ASYNC_AGENT_PERAGENTTYPE, executorOptions.StageTypeName)).Increment();
+            CounterStatistic.FindOrCreate(StatisticNames.RUNTIME_THREADS_ASYNC_AGENT_TOTAL_THREADS_CREATED).Increment();
+
 #if TRACK_DETAILED_STATS
                 if (StatisticsCollector.CollectThreadTimeTrackingStats)
                 {
@@ -60,17 +79,19 @@ namespace Orleans.Runtime
 
         private void TrackExecutionStop()
         {
+            CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.RUNTIME_THREADS_ASYNC_AGENT_PERAGENTTYPE, executorOptions.StageTypeName)).DecrementBy(1);
+            executorOptions.Log.Info(
+                ErrorCode.Runtime_Error_100328,
+                "Stopping AsyncAgent {0} that runs on managed thread {1}",
+                executorOptions.StageName,
+                Thread.CurrentThread.ManagedThreadId);
+
 #if TRACK_DETAILED_STATS
                 if (StatisticsCollector.CollectThreadTimeTrackingStats)
                 {
                     threadTracking.OnStopExecution();
                 }
 #endif
-        }
-
-        public bool CheckHealth(DateTime lastCheckTime)
-        {
-            return true;
         }
     }
 }
