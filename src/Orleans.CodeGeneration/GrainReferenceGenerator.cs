@@ -136,7 +136,7 @@ namespace Orleans.CodeGenerator
         private static MemberDeclarationSyntax[] GenerateInvokeMethods(Type grainType, Action<Type> onEncounteredType)
         {
             var baseReference = SF.BaseExpression();
-            var invokeMethodArgumentsType = typeof(InvokeMethodArguments).GetTypeSyntax();
+            var invokeMethodArgumentsType = typeof(GrainCallArguments).GetTypeSyntax();
             var methods = GrainInterfaceUtils.GetMethods(grainType);
             var members = new List<MemberDeclarationSyntax>();
             foreach (var method in methods)
@@ -172,20 +172,16 @@ namespace Orleans.CodeGenerator
                         allParameters.Add(SF.TypeOfExpression(typeParameter.GetTypeSyntax()));
                     }
 
-                    allParameters.AddRange(parameters.Select(GetParameterForInvocation));
+                    allParameters.AddRange(parameters.Select((p, i) => GetParameterForInvocation(p, i, true)));
 
                     args =
-                        SF.InvocationExpression(invokeMethodArgumentsType.Member(allParameters.Count > 1 ? "FromArguments" : "FromArgument"))
+                        SF.InvocationExpression(invokeMethodArgumentsType.Member("Create"))
                             .AddArgumentListArguments(allParameters.Select(p => SF.Argument(p)).ToArray());
-                }
-                else if (parameters.Length == 0)
-                {
-                    args = invokeMethodArgumentsType.Member("Empty");
                 }
                 else
                 {
                     args =
-                        SF.InvocationExpression(invokeMethodArgumentsType.Member(parameters.Length > 1 ? "FromArguments" : "FromArgument"))
+                        SF.InvocationExpression(invokeMethodArgumentsType.Member("Create"))
                             .AddArgumentListArguments(
                                 parameters.Select((p, i) => SF.Argument(GetParameterForInvocation(p, i))).ToArray());
                 }
@@ -226,7 +222,7 @@ namespace Orleans.CodeGenerator
                                          ? typeof(object)
                                          : method.ReturnType.GenericTypeArguments[0];
                     var invocation =
-                        SF.InvocationExpression(baseReference.Member("InvokeMethodAsync", returnType))
+                        SF.InvocationExpression(baseReference.Member("InvokeMethodAsync", GetMethodArgumentsType(method), returnType))
                             .AddArgumentListArguments(methodIdArgument)
                             .AddArgumentListArguments(SF.Argument(args));
 
@@ -299,7 +295,7 @@ namespace Orleans.CodeGenerator
             return SF.Argument(SF.NameColon("options"), SF.Token(SyntaxKind.None), allOptions);
         }
 
-         private static ExpressionSyntax GetParameterForInvocation(ParameterInfo arg, int argIndex)
+         private static ExpressionSyntax GetParameterForInvocation(ParameterInfo arg, int argIndex, bool asObject = false)
         {
             var argIdentifier = arg.GetOrCreateName(argIndex).ToIdentifierName();
 
@@ -307,14 +303,15 @@ namespace Orleans.CodeGenerator
             if (typeof(IAddressable).GetTypeInfo().IsAssignableFrom(arg.ParameterType)
                 && arg.ParameterType.GetTypeInfo().IsInterface)
             {
+                ExpressionSyntax invocExp = SF.InvocationExpression(argIdentifier.Member("AsReference", arg.ParameterType));
                 return
                     SF.ConditionalExpression(
                         SF.BinaryExpression(SyntaxKind.IsExpression, argIdentifier, typeof(Grain).GetTypeSyntax()),
-                        SF.InvocationExpression(argIdentifier.Member("AsReference", arg.ParameterType)),
+                        asObject ? SF.CastExpression(typeof(object).GetTypeSyntax(), invocExp) : invocExp,
                         argIdentifier);
             }
 
-            return argIdentifier;
+            return asObject ? (ExpressionSyntax)SF.CastExpression(typeof(object).GetTypeSyntax(), argIdentifier) : argIdentifier;
         }
 
         private static MemberDeclarationSyntax GenerateInterfaceIdProperty(Type grainType)
@@ -417,6 +414,32 @@ namespace Orleans.CodeGenerator
                 SF.SwitchStatement(interfaceIdArgument).AddSections(interfaceCases.ToArray()).AddSections(defaultCase);
 
             return methodDeclaration.AddBodyStatements(interfaceIdSwitch);
+        }
+
+        internal static Type GetMethodArgumentsType(MethodInfo method)
+        {
+            var parameters = new List<Type>();
+            var genParameters = method.GetGenericArguments();
+            bool asObj = false;
+
+            if (method.IsGenericMethodDefinition)
+            {
+                parameters.AddRange(Enumerable.Repeat(typeof(Type), method.GetGenericArguments().Length));
+                asObj = true;
+            }
+
+            var methodParameters = method.GetParameters().ToList();
+            for (var i = 0; i < methodParameters.Count; i++)
+            {
+                var parameter = methodParameters[i];
+                var parameterType = (asObj || genParameters.Contains(parameter.ParameterType)) ? typeof(object) : parameter.ParameterType;
+                parameters.Add(parameterType);
+            }
+
+            var argType = GrainCallArguments.GetGenericDefinition(parameters.Count);
+            if (parameters.Count != 0)
+                argType = argType.MakeGenericType(parameters.ToArray());
+            return argType;
         }
     }
 }

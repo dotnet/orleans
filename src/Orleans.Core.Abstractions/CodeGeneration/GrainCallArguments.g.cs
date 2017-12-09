@@ -1015,5 +1015,31 @@ namespace Orleans.CodeGeneration
 		public static GrainCallArguments<T1, T2, T3, T4, T5, T6, T7, T8> Create<T1, T2, T3, T4, T5, T6, T7, T8>(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5, T6 item6, T7 item7, T8 item8) =>
 			new GrainCallArguments<T1, T2, T3, T4, T5, T6, T7, T8>(item1, item2, item3, item4, item5, item6, item7, item8);
 
+		public static Type GetGenericDefinition(int argumentsCount)
+		{
+			switch(argumentsCount)
+			{
+				case 0:
+					return typeof(GrainCallArguments);
+				case 1:
+					return typeof(GrainCallArguments<>);
+				case 2:
+					return typeof(GrainCallArguments<,>);
+				case 3:
+					return typeof(GrainCallArguments<,,>);
+				case 4:
+					return typeof(GrainCallArguments<,,,>);
+				case 5:
+					return typeof(GrainCallArguments<,,,,>);
+				case 6:
+					return typeof(GrainCallArguments<,,,,,>);
+				case 7:
+					return typeof(GrainCallArguments<,,,,,,>);
+				case 8:
+					return typeof(GrainCallArguments<,,,,,,,>);
+				default:
+					throw new ArgumentOutOfRangeException();
+			}
+		}
 	}
 }

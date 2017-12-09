@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
@@ -21,6 +22,8 @@ namespace Orleans.CodeGeneration
         /// <param name="request">The request being invoked.</param>
         /// <returns>Value promise for the result of the method invoke.</returns>
         Task<object> Invoke(IAddressable grain, InvokeMethodRequest request);
+
+        Type GetMethodArgumentsType(int interfaceId, int methodId);
     }
 
     /// <summary>
@@ -51,5 +54,10 @@ namespace Orleans.CodeGeneration
         /// <see langword="true"/> if the extension is found, <see langword="false"/> otherwise.
         /// </returns>
         bool TryGetExtension(int interfaceId, out IGrainExtension extension);
+    }
+
+    public interface IGrainMethodInvokerFinder
+    {
+        IGrainMethodInvoker GetInvoker(int interfaceId, string genericGrainType = null);
     }
 }

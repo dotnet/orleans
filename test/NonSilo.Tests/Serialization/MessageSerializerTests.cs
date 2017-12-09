@@ -36,7 +36,7 @@ namespace UnitTests.Serialization
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public async Task MessageTest_TtlUpdatedOnAccess()
         {
-            var request = new InvokeMethodRequest(0, 0, 0, InvokeMethodArguments.Empty);
+            var request = new InvokeMethodRequest<GrainCallArguments>(0, 0, 0);
             var message = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None);
 
             message.TimeToLive = TimeSpan.FromSeconds(1);
@@ -47,7 +47,7 @@ namespace UnitTests.Serialization
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public async Task MessageTest_TtlUpdatedOnSerialization()
         {
-            var request = new InvokeMethodRequest(0, 0, 0, InvokeMethodArguments.Empty);
+            var request = new InvokeMethodRequest<GrainCallArguments>(0, 0, 0);
             var message = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None);
 
             message.TimeToLive = TimeSpan.FromSeconds(1);
@@ -73,7 +73,7 @@ namespace UnitTests.Serialization
 
         private void RunTest(int numItems)
         {
-            InvokeMethodRequest request = new InvokeMethodRequest(0, 2, 0, InvokeMethodArguments.Empty);
+            InvokeMethodRequest request = new InvokeMethodRequest<GrainCallArguments>(0, 2, 0);
             Message resp = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None);
             resp.Id = new CorrelationId();
             resp.SendingSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 200), 0);

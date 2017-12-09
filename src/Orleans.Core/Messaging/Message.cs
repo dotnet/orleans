@@ -392,13 +392,13 @@ namespace Orleans.Runtime
             set { Headers.RequestContextData = value; }
         }
 
-        public object GetDeserializedBody(SerializationManager serializationManager)
+        public object GetDeserializedBody(SerializationManager serializationManager, Type expectedType = null)
         {
             if (this.bodyObject != null) return this.bodyObject;
             
             try
             {
-                this.bodyObject = DeserializeBody(serializationManager, this.bodyBytes);
+                this.bodyObject = DeserializeBody(serializationManager, this.bodyBytes, expectedType);
             }
             finally
             {
@@ -424,7 +424,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private static object DeserializeBody(SerializationManager serializationManager, List<ArraySegment<byte>> bytes)
+        private static object DeserializeBody(SerializationManager serializationManager, List<ArraySegment<byte>> bytes, Type expectedType = null)
         {
             if (bytes == null)
             {
@@ -432,7 +432,7 @@ namespace Orleans.Runtime
             }
 
             var stream = new BinaryTokenStreamReader(bytes);
-            return serializationManager.Deserialize(stream);
+            return serializationManager.Deserialize(expectedType, stream);
         }
 
         public Message()
@@ -496,7 +496,7 @@ namespace Orleans.Runtime
             if (bodyBytes == null)
             {
                 var bodyStream = new BinaryTokenStreamWriter();
-                serializationManager.Serialize(bodyObject, bodyStream);
+                serializationManager.Serialize(bodyObject, bodyStream, null);
                 // We don't bother to turn this into a byte array and save it in bodyBytes because Serialize only gets called on a message
                 // being sent off-box. In this case, the likelihood of needed to re-serialize is very low, and the cost of capturing the
                 // serialized bytes from the steam -- where they're a list of ArraySegment objects -- into an array of bytes is actually

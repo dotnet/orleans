@@ -102,6 +102,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ISiloPerformanceMetrics>(sp => sp.GetRequiredService<SiloStatisticsManager>().MetricsTable);
             services.TryAddFromExisting<ICorePerformanceMetrics, ISiloPerformanceMetrics>();
             services.TryAddSingleton<GrainTypeManager>();
+            services.TryAddSingleton(sp => sp.GetRequiredService<GrainTypeManager>());
             services.TryAddSingleton<MessageCenter>();
             services.TryAddFromExisting<IMessageCenter, MessageCenter>();
             services.TryAddFromExisting<ISiloMessageCenter, MessageCenter>();

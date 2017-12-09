@@ -638,7 +638,7 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="original">The input data to be deep copied.</param>
         /// <returns>Deep copied clone of the original input object.</returns>
-        public T DeepCopy<T>(T original)
+        public object DeepCopy(object original)
         {
             DeepCopyInPlace(ref original);
             return original;
@@ -735,7 +735,7 @@ namespace Orleans.Serialization
             {
                 copy = serializer.DeepCopy(original, context);
                 context.RecordCopy(original, copy);
-                original = (T)reference;
+                original = (T)copy;
                 return;
             }
 
@@ -744,7 +744,7 @@ namespace Orleans.Serialization
             {
                 copy = copier(original, context);
                 context.RecordCopy(original, copy);
-                original = (T)reference;
+                original = (T)copy;
                 return;
             }
 
@@ -899,6 +899,11 @@ namespace Orleans.Serialization
         /// <param name="stream">The output stream to write to.</param>
         public void Serialize(object raw, IBinaryTokenStreamWriter stream)
         {
+            Serialize(raw, stream, null);
+        }
+
+        internal void Serialize(object raw, IBinaryTokenStreamWriter stream, Type expectedType)
+        {
             Stopwatch timer = null;
             if (StatisticsCollector.CollectSerializationStats)
             {
@@ -910,10 +915,10 @@ namespace Orleans.Serialization
             var context = this.serializationContext.Value;
             context.Reset();
             context.StreamWriter = stream;
-            SerializeInner(raw, context, null);
+            SerializeInner(raw, context, expectedType);
             context.Reset();
-            
-            if (timer!=null)
+
+            if (timer != null)
             {
                 timer.Stop();
                 SerTimeStatistic.IncrementBy(timer.ElapsedTicks);

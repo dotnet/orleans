@@ -128,6 +128,9 @@ namespace Orleans.Runtime
             return this.Result;
         }
 
+        Type IGrainMethodInvoker.GetMethodArgumentsType(int interfaceId, int methodId) =>
+            rootInvoker.GetMethodArgumentsType(interfaceId, methodId);
+
         private void ValidateArguments(IAddressable grain, InvokeMethodRequest invokeMethodRequest)
         {
             if (!Equals(this.Grain, grain))

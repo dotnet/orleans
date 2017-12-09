@@ -16,7 +16,7 @@ using Orleans.Utilities;
 
 namespace Orleans.Runtime
 {
-    internal class GrainTypeManager
+    internal class GrainTypeManager : IGrainMethodInvokerFinder
     {
         private Dictionary<SiloAddress, GrainInterfaceMap> grainInterfaceMapsBySilo;
         private Dictionary<int, List<SiloAddress>> supportedSilosByTypeCode;
@@ -254,7 +254,7 @@ namespace Orleans.Runtime
             return grainTypes.Keys.ToArray();
         }
 
-        internal IGrainMethodInvoker GetInvoker(int interfaceId, string genericGrainType = null)
+        public IGrainMethodInvoker GetInvoker(int interfaceId, string genericGrainType = null)
         {
             try
             {

@@ -119,6 +119,17 @@ namespace Orleans.Runtime
                 return invoker.Invoke(extension, request);
             }
 
+            public Type GetMethodArgumentsType(int interfaceId, int methodId)
+            {
+                if (extensionMap == null || !extensionMap.ContainsKey(interfaceId))
+                    throw new InvalidOperationException(
+                        String.Format("Extension invoker invoked with an unknown inteface ID:{0}.", interfaceId));
+
+                var invoker = extensionMap[interfaceId].Item2;
+                var extension = extensionMap[interfaceId].Item1;
+                return invoker.GetMethodArgumentsType(interfaceId, methodId);
+            }
+
             public bool IsExtensionInstalled(int interfaceId)
             {
                 return extensionMap != null && extensionMap.ContainsKey(interfaceId);

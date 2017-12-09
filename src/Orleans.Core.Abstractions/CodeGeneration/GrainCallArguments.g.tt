@@ -142,5 +142,19 @@ for (int i = 1; i <= maxArgsCount; i++)
 <#
 }
 #>
+		public static Type GetGenericDefinition(int argumentsCount)
+		{
+			switch(argumentsCount)
+			{
+				case 0:
+					return typeof(GrainCallArguments);
+<# for (int i = 1; i <= maxArgsCount; i++) { #>
+				case <#= i #>:
+					return typeof(GrainCallArguments<<#= string.Concat(Enumerable.Repeat(",", i - 1)) #>>);
+<#} #>
+				default:
+					throw new ArgumentOutOfRangeException();
+			}
+		}
 	}
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Collections.ObjectModel;
@@ -7,6 +8,7 @@ using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Concurrency;
 using Orleans.Runtime;
@@ -2149,20 +2151,27 @@ namespace Orleans.Serialization
         internal static object CopyGenericInvokeMethodRequest(object original, ICopyContext context)
         {
             Type t = original.GetType();
-            var concreteMethods = RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeInvokeMethodRequest), nameof(DeserializeImmutableSortedSet), nameof(CopyImmutableSortedSet));
+            var concreteMethods = RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeInvokeMethodRequest), nameof(DeserializeInvokeMethodRequest), nameof(CopyInvokeMethodRequest));
             return concreteMethods.Item3(original, context);
         }
 
         internal static object DeserializeGenericInvokeMethodRequest(Type expected, IDeserializationContext context)
         {
-            var concreteMethods = RegisterConcreteMethods(context.GetSerializationManager(), expected, nameof(SerializeInvokeMethodRequest), nameof(DeserializeImmutableSortedSet), nameof(CopyImmutableSortedSet));
-            return concreteMethods.Item2(expected, context);
+            //if(expected.IsConstructedGenericType)
+            //{
+                var concreteMethods = RegisterConcreteMethods(context.GetSerializationManager(), expected, nameof(SerializeInvokeMethodRequest), nameof(DeserializeInvokeMethodRequest), nameof(CopyInvokeMethodRequest));
+                return concreteMethods.Item2(expected, context);
+            //}
+            //else
+            //{
+            //    return DeserializeGenericInvokeMethodRequestDeferred(context);
+            //}
         }
 
         internal static void SerializeGenericInvokeMethodRequest(object original, ISerializationContext context, Type expected)
         {
             Type t = original.GetType();
-            var concreteMethods = RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeInvokeMethodRequest), nameof(DeserializeImmutableSortedSet), nameof(CopyImmutableSortedSet));
+            var concreteMethods = RegisterConcreteMethods(context.GetSerializationManager(), t, nameof(SerializeInvokeMethodRequest), nameof(DeserializeInvokeMethodRequest), nameof(CopyInvokeMethodRequest));
             concreteMethods.Item1(original, context, expected);
         }
 
@@ -2208,6 +2217,36 @@ namespace Orleans.Serialization
             ushort iVersion = context.StreamReader.ReadUShort();
             int mid = context.StreamReader.ReadInt();
 
+            var request = new InvokeMethodRequest<TArgs>(iid, iVersion, mid);
+            if (request.Arguments.Length != 0)
+            {
+                request.Arguments.Visit(DeserializeInvokeMethodRequestVisitor.Default, context);
+            }
+
+            return request;
+        }
+
+        private static readonly ConcurrentDictionary<RuntimeTypeHandle, Func<int, ushort, int, IDeserializationContext, object>> _invokeMethodRequestDeserializers = new ConcurrentDictionary<RuntimeTypeHandle, Func<int, ushort, int, IDeserializationContext, object>>();
+
+        private static object DeserializeGenericInvokeMethodRequestDeferred(IDeserializationContext context)
+        {
+            int iid = context.StreamReader.ReadInt();
+            ushort iVersion = context.StreamReader.ReadUShort();
+            int mid = context.StreamReader.ReadInt();
+
+            var invoker = context.ServiceProvider.GetRequiredService<IGrainMethodInvokerFinder>().GetInvoker(iid);
+            var argsType = invoker.GetMethodArgumentsType(iid, mid);
+            var deserializer = _invokeMethodRequestDeserializers.GetOrAdd(argsType.TypeHandle, k =>
+            {
+                var method = typeof(BuiltInTypes).GetMethods(BindingFlags.Static | BindingFlags.NonPublic).First(m => m.Name == nameof(DeserializeGenericInvokeMethodRequestNoHeader));
+                return (Func<int, ushort, int, IDeserializationContext, object>)method.MakeGenericMethod(Type.GetTypeFromHandle(k)).CreateDelegate(typeof(Func<int, ushort, int, IDeserializationContext, object>));
+            });
+            return deserializer(iid, iVersion, mid, context);
+        }
+
+        private static object DeserializeGenericInvokeMethodRequestNoHeader<TArgs>(int iid, ushort iVersion, int mid, IDeserializationContext context)
+            where TArgs : struct, IGrainCallArguments
+        {
             var request = new InvokeMethodRequest<TArgs>(iid, iVersion, mid);
             if (request.Arguments.Length != 0)
             {

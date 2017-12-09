@@ -69,6 +69,7 @@ namespace Orleans.CodeGenerator
                 GenerateInvokeMethod(grainType),
                 GenerateInterfaceIdProperty(grainType),
                 GenerateInterfaceVersionProperty(grainType),
+                GenerateGetMethodArgumentsTypeMethod(grainType)
             };
 
             // If this is an IGrainExtension, make the generated class implement IGrainExtensionMethodInvoker.
@@ -77,7 +78,7 @@ namespace Orleans.CodeGenerator
                 baseTypes.Add(SF.SimpleBaseType(typeof(IGrainExtensionMethodInvoker).GetTypeSyntax()));
                 members.Add(GenerateExtensionInvokeMethod(grainType));
             }
-            
+
             var classDeclaration =
                 SF.ClassDeclaration(className)
                     .AddModifiers(SF.Token(SyntaxKind.InternalKeyword))
@@ -117,7 +118,7 @@ namespace Orleans.CodeGenerator
             var property = TypeUtils.Member((IGrainMethodInvoker _) => _.InterfaceVersion);
             var returnValue = SF.LiteralExpression(
                 SyntaxKind.NumericLiteralExpression,
-                SF.Literal(GrainInterfaceUtils.GetGrainInterfaceVersion(grainType))); 
+                SF.Literal(GrainInterfaceUtils.GetGrainInterfaceVersion(grainType)));
             return
                 SF.PropertyDeclaration(typeof(ushort).GetTypeSyntax(), property.Name)
                     .AddAccessorListAccessors(
@@ -202,22 +203,14 @@ namespace Orleans.CodeGenerator
                                 .WithInitializer(SF.EqualsValueClause(requestArgument.Member((InvokeMethodRequest _) => _.MethodId)))));
             var methodIdVariable = SF.IdentifierName("methodId");
 
-            var argumentsDeclaration =
-                SF.LocalDeclarationStatement(
-                    SF.VariableDeclaration(typeof(InvokeMethodArguments).GetTypeSyntax())
-                        .AddVariables(
-                            SF.VariableDeclarator("arguments")
-                                .WithInitializer(SF.EqualsValueClause(requestArgument.Member((InvokeMethodRequest _) => _.Arguments)))));
-            var argumentsVariable = SF.IdentifierName("arguments");
-
             var methodDeclaration = invokeMethod.GetDeclarationSyntax()
                 .AddModifiers(SF.Token(SyntaxKind.AsyncKeyword))
-                .AddBodyStatements(interfaceIdDeclaration, methodIdDeclaration, argumentsDeclaration);
+                .AddBodyStatements(interfaceIdDeclaration, methodIdDeclaration);
 
             var interfaceCases = CodeGeneratorCommon.GenerateGrainInterfaceAndMethodSwitch(
                 grainType,
                 methodIdVariable,
-                methodType => GenerateInvokeForMethod(grainType, grainArgument, methodType, argumentsVariable));
+                methodType => GenerateInvokeForMethod(grainType, grainArgument, methodType, requestArgument));
 
             // Generate the default case, which will throw a NotImplementedException.
             var errorMessage = SF.BinaryExpression(
@@ -259,8 +252,8 @@ namespace Orleans.CodeGenerator
         /// <param name="method">
         /// The method.
         /// </param>
-        /// <param name="arguments">
-        /// The arguments expression.
+        /// <param name="requestArgument">
+        /// The request argument expression.
         /// </param>
         /// <returns>
         /// Syntax to invoke a method on a grain.
@@ -269,21 +262,28 @@ namespace Orleans.CodeGenerator
             Type grainType,
             IdentifierNameSyntax grain,
             MethodInfo method,
-            ExpressionSyntax arguments)
+            ExpressionSyntax requestArgument)
         {
             var castGrain = SF.ParenthesizedExpression(SF.CastExpression(grainType.GetTypeSyntax(), grain));
+            var argsType = GrainReferenceGenerator.GetMethodArgumentsType(method);
+            var reqestType = typeof(InvokeMethodRequest<>).MakeGenericType(argsType);
+            var arguments = SF.ParenthesizedExpression(SF.CastExpression(reqestType.GetTypeSyntax(), requestArgument))
+                .Member((InvokeMethodRequest r) => r.Arguments);
+
+            var argumentsDeclaration =
+                SF.LocalDeclarationStatement(
+                    SF.VariableDeclaration(argsType.GetTypeSyntax())
+                        .AddVariables(
+                            SF.VariableDeclarator("arguments")
+                                .WithInitializer(SF.EqualsValueClause(arguments))));
+            var argumentsVariable = SF.IdentifierName("arguments");
 
             // Construct expressions to retrieve each of the method's parameters.
             var parameters = new List<ExpressionSyntax>();
             var methodParameters = method.GetParameters().ToList();
             for (var i = 0; i < methodParameters.Count; i++)
             {
-                var parameter = methodParameters[i];
-                var parameterType = parameter.ParameterType.GetTypeSyntax();
-                var indexArg = SF.Argument(SF.LiteralExpression(SyntaxKind.NumericLiteralExpression, SF.Literal(i)));
-                var arg = SF.CastExpression(
-                    parameterType,
-                    SF.ElementAccessExpression(arguments).AddArgumentListArguments(indexArg));
+                var arg = argumentsVariable.Member("Item" + (i + 1));
                 parameters.Add(arg);
             }
 
@@ -293,7 +293,7 @@ namespace Orleans.CodeGenerator
                 var invokerFieldName = GetGenericMethodInvokerFieldName(method);
                 var invokerCall = SF.InvocationExpression(
                                         SF.IdentifierName(invokerFieldName)
-                                          .Member((GenericMethodInvoker invoker) => invoker.Invoke(null, default(InvokeMethodArguments))))
+                                          .Member((GenericMethodInvoker invoker) => invoker.Invoke(null, default(IGrainCallArguments))))
                                     .AddArgumentListArguments(SF.Argument(grain), SF.Argument(arguments));
                 return new StatementSyntax[] { SF.ReturnStatement(SF.AwaitExpression(invokerCall)) };
             }
@@ -308,8 +308,10 @@ namespace Orleans.CodeGenerator
             {
                 return new StatementSyntax[]
                 {
-                    SF.ExpressionStatement(grainMethodCall),
-                    SF.ReturnStatement(SF.LiteralExpression(SyntaxKind.NullLiteralExpression))
+                    SF.Block(
+                        argumentsDeclaration,
+                        SF.ExpressionStatement(grainMethodCall),
+                        SF.ReturnStatement(SF.LiteralExpression(SyntaxKind.NullLiteralExpression)))
                 };
             }
 
@@ -318,14 +320,18 @@ namespace Orleans.CodeGenerator
             {
                 return new StatementSyntax[]
                 {
-                    SF.ExpressionStatement(SF.AwaitExpression(grainMethodCall)),
-                    SF.ReturnStatement(SF.LiteralExpression(SyntaxKind.NullLiteralExpression))
+                    SF.Block(
+                        argumentsDeclaration,
+                        SF.ExpressionStatement(SF.AwaitExpression(grainMethodCall)),
+                        SF.ReturnStatement(SF.LiteralExpression(SyntaxKind.NullLiteralExpression)))
                 };
             }
-            
+
             return new StatementSyntax[]
             {
-                SF.ReturnStatement(SF.AwaitExpression(grainMethodCall))
+                SF.Block(
+                    argumentsDeclaration,
+                    SF.ReturnStatement(SF.AwaitExpression(grainMethodCall)))
             };
         }
 
@@ -385,6 +391,61 @@ namespace Orleans.CodeGenerator
         private static string GetGenericMethodInvokerFieldName(MethodInfo method)
         {
             return method.Name + string.Join("_", method.GetGenericArguments().Select(arg => arg.Name));
+        }
+
+        private static MethodDeclarationSyntax GenerateGetMethodArgumentsTypeMethod(Type grainType)
+        {
+            // Get the method with the correct type.
+            var getMethodArgumentsTypeMethod =
+                TypeUtils.Method(
+                    (IGrainMethodInvoker x) =>
+                    x.GetMethodArgumentsType(default(int), default(int)));
+
+            return GenerateGetMethodArgumentsTypeMethod(grainType, getMethodArgumentsTypeMethod);
+        }
+
+        private static MethodDeclarationSyntax GenerateGetMethodArgumentsTypeMethod(Type grainType, MethodInfo getMethodArgumentsTypeMethod)
+        {
+            var parameters = getMethodArgumentsTypeMethod.GetParameters();
+
+            var interfaceIdArgument = parameters[0].Name.ToIdentifierName();
+            var methodIdArgument = parameters[1].Name.ToIdentifierName();
+
+            var methodDeclaration = getMethodArgumentsTypeMethod.GetDeclarationSyntax();
+
+            var interfaceCases = CodeGeneratorCommon.GenerateGrainInterfaceAndMethodSwitch(
+                grainType,
+                methodIdArgument,
+                methodType => GenerateGetMethodArgumentsTypeForMethod(grainType, methodType));
+
+            // Generate the default case, which will throw a NotImplementedException.
+            var errorMessage = SF.BinaryExpression(
+                SyntaxKind.AddExpression,
+                "interfaceId=".GetLiteralExpression(),
+                interfaceIdArgument);
+            var throwStatement =
+                SF.ThrowStatement(
+                    SF.ObjectCreationExpression(typeof(NotImplementedException).GetTypeSyntax())
+                        .AddArgumentListArguments(SF.Argument(errorMessage)));
+            var defaultCase = SF.SwitchSection().AddLabels(SF.DefaultSwitchLabel()).AddStatements(throwStatement);
+            var interfaceIdSwitch =
+                SF.SwitchStatement(interfaceIdArgument).AddSections(interfaceCases.ToArray()).AddSections(defaultCase);
+
+            // If the provided grain is null, throw an argument exception.
+            var argumentNullException =
+                SF.ObjectCreationExpression(typeof(ArgumentNullException).GetTypeSyntax())
+                    .AddArgumentListArguments(SF.Argument(parameters[0].Name.GetLiteralExpression()));
+
+            return methodDeclaration.AddBodyStatements(interfaceIdSwitch);
+        }
+
+        private static StatementSyntax[] GenerateGetMethodArgumentsTypeForMethod(Type grainType, MethodInfo method)
+        {
+            var argType = GrainReferenceGenerator.GetMethodArgumentsType(method);
+            return new StatementSyntax[]
+            {
+                SF.ReturnStatement(SF.TypeOfExpression(argType.GetTypeSyntax()))
+            };
         }
     }
 }
