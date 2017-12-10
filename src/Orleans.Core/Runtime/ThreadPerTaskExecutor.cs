@@ -8,7 +8,7 @@ namespace Orleans.Runtime
     {
         private readonly SingleThreadExecutorOptions executorOptions;
 
-#if TRACK_DETAILED_STATS
+#if TRACK_DETAILED_STATS // todo: make it const bool 
         internal protected ThreadTrackingStatistic threadTracking;
 #endif
 
@@ -32,7 +32,7 @@ namespace Orleans.Runtime
             {
                 try
                 {
-                    CounterStatistic.SetOrleansManagedThread(); // must be called before using CounterStatistic.
+                    CounterStatistic.SetOrleansManagedThread(); // must be called before using CounterStatistic. todo?
                     TrackExecutionStart();
                     callback.Invoke(state);
                 }
@@ -60,7 +60,7 @@ namespace Orleans.Runtime
 
         private void HandleExecutionException(Exception exc)
         {
-            if (executorOptions.CancellationToken.IsCancellationRequested) return; // If we're stopping, ignore exceptions
+            if (executorOptions.CancellationToken.IsCancellationRequested) return;
 
             var explanation =
                 $"Executor thread {executorOptions.Name} of {executorOptions.StageTypeName} stage encountered unexpected exception.";
@@ -82,13 +82,14 @@ namespace Orleans.Runtime
                 new StatisticName(StatisticNames.RUNTIME_THREADS_ASYNC_AGENT_PERAGENTTYPE, executorOptions.StageTypeName)).Increment();
 
             executorOptions.Log.Info(
-                $"Starting Executor {executorOptions.Name} for stage {executorOptions.StageTypeName} on managed thread {Thread.CurrentThread.ManagedThreadId}");
-            
+                $"Starting Executor {executorOptions.Name} for stage {executorOptions.StageTypeName} " +
+                $"on managed thread {Thread.CurrentThread.ManagedThreadId}");
+
 #if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                {
-                    threadTracking.OnStartExecution();
-                }
+            if (StatisticsCollector.CollectThreadTimeTrackingStats)
+            {
+                threadTracking.OnStartExecution();
+            }
 #endif
         }
 
@@ -104,10 +105,10 @@ namespace Orleans.Runtime
                 Thread.CurrentThread.ManagedThreadId);
 
 #if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                {
-                    threadTracking.OnStopExecution();
-                }
+            if (StatisticsCollector.CollectThreadTimeTrackingStats)
+            {
+                threadTracking.OnStopExecution();
+            }
 #endif
         }
     }
