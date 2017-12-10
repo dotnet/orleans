@@ -108,7 +108,7 @@ for (int i = 1; i <= maxArgsCount; i++)
             {
 				if(_index < <#= i #>)
 				{
-					_current = _args.Item<#= i #>;
+					_current = _args[_index];
 					_index++;
 					return true;
 				}

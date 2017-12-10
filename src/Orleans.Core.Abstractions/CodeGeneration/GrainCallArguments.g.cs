@@ -84,7 +84,7 @@ namespace Orleans.CodeGeneration
             {
 				if(_index < 1)
 				{
-					_current = _args.Item1;
+					_current = _args[_index];
 					_index++;
 					return true;
 				}
@@ -184,7 +184,7 @@ namespace Orleans.CodeGeneration
             {
 				if(_index < 2)
 				{
-					_current = _args.Item2;
+					_current = _args[_index];
 					_index++;
 					return true;
 				}
@@ -293,7 +293,7 @@ namespace Orleans.CodeGeneration
             {
 				if(_index < 3)
 				{
-					_current = _args.Item3;
+					_current = _args[_index];
 					_index++;
 					return true;
 				}
@@ -411,7 +411,7 @@ namespace Orleans.CodeGeneration
             {
 				if(_index < 4)
 				{
-					_current = _args.Item4;
+					_current = _args[_index];
 					_index++;
 					return true;
 				}
@@ -538,7 +538,7 @@ namespace Orleans.CodeGeneration
             {
 				if(_index < 5)
 				{
-					_current = _args.Item5;
+					_current = _args[_index];
 					_index++;
 					return true;
 				}
@@ -674,7 +674,7 @@ namespace Orleans.CodeGeneration
             {
 				if(_index < 6)
 				{
-					_current = _args.Item6;
+					_current = _args[_index];
 					_index++;
 					return true;
 				}
@@ -819,7 +819,7 @@ namespace Orleans.CodeGeneration
             {
 				if(_index < 7)
 				{
-					_current = _args.Item7;
+					_current = _args[_index];
 					_index++;
 					return true;
 				}
@@ -973,7 +973,7 @@ namespace Orleans.CodeGeneration
             {
 				if(_index < 8)
 				{
-					_current = _args.Item8;
+					_current = _args[_index];
 					_index++;
 					return true;
 				}
