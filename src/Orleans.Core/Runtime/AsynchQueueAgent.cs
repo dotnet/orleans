@@ -1,10 +1,11 @@
 using System;
 using System.Threading;
 using Microsoft.Extensions.Logging;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
 {
-    internal abstract class AsynchQueueAgent<T> : AsynchAgent where T : IOutgoingMessage
+    internal abstract class AsynchQueueAgent<T> : AsynchAgent
     {
         protected AsynchQueueAgent(string nameSuffix, ExecutorService executorService, ILoggerFactory loggerFactory)
             : base(nameSuffix, executorService, loggerFactory)
@@ -30,9 +31,24 @@ namespace Orleans.Runtime
 
         protected override ExecutorOptions GetExecutorOptions()
         {
-            return new ThreadPoolExecutorOptions(Name, GetType(), Cts.Token, Log, drainAfterCancel: DrainAfterCancel, faultHandler: ExecutorFaultHandler);
+            return new ThreadPoolExecutorOptions(
+                Name,
+                GetType(),
+                Cts.Token,
+                Log,
+                drainAfterCancel: DrainAfterCancel,
+                faultHandler: ExecutorFaultHandler);
         }
 
-        internal virtual bool DrainAfterCancel { get; } = false;
+        internal static TimeSpan TurnWarningLengthThreshold { get; set; }
+
+        //// This is the maximum number of pending work items for a single activation before we write a warning log.
+        internal LimitValue MaxPendingItemsLimit { get; private set; }
+
+        internal TimeSpan DelayWarningThreshold { get; private set; }
+
+        protected virtual bool DrainAfterCancel { get; } = false;
+
+        // trackQueueStatistic, statistic name todo: add? 
     }
 }

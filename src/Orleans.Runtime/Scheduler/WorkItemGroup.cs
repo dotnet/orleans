@@ -380,7 +380,7 @@ namespace Orleans.Runtime.Scheduler
 #endif
                         totalItemsProcessed++;
                         var taskLength = stopwatch.Elapsed - taskStart;
-                        if (taskLength > OrleansTaskScheduler.TurnWarningLengthThreshold)
+                        if (taskLength > OrleansTaskScheduler.TurnWarningLengthThreshold) // todo: remove hard reference
                         {
                             SchedulerStatisticsGroup.NumLongRunningTurns.Increment();
                             log.Warn(ErrorCode.SchedulerTurnTooLong3, "Task {0} in WorkGroup {1} took elapsed time {2:g} for execution, which is longer than {3}. Running on thread {4}",

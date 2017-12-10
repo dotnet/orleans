@@ -34,7 +34,7 @@ namespace Orleans.Runtime
             Type stageType,
             CancellationToken cancellationToken, 
             ILogger log, 
-            ExecutorFaultHandler faultHandler)
+            ExecutorFaultHandler faultHandler = null)
         {
             Name = name;
             StageType = stageType;

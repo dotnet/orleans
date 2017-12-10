@@ -438,6 +438,7 @@ namespace Orleans.Runtime
             //TODO: Setup all (or as many as possible) of the class started in this call to work directly with lifecyce
 
             // The order of these 4 is pretty much arbitrary.
+            scheduler.Start();
             messageCenter.Start();
             incomingPingAgent.Start();
             incomingSystemAgent.Start();

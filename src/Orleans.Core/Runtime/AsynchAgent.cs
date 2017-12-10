@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
-    internal abstract class AsynchAgent : IDisposable
+    internal abstract class AsynchAgent : IHealthCheckable, IDisposable
     {
         public enum FaultBehavior
         {
@@ -28,6 +28,7 @@ namespace Orleans.Runtime
 #endif
 
         public ThreadState State { get; protected set; }
+
         internal string Name { get; private set; }
 
         protected AsynchAgent(string nameSuffix, ExecutorService executorService, ILoggerFactory loggerFactory)
@@ -167,9 +168,14 @@ namespace Orleans.Runtime
             return Name;
         }
 
+        public bool CheckHealth(DateTime lastCheckTime)
+        {
+            return executor.CheckHealth(lastCheckTime);
+        }
+
         internal static bool IsStarting { get; set; }
 
-        protected abstract ExecutorOptions GetExecutorOptions();
+        protected abstract ExecutorOptions GetExecutorOptions(); // todo: make getter
 
         protected void ExecutorFaultHandler(Exception ex, string executorExplanation)
         {
