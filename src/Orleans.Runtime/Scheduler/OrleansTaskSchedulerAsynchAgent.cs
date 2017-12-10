@@ -12,83 +12,40 @@ using Orleans.Runtime.Counters;
 
 namespace Orleans.Runtime.Scheduler
 {
-    internal class OrleansSchedulerSystemAgent : OrleansSchedulerAsynchAgent
+    internal class OrleansSchedulerAsynchAgent : AsynchQueueAgent<IWorkItem>
     {
-        public OrleansSchedulerSystemAgent(
-            string nameSuffix,
-            ExecutorService executorService, 
-            int maxDegreeOfParalelism,
-            TimeSpan delayWarningThreshold,
-            TimeSpan turnWarningLengthThreshold,
-            TaskScheduler scheduler,
-            ILoggerFactory loggerFactory) : base(
-                nameSuffix,
-                executorService,
-                maxDegreeOfParalelism,
-                delayWarningThreshold,
-                turnWarningLengthThreshold, 
-                scheduler,
-                loggerFactory)
-        {
-        }
-        protected override bool DrainAfterCancel => true;
-    }
-
-    internal class OrleansSchedulerMainAgent : OrleansSchedulerAsynchAgent
-    {
-        public OrleansSchedulerMainAgent(
-            string nameSuffix,
-            ExecutorService executorService,
-            int maxDegreeOfParalelism,
-            TimeSpan delayWarningThreshold, 
-            TimeSpan turnWarningLengthThreshold,
-            TaskScheduler scheduler,
-            ILoggerFactory loggerFactory) :
-            base(
-                nameSuffix,
-                executorService,
-                maxDegreeOfParalelism,
-                delayWarningThreshold,
-                turnWarningLengthThreshold,
-                scheduler,
-                loggerFactory)
-        {
-        }
-    }
-
-    internal abstract class OrleansSchedulerAsynchAgent : AsynchQueueAgent<IWorkItem>
-    {
-   //     private readonly QueueTrackingStatistic queueTracking; //todo
+        private readonly QueueTrackingStatistic queueTracking;
         private readonly ThreadPoolExecutorOptions executorOptions;
-
         private readonly TaskScheduler taskScheduler;
 
         public OrleansSchedulerAsynchAgent(
             string name,
+            string queueTrackingName,
             ExecutorService executorService,
             int maxDegreeOfParalelism, 
             TimeSpan delayWarningThreshold, 
             TimeSpan turnWarningLengthThreshold,
             TaskScheduler scheduler,
+            bool drainAfterCancel,
             ILoggerFactory loggerFactory) : base(name, executorService, loggerFactory)
         {
+            // todo: probably asynch agent should accept executor options
             executorOptions = new ThreadPoolExecutorOptions(
                 Name,
                 GetType(),
                 Cts.Token,
                 Log,
                 maxDegreeOfParalelism,
-                DrainAfterCancel, // todo: virtual call
+                drainAfterCancel,
                 turnWarningLengthThreshold,
                 delayWarningThreshold,
                 GetWorkItemStatus,
                 ExecutorFaultHandler);
             taskScheduler = scheduler;
-            //mainQueueTracking = new QueueTrackingStatistic("Scheduler.LevelOne.MainQueue"); todo:
-            //systemQueueTracking = new QueueTrackingStatistic("Scheduler.LevelOne.SystemQueue");
 
-            //mainQueueTracking.OnStartExecution();
-            //systemQueueTracking.OnStartExecution();
+            if (!StatisticsCollector.CollectShedulerQueuesStats) return;
+            queueTracking = new QueueTrackingStatistic(queueTrackingName);
+            queueTracking.OnStartExecution();
         }
 
         protected override void Process(IWorkItem request)
@@ -110,19 +67,10 @@ namespace Orleans.Runtime.Scheduler
         public override void Stop()
         {
             if (!StatisticsCollector.CollectShedulerQueuesStats) return;
-           // queueTracking.OnStopExecution();
+            queueTracking.OnStopExecution();
         }
 
-        protected override ExecutorOptions GetExecutorOptions()
-        {
-            return new ThreadPoolExecutorOptions(
-                Name,
-                GetType(), 
-                Cts.Token, 
-                Log, 
-                drainAfterCancel: DrainAfterCancel, 
-                faultHandler: ExecutorFaultHandler);
-        }
+        protected override ExecutorOptions ExecutorOptions => executorOptions;
 
         private string GetWorkItemStatus(object item, bool detailed)
         {

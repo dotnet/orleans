@@ -29,16 +29,15 @@ namespace Orleans.Runtime
 
         protected abstract void Process(T request);
 
-        protected override ExecutorOptions GetExecutorOptions()
-        {
-            return new ThreadPoolExecutorOptions(
+        protected override ExecutorOptions ExecutorOptions =>
+             new ThreadPoolExecutorOptions(
                 Name,
                 GetType(),
                 Cts.Token,
                 Log,
                 drainAfterCancel: DrainAfterCancel,
                 faultHandler: ExecutorFaultHandler);
-        }
+        
 
         internal static TimeSpan TurnWarningLengthThreshold { get; set; }
 

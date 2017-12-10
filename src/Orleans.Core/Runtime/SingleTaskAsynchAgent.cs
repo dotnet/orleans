@@ -19,9 +19,7 @@ namespace Orleans.Runtime
 
         protected abstract void Run();
 
-        protected override ExecutorOptions GetExecutorOptions()
-        {
-            return new SingleThreadExecutorOptions(Name, GetType(), Cts.Token, Log, ExecutorFaultHandler);
-        }
+        protected override ExecutorOptions ExecutorOptions =>
+            new SingleThreadExecutorOptions(Name, GetType(), Cts.Token, Log, ExecutorFaultHandler);
     }
 }

@@ -175,7 +175,7 @@ namespace Orleans.Runtime
 
         internal static bool IsStarting { get; set; }
 
-        protected abstract ExecutorOptions GetExecutorOptions(); // todo: make getter
+        protected abstract ExecutorOptions ExecutorOptions { get; }
 
         protected void ExecutorFaultHandler(Exception ex, string executorExplanation)
         {
@@ -200,7 +200,7 @@ namespace Orleans.Runtime
         {
             if (executor == null)
             {
-                executor = executorService.GetExecutor(GetExecutorOptions());
+                executor = executorService.GetExecutor(ExecutorOptions);
             }
         }
 
