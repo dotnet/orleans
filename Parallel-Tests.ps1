@@ -1,7 +1,8 @@
 param(
-    [string[]] $assemblies,
+    [string[]] $directories,
     [string] $testFilter,
-    [string] $outDir)
+    [string] $outDir,
+    [string] $dotnet)
 
 $maxDegreeOfParallelism = 4
 $failed = $false
@@ -21,23 +22,22 @@ function Receive-CompletedJobs {
     return $succeeded
 }
 
-# If there is multiple xunit packages installed, take the latest one
-$xunitRunner = Get-ChildItem packages -Directory -Filter "xunit.runner.console.*" | 
-                ForEach-Object { Get-ChildItem $_.FullName -Recurse -File -Filter "xunit.console.exe" } | 
-                Sort-Object -Property VersionInfo | 
-                Select-Object -Last 1
-
 $ExecuteCmd =
 {
-    param($cmd)
-    Invoke-Expression $cmd
+    param([string] $dotnet1, [string] $args1, [string] $path)
+
+    Set-Location -Path $path
+
+    $cmdline = "& `"" + $dotnet1 + "`" " + $args1
+
+    Invoke-Expression $cmdline
     if ($LASTEXITCODE -ne 0)
     {
         Throw "Error when running tests"
     }
 }
 
-foreach ($a in $assemblies)
+foreach ($d in $directories)
 {
     $running = @(Get-Job | Where-Object { $_.State -eq 'Running' })
     if ($running.Count -ge $maxDegreeOfParallelism) {
@@ -45,12 +45,12 @@ foreach ($a in $assemblies)
     }
 
     if (-not (Receive-CompletedJobs)) { $failed = $true }
-	
-    $xmlName = 'xUnit-Results-' + [System.IO.Path]::GetFileNameWithoutExtension($a) + '.xml'
+
+    $xmlName = 'xUnit-Results-' + [System.IO.Path]::GetFileName($d) + '.xml'
     $outXml = $(Join-Path $outDir $xmlName)
-    $cmdLine = $xunitRunner.FullName + ' ' + $a + ' ' + $testFilter + ' -xml ' + $outXml + ' -parallel none -noshadow -verbose' 
-    Write-Host $cmdLine
-    Start-Job $ExecuteCmd -ArgumentList $cmdLine -Name $([System.IO.Path]::GetFileNameWithoutExtension($a)) | Out-Null
+    $cmdLine = 'xunit ' + $testFilter + ' -xml ' + $outXml + ' -parallel none -noshadow -nobuild -configuration ' + $env:BuildConfiguration
+    Write-Host $dotnet $cmdLine
+    Start-Job $ExecuteCmd -ArgumentList @($dotnet, $cmdLine, $d) -Name $([System.IO.Path]::GetFileName($d)) | Out-Null
     Write-Host ''
 }
 
