@@ -526,7 +526,7 @@ namespace Orleans.Runtime
             if (this.multiClusterOracle != null) 
             {
                 logger.Info("Starting multicluster oracle with my ServiceId={0} and ClusterId={1}.",
-                    GlobalConfig.ServiceId, this.siloOptions.ClusterId);
+                    this.siloOptions.ServiceId, this.siloOptions.ClusterId);
 
                 this.multiClusterOracleContext = (multiClusterOracle as SystemTarget)?.SchedulingContext ??
                                                           this.providerManagerSystemTarget.SchedulingContext;

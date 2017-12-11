@@ -43,6 +43,11 @@ namespace Orleans.Hosting
                 {
                     options.ClusterId = configuration.Globals.DeploymentId;
                 }
+
+                if (options.ServiceId == Guid.Empty)
+                {
+                    options.ServiceId = configuration.Globals.ServiceId;
+                }
 #pragma warning restore CS0618 // Type or member is obsolete
             });
 

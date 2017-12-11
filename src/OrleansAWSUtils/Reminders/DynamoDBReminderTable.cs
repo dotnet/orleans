@@ -8,6 +8,7 @@ using OrleansAWSUtils.Storage;
 using Amazon.DynamoDBv2.Model;
 using Amazon.DynamoDBv2;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace OrleansAWSUtils.Reminders
 {
@@ -33,18 +34,19 @@ namespace OrleansAWSUtils.Reminders
         private ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         private DynamoDBStorage storage;
-        private Guid serviceId;
+        private readonly Guid serviceId;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DynamoDBReminderTable"/> class.
         /// </summary>
         /// <param name="grainReferenceConverter">The grain factory.</param>
         /// <param name="loggerFactory">logger factory to use</param>
-        public DynamoDBReminderTable(IGrainReferenceConverter grainReferenceConverter, ILoggerFactory loggerFactory)
+        public DynamoDBReminderTable(IGrainReferenceConverter grainReferenceConverter, ILoggerFactory loggerFactory, IOptions<SiloOptions> siloOptions)
         {
             this.grainReferenceConverter = grainReferenceConverter;
             this.logger = loggerFactory.CreateLogger<DynamoDBReminderTable>();
             this.loggerFactory = loggerFactory;
+            this.serviceId = siloOptions.Value.ServiceId;
         }
 
         /// <summary>
@@ -54,8 +56,6 @@ namespace OrleansAWSUtils.Reminders
         /// <returns></returns>
         public Task Init(GlobalConfiguration config)
         {
-            serviceId = config.ServiceId;
-
             storage = new DynamoDBStorage(config.DataConnectionStringForReminders, loggerFactory);
             logger.Info(ErrorCode.ReminderServiceBase, "Initializing AWS DynamoDB Reminders Table");
 
