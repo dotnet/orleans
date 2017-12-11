@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Providers;
 using Orleans.Transactions.Abstractions;
@@ -16,8 +17,7 @@ namespace Orleans.Transactions.Tests
         public override Task OnActivateAsync()
         {
             var resultGrain = this.GrainFactory.GetGrain<ITransactionOrchestrationResultGrain>(this.GetPrimaryKey());
-            Logger logger = this.GetLogger(nameof(TransactionOrchestrationGrain));
-            return this.resource.BindAsync(this, logger, this.ServiceProvider, resultGrain);
+            return this.resource.BindAsync(this, this.ServiceProvider, resultGrain);
         }
 
         public Task Set(int newValue)
@@ -54,7 +54,7 @@ namespace Orleans.Transactions.Tests
             private ITransactionOrchestrationResultGrain resultGrain;
             private Grain grain;
 
-            private Logger logger;
+            private ILogger logger;
             private ITransactionalResource transactionalResource;
 
             private readonly List<long> transactions= new List<long>();
@@ -125,11 +125,11 @@ namespace Orleans.Transactions.Tests
                 this.transactions.Remove(info.TransactionId);
             }
 
-            public async Task BindAsync(Grain containerGrain, Logger logger, IServiceProvider services, ITransactionOrchestrationResultGrain resultGrain)
+            public async Task BindAsync(Grain containerGrain, IServiceProvider services, ITransactionOrchestrationResultGrain resultGrain)
             {
                 this.grain = containerGrain;
                 this.resultGrain = resultGrain;
-                this.logger = logger.GetSubLogger(nameof(TransactionalResource));
+                this.logger = services.GetService<ILogger<TransactionalResource>>();
 
                 // bind extension to grain
                 IProviderRuntime runtime = services.GetRequiredService<IProviderRuntime>();

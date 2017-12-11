@@ -1,13 +1,13 @@
 ﻿using System;
+using Xunit;
 using Orleans.Runtime.Configuration;
 using Orleans.Hosting;
 using Orleans.TestingHost;
-using TestExtensions;
 using Orleans.Transactions.Tests;
 using Orleans.TestingHost.Utils;
-using Xunit;
+using TestExtensions;
 
-namespace Orleans.Transactions.Azure.Tests
+namespace Orleans.Transactions.AzureStorage.Tests
 {
     public class TestFixture : BaseTestClusterFixture
     {
@@ -32,12 +32,13 @@ namespace Orleans.Transactions.Azure.Tests
                 return new SiloHostBuilder()
                     .ConfigureSiloName(siloName)
                     .UseConfiguration(clusterConfiguration)
-                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.DeploymentId)))
-                    .UseInClusterTransactionManager(new TransactionsConfiguration())
-                    .UseAzureTransactionLog(new AzureTransactionLogConfiguration() {
+                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)))
+                    .UseInClusterTransactionManager()
+                    .UseAzureTransactionLog(options => {
                         // TODO: Find better way for test isolation.  Possibly different partition keys.
-                        TableName = $"TransactionLog{((uint)clusterConfiguration.Globals.DeploymentId.GetHashCode())%100000}",
-                        ConnectionString = TestDefaultConfiguration.DataConnectionString})
+                        options.TableName = $"TransactionLog{((uint)clusterConfiguration.Globals.ClusterId.GetHashCode()) % 100000}";
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    })
                     .UseTransactionalState();
             }
         }

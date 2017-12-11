@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 
@@ -12,9 +13,10 @@ namespace Orleans.Runtime.Counters
         private RuntimeStatisticsGroup runtimeStats;
         private CountersStatistics countersPublisher;
         internal SiloPerformanceMetrics MetricsTable;
-        private readonly Logger logger;
+        private readonly ILogger logger;
+        private SiloOptions siloOptions;
 
-        public SiloStatisticsManager(SiloInitializationParameters initializationParams, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
+        public SiloStatisticsManager(SiloInitializationParameters initializationParams, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory, IOptions<SiloOptions> siloOptions)
         {
             MessagingStatisticsGroup.Init(true);
             MessagingProcessingStatisticsGroup.Init();
@@ -23,7 +25,7 @@ namespace Orleans.Runtime.Counters
             SchedulerStatisticsGroup.Init(loggerFactory);
             StorageStatisticsGroup.Init();
             TransactionsStatisticsGroup.Init();
-            this.logger = new LoggerWrapper<SiloStatisticsManager>(loggerFactory);
+            this.logger = loggerFactory.CreateLogger<SiloStatisticsManager>();
             runtimeStats = new RuntimeStatisticsGroup(loggerFactory);
             this.logStatistics = new LogStatistics(initializationParams.NodeConfig.StatisticsLogWriteInterval, true, serializationManager, loggerFactory);
             this.MetricsTable = new SiloPerformanceMetrics(this.runtimeStats, loggerFactory, initializationParams.NodeConfig);
@@ -33,6 +35,7 @@ namespace Orleans.Runtime.Counters
                 "Defaults/LoadShedding",
                 () => this.MetricsTable.NodeConfig = initializationParams.NodeConfig,
                 false);
+            this.siloOptions = siloOptions.Value;
         }
 
         internal async Task SetSiloMetricsTableDataManager(Silo silo, NodeConfiguration nodeConfig)
@@ -57,7 +60,7 @@ namespace Orleans.Runtime.Counters
                 {
                     var gateway = nodeConfig.IsGatewayNode ? nodeConfig.ProxyGatewayEndpoint : null;
                     configurableMetricsDataPublisher.AddConfiguration(
-                        silo.GlobalConfig.DeploymentId, true, silo.Name, silo.SiloAddress, gateway, nodeConfig.DNSHostName);
+                        this.siloOptions.ClusterId, true, this.siloOptions.SiloName, silo.SiloAddress, gateway, nodeConfig.DNSHostName);
                 }
                 MetricsTable.MetricsDataPublisher = metricsDataPublisher;
             }
@@ -65,8 +68,8 @@ namespace Orleans.Runtime.Counters
             {
                 // Hook up to publish silo metrics to Azure storage table
                 var gateway = nodeConfig.IsGatewayNode ? nodeConfig.ProxyGatewayEndpoint : null;
-                var metricsDataPublisher = AssemblyLoader.LoadAndCreateInstance<ISiloMetricsDataPublisher>(Constants.ORLEANS_AZURE_UTILS_DLL, logger, silo.Services);
-                await metricsDataPublisher.Init(silo.GlobalConfig.DeploymentId, silo.GlobalConfig.DataConnectionString, silo.SiloAddress, silo.Name, gateway, nodeConfig.DNSHostName);
+                var metricsDataPublisher = AssemblyLoader.LoadAndCreateInstance<ISiloMetricsDataPublisher>(Constants.ORLEANS_STATISTICS_AZURESTORAGE, logger, silo.Services);
+                await metricsDataPublisher.Init(this.siloOptions.ClusterId, silo.GlobalConfig.DataConnectionString, silo.SiloAddress, this.siloOptions.SiloName, gateway, nodeConfig.DNSHostName);
                 MetricsTable.MetricsDataPublisher = metricsDataPublisher;
             }
             // else no metrics
@@ -96,26 +99,27 @@ namespace Orleans.Runtime.Counters
                 {
                     var gateway = nodeConfig.IsGatewayNode ? nodeConfig.ProxyGatewayEndpoint : null;
                     configurableStatsDataPublisher.AddConfiguration(
-                        silo.GlobalConfig.DeploymentId, true, silo.Name, silo.SiloAddress, gateway, nodeConfig.DNSHostName);
+                        this.siloOptions.ClusterId, true, this.siloOptions.SiloName, silo.SiloAddress, gateway, nodeConfig.DNSHostName);
                 }
                 logStatistics.StatsTablePublisher = statsDataPublisher;
             }
             else if (useAzureTable)
             {
-                var statsDataPublisher = AssemblyLoader.LoadAndCreateInstance<IStatisticsPublisher>(Constants.ORLEANS_AZURE_UTILS_DLL, logger, silo.Services);
-                await statsDataPublisher.Init(true, silo.GlobalConfig.DataConnectionString, silo.GlobalConfig.DeploymentId, silo.SiloAddress.ToLongString(), silo.Name, nodeConfig.DNSHostName);
+                var statsDataPublisher = AssemblyLoader.LoadAndCreateInstance<IStatisticsPublisher>(Constants.ORLEANS_STATISTICS_AZURESTORAGE, logger, silo.Services);
+                await statsDataPublisher.Init(true, silo.GlobalConfig.DataConnectionString, this.siloOptions.ClusterId, silo.SiloAddress.ToLongString(), this.siloOptions.SiloName, nodeConfig.DNSHostName);
                 logStatistics.StatsTablePublisher = statsDataPublisher;
             }
             // else no stats
         }
 
-        private static bool ShouldUseExternalMetricsProvider(
+        private bool ShouldUseExternalMetricsProvider(
             Silo silo,
             IStatisticsConfiguration nodeConfig,
             out bool useAzureTable)
         {
+            // TODO: use DI to configure this and don't rely on GlobalConfiguration nor NodeConfiguration
             useAzureTable = silo.GlobalConfig.LivenessType == GlobalConfiguration.LivenessProviderType.AzureTable
-                                 && !string.IsNullOrEmpty(silo.GlobalConfig.DeploymentId)
+                                 && !string.IsNullOrEmpty(this.siloOptions.ClusterId)
                                  && !string.IsNullOrEmpty(silo.GlobalConfig.DataConnectionString);
 
             return !string.IsNullOrEmpty(nodeConfig.StatisticsProviderName);

@@ -48,7 +48,7 @@ namespace Orleans.Serialization
         private readonly ConcurrentDictionary<Type, Func<GrainReference, GrainReference>> grainRefConstructorDictionary;
 
         private readonly IExternalSerializer fallbackSerializer;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         
         // Semi-constants: type handles for simple types
         private static readonly RuntimeTypeHandle shortTypeHandle = typeof(short).TypeHandle;
@@ -115,7 +115,7 @@ namespace Orleans.Serialization
             this.serializationContext = new ThreadLocal<SerializationContext>(() => new SerializationContext(this));
             this.deserializationContext = new ThreadLocal<DeserializationContext>(() => new DeserializationContext(this));
 
-            logger = new LoggerWrapper<SerializationManager>(loggerFactory);
+            logger = loggerFactory.CreateLogger<SerializationManager>();
             this.serviceProvider = serviceProvider;
             this.typeResolver = typeResolver;
 
@@ -327,7 +327,7 @@ namespace Orleans.Serialization
                         }
                     }
 
-                    if (logger.IsVerbose3) logger.Verbose3("Registered type {0} as {1}", t, name);
+                    if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Registered type {0} as {1}", t, name);
                 }
             }
 
@@ -368,7 +368,7 @@ namespace Orleans.Serialization
                 registeredTypes.Add(t);
                 types[name] = t;
             }
-            if (logger.IsVerbose3) logger.Verbose3("Registered type {0} as {1}", t, name);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Registered type {0} as {1}", t, name);
 
             // Register any interfaces this type implements, in order to support passing values that are statically of the interface type
             // but dynamically of this (implementation) type
@@ -469,8 +469,8 @@ namespace Orleans.Serialization
                 throw;
             }
 
-            if (this.logger.IsVerbose3)
-                this.logger.Verbose3(
+            if (this.logger.IsEnabled(LogLevel.Trace))
+                this.logger.Trace(
                     "Loaded serialization info for type {0} from assembly {1}",
                     type.Name,
                     serializerType.Assembly.GetName().Name);
@@ -1847,7 +1847,7 @@ namespace Orleans.Serialization
             }
 
             var report = String.Format("Registered artifacts for {0} types:" + Environment.NewLine + "{1}", count, lines);
-            logger.Verbose(ErrorCode.SerMgr_ArtifactReport, report);
+            logger.Debug(ErrorCode.SerMgr_ArtifactReport, report);
         }
 
         /// <summary>

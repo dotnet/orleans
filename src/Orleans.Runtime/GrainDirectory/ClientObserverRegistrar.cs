@@ -20,7 +20,7 @@ namespace Orleans.Runtime
         private readonly SiloAddress myAddress;
         private readonly OrleansTaskScheduler scheduler;
         private readonly ClusterConfiguration orleansConfig;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private Gateway gateway;
         private IDisposable refreshTimer;
 
@@ -37,7 +37,7 @@ namespace Orleans.Runtime
             myAddress = siloDetails.SiloAddress;
             this.scheduler = scheduler;
             orleansConfig = config;
-            logger = new LoggerWrapper<ClientObserverRegistrar>(loggerFactory);
+            logger = loggerFactory.CreateLogger<ClientObserverRegistrar>();
         }
 
         internal void SetGateway(Gateway gateway)
@@ -58,7 +58,7 @@ namespace Orleans.Runtime
                 randomOffset,
                 orleansConfig.Globals.ClientRegistrationRefresh,
                 "ClientObserverRegistrar.ClientRefreshTimer");
-            if (logger.IsVerbose) { logger.Verbose("Client registrar service started successfully."); }
+            if (logger.IsEnabled(LogLevel.Debug)) { logger.Debug("Client registrar service started successfully."); }
         }
 
         internal void ClientAdded(GrainId clientId)

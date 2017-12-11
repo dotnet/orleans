@@ -36,20 +36,20 @@ namespace Orleans.Runtime.Messaging
         private readonly SerializationManager serializationManager;
         private readonly ExecutorService executorService;
 
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         private readonly SiloMessagingOptions messagingOptions;
         
-        public Gateway(MessageCenter msgCtr, NodeConfiguration nodeConfig, MessageFactory messageFactory, SerializationManager serializationManager, ExecutorService executorService, GlobalConfiguration globalConfig, ILoggerFactory loggerFactory, IOptions<SiloMessagingOptions> options)
+        public Gateway(MessageCenter msgCtr, NodeConfiguration nodeConfig, MessageFactory messageFactory, SerializationManager serializationManager, ExecutorService executorService, ILoggerFactory loggerFactory, IOptions<SiloMessagingOptions> options, IOptions<SiloOptions> siloOptions, IOptions<MultiClusterOptions> multiClusterOptions)
         {
             this.messagingOptions = options.Value;
             this.loggerFactory = loggerFactory;
             messageCenter = msgCtr;
             this.messageFactory = messageFactory;
-            this.logger = new LoggerWrapper<Gateway>(this.loggerFactory);
+            this.logger = this.loggerFactory.CreateLogger<Gateway>();
             this.serializationManager = serializationManager;
             this.executorService = executorService;
-            acceptor = new GatewayAcceptor(msgCtr,this, nodeConfig.ProxyGatewayEndpoint, this.messageFactory, this.serializationManager, globalConfig, executorService, loggerFactory);
+            acceptor = new GatewayAcceptor(msgCtr,this, nodeConfig.ProxyGatewayEndpoint, this.messageFactory, this.serializationManager, executorService, siloOptions, multiClusterOptions, loggerFactory);
             senders = new Lazy<GatewaySender>[messagingOptions.GatewaySenderQueues];
             nextGatewaySenderToUseForRoundRobin = 0;
             dropper = new GatewayClientCleanupAgent(this, executorService, loggerFactory, messagingOptions.ClientDropTimeout);
@@ -423,7 +423,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     if (msg == null) return;
 
-                    if (Log.IsVerbose3) Log.Verbose3("Queued message {0} for client {1}", msg, client);
+                    if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Queued message {0} for client {1}", msg, client);
                     clientState.PendingToSend.Enqueue(msg);
                     return;
                 }
@@ -445,12 +445,12 @@ namespace Orleans.Runtime.Messaging
 
                 if (!Send(msg, clientState.Socket))
                 {
-                    if (Log.IsVerbose3) Log.Verbose3("Queued message {0} for client {1}", msg, client);
+                    if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Queued message {0} for client {1}", msg, client);
                     clientState.PendingToSend.Enqueue(msg);
                 }
                 else
                 {
-                    if (Log.IsVerbose3) Log.Verbose3("Sent message {0} to client {1}", msg, client);
+                    if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Sent message {0} to client {1}", msg, client);
                 }
             }
 
@@ -462,7 +462,7 @@ namespace Orleans.Runtime.Messaging
                     var m = clientState.PendingToSend.Peek();
                     if (Send(m, clientState.Socket))
                     {
-                        if (Log.IsVerbose3) Log.Verbose3("Sent queued message {0} to client {1}", m, clientState.Id);
+                        if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Sent queued message {0} to client {1}", m, clientState.Id);
                         clientState.PendingToSend.Dequeue();
                     }
                     else
@@ -489,7 +489,7 @@ namespace Orleans.Runtime.Messaging
                     {
                         Log.Info(ErrorCode.Messaging_LargeMsg_Outgoing, "Preparing to send large message Size={0} HeaderLength={1} BodyLength={2} #ArraySegments={3}. Msg={4}",
                             headerLength + bodyLength + Message.LENGTH_HEADER_SIZE, headerLength, bodyLength, data.Count, this.ToString());
-                        if (Log.IsVerbose3) Log.Verbose3("Sending large message {0}", msg.ToLongString());
+                        if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Sending large message {0}", msg.ToLongString());
                     }
                 }
                 catch (Exception exc)

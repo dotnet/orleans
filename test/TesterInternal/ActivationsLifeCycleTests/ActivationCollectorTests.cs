@@ -5,6 +5,8 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -25,7 +27,7 @@ namespace UnitTests.ActivationsLifeCycleTests
 
         private TestCluster testCluster;
 
-        private Logger logger;
+        private ILogger logger;
 
         private void Initialize(TimeSpan collectionAgeLimit, TimeSpan quantum)
         {
@@ -38,7 +40,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             config.Globals.Application.SetCollectionAgeLimit(typeof(BusyActivationGcTestGrain2), TimeSpan.FromSeconds(10));
             testCluster = new TestCluster(config);
             testCluster.Deploy();
-            this.logger = this.testCluster.Client.Logger;
+            this.logger = this.testCluster.Client.ServiceProvider.GetRequiredService<ILogger<ActivationCollectorTests>>();
         }
 
         private void Initialize(TimeSpan collectionAgeLimit)

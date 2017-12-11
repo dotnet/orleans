@@ -30,7 +30,7 @@ namespace Tester.AzureUtils.Streaming
         private readonly TestEnvironmentFixture fixture;
         private const int NumBatches = 20;
         private const int NumMessagesPerBatch = 20;
-        private string deploymentId;
+        private string clusterId;
         public static readonly string AZURE_QUEUE_STREAM_PROVIDER_NAME = "AQAdapterTests";
         private readonly ILoggerFactory loggerFactory;
         private static readonly SafeRandom Random = new SafeRandom();
@@ -39,14 +39,14 @@ namespace Tester.AzureUtils.Streaming
         {
             this.output = output;
             this.fixture = fixture;
-            this.deploymentId = MakeDeploymentId();
+            this.clusterId = MakeClusterId();
             this.loggerFactory = this.fixture.Services.GetService<ILoggerFactory>();
             BufferPool.InitGlobalBufferPool(Options.Create(new SiloMessagingOptions()));
         }
         
         public void Dispose()
         {
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(this.loggerFactory, AZURE_QUEUE_STREAM_PROVIDER_NAME, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
+            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(this.loggerFactory, AZURE_QUEUE_STREAM_PROVIDER_NAME, this.clusterId, TestDefaultConfiguration.DataConnectionString).Wait();
         }
 
         [SkippableFact, TestCategory("Functional"), TestCategory("Halo")]
@@ -55,7 +55,7 @@ namespace Tester.AzureUtils.Streaming
             var properties = new Dictionary<string, string>
                 {
                     {AzureQueueAdapterConstants.DataConnectionStringPropertyName, TestDefaultConfiguration.DataConnectionString},
-                    {AzureQueueAdapterConstants.DeploymentIdPropertyName, deploymentId},
+                    {AzureQueueAdapterConstants.DeploymentIdPropertyName, this.clusterId},
                     {AzureQueueAdapterConstants.MessageVisibilityTimeoutPropertyName, "00:00:30" }
                 };
             var config = new ProviderConfiguration(properties, "type", "name");
@@ -191,9 +191,9 @@ namespace Tester.AzureUtils.Streaming
             }).ToList();
         }
 
-        internal static string MakeDeploymentId()
+        internal static string MakeClusterId()
         {
-            const string DeploymentIdFormat = "deployment-{0}";
+            const string DeploymentIdFormat = "cluster-{0}";
             string now = DateTime.UtcNow.ToString("yyyy-MM-dd-hh-mm-ss-ffff");
             return String.Format(DeploymentIdFormat, now);
         }

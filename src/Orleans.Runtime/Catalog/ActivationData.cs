@@ -166,7 +166,7 @@ namespace Orleans.Runtime
         private readonly TimeSpan maxWarningRequestProcessingTime;
         private readonly NodeConfiguration nodeConfiguration;
         public readonly TimeSpan CollectionAgeLimit;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private IGrainMethodInvoker lastInvoker;
         private IServiceScope serviceScope;
 
@@ -191,7 +191,7 @@ namespace Orleans.Runtime
             if (null == placedUsing) throw new ArgumentNullException(nameof(placedUsing));
             if (null == collector) throw new ArgumentNullException(nameof(collector));
 
-            logger = new LoggerWrapper<ActivationData>(loggerFactory);
+            logger = loggerFactory.CreateLogger<ActivationData>();
             this.lifecycle = new GrainLifecycle(loggerFactory);
             this.maxRequestProcessingTime = maxRequestProcessingTime;
             this.maxWarningRequestProcessingTime = maxWarningRequestProcessingTime;
@@ -605,7 +605,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="log">Logger to use for reporting any overflow condition</param>
         /// <returns>Returns LimitExceededException if overloaded, otherwise <c>null</c>c></returns>
-        public LimitExceededException CheckOverloaded(Logger log)
+        public LimitExceededException CheckOverloaded(ILogger log)
         {
             LimitValue limitValue = GetMaxEnqueuedRequestLimit();
 

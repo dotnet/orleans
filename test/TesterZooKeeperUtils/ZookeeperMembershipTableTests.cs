@@ -32,16 +32,15 @@ namespace UnitTests.MembershipTests
             return filters;
         }
 
-        protected override IMembershipTable CreateMembershipTable(Logger logger)
+        protected override IMembershipTable CreateMembershipTable(ILogger logger)
         {
             var options = new ZooKeeperMembershipOptions();
             options.ConnectionString = this.connectionString;
            
-            return new ZooKeeperBasedMembershipTable(this.Services.GetService<ILogger<ZooKeeperBasedMembershipTable>>(),
-               Options.Create<ZooKeeperMembershipOptions>(options), this.globalConfiguration);
+            return new ZooKeeperBasedMembershipTable(this.Services.GetService<ILogger<ZooKeeperBasedMembershipTable>>(), Options.Create(options), this.siloOptions);
         }
 
-        protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
+        protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
             return AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>(Constants.ORLEANS_CLUSTERING_ZOOKEEPER,
                 logger, this.Services);

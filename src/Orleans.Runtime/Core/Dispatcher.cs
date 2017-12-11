@@ -22,7 +22,7 @@ namespace Orleans.Runtime
 
         private readonly OrleansTaskScheduler scheduler;
         private readonly Catalog catalog;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly ClusterConfiguration config;
         private readonly PlacementDirectorsManager placementDirectorsManager;
         private readonly ILocalGrainDirectory localGrainDirectory;
@@ -31,7 +31,6 @@ namespace Orleans.Runtime
         private readonly CompatibilityDirectorManager compatibilityDirectorManager;
         private readonly SafeRandom random;
         private readonly ILogger invokeWorkItemLogger;
-        private readonly ILoggerFactory loggerFactory;
         internal Dispatcher(
             OrleansTaskScheduler scheduler, 
             ISiloMessageCenter transport, 
@@ -44,7 +43,6 @@ namespace Orleans.Runtime
             CompatibilityDirectorManager compatibilityDirectorManager,
             ILoggerFactory loggerFactory)
         {
-            this.loggerFactory = loggerFactory;
             this.scheduler = scheduler;
             this.catalog = catalog;
             Transport = transport;
@@ -55,7 +53,7 @@ namespace Orleans.Runtime
             this.messagefactory = messagefactory;
             this.serializationManager = serializationManager;
             this.compatibilityDirectorManager = compatibilityDirectorManager;
-            logger = new LoggerWrapper<Dispatcher>(loggerFactory);
+            logger = loggerFactory.CreateLogger<Dispatcher>();
             random = new SafeRandom();
         }
 
@@ -136,7 +134,7 @@ namespace Orleans.Runtime
 
                     if (nea.IsStatelessWorker)
                     {
-                        if (logger.IsVerbose) logger.Verbose(ErrorCode.Dispatcher_Intermediate_GetOrCreateActivation,
+                        if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Dispatcher_Intermediate_GetOrCreateActivation,
                            String.Format("Intermediate StatelessWorker NonExistentActivation for message {0}", message), ex);
                     }
                     else
@@ -437,7 +435,7 @@ namespace Orleans.Runtime
 #if DEBUG
             // This is a hot code path, so using #if to remove diags from Release version
             // Note: Caller already holds lock on activation
-            if (logger.IsVerbose2) logger.Verbose2(ErrorCode.Dispatcher_EnqueueMessage,
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.Dispatcher_EnqueueMessage,
                 "EnqueueMessage for {0}: targetActivation={1}", message.TargetActivation, targetActivation.DumpStatus());
 #endif
         }
@@ -474,7 +472,7 @@ namespace Orleans.Runtime
                 this.localGrainDirectory.InvalidateCacheEntry(oldAddress);
             }
 
-            if (logger.IsInfo)
+            if (logger.IsEnabled(LogLevel.Information))
             {
                 logger.Info(ErrorCode.Messaging_Dispatcher_ForwardingRequests,
                     string.Format("Forwarding {0} requests destined for address {1} to address {2} after {3}.",
@@ -582,7 +580,7 @@ namespace Orleans.Runtime
 
         private void ResendMessageImpl(Message message, ActivationAddress forwardingAddress = null)
         {
-            if (logger.IsVerbose) logger.Verbose("Resend {0}", message);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Resend {0}", message);
             message.TargetHistory = message.GetTargetHistory();
 
             if (message.TargetGrain.IsSystemTarget)
@@ -734,7 +732,7 @@ namespace Orleans.Runtime
             {
                 CounterStatistic.FindOrCreate(StatisticNames.DISPATCHER_NEW_PLACEMENT).Increment();
             }
-            if (logger.IsVerbose2) logger.Verbose2(ErrorCode.Dispatcher_AddressMsg_SelectTarget, "AddressMessage Placement SelectTarget {0}", message);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.Dispatcher_AddressMsg_SelectTarget, "AddressMessage Placement SelectTarget {0}", message);
         }
 
         internal void SendResponse(Message request, Response response)
@@ -776,7 +774,7 @@ namespace Orleans.Runtime
         /// <param name="message"></param>
         public void TransportMessage(Message message)
         {
-            if (logger.IsVerbose2) logger.Verbose2(ErrorCode.Dispatcher_Send_AddressedMessage, "Addressed message {0}", message);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.Dispatcher_Send_AddressedMessage, "Addressed message {0}", message);
             Transport.SendMessage(message);
         }
 
@@ -795,9 +793,9 @@ namespace Orleans.Runtime
             {
 #if DEBUG
                 // This is a hot code path, so using #if to remove diags from Release version
-                if (logger.IsVerbose2)
+                if (logger.IsEnabled(LogLevel.Trace))
                 {
-                    logger.Verbose2(ErrorCode.Dispatcher_OnActivationCompletedRequest_Waiting,
+                    logger.Trace(ErrorCode.Dispatcher_OnActivationCompletedRequest_Waiting,
                         "OnActivationCompletedRequest {0}: Activation={1}", activation.ActivationId, activation.DumpStatus());
                 }
 #endif
@@ -818,9 +816,9 @@ namespace Orleans.Runtime
 #if DEBUG
             // This is a hot code path, so using #if to remove diags from Release version
             // Note: Caller already holds lock on activation
-            if (logger.IsVerbose2)
+            if (logger.IsEnabled(LogLevel.Trace))
             {
-                logger.Verbose2(ErrorCode.Dispatcher_ActivationEndedTurn_Waiting,
+                logger.Trace(ErrorCode.Dispatcher_ActivationEndedTurn_Waiting,
                     "RunMessagePump {0}: Activation={1}", activation.ActivationId, activation.DumpStatus());
             }
 #endif

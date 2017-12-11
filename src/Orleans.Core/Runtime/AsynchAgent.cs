@@ -18,9 +18,10 @@ namespace Orleans.Runtime
         protected IExecutor executor;
         protected CancellationTokenSource Cts;
         protected object Lockable;
-        protected Logger Log;
+        protected ILogger Log;
         protected readonly string type;
         protected FaultBehavior OnFault;
+        protected bool disposed;
 
 #if TRACK_DETAILED_STATS
         internal protected ThreadTrackingStatistic threadTracking;
@@ -51,7 +52,7 @@ namespace Orleans.Runtime
             Lockable = new object();
             State = ThreadState.Unstarted;
             OnFault = FaultBehavior.IgnoreFault;
-            Log = new LoggerWrapper(Name, loggerFactory);
+            Log = loggerFactory.CreateLogger(Name);
 
             this.executorService = executorService;
             AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
@@ -82,12 +83,13 @@ namespace Orleans.Runtime
             catch (Exception exc)
             {
                 // ignore. Just make sure DomainUnload handler does not throw.
-                Log.Verbose("Ignoring error during Stop: {0}", exc);
+                Log.Debug("Ignoring error during Stop: {0}", exc);
             }
         }
 
         public virtual void Start()
         {
+            ThrowIfDisposed();
             lock (Lockable)
             {
                 if (State == ThreadState.Running)
@@ -95,18 +97,17 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                executor = executorService.GetExecutor(new GetExecutorRequest(GetType(), Name, Cts));
-
                 if (State == ThreadState.Stopped)
                 {
                     Cts = new CancellationTokenSource();
                 }
 
+                EnsureExecutorInitialized();
                 OnStart();
                 State = ThreadState.Running;
             }
 
-            if (Log.IsVerbose) Log.Verbose("Started asynch agent " + this.Name);
+            if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Started asynch agent " + this.Name);
         }
 
         public virtual void OnStart() { }
@@ -116,12 +117,14 @@ namespace Orleans.Runtime
         {
             try
             {
+                ThrowIfDisposed();
                 lock (Lockable)
                 {
                     if (State == ThreadState.Running)
                     {
                         State = ThreadState.StopRequested;
                         Cts.Cancel();
+                        executor = null;
                         State = ThreadState.Stopped;
                     }
                 }
@@ -131,9 +134,9 @@ namespace Orleans.Runtime
             catch (Exception exc)
             {
                 // ignore. Just make sure stop does not throw.
-                Log.Verbose("Ignoring error during Stop: {0}", exc);
+                Log.Debug("Ignoring error during Stop: {0}", exc);
             }
-            Log.Verbose("Stopped agent");
+            Log.Debug("Stopped agent");
         }
 
 #region IDisposable Members
@@ -146,13 +149,15 @@ namespace Orleans.Runtime
 
         protected virtual void Dispose(bool disposing)
         {
-            if (!disposing) return;
+            if (!disposing || disposed) return;
 
             if (Cts != null)
             {
                 Cts.Dispose();
                 Cts = null;
             }
+
+            disposed = true;
         }
 
 #endregion
@@ -163,5 +168,21 @@ namespace Orleans.Runtime
         }
 
         internal static bool IsStarting { get; set; }
+
+        private void ThrowIfDisposed()
+        {
+            if (disposed)
+            {
+                throw new ObjectDisposedException("Cannot access a disposed AsynchAgent"); 
+            }
+        }
+
+        private void EnsureExecutorInitialized()
+        {
+            if (executor == null)
+            {
+                executor = executorService.GetExecutor(new GetExecutorRequest(GetType(), Name, Cts));
+            }
+        }
     }
 }

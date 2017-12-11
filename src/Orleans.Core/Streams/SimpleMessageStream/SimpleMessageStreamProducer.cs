@@ -30,7 +30,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         [NonSerialized]
         private bool                                    isDisposed;
         [NonSerialized]
-        private readonly Logger                         logger;
+        private readonly ILogger                         logger;
         [NonSerialized]
         private readonly AsyncLock                      initLock;
         [NonSerialized]
@@ -52,9 +52,9 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             this.optimizeForImmutableData = optimizeForImmutableData;
             IsRewindable = isRewindable;
             isDisposed = false;
-            logger = providerRuntime.GetLogger(GetType().Name);
             initLock = new AsyncLock();
             this.loggerFactory = loggerFactory;
+            this.logger = loggerFactory.CreateLogger(this.GetType().FullName);
             ConnectToRendezvous().Ignore();
         }
 
@@ -143,7 +143,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 
         public async Task Cleanup()
         {
-            if(logger.IsVerbose) logger.Verbose("Cleanup() called");
+            if(logger.IsEnabled(LogLevel.Debug)) logger.Debug("Cleanup() called");
 
             myExtension.RemoveStream(stream.StreamId);
 

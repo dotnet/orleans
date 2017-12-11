@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.GrainDirectory;
+using Orleans.Hosting;
 using Orleans.SystemTargetInterfaces;
 using OutcomeState = Orleans.Runtime.GrainDirectory.GlobalSingleInstanceResponseOutcome.OutcomeState;
 using Orleans.Runtime.Configuration;
@@ -25,7 +27,7 @@ namespace Orleans.Runtime.GrainDirectory
     {
         private readonly int numRetries;
         private readonly IInternalGrainFactory grainFactory;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly GrainDirectoryPartition directoryPartition;
         private readonly GlobalSingleInstanceActivationMaintainer gsiActivationMaintainer;
         private readonly IMultiClusterOracle multiClusterOracle;
@@ -34,11 +36,13 @@ namespace Orleans.Runtime.GrainDirectory
 
         public GlobalSingleInstanceRegistrar(
             LocalGrainDirectory localDirectory,
-            LoggerWrapper<GlobalSingleInstanceRegistrar> logger,
+            ILogger<GlobalSingleInstanceRegistrar> logger,
             GlobalSingleInstanceActivationMaintainer gsiActivationMaintainer,
             GlobalConfiguration config,
             IInternalGrainFactory grainFactory,
-            IMultiClusterOracle multiClusterOracle)
+            IMultiClusterOracle multiClusterOracle,
+            IOptions<SiloOptions> siloOptions,
+            IOptions<MultiClusterOptions> multiClusterOptions)
         {
             this.directoryPartition = localDirectory.DirectoryPartition;
             this.logger = logger;
@@ -46,8 +50,8 @@ namespace Orleans.Runtime.GrainDirectory
             this.numRetries = config.GlobalSingleInstanceNumberRetries;
             this.grainFactory = grainFactory;
             this.multiClusterOracle = multiClusterOracle;
-            this.hasMultiClusterNetwork = config.HasMultiClusterNetwork;
-            this.clusterId = config.ClusterId;
+            this.hasMultiClusterNetwork = multiClusterOptions.Value.HasMultiClusterNetwork;
+            this.clusterId = siloOptions.Value.ClusterId;
         }
 
         public bool IsSynchronous { get { return false; } }
@@ -105,13 +109,13 @@ namespace Orleans.Runtime.GrainDirectory
 
             while (retries-- > 0)
             {
-                if (logger.IsVerbose)
-                    logger.Verbose("GSIP:Req {0} Round={1} Act={2}", address.Grain.ToString(), numRetries - retries, myActivation.Address.ToString());
+                if (logger.IsEnabled(LogLevel.Debug))
+                    logger.Debug("GSIP:Req {0} Round={1} Act={2}", address.Grain.ToString(), numRetries - retries, myActivation.Address.ToString());
 
                 var outcome = await SendRequestRound(address, remoteClusters);
 
-                if (logger.IsVerbose)
-                    logger.Verbose("GSIP:End {0} Round={1} Outcome={2}", address.Grain.ToString(), numRetries - retries, outcome);
+                if (logger.IsEnabled(LogLevel.Debug))
+                    logger.Debug("GSIP:End {0} Round={1} Outcome={2}", address.Grain.ToString(), numRetries - retries, outcome);
 
                 switch (outcome.State)
                 {
@@ -182,23 +186,23 @@ namespace Orleans.Runtime.GrainDirectory
                 directoryPartition.RemoveActivation(address.Grain, address.Activation, cause, out existingAct, out wasRemoved);
                 if (existingAct == null)
                 {
-                    logger.Verbose2("GSIP:Unr {0} {1} ignored", cause, address);
+                    logger.Trace("GSIP:Unr {0} {1} ignored", cause, address);
                 }
                 else if (!wasRemoved)
                 {
-                    logger.Verbose2("GSIP:Unr {0} {1} too fresh", cause, address);
+                    logger.Trace("GSIP:Unr {0} {1} too fresh", cause, address);
                 }
                 else if (existingAct.RegistrationStatus == GrainDirectoryEntryStatus.Owned
                         || existingAct.RegistrationStatus == GrainDirectoryEntryStatus.Doubtful)
                 {
-                    logger.Verbose2("GSIP:Unr {0} {1} broadcast ({2})", cause, address, existingAct.RegistrationStatus);
+                    logger.Trace("GSIP:Unr {0} {1} broadcast ({2})", cause, address, existingAct.RegistrationStatus);
                     if (formerActivationsInThisCluster == null)
                         formerActivationsInThisCluster = new List<ActivationAddress>();
                     formerActivationsInThisCluster.Add(address);
                 }
                 else
                 {
-                    logger.Verbose2("GSIP:Unr {0} {1} removed ({2})", cause, address, existingAct.RegistrationStatus);
+                    logger.Trace("GSIP:Unr {0} {1} removed ({2})", cause, address, existingAct.RegistrationStatus);
                 }
             }
 
@@ -241,11 +245,11 @@ namespace Orleans.Runtime.GrainDirectory
             directoryPartition.RemoveActivation(address.Grain, address.Activation, UnregistrationCause.CacheInvalidation, out existingAct, out wasRemoved);
             if (!wasRemoved)
             {
-                logger.Verbose2("GSIP:Inv {0} ignored", address);
+                logger.Trace("GSIP:Inv {0} ignored", address);
             }
             else  
             {
-                logger.Verbose2("GSIP:Inv {0} removed ({1})", address, existingAct.RegistrationStatus);
+                logger.Trace("GSIP:Inv {0} removed ({1})", address, existingAct.RegistrationStatus);
             }
         }
         

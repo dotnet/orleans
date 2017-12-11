@@ -26,7 +26,7 @@ namespace Orleans
         internal static bool TestOnlyThrowExceptionDuringInit { get; set; }
 
         private ILogger logger;
-        private Logger callBackDataLogger;
+        private ILogger callBackDataLogger;
         private ILogger timerLogger;
         private ClientConfiguration config;
         private ClientMessagingOptions clientMessagingOptions;
@@ -105,7 +105,7 @@ namespace Orleans
             unregisterCallback = msg => UnRegisterCallback(msg.Id);
             callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
             localObjects = new ConcurrentDictionary<GuidId, LocalObjectData>();
-            this.callBackDataLogger = new LoggerWrapper<CallbackData>(loggerFactory);
+            this.callBackDataLogger = loggerFactory.CreateLogger<CallbackData>();
             this.timerLogger = loggerFactory.CreateLogger<SafeTimer>();
         }
 
@@ -770,7 +770,10 @@ namespace Orleans
         public GrainReference CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker)
         {
             if (obj is GrainReference)
-                throw new ArgumentException("Argument obj is already a grain reference.");
+                throw new ArgumentException("Argument obj is already a grain reference.", nameof(obj));
+
+            if (obj is Grain)
+                throw new ArgumentException("Argument must not be a grain class.", nameof(obj));
 
             GrainReference gr = GrainReference.NewObserverGrainReference(clientId, GuidId.GetNewGuidId(), this.GrainReferenceRuntime);
             if (!localObjects.TryAdd(gr.ObserverId, new LocalObjectData(obj, gr.ObserverId, invoker)))

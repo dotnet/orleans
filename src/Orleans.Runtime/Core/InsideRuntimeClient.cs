@@ -31,7 +31,7 @@ namespace Orleans.Runtime
     internal class InsideRuntimeClient : ISiloRuntimeClient, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly ILogger logger;
-        private readonly Logger callbackDataLogger;
+        private readonly ILogger callbackDataLogger;
         private readonly ILogger timerLogger;
         private readonly ILogger invokeExceptionLogger;
         private readonly ILoggerFactory loggerFactory;
@@ -88,7 +88,7 @@ namespace Orleans.Runtime
             this.invokeExceptionLogger =loggerFactory.CreateLogger($"{typeof(Grain).FullName}.InvokeException");
             this.loggerFactory = loggerFactory;
             this.messagingOptions = messagingOptions.Value;
-            this.callbackDataLogger = new LoggerWrapper<CallbackData>(loggerFactory);
+            this.callbackDataLogger = loggerFactory.CreateLogger<CallbackData>();
             this.timerLogger = loggerFactory.CreateLogger<SafeTimer>();
             this.cancellationTokenRuntime = cancellationTokenRuntime;
         }
@@ -411,6 +411,7 @@ namespace Orleans.Runtime
 
                     if (message.Direction != Message.Directions.OneWay)
                     {
+                        TransactionContext.Clear();
                         SafeSendExceptionResponse(message, exc1);
                     }
                     return;
@@ -430,6 +431,7 @@ namespace Orleans.Runtime
 
                     if (message.Direction != Message.Directions.OneWay)
                     {
+                        TransactionContext.Clear();
                         SafeSendExceptionResponse(message, abortException);
                     }
 
@@ -440,6 +442,7 @@ namespace Orleans.Runtime
                 {
                     // This request started the transaction, so we try to commit before returning.
                     await this.transactionAgent.Value.Commit(transactionInfo);
+                    TransactionContext.Clear();
                 }
 
                 if (message.Direction == Message.Directions.OneWay) return;
@@ -449,20 +452,27 @@ namespace Orleans.Runtime
             catch (Exception exc2)
             {
                 logger.Warn(ErrorCode.Runtime_Error_100329, "Exception during Invoke of message: " + message, exc2);
-                if (message.Direction != Message.Directions.OneWay)
-                    SafeSendExceptionResponse(message, exc2);
 
-                if (exc2 is OrleansTransactionInDoubtException)
+                try
                 {
-                    this.logger.LogError(exc2, "Transaction failed due to in doubt transaction");
+                    if (exc2 is OrleansTransactionInDoubtException)
+                    {
+                        this.logger.LogError(exc2, "Transaction failed due to in doubt transaction");
+                    }
+                    else if (TransactionContext.GetTransactionInfo() != null)
+                    {
+                        // Must abort the transaction on exceptions
+                        TransactionContext.GetTransactionInfo().IsAborted = true;
+                        var abortException = (exc2 as OrleansTransactionAbortedException) ??
+                            new OrleansTransactionAbortedException(TransactionContext.GetTransactionInfo().TransactionId, exc2);
+                        this.transactionAgent.Value.Abort(TransactionContext.GetTransactionInfo(), abortException);
+                    }
                 }
-                else if (TransactionContext.GetTransactionInfo() != null)
+                finally
                 {
-                    // Must abort the transaction on exceptions
-                    TransactionContext.GetTransactionInfo().IsAborted = true;
-                    var abortException = (exc2 as OrleansTransactionAbortedException) ?? 
-                        new OrleansTransactionAbortedException(TransactionContext.GetTransactionInfo().TransactionId, exc2);
-                    this.transactionAgent.Value.Abort(TransactionContext.GetTransactionInfo(), abortException);
+                    TransactionContext.Clear();
+                    if (message.Direction != Message.Directions.OneWay)
+                        SafeSendExceptionResponse(message, exc2);
                 }
             }
             finally

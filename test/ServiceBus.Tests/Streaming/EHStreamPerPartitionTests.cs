@@ -1,19 +1,16 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.WindowsAzure.Storage.Table;
-using Orleans;
-using Orleans.AzureUtils;
+using Orleans.Streaming.EventHubs;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
-using Tester;
 using ServiceBus.Tests.TestStreamProviders.EventHub;
 using TestExtensions;
 using UnitTests.GrainInterfaces;

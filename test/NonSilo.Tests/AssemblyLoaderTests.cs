@@ -17,13 +17,13 @@ namespace UnitTests
 
         private readonly ILoggerFactory defaultLoggerFactory;
 
-        private readonly Logger logger;
+        private readonly ILogger logger;
 
         public AssemblyLoaderTests()
         {
             this.defaultLoggerFactory =
                 TestingUtils.CreateDefaultLoggerFactory("AssemblyLoaderTests.log");
-            this.logger = new LoggerWrapper<AssemblyLoaderTests>(defaultLoggerFactory);
+            this.logger = defaultLoggerFactory.CreateLogger<AssemblyLoaderTests>();
         }
 
         public void Dispose()

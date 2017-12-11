@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
 using Orleans.SystemTargetInterfaces;
 using OutcomeState = Orleans.Runtime.GrainDirectory.GlobalSingleInstanceResponseOutcome.OutcomeState;
@@ -44,9 +45,9 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly TaskCompletionSource<GlobalSingleInstanceResponseOutcome> tcs = new TaskCompletionSource<GlobalSingleInstanceResponseOutcome>();
         private readonly GrainId grain;
         private readonly Task<RemoteClusterActivationResponse>[] responsePromises;
-        private Logger logger;
+        private ILogger logger;
 
-        private GlobalSingleInstanceResponseTracker(Task<RemoteClusterActivationResponse>[] responsePromises, GrainId grain, Logger logger)
+        private GlobalSingleInstanceResponseTracker(Task<RemoteClusterActivationResponse>[] responsePromises, GrainId grain, ILogger logger)
         {
             this.responsePromises = responsePromises;
             this.grain = grain;
@@ -62,7 +63,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="grainId">The ID of the grain that we want to know its owner status</param>
         /// <param name="logger">The logger in case there is useful information to log.</param>
         /// <returns>The outcome of aggregating all of the responses.</returns>
-        public static GlobalSingleInstanceResponseOutcome GetOutcome(RemoteClusterActivationResponse[] responses, GrainId grainId, Logger logger)
+        public static GlobalSingleInstanceResponseOutcome GetOutcome(RemoteClusterActivationResponse[] responses, GrainId grainId, ILogger logger)
         {
             if (responses.Any(t => t == null)) throw new ArgumentException("All responses should have a value", nameof(responses));
             return GetOutcome(responses, grainId, logger, hasPendingResponses: false).Value;
@@ -75,7 +76,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="grainId">The ID of the grain that we want to know its owner status</param>
         /// <param name="logger">The logger in case there is useful information to log.</param>
         /// <returns>The outcome of aggregating all of the responses. The task will complete as soon as it has enough responses to make a determination, even if not all of the clusters responded yet.</returns>
-        public static Task<GlobalSingleInstanceResponseOutcome> GetOutcomeAsync(Task<RemoteClusterActivationResponse>[] responsePromises, GrainId grainId, Logger logger)
+        public static Task<GlobalSingleInstanceResponseOutcome> GetOutcomeAsync(Task<RemoteClusterActivationResponse>[] responsePromises, GrainId grainId, ILogger logger)
         {
             if (responsePromises.Any(t => t == null)) throw new ArgumentException("All response promises should have been initiated", nameof(responsePromises));
             var details = new GlobalSingleInstanceResponseTracker(responsePromises, grainId, logger);
@@ -121,7 +122,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        private static GlobalSingleInstanceResponseOutcome? GetOutcome(ICollection<RemoteClusterActivationResponse> responses, GrainId grainId, Logger logger, bool hasPendingResponses)
+        private static GlobalSingleInstanceResponseOutcome? GetOutcome(ICollection<RemoteClusterActivationResponse> responses, GrainId grainId, ILogger logger, bool hasPendingResponses)
         {
             if (!hasPendingResponses && responses.All(res => res.ResponseStatus == ActivationResponseStatus.Pass))
             {

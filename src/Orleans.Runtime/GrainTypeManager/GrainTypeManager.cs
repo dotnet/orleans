@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.ApplicationParts;
 using Orleans.CodeGeneration;
@@ -19,7 +20,7 @@ namespace Orleans.Runtime
     {
         private Dictionary<SiloAddress, GrainInterfaceMap> grainInterfaceMapsBySilo;
         private Dictionary<int, List<SiloAddress>> supportedSilosByTypeCode;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly GrainInterfaceMap grainInterfaceMap;
         private readonly Dictionary<string, GrainTypeData> grainTypes;
         private readonly Dictionary<int, InvokerData> invokers;
@@ -40,7 +41,7 @@ namespace Orleans.Runtime
             DefaultPlacementStrategy defaultPlacementStrategy,
             SerializationManager serializationManager,
             MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager,
-            LoggerWrapper<GrainTypeManager> logger,
+            ILogger<GrainTypeManager> logger,
             IOptions<GrainClassOptions> grainClassOptions)
         {
             var localTestMode = siloDetails.SiloAddress.Endpoint.Address.Equals(IPAddress.Loopback);
@@ -330,7 +331,7 @@ namespace Orleans.Runtime
             return result;
         }
 
-        internal static void LogGrainTypesFound(Logger logger, IDictionary<string, GrainTypeData> grainTypeData)
+        internal static void LogGrainTypesFound(ILogger logger, IDictionary<string, GrainTypeData> grainTypeData)
         {
             var sb = new StringBuilder();
             sb.AppendLine(String.Format("Loaded grain type summary for {0} types: ", grainTypeData.Count));

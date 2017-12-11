@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost.Utils;
@@ -295,14 +296,38 @@ namespace DefaultCluster.Tests.General
             });
         }
 
+        [Fact, TestCategory("BVT")]
+        public async Task ObserverTest_CreateObjectReference_ThrowsForInvalidArgumentTypes()
+        {
+            TestInitialize();
+
+            // Attempt to create an object reference to a Grain class.
+            await Assert.ThrowsAsync<ArgumentException>(() => this.Client.CreateObjectReference<ISimpleGrainObserver>(new DummyObserverGrain()));
+
+            // Attempt to create an object reference to an existing GrainReference.
+            var observer = new DummyObserver();
+            var reference = await this.Client.CreateObjectReference<ISimpleGrainObserver>(observer);
+            await Assert.ThrowsAsync<ArgumentException>(() => this.Client.CreateObjectReference<ISimpleGrainObserver>(reference));
+        }
+
+        private class DummyObserverGrain : Grain, ISimpleGrainObserver
+        {
+            public void StateChanged(int a, int b) { }
+        }
+
+        private class DummyObserver : ISimpleGrainObserver
+        {
+            public void StateChanged(int a, int b) { }
+        }
+
         internal class SimpleGrainObserver : ISimpleGrainObserver
         {
             readonly Action<int, int, AsyncResultHandle> action;
             readonly AsyncResultHandle result;
 
-            private readonly Logger logger;
+            private readonly ILogger logger;
 
-            public SimpleGrainObserver(Action<int, int, AsyncResultHandle> action, AsyncResultHandle result, Logger logger)
+            public SimpleGrainObserver(Action<int, int, AsyncResultHandle> action, AsyncResultHandle result, ILogger logger)
             {
                 this.action = action;
                 this.result = result;
@@ -313,7 +338,7 @@ namespace DefaultCluster.Tests.General
 
             public void StateChanged(int a, int b)
             {
-                this.logger.Verbose("SimpleGrainObserver.StateChanged a={0} b={1}", a, b);
+                this.logger.Debug("SimpleGrainObserver.StateChanged a={0} b={1}", a, b);
                 action?.Invoke(a, b, result);
             }
 

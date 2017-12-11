@@ -18,7 +18,7 @@ namespace Orleans.SqlUtils
             {
                 { AdoNetInvariants.InvariantNameSqlServer, new Tuple<string, string>("System.Data.SqlClient", "System.Data.SqlClient.SqlClientFactory") },
                 { AdoNetInvariants.InvariantNameMySql, new Tuple<string, string>("MySql.Data", "MySql.Data.MySqlClient.MySqlClientFactory") },
-                { AdoNetInvariants.InvariantNameOracleDatabase, new Tuple<string, string>("System.Data.SqlClient", "System.Data.SqlClient.SqlClientFactory") },
+                { AdoNetInvariants.InvariantNameOracleDatabase, new Tuple<string, string>("Oracle.ManagedDataAccess", "Oracle.ManagedDataAccess.Client.OracleClientFactory") },
                 { AdoNetInvariants.InvariantNamePostgreSql, new Tuple<string, string>("Npgsql", "Npgsql.NpgsqlFactory") },
                 { AdoNetInvariants.InvariantNameSqlLite, new Tuple<string, string>("Microsoft.Data.SQLite", "Microsoft.Data.SQLite.SqliteFactory") },
             };
@@ -52,7 +52,7 @@ namespace Orleans.SqlUtils
             if (providerFactoryType == null)
                 throw new InvalidOperationException($"Unable to load type '{providerFactoryDefinition.Item2}' for '{invariantName}' invariant name.");
 
-            var prop = providerFactoryType.GetFields().Where(p => string.Equals(p.Name, "Instance", StringComparison.OrdinalIgnoreCase) && p.IsStatic).SingleOrDefault();
+            var prop = providerFactoryType.GetFields().SingleOrDefault(p => string.Equals(p.Name, "Instance", StringComparison.OrdinalIgnoreCase) && p.IsStatic);
             if (prop == null)
                 throw new InvalidOperationException($"Invalid provider type '{providerFactoryDefinition.Item2}' for '{invariantName}' invariant name.");
 

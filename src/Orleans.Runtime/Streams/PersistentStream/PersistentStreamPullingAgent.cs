@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.Runtime;
@@ -20,7 +21,7 @@ namespace Orleans.Streams
         private readonly Dictionary<StreamId, StreamConsumerCollection> pubSubCache;
         private readonly SafeRandom safeRandom;
         private readonly PersistentStreamProviderConfig config;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly CounterStatistic numReadMessagesCounter;
         private readonly CounterStatistic numSentMessagesCounter;
         private int numMessages;
@@ -58,7 +59,7 @@ namespace Orleans.Streams
             this.config = config;
             numMessages = 0;
 
-            logger = runtime.GetLogger(((ISystemTargetBase)this).GrainId + "-" + streamProviderName);
+            logger = runtime.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger($"{this.GetType().Namespace}.{((ISystemTargetBase)this).GrainId}.{streamProviderName}");
             logger.Info(ErrorCode.PersistentStreamPullingAgent_01, 
                 "Created {0} {1} for Stream Provider {2} on silo {3} for Queue {4}.",
                 GetType().Name, ((ISystemTargetBase)this).GrainId.ToDetailedString(), streamProviderName, Silo, QueueId.ToStringWithHashCode());
@@ -152,7 +153,7 @@ namespace Orleans.Streams
             {
                 IDisposable tmp = timer;
                 timer = null;
-                Utils.SafeExecute(tmp.Dispose);
+                Utils.SafeExecute(tmp.Dispose, this.logger);
             }
 
             this.queueCache = null;
@@ -220,7 +221,7 @@ namespace Orleans.Streams
             IStreamConsumerExtension streamConsumer,
             IStreamFilterPredicateWrapper filter)
         {
-            if (logger.IsVerbose) logger.Verbose(ErrorCode.PersistentStreamPullingAgent_09, "AddSubscriber: Stream={0} Subscriber={1}.", streamId, streamConsumer);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.PersistentStreamPullingAgent_09, "AddSubscriber: Stream={0} Subscriber={1}.", streamId, streamConsumer);
             // cannot await here because explicit consumers trigger this call, so it could cause a deadlock.
             AddSubscriber_Impl(subscriptionId, streamId, streamConsumer, null, filter)
                 .LogException(logger, ErrorCode.PersistentStreamPullingAgent_26,
@@ -327,7 +328,7 @@ namespace Orleans.Streams
 
             // remove consumer
             bool removed = streamData.RemoveConsumer(subscriptionId, logger);
-            if (removed && logger.IsVerbose) logger.Verbose(ErrorCode.PersistentStreamPullingAgent_10, "Removed Consumer: subscription={0}, for stream {1}.", subscriptionId, streamId);
+            if (removed && logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.PersistentStreamPullingAgent_10, "Removed Consumer: subscription={0}, for stream {1}.", subscriptionId, streamId);
             
             if (streamData.Count == 0)
                 pubSubCache.Remove(streamId);
@@ -436,7 +437,7 @@ namespace Orleans.Streams
             queueCache?.AddToCache(multiBatch);
             numMessages += multiBatch.Count;
             numReadMessagesCounter.IncrementBy(multiBatch.Count);
-            if (logger.IsVerbose2) logger.Verbose2(ErrorCode.PersistentStreamPullingAgent_11, "Got {0} messages from queue {1}. So far {2} msgs from this queue.",
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.PersistentStreamPullingAgent_11, "Got {0} messages from queue {1}. So far {2} msgs from this queue.",
                 multiBatch.Count, myQueueId.ToStringWithHashCode(), numMessages);
 
             foreach (var group in
@@ -700,7 +701,7 @@ namespace Orleans.Streams
 
                 IStreamProducerExtension meAsStreamProducer = this.AsReference<IStreamProducerExtension>();
                 ISet<PubSubSubscriptionState> streamData = await pubSub.RegisterProducer(streamId, streamProviderName, meAsStreamProducer);
-                if (logger.IsVerbose) logger.Verbose(ErrorCode.PersistentStreamPullingAgent_16, "Got back {0} Subscribers for stream {1}.", streamData.Count, streamId);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.PersistentStreamPullingAgent_16, "Got back {0} Subscribers for stream {1}.", streamData.Count, streamId);
 
                 var addSubscriptionTasks = new List<Task>(streamData.Count);
                 foreach (PubSubSubscriptionState item in streamData)

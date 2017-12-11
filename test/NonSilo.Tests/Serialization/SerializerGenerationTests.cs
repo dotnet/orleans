@@ -1,4 +1,3 @@
-using Orleans.Serialization;
 using Orleans.UnitTest.GrainInterfaces;
 using TestExtensions;
 using Xunit;

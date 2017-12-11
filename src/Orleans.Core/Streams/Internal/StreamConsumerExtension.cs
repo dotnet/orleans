@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Streams.Core;
 
 namespace Orleans.Streams
@@ -31,7 +33,7 @@ namespace Orleans.Streams
     {
         private readonly IStreamProviderRuntime providerRuntime;
         private readonly ConcurrentDictionary<GuidId, IStreamSubscriptionHandle> allStreamObservers; // map to different ObserversCollection<T> of different Ts.
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private const int MAXIMUM_ITEM_STRING_LOG_LENGTH = 128;
         // if this extension is attached to a cosnumer grain which implements IOnSubscriptionActioner,
         // then this will be not null, otherwise, it will be null
@@ -43,7 +45,7 @@ namespace Orleans.Streams
             this.subscriptionChangeHandler = streamSubscriptionChangeHandler;
             providerRuntime = providerRt;
             allStreamObservers = new ConcurrentDictionary<GuidId, IStreamSubscriptionHandle>();
-            logger = providerRuntime.GetLogger(GetType().Name);
+            logger = providerRt.ServiceProvider.GetRequiredService<ILogger<StreamConsumerExtension>>();
         }
 
         internal StreamSubscriptionHandleImpl<T> SetObserver<T>(GuidId subscriptionId, StreamImpl<T> stream, IAsyncObserver<T> observer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter)
@@ -53,7 +55,7 @@ namespace Orleans.Streams
 
             try
             {
-                if (logger.IsVerbose) logger.Verbose("{0} AddObserver for stream {1}", providerRuntime.ExecutingEntityIdentity(), stream.StreamId);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("{0} AddObserver for stream {1}", providerRuntime.ExecutingEntityIdentity(), stream.StreamId);
 
                 // Note: The caller [StreamConsumer] already handles locking for Add/Remove operations, so we don't need to repeat here.
                 var handle = new StreamSubscriptionHandleImpl<T>(subscriptionId, observer, stream, filter, token);
@@ -80,11 +82,11 @@ namespace Orleans.Streams
 
         public async Task<StreamHandshakeToken> DeliverMutable(GuidId subscriptionId, StreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
         {
-            if (logger.IsVerbose3)
+            if (logger.IsEnabled(LogLevel.Trace))
             {
                 var itemString = item.ToString();
                 itemString = (itemString.Length > MAXIMUM_ITEM_STRING_LOG_LENGTH) ? itemString.Substring(0, MAXIMUM_ITEM_STRING_LOG_LENGTH) + "..." : itemString;
-                logger.Verbose3("DeliverItem {0} for subscription {1}", itemString, subscriptionId);
+                logger.Trace("DeliverItem {0} for subscription {1}", itemString, subscriptionId);
             }
             IStreamSubscriptionHandle observer;
             if (allStreamObservers.TryGetValue(subscriptionId, out observer))
@@ -110,7 +112,7 @@ namespace Orleans.Streams
 
         public async Task<StreamHandshakeToken> DeliverBatch(GuidId subscriptionId, StreamId streamId, Immutable<IBatchContainer> batch, StreamHandshakeToken handshakeToken)
         {
-            if (logger.IsVerbose3) logger.Verbose3("DeliverBatch {0} for subscription {1}", batch.Value, subscriptionId);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("DeliverBatch {0} for subscription {1}", batch.Value, subscriptionId);
 
             IStreamSubscriptionHandle observer;
             if (allStreamObservers.TryGetValue(subscriptionId, out observer))
@@ -136,7 +138,7 @@ namespace Orleans.Streams
 
         public Task CompleteStream(GuidId subscriptionId)
         {
-            if (logger.IsVerbose3) logger.Verbose3("CompleteStream for subscription {0}", subscriptionId);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("CompleteStream for subscription {0}", subscriptionId);
 
             IStreamSubscriptionHandle observer;
             if (allStreamObservers.TryGetValue(subscriptionId, out observer))
@@ -151,7 +153,7 @@ namespace Orleans.Streams
 
         public Task ErrorInStream(GuidId subscriptionId, Exception exc)
         {
-            if (logger.IsVerbose3) logger.Verbose3("ErrorInStream {0} for subscription {1}", exc, subscriptionId);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("ErrorInStream {0} for subscription {1}", exc, subscriptionId);
 
             IStreamSubscriptionHandle observer;
             if (allStreamObservers.TryGetValue(subscriptionId, out observer))

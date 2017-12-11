@@ -9,7 +9,7 @@ namespace Orleans.Runtime.Messaging
     internal class InboundMessageQueue : IInboundMessageQueue
     {
         private readonly BlockingCollection<Message>[] messageQueues;
-        private readonly Logger log;
+        private readonly ILogger log;
         private readonly QueueTrackingStatistic[] queueTracking;
 
         public int Count
@@ -41,7 +41,7 @@ namespace Orleans.Runtime.Messaging
                 }
                 i++;
             }
-            log = new LoggerWrapper<InboundMessageQueue>(loggerFactory);
+            log = loggerFactory.CreateLogger<InboundMessageQueue>();
         }
 
         public void Stop()
@@ -66,7 +66,7 @@ namespace Orleans.Runtime.Messaging
 #endif
             messageQueues[(int)msg.Category].Add(msg);
            
-            if (log.IsVerbose3) log.Verbose3("Queued incoming {0} message", msg.Category.ToString());
+            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Queued incoming {0} message", msg.Category.ToString());
         }
 
         public Message WaitMessage(Message.Categories type)

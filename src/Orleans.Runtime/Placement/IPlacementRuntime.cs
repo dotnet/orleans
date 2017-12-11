@@ -6,8 +6,6 @@ namespace Orleans.Runtime.Placement
 {
     internal interface IPlacementRuntime : IPlacementContext
     {
-        Logger Logger { get; }
-
         /// <summary>
         /// Lookup locally known directory information for a target grain
         /// </summary>
