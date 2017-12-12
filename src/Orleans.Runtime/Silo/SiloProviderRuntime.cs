@@ -9,6 +9,7 @@ using Orleans.Runtime.Scheduler;
 using Orleans.Streams;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Runtime.Providers
 {
@@ -33,7 +34,7 @@ namespace Orleans.Runtime.Providers
 
         public SiloProviderRuntime(
             SiloInitializationParameters siloDetails,
-            GlobalConfiguration config,
+            IOptions<SiloOptions> siloOptions,
             IConsistentRingProvider consistentRingProvider,
             ISiloRuntimeClient runtimeClient,
             ImplicitStreamSubscriberTable implicitStreamSubscriberTable,
@@ -49,7 +50,7 @@ namespace Orleans.Runtime.Providers
             this.activationDirectory = activationDirectory;
             this.consistentRingProvider = consistentRingProvider;
             this.runtimeClient = runtimeClient;
-            this.ServiceId = config.ServiceId;
+            this.ServiceId = siloOptions.Value.ServiceId;
             this.SiloIdentity = siloDetails.SiloAddress.ToLongString();
 
             this.grainBasedPubSub = new GrainBasedPubSubRuntime(this.GrainFactory);

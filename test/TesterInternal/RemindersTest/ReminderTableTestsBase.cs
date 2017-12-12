@@ -36,7 +36,7 @@ namespace UnitTests.RemindersTest
             var clusterId = "test-" + serviceId;
 
             logger.Info("ClusterId={0}", clusterId);
-            siloOptions = Options.Create(new SiloOptions { ClusterId = clusterId });
+            siloOptions = Options.Create(new SiloOptions { ClusterId = clusterId, ServiceId = serviceId });
             fixture.InitializeConnectionStringAccessor(GetConnectionString);
 
             var globalConfiguration = new GlobalConfiguration

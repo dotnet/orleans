@@ -1,3 +1,4 @@
+using System;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime.Configuration;
 
@@ -18,7 +19,10 @@ namespace Orleans.Runtime
         /// </summary>
         public string ClusterId { get; set; }
 
-        // TODO: add ServiceId.
+        /// <summary>
+        /// Gets or sets a unique identifier for this service, which should survive deployment and redeployment, where as <see cref="ClusterId"/> might not.
+        /// </summary>
+        public Guid ServiceId { get; set; }
     }
 
     /// <summary>

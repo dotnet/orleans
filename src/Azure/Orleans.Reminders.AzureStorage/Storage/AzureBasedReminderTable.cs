@@ -26,7 +26,7 @@ namespace Orleans.Runtime.ReminderService
 
         public async Task Init(GlobalConfiguration config)
         {
-            remTableManager = await RemindersTableManager.GetManager(config.ServiceId, this.siloOptions.ClusterId, config.DataConnectionStringForReminders, this.loggerFactory);
+            remTableManager = await RemindersTableManager.GetManager(this.siloOptions.ServiceId, this.siloOptions.ClusterId, config.DataConnectionStringForReminders, this.loggerFactory);
         }
 
         #region Utility methods

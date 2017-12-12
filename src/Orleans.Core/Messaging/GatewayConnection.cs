@@ -12,12 +12,9 @@ namespace Orleans.Messaging
     /// 
     /// Note that both sends and receives are synchronous.
     /// </summary>
-    internal class GatewayConnection : OutgoingMessageSender, IQueueDrainable
+    internal class GatewayConnection : OutgoingMessageSender
     {
         private readonly MessageFactory messageFactory;
-
-        private readonly ManualResetEvent initializationEvent = new ManualResetEvent(false);
-
         internal bool IsLive { get; private set; }
         internal ProxiedMessageCenter MsgCenter { get; private set; }
 
@@ -31,7 +28,6 @@ namespace Orleans.Messaging
                 Silo = addr.ToSiloAddress();
             }
         }
-
         internal SiloAddress Silo { get; private set; }
 
         private readonly GatewayClientReceiver receiver;
@@ -62,15 +58,8 @@ namespace Orleans.Messaging
                 {
                     return;
                 }
-
                 Connect();
-                initializationEvent.Set();
-                if (!IsLive)
-                {
-                    // Only partially initialized, callers responsibility 
-                    // is not to use this object.
-                    return;
-                }
+                if (!IsLive) return;
 
                 // If the Connect succeeded
                 receiver.Start();
@@ -81,9 +70,9 @@ namespace Orleans.Messaging
         public override void Stop()
         {
             IsLive = false;
-            initializationEvent.Reset();
             receiver.Stop();
             base.Stop();
+            DrainQueue(RerouteMessage);
             MsgCenter.RuntimeClient.BreakOutstandingMessagesToDeadSilo(Silo);
             Socket s;
             lock (Lockable)
@@ -94,24 +83,6 @@ namespace Orleans.Messaging
             if (s == null) return;
 
             CloseSocket(s);
-        }
-
-        public void WaitInitialization()
-        {
-            initializationEvent.WaitOne();
-        }
-
-        protected override void Process(Message msg)
-        {
-            // After stop GatewayConnection needs to reroute not yet sent messages to another gateway 
-            if (!IsLive)
-            {
-                RerouteMessage(msg);
-            }
-            else
-            {
-                base.Process(msg);
-            }
         }
 
         // passed the exact same socket on which it got SocketException. This way we prevent races between connect and disconnect.
@@ -127,7 +98,7 @@ namespace Orleans.Messaging
                     s = Socket;
                     Socket = null;
                     Log.Warn(ErrorCode.ProxyClient_MarkGatewayDisconnected, String.Format("Marking gateway at address {0} as Disconnected", Address));
-                    if (MsgCenter != null && MsgCenter.GatewayManager != null)
+                    if ( MsgCenter != null && MsgCenter.GatewayManager != null)
                         // We need a refresh...
                         MsgCenter.GatewayManager.ExpediteUpdateLiveGatewaysSnapshot();
                 }
