@@ -57,6 +57,7 @@ namespace Tester.AzureUtils.Persistence
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         options.MaxStorageBusyRetries = 3;
                     })
+                    .ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory().AddFromAppDomain().WithReferences())
                     .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
             }
         }
@@ -66,7 +67,7 @@ namespace Tester.AzureUtils.Persistence
             {
                 gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString;
             })
-            .ConfigureApplicationParts(parts => parts.AddFromAppDomain())
+            .ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory().AddFromAppDomain().WithReferences())
             .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(config.ClientName, config.ClusterId)));
 
         public static IProviderConfiguration GetNamedProviderConfigForShardedProvider(IEnumerable<KeyValuePair<string, IProviderConfiguration>> providers, string providerName)
