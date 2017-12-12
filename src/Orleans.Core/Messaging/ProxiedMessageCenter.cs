@@ -271,17 +271,13 @@ namespace Orleans.Messaging
             if (startRequired)
             {
                 gatewayConnection.Start();
-            }
-            else
-            {
-                gatewayConnection.WaitInitialization();
-            }
 
-            if (!gatewayConnection.IsLive)
-            {
-                // if failed to start Gateway connection (failed to connect), try sending this msg to another Gateway.
-                RejectOrResend(msg);
-                return;
+                if (!gatewayConnection.IsLive)
+                {
+                    // if failed to start Gateway connection (failed to connect), try sending this msg to another Gateway.
+                    RejectOrResend(msg);
+                    return;
+                }
             }
 
             try
