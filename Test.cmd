@@ -9,8 +9,6 @@ set CMDHOME=%CMDHOME:~0,-1%
 
 call Ensure-DotNetSdk.cmd
 
-set /p _dotnet=< "%~dp0build\dotnetexe.txt"
-
 pushd "%CMDHOME%"
 @cd
 
