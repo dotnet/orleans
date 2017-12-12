@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
 using Orleans.SqlUtils;
-using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Runtime.ReminderService
 {
@@ -11,14 +11,14 @@ namespace Orleans.Runtime.ReminderService
         private string serviceId;
         private RelationalOrleansQueries orleansQueries;
 
-        public SqlReminderTable(IGrainReferenceConverter grainReferenceConverter)
+        public SqlReminderTable(IGrainReferenceConverter grainReferenceConverter, IOptions<SiloOptions> siloOptions)
         {
             this.grainReferenceConverter = grainReferenceConverter;
+            this.serviceId = siloOptions.Value.ServiceId.ToString();
         }
 
         public async Task Init(GlobalConfiguration config)
         {
-            serviceId = config.ServiceId.ToString();
             orleansQueries = await RelationalOrleansQueries.CreateInstance(config.AdoInvariantForReminders, config.DataConnectionStringForReminders, this.grainReferenceConverter);
         }
 

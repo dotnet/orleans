@@ -9,7 +9,7 @@ using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.Hosting;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Runtime.Configuration;
+using Microsoft.Extensions.Options;
 using Orleans.Runtime.Counters;
 using Orleans.Runtime.Storage;
 
@@ -42,7 +42,7 @@ namespace Orleans.Runtime.TestHooks
 
         public Task<bool> HasStatisticsProvider() => Task.FromResult(this.host.Services.GetService<StatisticsProviderManager>() != null);
 
-        public Task<Guid> GetServiceId() => Task.FromResult(this.host.Services.GetRequiredService<GlobalConfiguration>().ServiceId);
+        public Task<Guid> GetServiceId() => Task.FromResult(this.host.Services.GetRequiredService<IOptions<SiloOptions>>().Value.ServiceId);
 
         public Task<bool> HasStorageProvider(string providerName)
         {
