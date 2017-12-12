@@ -1,51 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Threading;
-using Orleans.Messaging;
+﻿using System.Threading.Tasks;
+using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime
 {
-    internal interface IExecutor
+    internal class ExecutorService : ITaskScheduler
     {
-        void QueueWorkItem(WaitCallback callback, object state = null);
+        private readonly TaskScheduler taskScheduler = new ThreadPerTaskScheduler(task => (task as AsynchAgentTask)?.Name);
 
-        int WorkQueueCount { get; }
-    }
-
-    internal interface IStageAttribute { }
-
-    internal interface IQueueDrainable : IStageAttribute { }
-
-    internal class ExecutorService
-    {
-        public IExecutor GetExecutor(GetExecutorRequest request)
+        public void RunTask(Task task)
         {
-            var stageType = request.StageType;
-            if (typeof(SingleTaskAsynchAgent).IsAssignableFrom(stageType))
-            {
-                return new ThreadPerTaskExecutor(request.StageName);
-            }
-            
-            return new QueuedExecutor(
-                request.StageName,
-                request.CancellationTokenSource,
-                typeof(IQueueDrainable).IsAssignableFrom(stageType));
+            task.Start(taskScheduler);
         }
-    }
-
-    internal class GetExecutorRequest
-    {
-        public GetExecutorRequest(Type stageType, string stageName, CancellationTokenSource cts)
-        {
-            StageType = stageType;
-            StageName = stageName;
-            CancellationTokenSource = cts;
-        }
-
-        public Type StageType { get; }
-
-        public string StageName { get; }
-
-        public CancellationTokenSource CancellationTokenSource { get; }
     }
 }

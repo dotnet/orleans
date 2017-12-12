@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.Scheduler
 {
-    internal class WorkerPoolThread : SingleTaskAsynchAgent
+    internal class WorkerPoolThread : AsynchAgent
     {
         internal const int MAX_THREAD_COUNT_TO_REPLACE = 500;
         private const int MAX_CPU_USAGE_TO_REPLACE = 50;
@@ -116,6 +116,13 @@ namespace Orleans.Runtime.Scheduler
                 RuntimeContext.InitializeThread(scheduler);
                 
                 int noWorkCount = 0;
+                
+#if TRACK_DETAILED_STATS
+                if (StatisticsCollector.CollectThreadTimeTrackingStats)
+                {
+                    threadTracking.OnStartExecution();
+                }
+#endif
 
                 // Until we're cancelled...
                 while (!Cts.IsCancellationRequested)
@@ -266,6 +273,13 @@ namespace Orleans.Runtime.Scheduler
             {
                 if (!IsSystem)
                     pool.RecordLeavingThread(this);
+                
+#if TRACK_DETAILED_STATS
+                if (StatisticsCollector.CollectThreadTimeTrackingStats)
+                {
+                    threadTracking.OnStopExecution();
+                }
+#endif
                 CurrentWorkItem = null;
             }
         }
