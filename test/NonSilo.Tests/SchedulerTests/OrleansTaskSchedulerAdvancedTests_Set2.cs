@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -771,6 +772,7 @@ namespace UnitTests.SchedulerTests
         private class MockSiloDetails : ILocalSiloDetails
         {
             public SiloAddress SiloAddress { get; set; }
+            public IPEndPoint GatewayEndpoint { get; set; }
             public string Name { get; set; } = Guid.NewGuid().ToString();
         }
     }

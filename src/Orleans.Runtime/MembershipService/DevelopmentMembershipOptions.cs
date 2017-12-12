@@ -8,6 +8,6 @@ namespace Orleans.Hosting
         /// <summary>
         /// Gets or sets the seed node to find the membership system grain.
         /// </summary>
-        public IPEndPoint PrimarySiloEndPoint { get; set; }
+        public IPEndPoint PrimarySiloEndpoint { get; set; }
     }
 }

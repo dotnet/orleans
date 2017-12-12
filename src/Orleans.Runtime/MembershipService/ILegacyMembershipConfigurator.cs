@@ -63,7 +63,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 if (configuration.SeedNodes?.Count > 0)
                 {
-                    options.PrimarySiloEndPoint = configuration.SeedNodes?.FirstOrDefault();
+                    options.PrimarySiloEndpoint = configuration.SeedNodes?.FirstOrDefault();
                 }
             }
         }
