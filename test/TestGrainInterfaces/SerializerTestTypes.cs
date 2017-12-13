@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.Serialization;
 using Orleans.Serialization;
 
 namespace UnitTests.GrainInterfaces
@@ -18,5 +19,21 @@ namespace UnitTests.GrainInterfaces
         {
             this.Context = context;
         }
+    }
+
+    [Serializable]
+    public class BaseClassWithAutoProp
+    {
+        public int AutoProp { get; set; }
+    }
+
+    /// <summary>
+    /// Code generation test to ensure that an overridden autoprop with a type which differs from
+    /// the base autoprop is not used during serializer generation
+    /// </summary>
+    [Serializable]
+    public class SubClassOverridingAutoProp : BaseClassWithAutoProp
+    {
+        public new string AutoProp { get => base.AutoProp.ToString(); set => base.AutoProp = int.Parse(value); }
     }
 }

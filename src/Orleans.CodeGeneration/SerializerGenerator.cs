@@ -87,7 +87,7 @@ namespace Orleans.CodeGenerator
         /// </returns>
         internal static TypeDeclarationSyntax GenerateClass(string className, Type type, Action<Type> onEncounteredType)
         {
-            var typeInfo = type.GetTypeInfo();
+            var typeInfo = type;
             var genericTypes = typeInfo.IsGenericTypeDefinition
                                    ? typeInfo.GetGenericArguments().Select(_ => SF.TypeParameter(_.ToString())).ToArray()
                                    : new TypeParameterSyntax[0];
@@ -138,7 +138,6 @@ namespace Orleans.CodeGenerator
             var body = new List<StatementSyntax>();
 
             Expression<Action<TypeInfo>> getField = _ => _.GetField(string.Empty, BindingFlags.Default);
-            Expression<Action<Type>> getTypeInfo = _ => _.GetTypeInfo();
             Expression<Action<IFieldUtils>> getGetter = _ => _.GetGetter(default(FieldInfo));
             Expression<Action<IFieldUtils>> getReferenceSetter = _ => _.GetReferenceSetter(default(FieldInfo));
             Expression<Action<IFieldUtils>> getValueSetter = _ => _.GetValueSetter(default(FieldInfo));
@@ -157,7 +156,7 @@ namespace Orleans.CodeGenerator
                 // Get the field
                 var fieldInfoField = SF.IdentifierName(field.InfoFieldName);
                 var fieldInfo =
-                    getField.Invoke(getTypeInfo.Invoke(SF.TypeOfExpression(field.FieldInfo.DeclaringType.GetTypeSyntax())))
+                    getField.Invoke(SF.TypeOfExpression(field.FieldInfo.DeclaringType.GetTypeSyntax()))
                         .AddArgumentListArguments(
                             SF.Argument(field.FieldInfo.Name.GetLiteralExpression()),
                             SF.Argument(bindingFlags));
@@ -186,7 +185,7 @@ namespace Orleans.CodeGenerator
                 }
                 if (!field.IsSettableProperty)
                 {
-                    if (field.FieldInfo.DeclaringType != null && field.FieldInfo.DeclaringType.GetTypeInfo().IsValueType)
+                    if (field.FieldInfo.DeclaringType != null && field.FieldInfo.DeclaringType.IsValueType)
                     {
                         var setterType =
                             typeof(ValueTypeSetter<,>).MakeGenericType(
@@ -250,7 +249,7 @@ namespace Orleans.CodeGenerator
             var body = new List<StatementSyntax> { resultDeclaration };
 
             // Value types cannot be referenced, only copied, so there is no need to box & record instances of value types.
-            if (!type.GetTypeInfo().IsValueType)
+            if (!type.IsValueType)
             {
                 // Record the result for cyclic deserialization.
                 Expression<Action<IDeserializationContext>> recordObject = ctx => ctx.RecordObject(default(object));
@@ -356,7 +355,7 @@ namespace Orleans.CodeGenerator
             var resultVariable = SF.IdentifierName("result");
 
             var body = new List<StatementSyntax>();
-            if (type.GetTypeInfo().GetCustomAttribute<ImmutableAttribute>() != null)
+            if (type.GetCustomAttribute<ImmutableAttribute>() != null)
             {
                 // Immutable types do not require copying.
                 var typeName = type.GetParseableName(new TypeFormattingOptions(includeGlobal: false));
@@ -439,7 +438,7 @@ namespace Orleans.CodeGenerator
 
                 if (!field.IsSettableProperty)
                 {
-                    if (field.FieldInfo.DeclaringType != null && field.FieldInfo.DeclaringType.GetTypeInfo().IsValueType)
+                    if (field.FieldInfo.DeclaringType != null && field.FieldInfo.DeclaringType.IsValueType)
                     {
                         var setterType =
                             typeof(ValueTypeSetter<,>).MakeGenericType(
@@ -483,17 +482,16 @@ namespace Orleans.CodeGenerator
         private static ExpressionSyntax GetObjectCreationExpressionSyntax(Type type)
         {
             ExpressionSyntax result;
-            var typeInfo = type.GetTypeInfo();
 
-            if (typeInfo.IsValueType)
+            if (type.IsValueType)
             {
                 // Use the default value.
-                result = SF.DefaultExpression(typeInfo.AsType().GetTypeSyntax());
+                result = SF.DefaultExpression(type.GetTypeSyntax());
             }
-            else if (GetEmptyConstructor(typeInfo) != null)
+            else if (GetEmptyConstructor(type) != null)
             {
                 // Use the default constructor.
-                result = SF.ObjectCreationExpression(typeInfo.AsType().GetTypeSyntax()).AddArgumentListArguments();
+                result = SF.ObjectCreationExpression(type.GetTypeSyntax()).AddArgumentListArguments();
             }
             else
             {
@@ -505,7 +503,7 @@ namespace Orleans.CodeGenerator
                     type.GetTypeSyntax(),
                     getUninitializedObject.Invoke()
                         .AddArgumentListArguments(
-                            SF.Argument(SF.TypeOfExpression(typeInfo.AsType().GetTypeSyntax()))));
+                            SF.Argument(SF.TypeOfExpression(type.GetTypeSyntax()))));
             }
 
             return result;
@@ -517,7 +515,7 @@ namespace Orleans.CodeGenerator
         /// </summary>
         /// <param name="typeInfo">The typeInfo</param>
         /// <returns>Given ctor or null if not found.</returns>
-        private static ConstructorInfo GetEmptyConstructor(TypeInfo typeInfo)
+        private static ConstructorInfo GetEmptyConstructor(Type typeInfo)
         {
             var result = default(ConstructorInfo);
             var ctors = typeInfo.GetConstructors();
@@ -550,8 +548,8 @@ namespace Orleans.CodeGenerator
         {
             var result =
                 type.GetAllFields()
-                    .Where(field => ShouldSerializeField(field))
-                    .Select((info, i) => new FieldInfoMember { FieldInfo = info, FieldNumber = i })
+                    .Where(ShouldSerializeField)
+                    .Select((info, i) => new FieldInfoMember(type, info, i))
                     .ToList();
             result.Sort(FieldInfoMember.Comparer.Instance);
             return result;
@@ -587,6 +585,19 @@ namespace Orleans.CodeGenerator
         private class FieldInfoMember
         {
             private PropertyInfo property;
+            private readonly Type targetType;
+
+            /// <summary>
+            /// The ordinal assigned to this field.
+            /// </summary>
+            private readonly int ordinal;
+
+            public FieldInfoMember(Type targetType, FieldInfo field, int ordinal)
+            {
+                this.targetType = targetType;
+                this.FieldInfo = field;
+                this.ordinal = ordinal;
+            }
 
             /// <summary>
             /// Gets or sets the underlying <see cref="FieldInfo"/> instance.
@@ -594,75 +605,34 @@ namespace Orleans.CodeGenerator
             public FieldInfo FieldInfo { get; set; }
 
             /// <summary>
-            /// Sets the ordinal assigned to this field.
-            /// </summary>
-            public int FieldNumber { private get; set; }
-
-            /// <summary>
             /// Gets the name of the field info field.
             /// </summary>
-            public string InfoFieldName
-            {
-                get
-                {
-                    return "field" + this.FieldNumber;
-                }
-            }
+            public string InfoFieldName => "field" + this.ordinal;
 
             /// <summary>
             /// Gets the name of the getter field.
             /// </summary>
-            public string GetterFieldName
-            {
-                get
-                {
-                    return "getField" + this.FieldNumber;
-                }
-            }
+            public string GetterFieldName => "getField" + this.ordinal;
 
             /// <summary>
             /// Gets the name of the setter field.
             /// </summary>
-            public string SetterFieldName
-            {
-                get
-                {
-                    return "setField" + this.FieldNumber;
-                }
-            }
+            public string SetterFieldName => "setField" + this.ordinal;
 
             /// <summary>
             /// Gets a value indicating whether or not this field represents a property with an accessible, non-obsolete getter. 
             /// </summary>
-            public bool IsGettableProperty
-            {
-                get
-                {
-                    return this.PropertyInfo != null && this.PropertyInfo.GetGetMethod() != null && !this.IsObsolete;
-                }
-            }
+            public bool IsGettableProperty => this.PropertyInfo?.GetGetMethod()?.IsPublic == true && !this.IsObsolete;
 
             /// <summary>
             /// Gets a value indicating whether or not this field represents a property with an accessible, non-obsolete setter. 
             /// </summary>
-            public bool IsSettableProperty
-            {
-                get
-                {
-                    return this.PropertyInfo != null && this.PropertyInfo.GetSetMethod() != null && !this.IsObsolete;
-                }
-            }
+            public bool IsSettableProperty => this.PropertyInfo?.GetSetMethod()?.IsPublic == true && !this.IsObsolete;
 
             /// <summary>
             /// Gets syntax representing the type of this field.
             /// </summary>
-            public TypeSyntax Type
-            {
-                get
-                {
-                    return this.FieldInfo.FieldType.GetTypeSyntax();
-                }
-            }
+            public TypeSyntax Type => this.FieldInfo.FieldType.GetTypeSyntax();
 
             /// <summary>
             /// Gets the <see cref="PropertyInfo"/> which this field is the backing property for, or
@@ -678,14 +648,20 @@ namespace Orleans.CodeGenerator
                     }
 
                     var propertyName = Regex.Match(this.FieldInfo.Name, "^<([^>]+)>.*$");
-                    if (propertyName.Success && this.FieldInfo.DeclaringType != null)
-                    {
-                        var name = propertyName.Groups[1].Value;
-                        this.property = this.FieldInfo.DeclaringType.GetTypeInfo()
-                            .GetProperty(name, BindingFlags.Instance | BindingFlags.Public);
-                    }
+                    if (!propertyName.Success || this.FieldInfo.DeclaringType == null) return null;
 
-                    return this.property;
+                    var name = propertyName.Groups[1].Value;
+                    var candidates = this.targetType
+                        .GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                        .Where(p => string.Equals(name, p.Name, StringComparison.Ordinal))
+                        .ToList();
+
+                    if (candidates.Count != 1) return null;
+                    var candidate = candidates[0];
+
+                    if (candidate?.PropertyType != this.FieldInfo.FieldType) return null;
+
+                    return this.property = candidate;
                 }
             }
 
@@ -731,7 +707,7 @@ namespace Orleans.CodeGenerator
                 // IGrainObserver instances cannot be directly converted to references, therefore they are not included.
                 ExpressionSyntax deepCopyValueExpression;
                 if (typeof(IAddressable).IsAssignableFrom(this.FieldInfo.FieldType)
-                    && this.FieldInfo.FieldType.GetTypeInfo().IsInterface
+                    && this.FieldInfo.FieldType.IsInterface
                     && !typeof(IGrainObserver).IsAssignableFrom(this.FieldInfo.FieldType))
                 {
                     var getAsReference = getValueExpression.Member(
@@ -780,7 +756,7 @@ namespace Orleans.CodeGenerator
             public ExpressionSyntax GetSetter(ExpressionSyntax instance, ExpressionSyntax value)
             {
                 // If the field is the backing field for an accessible auto-property use the property directly.
-                if (this.PropertyInfo != null && this.PropertyInfo.GetSetMethod() != null && !this.IsObsolete)
+                if (this.IsSettableProperty)
                 {
                     return SF.AssignmentExpression(
                         SyntaxKind.SimpleAssignmentExpression,
@@ -789,7 +765,7 @@ namespace Orleans.CodeGenerator
                 }
 
                 var instanceArg = SF.Argument(instance);
-                if (this.FieldInfo.DeclaringType != null && this.FieldInfo.DeclaringType.GetTypeInfo().IsValueType)
+                if (this.FieldInfo.DeclaringType != null && this.FieldInfo.DeclaringType.IsValueType)
                 {
                     instanceArg = instanceArg.WithRefOrOutKeyword(SF.Token(SyntaxKind.RefKeyword));
                 }
@@ -808,7 +784,7 @@ namespace Orleans.CodeGenerator
             {
                 // If the field is the backing field for an accessible auto-property use the property directly.
                 ExpressionSyntax result;
-                if (this.PropertyInfo != null && this.PropertyInfo.GetGetMethod() != null && !this.IsObsolete)
+                if (this.IsGettableProperty)
                 {
                     result = instance.Member(this.PropertyInfo.Name);
                 }
@@ -829,20 +805,9 @@ namespace Orleans.CodeGenerator
             public class Comparer : IComparer<FieldInfoMember>
             {
                 /// <summary>
-                /// The singleton instance.
-                /// </summary>
-                private static readonly Comparer Singleton = new Comparer();
-
-                /// <summary>
                 /// Gets the singleton instance of this class.
                 /// </summary>
-                public static Comparer Instance
-                {
-                    get
-                    {
-                        return Singleton;
-                    }
-                }
+                public static Comparer Instance { get; } = new Comparer();
 
                 public int Compare(FieldInfoMember x, FieldInfoMember y)
                 {
