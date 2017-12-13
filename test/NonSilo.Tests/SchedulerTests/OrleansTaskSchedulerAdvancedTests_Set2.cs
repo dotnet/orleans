@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -685,7 +686,7 @@ namespace UnitTests.SchedulerTests
             {
                 SiloAddress = SiloAddressUtils.NewLocalSiloAddress(23)
             };
-            var grain = NonReentrentStressGrainWithoutState.Create(grainId, new GrainRuntime(new GlobalConfiguration(), silo, null, null, null, null, null, NullLoggerFactory.Instance));
+            var grain = NonReentrentStressGrainWithoutState.Create(grainId, new GrainRuntime(Options.Create(new SiloOptions()), silo, null, null, null, null, null, NullLoggerFactory.Instance));
             await grain.OnActivateAsync();
 
             Task wrapped = null;
