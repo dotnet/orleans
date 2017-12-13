@@ -66,6 +66,7 @@ namespace Orleans.Runtime.Scheduler
 
         public override void Stop()
         {
+            base.Stop();
             if (!StatisticsCollector.CollectShedulerQueuesStats) return;
             queueTracking.OnStopExecution();
         }

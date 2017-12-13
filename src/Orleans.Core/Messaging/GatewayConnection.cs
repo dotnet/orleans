@@ -201,7 +201,7 @@ namespace Orleans.Messaging
             if (Cts.IsCancellationRequested)
             {
                 // Recycle the message we've dequeued. Note that this will recycle messages that were queued up to be sent when the gateway connection is declared dead
-                MsgCenter.SendMessage(msg);
+                RerouteMessage(msg);
                 return false;
             }
 

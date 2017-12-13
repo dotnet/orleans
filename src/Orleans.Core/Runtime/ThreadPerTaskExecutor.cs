@@ -32,7 +32,7 @@ namespace Orleans.Runtime
             {
                 try
                 {
-                    CounterStatistic.SetOrleansManagedThread(); // must be called before using CounterStatistic. todo?
+                    CounterStatistic.SetOrleansManagedThread(); // must be called before using CounterStatistic.
                     TrackExecutionStart();
                     callback.Invoke(state);
                 }

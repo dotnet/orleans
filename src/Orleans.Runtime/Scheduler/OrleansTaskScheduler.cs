@@ -30,7 +30,7 @@ namespace Orleans.Runtime.Scheduler
 
         internal static TimeSpan TurnWarningLengthThreshold { get; set; }
 
-        //// This is the maximum number of pending work items for a single activation before we write a warning log.
+        // This is the maximum number of pending work items for a single activation before we write a warning log.
         internal LimitValue MaxPendingItemsLimit { get; private set; }
         
         public int RunQueueLength => systemAgent.Count + mainAgent.Count;

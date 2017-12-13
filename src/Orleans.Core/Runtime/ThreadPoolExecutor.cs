@@ -87,14 +87,9 @@ namespace Orleans.Runtime
 
         protected void RunNonBatching(int workItemSlotIndex)
         {
-            while (true)
+            while (!workQueue.IsCompleted &&
+                (!executorOptions.CancellationToken.IsCancellationRequested || executorOptions.DrainAfterCancel))
             {
-                if (!executorOptions.DrainAfterCancel && executorOptions.CancellationToken.IsCancellationRequested ||
-                    workQueue.IsCompleted)
-                {
-                    return;
-                }
-
                 QueueWorkItemCallback workItem;
                 try
                 {
@@ -109,6 +104,7 @@ namespace Orleans.Runtime
                 TrackRequestDequeue(workItem);
                 TrackProcessingStart();
 
+                // todo: try .. catch from WorkerPoolThread
                 workItem.ExecuteWorkItem();
 
                 TrackProcessingStop();
