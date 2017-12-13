@@ -40,20 +40,20 @@ namespace Orleans.Runtime
             executorOptions = options;
             executorOptions.CancellationToken.Register(() =>
             {
-                // allow threads to get a chance to exit gracefully.
-                workQueue.Add(QueueWorkItemCallback.NoOpQueueWorkItemCallback);
+                var threadsChanceToGracefullyExit = QueueWorkItemCallback.NoOpQueueWorkItemCallback;
+                workQueue.Add(threadsChanceToGracefullyExit);
                 workQueue.CompleteAdding();
             });
 
             // padding reduces false sharing
             const int padding = 100;
             runningWorkItems = new QueueWorkItemCallback[options.DegreeOfParallelism * padding];
-            for (var createThreadCount = 0; createThreadCount < options.DegreeOfParallelism; createThreadCount++)
+            for (var threadIndex = 0; threadIndex < options.DegreeOfParallelism; threadIndex++)
             {
-                var executorWorkItemSlotIndex = createThreadCount * padding;
+                var executorWorkItemSlotIndex = threadIndex * padding;
                 new ThreadPerTaskExecutor(
                     new SingleThreadExecutorOptions(
-                        options.Name + createThreadCount,
+                        options.Name + threadIndex,
                         options.StageType,
                         options.CancellationToken,
                         options.Log,
