@@ -11,7 +11,7 @@ using Orleans.Providers.Streams.Generator;
 [assembly: InternalsVisibleTo("UnitTestGrains")]
 [assembly: InternalsVisibleTo("UnitTests")]
 
-[assembly: KnownAssembly(typeof(EventSequenceTokenV2))]
+[assembly: KnownAssembly(typeof(EventSequenceTokenV2), TreatTypesAsSerializable = true)]
 
 [assembly: GenerateSerializer(typeof(EventSequenceTokenV2))]
 [assembly: GenerateSerializer(typeof(GeneratedBatchContainer))]
