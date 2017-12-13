@@ -4,6 +4,9 @@ using System.Threading;
 
 namespace Orleans.Runtime
 {
+    /// <summary>
+    /// Essentially FixedThreadPool
+    /// </summary>
     internal class ThreadPoolExecutor : IExecutor
     {
 #if TRACK_DETAILED_STATS
@@ -42,7 +45,7 @@ namespace Orleans.Runtime
             });
 
             // padding reduces false sharing
-            var padding = 100;
+            const int padding = 100;
             RunningWorkItems = new QueueWorkItemCallback[options.DegreeOfParallelism * padding];
             for (var createThreadCount = 0; createThreadCount < options.DegreeOfParallelism; createThreadCount++)
             {
@@ -224,6 +227,8 @@ namespace Orleans.Runtime
                 this.enqueueTime = DateTime.UtcNow;
             }
 
+            public TimeSpan Elapsed => timeInterval.Elapsed;
+
             internal TimeSpan TimeSinceQueued => Utils.Since(enqueueTime);
 
             internal object State => state;
@@ -255,12 +260,7 @@ namespace Orleans.Runtime
                 return $"WorkItem={state} Executing for {Utils.Since(executionStart)} {statusProvider?.Invoke(state, detailed)}";
             }
 
-            internal bool CheckHealth()
-            {
-                return !IsFrozen();
-            }
-
-            private bool IsFrozen()
+            internal bool IsFrozen()
             {
                 if (timeInterval != null)
                 {
@@ -269,8 +269,6 @@ namespace Orleans.Runtime
 
                 return false;
             }
-
-            public TimeSpan Elapsed => timeInterval.Elapsed;
         }
 
         public bool CheckHealth(DateTime lastCheckTime)
@@ -278,7 +276,7 @@ namespace Orleans.Runtime
             var healthy = true;
             foreach (var workItem in RunningWorkItems)
             {
-                if (workItem != null && !workItem.CheckHealth())
+                if (workItem != null && workItem.IsFrozen())
                 {
                     healthy = false;
                     executorOptions.Log.Error(ErrorCode.SchedulerTurnTooLong,
