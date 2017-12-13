@@ -28,7 +28,11 @@ namespace Orleans.Runtime
                 threadTracking = new ThreadTrackingStatistic(Name);
             }
 #endif
-            workQueue = new BlockingCollection<QueueWorkItemCallback>();
+            workQueue = new BlockingCollection<QueueWorkItemCallback>(
+                options.PreserveOrder ?
+                (IProducerConsumerCollection <QueueWorkItemCallback>)new ConcurrentQueue<QueueWorkItemCallback>() :
+                new ConcurrentBag<QueueWorkItemCallback>());
+
             executorOptions = options;
             executorOptions.CancellationToken.Register(() =>
             {

@@ -37,6 +37,7 @@ namespace Orleans.Runtime.Scheduler
                 Log,
                 maxDegreeOfParalelism,
                 drainAfterCancel,
+                false,
                 turnWarningLengthThreshold,
                 delayWarningThreshold,
                 GetWorkItemStatus,

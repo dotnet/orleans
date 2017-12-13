@@ -65,6 +65,7 @@ namespace Orleans.Runtime
             ILogger log,
             int degreeOfParallelism = 1,
             bool drainAfterCancel = false,
+            bool preserveOrder = true,
             TimeSpan? workItemExecutionTimeTreshold = null,
             TimeSpan? delayWarningThreshold = null,
             WorkItemStatusProvider workItemStatusProvider = null,
@@ -73,6 +74,7 @@ namespace Orleans.Runtime
         {
             DegreeOfParallelism = degreeOfParallelism;
             DrainAfterCancel = drainAfterCancel;
+            PreserveOrder = preserveOrder;
             WorkItemExecutionTimeTreshold = workItemExecutionTimeTreshold ?? TimeSpan.MaxValue;
             DelayWarningThreshold = delayWarningThreshold ?? TimeSpan.MaxValue;
             WorkItemStatusProvider = workItemStatusProvider;
@@ -81,6 +83,8 @@ namespace Orleans.Runtime
         public int DegreeOfParallelism { get; }
 
         public bool DrainAfterCancel { get; }
+
+        public bool PreserveOrder { get; }
 
         public TimeSpan WorkItemExecutionTimeTreshold { get; }
 
