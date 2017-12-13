@@ -8,7 +8,7 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal class IncomingMessageAcceptor : AsynchAgent
+    internal class IncomingMessageAcceptor : SingleTaskAsynchAgent
     {
         private readonly ConcurrentObjectPool<SaeaPoolWrapper> receiveEventArgsPool;
         private const int SocketBufferSize = 1024 * 128; // 128 kb
