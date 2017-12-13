@@ -58,7 +58,7 @@ namespace Orleans.Hosting
                 {
                     options.HasMultiClusterNetwork = true;
                     options.BackgroundGossipInterval = globals.BackgroundGossipInterval;
-                    options.DefaultMultiCluster = globals.DefaultMultiCluster?.ToList() ?? new List<string>();
+                    options.DefaultMultiCluster = globals.DefaultMultiCluster?.ToList();
                     options.GlobalSingleInstanceNumberRetries = globals.GlobalSingleInstanceNumberRetries;
                     options.GlobalSingleInstanceRetryInterval = globals.GlobalSingleInstanceRetryInterval;
                     options.MaxMultiClusterGateways = globals.MaxMultiClusterGateways;
