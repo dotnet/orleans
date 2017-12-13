@@ -14,8 +14,10 @@ namespace Orleans.Runtime
 #endif
         private readonly QueueTrackingStatistic queueTracking;
 
-        private readonly QueueWorkItemCallback[] RunningWorkItems;
+        private readonly QueueWorkItemCallback[] runningWorkItems;
+
         private readonly BlockingCollection<QueueWorkItemCallback> workQueue;
+
         private readonly ThreadPoolExecutorOptions executorOptions;
 
         public ThreadPoolExecutor(ThreadPoolExecutorOptions options)
@@ -31,9 +33,8 @@ namespace Orleans.Runtime
                 threadTracking = new ThreadTrackingStatistic(Name);
             }
 #endif
-            workQueue = new BlockingCollection<QueueWorkItemCallback>(
-                options.PreserveOrder ?
-                (IProducerConsumerCollection <QueueWorkItemCallback>)new ConcurrentQueue<QueueWorkItemCallback>() :
+            workQueue = new BlockingCollection<QueueWorkItemCallback>(options.PreserveOrder ?
+                (IProducerConsumerCollection<QueueWorkItemCallback>)new ConcurrentQueue<QueueWorkItemCallback>() :
                 new ConcurrentBag<QueueWorkItemCallback>());
 
             executorOptions = options;
@@ -46,7 +47,7 @@ namespace Orleans.Runtime
 
             // padding reduces false sharing
             const int padding = 100;
-            RunningWorkItems = new QueueWorkItemCallback[options.DegreeOfParallelism * padding];
+            runningWorkItems = new QueueWorkItemCallback[options.DegreeOfParallelism * padding];
             for (var createThreadCount = 0; createThreadCount < options.DegreeOfParallelism; createThreadCount++)
             {
                 var executorWorkItemSlotIndex = createThreadCount * padding;
@@ -106,7 +107,7 @@ namespace Orleans.Runtime
                     break;
                 }
 
-                RunningWorkItems[workItemSlotIndex] = workItem;
+                runningWorkItems[workItemSlotIndex] = workItem;
                 TrackRequestDequeue(workItem);
                 TrackProcessingStart();
 
@@ -114,7 +115,7 @@ namespace Orleans.Runtime
                 workItem.ExecuteWorkItem();
 
                 TrackProcessingStop();
-                RunningWorkItems[workItemSlotIndex] = null;
+                runningWorkItems[workItemSlotIndex] = null;
             }
         }
 
@@ -274,7 +275,7 @@ namespace Orleans.Runtime
         public bool CheckHealth(DateTime lastCheckTime)
         {
             var healthy = true;
-            foreach (var workItem in RunningWorkItems)
+            foreach (var workItem in runningWorkItems)
             {
                 if (workItem != null && workItem.IsFrozen())
                 {
