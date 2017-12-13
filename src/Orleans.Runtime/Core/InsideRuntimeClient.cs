@@ -722,8 +722,11 @@ namespace Orleans.Runtime
 
         private Task OnRuntimeInitializeStart(CancellationToken tc)
         {
+            var stopWatch = Stopwatch.StartNew();
             typeManager.Start();
             GrainTypeResolver = typeManager.GetTypeCodeMap();
+            stopWatch.Stop();
+            this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Start InsideRuntimeClient took {stopWatch.ElapsedMilliseconds} Milliseconds");
             return Task.CompletedTask;
         }
 
