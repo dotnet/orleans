@@ -7,7 +7,7 @@ using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Storage;
-using Orleans.SqlUtils;
+using Orleans.Tests.SqlUtils;
 using Orleans.Storage;
 
 using TestExtensions;

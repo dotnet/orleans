@@ -22,7 +22,9 @@ namespace Orleans.Runtime
         public const string ORLEANS_REMINDERS_AZURESTORAGE = "Orleans.Reminders.AzureStorage";
         public const string ORLEANS_STATISTICS_AZURESTORAGE = "Orleans.Statistics.AzureStorage";
 
-        public const string ORLEANS_SQL_UTILS_DLL = "OrleansSQLUtils";
+        public const string ORLEANS_CLUSTERING_ADONET = "Orleans.Clustering.AdoNet";
+        public const string ORLEANS_REMINDERS_ADONET = "Orleans.Reminders.AdoNet";
+
         public const string INVARIANT_NAME_SQL_SERVER = "System.Data.SqlClient";
 
         public const string ORLEANS_CLUSTERING_ZOOKEEPER = "Orleans.Clustering.ZooKeeper";

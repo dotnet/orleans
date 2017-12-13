@@ -35,7 +35,7 @@ namespace Orleans.Runtime.MembershipService
                     configurator = new LegacyGrainBasedMembershipConfigurator();
                     break;
                 case LivenessProviderType.SqlServer:
-                    configurator = LegacyGatewayListProviderConfigurator.CreateInstanceWithParameterlessConstructor<ILegacyMembershipConfigurator>(Constants.ORLEANS_SQL_UTILS_DLL);
+                    configurator = LegacyGatewayListProviderConfigurator.CreateInstanceWithParameterlessConstructor<ILegacyMembershipConfigurator>(Constants.ORLEANS_CLUSTERING_ADONET);
                     break;
                 case LivenessProviderType.AzureTable:
                     configurator = LegacyGatewayListProviderConfigurator.CreateInstanceWithParameterlessConstructor<ILegacyMembershipConfigurator>(Constants.ORLEANS_CLUSTERING_AZURESTORAGE);

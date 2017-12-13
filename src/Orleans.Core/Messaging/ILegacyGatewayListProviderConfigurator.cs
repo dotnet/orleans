@@ -34,7 +34,7 @@ namespace Orleans.Messaging
                     break;
 
                 case ClientConfiguration.GatewayProviderType.SqlServer:
-                    configurator = CreateInstanceWithParameterlessConstructor<ILegacyGatewayListProviderConfigurator>(Constants.ORLEANS_SQL_UTILS_DLL);
+                    configurator = CreateInstanceWithParameterlessConstructor<ILegacyGatewayListProviderConfigurator>(Constants.ORLEANS_CLUSTERING_ADONET);
                     break;
 
                 case ClientConfiguration.GatewayProviderType.Custom:

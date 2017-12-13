@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using Orleans.SqlUtils;
+using Orleans.Tests.SqlUtils;
 using UnitTests.General;
 
 namespace Tester.RelationalUtilities
@@ -20,9 +20,18 @@ namespace Tester.RelationalUtilities
 
         public override string CreateStreamTestTable { get { return "CREATE TABLE StreamingTest(Id integer NOT NULL, StreamData bytea NOT NULL);"; } }
 
-        protected override string SetupSqlScriptFileName
+        protected override string[] SetupSqlScriptFileNames
         {
-            get { return "CreateOrleansTables_PostgreSql.sql"; }
+            get
+            {
+                return new[] {
+                    "PostgreSQL-Main.sql",
+                    "PostgreSQL-Clustering.sql",
+                    "PostgreSQL-Persistence.sql",
+                    "PostgreSQL-Reminders.sql",
+                    "PostgreSQL-Statistics.sql"
+                };
+            }
         }
 
         protected override string CreateDatabaseTemplate

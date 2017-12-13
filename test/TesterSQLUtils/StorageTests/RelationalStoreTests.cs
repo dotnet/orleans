@@ -8,7 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.SqlUtils;
+using Orleans.Tests.SqlUtils;
 using UnitTests.General;
 using Xunit;
 
