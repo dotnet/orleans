@@ -180,25 +180,32 @@ namespace Orleans.CodeGenerator
             var members = new List<MemberDeclarationSyntax>();
 
             // Expand the list of included assemblies and types.
-            var knownAssemblies = new HashSet<Assembly>(assemblies);
+            var knownAssemblies =
+                new Dictionary<Assembly, KnownAssemblyAttribute>(
+                    assemblies.ToDictionary(k => k, k => default(KnownAssemblyAttribute)));
             foreach (var attribute in assemblies.SelectMany(asm => asm.GetCustomAttributes<KnownAssemblyAttribute>()))
             {
-                knownAssemblies.Add(attribute.Assembly);
+                knownAssemblies[attribute.Assembly] = attribute;
             }
 
             if (logger.IsEnabled(LogLevel.Information))
             {
-                logger.Info($"Generating code for assemblies: {string.Join(", ", knownAssemblies.Select(a => a.FullName))}");
+                logger.Info($"Generating code for assemblies: {string.Join(", ", knownAssemblies.Keys.Select(a => a.FullName))}");
             }
 
             // Get types from assemblies which reference Orleans and are not generated assemblies.
             var grainClasses = new HashSet<Type>();
             var grainInterfaces = new HashSet<Type>();
-            foreach (var assembly in knownAssemblies)
+            foreach (var pair in knownAssemblies)
             {
+                var assembly = pair.Key;
+                var treatTypesAsSerializable = pair.Value?.TreatTypesAsSerializable ?? false;
                 foreach (var type in TypeUtils.GetDefinedTypes(assembly, this.logger))
                 {
-                    this.serializableTypes.RecordType(type, targetAssembly);
+                    if (treatTypesAsSerializable || type.IsSerializable)
+                    {
+                        serializableTypes.RecordType(type, targetAssembly);
+                    }
 
                     // Include grain interfaces and classes.
                     var isGrainInterface = GrainInterfaceUtils.IsGrainInterface(type);
@@ -315,9 +322,9 @@ namespace Orleans.CodeGenerator
             members.Add(serializerNamespace);
             
             // Add serialization metadata for the types which were encountered.
-            this.AddSerializationTypes(features.Serializers, targetAssembly, knownAssemblies.ToList());
+            this.AddSerializationTypes(features.Serializers, targetAssembly, knownAssemblies.Keys.ToList());
 
-            foreach (var attribute in knownAssemblies.SelectMany(asm => asm.GetCustomAttributes<ConsiderForCodeGenerationAttribute>()))
+            foreach (var attribute in knownAssemblies.Keys.SelectMany(asm => asm.GetCustomAttributes<ConsiderForCodeGenerationAttribute>()))
             {
                 this.serializableTypes.RecordType(attribute.Type, targetAssembly);
                 if (attribute.ThrowOnFailure && !this.serializableTypes.IsTypeRecorded(attribute.Type) && !this.serializableTypes.IsTypeIgnored(attribute.Type))
@@ -335,7 +342,7 @@ namespace Orleans.CodeGenerator
             var compilationUnit = SF.CompilationUnit().AddAttributeLists(attributeDeclarations.ToArray()).AddMembers(members.ToArray());
             return new GeneratedSyntax
             {
-                SourceAssemblies = knownAssemblies.ToList(),
+                SourceAssemblies = knownAssemblies.Keys.ToList(),
                 Syntax = compilationUnit
             };
         }
