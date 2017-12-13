@@ -98,7 +98,7 @@ namespace Orleans.Runtime.Scheduler
             IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.QUEUES_QUEUE_SIZE_INSTANTANEOUS_PER_QUEUE, "Scheduler.LevelOne"), () => RunQueueLength);
 
             if (!StatisticsCollector.CollectShedulerQueuesStats) return;
-            
+
             FloatValueStatistic.FindOrCreate(new StatisticName(StatisticNames.QUEUES_QUEUE_SIZE_AVERAGE_PER_QUEUE, "Scheduler.LevelTwo.Average"), () => AverageRunQueueLengthLevelTwo);
             FloatValueStatistic.FindOrCreate(new StatisticName(StatisticNames.QUEUES_ENQUEUED_PER_QUEUE, "Scheduler.LevelTwo.Average"), () => AverageEnqueuedLevelTwo);
             FloatValueStatistic.FindOrCreate(new StatisticName(StatisticNames.QUEUES_AVERAGE_ARRIVAL_RATE_PER_QUEUE, "Scheduler.LevelTwo.Average"), () => AverageArrivalRateLevelTwo);
@@ -179,6 +179,12 @@ namespace Orleans.Runtime.Scheduler
                 if (!group.IsSystemGroup)
                     group.Stop();
             }
+        }
+
+        public void Start()
+        {
+            systemAgent.Start();
+            mainAgent.Start();
         }
 
         public void Stop()
@@ -286,12 +292,6 @@ namespace Orleans.Runtime.Scheduler
             var wg = new WorkItemGroup(this, context, this.loggerFactory, cancellationTokenSource.Token);
             workgroupDirectory.TryAdd(context, wg);
             return wg;
-        }
-
-        public void Start()
-        {
-            systemAgent.Start();
-            mainAgent.Start();
         }
 
         // Only required if you have work groups flagged by a context that is not a WorkGroupingContext

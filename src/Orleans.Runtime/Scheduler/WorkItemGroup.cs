@@ -303,7 +303,7 @@ namespace Orleans.Runtime.Scheduler
                 state = WorkGroupStatus.Running;
             }
 
-            var thread = Thread.CurrentThread;//WorkerPoolThread.CurrentWorkerThread;
+            var thread = Thread.CurrentThread;
 
             try
             {
@@ -372,11 +372,12 @@ namespace Orleans.Runtime.Scheduler
                     finally
                     {
 #if TRACK_DETAILED_STATS
-                        if (StatisticsCollector.CollectTurnsStats)
-                            SchedulerStatisticsGroup.OnTurnExecutionEnd(Utils.Since(thread.CurrentStateStarted));
+                        // todo: thread no longer contains threadTracking
+                        //if (StatisticsCollector.CollectTurnsStats)
+                        //    SchedulerStatisticsGroup.OnTurnExecutionEnd(Utils.Since(thread.CurrentStateStarted));
                         
-                        if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                            thread.threadTracking.IncrementNumberOfProcessed();
+                        //if (StatisticsCollector.CollectThreadTimeTrackingStats)
+                        //    thread.threadTracking.IncrementNumberOfProcessed();
 #endif
                         totalItemsProcessed++;
                         var taskLength = stopwatch.Elapsed - taskStart;
