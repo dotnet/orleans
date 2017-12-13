@@ -145,6 +145,10 @@ namespace Orleans.CodeGenerator
                 return false;
             }
 
+            // Do not generate serializers for classes which require the use of serialization hooks.
+            // Instead, a fallback serializer which supports those hooks can be used.
+            if (DotNetSerializableUtilities.HasSerializationHookAttributes(t)) return false;
+
             typesToProcess.Add(t);
 
             var interfaces = t.GetInterfaces().Where(x => x.IsConstructedGenericType);
@@ -152,10 +156,6 @@ namespace Orleans.CodeGenerator
             {
                 RecordType(arg, targetAssembly);
             }
-
-            // Do not generate serializers for classes which require the use of serialization hooks.
-            // Instead, a fallback serializer which supports those hooks can be used.
-            if (DotNetSerializableUtilities.HasSerializationHookAttributes(t)) return false;
 
             return true;
         }
