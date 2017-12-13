@@ -29,7 +29,7 @@ namespace Orleans.Runtime.Scheduler
             bool drainAfterCancel,
             ILoggerFactory loggerFactory) : base(name, executorService, loggerFactory)
         {
-            // todo: probably asynch agent should accept executor options
+            // todo: probably asynch agent should accept queue configuration
             executorOptions = new ThreadPoolExecutorOptions(
                 Name,
                 GetType(),

@@ -6,11 +6,10 @@ namespace Orleans.Runtime
 {
     internal class ThreadPoolExecutor : IExecutor
     {
-        private QueueTrackingStatistic queueTracking;
-
 #if TRACK_DETAILED_STATS
         internal protected ThreadTrackingStatistic threadTracking;
 #endif
+        private readonly QueueTrackingStatistic queueTracking;
 
         private readonly QueueWorkItemCallback[] RunningWorkItems;
         private readonly BlockingCollection<QueueWorkItemCallback> workQueue;

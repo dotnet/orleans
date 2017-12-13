@@ -6,7 +6,7 @@ using Orleans.Runtime.Scheduler;
 namespace Orleans.Runtime.Messaging
 {
     internal class IncomingMessageAgent : SingleTaskAsynchAgent
-	{
+    {
         private readonly IMessageCenter messageCenter;
         private readonly ActivationDirectory directory;
         private readonly OrleansTaskScheduler scheduler;
