@@ -40,8 +40,8 @@ namespace Orleans.Runtime
             executorOptions = options;
             executorOptions.CancellationToken.Register(() =>
             {
-                var threadsChanceToGracefullyExit = QueueWorkItemCallback.NoOpQueueWorkItemCallback;
-                workQueue.Add(threadsChanceToGracefullyExit);
+                var chanceToGracefullyExit = QueueWorkItemCallback.NoOpQueueWorkItemCallback;
+                workQueue.Add(chanceToGracefullyExit);
                 workQueue.CompleteAdding();
             });
 
