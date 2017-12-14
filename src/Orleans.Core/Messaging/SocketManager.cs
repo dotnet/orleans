@@ -234,7 +234,10 @@ namespace Orleans.Runtime
 
             try
             {
-                s.Disconnect(false);
+                if (s.Connected)
+                    s.Disconnect(false);
+                else
+                    s.Close();
             }
             catch (Exception)
             {
