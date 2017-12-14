@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
@@ -94,28 +95,89 @@ namespace Orleans.Runtime
 
         protected void RunNonBatching(int workItemSlotIndex)
         {
-            while (!workQueue.IsCompleted &&
-                (!executorOptions.CancellationToken.IsCancellationRequested || executorOptions.DrainAfterCancel))
+            try
             {
-                QueueWorkItemCallback workItem;
-                try
+                while (!workQueue.IsCompleted &&
+                       (!executorOptions.CancellationToken.IsCancellationRequested || executorOptions.DrainAfterCancel))
                 {
-                    workItem = workQueue.Take();
+                    QueueWorkItemCallback workItem;
+                    try
+                    {
+                        workItem = workQueue.Take();
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        break;
+                    }
+
+                    try
+                    {
+                        runningWorkItems[workItemSlotIndex] = workItem;
+                        TrackRequestDequeue(workItem);
+                        TrackProcessingStart();
+                        try
+                        {
+                            workItem.ExecuteWorkItem();
+                        }
+                        catch (ThreadAbortException ex)
+                        {
+                            // The current turn was aborted (indicated by the exception state being set to true).
+                            // In this case, we just reset the abort so that life continues. No need to do anything else.
+                            if ((ex.ExceptionState != null) && ex.ExceptionState.Equals(true))
+                                Thread.ResetAbort();
+                            else
+                                executorOptions.Log.Error(ErrorCode.Runtime_Error_100029,
+                                    "Caught thread abort exception, allowing it to propagate outwards", ex);
+                        }
+                        catch (Exception ex)
+                        {
+                            executorOptions.Log
+                                .Error(ErrorCode.Runtime_Error_100030, $"Worker thread caught an exception thrown from task {workItem.State}.", ex);
+                        }
+                        finally
+                        {
+#if TRACK_DETAILED_STATS
+                                // todo
+                                if (todo.ItemType != WorkItemType.WorkItemGroup)
+                                {
+                                    if (StatisticsCollector.CollectTurnsStats)
+                                    {
+                                        //SchedulerStatisticsGroup.OnTurnExecutionEnd(CurrentStateTime.Elapsed);
+                                        SchedulerStatisticsGroup.OnTurnExecutionEnd(Utils.Since(CurrentStateStarted));
+                                    }
+                                    if (StatisticsCollector.CollectThreadTimeTrackingStats)
+                                    {
+                                        threadTracking.IncrementNumberOfProcessed();
+                                    }
+                                    CurrentWorkItem = null;
+                                }
+                                if (StatisticsCollector.CollectThreadTimeTrackingStats)
+                                {
+                                    threadTracking.OnStopProcessing();
+                                }
+#endif
+                        }
+
+                        TrackProcessingStop();
+                        runningWorkItems[workItemSlotIndex] = null;
+                    }
+                    catch (ThreadAbortException tae)
+                    {
+                        // Can be reported from RunQueue.Get when Silo is being shutdown, so downgrade to verbose log
+                        if (executorOptions.Log.IsEnabled(LogLevel.Debug)) executorOptions.Log.Debug("Received thread abort exception -- exiting. {0}", tae);
+                        Thread.ResetAbort();
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        executorOptions.Log.Error(ErrorCode.Runtime_Error_100031, "Exception bubbled up to worker thread", ex);
+                        break;
+                    }
                 }
-                catch (InvalidOperationException)
-                {
-                    break;
-                }
-
-                runningWorkItems[workItemSlotIndex] = workItem;
-                TrackRequestDequeue(workItem);
-                TrackProcessingStart();
-
-                // todo: try .. catch from WorkerPoolThread
-                workItem.ExecuteWorkItem();
-
-                TrackProcessingStop();
-                runningWorkItems[workItemSlotIndex] = null;
+            }
+            catch (Exception exc)
+            {
+                executorOptions.Log.Error(ErrorCode.SchedulerWorkerThreadExc, "WorkerPoolThread caugth exception:", exc);
             }
         }
 
