@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime.Configuration;
 
@@ -75,9 +76,10 @@ namespace Orleans.Runtime
         /// </summary>
         public NodeConfiguration NodeConfig { get; private set; }
 
-        /// <summary>
-        /// Gets the address of this silo's inter-silo endpoint.
-        /// </summary>
+        /// <inheritdoc />
         public SiloAddress SiloAddress { get; }
+
+        /// <inheritdoc />
+        public IPEndPoint GatewayEndpoint { get; }
     }
 }

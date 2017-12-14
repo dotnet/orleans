@@ -1,3 +1,5 @@
+using System.Net;
+
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -14,5 +16,10 @@ namespace Orleans.Runtime
         /// Gets the address of this silo's inter-silo endpoint.
         /// </summary>
         SiloAddress SiloAddress { get; }
+
+        /// <summary>
+        /// Gets the address of this silo's gateway proxy endpoint.
+        /// </summary>
+        IPEndPoint GatewayEndpoint { get; }
     }
 }
