@@ -4,6 +4,8 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
+using UnitTests.GrainInterfaces;
+using UnitTests.Grains;
 using Xunit;
 
 namespace NetCore.Tests
@@ -16,19 +18,32 @@ namespace NetCore.Tests
 
         public ExceptionTests()
         {
-            this.silo = SiloHostBuilder.CreateDefault().ConfigureApplicationParts(parts => parts.AddFromAppDomain()).ConfigureLocalHostPrimarySilo().Build();
+            this.silo = SiloHostBuilder.CreateDefault()
+                .ConfigureApplicationParts(
+                    parts =>
+                        parts.AddApplicationPart(typeof(ExceptionGrain).Assembly).WithReferences())
+                .ConfigureLocalHostPrimarySilo()
+                .Build();
             this.silo.StartAsync().GetAwaiter().GetResult();
 
-            this.client = ClientBuilder.CreateDefault().ConfigureApplicationParts(parts => parts.AddFromAppDomain()).UseConfiguration(ClientConfiguration.LocalhostSilo()).Build();
+            this.client = ClientBuilder.CreateDefault()
+                .ConfigureApplicationParts(parts =>
+                    parts.AddApplicationPart(typeof(IExceptionGrain).Assembly).WithReferences())
+                .UseConfiguration(ClientConfiguration.LocalhostSilo())
+                .Build();
             this.client.Connect().GetAwaiter().GetResult();
         }
 
         [Fact]
         public async Task ExceptionsPropagatedFromGrainToClient()
         {
-            var grain = this.client.GetGrain<UnitTests.GrainInterfaces.IExceptionGrain>(0);
-            var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => grain.ThrowsInvalidOperationException());
-            Assert.Equal("Test exception", exception.Message);
+            var grain = this.client.GetGrain<IExceptionGrain>(0);
+
+            var invalidOperationException = await Assert.ThrowsAsync<InvalidOperationException>(() => grain.ThrowsInvalidOperationException());
+            Assert.Equal("Test exception", invalidOperationException.Message);
+
+            var nullReferenceException = await Assert.ThrowsAsync<NullReferenceException>(() => grain.ThrowsNullReferenceException());
+            Assert.Equal("null null null", nullReferenceException.Message);
         }
 
         public void Dispose()
