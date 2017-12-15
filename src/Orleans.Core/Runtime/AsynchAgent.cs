@@ -184,15 +184,15 @@ namespace Orleans.Runtime
 
             if (OnFault == FaultBehavior.RestartOnFault)
             {
-                //try
-                //{
-                //    Start();
-                //}
-                //catch (Exception exc)
-                //{
-                //    Log.Error(ErrorCode.Runtime_Error_100027, "Unable to restart AsynchAgent", exc);
-                //    State = ThreadState.Stopped;
-                //}
+                try
+                {
+                    Start();
+                }
+                catch (Exception exc)
+                {
+                    Log.Error(ErrorCode.Runtime_Error_100027, "Unable to restart AsynchAgent", exc);
+                    State = ThreadState.Stopped;
+                }
             }
         }
 
