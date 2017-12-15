@@ -24,6 +24,11 @@ namespace UnitTests.Grains
             throw new InvalidOperationException("Test exception");
         }
 
+        public Task ThrowsNullReferenceException()
+        {
+            throw new NullReferenceException("null null null");
+        }
+
         public async Task ThrowsAggregateExceptionWrappingInvalidOperationException()
         {
             await Task.Delay(0);

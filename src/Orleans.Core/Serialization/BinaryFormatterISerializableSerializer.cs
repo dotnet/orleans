@@ -20,7 +20,7 @@ namespace Orleans.Serialization
         /// <inheritdoc />
         public bool IsSupportedType(Type itemType)
         {
-            return SerializableType.IsAssignableFrom(itemType) && DotNetSerializableUtilities.HasSerializationConstructor(itemType);
+            return itemType.IsSerializable && SerializableType.IsAssignableFrom(itemType) && DotNetSerializableUtilities.HasSerializationConstructor(itemType);
         }
 
         /// <inheritdoc />
