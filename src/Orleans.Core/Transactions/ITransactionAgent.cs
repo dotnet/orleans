@@ -27,7 +27,7 @@ namespace Orleans.Transactions
         /// <param name="readOnly">Whether it is a read-only transaction</param>
         /// <param name="timeout">Transaction is automatically aborted if it does not complete within this time</param>
         /// <returns>Info of the new transaction</returns>
-        Task<TransactionInfo> StartTransaction(bool readOnly, TimeSpan timeout);
+        Task<ITransactionInfo> StartTransaction(bool readOnly, TimeSpan timeout);
 
         /// <summary>
         /// Attempt to Commit a transaction. If this returns with no exceptions
@@ -39,7 +39,7 @@ namespace Orleans.Transactions
         /// The method throws OrleansTransactionInDoubtException if the outcome of the Commit cannot be determined.
         /// If any other exception is thrown then the transaction is aborted.
         /// </remarks>
-        Task Commit(TransactionInfo transactionInfo);
+        Task Commit(ITransactionInfo transactionInfo);
 
         /// <summary>
         /// Abort a transaction.
@@ -48,7 +48,7 @@ namespace Orleans.Transactions
         /// <param name="reason"></param>
         /// <returns>None.</returns>
         /// <remarks>This method is exception-free</remarks>
-        void Abort(TransactionInfo transactionInfo, OrleansTransactionAbortedException reason);
+        void Abort(ITransactionInfo transactionInfo, OrleansTransactionAbortedException reason);
 
         /// <summary>
         /// Check if a transaction is known to have aborted.

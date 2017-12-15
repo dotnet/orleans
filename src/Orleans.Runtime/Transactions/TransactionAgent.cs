@@ -137,7 +137,7 @@ namespace Orleans.Transactions
 
         #region ITransactionAgent
 
-        public async Task<TransactionInfo> StartTransaction(bool readOnly, TimeSpan timeout)
+        public async Task<ITransactionInfo> StartTransaction(bool readOnly, TimeSpan timeout)
         {
             if (readOnly)
             {
@@ -152,8 +152,10 @@ namespace Orleans.Transactions
             return new TransactionInfo(id);
         }
 
-        public async Task Commit(TransactionInfo transactionInfo)
+        public async Task Commit(ITransactionInfo info)
         {
+            var transactionInfo = (TransactionInfo)info;
+
             TransactionsStatisticsGroup.OnTransactionCommitRequest();
 
             if (transactionInfo.IsReadOnly)
@@ -203,8 +205,10 @@ namespace Orleans.Transactions
             await completion.Task;
         }
 
-        public void Abort(TransactionInfo transactionInfo, OrleansTransactionAbortedException reason)
+        public void Abort(ITransactionInfo info, OrleansTransactionAbortedException reason)
         {
+            var transactionInfo = (TransactionInfo)info;
+
             abortedTransactions.TryAdd(transactionInfo.TransactionId, 0);
             foreach (var g in transactionInfo.WriteSet.Keys)
             {
