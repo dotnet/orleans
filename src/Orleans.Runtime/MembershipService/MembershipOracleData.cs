@@ -24,16 +24,17 @@ namespace Orleans.Runtime.MembershipService
 
         internal readonly DateTime SiloStartTime;
         internal readonly SiloAddress MyAddress;
+        internal readonly int MyProxyPort;
         internal readonly string MyHostname;
         internal SiloStatus CurrentStatus { get; private set; } // current status of this silo.
-        internal string SiloName { get; private set; } // name of this silo.
+        internal string SiloName { get; } // name of this silo.
 
         private readonly bool multiClusterActive; // set by configuration if multicluster is active
         private readonly int maxMultiClusterGateways; // set by configuration
 
         private UpdateFaultCombo myFaultAndUpdateZones;
         
-        internal MembershipOracleData(ILocalSiloDetails siloDetails, NodeConfiguration nodeConfiguration, ILogger log, MultiClusterOptions multiClusterOptions)
+        internal MembershipOracleData(ILocalSiloDetails siloDetails, ILogger log, MultiClusterOptions multiClusterOptions)
         {
             logger = log;
             localTable = new Dictionary<SiloAddress, MembershipEntry>();  
@@ -45,7 +46,8 @@ namespace Orleans.Runtime.MembershipService
             
             SiloStartTime = DateTime.UtcNow;
             MyAddress = siloDetails.SiloAddress;
-            MyHostname = nodeConfiguration.DNSHostName;
+            MyHostname = siloDetails.DnsHostName;
+            MyProxyPort = siloDetails.GatewayAddress?.Endpoint?.Port ?? 0;
             SiloName = siloDetails.Name;
             this.multiClusterActive = multiClusterOptions.HasMultiClusterNetwork;
             this.maxMultiClusterGateways = multiClusterOptions.MaxMultiClusterGateways;
@@ -181,12 +183,12 @@ namespace Orleans.Runtime.MembershipService
             return dict;
         }
 
-        internal MembershipEntry CreateNewMembershipEntry(NodeConfiguration nodeConf, SiloStatus myStatus)
+        internal MembershipEntry CreateNewMembershipEntry(SiloStatus myStatus)
         {
-            return CreateNewMembershipEntry(nodeConf, MyAddress, MyHostname, myStatus, SiloStartTime);
+            return CreateNewMembershipEntry(SiloName, MyAddress, MyProxyPort, MyHostname, myStatus, SiloStartTime);
         }
 
-        private static MembershipEntry CreateNewMembershipEntry(NodeConfiguration nodeConf, SiloAddress myAddress, string myHostname, SiloStatus myStatus, DateTime startTime)
+        private static MembershipEntry CreateNewMembershipEntry(string siloName, SiloAddress myAddress, int proxyPort, string myHostname, SiloStatus myStatus, DateTime startTime)
         {
             var assy = Assembly.GetEntryAssembly() ?? typeof(MembershipOracleData).GetTypeInfo().Assembly;
             var roleName = assy.GetName().Name;
@@ -196,10 +198,10 @@ namespace Orleans.Runtime.MembershipService
                 SiloAddress = myAddress,
 
                 HostName = myHostname,
-                SiloName = nodeConf.SiloName,
+                SiloName = siloName,
 
                 Status = myStatus,
-                ProxyPort = (nodeConf.IsGatewayNode ? nodeConf.ProxyGatewayEndpoint.Port : 0),
+                ProxyPort = proxyPort,
 
                 RoleName = roleName,
                 

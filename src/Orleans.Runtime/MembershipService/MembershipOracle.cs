@@ -20,7 +20,6 @@ namespace Orleans.Runtime.MembershipService
         private Dictionary<SiloAddress, int> probedSilos;  // map from currently probed silos to the number of failed probes
         private readonly ILogger logger;
         private readonly ClusterConfiguration orleansConfig;
-        private readonly NodeConfiguration nodeConfig;
         private SiloAddress MyAddress { get { return membershipOracleData.MyAddress; } }
         private GrainTimer timerGetTableUpdates;
         private GrainTimer timerProbeOtherSilos;
@@ -42,17 +41,16 @@ namespace Orleans.Runtime.MembershipService
         private TimeSpan AllowedIAmAliveMissPeriod { get { return orleansConfig.Globals.IAmAliveTablePublishTimeout.Multiply(orleansConfig.Globals.NumMissedTableIAmAliveLimit); } }
         private readonly ILoggerFactory loggerFactory;
 
-        public MembershipOracle(ILocalSiloDetails siloDetails, ClusterConfiguration clusterConfiguration, NodeConfiguration nodeConfiguration, MembershipTableFactory membershipTableFactory, IInternalGrainFactory grainFactory, IOptions<MultiClusterOptions> multiClusterOptions, ILoggerFactory loggerFactory)
+        public MembershipOracle(ILocalSiloDetails siloDetails, ClusterConfiguration clusterConfiguration, MembershipTableFactory membershipTableFactory, IInternalGrainFactory grainFactory, IOptions<MultiClusterOptions> multiClusterOptions, ILoggerFactory loggerFactory)
             : base(Constants.MembershipOracleId, siloDetails.SiloAddress, loggerFactory)
         {
             this.loggerFactory = loggerFactory;
             this.membershipTableFactory = membershipTableFactory;
             this.grainFactory = grainFactory;
             logger = loggerFactory.CreateLogger<MembershipOracleData>();
-            membershipOracleData = new MembershipOracleData(siloDetails, nodeConfiguration, logger, multiClusterOptions.Value);
+            membershipOracleData = new MembershipOracleData(siloDetails, logger, multiClusterOptions.Value);
             probedSilos = new Dictionary<SiloAddress, int>();
             orleansConfig = clusterConfiguration;
-            nodeConfig = nodeConfiguration;
             pingCounter = 0;
             TimeSpan backOffMax = StandardExtensions.Max(EXP_BACKOFF_STEP.Multiply(orleansConfig.Globals.ExpectedClusterSize), SiloMessageSender.CONNECTION_RETRY_DELAY.Multiply(2));
             EXP_BACKOFF_CONTENTION_MAX = backOffMax;
@@ -103,7 +101,7 @@ namespace Orleans.Runtime.MembershipService
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("-ReadAll Membership table {0}", table.ToString());
             CheckMissedIAmAlives(table);
 
-            string mySiloName = nodeConfig.SiloName;
+            string mySiloName = SiloName;
             MembershipEntry mostRecentPreviousEntry = null;
             // look for silo instances that are same as me, find most recent with Generation before me.
             foreach (MembershipEntry entry in table.Members.Select(tuple => tuple.Item1).Where(data => mySiloName.Equals(data.SiloName)))
@@ -465,7 +463,7 @@ namespace Orleans.Runtime.MembershipService
             }
             else // first write attempt of this silo. Insert instead of Update.
             {
-                myEntry = membershipOracleData.CreateNewMembershipEntry(nodeConfig, newStatus);
+                myEntry = membershipOracleData.CreateNewMembershipEntry(newStatus);
             }
 
             var now = DateTime.UtcNow;

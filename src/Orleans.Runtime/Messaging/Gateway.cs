@@ -40,7 +40,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ILoggerFactory loggerFactory;
         private readonly SiloMessagingOptions messagingOptions;
         
-        public Gateway(MessageCenter msgCtr, NodeConfiguration nodeConfig, MessageFactory messageFactory, SerializationManager serializationManager, ExecutorService executorService, ILoggerFactory loggerFactory, IOptions<SiloMessagingOptions> options, IOptions<SiloOptions> siloOptions, IOptions<MultiClusterOptions> multiClusterOptions)
+        public Gateway(MessageCenter msgCtr, ILocalSiloDetails siloDetails, MessageFactory messageFactory, SerializationManager serializationManager, ExecutorService executorService, ILoggerFactory loggerFactory, IOptions<SiloMessagingOptions> options, IOptions<MultiClusterOptions> multiClusterOptions)
         {
             this.messagingOptions = options.Value;
             this.loggerFactory = loggerFactory;
@@ -49,14 +49,14 @@ namespace Orleans.Runtime.Messaging
             this.logger = this.loggerFactory.CreateLogger<Gateway>();
             this.serializationManager = serializationManager;
             this.executorService = executorService;
-            acceptor = new GatewayAcceptor(msgCtr,this, nodeConfig.ProxyGatewayEndpoint, this.messageFactory, this.serializationManager, executorService, siloOptions, multiClusterOptions, loggerFactory);
+            acceptor = new GatewayAcceptor(msgCtr,this, siloDetails.GatewayAddress?.Endpoint, this.messageFactory, this.serializationManager, executorService, siloDetails, multiClusterOptions, loggerFactory);
             senders = new Lazy<GatewaySender>[messagingOptions.GatewaySenderQueues];
             nextGatewaySenderToUseForRoundRobin = 0;
             dropper = new GatewayClientCleanupAgent(this, executorService, loggerFactory, messagingOptions.ClientDropTimeout);
             clients = new ConcurrentDictionary<GrainId, ClientState>();
             clientSockets = new ConcurrentDictionary<Socket, ClientState>();
             clientsReplyRoutingCache = new ClientsReplyRoutingCache(messagingOptions.ResponseTimeout);
-            this.gatewayAddress = SiloAddress.New(nodeConfig.ProxyGatewayEndpoint, 0);
+            this.gatewayAddress = siloDetails.GatewayAddress;
             lockable = new object();
         }
 

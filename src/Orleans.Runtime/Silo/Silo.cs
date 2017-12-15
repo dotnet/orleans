@@ -179,7 +179,7 @@ namespace Orleans.Runtime
             }
 
             logger.Info(ErrorCode.SiloInitializing, "-------------- Initializing {0} silo on host {1} MachineName {2} at {3}, gen {4} --------------",
-                this.initializationParams.Type, LocalConfig.DNSHostName, Environment.MachineName, localEndpoint, this.initializationParams.SiloAddress.Generation);
+                this.initializationParams.Type, initializationParams.DnsHostName, Environment.MachineName, localEndpoint, this.initializationParams.SiloAddress.Generation);
             logger.Info(ErrorCode.SiloInitConfig, "Starting silo {0} with the following configuration= " + Environment.NewLine + "{1}",
                 name, config.ToString(name));
 

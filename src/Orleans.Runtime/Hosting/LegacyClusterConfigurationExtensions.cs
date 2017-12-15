@@ -43,12 +43,12 @@ namespace Orleans.Hosting
                 {
                     options.ClusterId = configuration.Globals.DeploymentId;
                 }
+#pragma warning restore CS0618 // Type or member is obsolete
 
                 if (options.ServiceId == Guid.Empty)
                 {
                     options.ServiceId = configuration.Globals.ServiceId;
                 }
-#pragma warning restore CS0618 // Type or member is obsolete
             });
 
             services.Configure<MultiClusterOptions>(options =>
@@ -82,8 +82,22 @@ namespace Orleans.Hosting
                 options.ClientDropTimeout = configuration.Globals.ClientDropTimeout;
             });
 
-            services.Configure<NetworkingOptions>(options => LegacyConfigurationExtensions.CopyNetworkingOptions(configuration.Globals, options));
-            
+            services.AddOptions<NetworkingOptions>()
+                .Configure(options => LegacyConfigurationExtensions.CopyNetworkingOptions(configuration.Globals, options))
+                .Configure<IOptions<SiloOptions>>((options, siloOptions) =>
+                {
+                    var nodeConfig = configuration.GetOrCreateNodeConfigurationForSilo(siloOptions.Value.SiloName);
+                    if (options.IPAddress == null && string.IsNullOrWhiteSpace(options.HostNameOrIPAddress))
+                    {
+                        options.IPAddress = nodeConfig.Endpoint.Address;
+                        options.Port = nodeConfig.Endpoint.Port;
+                    }
+                    if (options.ProxyPort == 0 && nodeConfig.ProxyGatewayEndpoint != null)
+                    {
+                        options.ProxyPort = nodeConfig.ProxyGatewayEndpoint.Port;
+                    }
+                });
+
             services.Configure<SerializationProviderOptions>(options =>
             {
                 options.SerializationProviders = configuration.Globals.SerializationProviders;
