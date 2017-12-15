@@ -54,7 +54,7 @@ namespace Orleans.Runtime
             for (var threadIndex = 0; threadIndex < options.DegreeOfParallelism; threadIndex++)
             {
                 var workItemSlotIndex = threadIndex * padding;
-                var threadContext = new ExecutorThreadContext(CreateWorkItemFilters(workItemSlotIndex), workItemSlotIndex);
+                var threadContext = new ExecutorThreadContext(CreateWorkItemFilters(workItemSlotIndex));
                 new ThreadPerTaskExecutor(
                     new SingleThreadExecutorOptions(
                         options.Name + threadIndex,
@@ -228,10 +228,10 @@ namespace Orleans.Runtime
         {
             return WorkItemFilter.CreateChain(new Func<WorkItemFilter>[]
             {
-                () => new ExceptionHandlerFilter(executorOptions.Log, continueExecution: false),
+                () => new OuterExceptionHandlerFilter(executorOptions.Log),
                 () => new StatisticsTrackingFilter(this),
-                () => new RunningWorkItemsTrackerFilter(this, executorWorkItemSlotIndex),
-                () => new ExceptionHandlerFilter(executorOptions.Log, continueExecution: true)
+                () => new RunningWorkItemsTracker(this, executorWorkItemSlotIndex),
+                () => new ExceptionHandlerFilter(executorOptions.Log)
             });
         }
 
@@ -252,9 +252,9 @@ namespace Orleans.Runtime
             }
         }
 
-        private sealed class RunningWorkItemsTrackerFilter : WorkItemFilter
+        private sealed class RunningWorkItemsTracker : WorkItemFilter
         {
-            public RunningWorkItemsTrackerFilter(ThreadPoolExecutor executor, int workItemSlotIndex) : base(
+            public RunningWorkItemsTracker(ThreadPoolExecutor executor, int workItemSlotIndex) : base(
                 onActionExecuting: workItem =>
                 {
                     executor.runningWorkItems[workItemSlotIndex] = workItem;
@@ -268,25 +268,14 @@ namespace Orleans.Runtime
             }
         }
 
-        private sealed class NoOpWorkItemFilter : WorkItemFilter
-        {
-            private NoOpWorkItemFilter() { }
-
-            public static readonly NoOpWorkItemFilter Instance = new NoOpWorkItemFilter();
-        }
-
         internal sealed class ExecutorThreadContext
         {
-            public ExecutorThreadContext(WorkItemFilter[] workItemFilters, int workItemSlotIndex)
+            public ExecutorThreadContext(WorkItemFilter[] workItemFilters)
             {
                 WorkItemFilters = workItemFilters;
-                WorkItemSlotIndex = workItemSlotIndex;
             }
 
             public WorkItemFilter[] WorkItemFilters { get; }
-
-            // todo: to be removed
-            public int WorkItemSlotIndex { get; }
         }
     }
 

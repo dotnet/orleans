@@ -97,7 +97,7 @@ namespace Orleans.Runtime
 
     internal sealed class ExceptionHandlerFilter : WorkItemFilter
     {
-        public ExceptionHandlerFilter(ILogger log, bool continueExecution) : base(
+        public ExceptionHandlerFilter(ILogger log) : base(
             exceptionHandler: (ex, workItem) =>
             {
                 var tae = ex as ThreadAbortException;
@@ -105,7 +105,6 @@ namespace Orleans.Runtime
                 {
                     if (tae.ExceptionState != null && tae.ExceptionState.Equals(true))
                     {
-                        // todo: not needed?
                         Thread.ResetAbort();
                     }
                     else
@@ -119,7 +118,28 @@ namespace Orleans.Runtime
                     log.Error(ErrorCode.Runtime_Error_100030, $"Worker thread caught an exception thrown from task {workItem.State}.", ex);
                 }
 
-                return continueExecution;
+                return true;
+            })
+        {
+        }
+    }
+
+    internal sealed class OuterExceptionHandlerFilter : WorkItemFilter
+    {
+        public OuterExceptionHandlerFilter(ILogger log) : base(
+            exceptionHandler: (ex, workItem) =>
+            {
+                if (ex is ThreadAbortException)
+                {
+                    if (log.IsEnabled(LogLevel.Debug)) log.Debug("Received thread abort exception -- exiting. {0}", ex);
+                    Thread.ResetAbort();
+                }
+                else
+                {
+                    log.Error(ErrorCode.Runtime_Error_100030, $"Worker thread caught an exception thrown from task {workItem.State}.", ex);
+                }
+
+                return false;
             })
         {
         }
