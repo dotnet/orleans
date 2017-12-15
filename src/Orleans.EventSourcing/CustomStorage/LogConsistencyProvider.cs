@@ -29,9 +29,6 @@ namespace Orleans.EventSourcing.CustomStorage
         /// <inheritdoc/>
         public string Name { get; private set; }
 
-        /// <inheritdoc/>
-        public Logger Log { get; private set; }
-
         /// <summary>
         /// Specifies a clusterid of the primary cluster from which to access storage exclusively, null if
         /// storage should be accessed direcly from all clusters.
@@ -55,7 +52,6 @@ namespace Orleans.EventSourcing.CustomStorage
             var loggerName = $"{this.GetType().FullName}.{Name}";
             var loggerFactory = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>();
             this.logger = loggerFactory.CreateLogger(loggerName);
-            Log = new LoggerWrapper(logger, loggerName, loggerFactory);
             logger.Info("Init PrimaryCluster={1}", string.IsNullOrEmpty(PrimaryCluster) ? "(none specified)" : PrimaryCluster);
 
             return Task.CompletedTask;
