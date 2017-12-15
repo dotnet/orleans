@@ -22,6 +22,24 @@ namespace Orleans.Transactions
             return null;
         }
 
+
+        public static T GetRequiredTransactionInfo<T>() where T : class, ITransactionInfo
+        {
+            var result = GetTransactionInfo();
+            if (result == null)
+            {
+                throw new OrleansTransactionException($"A transaction context is required for access. Did you forget a [TransactionOption.Required] annotation?");
+            }
+            else if (result is T info)
+            {
+                return info;
+            }
+            else  
+            {
+                throw new OrleansTransactionException($"Configuration error: transaction agent is using a different protocol ({result.GetType().FullName}) than the participant expects ({typeof(T).FullName}).");
+            }
+        }
+
         internal static void SetTransactionInfo(ITransactionInfo info)
         {
             Dictionary<string, object> values = GetContextData();
@@ -52,6 +70,13 @@ namespace Orleans.Transactions
             // Meant to help humans when debugging or reading traces
             return resource.GetHashCode().ToString("x4").Substring(0,4);
         }
+
+        public static string ToShortString(this ITransactionParticipant participant)
+        {
+            // Meant to help humans when debugging or reading traces
+            return participant.GetHashCode().ToString("x4").Substring(0, 4);
+        }
+
     }
 
 }

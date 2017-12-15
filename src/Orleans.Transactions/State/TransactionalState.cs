@@ -72,7 +72,7 @@ namespace Orleans.Transactions
         /// </summary>
         public void Save()
         {
-            var info = (TransactionInfo) TransactionContext.GetTransactionInfo();
+            var info = TransactionContext.GetRequiredTransactionInfo<TransactionInfo>();
 
             if(this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("Write {0}", info);
 
@@ -345,7 +345,7 @@ namespace Orleans.Transactions
         private TState GetState()
         {
 
-            var info = (TransactionInfo) TransactionContext.GetTransactionInfo();
+            var info = TransactionContext.GetRequiredTransactionInfo<TransactionInfo>();
 
             Rollback();
 
