@@ -207,17 +207,7 @@ namespace Orleans.Runtime
                 while (!workQueue.IsCompleted &&
                        (!executorOptions.CancellationToken.IsCancellationRequested || executorOptions.DrainAfterCancel))
                 {
-                    QueueWorkItemCallback workItem;
-                    try
-                    {
-                        workItem = workQueue.Take();
-                    }
-                    catch (InvalidOperationException)
-                    {
-                        break;
-                    }
-
-                    if (!ExecuteWorkItem(workItem, threadContext.WorkItemFilters))
+                    if (!ExecuteWorkItem(workQueue.Take(), threadContext.WorkItemFilters))
                     {
                         break;
                     }
