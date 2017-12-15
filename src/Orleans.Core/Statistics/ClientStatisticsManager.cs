@@ -14,16 +14,18 @@ namespace Orleans.Runtime
         private readonly ClientConfiguration config;
         private readonly StatisticsOptions statisticsOptions;
         private readonly IServiceProvider serviceProvider;
+        private readonly ClusterClientOptions clusterClientOptions;
         private ClientTableStatistics tableStatistics;
         private LogStatistics logStatistics;
         private RuntimeStatisticsGroup runtimeStats;
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
-        public ClientStatisticsManager(ClientConfiguration config, SerializationManager serializationManager, IServiceProvider serviceProvider, ILoggerFactory loggerFactory, IOptions<StatisticsOptions> statisticsOptions)
+        public ClientStatisticsManager(ClientConfiguration config, SerializationManager serializationManager, IServiceProvider serviceProvider, ILoggerFactory loggerFactory, IOptions<StatisticsOptions> statisticsOptions, IOptions<ClusterClientOptions> clusterClientOptions)
         {
             this.config = config;
             this.statisticsOptions = statisticsOptions.Value;
             this.serviceProvider = serviceProvider;
+            this.clusterClientOptions = clusterClientOptions.Value;
             runtimeStats = new RuntimeStatisticsGroup(loggerFactory);
             logStatistics = new LogStatistics(this.statisticsOptions.LogWriteInterval, false, serializationManager, loggerFactory);
             logger = loggerFactory.CreateLogger<ClientStatisticsManager>();
@@ -54,7 +56,7 @@ namespace Orleans.Runtime
                 if (configurableMetricsDataPublisher != null)
                 {
                     configurableMetricsDataPublisher.AddConfiguration(
-                        config.ClusterId, config.DNSHostName, clientId.ToString(), transport.MyAddress.Endpoint.Address);
+                        this.clusterClientOptions.ClusterId, config.DNSHostName, clientId.ToString(), transport.MyAddress.Endpoint.Address);
                 }
                 tableStatistics = new ClientTableStatistics(transport, metricsDataPublisher, runtimeStats, this.loggerFactory)
                 {
@@ -83,7 +85,7 @@ namespace Orleans.Runtime
                 else if (config.UseAzureSystemStore)
                 {
                     var statsDataPublisher = AssemblyLoader.LoadAndCreateInstance<IStatisticsPublisher>(Constants.ORLEANS_STATISTICS_AZURESTORAGE, logger, this.serviceProvider);
-                    await statsDataPublisher.Init(false, config.DataConnectionString, config.ClusterId,
+                    await statsDataPublisher.Init(false, config.DataConnectionString, this.clusterClientOptions.ClusterId,
                         transport.MyAddress.Endpoint.ToString(), clientId.ToParsableString(), config.DNSHostName);
                     logStatistics.StatsTablePublisher = statsDataPublisher;
                 }

@@ -50,7 +50,7 @@ namespace UnitTests.MembershipTests
                 AdoInvariant = GetAdoInvariant()
             };
             return new SqlGatewayListProvider(this.loggerFactory.CreateLogger<SqlGatewayListProvider>(), this.GrainReferenceConverter
-                ,this.clientConfiguration, Options.Create(options));
+                ,this.clientConfiguration, Options.Create(options), this.clientOptions);
         }
 
         protected override string GetAdoInvariant()

@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 using Orleans.Hosting;
+using Orleans.Runtime;
 
 namespace Orleans.Configuration
 {
@@ -20,6 +21,14 @@ namespace Orleans.Configuration
             // these will eventually be removed once our code doesn't depend on the old ClientConfiguration
             services.TryAddSingleton(configuration);
             services.TryAddFromExisting<IMessagingConfiguration, ClientConfiguration>();
+
+            services.Configure<ClusterClientOptions>(options =>
+            {
+                if (string.IsNullOrWhiteSpace(options.ClusterId) && !string.IsNullOrWhiteSpace(configuration.ClusterId))
+                {
+                    options.ClusterId = configuration.ClusterId;
+                }
+            });
 
             // Translate legacy configuration to new Options
             services.Configure<ClientMessagingOptions>(options =>

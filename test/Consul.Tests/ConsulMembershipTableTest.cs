@@ -52,7 +52,7 @@ namespace Consul.Tests
             {
                 Address = new Uri(this.connectionString)
             };
-            return new ConsulGatewayListProvider(loggerFactory.CreateLogger<ConsulGatewayListProvider>(), this.clientConfiguration, Options.Create(options));
+            return new ConsulGatewayListProvider(loggerFactory.CreateLogger<ConsulGatewayListProvider>(), this.clientConfiguration, Options.Create(options), this.clientOptions);
         }
 
         protected override async Task<string> GetConnectionString()

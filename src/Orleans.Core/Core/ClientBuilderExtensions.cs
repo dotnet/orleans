@@ -206,5 +206,7 @@ namespace Orleans
             configure(builder.GetApplicationPartManager());
             return builder;
         }
+
+        //public static IClientBuilder ConfigureClusterClient(Action<OptionsBuilder<ClusterClient>> configureOptions)
     }
 }
