@@ -18,6 +18,7 @@ namespace Orleans.Runtime.Messaging
         internal Socket AcceptingSocket;
         protected MessageCenter MessageCenter;
         protected HashSet<Socket> OpenReceiveSockets;
+        private bool isStopping = false;
         protected readonly MessageFactory MessageFactory;
 
         private static readonly CounterStatistic allocatedSocketEventArgsCounter 
@@ -87,6 +88,7 @@ namespace Orleans.Runtime.Messaging
         public override void Stop()
         {
             base.Stop();
+            this.isStopping = true;
 
             if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Disconnecting the listening socket");
             SocketManager.CloseSocket(AcceptingSocket);
@@ -582,6 +584,12 @@ namespace Orleans.Runtime.Messaging
         {
             try
             {
+                if (this.isStopping)
+                {
+                    if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("System is stopping, I will not restart the accepting socket");
+                    return;
+                }
+
                 if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Restarting of the accepting socket");
                 SocketManager.CloseSocket(AcceptingSocket);
                 AcceptingSocket = MessageCenter.SocketManager.GetAcceptingSocketForEndpoint(listenAddress);

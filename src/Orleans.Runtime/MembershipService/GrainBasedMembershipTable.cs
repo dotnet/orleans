@@ -31,7 +31,7 @@ namespace Orleans.Runtime.MembershipService
         {
             var options = this.serviceProvider.GetRequiredService<IOptions<DevelopmentMembershipOptions>>().Value;
             var siloDetails = this.serviceProvider.GetService<ILocalSiloDetails>();
-            bool isPrimarySilo = siloDetails.SiloAddress.Endpoint.Equals(options.PrimarySiloEndPoint);
+            bool isPrimarySilo = siloDetails.SiloAddress.Endpoint.Equals(options.PrimarySiloEndpoint);
             if (isPrimarySilo)
             {
                 this.logger.Info(ErrorCode.MembershipFactory1, "Creating membership table grain");

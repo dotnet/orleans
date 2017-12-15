@@ -25,7 +25,6 @@ using Orleans.Runtime.Messaging;
 using Orleans.Runtime.MultiClusterNetwork;
 using Orleans.Runtime.Providers;
 using Orleans.Runtime.Scheduler;
-using Orleans.Runtime.Startup;
 using Orleans.Runtime.Storage;
 using Orleans.Services;
 using Orleans.Storage;
@@ -34,7 +33,6 @@ using Orleans.Transactions;
 using Orleans.Runtime.Versions;
 using Orleans.Versions;
 using Orleans.ApplicationParts;
-using Orleans.Configuration;
 using Orleans.Serialization;
 
 namespace Orleans.Runtime
@@ -58,7 +56,8 @@ namespace Orleans.Runtime
             Secondary,
         }
 
-        private readonly SiloInitializationParameters initializationParams;
+        private readonly ILocalSiloDetails siloDetails;
+        private readonly LegacyConfigurationWrapper legacyConfiguration;
         private readonly SiloOptions siloOptions;
         private readonly ISiloMessageCenter messageCenter;
         private readonly OrleansTaskScheduler scheduler;
@@ -97,11 +96,9 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets the type of this 
         /// </summary>
-        public SiloType Type => this.initializationParams.Type;
-        internal string Name => this.initializationParams.Name;
-        internal ClusterConfiguration OrleansConfig => this.initializationParams.ClusterConfig;
-        internal GlobalConfiguration GlobalConfig => this.initializationParams.ClusterConfig.Globals;
-        internal NodeConfiguration LocalConfig => this.initializationParams.NodeConfig;
+        internal string Name => this.siloDetails.Name;
+        internal GlobalConfiguration GlobalConfig => this.legacyConfiguration.ClusterConfig.Globals;
+        internal NodeConfiguration LocalConfig => this.legacyConfiguration.NodeConfig;
         internal OrleansTaskScheduler LocalScheduler { get { return scheduler; } }
         internal ILocalGrainDirectory LocalGrainDirectory { get { return localGrainDirectory; } }
         internal IMultiClusterOracle LocalMultiClusterOracle { get { return multiClusterOracle; } }
@@ -119,7 +116,7 @@ namespace Orleans.Runtime
         internal IServiceProvider Services { get; }
 
         /// <summary> SiloAddress for this silo. </summary>
-        public SiloAddress SiloAddress => this.initializationParams.SiloAddress;
+        public SiloAddress SiloAddress => this.siloDetails.SiloAddress;
 
         /// <summary>
         ///  Silo termination event used to signal shutdown of this silo.
@@ -136,26 +133,16 @@ namespace Orleans.Runtime
         /// <summary>
         /// Initializes a new instance of the <see cref="Silo"/> class.
         /// </summary>
-        /// <param name="name">Name of this silo.</param>
-        /// <param name="siloType">Type of this silo.</param>
-        /// <param name="config">Silo config data to be used for this silo.</param>
-        public Silo(string name, SiloType siloType, ClusterConfiguration config)
-            : this(new SiloInitializationParameters(name, siloType, config), null)
-        {
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="Silo"/> class.
-        /// </summary>
         /// <param name="initializationParams">The silo initialization parameters.</param>
         /// <param name="services">Dependency Injection container</param>
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "Should not Dispose of messageCenter in this method because it continues to run / exist after this point.")]
-        internal Silo(SiloInitializationParameters initializationParams, IServiceProvider services)
+        public Silo(ILocalSiloDetails siloDetails, IServiceProvider services)
         {
-            string name = initializationParams.Name;
-            ClusterConfiguration config = initializationParams.ClusterConfig;
-            this.initializationParams = initializationParams;
+            string name = siloDetails.Name;
+            // Temporarily still require this. Hopefuly gone when 2.0 is released.
+            this.legacyConfiguration = services.GetRequiredService<LegacyConfigurationWrapper>();
+            this.siloDetails = siloDetails;
 
             this.SystemStatus = SystemStatus.Creating;
             AsynchAgent.IsStarting = true;
@@ -172,32 +159,14 @@ namespace Orleans.Runtime
                 stopTimeout = initTimeout;
             }
 
-            var localEndpoint = this.initializationParams.SiloAddress.Endpoint;
-            // Configure DI using Startup type
-            if (services == null)
-            {
-                var serviceCollection = new ServiceCollection();
-                serviceCollection.AddSingleton<Silo>(this);
-                serviceCollection.AddSingleton(initializationParams);
-                serviceCollection.AddLegacyClusterConfigurationSupport(config);
-                serviceCollection.Configure<SiloOptions>(options => options.SiloName = name);
-                var hostContext = new HostBuilderContext(new Dictionary<object, object>());
-                DefaultSiloServices.AddDefaultServices(hostContext, serviceCollection);
-
-                hostContext.GetApplicationPartManager()
-                    .AddFromAppDomain()
-                    .AddFromApplicationBaseDirectory();
-
-                services = StartupBuilder.ConfigureStartup(this.LocalConfig.StartupTypeName, serviceCollection);
-                services.GetService<TelemetryManager>()?.AddFromConfiguration(services, LocalConfig.TelemetryConfiguration);
-            }
+            var localEndpoint = this.siloDetails.SiloAddress.Endpoint;
 
             services.GetService<SerializationManager>().RegisterSerializers(services.GetService<ApplicationPartManager>());
 
             this.Services = services;
             this.Services.InitializeSiloUnobservedExceptionsHandler();
             //set PropagateActivityId flag from node cofnig
-            RequestContext.PropagateActivityId = this.initializationParams.NodeConfig.PropagateActivityId;
+            RequestContext.PropagateActivityId = this.legacyConfiguration.NodeConfig.PropagateActivityId;
             this.loggerFactory = this.Services.GetRequiredService<ILoggerFactory>();
             logger = this.loggerFactory.CreateLogger<Silo>();
 
@@ -209,9 +178,9 @@ namespace Orleans.Runtime
             }
 
             logger.Info(ErrorCode.SiloInitializing, "-------------- Initializing {0} silo on host {1} MachineName {2} at {3}, gen {4} --------------",
-                this.initializationParams.Type, LocalConfig.DNSHostName, Environment.MachineName, localEndpoint, this.initializationParams.SiloAddress.Generation);
+                this.legacyConfiguration.Type, this.siloDetails.DnsHostName, Environment.MachineName, localEndpoint, this.siloDetails.SiloAddress.Generation);
             logger.Info(ErrorCode.SiloInitConfig, "Starting silo {0} with the following configuration= " + Environment.NewLine + "{1}",
-                name, config.ToString(name));
+                name, this.legacyConfiguration.ClusterConfig.ToString(name));
 
             var siloMessagingOptions = this.Services.GetRequiredService<IOptions<SiloMessagingOptions>>();
             BufferPool.InitGlobalBufferPool(siloMessagingOptions);

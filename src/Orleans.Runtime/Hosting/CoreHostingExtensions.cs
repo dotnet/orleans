@@ -28,7 +28,7 @@ namespace Orleans.Hosting
                                            ?? context.HostingEnvironment.ApplicationName
                                            ?? $"Silo_{Guid.NewGuid().ToString("N").Substring(0, 5)}");
 
-                    services.TryAddSingleton<Silo>(sp => new Silo(sp.GetRequiredService<SiloInitializationParameters>(), sp));
+                    services.TryAddSingleton<Silo>();
                     DefaultSiloServices.AddDefaultServices(context, services);
 
                     context.Properties.Add("OrleansServicesAdded", true);

@@ -8,6 +8,8 @@ using Orleans.Logging;
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Hosting;
+using Orleans.Runtime.Startup;
 
 namespace Orleans.Runtime.Host
 {
@@ -99,8 +101,26 @@ namespace Orleans.Runtime.Host
             try
             {
                 if (!ConfigLoaded) LoadOrleansConfig();
-                orleans = new Silo(Name, Type, Config);
-                logger.Info(ErrorCode.Runtime_Error_100288, "Successfully initialized Orleans silo '{0}' as a {1} node.", orleans.Name, orleans.Type);
+                var builder = new SiloHostBuilder()
+                    .ConfigureSiloName(Name)
+                    .UseConfiguration(Config)
+                    .ConfigureApplicationParts(parts => parts
+                        .AddFromAppDomain()
+                        .AddFromApplicationBaseDirectory());
+
+                if (!string.IsNullOrWhiteSpace(Config.Defaults.StartupTypeName))
+                {
+                    builder.UseServiceProviderFactory(services =>
+                        StartupBuilder.ConfigureStartup(Config.Defaults.StartupTypeName, services));
+                }
+
+                var host = builder.Build();
+
+                orleans = host.Services.GetRequiredService<Silo>();
+                var localConfig = host.Services.GetRequiredService<NodeConfiguration>();
+                host.Services.GetService<TelemetryManager>()?.AddFromConfiguration(host.Services, localConfig.TelemetryConfiguration);
+
+                logger.Info(ErrorCode.Runtime_Error_100288, "Successfully initialized Orleans silo '{0}'.", orleans.Name);
             }
             catch (Exception exc)
             {

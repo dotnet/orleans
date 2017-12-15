@@ -12,6 +12,8 @@ namespace UnitTests.GrainInterfaces
 
         Task ThrowsInvalidOperationException();
 
+        Task ThrowsNullReferenceException();
+
         Task ThrowsAggregateExceptionWrappingInvalidOperationException();
 
         Task ThrowsNestedAggregateExceptionsWrappingInvalidOperationException();

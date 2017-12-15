@@ -44,12 +44,12 @@ namespace Orleans.Runtime
         private ILocalGrainDirectory directory;
         private Catalog catalog;
         private Dispatcher dispatcher;
+        private List<IGrainCallFilter> grainCallFilters;
 
         private readonly InterfaceToImplementationMappingCache interfaceToImplementationMapping = new InterfaceToImplementationMappingCache();
         public TimeSpan ResponseTimeout { get; private set; }
         private readonly GrainTypeManager typeManager;
         private readonly MessageFactory messageFactory;
-        private readonly List<IGrainCallFilter> siloInterceptors;
         private readonly Lazy<ITransactionAgent> transactionAgent;
         private IGrainReferenceRuntime grainReferenceRuntime;
         private IGrainCancellationTokenRuntime cancellationTokenRuntime;
@@ -63,7 +63,6 @@ namespace Orleans.Runtime
             IServiceProvider serviceProvider,
             SerializationManager serializationManager,
             MessageFactory messageFactory,
-            IEnumerable<IGrainCallFilter> registeredInterceptors,
             Factory<ITransactionAgent> transactionAgent,
             ILoggerFactory loggerFactory,
             IOptions<SiloMessagingOptions> messagingOptions,
@@ -83,7 +82,6 @@ namespace Orleans.Runtime
             this.ConcreteGrainFactory = new GrainFactory(this, typeMetadataCache);
             tryResendMessage = msg => this.Dispatcher.TryResendMessage(msg);
             unregisterCallback = msg => UnRegisterCallback(msg.Id);
-            this.siloInterceptors = new List<IGrainCallFilter>(registeredInterceptors);
             this.logger = loggerFactory.CreateLogger<InsideRuntimeClient>();
             this.invokeExceptionLogger =loggerFactory.CreateLogger($"{typeof(Grain).FullName}.InvokeException");
             this.loggerFactory = loggerFactory;
@@ -118,6 +116,9 @@ namespace Orleans.Runtime
 
         private ILocalGrainDirectory Directory
             => this.directory ?? (this.directory = this.ServiceProvider.GetRequiredService<ILocalGrainDirectory>());
+
+        private List<IGrainCallFilter> GrainCallFilters
+            => this.grainCallFilters ?? (this.grainCallFilters = new List<IGrainCallFilter>(this.ServiceProvider.GetServices<IGrainCallFilter>()));
 
         private Dispatcher Dispatcher => this.dispatcher ?? (this.dispatcher = this.ServiceProvider.GetRequiredService<Dispatcher>());
 
@@ -367,7 +368,7 @@ namespace Orleans.Runtime
                         throw exc;
                     }
                     
-                    var requestInvoker = new GrainMethodInvoker(target, request, invoker, siloInterceptors, interfaceToImplementationMapping);
+                    var requestInvoker = new GrainMethodInvoker(target, request, invoker, GrainCallFilters, interfaceToImplementationMapping);
                     await requestInvoker.Invoke();
                     resultObject = requestInvoker.Result;
                 }

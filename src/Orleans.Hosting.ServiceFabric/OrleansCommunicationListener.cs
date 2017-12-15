@@ -41,7 +41,15 @@ namespace Orleans.Hosting.ServiceFabric
                 builder.ConfigureServices(
                     services =>
                     {
-                        services.AddSingleton<IConfigureOptions<FabricSiloInfo>, SiloInfoConfiguration>();
+                        services.AddOptions<FabricSiloInfo>().Configure<ILocalSiloDetails>((info, details) =>
+                        {
+                            info.Name = details.Name;
+                            info.Silo = details.SiloAddress.ToParsableString();
+                            if (details.GatewayAddress != null)
+                            {
+                                info.Gateway = details.GatewayAddress.ToParsableString();
+                            }
+                        });
                     });
                 this.configure(builder);
 
@@ -90,27 +98,6 @@ namespace Orleans.Hosting.ServiceFabric
             finally
             {
                 this.Host = null;
-            }
-        }
-
-        // ReSharper disable once ClassNeverInstantiated.Local
-        private class SiloInfoConfiguration : IConfigureOptions<FabricSiloInfo>
-        {
-            private readonly NodeConfiguration config;
-
-            public SiloInfoConfiguration(NodeConfiguration config)
-            {
-                this.config = config;
-            }
-
-            public void Configure(FabricSiloInfo info)
-            {
-                info.Name = this.config.SiloName;
-                info.Silo = SiloAddress.New(this.config.Endpoint, this.config.Generation).ToParsableString();
-                if (this.config.ProxyGatewayEndpoint != null)
-                {
-                    info.Gateway = SiloAddress.New(this.config.ProxyGatewayEndpoint, this.config.Generation).ToParsableString();
-                }
             }
         }
     }

@@ -137,7 +137,7 @@ namespace Orleans.Runtime.GrainDirectory
                     loggerFactory);
             GsiActivationMaintainer = new GlobalSingleInstanceActivationMaintainer(this, this.Logger, globalConfig, grainFactory, multiClusterOracle, executorService, siloOptions, multiClusterOptions, loggerFactory);
 
-            var primarySiloEndPoint = developmentMembershipOptions.Value.PrimarySiloEndPoint;
+            var primarySiloEndPoint = developmentMembershipOptions.Value.PrimarySiloEndpoint;
             if (primarySiloEndPoint != null)
             {
                 this.seed = this.MyAddress.Endpoint.Equals(primarySiloEndPoint) ? this.MyAddress : SiloAddress.New(primarySiloEndPoint, 0);

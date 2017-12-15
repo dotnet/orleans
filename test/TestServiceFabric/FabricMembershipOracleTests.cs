@@ -264,7 +264,10 @@ namespace TestServiceFabric
         private class MockSiloDetails : ILocalSiloDetails
         {
             public string Name { get; set; }
+            public string ClusterId { get; }
+            public string DnsHostName { get; }
             public SiloAddress SiloAddress { get; set; }
+            public SiloAddress GatewayAddress { get; }
         }
 
         private void AssertStatus(SiloStatus expected)

@@ -15,7 +15,6 @@ namespace Orleans.Runtime.Providers
 {
     internal class SiloProviderRuntime : ISiloSideStreamProviderRuntime
     {
-        private readonly SiloInitializationParameters siloDetails;
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly OrleansTaskScheduler scheduler;
         private readonly ActivationDirectory activationDirectory;
@@ -33,7 +32,7 @@ namespace Orleans.Runtime.Providers
         public string SiloIdentity { get; }
 
         public SiloProviderRuntime(
-            SiloInitializationParameters siloDetails,
+            ILocalSiloDetails siloDetails,
             IOptions<SiloOptions> siloOptions,
             IConsistentRingProvider consistentRingProvider,
             ISiloRuntimeClient runtimeClient,
@@ -44,7 +43,6 @@ namespace Orleans.Runtime.Providers
             ILoggerFactory loggerFactory)
         {
             this.loggerFactory = loggerFactory;
-            this.siloDetails = siloDetails;
             this.siloStatusOracle = siloStatusOracle;
             this.scheduler = scheduler;
             this.activationDirectory = activationDirectory;

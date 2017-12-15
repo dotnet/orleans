@@ -4,4 +4,4 @@ using Orleans.ServiceBus.Providers;
 
 [assembly: InternalsVisibleTo("ServiceBus.Tests")]
 
-[assembly: KnownAssembly(typeof(EventHubSequenceTokenV2))]
+[assembly: KnownAssembly(typeof(EventHubSequenceTokenV2), TreatTypesAsSerializable = true)]
