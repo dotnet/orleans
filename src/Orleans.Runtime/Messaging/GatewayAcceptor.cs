@@ -13,7 +13,7 @@ namespace Orleans.Runtime.Messaging
         private readonly Gateway gateway;
         private readonly CounterStatistic loadSheddingCounter;
         private readonly CounterStatistic gatewayTrafficCounter;
-        private readonly SiloOptions siloOptions;
+        private readonly ILocalSiloDetails siloDetails;
         private readonly MultiClusterOptions multiClusterOptions;
 
         internal GatewayAcceptor(
@@ -23,7 +23,7 @@ namespace Orleans.Runtime.Messaging
             MessageFactory messageFactory,
             SerializationManager serializationManager,
             ExecutorService executorService,
-            IOptions<SiloOptions> siloOptions,
+            ILocalSiloDetails siloDetails,
             IOptions<MultiClusterOptions> multiClusterOptions,
             ILoggerFactory loggerFactory)
             : base(msgCtr, gatewayAddress, SocketDirection.GatewayToClient, messageFactory, serializationManager, executorService, loggerFactory)
@@ -31,7 +31,7 @@ namespace Orleans.Runtime.Messaging
             this.gateway = gateway;
             this.loadSheddingCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_LOAD_SHEDDING);
             this.gatewayTrafficCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_RECEIVED);
-            this.siloOptions = siloOptions.Value;
+            this.siloDetails = siloDetails;
             this.multiClusterOptions = multiClusterOptions.Value;
         }
 
@@ -44,12 +44,12 @@ namespace Orleans.Runtime.Messaging
             // refuse clients that are connecting to the wrong cluster
             if (client.Category == UniqueKey.Category.GeoClient)
             {
-                if(client.Key.ClusterId != this.siloOptions.ClusterId)
+                if(client.Key.ClusterId != this.siloDetails.ClusterId)
                 {
                     Log.Error(ErrorCode.GatewayAcceptor_WrongClusterId,
                         string.Format(
                             "Refusing connection by client {0} because of cluster id mismatch: client={1} silo={2}",
-                            client, client.Key.ClusterId, this.siloOptions.ClusterId));
+                            client, client.Key.ClusterId, this.siloDetails.ClusterId));
                     return false;
                 }
             }
@@ -58,7 +58,7 @@ namespace Orleans.Runtime.Messaging
                 //convert handshake cliendId to a GeoClient ID 
                 if (this.multiClusterOptions.HasMultiClusterNetwork)
                 {
-                    client = GrainId.NewClientId(client.PrimaryKey, this.siloOptions.ClusterId);
+                    client = GrainId.NewClientId(client.PrimaryKey, this.siloDetails.ClusterId);
                 }
             }
 
@@ -94,7 +94,7 @@ namespace Orleans.Runtime.Messaging
             // return address translation for geo clients (replace sending address cli/* with gcl/*)
             if (this.multiClusterOptions.HasMultiClusterNetwork && msg.SendingAddress.Grain.Category != UniqueKey.Category.GeoClient)
             {
-                msg.SendingGrain = GrainId.NewClientId(msg.SendingAddress.Grain.PrimaryKey, this.siloOptions.ClusterId);
+                msg.SendingGrain = GrainId.NewClientId(msg.SendingAddress.Grain.PrimaryKey, this.siloDetails.ClusterId);
             }
 
             // Are we overloaded?
