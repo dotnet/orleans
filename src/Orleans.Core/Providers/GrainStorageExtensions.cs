@@ -15,16 +15,32 @@ namespace Orleans.Storage
         /// <returns></returns>
         public static IStorageProvider GetStorageProvider(this Grain grain, IServiceProvider services)
         {
-            StorageProviderAttribute attr = grain.GetType().GetTypeInfo().GetCustomAttributes<StorageProviderAttribute>(true).FirstOrDefault();
+            StorageProviderAttribute attr = grain.GetType().GetCustomAttributes<StorageProviderAttribute>(true).FirstOrDefault();
             IStorageProvider storageProvider = attr != null
                 ? services.GetServiceByName<IStorageProvider>(attr.ProviderName)
                 : services.GetService<IStorageProvider>();
             if (storageProvider == null)
             {
-                var errMsg = string.Format("No storage providers found loading grain type {0}", grain.GetType().FullName);
-                throw new BadProviderConfigException(errMsg);
+                ThrowMissingProviderException(grain, attr?.ProviderName);
             }
+
             return storageProvider;
+        }
+
+        private static void ThrowMissingProviderException(Grain grain, string name)
+        {
+            string errMsg;
+            var grainTypeName = grain.GetType().GetParseableName(TypeFormattingOptions.LogFormat);
+            if (string.IsNullOrEmpty(name))
+            {
+                errMsg = $"No default storage provider found loading grain type {grainTypeName}.";
+            }
+            else
+            {
+                errMsg = $"No storage provider named \"{name}\" found loading grain type {grainTypeName}.";
+            }
+
+            throw new BadProviderConfigException(errMsg);
         }
     }
 }
