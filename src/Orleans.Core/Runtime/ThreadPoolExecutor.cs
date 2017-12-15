@@ -129,7 +129,7 @@ namespace Orleans.Runtime
                         break;
                     }
 
-                    if (!ExecuteWorkItem(workItem, threadContext.WorkItemFilters))
+                    if (!workItem.ExecuteWithFilters(threadContext.WorkItemFilters))
                     {
                         break;
                     }
@@ -140,13 +140,7 @@ namespace Orleans.Runtime
                 executorOptions.Log.Error(ErrorCode.SchedulerWorkerThreadExc, "Executor thread caugth exception:", exc);
             }
         }
-
-        private bool ExecuteWorkItem(QueueWorkItemCallback workItem, IEnumerable<WorkItemFilter> actionFilters = null)
-        {
-            return actionFilters.First().ExecuteWorkItem(workItem);
-        }
-
-
+        
         #region StatisticsTracking
 
         private void TrackRequestEnqueue(QueueWorkItemCallback workItem)
@@ -324,6 +318,11 @@ namespace Orleans.Runtime
         {
             executionStart = DateTime.UtcNow;
             callback.Invoke(state);
+        }
+
+        public bool ExecuteWithFilters(IEnumerable<WorkItemFilter> actionFilters)
+        {
+            return actionFilters.First().ExecuteWorkItem(this);
         }
 
         public void Start()
