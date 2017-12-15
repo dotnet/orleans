@@ -1,13 +1,14 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.IO;
 using Microsoft.Extensions.Configuration;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Extensions;
 
 namespace TestExtensions
 {
     public class TestDefaultConfiguration
     {
-        private static object lockObject = new object();
+        private static readonly object LockObject = new object();
         private static IConfiguration defaultConfiguration;
 
         static TestDefaultConfiguration()
@@ -17,9 +18,9 @@ namespace TestExtensions
 
         public static void InitializeDefaults()
         {
-            lock (lockObject)
+            lock (LockObject)
             {
-                TestClusterOptions.FallbackOptions.DefaultExtendedConfiguration = defaultConfiguration = BuildDefaultConfiguration();
+                defaultConfiguration = BuildDefaultConfiguration();
             }
         }
 
@@ -29,7 +30,15 @@ namespace TestExtensions
 
         private static IConfiguration BuildDefaultConfiguration()
         {
-            var builder = TestClusterOptions.FallbackOptions.DefaultConfigurationBuilder();
+            var builder = new ConfigurationBuilder();
+            ConfigureHostConfiguration(builder);
+
+            var config = builder.Build();
+            return config;
+        }
+
+        public static void ConfigureHostConfiguration(IConfigurationBuilder builder)
+        {
             builder.AddInMemoryCollection(new Dictionary<string, string>
             {
                 { nameof(ZooKeeperConnectionString), "127.0.0.1:2181" }
@@ -37,13 +46,10 @@ namespace TestExtensions
 
             AddJsonFileInAncestorFolder(builder, "OrleansTestSecrets.json");
             builder.AddEnvironmentVariables("Orleans");
-
-            var config = builder.Build();
-            return config;
         }
 
         /// <summary>Try to find a file with specified name up the folder hierarchy, as some of our CI environments are configured this way.</summary>
-        private static void AddJsonFileInAncestorFolder(ConfigurationBuilder builder, string fileName)
+        private static void AddJsonFileInAncestorFolder(IConfigurationBuilder builder, string fileName)
         {
             // There might be some other out-of-the-box way of doing this though.
             var currentDir = new DirectoryInfo(Directory.GetCurrentDirectory());
@@ -58,6 +64,20 @@ namespace TestExtensions
 
                 currentDir = currentDir.Parent;
             }
+        }
+
+        public static void ConfigureTestCluster(TestClusterBuilder builder)
+        {
+            builder.ConfigureBuilder(() =>
+            {
+                if (builder.Properties.TryGetValue(nameof(LegacyTestClusterConfiguration), out var legacyConfigObj) &&
+                    legacyConfigObj is LegacyTestClusterConfiguration legacyConfig)
+                {
+                    legacyConfig.ClusterConfiguration.AdjustForTestEnvironment(DataConnectionString);
+                    legacyConfig.ClientConfiguration.AdjustForTestEnvironment(DataConnectionString);
+                }
+            });
+            builder.ConfigureHostConfiguration(ConfigureHostConfiguration);
         }
     }
 }

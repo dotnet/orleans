@@ -18,19 +18,19 @@ namespace UnitTests.StreamingTests
     {
         private readonly Fixture fixture;
 
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(2);
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
 
-                options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-
-                options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamProvider, false);
-                options.ClientConfiguration.AddSimpleMessageStreamProvider(StreamProvider, false);
-                return new TestCluster(options);
+                    legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamProvider, false);
+                    legacy.ClientConfiguration.AddSimpleMessageStreamProvider(StreamProvider, false);
+                });
             }
         }
 

@@ -14,7 +14,6 @@ using UnitTests.Grains;
 using Xunit;
 using Orleans.Hosting;
 using Orleans.Serialization;
-using Orleans.TestingHost.Utils;
 
 namespace UnitTests.General
 {
@@ -23,45 +22,40 @@ namespace UnitTests.General
     {
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(2);
-                options.ClusterConfiguration.AddMemoryStorageProvider("Default");
-                options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-                options.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProvider");
-                options.ClientConfiguration.AddSimpleMessageStreamProvider("SMSProvider");
-                options.UseSiloBuilderFactory<SiloInvokerTestSiloBuilderFactory>();
-                return new TestCluster(options);
-            }
-
-            private class SiloInvokerTestSiloBuilderFactory : ISiloBuilderFactory
-            {
-                public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+                builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
+                builder.AddSiloBuilderConfigurator<SiloInvokerTestSiloBuilderConfigurator>();
+                builder.ConfigureLegacyConfiguration(legacy =>
                 {
-                    return new SiloHostBuilder()
-                        .ConfigureSiloName(siloName)
-                        .UseConfiguration(clusterConfiguration)
-                        .ConfigureServices(ConfigureServices)
-                        .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
-                }
-            }
-            
-            private static void ConfigureServices(IServiceCollection services)
-            {
-                const string Key = GrainCallFilterTestConstants.Key;
-
-                services.AddGrainCallFilter(context =>
-                {
-                    if (string.Equals(context.Method.Name, nameof(IGrainCallFilterTestGrain.GetRequestContext)))
-                    {
-                        if (RequestContext.Get(Key) != null) throw new InvalidOperationException();
-                        RequestContext.Set(Key, "1");
-                    }
-
-                    return context.Invoke();
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+                    legacy.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProvider");
+                    legacy.ClientConfiguration.AddSimpleMessageStreamProvider("SMSProvider");
                 });
+            }
 
-                services.AddGrainCallFilter<GrainCallFilterWithDependencies>();
+            private class SiloInvokerTestSiloBuilderConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder.ConfigureServices((hostBuilderContext, services) =>
+                    {
+                        services.AddGrainCallFilter(context =>
+                        {
+                            if (string.Equals(context.Method.Name, nameof(IGrainCallFilterTestGrain.GetRequestContext)))
+                            {
+                                if (RequestContext.Get(GrainCallFilterTestConstants.Key) != null) throw new InvalidOperationException();
+                                RequestContext.Set(GrainCallFilterTestConstants.Key, "1");
+                            }
+
+                            return context.Invoke();
+                        });
+
+                        services.AddGrainCallFilter<GrainCallFilterWithDependencies>();
+                    });
+                }
+
             }
         }
 
@@ -103,7 +97,6 @@ namespace UnitTests.General
         /// <summary>
         /// Ensures that grain call filters are invoked around method calls in the correct order.
         /// </summary>
-        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         [Fact]
         public async Task GrainCallFilter_Order_Test()
         {
@@ -118,7 +111,6 @@ namespace UnitTests.General
         /// <summary>
         /// Ensures that the invocation interceptor is invoked for stream subscribers.
         /// </summary>
-        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         [Fact]
         public async Task GrainCallFilter_Stream_Test()
         {
@@ -137,7 +129,6 @@ namespace UnitTests.General
         /// <summary>
         /// Tests that some invalid usages of invoker interceptors are denied.
         /// </summary>
-        /// <returns></returns>
         [Fact]
         public async Task GrainCallFilter_InvalidOrder_Test()
         {
@@ -154,7 +145,6 @@ namespace UnitTests.General
         /// <summary>
         /// Tests filters on just the grain level.
         /// </summary>
-        /// <returns></returns>
         [Fact]
         public async Task GrainCallFilter_GrainLevel_Test()
         {
@@ -175,7 +165,6 @@ namespace UnitTests.General
         /// <summary>
         /// Tests filters on generic grains.
         /// </summary>
-        /// <returns></returns>
         [Fact]
         public async Task GrainCallFilter_GenericGrain_Test()
         {
@@ -191,7 +180,6 @@ namespace UnitTests.General
         /// <summary>
         /// Tests filters on grains which implement multiple of the same generic interface.
         /// </summary>
-        /// <returns></returns>
         [Fact]
         public async Task GrainCallFilter_ConstructedGenericInheritance_Test()
         {
@@ -214,7 +202,6 @@ namespace UnitTests.General
         /// <summary>
         /// Tests that grain call filters can handle exceptions.
         /// </summary>
-        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         [Fact]
         public async Task GrainCallFilter_ExceptionHandling_Test()
         {
@@ -230,7 +217,6 @@ namespace UnitTests.General
         /// <summary>
         /// Tests that grain call filters can throw exceptions.
         /// </summary>
-        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         [Fact]
         public async Task GrainCallFilter_FilterThrows_Test()
         {
@@ -245,7 +231,6 @@ namespace UnitTests.General
         /// Tests that if a grain call filter sets an incorrect result type for <see cref="Orleans.IGrainCallContext.Result"/>,
         /// an exception is thrown on the caller.
         /// </summary>
-        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         [Fact]
         public async Task GrainCallFilter_SetIncorrectResultType_Test()
         {

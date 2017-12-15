@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -42,14 +42,15 @@ namespace ServiceBus.Tests.StreamingTests
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(2);
-                // register stream provider
-                options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-                options.ClusterConfiguration.Globals.RegisterStreamProvider<StreamPerPartitionEventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
-                options.ClientConfiguration.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
-                return new TestCluster(options);
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    // register stream provider
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+                    legacy.ClusterConfiguration.Globals.RegisterStreamProvider<StreamPerPartitionEventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
+                    legacy.ClientConfiguration.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
+                });
             }
 
             public override void Dispose()

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -24,13 +24,15 @@ namespace Tester.HeterogeneousSilosTests
         {
             cluster?.StopAllSilos();
             var typesName = blackListedTypes.Select(t => t.FullName).ToList();
-            var options = new TestClusterOptions(1);
-
-            options.ClusterConfiguration.Globals.AssumeHomogenousSilosForTesting = false;
-            options.ClusterConfiguration.Globals.TypeMapRefreshInterval = refreshInterval;
-            options.ClusterConfiguration.Globals.DefaultPlacementStrategy = defaultPlacementStrategy;
-            options.ClusterConfiguration.Overrides[Silo.PrimarySiloName].ExcludedGrainTypes = typesName;
-            cluster = new TestCluster(options);
+            var builder = new TestClusterBuilder(1);
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.Globals.AssumeHomogenousSilosForTesting = false;
+                legacy.ClusterConfiguration.Globals.TypeMapRefreshInterval = refreshInterval;
+                legacy.ClusterConfiguration.Globals.DefaultPlacementStrategy = defaultPlacementStrategy;
+                legacy.ClusterConfiguration.GetOrCreateNodeConfigurationForSilo(Silo.PrimarySiloName).ExcludedGrainTypes = typesName;
+            });
+            cluster = builder.Build();
             cluster.Deploy();
         }
 

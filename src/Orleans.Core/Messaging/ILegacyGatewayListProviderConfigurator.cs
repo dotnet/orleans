@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -22,9 +22,13 @@ namespace Orleans.Messaging
 
     internal class LegacyGatewayListProviderConfigurator
     {
-        public static void ConfigureServices(ClientConfiguration clientConfiguration,
+        public static void ConfigureServices(
+            ClientConfiguration clientConfiguration,
             IServiceCollection services)
         {
+            // If a gateway list provider has already been configured in the service collection, use that instead.
+            if (services.Any(reg => reg.ServiceType == typeof(IGatewayListProvider))) return;
+
             ILegacyGatewayListProviderConfigurator configurator = null;
             switch (clientConfiguration.GatewayProviderToUse)
             {

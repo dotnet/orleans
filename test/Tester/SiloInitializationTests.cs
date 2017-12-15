@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Globalization;
 using System.Reflection;
 using Orleans.Runtime;
@@ -26,7 +26,7 @@ namespace Tester
 
             try
             {
-                var config = new TestClusterOptions(1).ClusterConfiguration;
+                var config = ClusterConfiguration.LocalhostPrimarySilo();
                 var originalLivenessType = config.Globals.LivenessType;
                 var originalMembershipAssembly = config.Globals.MembershipTableAssembly;
 

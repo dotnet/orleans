@@ -1,7 +1,8 @@
-﻿
+
 using System;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
@@ -32,8 +33,11 @@ namespace Tester.StreamingTests
             // Hard kill client
             testHost.KillClient();
 
+            // Use a default configuration to get the default client drop timeout.
+            var clusterConfig = new ClusterConfiguration();
+
             // make sure dead client has had time to drop
-            await Task.Delay(testHost.ClusterConfiguration.Globals.ClientDropTimeout + TimeSpan.FromSeconds(5));
+            await Task.Delay(clusterConfig.Globals.ClientDropTimeout + TimeSpan.FromSeconds(5));
 
             // initialize new client
             testHost.InitializeClient();
@@ -68,8 +72,11 @@ namespace Tester.StreamingTests
             // Hard kill client
             testHost.KillClient();
 
+            // Use a default configuration to get the default client drop timeout.
+            var clusterConfig = new ClusterConfiguration();
+
             // make sure dead client has had time to drop
-            await Task.Delay(testHost.ClusterConfiguration.Globals.ClientDropTimeout + TimeSpan.FromSeconds(5));
+            await Task.Delay(clusterConfig.Globals.ClientDropTimeout + TimeSpan.FromSeconds(5));
 
             // initialize new client
             testHost.InitializeClient();

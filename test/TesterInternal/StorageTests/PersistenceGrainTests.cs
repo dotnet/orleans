@@ -1,4 +1,4 @@
-﻿//#define REREAD_STATE_AFTER_WRITE_FAILED
+//#define REREAD_STATE_AFTER_WRITE_FAILED
 
 using System;
 using System.Collections.Generic;
@@ -31,16 +31,18 @@ namespace UnitTests.StorageTests
         public class Fixture : BaseTestClusterFixture
         {
 
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(initialSilosCount: 1);
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<MockStorageProvider>(MockStorageProviderName1);
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<MockStorageProvider>(MockStorageProviderName2, new Dictionary<string, string> { { "Config1", "1" }, { "Config2", "2" } });
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<ErrorInjectionStorageProvider>(ErrorInjectorProviderName);
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<MockStorageProvider>(MockStorageProviderNameLowerCase);
-                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-
-                return new TestCluster(options);
+                builder.Options.InitialSilosCount = 1;
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<MockStorageProvider>(MockStorageProviderName1);
+                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<MockStorageProvider>(MockStorageProviderName2,
+                        new Dictionary<string, string> {{"Config1", "1"}, {"Config2", "2"}});
+                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<ErrorInjectionStorageProvider>(ErrorInjectorProviderName);
+                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<MockStorageProvider>(MockStorageProviderNameLowerCase);
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+                });
             }
         }
 

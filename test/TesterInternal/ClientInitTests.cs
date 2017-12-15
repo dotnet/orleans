@@ -13,16 +13,18 @@ namespace UnitTests
 {
     public class ClientInitTests : OrleansTestingBase, IClassFixture<DefaultClusterFixture>
     {
+        private readonly DefaultClusterFixture fixture;
+
         public ClientInitTests(DefaultClusterFixture fixture)
         {
-            this.HostedCluster = fixture.HostedCluster;
+            this.fixture = fixture;
             if (!GrainClient.IsInitialized)
             {
-                GrainClient.Initialize(fixture.HostedCluster.ClientConfiguration);
+                GrainClient.Initialize(fixture.ClientConfiguration);
             }
         }
 
-        protected TestCluster HostedCluster { get; set; }
+        protected TestCluster HostedCluster => this.fixture.HostedCluster;
 
         [Fact, TestCategory("Functional"), TestCategory("Client")]
         public void ClientInit_IsInitialized()
@@ -45,7 +47,7 @@ namespace UnitTests
             GrainClient.Uninitialize();
             Assert.False(GrainClient.IsInitialized);
 
-            GrainClient.Initialize(HostedCluster.ClientConfiguration);
+            GrainClient.Initialize(fixture.ClientConfiguration);
             Assert.True(GrainClient.IsInitialized);
         }
 
@@ -54,17 +56,17 @@ namespace UnitTests
         {
             // First initialize will have been done by orleans unit test base class
 
-            GrainClient.Initialize(HostedCluster.ClientConfiguration);
+            GrainClient.Initialize(this.fixture.ClientConfiguration);
             Assert.True(GrainClient.IsInitialized);
 
-            GrainClient.Initialize(HostedCluster.ClientConfiguration);
+            GrainClient.Initialize(this.fixture.ClientConfiguration);
             Assert.True(GrainClient.IsInitialized);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Client")]
         public void ClientInit_ErrorDuringInitialize()
         {
-            ClientConfiguration cfg = TestClusterOptions.BuildClientConfiguration(HostedCluster.ClusterConfiguration);
+            ClientConfiguration cfg = this.fixture.ClientConfiguration;
 
             // First initialize will have been done by orleans unit test base class, so uninitialize back to null state
             GrainClient.Uninitialize();
@@ -93,13 +95,13 @@ namespace UnitTests
         [Fact, TestCategory("Functional"), TestCategory("Client")]
         public void ClientInit_InitializeUnThenReInit()
         {
-            GrainClient.Initialize(HostedCluster.ClientConfiguration);
+            GrainClient.Initialize(this.fixture.ClientConfiguration);
             Assert.True(GrainClient.IsInitialized);
 
             GrainClient.Uninitialize();
             Assert.False(GrainClient.IsInitialized);
 
-            GrainClient.Initialize(HostedCluster.ClientConfiguration);
+            GrainClient.Initialize(this.fixture.ClientConfiguration);
             Assert.True(GrainClient.IsInitialized);
 
             GrainClient.Uninitialize();

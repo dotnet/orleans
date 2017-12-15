@@ -1,4 +1,4 @@
-﻿using AWSUtils.Tests.StorageTests;
+using AWSUtils.Tests.StorageTests;
 using Orleans;
 using Orleans.Providers.Streams;
 using Orleans.Runtime;
@@ -22,7 +22,7 @@ namespace AWSUtils.Tests.Streaming
         private string StreamConnectionString = AWSTestConstants.DefaultSQSConnectionString;
         private readonly SubscriptionMultiplicityTestRunner runner;
 
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             if (!AWSTestConstants.IsSqsAvailable)
             {
@@ -31,20 +31,22 @@ namespace AWSUtils.Tests.Streaming
 
             var clusterId = Guid.NewGuid().ToString();
             var streamConnectionString = new Dictionary<string, string>
-                {
-                    { "DataConnectionString",  StreamConnectionString},
-                    { "DeploymentId",  clusterId}
-                };
-            var options = new TestClusterOptions(2);
-            options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-            
-            options.ClusterConfiguration.Globals.ClusterId = clusterId;
-            options.ClientConfiguration.ClusterId = clusterId;
-            options.ClientConfiguration.DataConnectionString = StreamConnectionString;
-            options.ClusterConfiguration.Globals.DataConnectionString = StreamConnectionString;
-            options.ClusterConfiguration.Globals.RegisterStreamProvider<SQSStreamProvider>(SQSStreamProviderName, streamConnectionString);
-            options.ClientConfiguration.RegisterStreamProvider<SQSStreamProvider>(SQSStreamProviderName, streamConnectionString);
-            return new TestCluster(options);
+            {
+                {"DataConnectionString", StreamConnectionString},
+                {"DeploymentId", clusterId}
+            };
+
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+
+                legacy.ClusterConfiguration.Globals.ClusterId = clusterId;
+                legacy.ClientConfiguration.ClusterId = clusterId;
+                legacy.ClientConfiguration.DataConnectionString = StreamConnectionString;
+                legacy.ClusterConfiguration.Globals.DataConnectionString = StreamConnectionString;
+                legacy.ClusterConfiguration.Globals.RegisterStreamProvider<SQSStreamProvider>(SQSStreamProviderName, streamConnectionString);
+                legacy.ClientConfiguration.RegisterStreamProvider<SQSStreamProvider>(SQSStreamProviderName, streamConnectionString);
+            });
         }
 
         public SQSSubscriptionMultiplicityTests()

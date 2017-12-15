@@ -1,4 +1,4 @@
-﻿//#define USE_GENERICS
+//#define USE_GENERICS
 //#define DELETE_AFTER_TEST
 
 using System;
@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;
 using Orleans.Hosting;
@@ -41,51 +42,53 @@ namespace UnitTests.Streaming.Reliability
         private HashSet<IStreamReliabilityTestGrain> _usedGrains; 
 #endif
 
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             TestUtils.CheckForAzureStorage();
 
             this.numExpectedSilos = 2;
-            var options = new TestClusterOptions(initialSilosCount: (short)this.numExpectedSilos);
+            builder.Options.InitialSilosCount = (short) this.numExpectedSilos;
+            builder.Options.UseTestClusterMembership = false;
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
 
-            options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
+                legacy.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore", deleteOnClear: true);
+                legacy.ClusterConfiguration.AddAzureTableStorageProvider("PubSubStore", deleteOnClear: true, useJsonFormat: false);
 
-            options.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore", deleteOnClear: true);
-            options.ClusterConfiguration.AddAzureTableStorageProvider("PubSubStore", deleteOnClear: true, useJsonFormat: false);
+                legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
 
-            options.ClusterConfiguration.AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
+                legacy.ClusterConfiguration.AddAzureQueueStreamProvider(AZURE_QUEUE_STREAM_PROVIDER_NAME);
+                legacy.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
+                
+                legacy.ClientConfiguration.AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
+                legacy.ClientConfiguration.AddAzureQueueStreamProvider(AZURE_QUEUE_STREAM_PROVIDER_NAME);
+            });
 
-            options.ClusterConfiguration.AddAzureQueueStreamProvider(AZURE_QUEUE_STREAM_PROVIDER_NAME);
-            options.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
-
-            options.ClusterConfiguration.Globals.ServiceId = Guid.NewGuid();
-
-            options.ClientConfiguration.AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
-            options.ClientConfiguration.AddAzureQueueStreamProvider(AZURE_QUEUE_STREAM_PROVIDER_NAME);
-            return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>().UseClientBuilderFactory(clientBuilderFactory);
+            builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+            builder.AddClientBuilderConfigurator<ClientBuilderConfigurator>();
         }
 
-        private Func<ClientConfiguration, IClientBuilder> clientBuilderFactory = config => new ClientBuilder()
-            .UseConfiguration(config).UseAzureTableGatewayListProvider(gatewayOptions =>
-            {
-                gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-            })
-            .ConfigureApplicationParts(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory())
-            .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(config.ClientName, config.ClusterId)));
-
-        public class SiloBuilderFactory : ISiloBuilderFactory
+        public class ClientBuilderConfigurator : IClientBuilderConfigurator
         {
-            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
-                return new SiloHostBuilder()
-                    .ConfigureSiloName(siloName)
-                    .UseConfiguration(clusterConfiguration)
-                    .UseAzureTableMembership(options =>
-                    {
-                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        options.MaxStorageBusyRetries = 3;
-                    })
-                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
+                clientBuilder.UseAzureTableGatewayListProvider(gatewayOptions =>
+                {
+                    gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                });
+            }
+        }
+
+        public class SiloBuilderConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder.UseAzureTableMembership(options =>
+                {
+                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    options.MaxStorageBusyRetries = 3;
+                });
             }
         }
 

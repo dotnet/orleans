@@ -1,11 +1,13 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Amazon.Runtime;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;
+using Orleans.AWSUtils.Tests;
 using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
@@ -14,7 +16,6 @@ using OrleansAWSUtils.Membership;
 using UnitTests.MembershipTests;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.AWSUtils.Tests;
 
 namespace AWSUtils.Tests.Liveness
 {
@@ -55,39 +56,38 @@ namespace AWSUtils.Tests.Liveness
         }
 
         public static string ConnectionString = "Service=http://localhost:8000;";
-        public override TestCluster CreateTestCluster()
-        {
-            if (!isDynamoDbAvailable.Value)                                                                                    
-                throw new SkipException("Unable to connect to DynamoDB simulator");
 
-            var options = new TestClusterOptions(2);
-            options.ClusterConfiguration.Globals.DataConnectionString = ConnectionString;
-            options.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
-            options.ClusterConfiguration.PrimaryNode = null;
-            options.ClusterConfiguration.Globals.SeedNodes.Clear();
-            return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>()
-                .UseClientBuilderFactory(clientBuilderFactory);
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        {
+            if (!isDynamoDbAvailable.Value)
+                throw new SkipException("Unable to connect to DynamoDB simulator");
+            builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+            builder.AddClientBuilderConfigurator<ClientBuilderConfigurator>();
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.Globals.DataConnectionString = ConnectionString;
+                legacy.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
+                legacy.ClusterConfiguration.PrimaryNode = null;
+                legacy.ClusterConfiguration.Globals.SeedNodes.Clear();
+            });
         }
 
-        private Func<ClientConfiguration, IClientBuilder> clientBuilderFactory = config => new ClientBuilder()
-            .UseConfiguration(config).UseDynamoDBGatewayListProvider(gatewayOptions =>
-            {
-               LegacyDynamoDBGatewayListProviderConfigurator.ParseDataConnectionString(ConnectionString, gatewayOptions);
-            })
-            .ConfigureApplicationParts(parts => parts.AddFromAppDomain())
-            .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(config.ClientName, config.ClusterId)));
-        public class SiloBuilderFactory : ISiloBuilderFactory
+        public class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            public void Configure(ISiloHostBuilder hostBuilder)
             {
-                return new SiloHostBuilder()
-                    .ConfigureSiloName(siloName)
-                    .UseConfiguration(clusterConfiguration)
-                    .UseDynamoDBMembership(options =>
-                    {
-                        options.ConnectionString = ConnectionString;
-                    })
-                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
+                hostBuilder.UseDynamoDBMembership(options => { options.ConnectionString = ConnectionString; });
+            }
+        }
+
+        public class ClientBuilderConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder.UseDynamoDBGatewayListProvider(gatewayOptions =>
+                {
+                    LegacyDynamoDBGatewayListProviderConfigurator.ParseDataConnectionString(ConnectionString, gatewayOptions);
+                });
             }
         }
 

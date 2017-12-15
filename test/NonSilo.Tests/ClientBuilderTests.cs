@@ -66,8 +66,10 @@ namespace NonSilo.Tests
         [Fact]
         public void ClientBuilder_DoubleSpecifyConfigurationTest()
         {
-            var builder = ClientBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators).UseConfiguration(new ClientConfiguration());
-            Assert.Throws<InvalidOperationException>(() => builder.UseConfiguration(new ClientConfiguration()));
+            var builder = ClientBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators)
+                .UseConfiguration(new ClientConfiguration())
+                .UseConfiguration(new ClientConfiguration());
+            Assert.Throws<InvalidOperationException>(() => builder.Build());
         }
 
         /// <summary>

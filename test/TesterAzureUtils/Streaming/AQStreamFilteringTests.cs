@@ -20,14 +20,15 @@ namespace Tester.AzureUtils.Streaming
         public class Fixture : BaseAzureTestClusterFixture
         {
             public const string StreamProvider = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(2);
-                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
 
-                options.ClusterConfiguration.AddAzureQueueStreamProvider(StreamProvider);
-                return new TestCluster(options);
+                    legacy.ClusterConfiguration.AddAzureQueueStreamProvider(StreamProvider);
+                });
             }
 
             public override void Dispose()

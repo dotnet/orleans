@@ -25,7 +25,24 @@ if not exist %CMDHOME%\test\Tester\%_Directory%\TestVersionGrainsV2\ mkdir %CMDH
 copy %CMDHOME%\test\Versions\TestVersionGrains\%_Directory%\* %CMDHOME%\test\Tester\%_Directory%\TestVersionGrainsV1\
 copy %CMDHOME%\test\Versions\TestVersionGrains2\%_Directory%\* %CMDHOME%\test\Tester\%_Directory%\TestVersionGrainsV2\
 
-set TESTS=%CMDHOME%\test\TesterAzureUtils,%CMDHOME%\test\TesterInternal,%CMDHOME%\test\Tester,%CMDHOME%\test\DefaultCluster.Tests,%CMDHOME%\test\NonSilo.Tests,%CMDHOME%\test\AWSUtils.Tests,%CMDHOME%\test\BondUtils.Tests,%CMDHOME%\test\Consul.Tests,%CMDHOME%\test\GoogleUtils.Tests,%CMDHOME%\test\ServiceBus.Tests,%CMDHOME%\test\TestServiceFabric,%CMDHOME%\test\TesterSQLUtils,%CMDHOME%\test\TesterZooKeeperUtils,%CMDHOME%\test\RuntimeCodeGen.Tests,%CMDHOME%\test\Orleans.Transactions.Tests,%CMDHOME%\test\Orleans.Transactions.Azure.Test
+set TESTS=^
+%CMDHOME%\test\TesterAzureUtils,^
+%CMDHOME%\test\TesterInternal,^
+%CMDHOME%\test\Tester,^
+%CMDHOME%\test\DefaultCluster.Tests,^
+%CMDHOME%\test\NonSilo.Tests,^
+%CMDHOME%\test\AWSUtils.Tests,^
+%CMDHOME%\test\BondUtils.Tests,^
+%CMDHOME%\test\Consul.Tests,^
+%CMDHOME%\test\GoogleUtils.Tests,^
+%CMDHOME%\test\ServiceBus.Tests,^
+%CMDHOME%\test\TestServiceFabric,^
+%CMDHOME%\test\TesterSQLUtils,^
+%CMDHOME%\test\TesterZooKeeperUtils,^
+%CMDHOME%\test\RuntimeCodeGen.Tests,^
+%CMDHOME%\test\Orleans.Transactions.Tests,^
+%CMDHOME%\test\Orleans.Transactions.Azure.Test,^
+%CMDHOME%\test\Orleans.TestingHost.Tests
 
 if []==[%TEST_FILTERS%] set TEST_FILTERS=-trait Category=BVT -trait Category=SlowBVT
 

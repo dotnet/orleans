@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -20,13 +20,13 @@ namespace UnitTests.General
         private const int leavy = 300;
         private const int perSilo = 1000;
 
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            var options = new TestClusterOptions();
-
-            options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-            options.ClusterConfiguration.AddMemoryStorageProvider("Default");
-            return new TestCluster(options);
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+                legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
+            });
         }
 
         /// <summary>
@@ -90,7 +90,7 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional")]
         public async Task ElasticityTest_StoppingSilos()
         {
-            List<SiloHandle> runtimes = this.HostedCluster.StartAdditionalSilos(2);
+            List<SiloHandle> runtimes = await this.HostedCluster.StartAdditionalSilos(2);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
             int stopLeavy = leavy;
 

@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using System.Linq;
 using Orleans.TestingHost;
 using BenchmarkGrainInterfaces.Ping;
+using Microsoft.Extensions.Configuration;
 
 namespace Benchmarks.Ping
 {
@@ -13,7 +14,7 @@ namespace Benchmarks.Ping
         public void Setup()
         {
             var options = new TestClusterOptions();
-            _host = new TestCluster(options);
+            _host = new TestCluster(options, new IConfigurationSource[0]);
             _host.Deploy();
         }
 

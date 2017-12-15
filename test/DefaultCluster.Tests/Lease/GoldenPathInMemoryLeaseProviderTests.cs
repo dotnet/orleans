@@ -1,4 +1,4 @@
-﻿using Xunit;
+using Xunit;
 using Xunit.Abstractions;
 using Orleans.Runtime.Development;
 using Orleans.TestingHost;
@@ -17,10 +17,9 @@ namespace DefaultCluster.Tests
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions();
-                return new TestCluster(options);
+                builder.ConfigureLegacyConfiguration();
             }
         }
     }

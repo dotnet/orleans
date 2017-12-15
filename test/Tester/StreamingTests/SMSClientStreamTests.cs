@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Threading.Tasks;
 using Orleans.Runtime;
@@ -24,15 +24,17 @@ namespace Tester.StreamingTests
             runner = new ClientStreamTestRunner(this.HostedCluster);
         }
 
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            var options = new TestClusterOptions(1);
-            options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-            options.ClusterConfiguration.AddSimpleMessageStreamProvider(SMSStreamProviderName);
-            options.ClusterConfiguration.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
+            builder.Options.InitialSilosCount = 1;
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+                legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(SMSStreamProviderName);
+                legacy.ClusterConfiguration.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
 
-            options.ClientConfiguration.AddSimpleMessageStreamProvider(SMSStreamProviderName);
-            return new TestCluster(options);
+                legacy.ClientConfiguration.AddSimpleMessageStreamProvider(SMSStreamProviderName);
+            });
         }
 
         [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Streaming")]

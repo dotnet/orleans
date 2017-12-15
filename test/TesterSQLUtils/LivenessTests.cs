@@ -1,4 +1,4 @@
-﻿using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Configuration;
 using Orleans.Tests.SqlUtils;
 using Orleans.TestingHost;
 using System.Threading.Tasks;
@@ -18,15 +18,17 @@ namespace UnitTests.MembershipTests
         public LivenessTests_SqlServer(ITestOutputHelper output) : base(output)
         {
         }
-        public override TestCluster CreateTestCluster()
+
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameSqlServer, TestDatabaseName).Result;
-            var options = new TestClusterOptions(2);
-            options.ClusterConfiguration.Globals.DataConnectionString = relationalStorage.CurrentConnectionString;
-            options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer;
-            options.ClusterConfiguration.PrimaryNode = null;
-            options.ClusterConfiguration.Globals.SeedNodes.Clear();
-            return new TestCluster(options);
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.Globals.DataConnectionString = relationalStorage.CurrentConnectionString;
+                legacy.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer;
+                legacy.ClusterConfiguration.PrimaryNode = null;
+                legacy.ClusterConfiguration.Globals.SeedNodes.Clear();
+            });
         }
 
         [Fact, TestCategory("Membership"), TestCategory("SqlServer")]
@@ -66,16 +68,17 @@ namespace UnitTests.MembershipTests
         public LivenessTests_PostgreSql(ITestOutputHelper output) : base(output)
         {
         }
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNamePostgreSql, TestDatabaseName).Result;
-            var options = new TestClusterOptions(2);
-            options.ClusterConfiguration.Globals.DataConnectionString = relationalStorage.CurrentConnectionString;
-            options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer;
-            options.ClusterConfiguration.Globals.AdoInvariant = AdoNetInvariants.InvariantNamePostgreSql;
-            options.ClusterConfiguration.PrimaryNode = null;
-            options.ClusterConfiguration.Globals.SeedNodes.Clear();
-            return new TestCluster(options);
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.Globals.DataConnectionString = relationalStorage.CurrentConnectionString;
+                legacy.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer;
+                legacy.ClusterConfiguration.Globals.AdoInvariant = AdoNetInvariants.InvariantNamePostgreSql;
+                legacy.ClusterConfiguration.PrimaryNode = null;
+                legacy.ClusterConfiguration.Globals.SeedNodes.Clear();
+            });
         }
 
         [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
@@ -115,16 +118,18 @@ namespace UnitTests.MembershipTests
         public LivenessTests_MySql(ITestOutputHelper output) : base(output)
         {
         }
-        public override TestCluster CreateTestCluster()
+
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameMySql, TestDatabaseName).Result;
-            var options = new TestClusterOptions(2);
-            options.ClusterConfiguration.Globals.DataConnectionString = relationalStorage.CurrentConnectionString;
-            options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer;
-            options.ClusterConfiguration.Globals.AdoInvariant = AdoNetInvariants.InvariantNameMySql;
-            options.ClusterConfiguration.PrimaryNode = null;
-            options.ClusterConfiguration.Globals.SeedNodes.Clear();
-            return new TestCluster(options);
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.Globals.DataConnectionString = relationalStorage.CurrentConnectionString;
+                legacy.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer;
+                legacy.ClusterConfiguration.Globals.AdoInvariant = AdoNetInvariants.InvariantNameMySql;
+                legacy.ClusterConfiguration.PrimaryNode = null;
+                legacy.ClusterConfiguration.Globals.SeedNodes.Clear();
+            });
         }
 
         [Fact, TestCategory("Membership"), TestCategory("MySql")]
