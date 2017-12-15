@@ -104,7 +104,7 @@ namespace Orleans.Runtime
 
             try
             {
-                RunNonBatchingV2(threadContext);
+                RunNonBatching(threadContext);
             }
             finally
             {
@@ -129,85 +129,7 @@ namespace Orleans.Runtime
                         break;
                     }
 
-                    try
-                    {
-                        runningWorkItems[threadContext.WorkItemSlotIndex] = workItem;
-                        TrackRequestDequeue(workItem);
-                        TrackProcessingStart();
-                        try
-                        {
-                            workItem.Execute();
-                        }
-                        catch (ThreadAbortException ex)
-                        {
-                            // The current turn was aborted (indicated by the exception state being set to true).
-                            // In this case, we just reset the abort so that life continues. No need to do anything else.
-                            if ((ex.ExceptionState != null) && ex.ExceptionState.Equals(true))
-                                Thread.ResetAbort();
-                            else
-                                executorOptions.Log.Error(ErrorCode.Runtime_Error_100029,
-                                    "Caught thread abort exception, allowing it to propagate outwards", ex);
-                        }
-                        catch (Exception ex)
-                        {
-                            executorOptions.Log
-                                .Error(ErrorCode.Runtime_Error_100030, $"Worker thread caught an exception thrown from task {workItem.State}.", ex);
-                        }
-                        finally
-                        {
-#if TRACK_DETAILED_STATS
-                                // todo
-                                if (todo.ItemType != WorkItemType.WorkItemGroup)
-                                {
-                                    if (StatisticsCollector.CollectTurnsStats)
-                                    {
-                                        //SchedulerStatisticsGroup.OnTurnExecutionEnd(CurrentStateTime.Elapsed);
-                                        SchedulerStatisticsGroup.OnTurnExecutionEnd(Utils.Since(CurrentStateStarted));
-                                    }
-                                    if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                                    {
-                                        threadTracking.IncrementNumberOfProcessed();
-                                    }
-                                    CurrentWorkItem = null;
-                                }
-                                if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                                {
-                                    threadTracking.OnStopProcessing();
-                                }
-#endif
-                        }
-
-                        TrackProcessingStop();
-                        runningWorkItems[threadContext.WorkItemSlotIndex] = null;
-                    }
-                    catch (ThreadAbortException tae)
-                    {
-                        // Can be reported from RunQueue.Get when Silo is being shutdown, so downgrade to verbose log
-                        if (executorOptions.Log.IsEnabled(LogLevel.Debug)) executorOptions.Log.Debug("Received thread abort exception -- exiting. {0}", tae);
-                        Thread.ResetAbort();
-                        break;
-                    }
-                    catch (Exception ex)
-                    {
-                        executorOptions.Log.Error(ErrorCode.Runtime_Error_100031, "Exception bubbled up to worker thread", ex);
-                        break;
-                    }
-                }
-            }
-            catch (Exception exc)
-            {
-                executorOptions.Log.Error(ErrorCode.SchedulerWorkerThreadExc, "WorkerPoolThread caugth exception:", exc);
-            }
-        }
-
-        protected void RunNonBatchingV2(ExecutorThreadContext threadContext)
-        {
-            try
-            {
-                while (!workQueue.IsCompleted &&
-                       (!executorOptions.CancellationToken.IsCancellationRequested || executorOptions.DrainAfterCancel))
-                {
-                    if (!ExecuteWorkItem(workQueue.Take(), threadContext.WorkItemFilters))
+                    if (!ExecuteWorkItem(workItem, threadContext.WorkItemFilters))
                     {
                         break;
                     }
@@ -221,8 +143,7 @@ namespace Orleans.Runtime
 
         private bool ExecuteWorkItem(QueueWorkItemCallback workItem, IEnumerable<WorkItemFilter> actionFilters = null)
         {
-           return (actionFilters?.FirstOrDefault() ?? NoOpWorkItemFilter.Instance)
-                .ExecuteWorkItem(workItem);
+            return actionFilters.First().ExecuteWorkItem(workItem);
         }
 
 
@@ -307,10 +228,10 @@ namespace Orleans.Runtime
         {
             return WorkItemFilter.CreateChain(new Func<WorkItemFilter>[]
             {
-                () => new OuterExceptionHandlerFilter(executorOptions.Log),
+                () => new ExceptionHandlerFilter(executorOptions.Log, continueExecution: false),
                 () => new StatisticsTrackingFilter(this),
                 () => new RunningWorkItemsTrackerFilter(this, executorWorkItemSlotIndex),
-                () => new ExceptionHandlerFilter(executorOptions.Log)
+                () => new ExceptionHandlerFilter(executorOptions.Log, continueExecution: true)
             });
         }
 

@@ -12,6 +12,8 @@ namespace Orleans.Runtime
     /// </summary>
     internal abstract class WorkItemFilter
     {
+        private static readonly Action<QueueWorkItemCallback> NoOpFilter = _ => { };
+
         public WorkItemFilter(
             Action<QueueWorkItemCallback> onActionExecuting = null,
             Action<QueueWorkItemCallback> onActionExecuted = null,
@@ -27,8 +29,8 @@ namespace Orleans.Runtime
             WorkItemFilter next)
         {
             Next = next;
-            OnActionExecuting = onActionExecuting ?? (_ => { });
-            OnActionExecuted = onActionExecuted ?? (_ => { });
+            OnActionExecuting = onActionExecuting ?? NoOpFilter;
+            OnActionExecuted = onActionExecuted ?? NoOpFilter;
             ExceptionHandler = exceptionHandler ?? ((e, c) => true);
         }
 
@@ -95,9 +97,7 @@ namespace Orleans.Runtime
 
     internal sealed class ExceptionHandlerFilter : WorkItemFilter
     {
-        private readonly ILogger log;
-
-        public ExceptionHandlerFilter(ILogger log) : base(
+        public ExceptionHandlerFilter(ILogger log, bool continueExecution) : base(
             exceptionHandler: (ex, workItem) =>
             {
                 var tae = ex as ThreadAbortException;
@@ -119,44 +119,9 @@ namespace Orleans.Runtime
                     log.Error(ErrorCode.Runtime_Error_100030, $"Worker thread caught an exception thrown from task {workItem.State}.", ex);
                 }
 
-                return true;
+                return continueExecution;
             })
         {
-            this.log = log;
-        }
-    }
-
-    // Breaks the processing loop 
-    internal sealed class OuterExceptionHandlerFilter : WorkItemFilter // todo: union with ExceptionHandlerFilter
-    {
-        private readonly ILogger log;
-
-        public OuterExceptionHandlerFilter(ILogger log) : base(
-            exceptionHandler: (ex, workItem) =>
-            {
-                var tae = ex as ThreadAbortException;
-                if (tae != null)
-                {
-                    if (tae.ExceptionState != null && tae.ExceptionState.Equals(true))
-                    {
-                        // not needed?
-                        Thread.ResetAbort();
-                    }
-                    else
-                    {
-                        log.Error(ErrorCode.Runtime_Error_100029,
-                            "Caught thread abort exception, allowing it to propagate outwards", ex);
-                    }
-                }
-                else
-                {
-                    log.Error(ErrorCode.Runtime_Error_100030, $"Worker thread caught an exception thrown from task {workItem.State}.", ex);
-                }
-
-                return false;
-            })
-        {
-            this.log = log;
         }
     }
 
