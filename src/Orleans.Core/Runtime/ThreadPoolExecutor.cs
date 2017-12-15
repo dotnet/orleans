@@ -318,15 +318,15 @@ namespace Orleans.Runtime
             return WorkItemFilter.CreateChain(new Func<WorkItemFilter>[]
             {
                 () => new OuterExceptionHandlerFilter(executorOptions.Log),
-                () => new StatisticsTrackingMixin(this),
-                () => new RunningWorkItemsTrackerMixin(this, executorWorkItemSlotIndex),
+                () => new StatisticsTrackingFilter(this),
+                () => new RunningWorkItemsTrackerFilter(this, executorWorkItemSlotIndex),
                 () => new ExceptionHandlerFilter(executorOptions.Log)
             });
         }
 
-        private sealed class StatisticsTrackingMixin : WorkItemFilter
+        private sealed class StatisticsTrackingFilter : WorkItemFilter
         {
-            public StatisticsTrackingMixin(ThreadPoolExecutor executor) : base(
+            public StatisticsTrackingFilter(ThreadPoolExecutor executor) : base(
                 onActionExecuting: workItem =>
                 {
                     executor.TrackRequestDequeue(workItem);
@@ -341,9 +341,9 @@ namespace Orleans.Runtime
             }
         }
 
-        private sealed class RunningWorkItemsTrackerMixin : WorkItemFilter
+        private sealed class RunningWorkItemsTrackerFilter : WorkItemFilter
         {
-            public RunningWorkItemsTrackerMixin(ThreadPoolExecutor executor, int workItemSlotIndex) : base(
+            public RunningWorkItemsTrackerFilter(ThreadPoolExecutor executor, int workItemSlotIndex) : base(
                 onActionExecuting: workItem =>
                 {
                     executor.runningWorkItems[workItemSlotIndex] = workItem;
