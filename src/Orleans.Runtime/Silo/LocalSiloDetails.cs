@@ -14,19 +14,19 @@ namespace Orleans.Runtime
 
         public LocalSiloDetails(
             IOptions<SiloOptions> siloOptions,
-            IOptions<NetworkingOptions> networkingOptions)
+            IOptions<EndpointOptions> siloEndpointOptions)
         {
             var options = siloOptions.Value;
             this.Name = options.SiloName;
             this.ClusterId = options.ClusterId;
             this.DnsHostName = Dns.GetHostName();
 
-            var network = networkingOptions.Value;
-            this.siloAddressLazy = new Lazy<SiloAddress>(() => SiloAddress.New(ResolveEndpoint(network), SiloAddress.AllocateNewGeneration()));
-            this.gatewayAddressLazy = new Lazy<SiloAddress>(() => network.ProxyPort != 0 ? SiloAddress.New(new IPEndPoint(this.SiloAddress.Endpoint.Address, network.ProxyPort), 0) : null);
+            var endpointOptions = siloEndpointOptions.Value;
+            this.siloAddressLazy = new Lazy<SiloAddress>(() => SiloAddress.New(ResolveEndpoint(endpointOptions), SiloAddress.AllocateNewGeneration()));
+            this.gatewayAddressLazy = new Lazy<SiloAddress>(() => endpointOptions.ProxyPort != 0 ? SiloAddress.New(new IPEndPoint(this.SiloAddress.Endpoint.Address, endpointOptions.ProxyPort), 0) : null);
         }
 
-        private static IPEndPoint ResolveEndpoint(NetworkingOptions options)
+        private static IPEndPoint ResolveEndpoint(EndpointOptions options)
         {
             IPAddress ipAddress;
             if (options.IPAddress != null)

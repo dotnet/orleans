@@ -79,8 +79,9 @@ namespace Orleans.Hosting
                 options.ClientDropTimeout = configuration.Globals.ClientDropTimeout;
             });
 
-            services.AddOptions<NetworkingOptions>()
-                .Configure(options => LegacyConfigurationExtensions.CopyNetworkingOptions(configuration.Globals, options))
+            services.Configure<NetworkingOptions>(options => LegacyConfigurationExtensions.CopyNetworkingOptions(configuration.Globals, options));
+
+            services.AddOptions<EndpointOptions>()
                 .Configure<IOptions<SiloOptions>>((options, siloOptions) =>
                 {
                     var nodeConfig = configuration.GetOrCreateNodeConfigurationForSilo(siloOptions.Value.SiloName);
