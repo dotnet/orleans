@@ -7,41 +7,19 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
 {
-    /// <summary>
-    /// Parameters used to initialize a silo and values derived from those parameters.
-    /// </summary>
-    internal class SiloInitializationParameters : ILocalSiloDetails
+    internal class LocalSiloDetails : ILocalSiloDetails
     {
         private readonly Lazy<SiloAddress> siloAddressLazy;
         private readonly Lazy<SiloAddress> gatewayAddressLazy;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="SiloInitializationParameters"/> class. 
-        /// </summary>
-        /// <param name="siloOptions">The identity of this silo.</param>
-        /// <param name="config">The cluster configuration.</param>
-        public SiloInitializationParameters(
+        public LocalSiloDetails(
             IOptions<SiloOptions> siloOptions,
-            IOptions<NetworkingOptions> networkingOptions,
-            ClusterConfiguration config)
+            IOptions<NetworkingOptions> networkingOptions)
         {
             var options = siloOptions.Value;
-            this.ClusterConfig = config;
             this.Name = options.SiloName;
             this.ClusterId = options.ClusterId;
             this.DnsHostName = Dns.GetHostName();
-
-            this.ClusterConfig.OnConfigChange(
-                "Defaults",
-                () => this.NodeConfig = this.ClusterConfig.GetOrCreateNodeConfigurationForSilo(this.Name));
-
-            if (this.NodeConfig.Generation == 0)
-            {
-                this.NodeConfig.Generation = SiloAddress.AllocateNewGeneration();
-            }
-
-            this.NodeConfig.InitNodeSettingsFromGlobals(config);
-            this.Type = this.NodeConfig.IsPrimaryNode ? Silo.SiloType.Primary : Silo.SiloType.Secondary;
 
             var network = networkingOptions.Value;
             this.siloAddressLazy = new Lazy<SiloAddress>(() => SiloAddress.New(ResolveEndpoint(network), SiloAddress.AllocateNewGeneration()));
@@ -73,11 +51,32 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public string DnsHostName { get; }
 
-        /// <summary>
-        /// Gets the type of this silo.
-        /// </summary>
-        public Silo.SiloType Type { get; }
+        /// <inheritdoc />
+        public SiloAddress SiloAddress => this.siloAddressLazy.Value;
 
+        /// <inheritdoc />
+        public SiloAddress GatewayAddress => this.gatewayAddressLazy.Value;
+    }
+
+    internal class LegacyConfigurationWrapper
+    {
+        public LegacyConfigurationWrapper(IOptions<SiloOptions> siloOptions,
+            ClusterConfiguration config)
+        {
+            var siloName = siloOptions.Value.SiloName;
+            this.ClusterConfig = config;
+            this.ClusterConfig.OnConfigChange(
+                "Defaults",
+                () => this.NodeConfig = this.ClusterConfig.GetOrCreateNodeConfigurationForSilo(siloName));
+
+            if (this.NodeConfig.Generation == 0)
+            {
+                this.NodeConfig.Generation = SiloAddress.AllocateNewGeneration();
+            }
+
+            this.NodeConfig.InitNodeSettingsFromGlobals(config);
+            this.Type = this.NodeConfig.IsPrimaryNode ? Silo.SiloType.Primary : Silo.SiloType.Secondary;
+        }
         /// <summary>
         /// Gets the cluster configuration.
         /// </summary>
@@ -88,10 +87,9 @@ namespace Orleans.Runtime
         /// </summary>
         public NodeConfiguration NodeConfig { get; private set; }
 
-        /// <inheritdoc />
-        public SiloAddress SiloAddress => this.siloAddressLazy.Value;
-
-        /// <inheritdoc />
-        public SiloAddress GatewayAddress => this.gatewayAddressLazy.Value;
+        /// <summary>
+        /// Gets the type of this silo.
+        /// </summary>
+        public Silo.SiloType Type { get; }
     }
 }

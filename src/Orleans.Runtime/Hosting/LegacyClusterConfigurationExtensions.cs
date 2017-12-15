@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -24,15 +23,13 @@ namespace Orleans.Hosting
 
             // these will eventually be removed once our code doesn't depend on the old ClientConfiguration
             services.AddSingleton(configuration);
-            services.TryAddSingleton<SiloInitializationParameters>();
-            services.TryAddFromExisting<ILocalSiloDetails, SiloInitializationParameters>();
-            services.TryAddSingleton(sp => sp.GetRequiredService<SiloInitializationParameters>().ClusterConfig);
-            services.TryAddSingleton(sp => sp.GetRequiredService<SiloInitializationParameters>().ClusterConfig.Globals);
-            services.TryAddTransient(sp => sp.GetRequiredService<SiloInitializationParameters>().NodeConfig);
+            services.TryAddSingleton<LegacyConfigurationWrapper>();
+            services.TryAddSingleton(sp => sp.GetRequiredService<LegacyConfigurationWrapper>().ClusterConfig.Globals);
+            services.TryAddTransient(sp => sp.GetRequiredService<LegacyConfigurationWrapper>().NodeConfig);
             services.TryAddSingleton<Factory<NodeConfiguration>>(
                 sp =>
                 {
-                    var initializationParams = sp.GetRequiredService<SiloInitializationParameters>();
+                    var initializationParams = sp.GetRequiredService<LegacyConfigurationWrapper>();
                     return () => initializationParams.NodeConfig;
                 });
 
