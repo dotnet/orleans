@@ -34,7 +34,6 @@ using Orleans.Transactions;
 using Orleans.Runtime.Versions;
 using Orleans.Versions;
 using Orleans.ApplicationParts;
-using Orleans.Configuration;
 using Orleans.Serialization;
 
 namespace Orleans.Runtime
@@ -136,17 +135,6 @@ namespace Orleans.Runtime
         /// <summary>
         /// Initializes a new instance of the <see cref="Silo"/> class.
         /// </summary>
-        /// <param name="name">Name of this silo.</param>
-        /// <param name="siloType">Type of this silo.</param>
-        /// <param name="config">Silo config data to be used for this silo.</param>
-        public Silo(string name, SiloType siloType, ClusterConfiguration config)
-            : this(new SiloInitializationParameters(name, siloType, config), null)
-        {
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="Silo"/> class.
-        /// </summary>
         /// <param name="initializationParams">The silo initialization parameters.</param>
         /// <param name="services">Dependency Injection container</param>
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
@@ -173,24 +161,6 @@ namespace Orleans.Runtime
             }
 
             var localEndpoint = this.initializationParams.SiloAddress.Endpoint;
-            // Configure DI using Startup type
-            if (services == null)
-            {
-                var serviceCollection = new ServiceCollection();
-                serviceCollection.AddSingleton<Silo>(this);
-                serviceCollection.AddSingleton(initializationParams);
-                serviceCollection.AddLegacyClusterConfigurationSupport(config);
-                serviceCollection.Configure<SiloOptions>(options => options.SiloName = name);
-                var hostContext = new HostBuilderContext(new Dictionary<object, object>());
-                DefaultSiloServices.AddDefaultServices(hostContext, serviceCollection);
-
-                hostContext.GetApplicationPartManager()
-                    .AddFromAppDomain()
-                    .AddFromApplicationBaseDirectory();
-
-                services = StartupBuilder.ConfigureStartup(this.LocalConfig.StartupTypeName, serviceCollection);
-                services.GetService<TelemetryManager>()?.AddFromConfiguration(services, LocalConfig.TelemetryConfiguration);
-            }
 
             services.GetService<SerializationManager>().RegisterSerializers(services.GetService<ApplicationPartManager>());
 
