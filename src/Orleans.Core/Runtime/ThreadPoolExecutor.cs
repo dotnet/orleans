@@ -1,12 +1,14 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
     /// <summary>
-    /// Essentially FixedThreadPool
+    /// Essentially lightweight FixedThreadPool
     /// </summary>
     internal class ThreadPoolExecutor : IExecutor
     {
@@ -47,11 +49,12 @@ namespace Orleans.Runtime
             });
 
             // padding reduces false sharing
-            const int padding = 100;
+            const int padding = 64;
             runningWorkItems = new QueueWorkItemCallback[options.DegreeOfParallelism * padding];
             for (var threadIndex = 0; threadIndex < options.DegreeOfParallelism; threadIndex++)
             {
-                var executorWorkItemSlotIndex = threadIndex * padding;
+                var workItemSlotIndex = threadIndex * padding;
+                var threadContext = new ExecutorThreadContext(CreateWorkItemFilters(workItemSlotIndex), workItemSlotIndex);
                 new ThreadPerTaskExecutor(
                     new SingleThreadExecutorOptions(
                         options.Name + threadIndex,
@@ -59,7 +62,7 @@ namespace Orleans.Runtime
                         options.CancellationToken,
                         options.Log,
                         options.FaultHandler))
-                    .QueueWorkItem(_ => ProcessQueue(executorWorkItemSlotIndex));
+                    .QueueWorkItem(_ => ProcessQueue(threadContext));
             }
         }
 
@@ -79,13 +82,29 @@ namespace Orleans.Runtime
             workQueue.Add(workItem);
         }
 
-        protected void ProcessQueue(int workItemSlotIndex)
+        public bool CheckHealth(DateTime lastCheckTime)
+        {
+            var healthy = true;
+            foreach (var workItem in runningWorkItems)
+            {
+                if (workItem != null && workItem.IsFrozen())
+                {
+                    healthy = false;
+                    executorOptions.Log.Error(ErrorCode.SchedulerTurnTooLong,
+                        $"Work item {workItem.GetWorkItemStatus(true)} has been executing for long time.");
+                }
+            }
+
+            return healthy;
+        }
+
+        protected void ProcessQueue(ExecutorThreadContext threadContext)
         {
             TrackExecutionStart();
 
             try
             {
-                RunNonBatching(workItemSlotIndex);
+                RunNonBatchingV2(threadContext);
             }
             finally
             {
@@ -93,7 +112,7 @@ namespace Orleans.Runtime
             }
         }
 
-        protected void RunNonBatching(int workItemSlotIndex)
+        protected void RunNonBatching(ExecutorThreadContext threadContext)
         {
             try
             {
@@ -112,12 +131,12 @@ namespace Orleans.Runtime
 
                     try
                     {
-                        runningWorkItems[workItemSlotIndex] = workItem;
+                        runningWorkItems[threadContext.WorkItemSlotIndex] = workItem;
                         TrackRequestDequeue(workItem);
                         TrackProcessingStart();
                         try
                         {
-                            workItem.ExecuteWorkItem();
+                            workItem.Execute();
                         }
                         catch (ThreadAbortException ex)
                         {
@@ -159,7 +178,7 @@ namespace Orleans.Runtime
                         }
 
                         TrackProcessingStop();
-                        runningWorkItems[workItemSlotIndex] = null;
+                        runningWorkItems[threadContext.WorkItemSlotIndex] = null;
                     }
                     catch (ThreadAbortException tae)
                     {
@@ -180,6 +199,42 @@ namespace Orleans.Runtime
                 executorOptions.Log.Error(ErrorCode.SchedulerWorkerThreadExc, "WorkerPoolThread caugth exception:", exc);
             }
         }
+
+        protected void RunNonBatchingV2(ExecutorThreadContext threadContext)
+        {
+            try
+            {
+                while (!workQueue.IsCompleted &&
+                       (!executorOptions.CancellationToken.IsCancellationRequested || executorOptions.DrainAfterCancel))
+                {
+                    QueueWorkItemCallback workItem;
+                    try
+                    {
+                        workItem = workQueue.Take();
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        break;
+                    }
+
+                    if (!ExecuteWorkItem(workItem, threadContext.WorkItemFilters))
+                    {
+                        break;
+                    }
+                }
+            }
+            catch (Exception exc)
+            {
+                executorOptions.Log.Error(ErrorCode.SchedulerWorkerThreadExc, "Executor thread caugth exception:", exc);
+            }
+        }
+
+        private bool ExecuteWorkItem(QueueWorkItemCallback workItem, IEnumerable<WorkItemFilter> actionFilters = null)
+        {
+           return (actionFilters?.FirstOrDefault() ?? NoOpWorkItemFilter.Instance)
+                .ExecuteWorkItem(workItem);
+        }
+
 
         #region StatisticsTracking
 
@@ -258,98 +313,148 @@ namespace Orleans.Runtime
 
         #endregion
 
-        internal class QueueWorkItemCallback : ITimeInterval
+        private WorkItemFilter[] CreateWorkItemFilters(int executorWorkItemSlotIndex)
         {
-            public static QueueWorkItemCallback NoOpQueueWorkItemCallback = new QueueWorkItemCallback(s => { }, null, TimeSpan.MaxValue);
-
-            private readonly WaitCallback callback;
-
-            private readonly WorkItemStatusProvider statusProvider;
-
-            private readonly object state;
-
-            private readonly TimeSpan executionTimeTreshold;
-
-            private readonly DateTime enqueueTime;
-
-            private ITimeInterval timeInterval;
-
-            // for lightweight execution time tracking 
-            private DateTime executionStart;
-
-            public QueueWorkItemCallback(
-                WaitCallback callback,
-                object state,
-                TimeSpan executionTimeTreshold,
-                WorkItemStatusProvider statusProvider = null)
+            return WorkItemFilter.CreateChain(new Func<WorkItemFilter>[]
             {
-                this.callback = callback;
-                this.state = state;
-                this.executionTimeTreshold = executionTimeTreshold;
-                this.statusProvider = statusProvider;
-                this.enqueueTime = DateTime.UtcNow;
-            }
+                () => new OuterExceptionHandlerFilter(executorOptions.Log),
+                () => new StatisticsTrackingMixin(this),
+                () => new RunningWorkItemsTrackerMixin(this, executorWorkItemSlotIndex),
+                () => new ExceptionHandlerFilter(executorOptions.Log)
+            });
+        }
 
-            public TimeSpan Elapsed => timeInterval.Elapsed;
-
-            internal TimeSpan TimeSinceQueued => Utils.Since(enqueueTime);
-
-            internal object State => state;
-
-            public void ExecuteWorkItem()
-            {
-                executionStart = DateTime.UtcNow;
-                callback.Invoke(state);
-            }
-
-            public void Start()
-            {
-                timeInterval = TimeIntervalFactory.CreateTimeInterval(true);
-                timeInterval.Start();
-            }
-
-            public void Stop()
-            {
-                timeInterval.Stop();
-            }
-
-            public void Restart()
-            {
-                timeInterval.Restart();
-            }
-
-            internal string GetWorkItemStatus(bool detailed)
-            {
-                return $"WorkItem={state} Executing for {Utils.Since(executionStart)} {statusProvider?.Invoke(state, detailed)}";
-            }
-
-            internal bool IsFrozen()
-            {
-                if (timeInterval != null)
+        private sealed class StatisticsTrackingMixin : WorkItemFilter
+        {
+            public StatisticsTrackingMixin(ThreadPoolExecutor executor) : base(
+                onActionExecuting: workItem =>
                 {
-                    return timeInterval.Elapsed > executionTimeTreshold;
-                }
+                    executor.TrackRequestDequeue(workItem);
+                    executor.TrackProcessingStart();
+                },
 
-                return false;
+                onActionExecuted: workItem =>
+                {
+                    executor.TrackProcessingStop();
+                })
+            {
             }
         }
 
-        public bool CheckHealth(DateTime lastCheckTime)
+        private sealed class RunningWorkItemsTrackerMixin : WorkItemFilter
         {
-            var healthy = true;
-            foreach (var workItem in runningWorkItems)
-            {
-                if (workItem != null && workItem.IsFrozen())
+            public RunningWorkItemsTrackerMixin(ThreadPoolExecutor executor, int workItemSlotIndex) : base(
+                onActionExecuting: workItem =>
                 {
-                    healthy = false;
-                    executorOptions.Log.Error(ErrorCode.SchedulerTurnTooLong,
-                        $"Work item {workItem.GetWorkItemStatus(true)} has been executing for long time.");
-                }
+                    executor.runningWorkItems[workItemSlotIndex] = workItem;
+                },
+
+                onActionExecuted: workItem =>
+                {
+                    executor.runningWorkItems[workItemSlotIndex] = null;
+                })
+            {
+            }
+        }
+
+        private sealed class NoOpWorkItemFilter : WorkItemFilter
+        {
+            private NoOpWorkItemFilter() { }
+
+            public static readonly NoOpWorkItemFilter Instance = new NoOpWorkItemFilter();
+        }
+
+        internal sealed class ExecutorThreadContext
+        {
+            public ExecutorThreadContext(WorkItemFilter[] workItemFilters, int workItemSlotIndex)
+            {
+                WorkItemFilters = workItemFilters;
+                WorkItemSlotIndex = workItemSlotIndex;
             }
 
-            return healthy;
+            public WorkItemFilter[] WorkItemFilters { get; }
+
+            // todo: to be removed
+            public int WorkItemSlotIndex { get; }
         }
     }
 
     internal delegate string WorkItemStatusProvider(object state, bool detailed);
+
+
+    internal class QueueWorkItemCallback : ITimeInterval
+    {
+        public static QueueWorkItemCallback NoOpQueueWorkItemCallback = new QueueWorkItemCallback(s => { }, null, TimeSpan.MaxValue);
+
+        private readonly WaitCallback callback;
+
+        private readonly WorkItemStatusProvider statusProvider;
+
+        private readonly object state;
+
+        private readonly TimeSpan executionTimeTreshold;
+
+        private readonly DateTime enqueueTime;
+
+        private ITimeInterval timeInterval;
+
+        // for lightweight execution time tracking 
+        private DateTime executionStart;
+
+        public QueueWorkItemCallback(
+            WaitCallback callback,
+            object state,
+            TimeSpan executionTimeTreshold,
+            WorkItemStatusProvider statusProvider = null)
+        {
+            this.callback = callback;
+            this.state = state;
+            this.executionTimeTreshold = executionTimeTreshold;
+            this.statusProvider = statusProvider;
+            this.enqueueTime = DateTime.UtcNow;
+        }
+
+        public TimeSpan Elapsed => timeInterval.Elapsed;
+
+        internal TimeSpan TimeSinceQueued => Utils.Since(enqueueTime);
+
+        internal object State => state;
+
+        public void Execute()
+        {
+            executionStart = DateTime.UtcNow;
+            callback.Invoke(state);
+        }
+
+        public void Start()
+        {
+            timeInterval = TimeIntervalFactory.CreateTimeInterval(true);
+            timeInterval.Start();
+        }
+
+        public void Stop()
+        {
+            timeInterval.Stop();
+        }
+
+        public void Restart()
+        {
+            timeInterval.Restart();
+        }
+
+        internal string GetWorkItemStatus(bool detailed)
+        {
+            return $"WorkItem={state} Executing for {Utils.Since(executionStart)} {statusProvider?.Invoke(state, detailed)}";
+        }
+
+        internal bool IsFrozen()
+        {
+            if (timeInterval != null)
+            {
+                return timeInterval.Elapsed > executionTimeTreshold;
+            }
+
+            return false;
+        }
+    }
 }
