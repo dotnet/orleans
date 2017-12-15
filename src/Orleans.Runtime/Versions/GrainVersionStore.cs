@@ -1,10 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿using System.Collections.Generic;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Options;
-using Orleans.Runtime.Configuration;
 using Orleans.Storage;
 using Orleans.Versions;
 using Orleans.Versions.Compatibility;
@@ -21,10 +16,10 @@ namespace Orleans.Runtime.Versions
 
         public bool IsEnabled { get; private set; }
 
-        public GrainVersionStore(IInternalGrainFactory grainFactory, IOptions<SiloOptions> siloOptions)
+        public GrainVersionStore(IInternalGrainFactory grainFactory, ILocalSiloDetails siloDetails)
         {
             this.grainFactory = grainFactory;
-            this.clusterId = siloOptions.Value.ClusterId;
+            this.clusterId = siloDetails.ClusterId;
             this.IsEnabled = false;
         }
 

@@ -33,7 +33,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
         private readonly IInternalGrainFactory grainFactory;
         private MultiClusterConfiguration injectedConfig;
         private readonly ILoggerFactory loggerFactory;
-        public MultiClusterOracle(ILocalSiloDetails siloDetails, MultiClusterGossipChannelFactory channelFactory, ISiloStatusOracle siloStatusOracle, IInternalGrainFactory grainFactory, ILoggerFactory loggerFactory, IOptions<SiloOptions> siloOptions, IOptions<MultiClusterOptions> multiClusterOptions)
+        public MultiClusterOracle(ILocalSiloDetails siloDetails, MultiClusterGossipChannelFactory channelFactory, ISiloStatusOracle siloStatusOracle, IInternalGrainFactory grainFactory, ILoggerFactory loggerFactory, IOptions<MultiClusterOptions> multiClusterOptions)
             : base(Constants.MultiClusterOracleId, siloDetails.SiloAddress, loggerFactory)
         {
             this.loggerFactory = loggerFactory;
@@ -43,7 +43,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
             logger = loggerFactory.CreateLogger<MultiClusterOracle>();
             localData = new MultiClusterOracleData(logger, grainFactory);
-            clusterId = siloOptions.Value.ClusterId;
+            clusterId = siloDetails.ClusterId;
             var multiClusterOptionsSnapshot = multiClusterOptions.Value;
             defaultMultiCluster = multiClusterOptionsSnapshot.DefaultMultiCluster?.ToList();
             random = new SafeRandom();
