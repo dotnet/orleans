@@ -16,17 +16,17 @@ namespace Orleans.Runtime
 
         private readonly BlockingCollection<QueueWorkItemCallback> workQueue;
 
-        private readonly ThreadPoolExecutorOptions executorOptions;
+        private readonly ThreadPoolExecutorOptions options;
 
         private readonly ThreadPoolTrackingStatistic statistics;
 
         public ThreadPoolExecutor(ThreadPoolExecutorOptions options)
         {
+            this.options = options;
+
             workQueue = new BlockingCollection<QueueWorkItemCallback>(options.PreserveOrder
                 ? (IProducerConsumerCollection<QueueWorkItemCallback>) new ConcurrentQueue<QueueWorkItemCallback>()
                 : new ConcurrentBag<QueueWorkItemCallback>());
-
-            executorOptions = options;
 
             statistics = new ThreadPoolTrackingStatistic(options.Name);
 
@@ -38,12 +38,13 @@ namespace Orleans.Runtime
             });
 
             runningWorkItems = new QueueWorkItemCallback[GetThreadSlotIndex(options.DegreeOfParallelism)];
+            
             for (var threadIndex = 0; threadIndex < options.DegreeOfParallelism; threadIndex++)
             {
-                RunWorker(options, threadIndex);
+                RunWorker(threadIndex);
             }
         }
-
+        
         public int WorkQueueCount => workQueue.Count;
 
         public void QueueWorkItem(WaitCallback callback, object state = null)
@@ -53,8 +54,8 @@ namespace Orleans.Runtime
             var workItem = new QueueWorkItemCallback(
                 callback,
                 state,
-                executorOptions.WorkItemExecutionTimeTreshold,
-                executorOptions.WorkItemStatusProvider);
+                options.WorkItemExecutionTimeTreshold,
+                options.WorkItemStatusProvider);
 
             TrackRequestEnqueue(workItem);
 
@@ -69,7 +70,7 @@ namespace Orleans.Runtime
                 if (workItem != null && workItem.IsFrozen())
                 {
                     healthy = false;
-                    executorOptions.Log.Error(
+                    options.Log.Error(
                         ErrorCode.SchedulerTurnTooLong,
                         string.Format(SR.WorkItem_LongExecutionTime, workItem.GetWorkItemStatus(true)));
                 }
@@ -92,7 +93,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private void RunWorker(ThreadPoolExecutorOptions options, int threadIndex)
+        private void RunWorker(int threadIndex)
         {
             var threadContext = new ExecutorThreadContext(CreateWorkItemFilters(GetThreadSlotIndex(threadIndex)));
             new ThreadPerTaskExecutor(
@@ -117,7 +118,7 @@ namespace Orleans.Runtime
             try
             {
                 while (!workQueue.IsCompleted &&
-                       (!executorOptions.CancellationToken.IsCancellationRequested || executorOptions.DrainAfterCancel))
+                       (!options.CancellationToken.IsCancellationRequested || options.DrainAfterCancel))
                 {
                     QueueWorkItemCallback workItem;
                     try
@@ -137,7 +138,7 @@ namespace Orleans.Runtime
             }
             catch (Exception exc)
             {
-                executorOptions.Log.Error(ErrorCode.SchedulerWorkerThreadExc, SR.Executor_Thread_Caugth_Exception, exc);
+                options.Log.Error(ErrorCode.SchedulerWorkerThreadExc, SR.Executor_Thread_Caugth_Exception, exc);
             }
         }
 
@@ -169,12 +170,11 @@ namespace Orleans.Runtime
 
         private void TrackRequestDequeue(QueueWorkItemCallback workItem)
         {
-            // Capture the queue wait time for this task
             var waitTime = workItem.TimeSinceQueued;
-            if (waitTime > executorOptions.DelayWarningThreshold && !System.Diagnostics.Debugger.IsAttached)
+            if (waitTime > options.DelayWarningThreshold && !System.Diagnostics.Debugger.IsAttached)
             {
                 SchedulerStatisticsGroup.NumLongQueueWaitTimes.Increment();
-                executorOptions.Log.Warn(
+                options.Log.Warn(
                     ErrorCode.SchedulerWorkerPoolThreadQueueWaitTime,
                     SR.Queue_Item_WaitTime, waitTime, workItem.State);
             }
@@ -208,10 +208,10 @@ namespace Orleans.Runtime
         {
             return WorkItemFilter.CreateChain(new Func<WorkItemFilter>[]
             {
-                () => new OuterExceptionHandlerFilter(executorOptions.Log),
+                () => new OuterExceptionHandlerFilter(options.Log),
                 () => new StatisticsTrackingFilter(this),
                 () => new RunningWorkItemsTracker(this, executorWorkItemSlotIndex),
-                () => new ExceptionHandlerFilter(executorOptions.Log)
+                () => new ExceptionHandlerFilter(options.Log)
             });
         }
 
@@ -260,8 +260,7 @@ namespace Orleans.Runtime
     }
 
     internal delegate string WorkItemStatusProvider(object state, bool detailed);
-
-
+    
     internal class QueueWorkItemCallback : ITimeInterval
     {
         public static QueueWorkItemCallback NoOpQueueWorkItemCallback =
