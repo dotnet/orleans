@@ -10,12 +10,22 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace OrleansAWSUtils.Storage
+#if CLUSTERING_DYNAMODB
+namespace Orleans.Clustering.DynamoDB
+#elif PERSISTENCE_DYNAMODB
+namespace Orleans.Persistence.DynamoDB
+#elif REMINDERS_DYNAMODB
+namespace Orleans.Reminders.DynamoDB
+#elif AWSUTILS_TESTS
+namespace Orleans.AWSUtils.Tests
+#else
+// No default namespace intentionally to cause compile errors if something is not defined
+#endif
 {
     /// <summary>
     /// Wrapper around AWS DynamoDB SDK.
     /// </summary>
-    public class DynamoDBStorage
+    internal class DynamoDBStorage
     {
         private const string AccessKeyPropertyName = "AccessKey";
         private const string SecretKeyPropertyName = "SecretKey";
@@ -93,7 +103,7 @@ namespace OrleansAWSUtils.Storage
             }
         }
 
-        #region Table Management Operations
+#region Table Management Operations
 
         internal static void ParseDataConnectionString(string dataConnectionString, out string accessKey, out string secretKey, out string service, out int readCapacityUnits, out int writeCapacityUnits)
         {
@@ -247,9 +257,9 @@ namespace OrleansAWSUtils.Storage
             }
         }
 
-        #endregion
+#endregion
 
-        #region CRUD
+#region CRUD
 
         /// <summary>
         /// Create or Replace an entry in a DynamoDB Table
@@ -605,6 +615,6 @@ namespace OrleansAWSUtils.Storage
             }
         }
 
-        #endregion
+#endregion
     }
 }

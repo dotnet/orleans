@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using Amazon.DynamoDBv2;
-using OrleansAWSUtils.Storage;
+﻿using Orleans.Clustering.DynamoDB;
 
 namespace OrleansAWSUtils.Options
 {

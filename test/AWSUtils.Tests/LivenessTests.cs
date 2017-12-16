@@ -1,9 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using OrleansAWSUtils.Storage;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Amazon.Runtime;
@@ -17,6 +14,7 @@ using OrleansAWSUtils.Membership;
 using UnitTests.MembershipTests;
 using Xunit;
 using Xunit.Abstractions;
+using Orleans.AWSUtils.Tests;
 
 namespace AWSUtils.Tests.Liveness
 {

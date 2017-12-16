@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;
 using Orleans.Runtime;
 using OrleansAWSUtils.Storage;
+using Orleans.AWSUtils.Tests;
 
 namespace AWSUtils.Tests.StorageTests
 {
