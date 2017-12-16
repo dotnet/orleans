@@ -8,21 +8,19 @@ namespace Orleans.Runtime
     {
         private readonly SingleThreadExecutorOptions executorOptions;
 
-#if TRACK_DETAILED_STATS // todo: make it const bool 
-        internal protected ThreadTrackingStatistic threadTracking;
-#endif
+        private const bool TRACK_DETAILED_STATS = false;
+
+        private readonly ThreadTrackingStatistic threadTracking;
 
         public ThreadPerTaskExecutor(SingleThreadExecutorOptions options)
         {
             executorOptions = options;
 
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectThreadTimeTrackingStats)
+            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
             {
-                threadTracking = new ThreadTrackingStatistic(Name);
+                threadTracking = new ThreadTrackingStatistic(options.Name , null); // todo: null
             }
-#endif
-        }
+         }
 
         public void QueueWorkItem(WaitCallback callback, object state = null)
         {
@@ -85,12 +83,10 @@ namespace Orleans.Runtime
                 $"Starting Executor {executorOptions.Name} for stage {executorOptions.StageTypeName} " +
                 $"on managed thread {Thread.CurrentThread.ManagedThreadId}");
 
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectThreadTimeTrackingStats)
+            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
             {
                 threadTracking.OnStartExecution();
             }
-#endif
         }
 
         private void TrackExecutionStop()
@@ -104,12 +100,10 @@ namespace Orleans.Runtime
                 executorOptions.Name,
                 Thread.CurrentThread.ManagedThreadId);
 
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectThreadTimeTrackingStats)
+            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
             {
                 threadTracking.OnStopExecution();
             }
-#endif
         }
     }
 }

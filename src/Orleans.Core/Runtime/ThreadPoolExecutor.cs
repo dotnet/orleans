@@ -12,16 +12,15 @@ namespace Orleans.Runtime
     /// </summary>
     internal class ThreadPoolExecutor : IExecutor
     {
-#if TRACK_DETAILED_STATS
-        internal protected ThreadTrackingStatistic threadTracking;
-#endif
-        private readonly QueueTrackingStatistic queueTracking;
-
         private readonly QueueWorkItemCallback[] runningWorkItems;
-        
+
         private readonly BlockingCollection<QueueWorkItemCallback> workQueue;
 
         private readonly ThreadPoolExecutorOptions executorOptions;
+
+        private readonly ThreadTrackingStatistic threadTracking;
+
+        private readonly QueueTrackingStatistic queueTracking; // the tracking should be left only one
 
         public ThreadPoolExecutor(ThreadPoolExecutorOptions options)
         {
@@ -30,12 +29,11 @@ namespace Orleans.Runtime
                 queueTracking = new QueueTrackingStatistic(options.Name);
             }
 
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectThreadTimeTrackingStats)
+            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
             {
-                threadTracking = new ThreadTrackingStatistic(Name);
+                threadTracking = new ThreadTrackingStatistic(options.Name, null); // todo: null
             }
-#endif
+
             workQueue = new BlockingCollection<QueueWorkItemCallback>(options.PreserveOrder ?
                 (IProducerConsumerCollection<QueueWorkItemCallback>)new ConcurrentQueue<QueueWorkItemCallback>() :
                 new ConcurrentBag<QueueWorkItemCallback>());
@@ -115,7 +113,7 @@ namespace Orleans.Runtime
                         options.FaultHandler))
                 .QueueWorkItem(_ => ProcessQueue(threadContext));
         }
-        
+
         private int GetThreadSlotIndex(int threadIndex)
         {
             // false sharing prevention
@@ -151,39 +149,31 @@ namespace Orleans.Runtime
                 executorOptions.Log.Error(ErrorCode.SchedulerWorkerThreadExc, SR.Executor_Thread_Caugth_Exception, exc);
             }
         }
-        
+
         #region StatisticsTracking
 
         private void TrackRequestEnqueue(QueueWorkItemCallback workItem)
         {
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectQueueStats)
+            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectQueueStats)
             {
                 queueTracking.OnEnQueueRequest(1, WorkQueueCount, workItem);
             }
-#endif
         }
 
         private void TrackExecutionStart()
         {
-
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectThreadTimeTrackingStats)
+            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
             {
                 queueTracking.OnStartExecution();
             }
-#endif
         }
 
         private void TrackExecutionStop()
         {
-
-#if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                {
-                    queueTracking.OnStopExecution();
-                }
-#endif
+            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
+            {
+                queueTracking.OnStopExecution();
+            }
         }
 
         private void TrackRequestDequeue(QueueWorkItemCallback workItem)
@@ -198,33 +188,27 @@ namespace Orleans.Runtime
                     SR.Queue_Item_WaitTime, waitTime, workItem.State);
             }
 
-#if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectQueueStats)
-                {
-                    queueTracking.OnDeQueueRequest(workItem);
-                }
-#endif
+            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectQueueStats)
+            {
+                queueTracking.OnDeQueueRequest(workItem);
+            }
         }
 
         private void TrackProcessingStart()
         {
-#if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                {
-                    threadTracking.OnStartProcessing();
-                }
-#endif
+            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
+            {
+                threadTracking.OnStartProcessing();
+            }
         }
 
         private void TrackProcessingStop()
         {
-#if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                {
-                    threadTracking.OnStopProcessing();
-                    threadTracking.IncrementNumberOfProcessed();
-                }
-#endif
+            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
+            {
+                threadTracking.OnStopProcessing();
+                threadTracking.IncrementNumberOfProcessed();
+            }
         }
 
         #endregion
