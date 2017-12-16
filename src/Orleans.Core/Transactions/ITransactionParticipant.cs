@@ -20,7 +20,7 @@ namespace Orleans.Transactions
         /// <param name="timeStamp">the commit timestamp for this transaction</param>
         /// <param name=""></param>
         /// <returns></returns>
-        Task<Status> CommitReadOnly(Guid transactionId, AccessCounter accessCount, DateTime timeStamp);
+        Task<TransactionalStatus> CommitReadOnly(Guid transactionId, AccessCounter accessCount, DateTime timeStamp);
 
         /// <summary>
         /// One-way message sent by TA to all participants except TM.  
@@ -43,7 +43,7 @@ namespace Orleans.Transactions
         /// <param name="writeParticipants">the participants who wrote during the transaction</param>
         /// <param name="totalParticipants">the total number of participants in the transaction</param>
         /// <returns>the status of the transaction</returns>
-        Task<Status> PrepareAndCommit(Guid transactionId, AccessCounter accessCount, DateTime timeStamp,
+        Task<TransactionalStatus> PrepareAndCommit(Guid transactionId, AccessCounter accessCount, DateTime timeStamp,
             List<ITransactionParticipant> writeParticipants, int totalParticipants);
 
         /// <summary>
@@ -58,9 +58,9 @@ namespace Orleans.Transactions
         /// <param name="transactionId">The id of the transaction</param>
         /// <param name="timeStamp">The commit timestamp of the transaction</param>
         /// <param name="participant">The participant sending the message</param>
-        /// <param name="Status">The outcome of the prepare</param>
+        /// <param name="status">The outcome of the prepare</param>
         /// <returns></returns>
-        Task Prepared(Guid transactionId, DateTime timeStamp, ITransactionParticipant participant, Status status);
+        Task Prepared(Guid transactionId, DateTime timeStamp, ITransactionParticipant participant, TransactionalStatus status);
 
         /// <summary>
         /// One-way message sent by TM to participants to let them know a transaction has aborted.
@@ -68,7 +68,7 @@ namespace Orleans.Transactions
         /// <param name="transactionId">The id of the aborted transaction</param>
         /// <param name="timeStamp">The commit timestamp of the aborted transaction</param>
         /// <param name="status">Reason for abort</param>
-        Task Cancel(Guid transactionId, DateTime timeStamp, Status status);
+        Task Cancel(Guid transactionId, DateTime timeStamp, TransactionalStatus status);
 
         /// <summary>
         /// Request sent by TM to participants to let them know a transaction has committed.
@@ -93,7 +93,7 @@ namespace Orleans.Transactions
     /// Used to propagate information about the status of a transaction. Used for transaction orchestration, for diagnostics, 
     /// and for generating informative user exceptions
     /// </summary>
-    public enum Status
+    public enum TransactionalStatus
     {
         Ok,
 

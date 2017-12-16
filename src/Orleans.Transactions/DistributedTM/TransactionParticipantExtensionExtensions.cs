@@ -58,12 +58,12 @@ namespace Orleans.Transactions.Abstractions
                 return extension.Abort(resourceId, transactionId);
             }
 
-            public Task Cancel(Guid transactionId, DateTime timeStamp, Status status)
+            public Task Cancel(Guid transactionId, DateTime timeStamp, TransactionalStatus status)
             {
                 return extension.Cancel(resourceId, transactionId, timeStamp, status);
             }
 
-            public Task<Status> CommitReadOnly(Guid transactionId, AccessCounter accessCount, DateTime timeStamp)
+            public Task<TransactionalStatus> CommitReadOnly(Guid transactionId, AccessCounter accessCount, DateTime timeStamp)
             {
                 return extension.CommitReadOnly(resourceId, transactionId, accessCount, timeStamp);
             }
@@ -82,12 +82,12 @@ namespace Orleans.Transactions.Abstractions
                 return extension.Prepare(resourceId, transactionId, accessCount, timeStamp, transactionManager);
             }
 
-            public Task<Status> PrepareAndCommit(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, List<ITransactionParticipant> writeParticipants, int totalParticipants)
+            public Task<TransactionalStatus> PrepareAndCommit(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, List<ITransactionParticipant> writeParticipants, int totalParticipants)
             {
                 return extension.PrepareAndCommit(resourceId, transactionId, accessCount, timeStamp, writeParticipants, totalParticipants);
             }
 
-            public Task Prepared(Guid transactionId, DateTime timeStamp, ITransactionParticipant participant, Status status)
+            public Task Prepared(Guid transactionId, DateTime timeStamp, ITransactionParticipant participant, TransactionalStatus status)
             {
                 return extension.Prepared(resourceId, transactionId, timeStamp, participant, status);
             }

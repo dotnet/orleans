@@ -20,11 +20,11 @@ namespace Orleans.Transactions
         [AlwaysInterleave]
         [Transaction(TransactionOption.NotSupported)]
         [OneWay]
-        Task Cancel(string resourceId, Guid transactionId, DateTime timeStamp, Status status);
+        Task Cancel(string resourceId, Guid transactionId, DateTime timeStamp, TransactionalStatus status);
 
         [AlwaysInterleave]
         [Transaction(TransactionOption.NotSupported)]
-        Task<Status> CommitReadOnly(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp);
+        Task<TransactionalStatus> CommitReadOnly(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp);
 
         [AlwaysInterleave]
         [Transaction(TransactionOption.NotSupported)]
@@ -42,11 +42,11 @@ namespace Orleans.Transactions
 
         [AlwaysInterleave]
         [Transaction(TransactionOption.NotSupported)]
-        Task<Status> PrepareAndCommit(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp, List<ITransactionParticipant> writeParticipants, int totalParticipants);
+        Task<TransactionalStatus> PrepareAndCommit(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp, List<ITransactionParticipant> writeParticipants, int totalParticipants);
 
         [AlwaysInterleave]
         [Transaction(TransactionOption.NotSupported)]
         [OneWay]
-        Task Prepared(string resourceId, Guid transactionId, DateTime timestamp, ITransactionParticipant participant, Status status);
+        Task Prepared(string resourceId, Guid transactionId, DateTime timestamp, ITransactionParticipant participant, TransactionalStatus status);
     }
 }

@@ -21,12 +21,12 @@ namespace Orleans.Transactions
             return localParticipants[resourceId].Abort(transactionId);
         }
 
-        public Task Cancel(string resourceId, Guid transactionId, DateTime timeStamp, Status status)
+        public Task Cancel(string resourceId, Guid transactionId, DateTime timeStamp, TransactionalStatus status)
         {
             return localParticipants[resourceId].Cancel(transactionId, timeStamp, status);
         }
 
-        public Task<Status> CommitReadOnly(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp)
+        public Task<TransactionalStatus> CommitReadOnly(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp)
         {
             return localParticipants[resourceId].CommitReadOnly(transactionId, accessCount, timeStamp);
         }
@@ -46,12 +46,12 @@ namespace Orleans.Transactions
             return localParticipants[resourceId].Prepare(transactionId, accessCount, timeStamp, transactionManager);
         }
 
-        public Task<Status> PrepareAndCommit(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp, List<ITransactionParticipant> writeParticipants, int totalParticipants)
+        public Task<TransactionalStatus> PrepareAndCommit(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp, List<ITransactionParticipant> writeParticipants, int totalParticipants)
         {
             return localParticipants[resourceId].PrepareAndCommit(transactionId, accessCount, timeStamp, writeParticipants, totalParticipants);
         }
 
-        public Task Prepared(string resourceId, Guid transactionId, DateTime timestamp, ITransactionParticipant participant, Status status)
+        public Task Prepared(string resourceId, Guid transactionId, DateTime timestamp, ITransactionParticipant participant, TransactionalStatus status)
         {
             return localParticipants[resourceId].Prepared(transactionId, timestamp, participant, status);
         }
