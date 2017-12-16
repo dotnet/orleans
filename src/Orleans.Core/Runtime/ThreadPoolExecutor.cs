@@ -81,7 +81,7 @@ namespace Orleans.Runtime
 
         protected void ProcessQueue(ExecutorThreadContext threadContext)
         {
-            TrackExecutionStart();
+            statistics.OnStartExecution();
 
             try
             {
@@ -89,7 +89,7 @@ namespace Orleans.Runtime
             }
             finally
             {
-                TrackExecutionStop();
+                statistics.OnStopExecution();
             }
         }
 
@@ -142,30 +142,22 @@ namespace Orleans.Runtime
             }
         }
 
+        private WorkItemFilter[] CreateWorkItemFilters(int executorWorkItemSlotIndex)
+        {
+            return WorkItemFilter.CreateChain(new Func<WorkItemFilter>[]
+            {
+                () => new OuterExceptionHandlerFilter(options.Log),
+                () => new StatisticsTrackingFilter(this),
+                () => new RunningWorkItemsTracker(this, executorWorkItemSlotIndex),
+                () => new ExceptionHandlerFilter(options.Log)
+            });
+        }
+
         #region StatisticsTracking
 
         private void TrackRequestEnqueue(QueueWorkItemCallback workItem)
         {
-            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectQueueStats)
-            {
-                statistics.OnEnQueueRequest(1, WorkQueueCount, workItem);
-            }
-        }
-
-        private void TrackExecutionStart()
-        {
-            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
-            {
-                statistics.OnStartExecution();
-            }
-        }
-
-        private void TrackExecutionStop()
-        {
-            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
-            {
-                statistics.OnStopExecution();
-            }
+            statistics.OnEnQueueRequest(1, WorkQueueCount, workItem);
         }
 
         private void TrackRequestDequeue(QueueWorkItemCallback workItem)
@@ -179,41 +171,10 @@ namespace Orleans.Runtime
                     SR.Queue_Item_WaitTime, waitTime, workItem.State);
             }
 
-            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectQueueStats)
-            {
-                statistics.OnDeQueueRequest(workItem);
-            }
-        }
-
-        private void TrackProcessingStart()
-        {
-            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
-            {
-                statistics.OnStartProcessing();
-            }
-        }
-
-        private void TrackProcessingStop()
-        {
-            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
-            {
-                statistics.OnStopProcessing();
-                statistics.IncrementNumberOfProcessed();
-            }
+            statistics.OnDeQueueRequest(workItem);
         }
 
         #endregion
-
-        private WorkItemFilter[] CreateWorkItemFilters(int executorWorkItemSlotIndex)
-        {
-            return WorkItemFilter.CreateChain(new Func<WorkItemFilter>[]
-            {
-                () => new OuterExceptionHandlerFilter(options.Log),
-                () => new StatisticsTrackingFilter(this),
-                () => new RunningWorkItemsTracker(this, executorWorkItemSlotIndex),
-                () => new ExceptionHandlerFilter(options.Log)
-            });
-        }
 
         private sealed class StatisticsTrackingFilter : WorkItemFilter
         {
@@ -221,9 +182,13 @@ namespace Orleans.Runtime
                 onActionExecuting: workItem =>
                 {
                     executor.TrackRequestDequeue(workItem);
-                    executor.TrackProcessingStart();
+                    executor.statistics.OnStartProcessing();
                 },
-                onActionExecuted: workItem => { executor.TrackProcessingStop(); })
+                onActionExecuted: workItem => 
+                {
+                    executor.statistics.OnStopProcessing();
+                    executor.statistics.IncrementNumberOfProcessed();
+                })
             {
             }
         }
@@ -231,8 +196,14 @@ namespace Orleans.Runtime
         private sealed class RunningWorkItemsTracker : WorkItemFilter
         {
             public RunningWorkItemsTracker(ThreadPoolExecutor executor, int workItemSlotIndex) : base(
-                onActionExecuting: workItem => { executor.runningWorkItems[workItemSlotIndex] = workItem; },
-                onActionExecuted: workItem => { executor.runningWorkItems[workItemSlotIndex] = null; })
+                onActionExecuting: workItem =>
+                {
+                    executor.runningWorkItems[workItemSlotIndex] = workItem;
+                },
+                onActionExecuted: workItem =>
+                {
+                    executor.runningWorkItems[workItemSlotIndex] = null;
+                })
             {
             }
         }
@@ -366,37 +337,58 @@ namespace Orleans.Runtime
 
         public void OnStartExecution()
         {
-            queueTracking.OnStartExecution();
+            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
+            {
+                queueTracking.OnStartExecution();
+            }
         }
 
         public void OnDeQueueRequest(QueueWorkItemCallback workItem)
         {
-            queueTracking.OnDeQueueRequest(workItem);
+            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectQueueStats)
+            {
+                queueTracking.OnDeQueueRequest(workItem);
+            }
         }
 
         public void OnEnQueueRequest(int i, int workQueueCount, QueueWorkItemCallback workItem)
         {
-            queueTracking.OnDeQueueRequest(workItem);
+            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectQueueStats)
+            {
+                queueTracking.OnDeQueueRequest(workItem);
+            }
         }
 
         public void OnStartProcessing()
         {
-            threadTracking.OnStartProcessing();
+            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
+            {
+                threadTracking.OnStartProcessing();
+            }
         }
 
         internal void OnStopProcessing()
         {
-            threadTracking.OnStopProcessing();
+            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
+            {
+                threadTracking.OnStopProcessing();
+            }
         }
 
         internal void IncrementNumberOfProcessed()
         {
-            threadTracking.IncrementNumberOfProcessed();
+            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
+            {
+                threadTracking.IncrementNumberOfProcessed();
+            }
         }
 
         public void OnStopExecution()
         {
-            threadTracking.OnStopExecution();
+            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
+            {
+                threadTracking.OnStopExecution();
+            }
         }
     }
 }
