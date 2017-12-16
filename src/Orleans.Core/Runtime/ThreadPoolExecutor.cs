@@ -19,6 +19,9 @@ namespace Orleans.Runtime
 
         private readonly QueueWorkItemCallback[] runningWorkItems;
 
+        /// The queue used for holding tasks and handing off to worker
+        /// threads.
+        /// </summary>
         private readonly BlockingCollection<QueueWorkItemCallback> workQueue;
 
         private readonly ThreadPoolExecutorOptions executorOptions;
@@ -53,16 +56,7 @@ namespace Orleans.Runtime
             runningWorkItems = new QueueWorkItemCallback[options.DegreeOfParallelism * padding];
             for (var threadIndex = 0; threadIndex < options.DegreeOfParallelism; threadIndex++)
             {
-                var workItemSlotIndex = threadIndex * padding;
-                var threadContext = new ExecutorThreadContext(CreateWorkItemFilters(workItemSlotIndex));
-                new ThreadPerTaskExecutor(
-                    new SingleThreadExecutorOptions(
-                        options.Name + threadIndex,
-                        options.StageType,
-                        options.CancellationToken,
-                        options.Log,
-                        options.FaultHandler))
-                    .QueueWorkItem(_ => ProcessQueue(threadContext));
+                RunWorker(options, threadIndex);
             }
         }
 
@@ -79,6 +73,7 @@ namespace Orleans.Runtime
                 executorOptions.WorkItemStatusProvider);
 
             TrackRequestEnqueue(workItem);
+
             workQueue.Add(workItem);
         }
 
@@ -109,6 +104,42 @@ namespace Orleans.Runtime
             finally
             {
                 TrackExecutionStop();
+            }
+        }
+
+        private void RunWorker(ThreadPoolExecutorOptions options, int threadIndex)
+        {
+            var threadContext = new ExecutorThreadContext(CreateWorkItemFilters(GetThreadSlotIndex(threadIndex)));
+            new ThreadPerTaskExecutor(
+                    new SingleThreadExecutorOptions(
+                        options.Name + threadIndex,
+                        options.StageType,
+                        options.CancellationToken,
+                        options.Log,
+                        options.FaultHandler))
+                .QueueWorkItem(_ => ProcessQueue(threadContext));
+        }
+
+        private int GetThreadSlotIndex(int threadIndex)
+        {
+            // padding reduces false sharing
+            const int padding = 64;
+            return threadIndex * padding;
+        }
+
+        private sealed class ExecutionTrackingFilter : WorkItemFilter
+        {
+            public ExecutionTrackingFilter(ThreadPoolExecutor executor) : base(
+                onActionExecuting: workItem =>
+                {
+                    executor.TrackExecutionStart();
+                },
+
+                onActionExecuted: workItem =>
+                {
+                    executor.TrackExecutionStop();
+                })
+            {
             }
         }
 

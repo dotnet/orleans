@@ -6,6 +6,10 @@ namespace Orleans.Runtime
 {
     internal interface IExecutor : IHealthCheckable
     {
+        /// <summary>
+        /// Executes the given command at some time in the future.  The command
+        /// may execute in a new thread, in a pooled thread, or in the calling thread
+        /// </summary>
         void QueueWorkItem(WaitCallback callback, object state = null);
 
         int WorkQueueCount { get; }
