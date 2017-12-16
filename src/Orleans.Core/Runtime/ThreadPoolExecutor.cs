@@ -18,10 +18,7 @@ namespace Orleans.Runtime
         private readonly QueueTrackingStatistic queueTracking;
 
         private readonly QueueWorkItemCallback[] runningWorkItems;
-
-        /// The queue used for holding tasks and handing off to worker
-        /// threads.
-        /// </summary>
+        
         private readonly BlockingCollection<QueueWorkItemCallback> workQueue;
 
         private readonly ThreadPoolExecutorOptions executorOptions;
@@ -51,9 +48,7 @@ namespace Orleans.Runtime
                 workQueue.CompleteAdding();
             });
 
-            // padding reduces false sharing
-            const int padding = 64;
-            runningWorkItems = new QueueWorkItemCallback[options.DegreeOfParallelism * padding];
+            runningWorkItems = new QueueWorkItemCallback[GetThreadSlotIndex(options.DegreeOfParallelism)];
             for (var threadIndex = 0; threadIndex < options.DegreeOfParallelism; threadIndex++)
             {
                 RunWorker(options, threadIndex);
@@ -85,8 +80,9 @@ namespace Orleans.Runtime
                 if (workItem != null && workItem.IsFrozen())
                 {
                     healthy = false;
-                    executorOptions.Log.Error(ErrorCode.SchedulerTurnTooLong,
-                        $"Work item {workItem.GetWorkItemStatus(true)} has been executing for long time.");
+                    executorOptions.Log.Error(
+                        ErrorCode.SchedulerTurnTooLong,
+                        string.Format(SR.WorkItem_LongExecutionTime, workItem.GetWorkItemStatus(true)));
                 }
             }
 
@@ -119,28 +115,12 @@ namespace Orleans.Runtime
                         options.FaultHandler))
                 .QueueWorkItem(_ => ProcessQueue(threadContext));
         }
-
+        
         private int GetThreadSlotIndex(int threadIndex)
         {
-            // padding reduces false sharing
+            // false sharing prevention
             const int padding = 64;
             return threadIndex * padding;
-        }
-
-        private sealed class ExecutionTrackingFilter : WorkItemFilter
-        {
-            public ExecutionTrackingFilter(ThreadPoolExecutor executor) : base(
-                onActionExecuting: workItem =>
-                {
-                    executor.TrackExecutionStart();
-                },
-
-                onActionExecuted: workItem =>
-                {
-                    executor.TrackExecutionStop();
-                })
-            {
-            }
         }
 
         protected void RunNonBatching(ExecutorThreadContext threadContext)
@@ -168,7 +148,7 @@ namespace Orleans.Runtime
             }
             catch (Exception exc)
             {
-                executorOptions.Log.Error(ErrorCode.SchedulerWorkerThreadExc, "Executor thread caugth exception:", exc);
+                executorOptions.Log.Error(ErrorCode.SchedulerWorkerThreadExc, SR.Executor_Thread_Caugth_Exception, exc);
             }
         }
         
@@ -215,7 +195,7 @@ namespace Orleans.Runtime
                 SchedulerStatisticsGroup.NumLongQueueWaitTimes.Increment();
                 executorOptions.Log.Warn(
                     ErrorCode.SchedulerWorkerPoolThreadQueueWaitTime,
-                    "Queue wait time of {0} for Item {1}", waitTime, workItem.State);
+                    SR.Queue_Item_WaitTime, waitTime, workItem.State);
             }
 
 #if TRACK_DETAILED_STATS
@@ -302,6 +282,17 @@ namespace Orleans.Runtime
 
             public WorkItemFilter[] WorkItemFilters { get; }
         }
+
+        internal static class SR
+        {
+            public static string WorkItem_ExecutionTime = "WorkItem={0} Executing for {1} {2}";
+
+            public static string WorkItem_LongExecutionTime = "Work item {0} has been executing for long time.";
+
+            public static string Executor_Thread_Caugth_Exception = "Executor thread caugth exception:";
+
+            public static string Queue_Item_WaitTime = "Queue wait time of {0} for Item {1}";
+        }
     }
 
     internal delegate string WorkItemStatusProvider(object state, bool detailed);
@@ -374,7 +365,8 @@ namespace Orleans.Runtime
 
         internal string GetWorkItemStatus(bool detailed)
         {
-            return $"WorkItem={state} Executing for {Utils.Since(executionStart)} {statusProvider?.Invoke(state, detailed)}";
+            return string.Format(
+                ThreadPoolExecutor.SR.WorkItem_ExecutionTime, state, Utils.Since(executionStart), statusProvider?.Invoke(state, detailed));
         }
 
         internal bool IsFrozen()
