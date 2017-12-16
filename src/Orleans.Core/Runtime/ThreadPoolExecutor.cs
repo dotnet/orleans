@@ -18,28 +18,19 @@ namespace Orleans.Runtime
 
         private readonly ThreadPoolExecutorOptions executorOptions;
 
-        private readonly ThreadTrackingStatistic threadTracking;
-
-        private readonly QueueTrackingStatistic queueTracking; // the tracking should be left only one
+        private readonly ThreadPoolTrackingStatistic statistics;
 
         public ThreadPoolExecutor(ThreadPoolExecutorOptions options)
         {
-            if (StatisticsCollector.CollectQueueStats)
-            {
-                queueTracking = new QueueTrackingStatistic(options.Name);
-            }
-
-            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
-            {
-                threadTracking = new ThreadTrackingStatistic(options.Name, null); // todo: null
-            }
-
-            workQueue = new BlockingCollection<QueueWorkItemCallback>(options.PreserveOrder ?
-                (IProducerConsumerCollection<QueueWorkItemCallback>)new ConcurrentQueue<QueueWorkItemCallback>() :
-                new ConcurrentBag<QueueWorkItemCallback>());
+            workQueue = new BlockingCollection<QueueWorkItemCallback>(options.PreserveOrder
+                ? (IProducerConsumerCollection<QueueWorkItemCallback>) new ConcurrentQueue<QueueWorkItemCallback>()
+                : new ConcurrentBag<QueueWorkItemCallback>());
 
             executorOptions = options;
-            executorOptions.CancellationToken.Register(() =>
+
+            statistics = new ThreadPoolTrackingStatistic(options.Name);
+
+            options.CancellationToken.Register(() =>
             {
                 var chanceToGracefullyExit = QueueWorkItemCallback.NoOpQueueWorkItemCallback;
                 workQueue.Add(chanceToGracefullyExit);
@@ -156,7 +147,7 @@ namespace Orleans.Runtime
         {
             if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectQueueStats)
             {
-                queueTracking.OnEnQueueRequest(1, WorkQueueCount, workItem);
+                statistics.OnEnQueueRequest(1, WorkQueueCount, workItem);
             }
         }
 
@@ -164,7 +155,7 @@ namespace Orleans.Runtime
         {
             if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
             {
-                queueTracking.OnStartExecution();
+                statistics.OnStartExecution();
             }
         }
 
@@ -172,7 +163,7 @@ namespace Orleans.Runtime
         {
             if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
             {
-                queueTracking.OnStopExecution();
+                statistics.OnStopExecution();
             }
         }
 
@@ -190,7 +181,7 @@ namespace Orleans.Runtime
 
             if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectQueueStats)
             {
-                queueTracking.OnDeQueueRequest(workItem);
+                statistics.OnDeQueueRequest(workItem);
             }
         }
 
@@ -198,7 +189,7 @@ namespace Orleans.Runtime
         {
             if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
             {
-                threadTracking.OnStartProcessing();
+                statistics.OnStartProcessing();
             }
         }
 
@@ -206,8 +197,8 @@ namespace Orleans.Runtime
         {
             if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
             {
-                threadTracking.OnStopProcessing();
-                threadTracking.IncrementNumberOfProcessed();
+                statistics.OnStopProcessing();
+                statistics.IncrementNumberOfProcessed();
             }
         }
 
@@ -232,11 +223,7 @@ namespace Orleans.Runtime
                     executor.TrackRequestDequeue(workItem);
                     executor.TrackProcessingStart();
                 },
-
-                onActionExecuted: workItem =>
-                {
-                    executor.TrackProcessingStop();
-                })
+                onActionExecuted: workItem => { executor.TrackProcessingStop(); })
             {
             }
         }
@@ -244,15 +231,8 @@ namespace Orleans.Runtime
         private sealed class RunningWorkItemsTracker : WorkItemFilter
         {
             public RunningWorkItemsTracker(ThreadPoolExecutor executor, int workItemSlotIndex) : base(
-                onActionExecuting: workItem =>
-                {
-                    executor.runningWorkItems[workItemSlotIndex] = workItem;
-                },
-
-                onActionExecuted: workItem =>
-                {
-                    executor.runningWorkItems[workItemSlotIndex] = null;
-                })
+                onActionExecuting: workItem => { executor.runningWorkItems[workItemSlotIndex] = workItem; },
+                onActionExecuted: workItem => { executor.runningWorkItems[workItemSlotIndex] = null; })
             {
             }
         }
@@ -284,7 +264,8 @@ namespace Orleans.Runtime
 
     internal class QueueWorkItemCallback : ITimeInterval
     {
-        public static QueueWorkItemCallback NoOpQueueWorkItemCallback = new QueueWorkItemCallback(s => { }, null, TimeSpan.MaxValue);
+        public static QueueWorkItemCallback NoOpQueueWorkItemCallback =
+            new QueueWorkItemCallback(s => { }, null, TimeSpan.MaxValue);
 
         private readonly WaitCallback callback;
 
@@ -350,7 +331,8 @@ namespace Orleans.Runtime
         internal string GetWorkItemStatus(bool detailed)
         {
             return string.Format(
-                ThreadPoolExecutor.SR.WorkItem_ExecutionTime, state, Utils.Since(executionStart), statusProvider?.Invoke(state, detailed));
+                ThreadPoolExecutor.SR.WorkItem_ExecutionTime, state, Utils.Since(executionStart),
+                statusProvider?.Invoke(state, detailed));
         }
 
         internal bool IsFrozen()
@@ -361,6 +343,61 @@ namespace Orleans.Runtime
             }
 
             return false;
+        }
+    }
+
+    internal class ThreadPoolTrackingStatistic
+    {
+        private readonly ThreadTrackingStatistic threadTracking;
+
+        private readonly QueueTrackingStatistic queueTracking;
+
+        public ThreadPoolTrackingStatistic(string name)
+        {
+            if (StatisticsCollector.CollectQueueStats)
+            {
+                queueTracking = new QueueTrackingStatistic(name);
+            }
+
+            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
+            {
+                threadTracking = new ThreadTrackingStatistic(name, null); // todo: null
+            }
+        }
+
+        public void OnStartExecution()
+        {
+            queueTracking.OnStartExecution();
+        }
+
+        public void OnDeQueueRequest(QueueWorkItemCallback workItem)
+        {
+            queueTracking.OnDeQueueRequest(workItem);
+        }
+
+        public void OnEnQueueRequest(int i, int workQueueCount, QueueWorkItemCallback workItem)
+        {
+            queueTracking.OnDeQueueRequest(workItem);
+        }
+
+        public void OnStartProcessing()
+        {
+            threadTracking.OnStartProcessing();
+        }
+
+        internal void OnStopProcessing()
+        {
+            threadTracking.OnStopProcessing();
+        }
+
+        internal void IncrementNumberOfProcessed()
+        {
+            threadTracking.IncrementNumberOfProcessed();
+        }
+
+        public void OnStopExecution()
+        {
+            threadTracking.OnStopExecution();
         }
     }
 }
