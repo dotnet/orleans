@@ -23,7 +23,7 @@ namespace Orleans
         public GrainReference GrainReference { get { return Data.GrainReference; } }
 
         internal IGrainRuntime Runtime { get; set; }
-
+        internal Object GrainLogger { get; set; }
         /// <summary>
         /// Gets an object which can be used to access other grains. Null if this grain is not associated with a Runtime, such as when created directly for unit testing.
         /// </summary>
@@ -230,26 +230,6 @@ namespace Orleans
         public virtual Task OnDeactivateAsync()
         {
             return Task.CompletedTask;
-        }
-
-        /// <summary>
-        /// Returns a logger object that this grain's code can use for tracing.
-        /// </summary>
-        /// <returns>Name of the logger to use.</returns>
-        protected virtual Logger GetLogger(string loggerName)
-        {
-            EnsureRuntime();
-            return Runtime.GetLogger(loggerName);
-        }
-
-        /// <summary>
-        /// Returns a logger object that this grain's code can use for tracing.
-        /// The name of the logger will be derived from the grain class name.
-        /// </summary>
-        /// <returns>A logger for this grain.</returns>
-        protected Logger GetLogger()
-        {
-            return GetLogger(GetType().Name);
         }
 
         private void EnsureRuntime()

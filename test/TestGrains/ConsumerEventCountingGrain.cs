@@ -43,7 +43,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            _logger = GetLogger("ConsumerEventCountingGrain " + IdentityString);
+            _logger = this.GetLogger("ConsumerEventCountingGrain " + IdentityString);
             _logger.Info("Consumer.OnActivateAsync");
             _numConsumedItems = 0;
             _subscriptionHandle = null;
@@ -52,7 +52,6 @@ namespace UnitTests.Grains
 
         public override async Task OnDeactivateAsync()
         {
-            _logger = GetLogger("ConsumerEventCountingGrain " + IdentityString);
             _logger.Info("Consumer.OnDeactivateAsync");
             await StopConsuming();
             _numConsumedItems = 0;

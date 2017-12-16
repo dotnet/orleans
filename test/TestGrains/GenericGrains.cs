@@ -568,13 +568,13 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            GetLogger().Verbose("***Activating*** {0}", this.GetPrimaryKey());
+            this.GetLogger().Verbose("***Activating*** {0}", this.GetPrimaryKey());
             return Task.CompletedTask;
         }
 
         public override Task OnDeactivateAsync()
         {
-            GetLogger().Verbose("***Deactivating*** {0}", this.GetPrimaryKey());
+            this.GetLogger().Verbose("***Deactivating*** {0}", this.GetPrimaryKey());
             return Task.CompletedTask;
         }
     }

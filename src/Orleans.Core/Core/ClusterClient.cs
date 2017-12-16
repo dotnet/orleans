@@ -16,7 +16,6 @@ namespace Orleans
         private readonly OutsideRuntimeClient runtimeClient;
         private readonly AsyncLock initLock = new AsyncLock();
         private LifecycleState state = LifecycleState.Created;
-        private readonly LoggerWrapper appLogger;
 
         private enum LifecycleState
         {
@@ -40,7 +39,6 @@ namespace Orleans
             this.runtimeClient = runtimeClient;
             //set PropagateActivityId flag from node cofnig
             RequestContext.PropagateActivityId = configuration.PropagateActivityId;
-            this.appLogger = new LoggerWrapper("Application", loggerFactory);
         }
 
         /// <inheritdoc />
@@ -48,16 +46,6 @@ namespace Orleans
 
         /// <inheritdoc />
         public IGrainFactory GrainFactory => this.InternalGrainFactory;
-
-        /// <inheritdoc />
-        public Logger Logger
-        {
-            get
-            {
-                this.ThrowIfDisposedOrNotInitialized();
-                return this.appLogger;
-            }
-        }
 
         /// <inheritdoc />
         public IServiceProvider ServiceProvider => this.runtimeClient.ServiceProvider;

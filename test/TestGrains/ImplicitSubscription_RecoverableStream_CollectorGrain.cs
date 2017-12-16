@@ -24,7 +24,7 @@ namespace TestGrains
 
         public override async Task OnActivateAsync()
         {
-            logger = base.GetLogger("ImplicitSubscription_RecoverableStream_CollectorGrain " + base.IdentityString);
+            logger = this.GetLogger("ImplicitSubscription_RecoverableStream_CollectorGrain " + base.IdentityString);
             logger.Info("OnActivateAsync");
 
             await ReadStateAsync();

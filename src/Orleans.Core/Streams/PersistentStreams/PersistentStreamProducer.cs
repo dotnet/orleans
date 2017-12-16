@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Serialization;
-
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 namespace Orleans.Streams
 {
     internal class PersistentStreamProducer<T> : IInternalAsyncBatchObserver<T>
@@ -20,8 +21,8 @@ namespace Orleans.Streams
             this.queueAdapter = queueAdapter;
             this.serializationManager = serializationManager;
             IsRewindable = isRewindable;
-            var logger = providerUtilities.GetLogger(this.GetType().Name);
-            if (logger.IsVerbose) logger.Verbose("Created PersistentStreamProducer for stream {0}, of type {1}, and with Adapter: {2}.",
+            var logger = providerUtilities.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(this.GetType().Name);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Created PersistentStreamProducer for stream {0}, of type {1}, and with Adapter: {2}.",
                 stream.ToString(), typeof (T), this.queueAdapter.Name);
         }
 

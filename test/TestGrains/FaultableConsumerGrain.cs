@@ -21,7 +21,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = base.GetLogger("FaultableConsumerGrain " + base.IdentityString);
+            logger = this.GetLogger("FaultableConsumerGrain " + base.IdentityString);
             logger.Info("OnActivateAsync");
             eventsConsumedCount = 0;
             errorsCount = 0;

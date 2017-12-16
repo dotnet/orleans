@@ -13,6 +13,7 @@ namespace Orleans.Runtime
     {
         private readonly ISiloRuntimeClient runtimeClient;
         private readonly ILoggerFactory loggerFactory;
+        private readonly ILogger logger;
         public GrainRuntime(
             IOptions<SiloOptions> siloOptions,
             ILocalSiloDetails localSiloDetails,
@@ -23,6 +24,7 @@ namespace Orleans.Runtime
             ISiloRuntimeClient runtimeClient,
             ILoggerFactory loggerFactory)
         {
+            this.logger = loggerFactory.CreateLogger<GrainRuntime>();
             this.runtimeClient = runtimeClient;
             ServiceId = siloOptions.Value.ServiceId;
             SiloAddress = localSiloDetails.SiloAddress;
@@ -48,11 +50,6 @@ namespace Orleans.Runtime
 
         public IServiceProvider ServiceProvider { get; }
 
-        public Logger GetLogger(string loggerName)
-        {
-            return new LoggerWrapper(loggerName, this.loggerFactory);
-        }
-
         public void DeactivateOnIdle(Grain grain)
         {
             this.runtimeClient.DeactivateOnIdle(grain.Data.ActivationId);
@@ -67,7 +64,7 @@ namespace Orleans.Runtime
         {
             IStorageProvider storageProvider = grain.GetStorageProvider(ServiceProvider);
             string grainTypeName = grain.GetType().FullName;
-            return new StateStorageBridge<TGrainState>(grainTypeName, grain.GrainReference, storageProvider);
+            return new StateStorageBridge<TGrainState>(grainTypeName, grain.GrainReference, storageProvider, this.logger);
         }
     }
 }

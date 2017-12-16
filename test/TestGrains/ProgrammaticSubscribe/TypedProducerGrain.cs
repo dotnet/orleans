@@ -21,7 +21,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
         private static readonly TimeSpan defaultFirePeriod = TimeSpan.FromMilliseconds(10);
         public override Task OnActivateAsync()
         {
-            logger = base.GetLogger(this.GetType() + base.IdentityString);
+            logger = this.GetLogger(this.GetType() + base.IdentityString);
             logger.Info("OnActivateAsync");
             numProducedItems = 0;
             return Task.CompletedTask;

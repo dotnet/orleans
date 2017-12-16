@@ -180,7 +180,7 @@ namespace UnitTests.Grains
             {
                 if (!recover) throw;
 
-                GetLogger().Warn(0, "Grain is handling error in DoWrite - Resetting value to " + original, exc);
+                this.GetLogger().Warn(0, "Grain is handling error in DoWrite - Resetting value to " + original, exc);
                 State = (PersistenceTestGrainState)original;
             }
         }
@@ -196,7 +196,7 @@ namespace UnitTests.Grains
             {
                 if (!recover) throw;
 
-                GetLogger().Warn(0, "Grain is handling error in DoRead - Resetting value to " + original, exc);
+                this.GetLogger().Warn(0, "Grain is handling error in DoRead - Resetting value to " + original, exc);
                 State = (PersistenceTestGrainState)original;
             }
             return State.Field1;
@@ -260,13 +260,13 @@ namespace UnitTests.Grains
     {
         public override Task OnActivateAsync()
         {
-            GetLogger().Warn(1, "OnActivateAsync");
+            this.GetLogger().Warn(1, "OnActivateAsync");
             return Task.CompletedTask;
         }
 
         public Task DoSomething()
         {
-            GetLogger().Warn(1, "DoSomething");
+            this.GetLogger().Warn(1, "DoSomething");
             throw new ApplicationException(
                 "BadProviderTestGrain.DoSomething should never get called when provider is missing");
         }
@@ -277,13 +277,13 @@ namespace UnitTests.Grains
     {
         public override Task OnActivateAsync()
         {
-            GetLogger().Info(1, "OnActivateAsync");
+            this.GetLogger().Info(1, "OnActivateAsync");
             return Task.CompletedTask;
         }
 
         public Task DoSomething()
         {
-            GetLogger().Info(1, "DoSomething");
+            this.GetLogger().Info(1, "DoSomething");
             return Task.CompletedTask;
         }
     }
@@ -653,7 +653,7 @@ namespace UnitTests.Grains
         {
             _context = RuntimeContext.Current.ActivationContext;
             _scheduler = TaskScheduler.Current;
-            logger = GetLogger("ReentrentGrainWithState-" + Identity);
+            logger = this.GetLogger("ReentrentGrainWithState-" + Identity);
             executing = false;
             return base.OnActivateAsync();
         }
@@ -858,7 +858,7 @@ namespace UnitTests.Grains
             _id = _counter++;
             executing = false;
 
-            logger = GetLogger("NonReentrentStressGrainWithoutState-" + _id);
+            logger = this.GetLogger("NonReentrentStressGrainWithoutState-" + _id);
             Log("--> OnActivateAsync");
 //#if DEBUG
 //            // HACK for testing
@@ -993,7 +993,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = GetLogger("InternalGrainWithState-" + Identity);
+            logger = this.GetLogger("InternalGrainWithState-" + Identity);
             return base.OnActivateAsync();
         }
 
@@ -1025,7 +1025,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = GetLogger("StateInheritanceTestGrain-" + Identity);
+            logger = this.GetLogger("StateInheritanceTestGrain-" + Identity);
             logger.Info("OnActivateAsync");
             return base.OnActivateAsync();
         }
@@ -1060,7 +1060,7 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync()
         {
             this.serializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
-            logger = GetLogger("SerializationTestGrain-" + IdentityString);
+            logger = this.GetLogger("SerializationTestGrain-" + IdentityString);
             return base.OnActivateAsync();
         }
 

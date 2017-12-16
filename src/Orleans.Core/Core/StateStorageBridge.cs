@@ -4,6 +4,7 @@ using System.Net;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Storage;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Core
 {
@@ -14,7 +15,7 @@ namespace Orleans.Core
         private readonly GrainReference grainRef;
         private readonly IStorageProvider store;
         private readonly GrainState<TState> grainState;
-
+        private readonly ILogger logger;
         public TState State
         {
             get { return grainState.State; }
@@ -26,12 +27,12 @@ namespace Orleans.Core
             get { return grainState.ETag; }
         }
 
-        public StateStorageBridge(string name, GrainReference grainRef, IStorageProvider store)
+        public StateStorageBridge(string name, GrainReference grainRef, IStorageProvider store, ILogger logger)
         {
             if (name == null) throw new ArgumentNullException(nameof(name));
             if (grainRef == null) throw new ArgumentNullException(nameof(grainRef));
             if (store == null) throw new ArgumentNullException(nameof(store));
-
+            this.logger = logger;
             this.name = name;
             this.grainRef = grainRef;
             this.store = store;
@@ -57,7 +58,7 @@ namespace Orleans.Core
                 StorageStatisticsGroup.OnStorageReadError(store, name, grainRef);
 
                 string errMsg = MakeErrorMsg(what, exc);
-                store.Log.Error((int)ErrorCode.StorageProvider_ReadFailed, errMsg, exc);
+                logger.Error((int)ErrorCode.StorageProvider_ReadFailed, errMsg, exc);
                 if (!(exc is OrleansException))
                 {
                     throw new OrleansException(errMsg, exc);
@@ -87,7 +88,7 @@ namespace Orleans.Core
             {
                 StorageStatisticsGroup.OnStorageWriteError(store, name, grainRef);
                 string errMsgToLog = MakeErrorMsg(what, exc);
-                store.Log.Error((int)ErrorCode.StorageProvider_WriteFailed, errMsgToLog, exc);
+                logger.Error((int)ErrorCode.StorageProvider_WriteFailed, errMsgToLog, exc);
                 // If error is not specialization of OrleansException, wrap it
                 if (!(exc is OrleansException))
                 {
@@ -121,7 +122,7 @@ namespace Orleans.Core
                 StorageStatisticsGroup.OnStorageDeleteError(store, name, grainRef);
 
                 string errMsg = MakeErrorMsg(what, exc);
-                store.Log.Error((int)ErrorCode.StorageProvider_DeleteFailed, errMsg, exc);
+                logger.Error((int)ErrorCode.StorageProvider_DeleteFailed, errMsg, exc);
                 if (!(exc is OrleansException))
                 {
                     throw new OrleansException(errMsg, exc);
@@ -138,8 +139,8 @@ namespace Orleans.Core
             var decoder = store as IRestExceptionDecoder;
             decoder?.DecodeException(exc, out httpStatusCode, out errorCode, true);
 
-            return string.Format("Error from storage provider during {0} for grain Type={1} Pk={2} Id={3} Error={4}" + Environment.NewLine + " {5}",
-                what, name, grainRef.GrainId.ToDetailedString(), grainRef, errorCode, LogFormatter.PrintException(exc));
+            return string.Format("Error from storage provider {0} during {1} for grain Type={2} Pk={3} Id={4} Error={5}" + Environment.NewLine + " {6}",
+                $"{this.store.GetType().Name}.{this.store.Name}", what, name, grainRef.GrainId.ToDetailedString(), grainRef, errorCode, LogFormatter.PrintException(exc));
         }
     }
 }

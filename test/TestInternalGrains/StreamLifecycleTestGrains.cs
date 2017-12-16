@@ -161,7 +161,7 @@ namespace UnitTests.Grains
 
         public override async Task OnActivateAsync()
         {
-            logger = GetLogger(GetType().Name + "-" + IdentityString);
+            logger = this.GetLogger(GetType().Name + "-" + IdentityString);
             if (logger.IsVerbose) logger.Verbose("OnActivateAsync");
 
             await RecordActivate();
@@ -373,7 +373,7 @@ namespace UnitTests.Grains
     {
         public override async Task OnActivateAsync()
         {
-            logger = GetLogger(GetType().Name + "-" + IdentityString);
+            logger = this.GetLogger(GetType().Name + "-" + IdentityString);
             if (logger.IsVerbose) logger.Verbose("OnActivateAsync");
 
             await RecordActivate();

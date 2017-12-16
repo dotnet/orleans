@@ -41,7 +41,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = GetLogger();
+            logger = this.GetLogger();
             logger.Info("OnActivateAsync");
             return base.OnActivateAsync();
         }
@@ -128,7 +128,7 @@ namespace UnitTests.Grains
 
             await stream.SubscribeAsync((item, _) =>
             {
-                var logger = GetLogger();
+                var logger = this.GetLogger();
                 logger.Info("Received stream item:" + item);
                 return Task.CompletedTask;
             });
@@ -177,7 +177,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = GetLogger(GetType().Name + "-" + this.GetPrimaryKeyLong());
+            logger = this.GetLogger(GetType().Name + "-" + this.GetPrimaryKeyLong());
             return Task.CompletedTask;
         }
 
@@ -220,7 +220,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = GetLogger(GetType().Name + "-" + this.GetPrimaryKeyLong());
+            logger = this.GetLogger(GetType().Name + "-" + this.GetPrimaryKeyLong());
             return Task.CompletedTask;
         }
 
@@ -264,7 +264,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = GetLogger(GetType().Name + "-" + this.GetPrimaryKeyLong());
+            logger = this.GetLogger(GetType().Name + "-" + this.GetPrimaryKeyLong());
             return Task.CompletedTask;
         }
 
@@ -380,7 +380,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = GetLogger(GetType().Name + "-" + this.GetPrimaryKeyLong());
+            logger = this.GetLogger(GetType().Name + "-" + this.GetPrimaryKeyLong());
             return Task.CompletedTask;
         }
 
@@ -494,7 +494,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = GetLogger(GetType().Name + "-" + this.GetPrimaryKeyLong());
+            logger = this.GetLogger(GetType().Name + "-" + this.GetPrimaryKeyLong());
             return Task.CompletedTask;
         }
 
@@ -528,7 +528,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = GetLogger(GetType().Name + "-" + this.GetPrimaryKeyLong());
+            logger = this.GetLogger(GetType().Name + "-" + this.GetPrimaryKeyLong());
             return Task.CompletedTask;
         }
 

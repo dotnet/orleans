@@ -48,7 +48,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = base.GetLogger("SampleStreaming_ProducerGrain " + base.IdentityString);
+            logger = this.GetLogger("SampleStreaming_ProducerGrain " + base.IdentityString);
             logger.Info("OnActivateAsync");
             numProducedItems = 0;
             return Task.CompletedTask;
@@ -124,7 +124,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = base.GetLogger("SampleStreaming_ConsumerGrain " + base.IdentityString);
+            logger = this.GetLogger("SampleStreaming_ConsumerGrain " + base.IdentityString);
             logger.Info("OnActivateAsync");
             numConsumedItems = 0;
             consumerHandle = null;
@@ -171,7 +171,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = base.GetLogger( "SampleStreaming_InlineConsumerGrain " + base.IdentityString );
+            logger = this.GetLogger( "SampleStreaming_InlineConsumerGrain " + base.IdentityString );
             logger.Info( "OnActivateAsync" );
             numConsumedItems = 0;
             consumerHandle = null;

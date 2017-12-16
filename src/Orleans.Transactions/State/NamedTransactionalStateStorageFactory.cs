@@ -3,13 +3,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 using Orleans.Storage;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Transactions
 {
     public class NamedTransactionalStateStorageFactory : INamedTransactionalStateStorageFactory
     {
         private readonly IGrainActivationContext context;
-
         public NamedTransactionalStateStorageFactory(IGrainActivationContext context)
         {
             this.context = context;

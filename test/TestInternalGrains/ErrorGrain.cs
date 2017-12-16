@@ -17,7 +17,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = GetLogger(String.Format("ErrorGrain-{0}-{1}-{2}", RuntimeIdentity, Identity, Data.ActivationId));
+            logger = this.GetLogger(String.Format("ErrorGrain-{0}-{1}-{2}", RuntimeIdentity, Identity, Data.ActivationId));
             logger.Info("Activate.");
             return Task.CompletedTask;
         }
