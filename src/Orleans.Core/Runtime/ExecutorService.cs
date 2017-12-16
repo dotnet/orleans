@@ -33,6 +33,8 @@ namespace Orleans.Runtime
 
     internal abstract class ExecutorOptions
     {
+        public static readonly bool TRACK_DETAILED_STATS = false;
+
         protected ExecutorOptions(
             string name,
             Type stageType,
