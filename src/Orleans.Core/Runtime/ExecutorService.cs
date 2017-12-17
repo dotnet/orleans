@@ -11,20 +11,23 @@ namespace Orleans.Runtime
         /// may execute in a new thread, in a pooled thread, or in the calling thread
         /// </summary>
         void QueueWorkItem(WaitCallback callback, object state = null);
+    }
 
+    internal interface IQueueCountable
+    {
         int WorkQueueCount { get; }
     }
 
     internal class ExecutorService
     {
-        public IExecutor GetExecutor(ExecutorOptions executorOptions)
+        public TExecutor GetExecutor<TExecutor>(ExecutorOptions executorOptions) where TExecutor : IExecutor
         {
             switch (executorOptions)
             {
                 case ThreadPoolExecutorOptions options:
-                    return new ThreadPoolExecutor(options);
+                    return (TExecutor)(object)new ThreadPoolExecutor(options); // todo: remove (TExecutor)(object)
                 case SingleThreadExecutorOptions options:
-                    return new ThreadPerTaskExecutor(options);
+                    return (TExecutor)(object)new ThreadPerTaskExecutor(options);
                 default:
                     throw new NotImplementedException();
             }
@@ -33,7 +36,7 @@ namespace Orleans.Runtime
 
     internal abstract class ExecutorOptions
     {
-        public static readonly bool TRACK_DETAILED_STATS = false;
+        public const bool TRACK_DETAILED_STATS = false;
 
         protected ExecutorOptions(
             string name,

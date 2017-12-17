@@ -8,8 +8,6 @@ namespace Orleans.Runtime
     {
         private readonly SingleThreadExecutorOptions executorOptions;
 
-        private const bool TRACK_DETAILED_STATS = false;
-
         private readonly ThreadTrackingStatistic threadTracking;
 
         public ThreadPerTaskExecutor(SingleThreadExecutorOptions options)
@@ -28,9 +26,9 @@ namespace Orleans.Runtime
 
             new Thread(() =>
             {
+                CounterStatistic.SetOrleansManagedThread(); // must be called before using CounterStatistic.
                 try
                 {
-                    CounterStatistic.SetOrleansManagedThread(); // must be called before using CounterStatistic.
                     TrackExecutionStart();
                     callback.Invoke(state);
                 }

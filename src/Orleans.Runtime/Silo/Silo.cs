@@ -145,7 +145,7 @@ namespace Orleans.Runtime
             this.siloDetails = siloDetails;
 
             this.SystemStatus = SystemStatus.Creating;
-            AsynchAgent.IsStarting = true;
+            // AsynchAgent.IsStarting = true; todo. remove hard reference
 
             var startTime = DateTime.UtcNow;
 
@@ -252,7 +252,7 @@ namespace Orleans.Runtime
             }
 
             this.SystemStatus = SystemStatus.Created;
-            AsynchAgent.IsStarting = false;
+          //  AsynchAgent.IsStarting = false; todo 
 
             StringValueStatistic.FindOrCreate(StatisticNames.SILO_START_TIME,
                 () => LogFormatter.PrintDate(startTime)); // this will help troubleshoot production deployment when looking at MDS logs.

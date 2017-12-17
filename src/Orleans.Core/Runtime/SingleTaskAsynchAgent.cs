@@ -2,7 +2,8 @@
 
 namespace Orleans.Runtime
 {
-    internal abstract class SingleTaskAsynchAgent : AsynchAgent
+    // todo: too much information about impl in the name
+    internal abstract class SingleTaskAsynchAgent : AsynchAgent<ThreadPerTaskExecutor>
     {
         protected SingleTaskAsynchAgent(string nameSuffix, ExecutorService executorService, ILoggerFactory loggerFactory) : base(nameSuffix, executorService, loggerFactory)
         {
