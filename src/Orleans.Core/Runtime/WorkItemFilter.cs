@@ -12,20 +12,20 @@ namespace Orleans.Runtime
     /// </summary>
     internal abstract class WorkItemFilter
     {
-        private static readonly Action<QueueWorkItemCallback> NoOpFilter = _ => { };
+        private static readonly Action<WorkItemWrapper> NoOpFilter = _ => { };
 
         public WorkItemFilter(
-            Action<QueueWorkItemCallback> onActionExecuting = null,
-            Action<QueueWorkItemCallback> onActionExecuted = null,
-            Func<Exception, QueueWorkItemCallback, bool> exceptionHandler = null)
+            Action<WorkItemWrapper> onActionExecuting = null,
+            Action<WorkItemWrapper> onActionExecuted = null,
+            Func<Exception, WorkItemWrapper, bool> exceptionHandler = null)
             : this(onActionExecuting, onActionExecuted, exceptionHandler, null)
         {
         }
 
         private WorkItemFilter(
-            Action<QueueWorkItemCallback> onActionExecuting,
-            Action<QueueWorkItemCallback> onActionExecuted,
-            Func<Exception, QueueWorkItemCallback, bool> exceptionHandler,
+            Action<WorkItemWrapper> onActionExecuting,
+            Action<WorkItemWrapper> onActionExecuted,
+            Func<Exception, WorkItemWrapper, bool> exceptionHandler,
             WorkItemFilter next)
         {
             Next = next;
@@ -36,18 +36,18 @@ namespace Orleans.Runtime
 
         public WorkItemFilter Next { get; private set; }
 
-        public Func<Exception, QueueWorkItemCallback, bool> ExceptionHandler { get; }
+        public Func<Exception, WorkItemWrapper, bool> ExceptionHandler { get; }
 
-        public Action<QueueWorkItemCallback> OnActionExecuting { get; }
+        public Action<WorkItemWrapper> OnActionExecuting { get; }
 
-        public Action<QueueWorkItemCallback> OnActionExecuted { get; }
+        public Action<WorkItemWrapper> OnActionExecuted { get; }
 
-        public bool ExecuteWorkItem(QueueWorkItemCallback workItem)
+        public bool ExecuteWorkItem(WorkItemWrapper workItem)
         {
             return ExecuteWorkItem(workItem, Next);
         }
 
-        public bool ExecuteWorkItem(QueueWorkItemCallback workItem, WorkItemFilter next)
+        public bool ExecuteWorkItem(WorkItemWrapper workItem, WorkItemFilter next)
         {
             try
             {
