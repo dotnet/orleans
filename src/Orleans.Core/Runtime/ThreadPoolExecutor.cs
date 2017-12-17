@@ -232,22 +232,19 @@ namespace Orleans.Runtime
 
     internal delegate string WorkItemStatusProvider(object state, bool detailed);
     
-    internal class QueueWorkItemCallback : ITimeInterval
+    internal class QueueWorkItemCallback
     {
-        public static QueueWorkItemCallback NoOpQueueWorkItemCallback =
-            new QueueWorkItemCallback(s => { }, null, TimeSpan.MaxValue);
+        public static QueueWorkItemCallback NoOpQueueWorkItemCallback = new QueueWorkItemCallback(s => { }, null, TimeSpan.MaxValue);
+
+        public ITimeInterval ExecutionTime { get; private set; }
 
         private readonly WaitCallback callback;
 
         private readonly WorkItemStatusProvider statusProvider;
 
-        private readonly object state;
-
         private readonly TimeSpan executionTimeTreshold;
 
         private readonly DateTime enqueueTime;
-
-        private ITimeInterval timeInterval;
 
         // for lightweight execution time tracking 
         private DateTime executionStart;
@@ -259,22 +256,20 @@ namespace Orleans.Runtime
             WorkItemStatusProvider statusProvider = null)
         {
             this.callback = callback;
-            this.state = state;
+            this.State = state;
             this.executionTimeTreshold = executionTimeTreshold;
             this.statusProvider = statusProvider;
             this.enqueueTime = DateTime.UtcNow;
         }
 
-        public TimeSpan Elapsed => timeInterval.Elapsed;
-
         internal TimeSpan TimeSinceQueued => Utils.Since(enqueueTime);
 
-        internal object State => state;
+        internal object State { get; }
 
         public void Execute()
         {
             executionStart = DateTime.UtcNow;
-            callback.Invoke(state);
+            callback.Invoke(State);
         }
 
         public bool ExecuteWithFilters(IEnumerable<WorkItemFilter> actionFilters)
@@ -282,34 +277,24 @@ namespace Orleans.Runtime
             return actionFilters.First().ExecuteWorkItem(this);
         }
 
-        public void Start()
-        {
-            timeInterval = TimeIntervalFactory.CreateTimeInterval(true);
-            timeInterval.Start();
-        }
-
-        public void Stop()
-        {
-            timeInterval.Stop();
-        }
-
-        public void Restart()
-        {
-            timeInterval.Restart();
-        }
+        //public void Start() // todo
+        //{
+        //    timeInterval = TimeIntervalFactory.CreateTimeInterval(true);
+        //    timeInterval.Start();
+        //}
 
         internal string GetWorkItemStatus(bool detailed)
         {
             return string.Format(
-                ThreadPoolExecutor.SR.WorkItem_ExecutionTime, state, Utils.Since(executionStart),
-                statusProvider?.Invoke(state, detailed));
+                ThreadPoolExecutor.SR.WorkItem_ExecutionTime, State, Utils.Since(executionStart),
+                statusProvider?.Invoke(State, detailed));
         }
 
         internal bool IsFrozen()
         {
-            if (timeInterval != null)
+            if (ExecutionTime != null)
             {
-                return timeInterval.Elapsed > executionTimeTreshold;
+                return ExecutionTime.Elapsed > executionTimeTreshold;
             }
 
             return false;
@@ -347,7 +332,7 @@ namespace Orleans.Runtime
         {
             if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectQueueStats)
             {
-                queueTracking.OnDeQueueRequest(workItem);
+                queueTracking.OnDeQueueRequest(workItem.ExecutionTime);
             }
         }
 
@@ -355,7 +340,7 @@ namespace Orleans.Runtime
         {
             if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectQueueStats)
             {
-                queueTracking.OnDeQueueRequest(workItem);
+                queueTracking.OnEnQueueRequest(i, workQueueCount, workItem.ExecutionTime);
             }
         }
 
