@@ -3,12 +3,11 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
     /// <summary>
-    /// Essentially lightweight FixedThreadPool
+    /// Essentially FixedThreadPool
     /// </summary>
     internal class ThreadPoolExecutor : IExecutor
     {
@@ -22,7 +21,7 @@ namespace Orleans.Runtime
 
         public ThreadPoolExecutor(ThreadPoolExecutorOptions options)
         {
-            this.options = options;
+            this.options = options ?? throw new ArgumentNullException(nameof(options));
 
             workQueue = new BlockingCollection<QueueWorkItemCallback>(options.PreserveOrder
                 ? (IProducerConsumerCollection<QueueWorkItemCallback>) new ConcurrentQueue<QueueWorkItemCallback>()
@@ -30,14 +29,14 @@ namespace Orleans.Runtime
 
             statistics = new ThreadPoolTrackingStatistic(options.Name);
 
+            runningWorkItems = new QueueWorkItemCallback[GetThreadSlotIndex(options.DegreeOfParallelism)];
+
             options.CancellationToken.Register(() =>
             {
                 var chanceToGracefullyExit = QueueWorkItemCallback.NoOpQueueWorkItemCallback;
                 workQueue.Add(chanceToGracefullyExit);
                 workQueue.CompleteAdding();
-            });
-
-            runningWorkItems = new QueueWorkItemCallback[GetThreadSlotIndex(options.DegreeOfParallelism)];
+            });;
             
             for (var threadIndex = 0; threadIndex < options.DegreeOfParallelism; threadIndex++)
             {
@@ -79,42 +78,10 @@ namespace Orleans.Runtime
             return healthy;
         }
 
-        protected void ProcessQueue(ExecutorThreadContext threadContext)
+        private void ProcessQueue(ExecutorThreadContext threadContext)
         {
             statistics.OnStartExecution();
 
-            try
-            {
-                RunNonBatching(threadContext);
-            }
-            finally
-            {
-                statistics.OnStopExecution();
-            }
-        }
-
-        private void RunWorker(int threadIndex)
-        {
-            var threadContext = new ExecutorThreadContext(CreateWorkItemFilters(GetThreadSlotIndex(threadIndex)));
-            new ThreadPerTaskExecutor(
-                    new SingleThreadExecutorOptions(
-                        options.Name + threadIndex,
-                        options.StageType,
-                        options.CancellationToken,
-                        options.Log,
-                        options.FaultHandler))
-                .QueueWorkItem(_ => ProcessQueue(threadContext));
-        }
-
-        private int GetThreadSlotIndex(int threadIndex)
-        {
-            // false sharing prevention
-            const int padding = 64;
-            return threadIndex * padding;
-        }
-
-        protected void RunNonBatching(ExecutorThreadContext threadContext)
-        {
             try
             {
                 while (!workQueue.IsCompleted &&
@@ -140,8 +107,32 @@ namespace Orleans.Runtime
             {
                 options.Log.Error(ErrorCode.SchedulerWorkerThreadExc, SR.Executor_Thread_Caugth_Exception, exc);
             }
+            finally
+            {
+                statistics.OnStopExecution();
+            }
         }
 
+        private void RunWorker(int threadIndex)
+        {
+            var threadContext = new ExecutorThreadContext(CreateWorkItemFilters(GetThreadSlotIndex(threadIndex)));
+            new ThreadPerTaskExecutor(
+                    new SingleThreadExecutorOptions(
+                        options.Name + threadIndex,
+                        options.StageType,
+                        options.CancellationToken,
+                        options.Log,
+                        options.FaultHandler))
+                .QueueWorkItem(_ => ProcessQueue(threadContext));
+        }
+
+        private static int GetThreadSlotIndex(int threadIndex)
+        {
+            // false sharing prevention
+            const int padding = 64;
+            return threadIndex * padding;
+        }
+        
         private WorkItemFilter[] CreateWorkItemFilters(int executorWorkItemSlotIndex)
         {
             return WorkItemFilter.CreateChain(new Func<WorkItemFilter>[]
