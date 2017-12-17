@@ -75,7 +75,7 @@ namespace Orleans.Serialization
         {
             this.GetUninitializedObject = TypeUtils.Method(() => FormatterServices.GetUninitializedObject(typeof(int)));
             this.GetTypeFromHandle = TypeUtils.Method(() => Type.GetTypeFromHandle(typeof(Type).TypeHandle));
-            this.DeepCopyInner = TypeUtils.Method(() => SerializationManager.DeepCopyInner(default(Type), default(ICopyContext)));
+            this.DeepCopyInner = typeof(SerializationManager).GetMethod(nameof(SerializationManager.DeepCopyInner), BindingFlags.Static | BindingFlags.Public);
             this.SerializeInner = TypeUtils.Method(() => SerializationManager.SerializeInner(default(object), default(ISerializationContext), default(Type)));
             this.DeserializeInner = TypeUtils.Method(() => SerializationManager.DeserializeInner(default(Type), default(IDeserializationContext)));
             

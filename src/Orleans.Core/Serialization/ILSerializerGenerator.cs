@@ -146,12 +146,10 @@ namespace Orleans.Serialization
                 // Deep-copy the field if needed, otherwise just leave it as-is.
                 if (!field.FieldType.IsOrleansShallowCopyable())
                 {
-                    var copyMethod = SerializationMethodInfos.DeepCopyInner;
+                    var copyMethod = SerializationMethodInfos.DeepCopyInner.MakeGenericMethod(field.FieldType);
 
-                    il.BoxIfValueType(field.FieldType);
                     il.LoadArgument(1);
                     il.Call(copyMethod);
-                    il.CastOrUnbox(field.FieldType);
                 }
 
                 // Store the copy of the field on the result.
