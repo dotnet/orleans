@@ -693,7 +693,7 @@ namespace Orleans.Serialization
         {
             var sm = context.GetSerializationManager();
 
-            var t = original.GetType();
+            var t = Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T);
             var shallow = t.IsOrleansShallowCopyable();
 
             if (shallow) return;
