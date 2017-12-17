@@ -645,7 +645,7 @@ namespace Orleans
         WaitCalledInsideGrain                   = SchedulerBase + 9,
         SchedulerStatus                         = SchedulerBase + 10,
         WaitCalledInServerCode                  = SchedulerBase + 11,
-        SchedulerTurnTooLong                    = SchedulerBase + 12,
+        ExecutorTurnTooLong                     = SchedulerBase + 12,
         SchedulerTooManyPendingItems            = SchedulerBase + 13,
         SchedulerTurnTooLong2                   = SchedulerBase + 14,
         SchedulerTurnTooLong3                   = SchedulerBase + 15,
@@ -663,7 +663,7 @@ namespace Orleans
         SchedulerTaskExecuteIncomplete3         = SchedulerBase + 27,
         SchedulerTaskExecuteIncomplete4         = SchedulerBase + 28,
         SchedulerTaskWaitIncomplete             = SchedulerBase + 29,
-        SchedulerWorkerThreadExc                = SchedulerBase + 30,
+        ExecutorWorkerThreadExc                 = SchedulerBase + 30,
         SchedulerQueueWorkItemWrongContext      = SchedulerBase + 31,
         SchedulerAppTurnsStopped_2              = SchedulerBase + 32,
 

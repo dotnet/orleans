@@ -17,7 +17,7 @@ namespace Orleans.Runtime
 
         private readonly ThreadPoolExecutorOptions options;
 
-        private readonly ThreadPoolTrackingStatistic statistics;
+        private readonly ThreadPoolTrackingStatistic statistic;
 
         public ThreadPoolExecutor(ThreadPoolExecutorOptions options)
         {
@@ -27,7 +27,7 @@ namespace Orleans.Runtime
                 ? (IProducerConsumerCollection<WorkItemWrapper>) new ConcurrentQueue<WorkItemWrapper>()
                 : new ConcurrentBag<WorkItemWrapper>());
 
-            statistics = new ThreadPoolTrackingStatistic(options.Name);
+            statistic = new ThreadPoolTrackingStatistic(options.Name);
 
             runningItems = new WorkItemWrapper[GetThreadSlotIndex(options.DegreeOfParallelism)];
 
@@ -70,8 +70,7 @@ namespace Orleans.Runtime
                 {
                     healthy = false;
                     options.Log.Error(
-                        // todo: is SchedulerTurnTooLong incorrect?
-                        ErrorCode.SchedulerTurnTooLong,
+                        ErrorCode.ExecutorTurnTooLong,
                         string.Format(SR.WorkItem_LongExecutionTime, workItem.GetWorkItemStatus(true)));
                 }
             }
@@ -81,7 +80,7 @@ namespace Orleans.Runtime
 
         private void ProcessQueue(ExecutorThreadContext threadContext)
         {
-            statistics.OnStartExecution();
+            statistic.OnStartExecution();
 
             try
             {
@@ -106,11 +105,11 @@ namespace Orleans.Runtime
             }
             catch (Exception ex)
             {
-                options.Log.Error(ErrorCode.SchedulerWorkerThreadExc, SR.Executor_Thread_Caugth_Exception, ex);
+                options.Log.Error(ErrorCode.ExecutorWorkerThreadExc, SR.Executor_Thread_Caugth_Exception, ex);
             }
             finally
             {
-                statistics.OnStopExecution();
+                statistic.OnStopExecution();
             }
         }
 
@@ -149,7 +148,7 @@ namespace Orleans.Runtime
 
         private void TrackRequestEnqueue(WorkItemWrapper workItem)
         {
-            statistics.OnEnQueueRequest(1, WorkQueueCount, workItem);
+            statistic.OnEnQueueRequest(1, WorkQueueCount, workItem);
         }
 
         private void TrackRequestDequeue(WorkItemWrapper workItem)
@@ -163,7 +162,7 @@ namespace Orleans.Runtime
                     SR.Queue_Item_WaitTime, waitTime, workItem.State);
             }
 
-            statistics.OnDeQueueRequest(workItem);
+            statistic.OnDeQueueRequest(workItem);
         }
 
         #endregion
@@ -174,12 +173,12 @@ namespace Orleans.Runtime
                 onActionExecuting: workItem =>
                 {
                     executor.TrackRequestDequeue(workItem);
-                    executor.statistics.OnStartProcessing();
+                    executor.statistic.OnStartProcessing();
                 },
                 onActionExecuted: workItem => 
                 {
-                    executor.statistics.OnStopProcessing();
-                    executor.statistics.IncrementNumberOfProcessed();
+                    executor.statistic.OnStopProcessing();
+                    executor.statistic.IncrementNumberOfProcessed();
                 })
             {
             }

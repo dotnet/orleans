@@ -145,7 +145,7 @@ namespace Orleans.Runtime
             this.siloDetails = siloDetails;
 
             this.SystemStatus = SystemStatus.Creating;
-            // AsynchAgent.IsStarting = true; todo. remove hard reference
+            // AsynchAgent.IsStarting = true; todo. remove hard reference. (use ISiloLifecycle) 
 
             var startTime = DateTime.UtcNow;
 
