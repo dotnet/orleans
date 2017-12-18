@@ -1,11 +1,10 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans;
 using Orleans.Runtime.Configuration;
 using Orleans.Hosting;
-using AccountTransfer.Grains;
-using Orleans.Transactions;
-using Orleans.Transactions.Development;
+using Orleans.Hosting.Development;
 
 namespace OrleansSiloHost
 {
@@ -43,9 +42,9 @@ namespace OrleansSiloHost
 
             var builder = new SiloHostBuilder()
                 .UseConfiguration(config)
-                .AddApplicationPartsFromReferences(typeof(ATMGrain).Assembly)
+                .ConfigureApplicationParts(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory())
                 .ConfigureLogging(logging => logging.AddConsole())
-                .UseInClusterTransactionManager(new TransactionsConfiguration())
+                .UseInClusterTransactionManager()
                 .UseInMemoryTransactionLog()
                 .UseTransactionalState();
 
