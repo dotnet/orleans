@@ -305,7 +305,7 @@ namespace Orleans.Runtime
                 queueTracking = new QueueTrackingStatistic(name);
             }
 
-            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
+            if (ExecutorOptions.CollectDetailedThreadStatistics)
             {
                 threadTracking = new ThreadTrackingStatistic(name, null); // todo: null
             }
@@ -313,7 +313,7 @@ namespace Orleans.Runtime
 
         public void OnStartExecution()
         {
-            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
+            if (ExecutorOptions.CollectDetailedThreadStatistics)
             {
                 queueTracking.OnStartExecution();
             }
@@ -321,7 +321,7 @@ namespace Orleans.Runtime
 
         public void OnDeQueueRequest(WorkItemWrapper workItem)
         {
-            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectQueueStats)
+            if (ExecutorOptions.CollectDetailedQueueStatistics)
             {
                 queueTracking.OnDeQueueRequest(workItem.ExecutionTime);
             }
@@ -329,7 +329,7 @@ namespace Orleans.Runtime
 
         public void OnEnQueueRequest(int i, int workQueueCount, WorkItemWrapper workItem)
         {
-            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectQueueStats)
+            if (ExecutorOptions.CollectDetailedQueueStatistics)
             {
                 queueTracking.OnEnQueueRequest(i, workQueueCount, workItem.ExecutionTime);
             }
@@ -337,7 +337,7 @@ namespace Orleans.Runtime
 
         public void OnStartProcessing()
         {
-            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
+            if (ExecutorOptions.CollectDetailedThreadStatistics)
             {
                 threadTracking.OnStartProcessing();
             }
@@ -345,7 +345,7 @@ namespace Orleans.Runtime
 
         internal void OnStopProcessing()
         {
-            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
+            if (ExecutorOptions.CollectDetailedThreadStatistics)
             {
                 threadTracking.OnStopProcessing();
             }
@@ -353,7 +353,7 @@ namespace Orleans.Runtime
 
         internal void IncrementNumberOfProcessed()
         {
-            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
+            if (ExecutorOptions.CollectDetailedThreadStatistics)
             {
                 threadTracking.IncrementNumberOfProcessed();
             }
@@ -361,7 +361,7 @@ namespace Orleans.Runtime
 
         public void OnStopExecution()
         {
-            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
+            if (ExecutorOptions.CollectDetailedThreadStatistics)
             {
                 threadTracking.OnStopExecution();
             }

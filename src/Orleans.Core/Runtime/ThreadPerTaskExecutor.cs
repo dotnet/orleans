@@ -16,7 +16,7 @@ namespace Orleans.Runtime
 
             if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
             {
-                threadTracking = new ThreadTrackingStatistic(options.Name , null); // todo: null
+                threadTracking = new ThreadTrackingStatistic(options.Name, null); // todo: null
             }
          }
 
@@ -26,7 +26,9 @@ namespace Orleans.Runtime
 
             new Thread(() =>
             {
+                // todo: statistic should be injected as dependency
                 CounterStatistic.SetOrleansManagedThread(); // must be called before using CounterStatistic.
+
                 try
                 {
                     TrackExecutionStart();
@@ -81,7 +83,7 @@ namespace Orleans.Runtime
                 $"Starting Executor {executorOptions.Name} for stage {executorOptions.StageTypeName} " +
                 $"on managed thread {Thread.CurrentThread.ManagedThreadId}");
 
-            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
+            if (ExecutorOptions.CollectDetailedThreadStatistics)
             {
                 threadTracking.OnStartExecution();
             }
@@ -98,7 +100,7 @@ namespace Orleans.Runtime
                 executorOptions.Name,
                 Thread.CurrentThread.ManagedThreadId);
 
-            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
+            if (ExecutorOptions.CollectDetailedThreadStatistics)
             {
                 threadTracking.OnStopExecution();
             }
