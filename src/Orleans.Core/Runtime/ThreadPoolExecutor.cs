@@ -81,23 +81,22 @@ namespace Orleans.Runtime
         private void ProcessQueue(ExecutorThreadContext threadContext)
         {
             statistic.OnStartExecution();
-
             try
             {
                 while (!workQueue.IsCompleted &&
                        (!options.CancellationToken.IsCancellationRequested || options.DrainAfterCancel))
                 {
-                    WorkItemWrapper workItem;
+                    WorkItemWrapper work;
                     try
                     {
-                        workItem = workQueue.Take();
+                        work = workQueue.Take();
                     }
                     catch (InvalidOperationException)
                     {
                         break;
                     }
 
-                    if (!workItem.ExecuteWithFilters(threadContext.WorkItemFilters))
+                    if (!work.ExecuteWithFilters(threadContext.WorkItemFilters))
                     {
                         break;
                     }
