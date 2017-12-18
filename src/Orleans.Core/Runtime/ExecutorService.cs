@@ -13,11 +13,6 @@ namespace Orleans.Runtime
         void QueueWorkItem(WaitCallback callback, object state = null);
     }
 
-    internal interface IQueueCountable
-    {
-        int WorkQueueCount { get; }
-    }
-
     internal class ExecutorService
     {
         public TExecutor GetExecutor<TExecutor>(ExecutorOptions executorOptions) where TExecutor : IExecutor
@@ -36,8 +31,6 @@ namespace Orleans.Runtime
 
     internal abstract class ExecutorOptions
     {
-        public const bool TRACK_DETAILED_STATS = false;
-
         protected ExecutorOptions(
             string name,
             Type stageType,
@@ -63,6 +56,16 @@ namespace Orleans.Runtime
         public ILogger Log { get; }
 
         public ExecutorFaultHandler FaultHandler { get; }
+
+
+        public const bool TRACK_DETAILED_STATS = false;
+
+        // todo: consider making StatisticsCollector.CollectThreadTimeTrackingStats static
+        public static bool CollectDetailedThreadStatistics =
+            TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats;
+
+        public static bool CollectDetailedQueueStatistics =
+            TRACK_DETAILED_STATS && StatisticsCollector.CollectQueueStats;
     }
 
     internal class ThreadPoolExecutorOptions : ExecutorOptions

@@ -14,7 +14,7 @@ namespace Orleans.Runtime
         {
             executorOptions = options;
 
-            if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats)
+            if (ExecutorOptions.CollectDetailedThreadStatistics)
             {
                 threadTracking = new ThreadTrackingStatistic(options.Name, null); // todo: null
             }
