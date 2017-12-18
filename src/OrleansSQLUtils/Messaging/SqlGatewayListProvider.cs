@@ -20,12 +20,13 @@ namespace Orleans.Runtime.Membership
         private readonly IGrainReferenceConverter grainReferenceConverter;
         private readonly TimeSpan maxStaleness;
         public SqlGatewayListProvider(ILogger<SqlGatewayListProvider> logger, IGrainReferenceConverter grainReferenceConverter, ClientConfiguration clientConfiguration,
-            IOptions<SqlGatewayListProviderOptions> options)
+            IOptions<SqlGatewayListProviderOptions> options,
+            IOptions<ClusterClientOptions> clusterClientOptions)
         {
             this.logger = logger;
             this.grainReferenceConverter = grainReferenceConverter;
             this.options = options.Value;
-            this.clusterId = clientConfiguration.ClusterId;
+            this.clusterId = clusterClientOptions.Value.ClusterId;
             this.maxStaleness = clientConfiguration.GatewayListRefreshPeriod;
         }
 

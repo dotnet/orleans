@@ -35,12 +35,10 @@ namespace Orleans.Hosting
 
             services.Configure<SiloOptions>(options =>
             {
-#pragma warning disable CS0618 // Type or member is obsolete
-                if (string.IsNullOrWhiteSpace(options.ClusterId) && !string.IsNullOrWhiteSpace(configuration.Globals.DeploymentId))
+                if (string.IsNullOrWhiteSpace(options.ClusterId) && !string.IsNullOrWhiteSpace(configuration.Globals.ClusterId))
                 {
-                    options.ClusterId = configuration.Globals.DeploymentId;
+                    options.ClusterId = configuration.Globals.ClusterId;
                 }
-#pragma warning restore CS0618 // Type or member is obsolete
 
                 if (options.ServiceId == Guid.Empty)
                 {

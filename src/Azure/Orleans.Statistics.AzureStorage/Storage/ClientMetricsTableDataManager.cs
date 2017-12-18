@@ -4,6 +4,7 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -56,7 +57,7 @@ namespace Orleans.AzureUtils
     {
         protected const string INSTANCE_TABLE_NAME = "OrleansClientMetrics";
 
-        private string deploymentId;
+        private readonly string deploymentId;
         private string clientId;
         private IPAddress address;
         private string myHostName;
@@ -66,15 +67,15 @@ namespace Orleans.AzureUtils
         private readonly ILoggerFactory loggerFactory;
         private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
 
-        public ClientMetricsTableDataManager(ILoggerFactory loggerFactory)
+        public ClientMetricsTableDataManager(ILoggerFactory loggerFactory, IOptions<ClusterClientOptions> clusterClientOptions)
         {
             logger = loggerFactory.CreateLogger<ClientMetricsTableDataManager>();
             this.loggerFactory = loggerFactory;
+            this.deploymentId = clusterClientOptions.Value.ClusterId;
         }
 
         async Task IClientMetricsDataPublisher.Init(ClientConfiguration config, IPAddress address, string clientId)
         {
-            deploymentId = config.ClusterId;
             this.clientId = clientId;
             this.address = address;
             myHostName = config.DNSHostName;

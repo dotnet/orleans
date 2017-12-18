@@ -1,16 +1,13 @@
 using System;
 using System.IO;
-using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Configuration.Options;
 using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
-using Microsoft.Extensions.Configuration;
 using Orleans.ApplicationParts;
-using Orleans.CodeGeneration;
-using Orleans.Messaging;
+using Orleans.Runtime;
 
 namespace Orleans
 {
@@ -204,6 +201,38 @@ namespace Orleans
             }
 
             configure(builder.GetApplicationPartManager());
+            return builder;
+        }
+
+        /// <summary>
+        /// Configures the cluster client general options.
+        /// </summary>
+        /// <param name="builder">The builder.</param>
+        /// <param name="configureOptions">The delegate that configures the options.</param>
+        /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
+        public static IClientBuilder ConfigureClusterClient(this IClientBuilder builder, Action<ClusterClientOptions> configureOptions)
+        {
+            if (configureOptions != null)
+            {
+                builder.ConfigureServices(services => services.Configure(configureOptions));
+            }
+
+            return builder;
+        }
+
+        /// <summary>
+        /// Configures the cluster client general options.
+        /// </summary>
+        /// <param name="builder">The builder.</param>
+        /// <param name="configureOptions">The delegate that configures the options using the options builder.</param>
+        /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
+        public static IClientBuilder ConfigureClusterClient(this IClientBuilder builder, Action<OptionsBuilder<ClusterClientOptions>> configureOptions)
+        {
+            if (configureOptions != null)
+            {
+                builder.ConfigureServices(services => configureOptions.Invoke(services.AddOptions<ClusterClientOptions>()));
+            }
+
             return builder;
         }
     }

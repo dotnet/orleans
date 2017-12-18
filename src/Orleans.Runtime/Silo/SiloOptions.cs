@@ -3,7 +3,7 @@ using System;
 namespace Orleans.Runtime
 {
     /// <summary>
-    /// Silo identity configuration options.
+    /// Silo configuration options.
     /// </summary>
     public class SiloOptions
     {
