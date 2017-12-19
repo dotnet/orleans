@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
-    internal abstract class AsynchAgent<TExecutor> : IHealthCheckable, IDisposable where TExecutor : IExecutor
+    internal abstract class AsynchAgent : IHealthCheckable, IDisposable
     {
         public enum FaultBehavior
         {
@@ -15,7 +15,7 @@ namespace Orleans.Runtime
         }
 
         protected readonly ExecutorService executorService;
-        protected TExecutor executor;
+        protected ThreadPoolExecutor executor;
         protected CancellationTokenSource Cts;
         protected object Lockable;
         protected ILogger Log;
@@ -125,7 +125,7 @@ namespace Orleans.Runtime
                     {
                         State = ThreadState.StopRequested;
                         Cts.Cancel();
-                        executor = default(TExecutor);
+                        executor = null;
                         State = ThreadState.Stopped;
                     }
                 }
@@ -175,7 +175,7 @@ namespace Orleans.Runtime
 
         internal static bool IsStarting { get; set; }
 
-        protected abstract ExecutorOptions ExecutorOptions { get; }
+        protected abstract ThreadPoolExecutorOptions ExecutorOptions { get; }
 
         protected void ExecutorFaultHandler(Exception ex, string executorExplanation)
         {
@@ -200,7 +200,7 @@ namespace Orleans.Runtime
         {
             if (executor == null)
             {
-                executor = executorService.GetExecutor<TExecutor>(ExecutorOptions);
+                executor = executorService.GetExecutor(ExecutorOptions);
             }
         }
 

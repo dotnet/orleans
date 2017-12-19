@@ -5,7 +5,7 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
 {
-    internal abstract class AsynchQueueAgent<T> : AsynchAgent<ThreadPoolExecutor>
+    internal abstract class AsynchQueueAgent<T> : AsynchAgent
     {
         protected AsynchQueueAgent(string nameSuffix, ExecutorService executorService, ILoggerFactory loggerFactory)
             : base(nameSuffix, executorService, loggerFactory)
@@ -30,7 +30,7 @@ namespace Orleans.Runtime
 
         protected abstract void Process(T request);
 
-        protected override ExecutorOptions ExecutorOptions =>
+        protected override ThreadPoolExecutorOptions ExecutorOptions =>
              new ThreadPoolExecutorOptions(
                 Name,
                 GetType(),

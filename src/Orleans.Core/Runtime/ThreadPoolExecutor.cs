@@ -115,7 +115,7 @@ namespace Orleans.Runtime
         private void RunWorker(int threadIndex)
         {
             var threadContext = new ExecutorThreadContext(CreateWorkItemFilters(GetThreadSlotIndex(threadIndex)));
-            new ThreadPerTaskExecutor(
+            new ThreadPoolThread(
                     new SingleThreadExecutorOptions(
                         options.Name + threadIndex,
                         options.StageType,

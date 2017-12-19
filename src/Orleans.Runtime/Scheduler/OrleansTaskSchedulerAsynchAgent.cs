@@ -15,7 +15,6 @@ namespace Orleans.Runtime.Scheduler
     internal class OrleansSchedulerAsynchAgent : AsynchQueueAgent<IWorkItem>
     {
         private readonly QueueTrackingStatistic queueTracking;
-        private readonly ThreadPoolExecutorOptions executorOptions;
         private readonly TaskScheduler taskScheduler;
 
         public OrleansSchedulerAsynchAgent(
@@ -31,7 +30,7 @@ namespace Orleans.Runtime.Scheduler
         {
             // todo: + executor options builder;
             // + queue configuration? 
-            executorOptions = new ThreadPoolExecutorOptions(
+            ExecutorOptions = new ThreadPoolExecutorOptions(
                 Name,
                 GetType(),
                 Cts.Token,
@@ -73,7 +72,7 @@ namespace Orleans.Runtime.Scheduler
             queueTracking.OnStopExecution();
         }
 
-        protected override ExecutorOptions ExecutorOptions => executorOptions;
+        protected override ThreadPoolExecutorOptions ExecutorOptions { get; }
 
         private string GetWorkItemStatus(object item, bool detailed)
         {

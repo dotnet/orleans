@@ -3,7 +3,7 @@
 namespace Orleans.Runtime
 {
     // todo: too much information about impl in the name
-    internal abstract class SingleTaskAsynchAgent : AsynchAgent<ThreadPerTaskExecutor>
+    internal abstract class SingleTaskAsynchAgent : AsynchAgent
     {
         protected SingleTaskAsynchAgent(string nameSuffix, ExecutorService executorService, ILoggerFactory loggerFactory) : base(nameSuffix, executorService, loggerFactory)
         {
@@ -20,7 +20,7 @@ namespace Orleans.Runtime
 
         protected abstract void Run();
 
-        protected override ExecutorOptions ExecutorOptions =>
-            new SingleThreadExecutorOptions(Name, GetType(), Cts.Token, Log, ExecutorFaultHandler);
+        protected override ThreadPoolExecutorOptions ExecutorOptions =>
+            new ThreadPoolExecutorOptions(Name, GetType(), Cts.Token, Log, faultHandler: ExecutorFaultHandler);
     }
 }

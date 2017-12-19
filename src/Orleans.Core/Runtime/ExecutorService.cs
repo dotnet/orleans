@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
-    internal interface IExecutor : IHealthCheckable
+    internal interface IExecutor : IHealthCheckable // todo: move IHealthCheckable to ThreadPoolExecutor
     {
         /// <summary>
         /// Executes the given command at some time in the future.  The command
@@ -15,17 +15,9 @@ namespace Orleans.Runtime
 
     internal class ExecutorService
     {
-        public TExecutor GetExecutor<TExecutor>(ExecutorOptions executorOptions) where TExecutor : IExecutor
+        public ThreadPoolExecutor GetExecutor(ThreadPoolExecutorOptions options)
         {
-            switch (executorOptions)
-            {
-                case ThreadPoolExecutorOptions options:
-                    return (TExecutor)(object)new ThreadPoolExecutor(options); // todo: remove (TExecutor)(object)
-                case SingleThreadExecutorOptions options:
-                    return (TExecutor)(object)new ThreadPerTaskExecutor(options);
-                default:
-                    throw new NotImplementedException();
-            }
+            return new ThreadPoolExecutor(options);
         }
     }
 

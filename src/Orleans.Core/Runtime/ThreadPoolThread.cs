@@ -4,13 +4,13 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
-    internal class ThreadPerTaskExecutor : IExecutor
+    internal class ThreadPoolThread
     {
         private readonly SingleThreadExecutorOptions executorOptions;
 
         private readonly ThreadTrackingStatistic threadTracking;
 
-        public ThreadPerTaskExecutor(SingleThreadExecutorOptions options)
+        public ThreadPoolThread(SingleThreadExecutorOptions options)
         {
             executorOptions = options;
 
@@ -48,14 +48,7 @@ namespace Orleans.Runtime
                 Name = executorOptions.Name
             }.Start();
         }
-
-        public int WorkQueueCount => 0;
-
-        public bool CheckHealth(DateTime lastCheckTime)
-        {
-            return true;
-        }
-
+        
         private void HandleExecutionException(Exception exc)
         {
             if (executorOptions.CancellationToken.IsCancellationRequested) return;
