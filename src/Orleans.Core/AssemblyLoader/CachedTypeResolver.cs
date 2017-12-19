@@ -107,16 +107,22 @@ namespace Orleans.Runtime
                 }
             }
 
-            var asmSeparator = fullName.LastIndexOf(',');
-            if (asmSeparator > -1)
+            // For types in an Orleans namespace, allow remapping the assembly to another assembly.
+            // This is in order to support migration from version 1.x to 2.x, during which assemblies
+            // were split and renamed.
+            if (fullName.StartsWith("Orleans."))
             {
-                var shortName = fullName.Substring(0, asmSeparator).Trim();
-                foreach (var assembly in assemblies)
+                var asmSeparator = fullName.LastIndexOf(',');
+                if (asmSeparator > -1)
                 {
-                    type = assembly.GetType(shortName, false);
-                    if (type != null)
+                    var shortName = fullName.Substring(0, asmSeparator).Trim();
+                    foreach (var assembly in assemblies)
                     {
-                        return true;
+                        type = assembly.GetType(shortName, false);
+                        if (type != null)
+                        {
+                            return true;
+                        }
                     }
                 }
             }
