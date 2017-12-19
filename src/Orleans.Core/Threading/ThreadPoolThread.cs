@@ -7,20 +7,33 @@ namespace Orleans.Threading
 {
     internal class ThreadPoolThread
     {
-        private readonly SingleThreadExecutorOptions executorOptions;
+        private readonly CancellationToken cancellationToken;
+
+        private readonly ILogger log;
 
         private readonly ThreadTrackingStatistic threadTracking;
 
-        public ThreadPoolThread(SingleThreadExecutorOptions options)
+        private readonly ExecutorFaultHandler faultHandler;
+
+        public ThreadPoolThread(
+            string name,
+            CancellationToken cancellationToken,
+            ILogger log,
+            ExecutorFaultHandler faultHandler = null)
         {
-            executorOptions = options;
+            this.Name = name;
+            this.cancellationToken = cancellationToken;
+            this.log = log;
+            this.faultHandler = faultHandler;
 
             if (ExecutorOptions.CollectDetailedThreadStatistics)
             {
-                threadTracking = new ThreadTrackingStatistic(options.Name, null); // todo: null
+                threadTracking = new ThreadTrackingStatistic(name, null); // todo: null
             }
          }
 
+        public string Name { get; }
+        
         public void QueueWorkItem(WaitCallback callback, object state = null)
         {
             if (callback == null) throw new ArgumentNullException(nameof(callback));
@@ -46,24 +59,24 @@ namespace Orleans.Threading
             })
             {
                 IsBackground = true,
-                Name = executorOptions.Name
+                Name = Name
             }.Start();
         }
         
         private void HandleExecutionException(Exception exc)
         {
-            if (executorOptions.CancellationToken.IsCancellationRequested) return;
+            if (cancellationToken.IsCancellationRequested) return;
 
             var explanation =
-                $"Executor thread {executorOptions.Name} of {executorOptions.StageTypeName} stage encountered unexpected exception.";
+                $"Executor thread {Name} encountered unexpected exception.";
 
-            if (executorOptions.FaultHandler != null)
+            if (faultHandler != null)
             {
-                executorOptions.FaultHandler(exc, explanation);
+                faultHandler(exc, explanation);
             }
             else
             {
-                executorOptions.Log.LogError(exc, explanation);
+                log.LogError(exc, explanation);
             }
         }
 
@@ -71,10 +84,10 @@ namespace Orleans.Threading
         {
             CounterStatistic.FindOrCreate(StatisticNames.RUNTIME_THREADS_ASYNC_AGENT_TOTAL_THREADS_CREATED).Increment();
             CounterStatistic.FindOrCreate(
-                new StatisticName(StatisticNames.RUNTIME_THREADS_ASYNC_AGENT_PERAGENTTYPE, executorOptions.StageTypeName)).Increment();
+                new StatisticName(StatisticNames.RUNTIME_THREADS_ASYNC_AGENT_PERAGENTTYPE, Name)).Increment();
 
-            executorOptions.Log.Info(
-                $"Starting Executor {executorOptions.Name} for stage {executorOptions.StageTypeName} " +
+            log.Info(
+                $"Starting Executor {Name} " +
                 $"on managed thread {Thread.CurrentThread.ManagedThreadId}");
 
             if (ExecutorOptions.CollectDetailedThreadStatistics)
@@ -86,12 +99,12 @@ namespace Orleans.Threading
         private void TrackExecutionStop()
         {
             CounterStatistic.FindOrCreate(
-                new StatisticName(StatisticNames.RUNTIME_THREADS_ASYNC_AGENT_PERAGENTTYPE, executorOptions.StageTypeName)).DecrementBy(1);
+                new StatisticName(StatisticNames.RUNTIME_THREADS_ASYNC_AGENT_PERAGENTTYPE, Name)).DecrementBy(1);
 
-            executorOptions.Log.Info(
+            log.Info(
                 ErrorCode.Runtime_Error_100328,
                 "Stopping AsyncAgent {0} that runs on managed thread {1}",
-                executorOptions.Name,
+                Name,
                 Thread.CurrentThread.ManagedThreadId);
 
             if (ExecutorOptions.CollectDetailedThreadStatistics)

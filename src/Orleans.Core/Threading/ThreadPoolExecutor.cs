@@ -118,12 +118,10 @@ namespace Orleans.Threading
         {
             var threadContext = new ExecutorThreadContext(CreateWorkItemFilters(GetThreadSlotIndex(threadIndex)));
             new ThreadPoolThread(
-                    new SingleThreadExecutorOptions(
                         options.Name + threadIndex,
-                        options.StageType,
                         options.CancellationToken,
                         options.Log,
-                        options.FaultHandler))
+                        options.FaultHandler)
                 .QueueWorkItem(_ => ProcessQueue(threadContext));
         }
 
