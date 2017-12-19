@@ -70,6 +70,16 @@ namespace Orleans.Transactions
             this.TransactionId = transactionId;
         }
 
+        public OrleansTransactionInDoubtException(string transactionId, Exception exc) : base(string.Format("Transaction {0} is InDoubt", transactionId), exc)
+        {
+            this.TransactionId = transactionId;
+        }
+
+        public OrleansTransactionInDoubtException(string transactionId, string msg) : base(string.Format("Transaction {0} is InDoubt: {1}", transactionId, msg))
+        {
+            this.TransactionId = transactionId;
+        }
+
         public OrleansTransactionInDoubtException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -103,6 +113,12 @@ namespace Orleans.Transactions
         }
 
         public OrleansTransactionAbortedException(string transactionId, string msg) : base(msg) 
+        {
+            this.TransactionId = transactionId;
+        }
+
+        public OrleansTransactionAbortedException(string transactionId, string msg, Exception innerException) :
+            base(string.Format("Transaction {0} Aborted: {1}", transactionId, msg), innerException)
         {
             this.TransactionId = transactionId;
         }
@@ -150,6 +166,11 @@ namespace Orleans.Transactions
             this.DependentTransactionId = dependentId;
         }
 
+        public OrleansCascadingAbortException(string transactionId)
+            : base(transactionId, string.Format("Transaction {0} aborted because a dependent transaction aborted", transactionId))
+        {
+        }
+
         public OrleansCascadingAbortException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -190,6 +211,16 @@ namespace Orleans.Transactions
     {
         public OrleansPrepareFailedException(string transactionId)
             : base(transactionId, string.Format("Transaction {0} aborted because Prepare phase did not succeed", transactionId))
+        {
+        }
+
+        public OrleansPrepareFailedException(string transactionId, string message)
+        : base(transactionId, string.Format("Transaction {0} aborted because Prepare failed: {1}", transactionId, message))
+        {
+        }
+
+        public OrleansPrepareFailedException(string transactionId, string message, Exception innerException) 
+            : base(transactionId, message, innerException)
         {
         }
 
