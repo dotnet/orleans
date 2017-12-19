@@ -3,8 +3,10 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+// todo: dependency on runtime (due to logging)
+using Orleans.Runtime;
 
-namespace Orleans.Runtime
+namespace Orleans.Threading
 {
     /// <summary>
     /// Essentially FixedThreadPool

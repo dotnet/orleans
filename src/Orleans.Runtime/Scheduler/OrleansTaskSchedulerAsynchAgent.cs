@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Counters;
+using Orleans.Threading;
 
 namespace Orleans.Runtime.Scheduler
 {

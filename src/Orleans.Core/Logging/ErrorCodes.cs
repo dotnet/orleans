@@ -663,7 +663,7 @@ namespace Orleans
         SchedulerTaskExecuteIncomplete3         = SchedulerBase + 27,
         SchedulerTaskExecuteIncomplete4         = SchedulerBase + 28,
         SchedulerTaskWaitIncomplete             = SchedulerBase + 29,
-        ExecutorWorkerThreadExc           = SchedulerBase + 30,
+        ExecutorWorkerThreadExc                 = SchedulerBase + 30,
         SchedulerQueueWorkItemWrongContext      = SchedulerBase + 31,
         SchedulerAppTurnsStopped_2              = SchedulerBase + 32,
 

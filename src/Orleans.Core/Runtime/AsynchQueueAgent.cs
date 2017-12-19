@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
+using Orleans.Threading;
 
 namespace Orleans.Runtime
 {

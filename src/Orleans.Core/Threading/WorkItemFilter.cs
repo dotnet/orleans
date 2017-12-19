@@ -4,8 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using Microsoft.Extensions.Logging;
+// todo: dependency on runtime (due to logging)
+using Orleans.Runtime;
 
-namespace Orleans.Runtime
+namespace Orleans.Threading
 {
     /// <summary>
     /// Allows clear definition of action behavior wrappers

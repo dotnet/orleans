@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Threading;
 using Microsoft.Extensions.Logging;
+using Orleans.Runtime;
 
-namespace Orleans.Runtime
+namespace Orleans.Threading
 {
     internal class ThreadPoolThread
     {
