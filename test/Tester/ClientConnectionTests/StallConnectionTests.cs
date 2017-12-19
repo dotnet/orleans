@@ -2,6 +2,7 @@
 using Orleans.TestingHost;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net.Sockets;
 using System.Text;
@@ -13,9 +14,14 @@ namespace Tester.ClientConnectionTests
 {
     public class StallConnectionTests : TestClusterPerTest
     {
+        private static TimeSpan Timeout = TimeSpan.FromSeconds(10);
+
         public override TestCluster CreateTestCluster()
         {
-            return new TestCluster(new TestClusterOptions(1));
+            var options = new TestClusterOptions(1);
+            options.ClusterConfiguration.Globals.OpenConnectionTimeout = Timeout;
+            options.ClientConfiguration.ResponseTimeout = Timeout;
+            return new TestCluster(options);
         }
 
         [Fact, TestCategory("Functional")]
@@ -33,7 +39,12 @@ namespace Tester.ClientConnectionTests
                 await stalledSocket.ConnectAsync(gwEndpoint);
 
                 // Try to reconnect to GW
+                var stopwatch = Stopwatch.StartNew();
                 this.HostedCluster.InitializeClient();
+                stopwatch.Stop();
+
+                // Check that we were able to connect before the first connection timeout
+                Assert.True(stopwatch.Elapsed < Timeout);
 
                 stalledSocket.Disconnect(true);
             }
@@ -54,15 +65,29 @@ namespace Tester.ClientConnectionTests
                 this.HostedCluster.StartAdditionalSilo();
 
                 // Wait for the silo to join the cluster
-                await this.HostedCluster.WaitForLivenessToStabilizeAsync();
-
-                var mgmtGrain = this.Client.GetGrain<IManagementGrain>(0);
-                var hosts = await mgmtGrain.GetHosts();
-
-                Assert.Equal(2, hosts.Count);
+                Assert.True(await WaitForClusterSize(2));
 
                 stalledSocket.Disconnect(true);
             }
+        }
+
+        private async Task<bool> WaitForClusterSize(int expectedSize)
+        {
+            var mgmtGrain = this.Client.GetGrain<IManagementGrain>(0);
+            var timeout = TestCluster.GetLivenessStabilizationTime(this.HostedCluster.ClusterConfiguration.Globals);
+            var stopWatch = Stopwatch.StartNew();
+            do
+            {
+                var hosts = await mgmtGrain.GetHosts();
+                if (hosts.Count == expectedSize)
+                {
+                    stopWatch.Stop();
+                    return true;
+                }
+                await Task.Delay(500);
+            }
+            while (stopWatch.Elapsed < timeout);
+            return false;
         }
     }
 }

@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using Microsoft.Extensions.Logging;
 using Orleans.Messaging;
 using Orleans.Serialization;
+using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -342,19 +343,22 @@ namespace Orleans.Runtime.Messaging
                     // Prep the socket so it will reset on close
                     sock.LingerState = receiveLingerOption;
 
-                    // Add the socket to the open socket collection
-                    if (ima.RecordOpenedSocket(sock))
+                    Task.Factory.StartNew(() =>
                     {
-                        // Get the socket for the accepted client connection and put it into the 
-                        // ReadEventArg object user token.
-                        var readEventArgs = GetSocketReceiveAsyncEventArgs(sock);
+                        // Add the socket to the open socket collection
+                        if (ima.RecordOpenedSocket(sock))
+                        {
+                            // Get the socket for the accepted client connection and put it into the 
+                            // ReadEventArg object user token.
+                            var readEventArgs = GetSocketReceiveAsyncEventArgs(sock);
 
-                        StartReceiveAsync(sock, readEventArgs, ima);
-                    }
-                    else
-                    {
-                        ima.SafeCloseSocket(sock);
-                    }
+                            StartReceiveAsync(sock, readEventArgs, ima);
+                        }
+                        else
+                        {
+                            ima.SafeCloseSocket(sock);
+                        }
+                    }).Ignore();
                 }
 
                 // The next accept will be started in the caller method
