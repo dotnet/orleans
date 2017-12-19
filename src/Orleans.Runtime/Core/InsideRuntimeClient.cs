@@ -320,7 +320,7 @@ namespace Orleans.Runtime
                 }
 
                 bool startNewTransaction = false;
-                TransactionInfo transactionInfo = message.TransactionInfo;
+                ITransactionInfo transactionInfo = message.TransactionInfo;
 
                 if (message.IsTransactionRequired && transactionInfo == null)
                 {
@@ -419,9 +419,9 @@ namespace Orleans.Runtime
                 }
 
                 transactionInfo = TransactionContext.GetTransactionInfo();
-                if (transactionInfo != null && transactionInfo.ReconcilePending() > 0)
+                if (transactionInfo != null && ! transactionInfo.ReconcilePending(out var numberOrphans))
                 {
-                    var abortException = new OrleansOrphanCallException(transactionInfo.TransactionId, transactionInfo.PendingCalls);
+                    var abortException = new OrleansOrphanCallException(transactionInfo.TransactionId, numberOrphans);
                     // Can't exit before the transaction completes.
                     TransactionContext.GetTransactionInfo().IsAborted = true;
                     if (startNewTransaction)

@@ -33,11 +33,10 @@ namespace Orleans.Runtime
                 IsUsingInterfaceVersions = request.InterfaceVersion > 0,
             };
 
-            TransactionInfo transactionInfo = message.IsTransactionRequired ? TransactionContext.GetTransactionInfo() : null;
+            ITransactionInfo transactionInfo = message.IsTransactionRequired ? TransactionContext.GetTransactionInfo() : null;
             if (transactionInfo != null)
             {
-                transactionInfo.PendingCalls++;
-                message.TransactionInfo = new TransactionInfo(transactionInfo);
+                message.TransactionInfo = transactionInfo.Fork();
             }
 
             if ((options & InvokeMethodOptions.AlwaysInterleave) != 0)

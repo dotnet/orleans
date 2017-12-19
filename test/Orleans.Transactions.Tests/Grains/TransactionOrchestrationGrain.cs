@@ -86,7 +86,7 @@ namespace Orleans.Transactions.Tests
 
             public void JoinTransaction()
             {
-                TransactionInfo info = TransactionContext.GetTransactionInfo();
+                TransactionInfo info = TransactionContext.GetRequiredTransactionInfo<TransactionInfo>();
                 logger.Info($"Grain {grain} is joining transaction {info.TransactionId}.");
 
                 // are we already part of the transaction?
