@@ -2,9 +2,9 @@
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.OrleansSQLUtils</PackageId>
     <Title>Microsoft Orleans SQL Utilities</Title>
-    <Description>Library of utility types for relational storage of Microsoft Orleans.</Description>
+    <Description>Library of utility types for relational storage of Microsoft Orleans</Description>
     <IncludeBuildOutput>false</IncludeBuildOutput>
-    <PackageTags>$(PackageTags) Azure</PackageTags>
+    <PackageTags>$(PackageTags) ADO.NET SQL MySQL PostgreSQL Oracle</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

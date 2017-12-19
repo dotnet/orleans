@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Statistics.AdoNet</PackageId>
-    <Title>Microsoft Orleans Statistics AdoNet Providers</Title>
-    <Description>Microsoft Orleans statistics provider for AdoNet Providers</Description>
-    <PackageTags>$(PackageTags) AdoNet SQL MySQL PostgreSQL Oracle</PackageTags>
+    <Title>Microsoft Orleans Statistics ADO.NET Providers</Title>
+    <Description>Microsoft Orleans statistics provider for ADO.NET Providers</Description>
+    <PackageTags>$(PackageTags) ADO.NET SQL MySQL PostgreSQL Oracle</PackageTags>
   </PropertyGroup>
 
   <PropertyGroup>
