@@ -331,4 +331,73 @@ namespace Orleans.Transactions
         {
         }
     }
+
+    /// <summary>
+    /// Signifies that the executing transaction has aborted because its execution lock was broken
+    /// </summary>
+    [Serializable]
+    public class OrleansBrokenTransactionLockException : OrleansTransactionAbortedException
+    {
+        public OrleansBrokenTransactionLockException(string transactionId, string situation)
+            : base(transactionId, $"Transaction {transactionId} aborted because a broken lock was detected, {situation}")
+        {
+        }
+
+        public OrleansBrokenTransactionLockException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        {
+        }
+    }
+
+    /// <summary>
+    /// Signifies that the executing transaction has aborted because it could not acquire some lock in time
+    /// </summary>
+    [Serializable]
+    public class OrleansTransactionLockAcquireTimeoutException : OrleansTransactionAbortedException
+    {
+        public OrleansTransactionLockAcquireTimeoutException(string transactionId)
+            : base(transactionId, $"Transaction {transactionId} Aborted because some lock could not be acquired within the transaction timeout limit")
+        {
+        }
+
+        public OrleansTransactionLockAcquireTimeoutException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        {
+        }
+    }
+
+    /// <summary>
+    /// Signifies that the executing transaction has aborted because it could not upgrade some lock
+    /// </summary>
+    [Serializable]
+    public class OrleansTransactionLockUpgradeException : OrleansTransactionAbortedException
+    {
+        public OrleansTransactionLockUpgradeException(string transactionId) :
+            base(transactionId, $"Transaction {transactionId} Aborted because it could not upgrade a lock, because of a higher-priority conflicting transaction")
+        {
+        }
+
+        public OrleansTransactionLockUpgradeException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        {
+        }
+    }
+
+    /// <summary>
+    /// Signifies that the executing transaction has aborted because its execution lock was broken
+    /// </summary>
+    [Serializable]
+    public class OrleansTransactionPrepareTimeoutException : OrleansTransactionAbortedException
+    {
+        public OrleansTransactionPrepareTimeoutException(string transactionId)
+            : base(transactionId, $"Transaction {transactionId} Aborted because the prepare phase did not complete within the timeout limit")
+        {
+        }
+
+        public OrleansTransactionPrepareTimeoutException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        {
+        }
+    }
+
 }
