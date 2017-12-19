@@ -388,7 +388,7 @@ namespace Orleans.Runtime
                         if (startNewTransaction)
                         {
                             var abortException = (exc1 as OrleansTransactionAbortedException) ?? 
-                                new OrleansTransactionAbortedException(transactionInfo.TransactionId, exc1);
+                                new OrleansTransactionAbortedException(transactionInfo.TransactionId.ToString(), exc1);
                             this.transactionAgent.Value.Abort(transactionInfo, abortException);
                             exc1 = abortException;
                         }
@@ -421,7 +421,7 @@ namespace Orleans.Runtime
                 transactionInfo = TransactionContext.GetTransactionInfo();
                 if (transactionInfo != null && ! transactionInfo.ReconcilePending(out var numberOrphans))
                 {
-                    var abortException = new OrleansOrphanCallException(transactionInfo.TransactionId, numberOrphans);
+                    var abortException = new OrleansOrphanCallException(transactionInfo.TransactionId.ToString(), numberOrphans);
                     // Can't exit before the transaction completes.
                     TransactionContext.GetTransactionInfo().IsAborted = true;
                     if (startNewTransaction)
@@ -465,7 +465,7 @@ namespace Orleans.Runtime
                         // Must abort the transaction on exceptions
                         TransactionContext.GetTransactionInfo().IsAborted = true;
                         var abortException = (exc2 as OrleansTransactionAbortedException) ??
-                            new OrleansTransactionAbortedException(TransactionContext.GetTransactionInfo().TransactionId, exc2);
+                            new OrleansTransactionAbortedException(TransactionContext.GetTransactionInfo().TransactionId.ToString(), exc2);
                         this.transactionAgent.Value.Abort(TransactionContext.GetTransactionInfo(), abortException);
                     }
                 }
