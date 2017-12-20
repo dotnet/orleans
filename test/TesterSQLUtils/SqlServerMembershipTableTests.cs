@@ -7,7 +7,7 @@ using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Membership;
 using Orleans.Runtime.MembershipService;
-using Orleans.SqlUtils;
+using Orleans.Tests.SqlUtils;
 using OrleansSQLUtils.Configuration;
 using TestExtensions;
 using UnitTests.General;

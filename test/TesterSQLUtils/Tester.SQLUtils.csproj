@@ -2,6 +2,7 @@
   <PropertyGroup>
     <RootNamespace>Tester.SQLUtils</RootNamespace>
     <AssemblyName>Tester.SQLUtils</AssemblyName>
+    <DefineConstants>$(DefineConstants);TESTER_SQLUTILS</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,8 +17,28 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\..\src\AdoNet\Shared\Storage\AdoNetInvariants.cs" Link="Storage\AdoNetInvariants.cs" />
+    <Compile Include="..\..\src\AdoNet\Shared\Storage\DbConnectionFactory.cs" Link="Storage\DbConnectionFactory.cs" />
+    <Compile Include="..\..\src\AdoNet\Shared\Storage\DbExtensions.cs" Link="Storage\DbExtensions.cs" />
+    <Compile Include="..\..\src\AdoNet\Shared\Storage\DbConstantsStore.cs" Link="Storage\DbConstantsStore.cs" />
+    <Compile Include="..\..\src\AdoNet\Shared\Storage\DbStoredQueries.cs" Link="Storage\DbStoredQueries.cs" />
+    <Compile Include="..\..\src\AdoNet\Shared\Storage\ICommandInterceptor.cs" Link="Storage\ICommandInterceptor.cs" />
+    <Compile Include="..\..\src\AdoNet\Shared\Storage\IRelationalStorage.cs" Link="Storage\IRelationalStorage.cs" />
+    <Compile Include="..\..\src\AdoNet\Shared\Storage\NoOpDatabaseCommandInterceptor.cs" Link="Storage\NoOpDatabaseCommandInterceptor.cs" />
+    <Compile Include="..\..\src\AdoNet\Shared\Storage\OracleDatabaseCommandInterceptor.cs" Link="Storage\OracleDatabaseCommandInterceptor.cs" />
+    <Compile Include="..\..\src\AdoNet\Shared\Storage\OrleansRelationalDownloadStream.cs" Link="Storage\OrleansRelationalDownloadStream.cs" />
+    <Compile Include="..\..\src\AdoNet\Shared\Storage\RelationalOrleansQueries.cs" Link="Storage\RelationalOrleansQueries.cs" />
+    <Compile Include="..\..\src\AdoNet\Shared\Storage\RelationalStorage.cs" Link="Storage\RelationalStorage.cs" />
+    <Compile Include="..\..\src\AdoNet\Shared\Storage\RelationalStorageExtensions.cs" Link="Storage\RelationalStorageExtensions.cs" />
+    <Compile Include="..\..\src\AdoNet\Shared\Storage\SqlFormatProvider.cs" Link="Storage\SqlFormatProvider.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
-    <ProjectReference Include="..\..\src\OrleansSQLUtils\OrleansSQLUtils.csproj" />
+    <ProjectReference Include="..\..\src\AdoNet\Orleans.Clustering.AdoNet\Orleans.Clustering.AdoNet.csproj" />
+    <ProjectReference Include="..\..\src\AdoNet\Orleans.Persistence.AdoNet\Orleans.Persistence.AdoNet.csproj" />
+    <ProjectReference Include="..\..\src\AdoNet\Orleans.Reminders.AdoNet\Orleans.Reminders.AdoNet.csproj" />
+    <ProjectReference Include="..\..\src\AdoNet\Orleans.Statistics.AdoNet\Orleans.Statistics.AdoNet.csproj" />
     <ProjectReference Include="..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
     <ProjectReference Include="..\TesterInternal\TesterInternal.csproj" />
     <ProjectReference Include="..\Tester\Tester.csproj" />
@@ -29,18 +50,6 @@
 
   <ItemGroup>
     <None Include="App.config" />
-    <None Include="..\..\src\OrleansSQLUtils\CreateOrleansTables_MySql.sql">
-      <Link>CreateOrleansTables_MySql.sql</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="..\..\src\OrleansSQLUtils\CreateOrleansTables_PostgreSql.sql">
-      <Link>CreateOrleansTables_PostgreSql.sql</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="..\..\src\OrleansSQLUtils\CreateOrleansTables_SqlServer.sql">
-      <Link>CreateOrleansTables_SqlServer.sql</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Include="Data\TestDb.mdf">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -48,4 +57,72 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\src\AdoNet\Shared\MySQL-Main.sql" Link="MySQL-Main.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\src\AdoNet\Shared\Oracle-Main.sql" Link="Oracle-Main.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\src\AdoNet\Shared\PostgreSQL-Main.sql" Link="PostgreSQL-Main.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\src\AdoNet\Shared\SQLServer-Main.sql" Link="SQLServer-Main.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\src\AdoNet\Orleans.Clustering.AdoNet\MySQL-Clustering.sql" Link="MySQL-Clustering.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\src\AdoNet\Orleans.Clustering.AdoNet\Oracle-Clustering.sql" Link="Oracle-Clustering.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\src\AdoNet\Orleans.Clustering.AdoNet\PostgreSQL-Clustering.sql" Link="PostgreSQL-Clustering.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\src\AdoNet\Orleans.Clustering.AdoNet\SQLServer-Clustering.sql" Link="SQLServer-Clustering.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\src\AdoNet\Orleans.Persistence.AdoNet\MySQL-Persistence.sql" Link="MySQL-Persistence.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\src\AdoNet\Orleans.Persistence.AdoNet\Oracle-Persistence.sql" Link="Oracle-Persistence.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\src\AdoNet\Orleans.Persistence.AdoNet\PostgreSQL-Persistence.sql" Link="PostgreSQL-Persistence.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\src\AdoNet\Orleans.Persistence.AdoNet\SQLServer-Persistence.sql" Link="SQLServer-Persistence.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\src\AdoNet\Orleans.Reminders.AdoNet\MySQL-Reminders.sql" Link="MySQL-Reminders.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\src\AdoNet\Orleans.Reminders.AdoNet\Oracle-Reminders.sql" Link="Oracle-Reminders.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\src\AdoNet\Orleans.Reminders.AdoNet\PostgreSQL-Reminders.sql" Link="PostgreSQL-Reminders.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\src\AdoNet\Orleans.Reminders.AdoNet\SQLServer-Reminders.sql" Link="SQLServer-Reminders.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\src\AdoNet\Orleans.Statistics.AdoNet\MySQL-Statistics.sql" Link="MySQL-Statistics.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\src\AdoNet\Orleans.Statistics.AdoNet\Oracle-Statistics.sql" Link="Oracle-Statistics.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\src\AdoNet\Orleans.Statistics.AdoNet\PostgreSQL-Statistics.sql" Link="PostgreSQL-Statistics.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\src\AdoNet\Orleans.Statistics.AdoNet\SQLServer-Statistics.sql" Link="SQLServer-Statistics.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Storage\" />
+  </ItemGroup>
+
 </Project>

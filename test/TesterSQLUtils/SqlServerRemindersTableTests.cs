@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.ReminderService;
-using Orleans.SqlUtils;
+using Orleans.Tests.SqlUtils;
 using TestExtensions;
 using UnitTests.General;
 using Xunit;

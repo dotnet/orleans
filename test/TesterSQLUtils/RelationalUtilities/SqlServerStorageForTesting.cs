@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Orleans.SqlUtils;
+using Orleans.Tests.SqlUtils;
 
 namespace UnitTests.General
 {
@@ -22,9 +22,16 @@ namespace UnitTests.General
 
         public override string CreateStreamTestTable { get { return "CREATE TABLE StreamingTest(Id INT NOT NULL, StreamData VARBINARY(MAX) NOT NULL);"; } }               
                
-        protected override string SetupSqlScriptFileName
+        protected override string[] SetupSqlScriptFileNames
         {
-            get { return "CreateOrleansTables_SqlServer.sql"; }
+            get { return new[] {
+                    "SQLServer-Main.sql",
+                    "SQLServer-Clustering.sql",
+                    "SQLServer-Persistence.sql",
+                    "SQLServer-Reminders.sql",
+                    "SQLServer-Statistics.sql"
+                };
+            }
         }
 
         protected override string CreateDatabaseTemplate

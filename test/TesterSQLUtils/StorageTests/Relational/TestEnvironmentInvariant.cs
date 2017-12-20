@@ -1,5 +1,5 @@
 ﻿using Newtonsoft.Json.Linq;
-using Orleans.SqlUtils;
+using Orleans.Tests.SqlUtils;
 using Orleans.TestingHost.Utils;
 using System;
 using System.Collections.Generic;

@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Orleans.SqlUtils;
+using Orleans.Tests.SqlUtils;
 
 namespace UnitTests.General
 {
@@ -37,9 +37,18 @@ namespace UnitTests.General
             get { return "Server=127.0.0.1;Database=sys; Uid=root;Pwd=root;"; }
         }
 
-        protected override string SetupSqlScriptFileName
+        protected override string[] SetupSqlScriptFileNames
         {
-            get { return "CreateOrleansTables_MySql.sql"; }
+            get
+            {
+                return new[] {
+                    "MySQL-Main.sql",
+                    "MySQL-Clustering.sql",
+                    "MySQL-Persistence.sql",
+                    "MySQL-Reminders.sql",
+                    "MySQL-Statistics.sql"
+                };
+            }
         }
 
         protected override string ExistsDatabaseTemplate

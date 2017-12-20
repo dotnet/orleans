@@ -35,7 +35,7 @@ namespace Orleans.Runtime.ReminderService
                               $"The reminder table does not currently support service provider {serviceType}.");
                 case GlobalConfiguration.ReminderServiceProviderType.SqlServer:
                     return AssemblyLoader.LoadAndCreateInstance<IReminderTable>(
-                        Constants.ORLEANS_SQL_UTILS_DLL,
+                        Constants.ORLEANS_REMINDERS_ADONET,
                         logger,
                         this.serviceProvider);
                 case GlobalConfiguration.ReminderServiceProviderType.AzureTable:
