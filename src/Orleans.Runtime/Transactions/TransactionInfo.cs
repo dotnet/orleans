@@ -143,7 +143,7 @@ namespace Orleans.Transactions
                     && resourceWriteNumber > readVersion.WriteNumber)
                 {
                     // Context has record of more writes than we have, some writes must be lost.
-                    throw new OrleansTransactionAbortedException(TransactionId, "Lost Write");
+                    throw new OrleansTransactionAbortedException(TransactionId.ToString(), "Lost Write");
                 }
             }
             else
@@ -153,7 +153,7 @@ namespace Orleans.Transactions
                     && resourceReadVersion != readVersion)
                 {
                     // Uh-oh. Read two different versions of the grain.
-                    throw new OrleansValidationFailedException(TransactionId);
+                    throw new OrleansValidationFailedException(TransactionId.ToString());
                 }
 
                 ReadSet[transactionalResource] = readVersion;

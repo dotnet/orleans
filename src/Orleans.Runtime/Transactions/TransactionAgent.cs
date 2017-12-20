@@ -198,7 +198,7 @@ namespace Orleans.Transactions
             {
                 TransactionsStatisticsGroup.OnTransactionAborted();
                 abortedTransactions.TryAdd(transactionInfo.TransactionId, 0);
-                throw new OrleansPrepareFailedException(transactionInfo.TransactionId);
+                throw new OrleansPrepareFailedException(transactionInfo.TransactionId.ToString());
             }
             commitCompletions.TryAdd(transactionInfo.TransactionId, completion);
             transactionCommitQueue.Enqueue(transactionInfo);
@@ -351,7 +351,7 @@ namespace Orleans.Transactions
                             else
                             {
                                 TransactionsStatisticsGroup.OnTransactionInDoubt();
-                                completion.SetException(new OrleansTransactionInDoubtException(completedId));
+                                completion.SetException(new OrleansTransactionInDoubtException(completedId.ToString()));
                             }
                         }
                     }
@@ -377,7 +377,7 @@ namespace Orleans.Transactions
                     if (commitCompletions.TryRemove(tx.TransactionId, out completion))
                     {
                         outstandingCommits.Remove(tx.TransactionId);
-                        completion.SetException(new OrleansTransactionInDoubtException(tx.TransactionId));
+                        completion.SetException(new OrleansTransactionInDoubtException(tx.TransactionId.ToString()));
                     }
                 }
             }
