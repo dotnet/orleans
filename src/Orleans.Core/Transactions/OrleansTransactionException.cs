@@ -384,7 +384,7 @@ namespace Orleans.Transactions
     }
 
     /// <summary>
-    /// Signifies that the executing transaction has aborted because its execution lock was broken
+    /// Signifies that the executing transaction has aborted because the TM did not receive all prepared messages in time
     /// </summary>
     [Serializable]
     public class OrleansTransactionPrepareTimeoutException : OrleansTransactionAbortedException
