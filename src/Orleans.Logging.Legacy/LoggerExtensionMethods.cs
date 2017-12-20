@@ -23,7 +23,7 @@ namespace Orleans.Runtime
             var loggerFactory = grain.Runtime.ServiceProvider.GetRequiredService<ILoggerFactory>();
             return new LoggerWrapper(loggerName, loggerFactory);
         }
-
+        private const string GrainLoggerKey = "GrainLogger";
         /// <summary>
         /// Returns a logger object that this grain's code can use for tracing.
         /// The name of the logger will be derived from the grain class name.
@@ -31,9 +31,20 @@ namespace Orleans.Runtime
         /// <returns>A logger for this grain.</returns>
         public static Logger GetLogger(this Grain grain)
         {
-            if (grain.GrainLogger == null)
-                grain.GrainLogger = grain.GetLogger(grain.GetType().FullName);
-            return grain.GrainLogger as Logger;
+            var grainActivatinContext = grain.Data as IGrainActivationContext;
+            if (grainActivatinContext == null)
+            {
+                return grain.GetLogger(grain.GetType().FullName);
+            }
+            else
+            {
+                if (!grainActivatinContext.Items.TryGetValue(GrainLoggerKey, out var grainLogger))
+                {
+                    grainLogger = grain.GetLogger(grain.GetType().FullName);
+                    grainActivatinContext.Items.Add(GrainLoggerKey, grainLogger);
+                }
+                return grainLogger as Logger;
+            }
         }
 
         /// <summary>

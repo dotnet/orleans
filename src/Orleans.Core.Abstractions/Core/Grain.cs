@@ -19,11 +19,9 @@ namespace Orleans
         // from within client code (including subclasses of this class), should be exposed through IGrainRuntime.
         // The better solution is to refactor this interface and make it injectable through the constructor.
         internal IActivationData Data;
-
         public GrainReference GrainReference { get { return Data.GrainReference; } }
 
         internal IGrainRuntime Runtime { get; set; }
-        internal Object GrainLogger { get; set; }
         /// <summary>
         /// Gets an object which can be used to access other grains. Null if this grain is not associated with a Runtime, such as when created directly for unit testing.
         /// </summary>
