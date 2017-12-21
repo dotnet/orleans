@@ -32,6 +32,7 @@ namespace UnitTests
                 options.ClusterConfiguration.AddMemoryStorageProvider("Default");
                 options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
                 options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+                options.ClusterConfiguration.Globals.AllowCallChainReentrancy = true;
                 return new TestCluster(options);
             }
         }
@@ -62,75 +63,7 @@ namespace UnitTests
             }
             this.fixture.Logger.Info("Reentrancy ReentrantGrain Test finished OK.");
         }
-
-        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public void NonReentrantGrain()
-        {
-            INonReentrantGrain nonreentrant = this.fixture.GrainFactory.GetGrain<INonReentrantGrain>(GetRandomGrainId());
-            nonreentrant.SetSelf(nonreentrant).Wait();
-            bool timeout = false;
-            bool deadlock = false;
-            try
-            {
-                timeout = !nonreentrant.Two().Wait(2000);
-            }
-            catch (Exception exc)
-            {
-                Exception baseExc = exc.GetBaseException();
-                if (baseExc.GetType().Equals(typeof(DeadlockException)))
-                {
-                    deadlock = true;
-                }
-                else
-                {
-                    Assert.True(false, string.Format("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace));
-                }
-            }
-            if (this.hostedCluster.ClusterConfiguration.Globals.PerformDeadlockDetection)
-            {
-                Assert.True(deadlock, "Non-reentrant grain should deadlock");
-            }
-            else
-            {
-                Assert.True(timeout, "Non-reentrant grain should timeout");
-            }
-            this.fixture.Logger.Info("Reentrancy NonReentrantGrain Test finished OK.");
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public void NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsFalse()
-        {
-            var grain = this.fixture.GrainFactory.GetGrain<IMayInterleavePredicateGrain>(GetRandomGrainId());
-            grain.SetSelf(grain).Wait();
-            bool timeout = false;
-            bool deadlock = false;
-            try
-            {
-                timeout = !grain.Two().Wait(2000);
-            }
-            catch (Exception exc)
-            {
-                Exception baseExc = exc.GetBaseException();
-                if (baseExc.GetType().Equals(typeof(DeadlockException)))
-                {
-                    deadlock = true;
-                }
-                else
-                {
-                    Assert.True(false, string.Format("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace));
-                }
-            }
-            if (this.hostedCluster.ClusterConfiguration.Globals.PerformDeadlockDetection)
-            {
-                Assert.True(deadlock, "Non-reentrant grain should deadlock when MayInterleave predicate returns false");
-            }
-            else
-            {
-                Assert.True(timeout, "Non-reentrant grain should timeout when MayInterleave predicate returns false");
-            }
-            this.fixture.Logger.Info("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsFalse Test finished OK.");
-        }
-
+        
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsTrue()
         {
@@ -145,40 +78,6 @@ namespace UnitTests
                 Assert.True(false, string.Format("Unexpected exception {0}: {1}", ex.Message, ex.StackTrace));
             }
             this.fixture.Logger.Info("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsTrue Test finished OK.");
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public void NonReentrantGrain_WithMessageInterleavesPredicate_StreamItemDelivery_WhenPredicateReturnsFalse()
-        {
-            var grain = this.fixture.GrainFactory.GetGrain<IMayInterleavePredicateGrain>(GetRandomGrainId());
-            grain.SubscribeToStream().Wait();
-            bool timeout = false;
-            bool deadlock = false;
-            try
-            {
-                timeout = !grain.PushToStream("foo").Wait(2000);
-            }
-            catch (Exception exc)
-            {
-                Exception baseExc = exc.GetBaseException();
-                if (baseExc.GetType().Equals(typeof(DeadlockException)))
-                {
-                    deadlock = true;
-                }
-                else
-                {
-                    Assert.True(false, string.Format("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace));
-                }
-            }
-            if (this.hostedCluster.ClusterConfiguration.Globals.PerformDeadlockDetection)
-            {
-                Assert.True(deadlock, "Non-reentrant grain should deadlock on stream item delivery to itself when CanInterleave predicate returns false");
-            }
-            else
-            {
-                Assert.True(timeout, "Non-reentrant grain should timeout on stream item delivery to itself when CanInterleave predicate returns false");
-            }
-            this.fixture.Logger.Info("Reentrancy NonReentrantGrain_WithMessageInterleavesPredicate_StreamItemDelivery_WhenPredicateReturnsFalse Test finished OK.");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
@@ -211,47 +110,12 @@ namespace UnitTests
                 Assert.IsType<OrleansException>(ex.GetBaseException());
                 Assert.NotNull(ex.GetBaseException().InnerException);
                 Assert.IsType<ApplicationException>(ex.GetBaseException().InnerException);
-                Assert.True(ex.GetBaseException().InnerException?.Message == "boom", 
+                Assert.True(ex.GetBaseException().InnerException?.Message == "boom",
                     "Should fail with Orleans runtime exception having all of neccessary details");
             }
             this.fixture.Logger.Info("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateThrows Test finished OK.");
         }
-
-        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public void UnorderedNonReentrantGrain()
-        {
-            IUnorderedNonReentrantGrain unonreentrant = this.fixture.GrainFactory.GetGrain<IUnorderedNonReentrantGrain>(GetRandomGrainId());
-            unonreentrant.SetSelf(unonreentrant).Wait();
-            bool timeout = false;
-            bool deadlock = false;
-            try
-            {
-                timeout = !unonreentrant.Two().Wait(2000);
-            }
-            catch (Exception exc)
-            {
-                Exception baseExc = exc.GetBaseException();
-                if (baseExc.GetType().Equals(typeof(DeadlockException)))
-                {
-                    deadlock = true;
-                }
-                else
-                {
-                    Assert.True(false, $"Unexpected exception {exc.Message}: {exc.StackTrace}");
-                }
-            }
-            if (this.hostedCluster.ClusterConfiguration.Globals.PerformDeadlockDetection)
-            {
-                Assert.True(deadlock, "Non-reentrant grain should deadlock");
-            }
-            else
-            {
-                Assert.True(timeout, "Non-reentrant grain should timeout");
-            }
-
-            this.fixture.Logger.Info("Reentrancy UnorderedNonReentrantGrain Test finished OK.");
-        }
-
+        
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task IsReentrant()
         {
@@ -299,6 +163,16 @@ namespace UnitTests
 
             Task.WhenAll(done).Wait();
             this.fixture.Logger.Info("ReentrancyTest_Deadlock_2 OK - no deadlock.");
+        }
+
+        [Fact, TestCategory("Failures"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        private async Task NonReentrantFanOut()
+        {
+            var grain = fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<int>>(Guid.NewGuid());
+            var target = fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<int>>(Guid.NewGuid());
+            await grain.CallOtherLongRunningTask(target, 2, TimeSpan.FromSeconds(1));
+            await Assert.ThrowsAsync<TimeoutException>(
+                () => target.FanOutOtherLongRunningTask(grain, 2, TimeSpan.FromSeconds(10), 5));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
@@ -482,6 +356,172 @@ namespace UnitTests
             }
             TimeSpan elapsed = totalTime.Elapsed;
             Assert.True(elapsed < MaxStressExecutionTime, $"Stress test execution took too long: {elapsed}");
+        }
+    }
+
+    public class DisabledCallChainReentrancyTests : OrleansTestingBase, IClassFixture<DisabledCallChainReentrancyTests.Fixture>
+    {
+        public class Fixture : BaseTestClusterFixture
+        {
+            protected override TestCluster CreateTestCluster()
+            {
+                var options = new TestClusterOptions();
+                options.ClusterConfiguration.Globals.RegisterStreamProvider<SimpleMessageStreamProvider>("sms");
+                options.ClusterConfiguration.Globals.AllowCallChainReentrancy = false;
+                options.ClusterConfiguration.AddMemoryStorageProvider("Default");
+                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+                options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+                return new TestCluster(options);
+            }
+        }
+
+        private readonly ITestOutputHelper output;
+        private readonly Fixture fixture;
+        private readonly TestCluster hostedCluster;
+
+        public DisabledCallChainReentrancyTests(ITestOutputHelper output, Fixture fixture)
+        {
+            this.output = output;
+            this.fixture = fixture;
+            hostedCluster = fixture.HostedCluster;
+        }
+
+
+        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        public void NonReentrantGrain_WithMessageInterleavesPredicate_StreamItemDelivery_WhenPredicateReturnsFalse()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<IMayInterleavePredicateGrain>(GetRandomGrainId());
+            grain.SubscribeToStream().Wait();
+            bool timeout = false;
+            bool deadlock = false;
+            try
+            {
+                timeout = !grain.PushToStream("foo").Wait(2000);
+            }
+            catch (Exception exc)
+            {
+                Exception baseExc = exc.GetBaseException();
+                if (baseExc.GetType().Equals(typeof(DeadlockException)))
+                {
+                    deadlock = true;
+                }
+                else
+                {
+                    Assert.True(false, string.Format("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace));
+                }
+            }
+            if (this.hostedCluster.ClusterConfiguration.Globals.PerformDeadlockDetection)
+            {
+                Assert.True(deadlock, "Non-reentrant grain should deadlock on stream item delivery to itself when CanInterleave predicate returns false");
+            }
+            else
+            {
+                Assert.True(timeout, "Non-reentrant grain should timeout on stream item delivery to itself when CanInterleave predicate returns false");
+            }
+            this.fixture.Logger.Info("Reentrancy NonReentrantGrain_WithMessageInterleavesPredicate_StreamItemDelivery_WhenPredicateReturnsFalse Test finished OK.");
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        public void NonReentrantGrain()
+        {
+            INonReentrantGrain nonreentrant = this.fixture.GrainFactory.GetGrain<INonReentrantGrain>(GetRandomGrainId());
+            nonreentrant.SetSelf(nonreentrant).Wait();
+            bool timeout = false;
+            bool deadlock = false;
+            try
+            {
+                timeout = !nonreentrant.Two().Wait(2000);
+            }
+            catch (Exception exc)
+            {
+                Exception baseExc = exc.GetBaseException();
+                if (baseExc.GetType().Equals(typeof(DeadlockException)))
+                {
+                    deadlock = true;
+                }
+                else
+                {
+                    Assert.True(false, string.Format("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace));
+                }
+            }
+            if (this.hostedCluster.ClusterConfiguration.Globals.PerformDeadlockDetection)
+            {
+                Assert.True(deadlock, "Non-reentrant grain should deadlock");
+            }
+            else
+            {
+                Assert.True(timeout, "Non-reentrant grain should timeout");
+            }
+            this.fixture.Logger.Info("Reentrancy NonReentrantGrain Test finished OK.");
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        public void NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsFalse()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<IMayInterleavePredicateGrain>(GetRandomGrainId());
+            grain.SetSelf(grain).Wait();
+            bool timeout = false;
+            bool deadlock = false;
+            try
+            {
+                timeout = !grain.Two().Wait(2000);
+            }
+            catch (Exception exc)
+            {
+                Exception baseExc = exc.GetBaseException();
+                if (baseExc.GetType().Equals(typeof(DeadlockException)))
+                {
+                    deadlock = true;
+                }
+                else
+                {
+                    Assert.True(false, string.Format("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace));
+                }
+            }
+            if (this.hostedCluster.ClusterConfiguration.Globals.PerformDeadlockDetection)
+            {
+                Assert.True(deadlock, "Non-reentrant grain should deadlock when MayInterleave predicate returns false");
+            }
+            else
+            {
+                Assert.True(timeout, "Non-reentrant grain should timeout when MayInterleave predicate returns false");
+            }
+            this.fixture.Logger.Info("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsFalse Test finished OK.");
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        public void UnorderedNonReentrantGrain()
+        {
+            IUnorderedNonReentrantGrain unonreentrant = this.fixture.GrainFactory.GetGrain<IUnorderedNonReentrantGrain>(GetRandomGrainId());
+            unonreentrant.SetSelf(unonreentrant).Wait();
+            bool timeout = false;
+            bool deadlock = false;
+            try
+            {
+                timeout = !unonreentrant.Two().Wait(2000);
+            }
+            catch (Exception exc)
+            {
+                Exception baseExc = exc.GetBaseException();
+                if (baseExc.GetType().Equals(typeof(DeadlockException)))
+                {
+                    deadlock = true;
+                }
+                else
+                {
+                    Assert.True(false, $"Unexpected exception {exc.Message}: {exc.StackTrace}");
+                }
+            }
+            if (this.hostedCluster.ClusterConfiguration.Globals.PerformDeadlockDetection)
+            {
+                Assert.True(deadlock, "Non-reentrant grain should deadlock");
+            }
+            else
+            {
+                Assert.True(timeout, "Non-reentrant grain should timeout");
+            }
+
+            this.fixture.Logger.Info("Reentrancy UnorderedNonReentrantGrain Test finished OK.");
         }
     }
 }
