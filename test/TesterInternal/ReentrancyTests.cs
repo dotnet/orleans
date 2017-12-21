@@ -32,6 +32,7 @@ namespace UnitTests
                 options.ClusterConfiguration.AddMemoryStorageProvider("Default");
                 options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
                 options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+                options.ClusterConfiguration.Globals.AllowCallChainReentrancy = true;
                 return new TestCluster(options);
             }
         }

@@ -523,7 +523,7 @@ namespace Orleans.Runtime.Configuration
         private static readonly TimeSpan DEFAULT_UNREGISTER_RACE_DELAY = TimeSpan.FromMinutes(1);
         private static readonly TimeSpan DEFAULT_CLIENT_REGISTRATION_REFRESH = TimeSpan.FromMinutes(5);
         public const bool DEFAULT_PERFORM_DEADLOCK_DETECTION = false;
-        public const bool DEFAULT_ALLOW_CALL_CHAIN_REENTRANCY = true;
+        public const bool DEFAULT_ALLOW_CALL_CHAIN_REENTRANCY = false;
         public static readonly string DEFAULT_PLACEMENT_STRATEGY = typeof(RandomPlacement).Name;
         public static readonly string DEFAULT_MULTICLUSTER_REGISTRATION_STRATEGY = typeof(GlobalSingleInstanceRegistration).Name;
         private static readonly TimeSpan DEFAULT_DEPLOYMENT_LOAD_PUBLISHER_REFRESH_TIME = TimeSpan.FromSeconds(1);

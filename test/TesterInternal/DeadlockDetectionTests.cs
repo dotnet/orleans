@@ -22,6 +22,7 @@ namespace UnitTests.General
             {
                 var options = new TestClusterOptions();
                 options.ClusterConfiguration.Globals.PerformDeadlockDetection = true;
+                options.ClusterConfiguration.Globals.AllowCallChainReentrancy = true;
 
                 return new TestCluster(options);
             }
