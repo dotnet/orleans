@@ -282,8 +282,7 @@ namespace Tester
 
             var serviceProvider = new ServiceCollection().AddLogging(builder =>
                     builder.AddLegacyOrleansLogging(new List<ILogConsumer>() { logConsumer }, null,
-                        eventBulkingOptions)
-                        .AddFile("Test.log"))
+                        eventBulkingOptions))
                 .BuildServiceProvider();
             var logger = serviceProvider.GetService<ILoggerFactory>().CreateLogger(testName);
 

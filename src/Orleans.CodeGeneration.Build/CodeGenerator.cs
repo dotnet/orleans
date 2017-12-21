@@ -3,13 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Orleans.ApplicationParts;
-using Orleans.Runtime.Configuration;
 using Orleans.CodeGenerator;
 using Orleans.Serialization;
 using Orleans.Runtime;
-using Orleans.Hosting;
 using Orleans.Metadata;
 #if NETCOREAPP2_0
 using System.Runtime.Loader;
