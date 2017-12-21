@@ -8,9 +8,9 @@ title: Migration from Orleans 1.5 to 2.0
 The bulk of the Orleans APIs stayed unchanged in 2.0 or implementation of those APIs were left in legacy classes for backward compatibility. At the same time, the newly introduced APIs provide some new capabilities or better ways of accomplishing those tasks. There are also more subtle differences when it comes to .NET SDK tooling and Visual Studio support that helps to be aware of. This document provides guidance for migrating application code from to Orleans 2.0.
 
 ## Visual Studio and Tooling requirements
-Orleans 2.0.0 is built on top of .Net Standard 2.0. Because of that, you need to upgrade development tools to ensure yourself a pleasant developing experience. We recommend to use Visual Studio 15 or above to develop Orleans 2.0.0 applications. Based on our experience, version 15.4 and above works best. 
-.Net Standard 2.0.0 is compatible with .Net 4.6.1 and above, .Net Core 2.0, and a list of other frameworks. Orleans 2.0.0 inherited that compatibility. For more information on .Net Standard compatibility with other framework, please refer to [.Net Standard documentation](https://docs.microsoft.com/en-us/dotnet/standard/net-standard) : 
-If you are developing a .Net Core application using Orleans, you will need to follow certain steps to set up your environment, such as installing .Net Core SDK. For more information, please refer to their [documentation](https://dotnet.github.io/).
+Orleans 2.0.0 is built on top of .NET Standard 2.0. Because of that, you need to upgrade development tools to ensure yourself a pleasant developing experience. We recommend to use Visual Studio 2017 or above to develop Orleans 2.0.0 applications. Based on our experience, version 15.5.2 and above works best. 
+.NET Standard 2.0.0 is compatible with .NET 4.6.1 and above, .NET Core 2.0, and a list of other frameworks. Orleans 2.0.0 inherited that compatibility. For more information on .NET Standard compatibility with other framework, please refer to [.NET Standard documentation](https://docs.microsoft.com/en-us/dotnet/standard/net-standard) : 
+If you are developing a .NET Core or .NET application using Orleans, you will need to follow certain steps to set up your environment, such as installing .NET Core SDK. For more information, please refer to their [documentation](https://dotnet.github.io/).
 
 ## Available options for configuration code
 
