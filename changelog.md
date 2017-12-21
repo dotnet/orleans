@@ -7,6 +7,28 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [2.0.0-beta3]
+
+- Breaking changes
+  - Remove legacy initialization from Silo class (#3795) 
+
+- Non-breaking improvements
+  - Move ServiceId to SiloOptions (#3779)
+  - Do not generate serializers for classes which require the use of serialization hooks. (#3790)
+  - CodeGen: reduce aggressiveness of serializer generation (#3789)
+  - CodeGen: avoid potential confusion between overridden properties in a type hierarchy (#3791)
+  - Fix Exception serialization on .NET Core (#3794)
+  - Fix shutdown sequence in linuxcontainer (#3796)
+  - Fix potential dependency cycles with user-supplied IGrainCallFilter implementations (#3798)
+  - Include required provider name in GetStorageProvider exception message. (#3797)
+  - Strongly typed endpoint options (#3799)
+  - Fix wrong config usages (#3800)
+  - Split AWSUtils into separate packages, keep original as meta package (#3720)
+  - Add ClusterClientOptions to configure ClusterId (#3801)
+  - Refactor transaction abstractions to enable injection of alternate protocols (#3785)
+  - Wrap the connection preamble read check in a task (#3729)
+  - Split OrleansSQLUtils into separate packages (#3793)
+
 ### [2.0.0-beta2]
 
 - Known issues
