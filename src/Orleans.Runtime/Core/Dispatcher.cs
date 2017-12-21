@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.Configuration;
@@ -29,6 +30,7 @@ namespace Orleans.Runtime
         private readonly MessageFactory messagefactory;
         private readonly SerializationManager serializationManager;
         private readonly CompatibilityDirectorManager compatibilityDirectorManager;
+        private readonly SchedulingOptions schedulingOptions;
         private readonly SafeRandom random;
         private readonly ILogger invokeWorkItemLogger;
         internal Dispatcher(
@@ -41,7 +43,8 @@ namespace Orleans.Runtime
             MessageFactory messagefactory,
             SerializationManager serializationManager,
             CompatibilityDirectorManager compatibilityDirectorManager,
-            ILoggerFactory loggerFactory)
+            ILoggerFactory loggerFactory,
+            IOptions<SchedulingOptions> schedulerOptions)
         {
             this.scheduler = scheduler;
             this.catalog = catalog;
@@ -53,6 +56,7 @@ namespace Orleans.Runtime
             this.messagefactory = messagefactory;
             this.serializationManager = serializationManager;
             this.compatibilityDirectorManager = compatibilityDirectorManager;
+            this.schedulingOptions = schedulerOptions.Value;
             logger = loggerFactory.CreateLogger<Dispatcher>();
             random = new SafeRandom();
         }
@@ -271,7 +275,7 @@ namespace Orleans.Runtime
                 else if (!ActivationMayAcceptRequest(targetActivation, message))
                 {
                     // Check for deadlock before Enqueueing.
-                    if (config.Globals.PerformDeadlockDetection && !message.TargetGrain.IsSystemTarget)
+                    if (schedulingOptions.PerformDeadlockDetection && !message.TargetGrain.IsSystemTarget)
                     {
                         try
                         {
@@ -326,7 +330,7 @@ namespace Orleans.Runtime
                    incoming.IsAlwaysInterleave
                 || targetActivation.Running == null
                 || (targetActivation.Running.IsReadOnly && incoming.IsReadOnly)
-                || (config.Globals.AllowCallChainReentrancy && targetActivation.ActivationId.Equals(incoming.SendingActivation))
+                || (schedulingOptions.AllowCallChainReentrancy && targetActivation.ActivationId.Equals(incoming.SendingActivation))
                 || catalog.CanInterleave(targetActivation.ActivationId, incoming);
 
             return canInterleave;
@@ -342,7 +346,7 @@ namespace Orleans.Runtime
         /// </summary>
         private void MarkSameCallChainMessageAsInterleaving(ActivationData sendingActivation, Message outgoing)
         {
-            if (!config.Globals.AllowCallChainReentrancy)
+            if (!schedulingOptions.AllowCallChainReentrancy)
             {
                 return;
             }

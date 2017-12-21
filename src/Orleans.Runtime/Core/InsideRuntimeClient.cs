@@ -52,8 +52,9 @@ namespace Orleans.Runtime
         private readonly List<IGrainCallFilter> siloInterceptors;
         private readonly Lazy<ITransactionAgent> transactionAgent;
         private IGrainReferenceRuntime grainReferenceRuntime;
-        private IGrainCancellationTokenRuntime cancellationTokenRuntime;
-        
+        private readonly IGrainCancellationTokenRuntime cancellationTokenRuntime;
+        private readonly SchedulingOptions schedulingOptions;
+
         public InsideRuntimeClient(
             ILocalSiloDetails siloDetails,
             ClusterConfiguration config,
@@ -67,7 +68,8 @@ namespace Orleans.Runtime
             Factory<ITransactionAgent> transactionAgent,
             ILoggerFactory loggerFactory,
             IOptions<SiloMessagingOptions> messagingOptions,
-            IGrainCancellationTokenRuntime cancellationTokenRuntime)
+            IGrainCancellationTokenRuntime cancellationTokenRuntime,
+            IOptions<SchedulingOptions> schedulerOptions)
         {
             this.ServiceProvider = serviceProvider;
             this.SerializationManager = serializationManager;
@@ -91,6 +93,7 @@ namespace Orleans.Runtime
             this.callbackDataLogger = loggerFactory.CreateLogger<CallbackData>();
             this.timerLogger = loggerFactory.CreateLogger<SafeTimer>();
             this.cancellationTokenRuntime = cancellationTokenRuntime;
+            this.schedulingOptions = schedulerOptions.Value;
         }
         
         public IServiceProvider ServiceProvider { get; }
@@ -311,7 +314,7 @@ namespace Orleans.Runtime
                 }
 
                 RequestContextExtensions.Import(message.RequestContextData);
-                if (Config.Globals.PerformDeadlockDetection && !message.TargetGrain.IsSystemTarget)
+                if (schedulingOptions.PerformDeadlockDetection && !message.TargetGrain.IsSystemTarget)
                 {
                     UpdateDeadlockInfoInRequestContext(new RequestInvocationHistory(message.TargetGrain, message.TargetActivation, message.DebugContext));
                     // RequestContext is automatically saved in the msg upon send and propagated to the next hop

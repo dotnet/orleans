@@ -8,6 +8,7 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
+using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Hosting
 {
@@ -92,6 +93,12 @@ namespace Orleans.Hosting
             });
 
             LegacyMembershipConfigurator.ConfigureServices(configuration.Globals, services);
+
+            services.AddOptions<SchedulingOptions>().Configure<GlobalConfiguration>((options, config) =>
+            {
+                options.AllowCallChainReentrancy = config.AllowCallChainReentrancy;
+                options.PerformDeadlockDetection = config.PerformDeadlockDetection;
+            });
             return services;
         }
     }
