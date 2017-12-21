@@ -134,7 +134,7 @@ namespace Orleans.CodeGeneration
                     return -2;
                 }
                 stopWatch.Stop();
-                Console.WriteLine($"Built time code generation for assembly {options.InputAssembly} took {stopWatch.ElapsedMilliseconds} miliseconds");
+                Console.WriteLine($"Build time code generation for assembly {options.InputAssembly} took {stopWatch.ElapsedMilliseconds} milliseconds");
                 // DONE!
                 return 0;
             }
