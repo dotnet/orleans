@@ -55,7 +55,7 @@ namespace Orleans
 
             // Application parts
             var parts = builder.GetApplicationPartManager();
-            services.TryAddSingleton<ApplicationPartManager>(parts);
+            services.TryAddSingleton<IApplicationPartManager>(parts);
             parts.AddApplicationPart(new AssemblyPart(typeof(RuntimeVersion).Assembly) { IsFrameworkAssembly = true });
             parts.AddFeatureProvider(new BuiltInTypesSerializationFeaturePopulator());
             parts.AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainInterfaceFeature>());

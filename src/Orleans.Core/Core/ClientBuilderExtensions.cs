@@ -180,7 +180,7 @@ namespace Orleans
         /// </summary>
         /// <param name="builder">The builder.</param>
         /// <returns>The <see cref="ApplicationPartManager"/> for this builder.</returns>
-        public static ApplicationPartManager GetApplicationPartManager(this IClientBuilder builder) => ApplicationPartManagerExtensions.GetApplicationPartManager(builder.Properties);
+        public static IApplicationPartManager GetApplicationPartManager(this IClientBuilder builder) => ApplicationPartManagerExtensions.GetApplicationPartManager(builder.Properties);
         
         /// <summary>
         /// Configures the <see cref="ApplicationPartManager"/> for this builder.

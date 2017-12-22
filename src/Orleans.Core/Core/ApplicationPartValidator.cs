@@ -9,9 +9,9 @@ namespace Orleans
 {
     internal class ApplicationPartValidator : IConfigurationValidator
     {
-        private readonly ApplicationPartManager applicationPartManager;
+        private readonly IApplicationPartManager applicationPartManager;
 
-        public ApplicationPartValidator(ApplicationPartManager applicationPartManager)
+        public ApplicationPartValidator(IApplicationPartManager applicationPartManager)
         {
             this.applicationPartManager = applicationPartManager;
         }

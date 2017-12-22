@@ -222,7 +222,7 @@ namespace Orleans.Hosting
 
             // Application Parts
             var applicationPartManager = context.GetApplicationPartManager();
-            services.TryAddSingleton<ApplicationPartManager>(applicationPartManager);
+            services.TryAddSingleton<IApplicationPartManager>(applicationPartManager);
             applicationPartManager.AddApplicationPart(new AssemblyPart(typeof(RuntimeVersion).Assembly) {IsFrameworkAssembly = true});
             applicationPartManager.AddApplicationPart(new AssemblyPart(typeof(Silo).Assembly) {IsFrameworkAssembly = true});
             applicationPartManager.AddFeatureProvider(new BuiltInTypesSerializationFeaturePopulator());
