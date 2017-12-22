@@ -9,11 +9,6 @@ namespace UnitTests.SqlStatisticsPublisherTests
 {
     internal class StatisticsPublisherProviderRuntime : IProviderRuntime
     {
-        public Logger GetLogger(string loggerName)
-        {
-            throw new NotImplementedException();
-        }
-
         public Guid ServiceId
         {
             get { throw new NotImplementedException(); }

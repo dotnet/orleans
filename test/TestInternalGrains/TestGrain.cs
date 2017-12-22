@@ -19,7 +19,7 @@ namespace UnitTests.Grains
             if (this.GetPrimaryKeyLong() == -2)
                 throw new ArgumentException("Primary key cannot be -2 for this test case");
 
-            logger = GetLogger("TestGrain " + Data.Address);
+            logger = this.GetLogger("TestGrain " + Data.Address);
             label = this.GetPrimaryKeyLong().ToString();
             logger.Info("OnActivateAsync");
 
@@ -142,7 +142,7 @@ namespace UnitTests.Grains
             //    throw new ArgumentException("Primary key cannot be -2 for this test case");
 
             label = this.GetPrimaryKey().ToString();
-            logger = GetLogger("GuidTestGrain " + Data.Address);
+            logger = this.GetLogger("GuidTestGrain " + Data.Address);
             logger.Info("OnActivateAsync");
 
             return Task.CompletedTask;

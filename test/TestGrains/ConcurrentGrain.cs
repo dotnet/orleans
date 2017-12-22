@@ -19,7 +19,7 @@ namespace UnitTests.Grains
         public async Task Initialize(int ind)
         {
             index = ind;
-            logger = GetLogger("ConcurrentGrain-" + index);
+            logger = this.GetLogger("ConcurrentGrain-" + index);
             logger.Info("Initialize(" + index + ")");
             if (index == 0)
             {
@@ -81,7 +81,7 @@ namespace UnitTests.Grains
         public Task Initialize_2(int ind)
         {
             index = ind;
-            logger = GetLogger("ConcurrentGrain-" + index);
+            logger = this.GetLogger("ConcurrentGrain-" + index);
             logger.Info("Initialize(" + index + ")");
             return Task.CompletedTask;
         }
@@ -119,7 +119,7 @@ namespace UnitTests.Grains
         public Task Initialize_2(int ind)
         {
             index = ind;
-            logger = GetLogger("ConcurrentReentrantGrain-" + index);
+            logger = this.GetLogger("ConcurrentReentrantGrain-" + index);
             logger.Info("Initialize(" + index + ")");
             return Task.CompletedTask;
         }

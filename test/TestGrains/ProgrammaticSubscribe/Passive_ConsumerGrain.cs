@@ -17,7 +17,7 @@ namespace UnitTests.Grains
         private int onAddCalledCount;
         public override Task OnActivateAsync()
         {
-            logger = base.GetLogger(this.GetType().Name + base.IdentityString);
+            logger = this.GetLogger(this.GetType().Name + base.IdentityString);
             logger.Info("OnActivateAsync");
             onAddCalledCount = 0;
             consumerObservers = new List<ICounterObserver>();
@@ -86,7 +86,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = base.GetLogger("Jerk_ConsumerGrain" + base.IdentityString);
+            logger = this.GetLogger("Jerk_ConsumerGrain" + base.IdentityString);
             logger.Info("OnActivateAsync");
             return Task.CompletedTask;
         }

@@ -24,7 +24,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = GetLogger(String.Format("{0}-{1}-{2}", typeof(SimplePersistentGrain).Name, base.IdentityString, base.RuntimeIdentity));
+            logger = this.GetLogger(String.Format("{0}-{1}-{2}", typeof(SimplePersistentGrain).Name, base.IdentityString, base.RuntimeIdentity));
             logger.Info("Activate.");
             version = Guid.NewGuid();
             return base.OnActivateAsync();

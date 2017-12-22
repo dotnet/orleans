@@ -26,7 +26,7 @@ namespace UnitTestGrains
         public override Task OnActivateAsync()
         {
             ThrowIfDeactivating();
-            logger = (Logger)this.GetLogger("TimerGrain_" + base.Data.Address.ToString());
+            logger = this.GetLogger("TimerGrain_" + base.Data.Address.ToString());
             context = RuntimeContext.Current.ActivationContext;
             defaultTimer = this.RegisterTimer(Tick, DefaultTimerName, period, period);
             allTimers = new Dictionary<string, IDisposable>();
@@ -39,14 +39,14 @@ namespace UnitTestGrains
             defaultTimer.Dispose();
             return Task.CompletedTask;
         }
-
         private Task Tick(object data)
         {
             counter++;
             logger.Info(data.ToString() + " Tick # " + counter + " RuntimeContext = " + RuntimeContext.Current.ActivationContext.ToString());
 
             // make sure we run in the right activation context.
-            logger.Assert(ErrorCode.Runtime_Error_100146, Equals(context, RuntimeContext.Current.ActivationContext));
+            if(!Equals(context, RuntimeContext.Current.ActivationContext))
+                logger.Error((int)ErrorCode.Runtime_Error_100146, "grain not running in the right activation context");
 
             string name = (string)data;
             IDisposable timer = null;
@@ -58,7 +58,8 @@ namespace UnitTestGrains
             {
                 timer = allTimers[(string)data];
             }
-            logger.Assert(ErrorCode.Runtime_Error_100146, timer != null);
+            if(timer == null)
+                logger.Error((int)ErrorCode.Runtime_Error_100146, "Timer is null");
             if (timer != null && counter > 10000)
             {
                 // do not let orphan timers ticking for long periods

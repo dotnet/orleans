@@ -39,5 +39,6 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("UnitTestGrainInterfaces")]
 [assembly: InternalsVisibleTo("UnitTestGrains")]
 [assembly: InternalsVisibleTo("UnitTests")]
+[assembly: InternalsVisibleTo("Orleans.Logging.Legacy")]
 
 [assembly: KnownAssembly(typeof(IGrain))]

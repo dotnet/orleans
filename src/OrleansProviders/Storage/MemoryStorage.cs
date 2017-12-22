@@ -51,10 +51,6 @@ namespace Orleans.Storage
         /// <see cref="IProvider.Name"/>
         public string Name { get; private set; }
 
-        /// <summary> Logger used by this storage provider instance. </summary>
-        /// <see cref="IStorageProvider.Log"/>
-        public Logger Log { get; private set; }
-
         /// <summary> Default constructor. </summary>
         public MemoryStorage()
             : this(NumStorageGrainsDefaultValue)
@@ -78,7 +74,6 @@ namespace Orleans.Storage
             var loggerName = $"{this.GetType().FullName}.{Name}";
             var loggerFactory = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>();
             this.logger = loggerFactory.CreateLogger(loggerName);
-            Log = new LoggerWrapper(logger, loggerName, loggerFactory);
 
             string numStorageGrainsStr;
             if (config.Properties.TryGetValue(NumStorageGrainsPropertyName, out numStorageGrainsStr))

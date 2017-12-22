@@ -43,7 +43,7 @@ namespace UnitTests.Grains
             myId = Data.ActivationId.ToString();// new Random().Next();
             allReminders = new Dictionary<string, IGrainReminder>();
             sequence = new Dictionary<string, long>();
-            logger = GetLogger(string.Format("ReminderTestGrain {0}_{1}", RuntimeIdentity.ToString(), Identity));
+            logger = this.GetLogger(string.Format("ReminderTestGrain {0}_{1}", RuntimeIdentity.ToString(), Identity));
             period = GetDefaultPeriod(logger);            
             logger.Info("OnActivateAsync.");
             filePrefix = "g" + Identity.PrimaryKey + "_";
@@ -249,7 +249,7 @@ namespace UnitTests.Grains
             myId = new Random().Next();
             allReminders = new Dictionary<string, IGrainReminder>();
             sequence = new Dictionary<string, long>();
-            logger = GetLogger(string.Format("ReminderCopyGrain {0}_{1}", myId, Identity));
+            logger = this.GetLogger(string.Format("ReminderCopyGrain {0}_{1}", myId, Identity));
             period = ReminderTestGrain2.GetDefaultPeriod(logger);
             logger.Info("OnActivateAsync.");
             filePrefix = "gc" + Identity.PrimaryKey + "_";
@@ -404,7 +404,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = GetLogger(String.Format("WrongReminderGrain_{0}", Identity));
+            logger = this.GetLogger(String.Format("WrongReminderGrain_{0}", Identity));
             logger.Info("OnActivateAsync.");
             return Task.CompletedTask;
         }

@@ -6,6 +6,8 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Core;
@@ -180,7 +182,7 @@ namespace UnitTests.Grains
             {
                 if (!recover) throw;
 
-                GetLogger().Warn(0, "Grain is handling error in DoWrite - Resetting value to " + original, exc);
+                this.GetLogger().Warn(0, "Grain is handling error in DoWrite - Resetting value to " + original, exc);
                 State = (PersistenceTestGrainState)original;
             }
         }
@@ -196,7 +198,7 @@ namespace UnitTests.Grains
             {
                 if (!recover) throw;
 
-                GetLogger().Warn(0, "Grain is handling error in DoRead - Resetting value to " + original, exc);
+                this.GetLogger().Warn(0, "Grain is handling error in DoRead - Resetting value to " + original, exc);
                 State = (PersistenceTestGrainState)original;
             }
             return State.Field1;
@@ -260,13 +262,13 @@ namespace UnitTests.Grains
     {
         public override Task OnActivateAsync()
         {
-            GetLogger().Warn(1, "OnActivateAsync");
+            this.GetLogger().Warn(1, "OnActivateAsync");
             return Task.CompletedTask;
         }
 
         public Task DoSomething()
         {
-            GetLogger().Warn(1, "DoSomething");
+            this.GetLogger().Warn(1, "DoSomething");
             throw new ApplicationException(
                 "BadProviderTestGrain.DoSomething should never get called when provider is missing");
         }
@@ -277,13 +279,13 @@ namespace UnitTests.Grains
     {
         public override Task OnActivateAsync()
         {
-            GetLogger().Info(1, "OnActivateAsync");
+            this.GetLogger().Info(1, "OnActivateAsync");
             return Task.CompletedTask;
         }
 
         public Task DoSomething()
         {
-            GetLogger().Info(1, "DoSomething");
+            this.GetLogger().Info(1, "DoSomething");
             return Task.CompletedTask;
         }
     }
@@ -653,7 +655,7 @@ namespace UnitTests.Grains
         {
             _context = RuntimeContext.Current.ActivationContext;
             _scheduler = TaskScheduler.Current;
-            logger = GetLogger("ReentrentGrainWithState-" + Identity);
+            logger = this.GetLogger("ReentrentGrainWithState-" + Identity);
             executing = false;
             return base.OnActivateAsync();
         }
@@ -820,7 +822,7 @@ namespace UnitTests.Grains
     {
         private readonly OrleansTaskScheduler scheduler;
         private const int Multiple = 100;
-        private Logger logger;
+        private ILogger logger;
         private bool executing;
         private const int LEVEL = 2; // level 2 is enough to repro the problem.
 
@@ -855,10 +857,15 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            _id = _counter++;
-            executing = false;
 
-            logger = GetLogger("NonReentrentStressGrainWithoutState-" + _id);
+            _id = _counter++;
+            var loggerFactory = this.ServiceProvider?.GetService<ILoggerFactory>();
+            //if grain created outside a cluster
+            if (loggerFactory == null)
+                loggerFactory = NullLoggerFactory.Instance;
+            logger = loggerFactory.CreateLogger($"NonReentrentStressGrainWithoutState-{_id}");
+
+            executing = false;
             Log("--> OnActivateAsync");
 //#if DEBUG
 //            // HACK for testing
@@ -993,7 +1000,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = GetLogger("InternalGrainWithState-" + Identity);
+            logger = this.GetLogger("InternalGrainWithState-" + Identity);
             return base.OnActivateAsync();
         }
 
@@ -1025,7 +1032,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = GetLogger("StateInheritanceTestGrain-" + Identity);
+            logger = this.GetLogger("StateInheritanceTestGrain-" + Identity);
             logger.Info("OnActivateAsync");
             return base.OnActivateAsync();
         }
@@ -1060,7 +1067,7 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync()
         {
             this.serializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
-            logger = GetLogger("SerializationTestGrain-" + IdentityString);
+            logger = this.GetLogger("SerializationTestGrain-" + IdentityString);
             return base.OnActivateAsync();
         }
 

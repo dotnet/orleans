@@ -21,11 +21,6 @@ namespace Orleans.TestingHost
         private ILogger logger;
         /// <summary>The name of this provider instance, as given to it in the config.</summary>
         public string Name => realStorageProvider.Name;
-
-        /// <summary>Logger used by this storage provider instance.</summary>
-        /// <returns>Reference to the Logger object used by this provider.</returns>
-        /// <seealso cref="Logger"/>
-        public Logger Log { get; private set; }
         
         /// <summary>
         /// Default conststructor which creates the decorated storage provider
@@ -53,7 +48,6 @@ namespace Orleans.TestingHost
             await realStorageProvider.Init(name, providerRuntime, config);
             var loggerFactory = providerRuntime.ServiceProvider.GetService<ILoggerFactory>();
             logger = loggerFactory.CreateLogger<FaultInjectionStorageProvider<TStorage>>();
-            Log = new LoggerWrapper<FaultInjectionStorageProvider<TStorage>>(logger, loggerFactory);
             logger.Info($"Initialized fault injection for storage provider {Name}");
 
             string value;

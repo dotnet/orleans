@@ -18,13 +18,6 @@ namespace Orleans
         bool IsInitialized { get; }
 
         /// <summary>
-        /// Provides logging facility for applications.
-        /// </summary>
-        /// <exception cref="InvalidOperationException">Thrown if Orleans runtime is not correctly initialized before this call.</exception>
-       //TODO: Mark it as [Obsolete] after all runtime has migrated
-        Logger Logger { get; }
-
-        /// <summary>
         /// Gets the service provider used by this client.
         /// </summary>
         IServiceProvider ServiceProvider { get; }

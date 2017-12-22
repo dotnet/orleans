@@ -8,7 +8,6 @@ using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using Orleans.Extensions.Logging;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime

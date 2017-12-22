@@ -10,6 +10,7 @@ namespace Orleans.Logging.Legacy
     /// </summary>
     public class OrleansLoggingUtils
     {
+        internal const string ObsoleteMessageStringForLegacyLoggingInfrastructure = "Deprecated in favor of Microsoft.Extension.Logging";
         internal const string ObsoleteMessageString =
                 "The Microsoft.Orleans.Logging.Legacy namespace was kept to facilitate migration from Orleans 1.x but will be removed in the near future. It is recommended that you use the Microsoft.Extensions.Logging infrastructure and providers directly instead of Microsoft.Orleans.Logging.Legacy.Logger and Microsoft.Orleans.Logging.Legacy.ILogConsumer";
         /// <summary>The method to call during logging to format the log info into a string, which is orleans legacy logging style</summary>
