@@ -22,6 +22,6 @@ namespace Orleans.Runtime
         protected abstract void Run();
 
         protected override ThreadPoolExecutorOptions ExecutorOptions =>
-            new ThreadPoolExecutorOptions(Name, GetType(), Cts.Token, Log, faultHandler: ExecutorFaultHandler);
+            new ThreadPoolExecutorOptions(Name, GetType(), Cts.Token, loggerFactory, faultHandler: ExecutorFaultHandler);
     }
 }

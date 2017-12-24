@@ -1,14 +1,6 @@
 using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Counters;
 using Orleans.Threading;
 
 namespace Orleans.Runtime.Scheduler
@@ -16,7 +8,7 @@ namespace Orleans.Runtime.Scheduler
     internal class OrleansSchedulerAsynchAgent : AsynchQueueAgent<IWorkItem>
     {
         private readonly QueueTrackingStatistic queueTracking;
-        private readonly TaskScheduler taskScheduler;
+        private readonly TaskScheduler scheduler;
 
         public OrleansSchedulerAsynchAgent(
             string name,
@@ -35,7 +27,7 @@ namespace Orleans.Runtime.Scheduler
                 Name,
                 GetType(),
                 Cts.Token,
-                Log,
+                loggerFactory,
                 maxDegreeOfParalelism,
                 drainAfterCancel,
                 false,
@@ -43,7 +35,8 @@ namespace Orleans.Runtime.Scheduler
                 delayWarningThreshold,
                 GetWorkItemStatus,
                 ExecutorFaultHandler);
-            taskScheduler = scheduler;
+
+            this.scheduler = scheduler;
 
             if (!StatisticsCollector.CollectShedulerQueuesStats) return;
             queueTracking = new QueueTrackingStatistic(queueTrackingName);
@@ -52,12 +45,12 @@ namespace Orleans.Runtime.Scheduler
 
         protected override void Process(IWorkItem request)
         {
-            RuntimeContext.InitializeThread(taskScheduler);
+            RuntimeContext.InitializeThread(scheduler);
 
             TrackWorkItemDequeue();
             try
             {
-                RuntimeContext.SetExecutionContext(request.SchedulingContext, taskScheduler);
+                RuntimeContext.SetExecutionContext(request.SchedulingContext, scheduler);
                 request.Execute();
             }
             finally

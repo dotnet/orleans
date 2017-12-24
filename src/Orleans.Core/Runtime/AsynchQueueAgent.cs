@@ -31,12 +31,13 @@ namespace Orleans.Runtime
 
         protected abstract void Process(T request);
 
+        // todo: options factory
         protected override ThreadPoolExecutorOptions ExecutorOptions =>
              new ThreadPoolExecutorOptions(
                 Name,
                 GetType(),
                 Cts.Token,
-                Log,
+                loggerFactory,
                 drainAfterCancel: DrainAfterCancel,
                 faultHandler: ExecutorFaultHandler);
         

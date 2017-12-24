@@ -19,14 +19,14 @@ namespace Orleans.Threading
         protected ExecutorOptions(
             string name,
             Type stageType,
-            CancellationToken cancellationToken, 
-            ILogger log, 
+            CancellationToken cancellationToken,
+            ILoggerFactory loggerFactory,
             ExecutorFaultHandler faultHandler = null)
         {
             Name = name;
             StageType = stageType;
             CancellationToken = cancellationToken;
-            Log = log;
+            LoggerFactory = loggerFactory;
             FaultHandler = faultHandler;
         }
 
@@ -38,7 +38,8 @@ namespace Orleans.Threading
 
         public CancellationToken CancellationToken { get; }
 
-        public ILogger Log { get; }
+        public ILoggerFactory LoggerFactory { get; }
+
 
         public ExecutorFaultHandler FaultHandler { get; }
 
@@ -59,7 +60,7 @@ namespace Orleans.Threading
             string name,
             Type stageType,
             CancellationToken ct,
-            ILogger log,
+            ILoggerFactory loggerFactory,
             int degreeOfParallelism = 1,
             bool drainAfterCancel = false,
             bool preserveOrder = true,
@@ -67,7 +68,7 @@ namespace Orleans.Threading
             TimeSpan? delayWarningThreshold = null,
             WorkItemStatusProvider workItemStatusProvider = null,
             ExecutorFaultHandler faultHandler = null)
-            : base(name, stageType, ct, log, faultHandler)
+            : base(name, stageType, ct, loggerFactory, faultHandler)
         {
             DegreeOfParallelism = degreeOfParallelism;
             DrainAfterCancel = drainAfterCancel;
@@ -88,19 +89,6 @@ namespace Orleans.Threading
         public TimeSpan DelayWarningThreshold { get; }
 
         public WorkItemStatusProvider WorkItemStatusProvider { get; }
-    }
-
-    internal class SingleThreadExecutorOptions : ExecutorOptions
-    {
-        public SingleThreadExecutorOptions(
-            string name,
-            Type stageType,
-            CancellationToken ct, 
-            ILogger log, 
-            ExecutorFaultHandler faultHandler = null) 
-            : base(name, stageType, ct, log, faultHandler)
-        {
-        }
     }
 
     internal delegate void ExecutorFaultHandler(Exception ex, string executorExplanation);

@@ -20,6 +20,7 @@ namespace Orleans.Runtime
         protected CancellationTokenSource Cts;
         protected object Lockable;
         protected ILogger Log;
+        protected ILoggerFactory loggerFactory;
         protected readonly string type;
         protected FaultBehavior OnFault;
         protected bool disposed;
@@ -54,6 +55,7 @@ namespace Orleans.Runtime
             Lockable = new object();
             State = ThreadState.Unstarted;
             OnFault = FaultBehavior.IgnoreFault;
+            this.loggerFactory = loggerFactory;
             Log = loggerFactory.CreateLogger(Name);
 
             this.executorService = executorService;

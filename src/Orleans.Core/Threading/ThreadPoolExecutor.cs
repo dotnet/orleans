@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 // todo: dependency on runtime (due to logging)
 using Orleans.Runtime;
 
@@ -21,6 +22,8 @@ namespace Orleans.Threading
 
         private readonly ThreadPoolTrackingStatistic statistic;
 
+        private readonly ILogger log;
+
         public ThreadPoolExecutor(ThreadPoolExecutorOptions options)
         {
             this.options = options ?? throw new ArgumentNullException(nameof(options));
@@ -30,6 +33,8 @@ namespace Orleans.Threading
                 : new ConcurrentBag<WorkItemWrapper>());
 
             statistic = new ThreadPoolTrackingStatistic(options.Name);
+
+            log = options.LoggerFactory.CreateLogger<ThreadPoolExecutor>();
 
             runningItems = new WorkItemWrapper[GetThreadSlotIndex(options.DegreeOfParallelism)];
 
@@ -71,7 +76,7 @@ namespace Orleans.Threading
                 if (workItem != null && workItem.IsFrozen())
                 {
                     healthy = false;
-                    options.Log.Error(
+                    log.Error(
                         ErrorCode.ExecutorTurnTooLong,
                         string.Format(SR.WorkItem_LongExecutionTime, workItem.GetWorkItemStatus(true)));
                 }
@@ -106,7 +111,7 @@ namespace Orleans.Threading
             }
             catch (Exception ex)
             {
-                options.Log.Error(ErrorCode.ExecutorWorkerThreadExc, SR.Executor_Thread_Caugth_Exception, ex);
+                log.Error(ErrorCode.ExecutorWorkerThreadExc, SR.Executor_Thread_Caugth_Exception, ex);
             }
             finally
             {
@@ -120,7 +125,7 @@ namespace Orleans.Threading
             new ThreadPoolThread(
                         options.Name + threadIndex,
                         options.CancellationToken,
-                        options.Log,
+                        log,
                         options.FaultHandler)
                 .QueueWorkItem(_ => ProcessQueue(threadContext));
         }
@@ -136,10 +141,10 @@ namespace Orleans.Threading
         {
             return WorkItemFilter.CreateChain(new Func<WorkItemFilter>[]
             {
-                () => new OuterExceptionHandlerFilter(options.Log),
+                () => new OuterExceptionHandlerFilter(log),
                 () => new StatisticsTrackingFilter(this),
                 () => new RunningWorkItemsTracker(this, executorWorkItemSlotIndex),
-                () => new ExceptionHandlerFilter(options.Log)
+                () => new ExceptionHandlerFilter(log)
             });
         }
 
@@ -156,7 +161,7 @@ namespace Orleans.Threading
             if (waitTime > options.DelayWarningThreshold && !System.Diagnostics.Debugger.IsAttached)
             {
                 SchedulerStatisticsGroup.NumLongQueueWaitTimes.Increment();
-                options.Log.Warn(
+                log.Warn(
                     ErrorCode.SchedulerWorkerPoolThreadQueueWaitTime,
                     SR.Queue_Item_WaitTime, waitTime, workItem.State);
             }
