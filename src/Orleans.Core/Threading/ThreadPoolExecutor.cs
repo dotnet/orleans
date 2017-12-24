@@ -85,7 +85,7 @@ namespace Orleans.Threading
             return healthy;
         }
 
-        private void ProcessQueue(ExecutorThreadContext threadContext)
+        private void ProcessWorkItems(ExecutorThreadContext threadContext)
         {
             statistic.OnStartExecution();
             try
@@ -127,7 +127,7 @@ namespace Orleans.Threading
                         options.CancellationToken,
                         options.LoggerFactory,
                         options.FaultHandler)
-                .QueueWorkItem(_ => ProcessQueue(threadContext));
+                .QueueWorkItem(_ => ProcessWorkItems(threadContext));
         }
 
         private static int GetThreadSlotIndex(int threadIndex)
@@ -213,20 +213,20 @@ namespace Orleans.Threading
             public WorkItemFilter[] WorkItemFilters { get; }
         }
 
-        internal static class SR
+        private static class SR
         {
-            public static string WorkItem_ExecutionTime = "WorkItem={0} Executing for {1} {2}";
+            public const string WorkItem_ExecutionTime = "WorkItem={0} Executing for {1} {2}";
 
-            public static string WorkItem_LongExecutionTime = "Work item {0} has been executing for long time.";
+            public const string WorkItem_LongExecutionTime = "Work item {0} has been executing for long time.";
 
-            public static string Executor_Thread_Caugth_Exception = "Executor thread caugth exception:";
+            public const string Executor_Thread_Caugth_Exception = "Executor thread caugth exception:";
 
-            public static string Queue_Item_WaitTime = "Queue wait time of {0} for Item {1}";
+            public const string Queue_Item_WaitTime = "Queue wait time of {0} for Item {1}";
         }
     }
 
     internal delegate string WorkItemStatusProvider(object state, bool detailed);
-    
+
     internal class WorkItemWrapper
     {
         public static WorkItemWrapper NoOpWorkItemWrapper = new WorkItemWrapper(s => { }, null, TimeSpan.MaxValue);
