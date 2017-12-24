@@ -18,17 +18,17 @@ namespace Orleans.Threading
         public ThreadPoolThread(
             string name,
             CancellationToken cancellationToken,
-            ILogger log,
+            ILoggerFactory loggerFactory,
             ExecutorFaultHandler faultHandler = null)
         {
             this.Name = name;
             this.cancellationToken = cancellationToken;
-            this.log = log;
+            this.log = loggerFactory.CreateLogger<ThreadPoolThread>();
             this.faultHandler = faultHandler;
 
             if (ExecutorOptions.CollectDetailedThreadStatistics)
             {
-                threadTracking = new ThreadTrackingStatistic(name, null); // todo: null
+                threadTracking = new ThreadTrackingStatistic(name, loggerFactory);
             }
          }
 

@@ -32,7 +32,7 @@ namespace Orleans.Threading
                 ? (IProducerConsumerCollection<WorkItemWrapper>) new ConcurrentQueue<WorkItemWrapper>()
                 : new ConcurrentBag<WorkItemWrapper>());
 
-            statistic = new ThreadPoolTrackingStatistic(options.Name);
+            statistic = new ThreadPoolTrackingStatistic(options.Name, options.LoggerFactory);
 
             log = options.LoggerFactory.CreateLogger<ThreadPoolExecutor>();
 
@@ -125,7 +125,7 @@ namespace Orleans.Threading
             new ThreadPoolThread(
                         options.Name + threadIndex,
                         options.CancellationToken,
-                        log,
+                        options.LoggerFactory,
                         options.FaultHandler)
                 .QueueWorkItem(_ => ProcessQueue(threadContext));
         }
@@ -231,8 +231,6 @@ namespace Orleans.Threading
     {
         public static WorkItemWrapper NoOpWorkItemWrapper = new WorkItemWrapper(s => { }, null, TimeSpan.MaxValue);
 
-        public ITimeInterval ExecutionTime { get; private set; }
-
         private readonly WaitCallback callback;
 
         private readonly WorkItemStatusProvider statusProvider;
@@ -240,6 +238,8 @@ namespace Orleans.Threading
         private readonly TimeSpan executionTimeTreshold;
 
         private readonly DateTime enqueueTime;
+
+        private ITimeInterval executionTime;
 
         // for lightweight execution time tracking 
         private DateTime executionStart;
@@ -257,6 +257,16 @@ namespace Orleans.Threading
             this.enqueueTime = DateTime.UtcNow;
         }
 
+        // Being tracked only when queue tracking statistic is enabled. Todo: remove implicit behavior?
+        internal ITimeInterval ExecutionTime
+        {
+            get
+            {
+                EnsureExecutionTime();
+                return executionTime;
+            }
+        }
+
         internal TimeSpan TimeSinceQueued => Utils.Since(enqueueTime);
 
         internal object State { get; }
@@ -272,11 +282,13 @@ namespace Orleans.Threading
             return actionFilters.First().ExecuteWorkItem(this);
         }
 
-        //public void Start() // todo
-        //{
-        //    timeInterval = TimeIntervalFactory.CreateTimeInterval(true);
-        //    timeInterval.Start();
-        //}
+        public void EnsureExecutionTime() 
+        {
+            if (executionTime == null)
+            {
+                executionTime = TimeIntervalFactory.CreateTimeInterval(true);
+            }
+        }
 
         internal string GetWorkItemStatus(bool detailed)
         {
@@ -302,7 +314,7 @@ namespace Orleans.Threading
 
         private readonly QueueTrackingStatistic queueTracking;
 
-        public ThreadPoolTrackingStatistic(string name)
+        public ThreadPoolTrackingStatistic(string name, ILoggerFactory loggerFactory)
         {
             if (StatisticsCollector.CollectQueueStats)
             {
@@ -311,7 +323,7 @@ namespace Orleans.Threading
 
             if (ExecutorOptions.CollectDetailedThreadStatistics)
             {
-                threadTracking = new ThreadTrackingStatistic(name, null); // todo: null
+                threadTracking = new ThreadTrackingStatistic(name, loggerFactory);
             }
         }
 
