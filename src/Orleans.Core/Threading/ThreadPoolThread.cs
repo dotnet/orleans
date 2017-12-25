@@ -9,11 +9,11 @@ namespace Orleans.Threading
     {
         private readonly CancellationToken cancellationToken;
 
-        private readonly ILogger log;
-
         private readonly ThreadTrackingStatistic threadTracking;
 
         private readonly ExecutorFaultHandler faultHandler;
+
+        private readonly ILogger log;
 
         public ThreadPoolThread(
             string name,

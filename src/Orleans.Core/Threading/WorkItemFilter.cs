@@ -95,58 +95,7 @@ namespace Orleans.Threading
             return workItemFilters.ToArray();
         }
     }
-
-
-    internal sealed class ExceptionHandlerFilter : WorkItemFilter
-    {
-        public ExceptionHandlerFilter(ILogger log) : base(
-            exceptionHandler: (ex, workItem) =>
-            {
-                var tae = ex as ThreadAbortException;
-                if (tae != null)
-                {
-                    if (tae.ExceptionState != null && tae.ExceptionState.Equals(true))
-                    {
-                        Thread.ResetAbort();
-                    }
-                    else
-                    {
-                        log.Error(ErrorCode.Runtime_Error_100029,
-                            "Caught thread abort exception, allowing it to propagate outwards", ex);
-                    }
-                }
-                else
-                {
-                    log.Error(ErrorCode.Runtime_Error_100030, $"Worker thread caught an exception thrown from task {workItem.State}.", ex);
-                }
-
-                return true;
-            })
-        {
-        }
-    }
-
-    internal sealed class OuterExceptionHandlerFilter : WorkItemFilter
-    {
-        public OuterExceptionHandlerFilter(ILogger log) : base(
-            exceptionHandler: (ex, workItem) =>
-            {
-                if (ex is ThreadAbortException)
-                {
-                    if (log.IsEnabled(LogLevel.Debug)) log.Debug("Received thread abort exception -- exiting. {0}", ex);
-                    Thread.ResetAbort();
-                }
-                else
-                {
-                    log.Error(ErrorCode.Runtime_Error_100030, $"Worker thread caught an exception thrown from task {workItem.State}.", ex);
-                }
-
-                return false;
-            })
-        {
-        }
-    }
-
+    
     internal sealed class WorkerThreadStatisticsFilter : WorkItemFilter
     {
         public WorkerThreadStatisticsFilter() : base(

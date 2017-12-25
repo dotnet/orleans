@@ -57,11 +57,7 @@ namespace Orleans.Threading
         {
             if (callback == null) throw new ArgumentNullException(nameof(callback));
 
-            var workItem = new WorkItemWrapper(
-                callback,
-                state,
-                options.WorkItemExecutionTimeTreshold,
-                options.WorkItemStatusProvider);
+            var workItem = new WorkItemWrapper(callback, state, options.WorkItemExecutionTimeTreshold, options.WorkItemStatusProvider);
 
             TrackRequestEnqueue(workItem);
 
@@ -76,9 +72,7 @@ namespace Orleans.Threading
                 if (workItem != null && workItem.IsFrozen())
                 {
                     healthy = false;
-                    log.Error(
-                        ErrorCode.ExecutorTurnTooLong,
-                        string.Format(SR.WorkItem_LongExecutionTime, workItem.GetWorkItemStatus(true)));
+                    log.Error(ErrorCode.ExecutorTurnTooLong, string.Format(SR.WorkItem_LongExecutionTime, workItem.GetWorkItemStatus(true)));
                 }
             }
 
@@ -171,6 +165,27 @@ namespace Orleans.Threading
 
         #endregion
 
+        internal sealed class OuterExceptionHandlerFilter : WorkItemFilter
+        {
+            public OuterExceptionHandlerFilter(ILogger log) : base(
+                exceptionHandler: (ex, workItem) =>
+                {
+                    if (ex is ThreadAbortException)
+                    {
+                        if (log.IsEnabled(LogLevel.Debug)) log.Debug(SR.On_Thread_Abort_Exit, ex);
+                        Thread.ResetAbort();
+                    }
+                    else
+                    {
+                        log.Error(ErrorCode.Runtime_Error_100030, string.Format(SR.Thread_On_Exception, workItem.State), ex);
+                    }
+
+                    return false;
+                })
+            {
+            }
+        }
+
         private sealed class StatisticsTrackingFilter : WorkItemFilter
         {
             public StatisticsTrackingFilter(ThreadPoolExecutor executor) : base(
@@ -203,6 +218,34 @@ namespace Orleans.Threading
             }
         }
 
+        internal sealed class ExceptionHandlerFilter : WorkItemFilter
+        {
+            public ExceptionHandlerFilter(ILogger log) : base(
+                exceptionHandler: (ex, workItem) =>
+                {
+                    var tae = ex as ThreadAbortException;
+                    if (tae != null)
+                    {
+                        if (tae.ExceptionState != null && tae.ExceptionState.Equals(true))
+                        {
+                            Thread.ResetAbort();
+                        }
+                        else
+                        {
+                            log.Error(ErrorCode.Runtime_Error_100029, SR.Thread_On_Abort_Propagate, ex);
+                        }
+                    }
+                    else
+                    {
+                        log.Error(ErrorCode.Runtime_Error_100030, string.Format(SR.Thread_On_Exception, workItem.State), ex);
+                    }
+
+                    return true;
+                })
+            {
+            }
+        }
+
         private sealed class ExecutorThreadContext
         {
             public ExecutorThreadContext(WorkItemFilter[] workItemFilters)
@@ -213,7 +256,7 @@ namespace Orleans.Threading
             public WorkItemFilter[] WorkItemFilters { get; }
         }
 
-        private static class SR
+        internal static class SR
         {
             public const string WorkItem_ExecutionTime = "WorkItem={0} Executing for {1} {2}";
 
@@ -222,6 +265,12 @@ namespace Orleans.Threading
             public const string Executor_Thread_Caugth_Exception = "Executor thread caugth exception:";
 
             public const string Queue_Item_WaitTime = "Queue wait time of {0} for Item {1}";
+
+            public const string On_Thread_Abort_Exit = "Received thread abort exception - exiting. {0}.";
+
+            public const string Thread_On_Exception = "Thread caught an exception thrown from task {0}.";
+
+            public const string Thread_On_Abort_Propagate = "Caught thread abort exception, allowing it to propagate outwards.";
         }
     }
 
