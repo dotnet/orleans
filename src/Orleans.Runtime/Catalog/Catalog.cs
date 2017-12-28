@@ -1091,7 +1091,7 @@ namespace Orleans.Runtime
         {
             lock (activation)
             {
-                List<Message> msgs = activation.DequeueAllWaitingMessages();
+                var msgs = activation.DequeueAllWaitingMessages();
                 if (msgs == null || msgs.Count <= 0) return;
 
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Catalog_RerouteAllQueuedMessages, String.Format("RerouteAllQueuedMessages: {0} msgs from Invalid activation {1}.", msgs.Count(), activation));
@@ -1112,7 +1112,7 @@ namespace Orleans.Runtime
         {
             lock (activation)
             {
-                List<Message> msgs = activation.DequeueAllWaitingMessages();
+                var msgs = activation.DequeueAllWaitingMessages();
                 if (msgs == null || msgs.Count <= 0) return;
 
                 if (logger.IsEnabled(LogLevel.Debug))
