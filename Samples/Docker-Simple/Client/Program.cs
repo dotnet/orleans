@@ -22,12 +22,14 @@ namespace Client
 
             var config = new ClientConfiguration
             {
+                ClusterId = "orleans-docker",
                 GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable,
                 DataConnectionString = connectionString
             };
 
             var client = new ClientBuilder()
-                .AddApplicationPartsFromBasePath()
+                .ConfigureApplicationParts(parts =>
+                        parts.AddApplicationPart(typeof(IPingGrain).Assembly).WithReferences())
                 .UseConfiguration(config)
                 .Build();
 
