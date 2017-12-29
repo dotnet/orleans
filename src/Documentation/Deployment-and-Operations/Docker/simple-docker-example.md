@@ -3,7 +3,7 @@ layout: page
 title: Simple Docker deployment
 ---
 
-> **Note**: There is still some issue with Orleans in docker, related to the shutdown sequence. Please see the [following issue onm GitHub](https://github.com/dotnet/orleans/issues/3620).
+> **Note**: There is still some issue with Orleans in docker, related to the shutdown sequence. Please see the [following issue on GitHub](https://github.com/dotnet/orleans/issues/3620).
 
 # Prerequisites
 
@@ -14,7 +14,7 @@ title: Simple Docker deployment
 
 # Getting the code
 
-The source code used in this sample is [available here](SOME LINK!!!). Download it locally, and create a file named "connection-string.txt" that will contains the connection string to the azure storage that you will use for this sample.
+The source code used in this sample is [available here](https://github.com/dotnet/orleans/tree/master/Samples/Docker-Simple). Download it locally, and create a file named "connection-string.txt" that will contains the connection string to the azure storage that you will use for this sample.
 
 The source code is a pretty standard Orleans application, with the exceptions of  `docker-compose.yaml`, and the `Dockerfile` in the Client and the Silo subfolder. They will be used to build the container images.
 
@@ -29,10 +29,6 @@ AppDomain.CurrentDomain.ProcessExit += (object sender, EventArgs e) =>
 ```
 
 When asked to stop (via the command `docker stop`), the event `AppDomain.CurrentDomain.ProcessExit` will be raised, so you should implement the cleaning/shutdown silo call here.
-
-> [!WARNING]
-> - There is a bug in Orleans, currently the silo will self initiate a fast-kill when detecting that the process is terminating. This is tracked by [this issue](https://github.com/dotnet/orleans/issues/3621)
-> - It seems that Windows container does not receive this event. This is still being investigated
 
 # Building the application
 
