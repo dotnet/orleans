@@ -102,8 +102,12 @@ The following attributes can be added to the `<Provider />` element to configure
 ### ADO.NET Storage Provider (SQL Storage Provider)
 
 The ADO .NET Storage Provider allows you to store grain state in relational databases.
-Currently, SQL Server and MySQL/MariaDB are supported. PostgreSQL is a work in progress
-and not yet available.
+Currently following databases are supported:
+
+- SQL Server
+- MySQL/MariaDB
+- PostgreSQL
+- Oracle
 
 First, install the base package:
 
@@ -120,11 +124,12 @@ The next steps are to install a second NuGet package (see table below) specific 
 database vendor you want, and to configure the storage provider either programmatically or
 via XML configuration.
 
-|                | SQL Server                                                                     | MySQL / MariaDB                                                |
-|----------------|--------------------------------------------------------------------------------|----------------------------------------------------------------|
-| Script         | SQLServer\CreateOrleansTables_SqlServer.sql                                    | MySql\CreateOrleansTables_MySql.sql                            |
-| NuGet Package  | [System.Data.SqlClient](https://www.nuget.org/packages/System.Data.SqlClient/) | [MySql.Data](https://www.nuget.org/packages/MySql.Data/) |
-| AdoInvariant   | System.Data.SqlClient                                                          | MySql.Data.MySqlClient                                         |
+| Database        | Script                                                                                                                                     | NuGet Package                                                                 | AdoInvariant             | Remarks              |
+|-----------------|--------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------|--------------------------|----------------------|
+| SQL Server      | [CreateOrleansTables_SQLServer.sql](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/CreateOrleansTables_SQLServer.sql)   | [System.Data.SqlClient](https://www.nuget.org/packages/System.Data.SqlClient/) | System.Data.SqlClient    |                      |
+| MySQL / MariaDB | [CreateOrleansTables_MySQL.sql](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/CreateOrleansTables_MySQL.sql)            | [MySql.Data](https://www.nuget.org/packages/MySql.Data/)                      | MySql.Data.MySqlClient   |                      |
+| PostgreSQL      | [CreateOrleansTables_PostgreSQL.sql](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/CreateOrleansTables_PostgreSQL.sql) | [Npgsql](https://www.nuget.org/packages/Npgsql/)                              | Npgsql                   |                      |
+| Oracle          | [CreateOrleansTables_Oracle.sql](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/CreateOrleansTables_Oracle.sql)         | [ODP.net](https://www.nuget.org/packages/Oracle.ManagedDataAccess/)           | Oracle.DataAccess.Client | No .net Core support |
 
 The following is an example of how to configure an ADO .NET Storage Provider using XML configuration:
 
@@ -151,7 +156,7 @@ var properties = new Dictionary<string, string>()
     ["DataConnectionString"] = "<ConnectionString>",
     ["UseJsonFormat"] = "true"
 };
- 
+
 config.Globals.RegisterStorageProvider<AdoNetStorageProvider>("OrleansStorage", properties);
 ```
 

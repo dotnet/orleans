@@ -1,6 +1,6 @@
 {
   "homepages": [],
-  "source_base_path": "C:/GitHub/sergeybykov/orleans-2/src",
+  "source_base_path": "C:/GitHub/sergeybykov/Orleans/src",
   "xrefmap": "xrefmap.yml",
   "files": [
     {
@@ -122,11 +122,23 @@
     },
     {
       "type": "Conceptual",
+      "source_relative_path": "Documentation/2.0/Codegen.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/2.0/Codegen.html",
+          "hash": "+Q0bpmP7U8/3DntS2zLv2A=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
       "source_relative_path": "Documentation/2.0/Configuration2.0.md",
       "output": {
         ".html": {
           "relative_path": "Documentation/2.0/Configuration2.0.html",
-          "hash": "PFQGgwoNU1xhU/puIY0DUg=="
+          "hash": "OUkkZAQX+CeDQW2CqCwnDQ=="
         }
       },
       "is_incremental": false,
@@ -138,7 +150,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/2.0/Migration1.5.html",
-          "hash": "hb9vyzW8CTLknQzzJhxT+g=="
+          "hash": "mixv7nsT7PUgTXGulkriog=="
         }
       },
       "is_incremental": false,
@@ -150,7 +162,19 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/2.0/New.html",
-          "hash": "grNvJhT6Afo52J5Ewg6kDA=="
+          "hash": "3F+xPwj4WAhJKjsfUz1Ywg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/2.0/Transactions.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/2.0/Transactions.html",
+          "hash": "UJfRtae/MVAllVvbTMWf2A=="
         }
       },
       "is_incremental": false,
@@ -210,7 +234,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Advanced-Concepts/External-Tasks-and-Grains.html",
-          "hash": "7yefB8MRUOQcHa261OUVvg=="
+          "hash": "OOiDx0w2un8m0+2bA46JDQ=="
         }
       },
       "is_incremental": false,
@@ -318,7 +342,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Core-Features/Grain-Persistence.html",
-          "hash": "Kk8m0Qoy5Tbl0hwi7FIzZA=="
+          "hash": "V4hvDrtXxfNSFWNySFJuMg=="
         }
       },
       "is_incremental": false,
@@ -498,6 +522,18 @@
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Monitoring/Silo-Error-Code-Monitoring.html",
           "hash": "9oLg0ifsRSrX8nykDQ5wqg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/Deployment-and-Operations/Service-Fabric.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/Deployment-and-Operations/Service-Fabric.html",
+          "hash": "IxWAMGErvi8jVnIRKCh2cQ=="
         }
       },
       "is_incremental": false,
@@ -1367,7 +1403,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/toc.html",
-          "hash": "EPI/we0CwZqtIy/PLDBHvQ=="
+          "hash": "OTJ9iAKWV/4wO70RmrUQTA=="
         }
       },
       "is_incremental": false,
@@ -1997,11 +2033,6 @@
         "incrementalPhase": "build"
       },
       "processors": {
-        "TocDocumentProcessor": {
-          "can_incremental": false,
-          "details": "Processor TocDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
-          "incrementalPhase": "build"
-        },
         "ResourceDocumentProcessor": {
           "can_incremental": false,
           "details": "Processor ResourceDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
@@ -2009,6 +2040,11 @@
         },
         "ConceptualDocumentProcessor": {
           "can_incremental": false,
+          "incrementalPhase": "build"
+        },
+        "TocDocumentProcessor": {
+          "can_incremental": false,
+          "details": "Processor TocDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
           "incrementalPhase": "build"
         }
       }
