@@ -93,7 +93,7 @@ namespace Orleans.CodeGeneration
             var methodParameters = concreteMethod.GetParameters();
             for (var i = 0; i < methodParameters.Length; i++)
             {
-                il.LoadArgumentAddress(1); // Load the arguments ref.
+                il.LoadArgument(1); // Load the arguments ref.
 
                 // Skip the type parameters and load the particular argument.
                 il.LoadConstant(i + this.typeParameterCount);

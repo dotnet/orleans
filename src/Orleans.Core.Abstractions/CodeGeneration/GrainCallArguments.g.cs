@@ -9,44 +9,44 @@ using System.Text;
 
 namespace Orleans.CodeGeneration
 {
-	[Serializable]
-	[StructLayout(LayoutKind.Auto)]
-	public struct GrainCallArguments<T1> : IGrainCallArguments
-	{
-		public T1 Item1;
+    [Serializable]
+    [StructLayout(LayoutKind.Auto)]
+    public struct GrainCallArguments<T1> : IGrainCallArguments
+    {
+        public T1 Item1;
 
-		public GrainCallArguments(T1 item1)
-		{
-			Item1 = item1;
-		}
+        public GrainCallArguments(T1 item1)
+        {
+            Item1 = item1;
+        }
 
-		public object this[int index]
-		{
-			get
-			{
-				switch(index)
-				{
-					case 0:
-						return Item1;
-					default:
-						throw new ArgumentOutOfRangeException();
-				}
-			}
+        public object this[int index]
+        {
+            get
+            {
+                switch(index)
+                {
+                    case 0:
+                        return Item1;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
 
-			set
-			{
-				switch(index)
-				{
-					case 0:
-						Item1 = (T1)value;
-						break;
-					default:
-						throw new ArgumentOutOfRangeException();
-				}
-			}
-		}
-		
-		public int Length => 1;
+            set
+            {
+                switch(index)
+                {
+                    case 0:
+                        Item1 = (T1)value;
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
+        }
+        
+        public int Length => 1;
 
         int IReadOnlyCollection<object>.Count => Length;
 
@@ -58,7 +58,7 @@ namespace Orleans.CodeGeneration
 
         public void Visit<TContext>(IGrainCallArgumentVisitor<TContext> vistor, TContext context)
         {
-			vistor.Visit(ref Item1, context);
+            vistor.Visit(ref Item1, context);
         }
 
         public struct Enumerator : IEnumerator<object>
@@ -82,12 +82,12 @@ namespace Orleans.CodeGeneration
 
             public bool MoveNext()
             {
-				if(_index < 1)
-				{
-					_current = _args[_index];
-					_index++;
-					return true;
-				}
+                if(_index < 1)
+                {
+                    _current = _args[_index];
+                    _index++;
+                    return true;
+                }
 
                 return false;
             }
@@ -95,57 +95,57 @@ namespace Orleans.CodeGeneration
             public void Reset()
             {
                 _index = 0;
-				_current = null;
+                _current = null;
             }
         }
-	}
+    }
 
-	[Serializable]
-	[StructLayout(LayoutKind.Auto)]
-	public struct GrainCallArguments<T1, T2> : IGrainCallArguments
-	{
-		public T1 Item1;
+    [Serializable]
+    [StructLayout(LayoutKind.Auto)]
+    public struct GrainCallArguments<T1, T2> : IGrainCallArguments
+    {
+        public T1 Item1;
 
-		public T2 Item2;
+        public T2 Item2;
 
-		public GrainCallArguments(T1 item1, T2 item2)
-		{
-			Item1 = item1;
-			Item2 = item2;
-		}
+        public GrainCallArguments(T1 item1, T2 item2)
+        {
+            Item1 = item1;
+            Item2 = item2;
+        }
 
-		public object this[int index]
-		{
-			get
-			{
-				switch(index)
-				{
-					case 0:
-						return Item1;
-					case 1:
-						return Item2;
-					default:
-						throw new ArgumentOutOfRangeException();
-				}
-			}
+        public object this[int index]
+        {
+            get
+            {
+                switch(index)
+                {
+                    case 0:
+                        return Item1;
+                    case 1:
+                        return Item2;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
 
-			set
-			{
-				switch(index)
-				{
-					case 0:
-						Item1 = (T1)value;
-						break;
-					case 1:
-						Item2 = (T2)value;
-						break;
-					default:
-						throw new ArgumentOutOfRangeException();
-				}
-			}
-		}
-		
-		public int Length => 2;
+            set
+            {
+                switch(index)
+                {
+                    case 0:
+                        Item1 = (T1)value;
+                        break;
+                    case 1:
+                        Item2 = (T2)value;
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
+        }
+        
+        public int Length => 2;
 
         int IReadOnlyCollection<object>.Count => Length;
 
@@ -157,8 +157,8 @@ namespace Orleans.CodeGeneration
 
         public void Visit<TContext>(IGrainCallArgumentVisitor<TContext> vistor, TContext context)
         {
-			vistor.Visit(ref Item1, context);
-			vistor.Visit(ref Item2, context);
+            vistor.Visit(ref Item1, context);
+            vistor.Visit(ref Item2, context);
         }
 
         public struct Enumerator : IEnumerator<object>
@@ -182,12 +182,12 @@ namespace Orleans.CodeGeneration
 
             public bool MoveNext()
             {
-				if(_index < 2)
-				{
-					_current = _args[_index];
-					_index++;
-					return true;
-				}
+                if(_index < 2)
+                {
+                    _current = _args[_index];
+                    _index++;
+                    return true;
+                }
 
                 return false;
             }
@@ -195,65 +195,65 @@ namespace Orleans.CodeGeneration
             public void Reset()
             {
                 _index = 0;
-				_current = null;
+                _current = null;
             }
         }
-	}
+    }
 
-	[Serializable]
-	[StructLayout(LayoutKind.Auto)]
-	public struct GrainCallArguments<T1, T2, T3> : IGrainCallArguments
-	{
-		public T1 Item1;
+    [Serializable]
+    [StructLayout(LayoutKind.Auto)]
+    public struct GrainCallArguments<T1, T2, T3> : IGrainCallArguments
+    {
+        public T1 Item1;
 
-		public T2 Item2;
+        public T2 Item2;
 
-		public T3 Item3;
+        public T3 Item3;
 
-		public GrainCallArguments(T1 item1, T2 item2, T3 item3)
-		{
-			Item1 = item1;
-			Item2 = item2;
-			Item3 = item3;
-		}
+        public GrainCallArguments(T1 item1, T2 item2, T3 item3)
+        {
+            Item1 = item1;
+            Item2 = item2;
+            Item3 = item3;
+        }
 
-		public object this[int index]
-		{
-			get
-			{
-				switch(index)
-				{
-					case 0:
-						return Item1;
-					case 1:
-						return Item2;
-					case 2:
-						return Item3;
-					default:
-						throw new ArgumentOutOfRangeException();
-				}
-			}
+        public object this[int index]
+        {
+            get
+            {
+                switch(index)
+                {
+                    case 0:
+                        return Item1;
+                    case 1:
+                        return Item2;
+                    case 2:
+                        return Item3;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
 
-			set
-			{
-				switch(index)
-				{
-					case 0:
-						Item1 = (T1)value;
-						break;
-					case 1:
-						Item2 = (T2)value;
-						break;
-					case 2:
-						Item3 = (T3)value;
-						break;
-					default:
-						throw new ArgumentOutOfRangeException();
-				}
-			}
-		}
-		
-		public int Length => 3;
+            set
+            {
+                switch(index)
+                {
+                    case 0:
+                        Item1 = (T1)value;
+                        break;
+                    case 1:
+                        Item2 = (T2)value;
+                        break;
+                    case 2:
+                        Item3 = (T3)value;
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
+        }
+        
+        public int Length => 3;
 
         int IReadOnlyCollection<object>.Count => Length;
 
@@ -265,9 +265,9 @@ namespace Orleans.CodeGeneration
 
         public void Visit<TContext>(IGrainCallArgumentVisitor<TContext> vistor, TContext context)
         {
-			vistor.Visit(ref Item1, context);
-			vistor.Visit(ref Item2, context);
-			vistor.Visit(ref Item3, context);
+            vistor.Visit(ref Item1, context);
+            vistor.Visit(ref Item2, context);
+            vistor.Visit(ref Item3, context);
         }
 
         public struct Enumerator : IEnumerator<object>
@@ -291,12 +291,12 @@ namespace Orleans.CodeGeneration
 
             public bool MoveNext()
             {
-				if(_index < 3)
-				{
-					_current = _args[_index];
-					_index++;
-					return true;
-				}
+                if(_index < 3)
+                {
+                    _current = _args[_index];
+                    _index++;
+                    return true;
+                }
 
                 return false;
             }
@@ -304,73 +304,73 @@ namespace Orleans.CodeGeneration
             public void Reset()
             {
                 _index = 0;
-				_current = null;
+                _current = null;
             }
         }
-	}
+    }
 
-	[Serializable]
-	[StructLayout(LayoutKind.Auto)]
-	public struct GrainCallArguments<T1, T2, T3, T4> : IGrainCallArguments
-	{
-		public T1 Item1;
+    [Serializable]
+    [StructLayout(LayoutKind.Auto)]
+    public struct GrainCallArguments<T1, T2, T3, T4> : IGrainCallArguments
+    {
+        public T1 Item1;
 
-		public T2 Item2;
+        public T2 Item2;
 
-		public T3 Item3;
+        public T3 Item3;
 
-		public T4 Item4;
+        public T4 Item4;
 
-		public GrainCallArguments(T1 item1, T2 item2, T3 item3, T4 item4)
-		{
-			Item1 = item1;
-			Item2 = item2;
-			Item3 = item3;
-			Item4 = item4;
-		}
+        public GrainCallArguments(T1 item1, T2 item2, T3 item3, T4 item4)
+        {
+            Item1 = item1;
+            Item2 = item2;
+            Item3 = item3;
+            Item4 = item4;
+        }
 
-		public object this[int index]
-		{
-			get
-			{
-				switch(index)
-				{
-					case 0:
-						return Item1;
-					case 1:
-						return Item2;
-					case 2:
-						return Item3;
-					case 3:
-						return Item4;
-					default:
-						throw new ArgumentOutOfRangeException();
-				}
-			}
+        public object this[int index]
+        {
+            get
+            {
+                switch(index)
+                {
+                    case 0:
+                        return Item1;
+                    case 1:
+                        return Item2;
+                    case 2:
+                        return Item3;
+                    case 3:
+                        return Item4;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
 
-			set
-			{
-				switch(index)
-				{
-					case 0:
-						Item1 = (T1)value;
-						break;
-					case 1:
-						Item2 = (T2)value;
-						break;
-					case 2:
-						Item3 = (T3)value;
-						break;
-					case 3:
-						Item4 = (T4)value;
-						break;
-					default:
-						throw new ArgumentOutOfRangeException();
-				}
-			}
-		}
-		
-		public int Length => 4;
+            set
+            {
+                switch(index)
+                {
+                    case 0:
+                        Item1 = (T1)value;
+                        break;
+                    case 1:
+                        Item2 = (T2)value;
+                        break;
+                    case 2:
+                        Item3 = (T3)value;
+                        break;
+                    case 3:
+                        Item4 = (T4)value;
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
+        }
+        
+        public int Length => 4;
 
         int IReadOnlyCollection<object>.Count => Length;
 
@@ -382,10 +382,10 @@ namespace Orleans.CodeGeneration
 
         public void Visit<TContext>(IGrainCallArgumentVisitor<TContext> vistor, TContext context)
         {
-			vistor.Visit(ref Item1, context);
-			vistor.Visit(ref Item2, context);
-			vistor.Visit(ref Item3, context);
-			vistor.Visit(ref Item4, context);
+            vistor.Visit(ref Item1, context);
+            vistor.Visit(ref Item2, context);
+            vistor.Visit(ref Item3, context);
+            vistor.Visit(ref Item4, context);
         }
 
         public struct Enumerator : IEnumerator<object>
@@ -409,12 +409,12 @@ namespace Orleans.CodeGeneration
 
             public bool MoveNext()
             {
-				if(_index < 4)
-				{
-					_current = _args[_index];
-					_index++;
-					return true;
-				}
+                if(_index < 4)
+                {
+                    _current = _args[_index];
+                    _index++;
+                    return true;
+                }
 
                 return false;
             }
@@ -422,81 +422,81 @@ namespace Orleans.CodeGeneration
             public void Reset()
             {
                 _index = 0;
-				_current = null;
+                _current = null;
             }
         }
-	}
+    }
 
-	[Serializable]
-	[StructLayout(LayoutKind.Auto)]
-	public struct GrainCallArguments<T1, T2, T3, T4, T5> : IGrainCallArguments
-	{
-		public T1 Item1;
+    [Serializable]
+    [StructLayout(LayoutKind.Auto)]
+    public struct GrainCallArguments<T1, T2, T3, T4, T5> : IGrainCallArguments
+    {
+        public T1 Item1;
 
-		public T2 Item2;
+        public T2 Item2;
 
-		public T3 Item3;
+        public T3 Item3;
 
-		public T4 Item4;
+        public T4 Item4;
 
-		public T5 Item5;
+        public T5 Item5;
 
-		public GrainCallArguments(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5)
-		{
-			Item1 = item1;
-			Item2 = item2;
-			Item3 = item3;
-			Item4 = item4;
-			Item5 = item5;
-		}
+        public GrainCallArguments(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5)
+        {
+            Item1 = item1;
+            Item2 = item2;
+            Item3 = item3;
+            Item4 = item4;
+            Item5 = item5;
+        }
 
-		public object this[int index]
-		{
-			get
-			{
-				switch(index)
-				{
-					case 0:
-						return Item1;
-					case 1:
-						return Item2;
-					case 2:
-						return Item3;
-					case 3:
-						return Item4;
-					case 4:
-						return Item5;
-					default:
-						throw new ArgumentOutOfRangeException();
-				}
-			}
+        public object this[int index]
+        {
+            get
+            {
+                switch(index)
+                {
+                    case 0:
+                        return Item1;
+                    case 1:
+                        return Item2;
+                    case 2:
+                        return Item3;
+                    case 3:
+                        return Item4;
+                    case 4:
+                        return Item5;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
 
-			set
-			{
-				switch(index)
-				{
-					case 0:
-						Item1 = (T1)value;
-						break;
-					case 1:
-						Item2 = (T2)value;
-						break;
-					case 2:
-						Item3 = (T3)value;
-						break;
-					case 3:
-						Item4 = (T4)value;
-						break;
-					case 4:
-						Item5 = (T5)value;
-						break;
-					default:
-						throw new ArgumentOutOfRangeException();
-				}
-			}
-		}
-		
-		public int Length => 5;
+            set
+            {
+                switch(index)
+                {
+                    case 0:
+                        Item1 = (T1)value;
+                        break;
+                    case 1:
+                        Item2 = (T2)value;
+                        break;
+                    case 2:
+                        Item3 = (T3)value;
+                        break;
+                    case 3:
+                        Item4 = (T4)value;
+                        break;
+                    case 4:
+                        Item5 = (T5)value;
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
+        }
+        
+        public int Length => 5;
 
         int IReadOnlyCollection<object>.Count => Length;
 
@@ -508,11 +508,11 @@ namespace Orleans.CodeGeneration
 
         public void Visit<TContext>(IGrainCallArgumentVisitor<TContext> vistor, TContext context)
         {
-			vistor.Visit(ref Item1, context);
-			vistor.Visit(ref Item2, context);
-			vistor.Visit(ref Item3, context);
-			vistor.Visit(ref Item4, context);
-			vistor.Visit(ref Item5, context);
+            vistor.Visit(ref Item1, context);
+            vistor.Visit(ref Item2, context);
+            vistor.Visit(ref Item3, context);
+            vistor.Visit(ref Item4, context);
+            vistor.Visit(ref Item5, context);
         }
 
         public struct Enumerator : IEnumerator<object>
@@ -536,12 +536,12 @@ namespace Orleans.CodeGeneration
 
             public bool MoveNext()
             {
-				if(_index < 5)
-				{
-					_current = _args[_index];
-					_index++;
-					return true;
-				}
+                if(_index < 5)
+                {
+                    _current = _args[_index];
+                    _index++;
+                    return true;
+                }
 
                 return false;
             }
@@ -549,89 +549,89 @@ namespace Orleans.CodeGeneration
             public void Reset()
             {
                 _index = 0;
-				_current = null;
+                _current = null;
             }
         }
-	}
+    }
 
-	[Serializable]
-	[StructLayout(LayoutKind.Auto)]
-	public struct GrainCallArguments<T1, T2, T3, T4, T5, T6> : IGrainCallArguments
-	{
-		public T1 Item1;
+    [Serializable]
+    [StructLayout(LayoutKind.Auto)]
+    public struct GrainCallArguments<T1, T2, T3, T4, T5, T6> : IGrainCallArguments
+    {
+        public T1 Item1;
 
-		public T2 Item2;
+        public T2 Item2;
 
-		public T3 Item3;
+        public T3 Item3;
 
-		public T4 Item4;
+        public T4 Item4;
 
-		public T5 Item5;
+        public T5 Item5;
 
-		public T6 Item6;
+        public T6 Item6;
 
-		public GrainCallArguments(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5, T6 item6)
-		{
-			Item1 = item1;
-			Item2 = item2;
-			Item3 = item3;
-			Item4 = item4;
-			Item5 = item5;
-			Item6 = item6;
-		}
+        public GrainCallArguments(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5, T6 item6)
+        {
+            Item1 = item1;
+            Item2 = item2;
+            Item3 = item3;
+            Item4 = item4;
+            Item5 = item5;
+            Item6 = item6;
+        }
 
-		public object this[int index]
-		{
-			get
-			{
-				switch(index)
-				{
-					case 0:
-						return Item1;
-					case 1:
-						return Item2;
-					case 2:
-						return Item3;
-					case 3:
-						return Item4;
-					case 4:
-						return Item5;
-					case 5:
-						return Item6;
-					default:
-						throw new ArgumentOutOfRangeException();
-				}
-			}
+        public object this[int index]
+        {
+            get
+            {
+                switch(index)
+                {
+                    case 0:
+                        return Item1;
+                    case 1:
+                        return Item2;
+                    case 2:
+                        return Item3;
+                    case 3:
+                        return Item4;
+                    case 4:
+                        return Item5;
+                    case 5:
+                        return Item6;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
 
-			set
-			{
-				switch(index)
-				{
-					case 0:
-						Item1 = (T1)value;
-						break;
-					case 1:
-						Item2 = (T2)value;
-						break;
-					case 2:
-						Item3 = (T3)value;
-						break;
-					case 3:
-						Item4 = (T4)value;
-						break;
-					case 4:
-						Item5 = (T5)value;
-						break;
-					case 5:
-						Item6 = (T6)value;
-						break;
-					default:
-						throw new ArgumentOutOfRangeException();
-				}
-			}
-		}
-		
-		public int Length => 6;
+            set
+            {
+                switch(index)
+                {
+                    case 0:
+                        Item1 = (T1)value;
+                        break;
+                    case 1:
+                        Item2 = (T2)value;
+                        break;
+                    case 2:
+                        Item3 = (T3)value;
+                        break;
+                    case 3:
+                        Item4 = (T4)value;
+                        break;
+                    case 4:
+                        Item5 = (T5)value;
+                        break;
+                    case 5:
+                        Item6 = (T6)value;
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
+        }
+        
+        public int Length => 6;
 
         int IReadOnlyCollection<object>.Count => Length;
 
@@ -643,12 +643,12 @@ namespace Orleans.CodeGeneration
 
         public void Visit<TContext>(IGrainCallArgumentVisitor<TContext> vistor, TContext context)
         {
-			vistor.Visit(ref Item1, context);
-			vistor.Visit(ref Item2, context);
-			vistor.Visit(ref Item3, context);
-			vistor.Visit(ref Item4, context);
-			vistor.Visit(ref Item5, context);
-			vistor.Visit(ref Item6, context);
+            vistor.Visit(ref Item1, context);
+            vistor.Visit(ref Item2, context);
+            vistor.Visit(ref Item3, context);
+            vistor.Visit(ref Item4, context);
+            vistor.Visit(ref Item5, context);
+            vistor.Visit(ref Item6, context);
         }
 
         public struct Enumerator : IEnumerator<object>
@@ -672,12 +672,12 @@ namespace Orleans.CodeGeneration
 
             public bool MoveNext()
             {
-				if(_index < 6)
-				{
-					_current = _args[_index];
-					_index++;
-					return true;
-				}
+                if(_index < 6)
+                {
+                    _current = _args[_index];
+                    _index++;
+                    return true;
+                }
 
                 return false;
             }
@@ -685,97 +685,97 @@ namespace Orleans.CodeGeneration
             public void Reset()
             {
                 _index = 0;
-				_current = null;
+                _current = null;
             }
         }
-	}
+    }
 
-	[Serializable]
-	[StructLayout(LayoutKind.Auto)]
-	public struct GrainCallArguments<T1, T2, T3, T4, T5, T6, T7> : IGrainCallArguments
-	{
-		public T1 Item1;
+    [Serializable]
+    [StructLayout(LayoutKind.Auto)]
+    public struct GrainCallArguments<T1, T2, T3, T4, T5, T6, T7> : IGrainCallArguments
+    {
+        public T1 Item1;
 
-		public T2 Item2;
+        public T2 Item2;
 
-		public T3 Item3;
+        public T3 Item3;
 
-		public T4 Item4;
+        public T4 Item4;
 
-		public T5 Item5;
+        public T5 Item5;
 
-		public T6 Item6;
+        public T6 Item6;
 
-		public T7 Item7;
+        public T7 Item7;
 
-		public GrainCallArguments(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5, T6 item6, T7 item7)
-		{
-			Item1 = item1;
-			Item2 = item2;
-			Item3 = item3;
-			Item4 = item4;
-			Item5 = item5;
-			Item6 = item6;
-			Item7 = item7;
-		}
+        public GrainCallArguments(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5, T6 item6, T7 item7)
+        {
+            Item1 = item1;
+            Item2 = item2;
+            Item3 = item3;
+            Item4 = item4;
+            Item5 = item5;
+            Item6 = item6;
+            Item7 = item7;
+        }
 
-		public object this[int index]
-		{
-			get
-			{
-				switch(index)
-				{
-					case 0:
-						return Item1;
-					case 1:
-						return Item2;
-					case 2:
-						return Item3;
-					case 3:
-						return Item4;
-					case 4:
-						return Item5;
-					case 5:
-						return Item6;
-					case 6:
-						return Item7;
-					default:
-						throw new ArgumentOutOfRangeException();
-				}
-			}
+        public object this[int index]
+        {
+            get
+            {
+                switch(index)
+                {
+                    case 0:
+                        return Item1;
+                    case 1:
+                        return Item2;
+                    case 2:
+                        return Item3;
+                    case 3:
+                        return Item4;
+                    case 4:
+                        return Item5;
+                    case 5:
+                        return Item6;
+                    case 6:
+                        return Item7;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
 
-			set
-			{
-				switch(index)
-				{
-					case 0:
-						Item1 = (T1)value;
-						break;
-					case 1:
-						Item2 = (T2)value;
-						break;
-					case 2:
-						Item3 = (T3)value;
-						break;
-					case 3:
-						Item4 = (T4)value;
-						break;
-					case 4:
-						Item5 = (T5)value;
-						break;
-					case 5:
-						Item6 = (T6)value;
-						break;
-					case 6:
-						Item7 = (T7)value;
-						break;
-					default:
-						throw new ArgumentOutOfRangeException();
-				}
-			}
-		}
-		
-		public int Length => 7;
+            set
+            {
+                switch(index)
+                {
+                    case 0:
+                        Item1 = (T1)value;
+                        break;
+                    case 1:
+                        Item2 = (T2)value;
+                        break;
+                    case 2:
+                        Item3 = (T3)value;
+                        break;
+                    case 3:
+                        Item4 = (T4)value;
+                        break;
+                    case 4:
+                        Item5 = (T5)value;
+                        break;
+                    case 5:
+                        Item6 = (T6)value;
+                        break;
+                    case 6:
+                        Item7 = (T7)value;
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
+        }
+        
+        public int Length => 7;
 
         int IReadOnlyCollection<object>.Count => Length;
 
@@ -787,13 +787,13 @@ namespace Orleans.CodeGeneration
 
         public void Visit<TContext>(IGrainCallArgumentVisitor<TContext> vistor, TContext context)
         {
-			vistor.Visit(ref Item1, context);
-			vistor.Visit(ref Item2, context);
-			vistor.Visit(ref Item3, context);
-			vistor.Visit(ref Item4, context);
-			vistor.Visit(ref Item5, context);
-			vistor.Visit(ref Item6, context);
-			vistor.Visit(ref Item7, context);
+            vistor.Visit(ref Item1, context);
+            vistor.Visit(ref Item2, context);
+            vistor.Visit(ref Item3, context);
+            vistor.Visit(ref Item4, context);
+            vistor.Visit(ref Item5, context);
+            vistor.Visit(ref Item6, context);
+            vistor.Visit(ref Item7, context);
         }
 
         public struct Enumerator : IEnumerator<object>
@@ -817,12 +817,12 @@ namespace Orleans.CodeGeneration
 
             public bool MoveNext()
             {
-				if(_index < 7)
-				{
-					_current = _args[_index];
-					_index++;
-					return true;
-				}
+                if(_index < 7)
+                {
+                    _current = _args[_index];
+                    _index++;
+                    return true;
+                }
 
                 return false;
             }
@@ -830,105 +830,105 @@ namespace Orleans.CodeGeneration
             public void Reset()
             {
                 _index = 0;
-				_current = null;
+                _current = null;
             }
         }
-	}
+    }
 
-	[Serializable]
-	[StructLayout(LayoutKind.Auto)]
-	public struct GrainCallArguments<T1, T2, T3, T4, T5, T6, T7, T8> : IGrainCallArguments
-	{
-		public T1 Item1;
+    [Serializable]
+    [StructLayout(LayoutKind.Auto)]
+    public struct GrainCallArguments<T1, T2, T3, T4, T5, T6, T7, T8> : IGrainCallArguments
+    {
+        public T1 Item1;
 
-		public T2 Item2;
+        public T2 Item2;
 
-		public T3 Item3;
+        public T3 Item3;
 
-		public T4 Item4;
+        public T4 Item4;
 
-		public T5 Item5;
+        public T5 Item5;
 
-		public T6 Item6;
+        public T6 Item6;
 
-		public T7 Item7;
+        public T7 Item7;
 
-		public T8 Item8;
+        public T8 Item8;
 
-		public GrainCallArguments(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5, T6 item6, T7 item7, T8 item8)
-		{
-			Item1 = item1;
-			Item2 = item2;
-			Item3 = item3;
-			Item4 = item4;
-			Item5 = item5;
-			Item6 = item6;
-			Item7 = item7;
-			Item8 = item8;
-		}
+        public GrainCallArguments(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5, T6 item6, T7 item7, T8 item8)
+        {
+            Item1 = item1;
+            Item2 = item2;
+            Item3 = item3;
+            Item4 = item4;
+            Item5 = item5;
+            Item6 = item6;
+            Item7 = item7;
+            Item8 = item8;
+        }
 
-		public object this[int index]
-		{
-			get
-			{
-				switch(index)
-				{
-					case 0:
-						return Item1;
-					case 1:
-						return Item2;
-					case 2:
-						return Item3;
-					case 3:
-						return Item4;
-					case 4:
-						return Item5;
-					case 5:
-						return Item6;
-					case 6:
-						return Item7;
-					case 7:
-						return Item8;
-					default:
-						throw new ArgumentOutOfRangeException();
-				}
-			}
+        public object this[int index]
+        {
+            get
+            {
+                switch(index)
+                {
+                    case 0:
+                        return Item1;
+                    case 1:
+                        return Item2;
+                    case 2:
+                        return Item3;
+                    case 3:
+                        return Item4;
+                    case 4:
+                        return Item5;
+                    case 5:
+                        return Item6;
+                    case 6:
+                        return Item7;
+                    case 7:
+                        return Item8;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
 
-			set
-			{
-				switch(index)
-				{
-					case 0:
-						Item1 = (T1)value;
-						break;
-					case 1:
-						Item2 = (T2)value;
-						break;
-					case 2:
-						Item3 = (T3)value;
-						break;
-					case 3:
-						Item4 = (T4)value;
-						break;
-					case 4:
-						Item5 = (T5)value;
-						break;
-					case 5:
-						Item6 = (T6)value;
-						break;
-					case 6:
-						Item7 = (T7)value;
-						break;
-					case 7:
-						Item8 = (T8)value;
-						break;
-					default:
-						throw new ArgumentOutOfRangeException();
-				}
-			}
-		}
-		
-		public int Length => 8;
+            set
+            {
+                switch(index)
+                {
+                    case 0:
+                        Item1 = (T1)value;
+                        break;
+                    case 1:
+                        Item2 = (T2)value;
+                        break;
+                    case 2:
+                        Item3 = (T3)value;
+                        break;
+                    case 3:
+                        Item4 = (T4)value;
+                        break;
+                    case 4:
+                        Item5 = (T5)value;
+                        break;
+                    case 5:
+                        Item6 = (T6)value;
+                        break;
+                    case 6:
+                        Item7 = (T7)value;
+                        break;
+                    case 7:
+                        Item8 = (T8)value;
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
+        }
+        
+        public int Length => 8;
 
         int IReadOnlyCollection<object>.Count => Length;
 
@@ -940,14 +940,14 @@ namespace Orleans.CodeGeneration
 
         public void Visit<TContext>(IGrainCallArgumentVisitor<TContext> vistor, TContext context)
         {
-			vistor.Visit(ref Item1, context);
-			vistor.Visit(ref Item2, context);
-			vistor.Visit(ref Item3, context);
-			vistor.Visit(ref Item4, context);
-			vistor.Visit(ref Item5, context);
-			vistor.Visit(ref Item6, context);
-			vistor.Visit(ref Item7, context);
-			vistor.Visit(ref Item8, context);
+            vistor.Visit(ref Item1, context);
+            vistor.Visit(ref Item2, context);
+            vistor.Visit(ref Item3, context);
+            vistor.Visit(ref Item4, context);
+            vistor.Visit(ref Item5, context);
+            vistor.Visit(ref Item6, context);
+            vistor.Visit(ref Item7, context);
+            vistor.Visit(ref Item8, context);
         }
 
         public struct Enumerator : IEnumerator<object>
@@ -971,12 +971,12 @@ namespace Orleans.CodeGeneration
 
             public bool MoveNext()
             {
-				if(_index < 8)
-				{
-					_current = _args[_index];
-					_index++;
-					return true;
-				}
+                if(_index < 8)
+                {
+                    _current = _args[_index];
+                    _index++;
+                    return true;
+                }
 
                 return false;
             }
@@ -984,62 +984,62 @@ namespace Orleans.CodeGeneration
             public void Reset()
             {
                 _index = 0;
-				_current = null;
+                _current = null;
             }
         }
-	}
+    }
 
-	public partial struct GrainCallArguments
-	{
-		public static GrainCallArguments<T1> Create<T1>(T1 item1) =>
-			new GrainCallArguments<T1>(item1);
+    public partial struct GrainCallArguments
+    {
+        public static GrainCallArguments<T1> Create<T1>(T1 item1) =>
+            new GrainCallArguments<T1>(item1);
 
-		public static GrainCallArguments<T1, T2> Create<T1, T2>(T1 item1, T2 item2) =>
-			new GrainCallArguments<T1, T2>(item1, item2);
+        public static GrainCallArguments<T1, T2> Create<T1, T2>(T1 item1, T2 item2) =>
+            new GrainCallArguments<T1, T2>(item1, item2);
 
-		public static GrainCallArguments<T1, T2, T3> Create<T1, T2, T3>(T1 item1, T2 item2, T3 item3) =>
-			new GrainCallArguments<T1, T2, T3>(item1, item2, item3);
+        public static GrainCallArguments<T1, T2, T3> Create<T1, T2, T3>(T1 item1, T2 item2, T3 item3) =>
+            new GrainCallArguments<T1, T2, T3>(item1, item2, item3);
 
-		public static GrainCallArguments<T1, T2, T3, T4> Create<T1, T2, T3, T4>(T1 item1, T2 item2, T3 item3, T4 item4) =>
-			new GrainCallArguments<T1, T2, T3, T4>(item1, item2, item3, item4);
+        public static GrainCallArguments<T1, T2, T3, T4> Create<T1, T2, T3, T4>(T1 item1, T2 item2, T3 item3, T4 item4) =>
+            new GrainCallArguments<T1, T2, T3, T4>(item1, item2, item3, item4);
 
-		public static GrainCallArguments<T1, T2, T3, T4, T5> Create<T1, T2, T3, T4, T5>(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5) =>
-			new GrainCallArguments<T1, T2, T3, T4, T5>(item1, item2, item3, item4, item5);
+        public static GrainCallArguments<T1, T2, T3, T4, T5> Create<T1, T2, T3, T4, T5>(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5) =>
+            new GrainCallArguments<T1, T2, T3, T4, T5>(item1, item2, item3, item4, item5);
 
-		public static GrainCallArguments<T1, T2, T3, T4, T5, T6> Create<T1, T2, T3, T4, T5, T6>(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5, T6 item6) =>
-			new GrainCallArguments<T1, T2, T3, T4, T5, T6>(item1, item2, item3, item4, item5, item6);
+        public static GrainCallArguments<T1, T2, T3, T4, T5, T6> Create<T1, T2, T3, T4, T5, T6>(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5, T6 item6) =>
+            new GrainCallArguments<T1, T2, T3, T4, T5, T6>(item1, item2, item3, item4, item5, item6);
 
-		public static GrainCallArguments<T1, T2, T3, T4, T5, T6, T7> Create<T1, T2, T3, T4, T5, T6, T7>(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5, T6 item6, T7 item7) =>
-			new GrainCallArguments<T1, T2, T3, T4, T5, T6, T7>(item1, item2, item3, item4, item5, item6, item7);
+        public static GrainCallArguments<T1, T2, T3, T4, T5, T6, T7> Create<T1, T2, T3, T4, T5, T6, T7>(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5, T6 item6, T7 item7) =>
+            new GrainCallArguments<T1, T2, T3, T4, T5, T6, T7>(item1, item2, item3, item4, item5, item6, item7);
 
-		public static GrainCallArguments<T1, T2, T3, T4, T5, T6, T7, T8> Create<T1, T2, T3, T4, T5, T6, T7, T8>(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5, T6 item6, T7 item7, T8 item8) =>
-			new GrainCallArguments<T1, T2, T3, T4, T5, T6, T7, T8>(item1, item2, item3, item4, item5, item6, item7, item8);
+        public static GrainCallArguments<T1, T2, T3, T4, T5, T6, T7, T8> Create<T1, T2, T3, T4, T5, T6, T7, T8>(T1 item1, T2 item2, T3 item3, T4 item4, T5 item5, T6 item6, T7 item7, T8 item8) =>
+            new GrainCallArguments<T1, T2, T3, T4, T5, T6, T7, T8>(item1, item2, item3, item4, item5, item6, item7, item8);
 
-		public static Type GetGenericDefinition(int argumentsCount)
-		{
-			switch(argumentsCount)
-			{
-				case 0:
-					return typeof(GrainCallArguments);
-				case 1:
-					return typeof(GrainCallArguments<>);
-				case 2:
-					return typeof(GrainCallArguments<,>);
-				case 3:
-					return typeof(GrainCallArguments<,,>);
-				case 4:
-					return typeof(GrainCallArguments<,,,>);
-				case 5:
-					return typeof(GrainCallArguments<,,,,>);
-				case 6:
-					return typeof(GrainCallArguments<,,,,,>);
-				case 7:
-					return typeof(GrainCallArguments<,,,,,,>);
-				case 8:
-					return typeof(GrainCallArguments<,,,,,,,>);
-				default:
-					throw new ArgumentOutOfRangeException();
-			}
-		}
-	}
+        public static Type GetGenericDefinition(int argumentsCount)
+        {
+            switch(argumentsCount)
+            {
+                case 0:
+                    return typeof(GrainCallArguments);
+                case 1:
+                    return typeof(GrainCallArguments<>);
+                case 2:
+                    return typeof(GrainCallArguments<,>);
+                case 3:
+                    return typeof(GrainCallArguments<,,>);
+                case 4:
+                    return typeof(GrainCallArguments<,,,>);
+                case 5:
+                    return typeof(GrainCallArguments<,,,,>);
+                case 6:
+                    return typeof(GrainCallArguments<,,,,,>);
+                case 7:
+                    return typeof(GrainCallArguments<,,,,,,>);
+                case 8:
+                    return typeof(GrainCallArguments<,,,,,,,>);
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+        }
+    }
 }

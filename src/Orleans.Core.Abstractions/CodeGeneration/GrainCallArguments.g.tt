@@ -21,54 +21,54 @@ namespace Orleans.CodeGeneration
 <#
 for (int i = 1; i <= maxArgsCount; i++)
 {
-	var typeArgs = string.Join(", ", from t in Enumerable.Range(1, i) select "T" + t);
+    var typeArgs = string.Join(", ", from t in Enumerable.Range(1, i) select "T" + t);
 #>
-	[Serializable]
-	[StructLayout(LayoutKind.Auto)]
-	public struct GrainCallArguments<<#= typeArgs #>> : IGrainCallArguments
-	{
+    [Serializable]
+    [StructLayout(LayoutKind.Auto)]
+    public struct GrainCallArguments<<#= typeArgs #>> : IGrainCallArguments
+    {
 <# for (int j = 1; j <= i; j++) { #>
-		public T<#= j #> Item<#= j #>;
+        public T<#= j #> Item<#= j #>;
 
 <#} #>
-		public GrainCallArguments(<#= string.Join(", ", from t in Enumerable.Range(1, i) select string.Format("T{0} item{0}", t)) #>)
-		{
+        public GrainCallArguments(<#= string.Join(", ", from t in Enumerable.Range(1, i) select string.Format("T{0} item{0}", t)) #>)
+        {
 <# for (int j = 1; j <= i; j++) { #>
-			Item<#= j #> = item<#= j #>;
+            Item<#= j #> = item<#= j #>;
 <#} #>
-		}
+        }
 
-		public object this[int index]
-		{
-			get
-			{
-				switch(index)
-				{
+        public object this[int index]
+        {
+            get
+            {
+                switch(index)
+                {
 <# for (int j = 0; j < i; j++) { #>
-					case <#= j #>:
-						return Item<#= j + 1 #>;
+                    case <#= j #>:
+                        return Item<#= j + 1 #>;
 <#} #>
-					default:
-						throw new ArgumentOutOfRangeException();
-				}
-			}
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
 
-			set
-			{
-				switch(index)
-				{
+            set
+            {
+                switch(index)
+                {
 <# for (int j = 0; j < i; j++) { #>
-					case <#= j #>:
-						Item<#= j + 1 #> = (T<#= j + 1 #>)value;
-						break;
+                    case <#= j #>:
+                        Item<#= j + 1 #> = (T<#= j + 1 #>)value;
+                        break;
 <#} #>
-					default:
-						throw new ArgumentOutOfRangeException();
-				}
-			}
-		}
-		
-		public int Length => <#= i #>;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
+        }
+        
+        public int Length => <#= i #>;
 
         int IReadOnlyCollection<object>.Count => Length;
 
@@ -81,7 +81,7 @@ for (int i = 1; i <= maxArgsCount; i++)
         public void Visit<TContext>(IGrainCallArgumentVisitor<TContext> vistor, TContext context)
         {
 <# for (int j = 1; j <= i; j++) { #>
-			vistor.Visit(ref Item<#= j #>, context);
+            vistor.Visit(ref Item<#= j #>, context);
 <#} #>
         }
 
@@ -106,12 +106,12 @@ for (int i = 1; i <= maxArgsCount; i++)
 
             public bool MoveNext()
             {
-				if(_index < <#= i #>)
-				{
-					_current = _args[_index];
-					_index++;
-					return true;
-				}
+                if(_index < <#= i #>)
+                {
+                    _current = _args[_index];
+                    _index++;
+                    return true;
+                }
 
                 return false;
             }
@@ -119,42 +119,42 @@ for (int i = 1; i <= maxArgsCount; i++)
             public void Reset()
             {
                 _index = 0;
-				_current = null;
+                _current = null;
             }
         }
-	}
+    }
 
 <#
 }
 #>
-	public partial struct GrainCallArguments
-	{
+    public partial struct GrainCallArguments
+    {
 <#
 for (int i = 1; i <= maxArgsCount; i++)
 {
-	var typeArgs = string.Join(", ", from t in Enumerable.Range(1, i) select "T" + t);
-	var args = string.Join(", ", from t in Enumerable.Range(1, i) select string.Format("T{0} item{0}", t));
-	var @params = string.Join(", ", from t in Enumerable.Range(1, i) select "item" + t);
+    var typeArgs = string.Join(", ", from t in Enumerable.Range(1, i) select "T" + t);
+    var args = string.Join(", ", from t in Enumerable.Range(1, i) select string.Format("T{0} item{0}", t));
+    var @params = string.Join(", ", from t in Enumerable.Range(1, i) select "item" + t);
 #>
-		public static GrainCallArguments<<#= typeArgs #>> Create<<#= typeArgs #>>(<#= args #>) =>
-			new GrainCallArguments<<#= typeArgs #>>(<#= @params #>);
+        public static GrainCallArguments<<#= typeArgs #>> Create<<#= typeArgs #>>(<#= args #>) =>
+            new GrainCallArguments<<#= typeArgs #>>(<#= @params #>);
 
 <#
 }
 #>
-		public static Type GetGenericDefinition(int argumentsCount)
-		{
-			switch(argumentsCount)
-			{
-				case 0:
-					return typeof(GrainCallArguments);
+        public static Type GetGenericDefinition(int argumentsCount)
+        {
+            switch(argumentsCount)
+            {
+                case 0:
+                    return typeof(GrainCallArguments);
 <# for (int i = 1; i <= maxArgsCount; i++) { #>
-				case <#= i #>:
-					return typeof(GrainCallArguments<<#= string.Concat(Enumerable.Repeat(",", i - 1)) #>>);
+                case <#= i #>:
+                    return typeof(GrainCallArguments<<#= string.Concat(Enumerable.Repeat(",", i - 1)) #>>);
 <#} #>
-				default:
-					throw new ArgumentOutOfRangeException();
-			}
-		}
-	}
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+        }
+    }
 }
