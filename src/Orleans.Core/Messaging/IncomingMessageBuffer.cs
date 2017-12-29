@@ -176,6 +176,11 @@ namespace Orleans.Runtime
             {
                 Headers = SerializationManager.DeserializeMessageHeaders(this.deserializationContext)
             };
+            if (msg.HasDirection && msg.Direction != Message.Directions.Response)
+            {
+                msg.ExpectedBodyType = typeof(CodeGeneration.InvokeMethodRequest<>);
+                this.deserializationContext.GenericGrainType = string.IsNullOrEmpty(msg.GenericGrainType) ? null : msg.GenericGrainType;
+            }
             try
             {
                 if (this.supportForwarding)

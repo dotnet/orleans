@@ -103,6 +103,7 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<ICorePerformanceMetrics, ISiloPerformanceMetrics>();
             services.TryAddSingleton<GrainTypeManager>();
             services.TryAddSingleton(sp => sp.GetRequiredService<GrainTypeManager>());
+            services.TryAddFromExisting<CodeGeneration.IGrainMethodInvokerFinder, GrainTypeManager>();
             services.TryAddSingleton<MessageCenter>();
             services.TryAddFromExisting<IMessageCenter, MessageCenter>();
             services.TryAddFromExisting<ISiloMessageCenter, MessageCenter>();

@@ -336,7 +336,7 @@ namespace Orleans.Runtime
                 object resultObject;
                 try
                 {
-                    var request = (InvokeMethodRequest) message.GetDeserializedBody(this.SerializationManager, null);
+                    var request = (InvokeMethodRequest) message.GetDeserializedBody(this.SerializationManager);
                     if (request.Arguments.Length != 0)
                     {
                         CancellationSourcesExtension.RegisterCancellationTokens(target, request, this.loggerFactory, logger, this, this.cancellationTokenRuntime);

@@ -69,6 +69,8 @@ namespace Orleans.Serialization
         /// </summary>
         int CurrentPosition { get; }
 
+        string GenericGrainType { get; }
+
         /// <summary>
         /// Records deserialization of the provided object.
         /// </summary>

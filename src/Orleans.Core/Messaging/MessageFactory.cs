@@ -30,6 +30,7 @@ namespace Orleans.Runtime
                 IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
                 IsTransactionRequired = (options & InvokeMethodOptions.TransactionRequiresNew) != 0 || (options & InvokeMethodOptions.TransactionRequired) != 0,
                 BodyObject = request,
+                ExpectedBodyType = request.GetType(),
                 IsUsingInterfaceVersions = request.InterfaceVersion > 0,
             };
 

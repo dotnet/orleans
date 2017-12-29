@@ -68,9 +68,12 @@ namespace Orleans.Serialization
         {
             this.taggedObjects.Clear();
             this.CurrentObjectOffset = 0;
+            this.GenericGrainType = null;
         }
 
         public override object AdditionalContext => this.SerializationManager.RuntimeClient;
+
+        public string GenericGrainType { get; set; }
 
         public object DeserializeInner(Type expected)
         {
@@ -101,6 +104,8 @@ namespace Orleans.Serialization
             public IBinaryTokenStreamReader StreamReader { get; }
             public int CurrentObjectOffset { get; set; }
             public int CurrentPosition => this.position + this.StreamReader.CurrentPosition;
+            public string GenericGrainType => this.parent.GenericGrainType;
+
             public void RecordObject(object obj, int offset) => this.parent.RecordObject(obj, offset);
             public void RecordObject(object obj) => this.RecordObject(obj, this.CurrentObjectOffset);
             public object FetchReferencedObject(int offset) => this.parent.FetchReferencedObject(offset);

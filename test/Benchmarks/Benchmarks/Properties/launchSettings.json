@@ -1,9 +1,0 @@
-{
-  "profiles": {
-    "Benchmarks": {
-      "commandName": "Project",
-      "commandLineArgs": "Ping",
-      "workingDirectory": "F:\\Work\\Repository\\orleans\\test\\Benchmarks\\Benchmarks\\bin\\Debug\\net461\\win10-x64"
-    }
-  }
-}

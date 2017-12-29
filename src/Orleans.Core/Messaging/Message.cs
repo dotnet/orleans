@@ -392,13 +392,13 @@ namespace Orleans.Runtime
             set { Headers.RequestContextData = value; }
         }
 
-        public object GetDeserializedBody(SerializationManager serializationManager, Type expectedType = null)
+        public object GetDeserializedBody(SerializationManager serializationManager)
         {
             if (this.bodyObject != null) return this.bodyObject;
             
             try
             {
-                this.bodyObject = DeserializeBody(serializationManager, this.bodyBytes, expectedType);
+                this.bodyObject = DeserializeBody(serializationManager, this.bodyBytes, ExpectedBodyType);
             }
             finally
             {
@@ -424,7 +424,9 @@ namespace Orleans.Runtime
             }
         }
 
-        private static object DeserializeBody(SerializationManager serializationManager, List<ArraySegment<byte>> bytes, Type expectedType = null)
+        public Type ExpectedBodyType { get; set; }
+
+        private static object DeserializeBody(SerializationManager serializationManager, List<ArraySegment<byte>> bytes, Type expectedType)
         {
             if (bytes == null)
             {
@@ -460,7 +462,7 @@ namespace Orleans.Runtime
         /// <param name="body">The serialized body contents.</param>
         public void DeserializeBodyObject(SerializationManager serializationManager, List<ArraySegment<byte>> body)
         {
-            this.BodyObject = DeserializeBody(serializationManager, body);
+            this.BodyObject = DeserializeBody(serializationManager, body, ExpectedBodyType);
         }
 
         public void ClearTargetAddress()
@@ -496,7 +498,7 @@ namespace Orleans.Runtime
             if (bodyBytes == null)
             {
                 var bodyStream = new BinaryTokenStreamWriter();
-                serializationManager.Serialize(bodyObject, bodyStream, null);
+                serializationManager.Serialize(bodyObject, bodyStream, ExpectedBodyType);
                 // We don't bother to turn this into a byte array and save it in bodyBytes because Serialize only gets called on a message
                 // being sent off-box. In this case, the likelihood of needed to re-serialize is very low, and the cost of capturing the
                 // serialized bytes from the steam -- where they're a list of ArraySegment objects -- into an array of bytes is actually

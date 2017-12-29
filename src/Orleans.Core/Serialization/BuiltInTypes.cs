@@ -2157,15 +2157,15 @@ namespace Orleans.Serialization
 
         internal static object DeserializeGenericInvokeMethodRequest(Type expected, IDeserializationContext context)
         {
-            //if(expected.IsConstructedGenericType)
-            //{
-                var concreteMethods = RegisterConcreteMethods(context.GetSerializationManager(), expected, nameof(SerializeInvokeMethodRequest), nameof(DeserializeInvokeMethodRequest), nameof(CopyInvokeMethodRequest));
-                return concreteMethods.Item2(expected, context);
-            //}
-            //else
-            //{
-            //    return DeserializeGenericInvokeMethodRequestDeferred(context);
-            //}
+            if(expected.IsConstructedGenericType)
+            {
+              var concreteMethods = RegisterConcreteMethods(context.GetSerializationManager(), expected, nameof(SerializeInvokeMethodRequest), nameof(DeserializeInvokeMethodRequest), nameof(CopyInvokeMethodRequest));
+              return concreteMethods.Item2(expected, context);
+            }
+            else
+            {
+                return DeserializeGenericInvokeMethodRequestDeferred(context);
+            }
         }
 
         internal static void SerializeGenericInvokeMethodRequest(object original, ISerializationContext context, Type expected)
@@ -2226,7 +2226,7 @@ namespace Orleans.Serialization
             return request;
         }
 
-        private static readonly ConcurrentDictionary<RuntimeTypeHandle, Func<int, ushort, int, IDeserializationContext, object>> _invokeMethodRequestDeserializers = new ConcurrentDictionary<RuntimeTypeHandle, Func<int, ushort, int, IDeserializationContext, object>>();
+        private static readonly ConcurrentDictionary<Type, Func<int, ushort, int, IDeserializationContext, object>> _invokeMethodRequestDeserializers = new ConcurrentDictionary<Type, Func<int, ushort, int, IDeserializationContext, object>>();
 
         private static object DeserializeGenericInvokeMethodRequestDeferred(IDeserializationContext context)
         {
@@ -2234,12 +2234,12 @@ namespace Orleans.Serialization
             ushort iVersion = context.StreamReader.ReadUShort();
             int mid = context.StreamReader.ReadInt();
 
-            var invoker = context.ServiceProvider.GetRequiredService<IGrainMethodInvokerFinder>().GetInvoker(iid);
+            var invoker = context.ServiceProvider.GetRequiredService<IGrainMethodInvokerFinder>().GetInvoker(iid, context.GenericGrainType);
             var argsType = invoker.GetMethodArgumentsType(iid, mid);
-            var deserializer = _invokeMethodRequestDeserializers.GetOrAdd(argsType.TypeHandle, k =>
+            var deserializer = _invokeMethodRequestDeserializers.GetOrAdd(argsType, k =>
             {
                 var method = typeof(BuiltInTypes).GetMethods(BindingFlags.Static | BindingFlags.NonPublic).First(m => m.Name == nameof(DeserializeGenericInvokeMethodRequestNoHeader));
-                return (Func<int, ushort, int, IDeserializationContext, object>)method.MakeGenericMethod(Type.GetTypeFromHandle(k)).CreateDelegate(typeof(Func<int, ushort, int, IDeserializationContext, object>));
+                return (Func<int, ushort, int, IDeserializationContext, object>)method.MakeGenericMethod(k).CreateDelegate(typeof(Func<int, ushort, int, IDeserializationContext, object>));
             });
             return deserializer(iid, iVersion, mid, context);
         }
