@@ -12,5 +12,10 @@ namespace Grains
         {
             return Task.FromResult(++this.counter);
         }
+
+        public Task<string> GetRuntimeIdentity()
+        {
+            return Task.FromResult(this.RuntimeIdentity);
+        }
     }
 }

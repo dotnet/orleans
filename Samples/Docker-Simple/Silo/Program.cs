@@ -41,7 +41,6 @@ namespace Silo
 
             AssemblyLoadContext.Default.Unloading += context =>
             {
-                Console.WriteLine("AssemblyLoadContext.Default.Unloading fired");
                 Task.Run(StopSilo);
                 siloStopped.WaitOne();
             };
