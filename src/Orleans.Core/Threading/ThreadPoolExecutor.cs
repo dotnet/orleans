@@ -135,10 +135,10 @@ namespace Orleans.Threading
         {
             return WorkItemFilter.CreateChain(new Func<WorkItemFilter>[]
             {
-                () => new OuterExceptionHandlerFilter(log),
-                () => new StatisticsTrackingFilter(this),
+                () => new OuterExceptionHandler(log),
+                () => new StatisticsTracking(this),
                 () => new RunningWorkItemsTracker(this, executorWorkItemSlotIndex),
-                () => new ExceptionHandlerFilter(log)
+                () => new ExceptionHandler(log)
             });
         }
 
@@ -165,9 +165,9 @@ namespace Orleans.Threading
 
         #endregion
 
-        internal sealed class OuterExceptionHandlerFilter : WorkItemFilter
+        internal sealed class OuterExceptionHandler : WorkItemFilter
         {
-            public OuterExceptionHandlerFilter(ILogger log) : base(
+            public OuterExceptionHandler(ILogger log) : base(
                 exceptionHandler: (ex, workItem) =>
                 {
                     if (ex is ThreadAbortException)
@@ -186,9 +186,9 @@ namespace Orleans.Threading
             }
         }
 
-        private sealed class StatisticsTrackingFilter : WorkItemFilter
+        private sealed class StatisticsTracking : WorkItemFilter
         {
-            public StatisticsTrackingFilter(ThreadPoolExecutor executor) : base(
+            public StatisticsTracking(ThreadPoolExecutor executor) : base(
                 onActionExecuting: workItem =>
                 {
                     executor.TrackRequestDequeue(workItem);
@@ -218,9 +218,9 @@ namespace Orleans.Threading
             }
         }
 
-        internal sealed class ExceptionHandlerFilter : WorkItemFilter
+        internal sealed class ExceptionHandler : WorkItemFilter
         {
-            public ExceptionHandlerFilter(ILogger log) : base(
+            public ExceptionHandler(ILogger log) : base(
                 exceptionHandler: (ex, workItem) =>
                 {
                     var tae = ex as ThreadAbortException;
