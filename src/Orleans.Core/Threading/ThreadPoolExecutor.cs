@@ -136,7 +136,7 @@ namespace Orleans.Threading
             return WorkItemFilter.CreateChain(new Func<WorkItemFilter>[]
             {
                 () => new OuterExceptionHandler(log),
-                () => new StatisticsTracking(this),
+                () => new StatisticsTracker(this),
                 () => new RunningWorkItemsTracker(this, executorWorkItemSlotIndex),
                 () => new ExceptionHandler(log)
             });
@@ -186,9 +186,9 @@ namespace Orleans.Threading
             }
         }
 
-        private sealed class StatisticsTracking : WorkItemFilter
+        private sealed class StatisticsTracker : WorkItemFilter
         {
-            public StatisticsTracking(ThreadPoolExecutor executor) : base(
+            public StatisticsTracker(ThreadPoolExecutor executor) : base(
                 onActionExecuting: workItem =>
                 {
                     executor.TrackRequestDequeue(workItem);
