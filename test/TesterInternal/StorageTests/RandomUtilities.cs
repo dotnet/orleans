@@ -25,7 +25,7 @@ namespace UnitTests.StorageTests.Relational
         public const long NormalGrainTypeCode = 3L;
 
         /// <summary>
-        /// This type code is consistent with Orleans.Runtime.Category.Grain = 3, used also like
+        /// This type code is consistent with Orleans.Runtime.Category.Grain = 6, used also like
         /// "public Category IdCategory { get { return GetCategory(TypeCodeData); } }".
         /// Note that 0L would likely do also.
         /// </summary>
