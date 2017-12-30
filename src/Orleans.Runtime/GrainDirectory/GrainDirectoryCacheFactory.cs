@@ -23,7 +23,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        internal static SingleTaskAsynchAgent CreateGrainDirectoryCacheMaintainer(
+        internal static DedicatedAsynchAgent CreateGrainDirectoryCacheMaintainer(
             LocalGrainDirectory router,
             IGrainDirectoryCache<TValue> cache,
             Func<List<ActivationAddress>, TValue> updateFunc,

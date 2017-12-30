@@ -14,7 +14,7 @@ using Orleans.Runtime.MultiClusterNetwork;
 
 namespace Orleans.Runtime.GrainDirectory
 {
-    internal class GlobalSingleInstanceActivationMaintainer : SingleTaskAsynchAgent
+    internal class GlobalSingleInstanceActivationMaintainer : DedicatedAsynchAgent
     {
         private readonly object lockable = new object();
         private readonly LocalGrainDirectory router;
