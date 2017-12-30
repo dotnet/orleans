@@ -8,7 +8,10 @@ namespace Orleans.Runtime.Scheduler
     internal class OrleansSchedulerAsynchAgent : AsynchQueueAgent<IWorkItem>
     {
         private readonly QueueTrackingStatistic queueTracking;
+
         private readonly TaskScheduler scheduler;
+
+        private readonly ThreadPoolExecutorOptions.BuilderConfigurator configureExecutorOptionsBuilder;
 
         public OrleansSchedulerAsynchAgent(
             string name,
@@ -21,22 +24,15 @@ namespace Orleans.Runtime.Scheduler
             bool drainAfterCancel,
             ILoggerFactory loggerFactory) : base(name, executorService, loggerFactory)
         {
-            // todo: + executor options builder;
-            // + queue configuration? 
-            ExecutorOptions = new ThreadPoolExecutorOptions(
-                Name,
-                GetType(),
-                Cts.Token,
-                loggerFactory,
-                maxDegreeOfParalelism,
-                drainAfterCancel,
-                false,
-                turnWarningLengthThreshold,
-                delayWarningThreshold,
-                GetWorkItemStatus,
-                ExecutorFaultHandler);
-
             this.scheduler = scheduler;
+
+            configureExecutorOptionsBuilder = builder => builder
+                .WithDegreeOfParallelism(maxDegreeOfParalelism)
+                .WithDrainAfterCancel(drainAfterCancel)
+                .WithPreserveOrder(false)
+                .WithWorkItemExecutionTimeTreshold(turnWarningLengthThreshold)
+                .WithDelayWarningThreshold(delayWarningThreshold)
+                .WithWorkItemStatusProvider(GetWorkItemStatus);
 
             if (!StatisticsCollector.CollectShedulerQueuesStats) return;
             queueTracking = new QueueTrackingStatistic(queueTrackingName);
@@ -66,7 +62,7 @@ namespace Orleans.Runtime.Scheduler
             queueTracking.OnStopExecution();
         }
 
-        protected override ThreadPoolExecutorOptions ExecutorOptions { get; }
+        protected override ThreadPoolExecutorOptions.Builder ExecutorOptionsBuilder => configureExecutorOptionsBuilder(base.ExecutorOptionsBuilder);
 
         private string GetWorkItemStatus(object item, bool detailed)
         {

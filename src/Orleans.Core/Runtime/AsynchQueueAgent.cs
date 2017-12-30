@@ -30,17 +30,9 @@ namespace Orleans.Runtime
         public int Count => executor.WorkQueueCount;
 
         protected abstract void Process(T request);
-
-        // todo: options factory
-        protected override ThreadPoolExecutorOptions ExecutorOptions =>
-             new ThreadPoolExecutorOptions(
-                Name,
-                GetType(),
-                Cts.Token,
-                loggerFactory,
-                drainAfterCancel: DrainAfterCancel,
-                faultHandler: ExecutorFaultHandler);
         
+        protected override ThreadPoolExecutorOptions.Builder ExecutorOptionsBuilder => base.ExecutorOptionsBuilder
+            .WithDrainAfterCancel(DrainAfterCancel);
 
         internal static TimeSpan TurnWarningLengthThreshold { get; set; }
 

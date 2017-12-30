@@ -39,11 +39,9 @@ namespace Orleans.Threading
         public CancellationToken CancellationToken { get; }
 
         public ILoggerFactory LoggerFactory { get; }
-
-
+        
         public ExecutorFaultHandler FaultHandler { get; }
-
-
+        
         public const bool TRACK_DETAILED_STATS = false;
 
         // todo: consider making StatisticsCollector.CollectThreadTimeTrackingStats static
@@ -78,17 +76,72 @@ namespace Orleans.Threading
             WorkItemStatusProvider = workItemStatusProvider;
         }
 
-        public int DegreeOfParallelism { get; }
+        public int DegreeOfParallelism { get; private set; }
 
-        public bool DrainAfterCancel { get; }
+        public bool DrainAfterCancel { get; private set; }
 
-        public bool PreserveOrder { get; }
+        public bool PreserveOrder { get; private set; }
 
-        public TimeSpan WorkItemExecutionTimeTreshold { get; }
+        public TimeSpan WorkItemExecutionTimeTreshold { get; private set; }
 
-        public TimeSpan DelayWarningThreshold { get; }
+        public TimeSpan DelayWarningThreshold { get; private set; }
 
-        public WorkItemStatusProvider WorkItemStatusProvider { get; }
+        public WorkItemStatusProvider WorkItemStatusProvider { get; private set; }
+        
+        public class Builder
+        {
+            public Builder(
+                string name,
+                Type stageType,
+                CancellationToken cancellationToken,
+                ILoggerFactory loggerFactory,
+                ExecutorFaultHandler faultHandler = null)
+            {
+                Options = new ThreadPoolExecutorOptions(name, stageType, cancellationToken, loggerFactory, faultHandler: faultHandler);
+            }
+
+            public ThreadPoolExecutorOptions Options { get; }
+
+            public Builder WithDegreeOfParallelism(int degreeOfParallelism)
+            {
+                Options.DegreeOfParallelism = degreeOfParallelism;
+                return this;
+            }
+
+            public Builder WithDrainAfterCancel(bool drainAfterCancel)
+            {
+                Options.DrainAfterCancel = drainAfterCancel;
+                return this;
+            }
+
+            public Builder WithPreserveOrder(bool preserveOrder)
+            {
+                Options.PreserveOrder = preserveOrder;
+                return this;
+            }
+
+            public Builder WithWorkItemExecutionTimeTreshold(
+                TimeSpan workItemExecutionTimeTreshold)
+            {
+                Options.WorkItemExecutionTimeTreshold = workItemExecutionTimeTreshold;
+                return this;
+            }
+
+            public Builder WithDelayWarningThreshold(TimeSpan delayWarningThreshold)
+            {
+                Options.DelayWarningThreshold = delayWarningThreshold;
+                return this;
+            }
+
+            public Builder WithWorkItemStatusProvider(
+                WorkItemStatusProvider workItemStatusProvider)
+            {
+                Options.WorkItemStatusProvider = workItemStatusProvider;
+                return this;
+            }
+        }
+
+        public delegate Builder BuilderConfigurator(Builder builder);
     }
 
     internal delegate void ExecutorFaultHandler(Exception ex, string executorExplanation);

@@ -178,7 +178,8 @@ namespace Orleans.Runtime
 
         internal static bool IsStarting { get; set; }
 
-        protected abstract ThreadPoolExecutorOptions ExecutorOptions { get; }
+        protected virtual ThreadPoolExecutorOptions.Builder ExecutorOptionsBuilder =>
+            new ThreadPoolExecutorOptions.Builder(Name, GetType(), Cts.Token, loggerFactory, ExecutorFaultHandler);
 
         protected void ExecutorFaultHandler(Exception ex, string executorExplanation)
         {
@@ -203,7 +204,7 @@ namespace Orleans.Runtime
         {
             if (executor == null)
             {
-                executor = executorService.GetExecutor(ExecutorOptions);
+                executor = executorService.GetExecutor(ExecutorOptionsBuilder.Options);
             }
         }
 
