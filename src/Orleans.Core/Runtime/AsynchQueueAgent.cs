@@ -1,7 +1,5 @@
-using System;
 using System.Threading;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime.Configuration;
 using Orleans.Threading;
 
 namespace Orleans.Runtime
@@ -30,18 +28,11 @@ namespace Orleans.Runtime
         public int Count => executor.WorkQueueCount;
 
         protected abstract void Process(T request);
-        
-        protected override ThreadPoolExecutorOptions.Builder ExecutorOptionsBuilder => base.ExecutorOptionsBuilder
-            .WithDrainAfterCancel(DrainAfterCancel);
-
-        internal static TimeSpan TurnWarningLengthThreshold { get; set; }
-
-        //// This is the maximum number of pending work items for a single activation before we write a warning log.
-        internal LimitValue MaxPendingItemsLimit { get; private set; }
-
-        internal TimeSpan DelayWarningThreshold { get; private set; }
 
         protected virtual bool DrainAfterCancel { get; } = false;
+
+        protected override ThreadPoolExecutorOptions.Builder ExecutorOptionsBuilder => base.ExecutorOptionsBuilder
+            .WithDrainAfterCancel(DrainAfterCancel);
 
         //  trackQueueStatistic, from OrleansTaskScheduler todo: add? 
     }

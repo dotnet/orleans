@@ -81,17 +81,20 @@ namespace Orleans.Threading
 
         public static WorkItemFilter[] CreateChain(IEnumerable<Func<WorkItemFilter>> workItemsFactories)
         {
-            WorkItemFilter first = null;
+            WorkItemFilter previousItem = null;
             var workItemFilters = new List<WorkItemFilter>();
-            foreach (var fact in workItemsFactories.Reverse())
+            foreach (var fact in workItemsFactories)
             {
                 var workItem = fact();
-                workItem.Next = first;
-                workItemFilters.Add(workItem);
-                first = workItem;
-            }
+                if (previousItem != null)
+                {
+                    previousItem.Next = workItem;
+                }
 
-            workItemFilters.Reverse();
+                previousItem = workItem;
+                workItemFilters.Add(workItem);
+            }
+            
             return workItemFilters.ToArray();
         }
     }
