@@ -47,7 +47,7 @@ namespace Orleans.Threading
 
             for (var threadIndex = 0; threadIndex < options.DegreeOfParallelism; threadIndex++)
             {
-                RunWorker(new ExecutionContext(CreateWorkItemFilters(), GetThreadSlotIndex(threadIndex)));
+                RunWorker(new ExecutionContext(CreateWorkItemFilters(), options.CancellationTokenSource, GetThreadSlotIndex(threadIndex)));
             }
         }
 
@@ -76,7 +76,7 @@ namespace Orleans.Threading
             try
             {
                 while (!workQueue.IsCompleted &&
-                       (!options.CancellationTokenSource.IsCancellationRequested || options.DrainAfterCancel))
+                       (!context.CancellationTokenSource.IsCancellationRequested || options.DrainAfterCancel))
                 {
                     try
                     {
@@ -108,7 +108,7 @@ namespace Orleans.Threading
         }
 
         private void RunWorker(ExecutionContext context)
-        {;
+        {
             new ThreadPoolThread(
                     options.Name + context.ThreadSlot,
                     options.CancellationTokenSource.Token,
@@ -366,13 +366,16 @@ namespace Orleans.Threading
 
     internal class ExecutionContext : IExecutable
     {
-        public ExecutionContext(ThreadPoolExecutor.WorkItemFiltersApplicant workItemFilters, int threadSlot)
+        public ExecutionContext(ThreadPoolExecutor.WorkItemFiltersApplicant workItemFilters, CancellationTokenSource cts, int threadSlot)
         {
             WorkItemFilters = workItemFilters;
+            CancellationTokenSource = cts;
             ThreadSlot = threadSlot;
         }
 
         public ThreadPoolExecutor.WorkItemFiltersApplicant WorkItemFilters { get; }
+
+        public CancellationTokenSource CancellationTokenSource { get; }
 
         public WorkItemWrapper WorkItem { get; set; }
 
