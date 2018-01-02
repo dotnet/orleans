@@ -18,19 +18,19 @@ namespace Orleans.Threading
             ExceptionHandler = exceptionHandler ?? ((e, c) => true);
         }
 
-        public Func<Exception, T, bool> ExceptionHandler { get; }
+        public virtual Action<T> OnActionExecuting { get; }
 
-        public Action<T> OnActionExecuting { get; }
+        public virtual Action<T> OnActionExecuted { get; }
 
-        public Action<T> OnActionExecuted { get; }
+        public virtual Func<Exception, T, bool> ExceptionHandler { get; }
     }
 
-    internal class WorkItemFilter : ActionFilter<WorkItemWrapper>
+    internal class ExecutionFilter : ActionFilter<ExecutionContext>
     {
-        public WorkItemFilter(
-            Action<WorkItemWrapper> onActionExecuting = null,
-            Action<WorkItemWrapper> onActionExecuted = null,
-            Func<Exception, WorkItemWrapper, bool> exceptionHandler = null)
+        public ExecutionFilter(
+            Action<ExecutionContext> onActionExecuting = null,
+            Action<ExecutionContext> onActionExecuted = null,
+            Func<Exception, ExecutionContext, bool> exceptionHandler = null)
             : base(onActionExecuting, onActionExecuted, exceptionHandler)
         {
         }
