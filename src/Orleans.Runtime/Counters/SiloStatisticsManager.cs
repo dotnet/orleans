@@ -13,7 +13,7 @@ namespace Orleans.Runtime.Counters
     internal class SiloStatisticsManager
     {
         private LogStatistics logStatistics;
-        private RuntimeStatisticsGroup runtimeStats;
+        private IHostEnvironmentStatistics hostEnvironmentStatistics;
         private CountersStatistics countersPublisher;
         internal SiloPerformanceMetrics MetricsTable;
         private readonly ILogger logger;
@@ -23,7 +23,8 @@ namespace Orleans.Runtime.Counters
             NodeConfiguration nodeConfiguration, 
             ILocalSiloDetails siloDetails, 
             SerializationManager serializationManager, 
-            ITelemetryProducer telemetryProducer, 
+            ITelemetryProducer telemetryProducer,
+            IHostEnvironmentStatistics hostEnvironmentStatistics,
             IAppEnvironmentStatistics appEnvironmentStatistics,
             ILoggerFactory loggerFactory, 
             IOptions<MessagingOptions> messagingOptions)
@@ -37,9 +38,9 @@ namespace Orleans.Runtime.Counters
             StorageStatisticsGroup.Init();
             TransactionsStatisticsGroup.Init();
             this.logger = loggerFactory.CreateLogger<SiloStatisticsManager>();
-            runtimeStats = new RuntimeStatisticsGroup(loggerFactory);
+            this.hostEnvironmentStatistics = hostEnvironmentStatistics;
             this.logStatistics = new LogStatistics(nodeConfiguration.StatisticsLogWriteInterval, true, serializationManager, loggerFactory);
-            this.MetricsTable = new SiloPerformanceMetrics(this.runtimeStats, appEnvironmentStatistics, loggerFactory, nodeConfiguration);
+            this.MetricsTable = new SiloPerformanceMetrics(this.hostEnvironmentStatistics, appEnvironmentStatistics, loggerFactory, nodeConfiguration);
             this.countersPublisher = new CountersStatistics(nodeConfiguration.StatisticsPerfCountersWriteInterval, telemetryProducer, loggerFactory);
         }
 
@@ -106,16 +107,12 @@ namespace Orleans.Runtime.Counters
         {
             countersPublisher.Start();
             logStatistics.Start();
-            runtimeStats.Start();
             // Start performance metrics publisher
             MetricsTable.MetricsTableWriteInterval = options.MetricsTableWriteInterval;
         }
 
         internal void Stop()
         {
-            if (runtimeStats != null)
-                runtimeStats.Stop();
-            runtimeStats = null;
             if (MetricsTable != null)
                 MetricsTable.Dispose();
             MetricsTable = null;

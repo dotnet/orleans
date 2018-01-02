@@ -20,20 +20,20 @@ namespace Orleans.Runtime.Counters
         private TimeSpan reportFrequency;
         private bool overloadLatched;
         private bool overloadValue;
-        private readonly RuntimeStatisticsGroup runtimeStats;
+        private readonly IHostEnvironmentStatistics hostEnvironmentStatistics;
         private readonly IAppEnvironmentStatistics appEnvironmentStatistics;
         private AsyncTaskSafeTimer tableReportTimer;
         private readonly ILogger logger;
         private float? cpuUsageLatch;
 
         internal SiloPerformanceMetrics(
-            RuntimeStatisticsGroup runtime,
+            IHostEnvironmentStatistics hostEnvironmentStatistics,
             IAppEnvironmentStatistics appEnvironmentStatistics,
             ILoggerFactory loggerFactory, 
             NodeConfiguration cfg = null)
         {
             this.loggerFactory = loggerFactory;
-            runtimeStats = runtime;
+            this.hostEnvironmentStatistics = hostEnvironmentStatistics;
             this.appEnvironmentStatistics = appEnvironmentStatistics;
             reportFrequency = TimeSpan.Zero;
             overloadLatched = false;
@@ -70,17 +70,17 @@ namespace Orleans.Runtime.Counters
 
         public float CpuUsage 
         { 
-            get { return cpuUsageLatch.HasValue ? cpuUsageLatch.Value : runtimeStats.CpuUsage; } 
+            get { return cpuUsageLatch.HasValue ? cpuUsageLatch.Value : hostEnvironmentStatistics.CpuUsage; } 
         }
 
         public long AvailablePhysicalMemory
         {
-            get { return runtimeStats.AvailableMemory; }
+            get { return hostEnvironmentStatistics.AvailableMemory; }
         }
 
         public long TotalPhysicalMemory
         {
-            get { return runtimeStats.TotalPhysicalMemory; }
+            get { return hostEnvironmentStatistics.TotalPhysicalMemory; }
         }
 
         public long MemoryUsage 

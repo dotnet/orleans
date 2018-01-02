@@ -68,6 +68,8 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();
 
             services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
+            // if no IHostEnvironmentStatistics registered, use the dummy one
+            services.TryAddSingleton<IHostEnvironmentStatistics, DummyHostEnvironmentStatistics>();
 
             services.TryAddSingleton<ExecutorService>();
             // queue balancer contructing related

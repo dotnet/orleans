@@ -13,15 +13,15 @@ namespace Orleans.Runtime
         private TimeSpan reportFrequency;
 
         private readonly IntValueStatistic connectedGatewayCount;
-        private readonly RuntimeStatisticsGroup runtimeStats;
+        private readonly IHostEnvironmentStatistics hostEnvironmentStatistics;
         private readonly IAppEnvironmentStatistics appEnvironmentStatistics;
         private AsyncTaskSafeTimer reportTimer;
         private readonly ILogger logger;
         private readonly ILogger timerLogger;
         internal ClientTableStatistics(
             IMessageCenter mc, 
-            IClientMetricsDataPublisher metricsDataPublisher, 
-            RuntimeStatisticsGroup runtime, 
+            IClientMetricsDataPublisher metricsDataPublisher,
+            IHostEnvironmentStatistics hostEnvironmentStatistics, 
             IAppEnvironmentStatistics appEnvironmentStatistics,
             ILoggerFactory loggerFactory)
         {
@@ -30,7 +30,7 @@ namespace Orleans.Runtime
             this.logger = loggerFactory.CreateLogger<ClientTableStatistics>();
             //async timer created through current class all share this logger for perf reasons
             this.timerLogger = loggerFactory.CreateLogger<AsyncTaskSafeTimer>();
-            runtimeStats = runtime;
+            this.hostEnvironmentStatistics = hostEnvironmentStatistics;
             this.appEnvironmentStatistics = appEnvironmentStatistics;
             reportFrequency = TimeSpan.Zero;
             connectedGatewayCount = IntValueStatistic.Find(StatisticNames.CLIENT_CONNECTED_GATEWAY_COUNT);
@@ -40,12 +40,12 @@ namespace Orleans.Runtime
 
         public float CpuUsage
         {
-            get { return runtimeStats.CpuUsage; }
+            get { return hostEnvironmentStatistics.CpuUsage; }
         }
 
         public long AvailablePhysicalMemory
         {
-            get { return runtimeStats.AvailableMemory; }
+            get { return hostEnvironmentStatistics.AvailableMemory; }
         }
 
         public long MemoryUsage
@@ -54,7 +54,7 @@ namespace Orleans.Runtime
         }
         public long TotalPhysicalMemory
         {
-            get { return runtimeStats.TotalPhysicalMemory; }
+            get { return hostEnvironmentStatistics.TotalPhysicalMemory; }
         }
 
         public int SendQueueLength

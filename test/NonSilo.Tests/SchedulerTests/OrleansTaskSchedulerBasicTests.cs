@@ -46,7 +46,6 @@ namespace UnitTests.SchedulerTests
     {
         private readonly ITestOutputHelper output;
         private static readonly object lockable = new object();
-        private readonly RuntimeStatisticsGroup runtimeStatisticsGroup;
         private readonly SiloPerformanceMetrics performanceMetrics;
         private readonly UnitTestSchedulingContext rootContext;
         private readonly OrleansTaskScheduler scheduler;
@@ -56,8 +55,7 @@ namespace UnitTests.SchedulerTests
             this.output = output;
             SynchronizationContext.SetSynchronizationContext(null);
             loggerFactory = InitSchedulerLogging();
-            this.runtimeStatisticsGroup = new RuntimeStatisticsGroup(loggerFactory);
-            this.performanceMetrics = new SiloPerformanceMetrics(this.runtimeStatisticsGroup, new AppEnvironmentStatistics(), this.loggerFactory);
+            this.performanceMetrics = new SiloPerformanceMetrics(new DummyHostEnvironmentStatistics(loggerFactory), new AppEnvironmentStatistics(), this.loggerFactory);
             this.rootContext = new UnitTestSchedulingContext();
             this.scheduler = TestInternalHelper.InitializeSchedulerForTesting(rootContext, this.performanceMetrics, loggerFactory);
         }
@@ -66,7 +64,6 @@ namespace UnitTests.SchedulerTests
         {
             SynchronizationContext.SetSynchronizationContext(null);
             this.performanceMetrics.Dispose();
-            this.runtimeStatisticsGroup.Dispose();
             this.scheduler.Stop();
         }
 

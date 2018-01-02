@@ -19,7 +19,6 @@ namespace UnitTests.SchedulerTests
     public class OrleansTaskSchedulerAdvancedTests : MarshalByRefObject, IDisposable
     {
         private readonly ITestOutputHelper output;
-        private readonly RuntimeStatisticsGroup runtimeStatisticsGroup;
         private readonly SiloPerformanceMetrics performanceMetrics;
         private OrleansTaskScheduler orleansTaskScheduler;
 
@@ -36,8 +35,7 @@ namespace UnitTests.SchedulerTests
         {
             this.output = output;
             loggerFactory = OrleansTaskSchedulerBasicTests.InitSchedulerLogging();
-            this.runtimeStatisticsGroup = new RuntimeStatisticsGroup(loggerFactory);
-            this.performanceMetrics = new SiloPerformanceMetrics(this.runtimeStatisticsGroup, new AppEnvironmentStatistics(), this.loggerFactory);
+            this.performanceMetrics = new SiloPerformanceMetrics(new DummyHostEnvironmentStatistics(loggerFactory), new AppEnvironmentStatistics(), this.loggerFactory);
             
         }
 
@@ -48,7 +46,6 @@ namespace UnitTests.SchedulerTests
                 orleansTaskScheduler.Stop();
             }
             this.loggerFactory.Dispose();
-            this.runtimeStatisticsGroup.Dispose();
             this.performanceMetrics.Dispose();
         }
 
