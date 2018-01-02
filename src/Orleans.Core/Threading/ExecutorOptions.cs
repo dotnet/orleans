@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
@@ -57,7 +59,8 @@ namespace Orleans.Threading
             TimeSpan? workItemExecutionTimeTreshold = null,
             TimeSpan? delayWarningThreshold = null,
             WorkItemStatusProvider workItemStatusProvider = null,
-            ExecutorFaultHandler faultHandler = null)
+            ExecutorFaultHandler faultHandler = null,
+            IEnumerable<ExecutionFilter> executionFilters = null)
             : base(name, stageType, cts, loggerFactory, faultHandler)
         {
             DegreeOfParallelism = degreeOfParallelism;
@@ -66,7 +69,10 @@ namespace Orleans.Threading
             WorkItemExecutionTimeTreshold = workItemExecutionTimeTreshold ?? TimeSpan.MaxValue;
             DelayWarningThreshold = delayWarningThreshold ?? TimeSpan.MaxValue;
             WorkItemStatusProvider = workItemStatusProvider;
+            ExecutionFilters = executionFilters?.ToArray();
         }
+
+        public IReadOnlyCollection<ExecutionFilter> ExecutionFilters { get; private set; }
 
         public int DegreeOfParallelism { get; private set; }
 
@@ -125,8 +131,13 @@ namespace Orleans.Threading
                 return this;
             }
 
-            public Builder WithWorkItemStatusProvider(
-                WorkItemStatusProvider workItemStatusProvider)
+            public Builder WithExecutionFilters(params ExecutionFilter[] executionFilters)
+            {
+                Options.ExecutionFilters = executionFilters.ToArray();
+                return this;
+            }
+
+            public Builder WithWorkItemStatusProvider(WorkItemStatusProvider workItemStatusProvider)
             {
                 Options.WorkItemStatusProvider = workItemStatusProvider;
                 return this;

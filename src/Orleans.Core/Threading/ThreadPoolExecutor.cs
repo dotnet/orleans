@@ -14,7 +14,7 @@ namespace Orleans.Threading
     /// </summary>
     internal class ThreadPoolExecutor : IExecutor
     {
-        private readonly BlockingCollection<WorkItemWrapper> workQueue;
+        private readonly BlockingCollection<WorkItem> workQueue;
 
         private readonly ThreadPoolExecutorOptions options;
 
@@ -28,9 +28,9 @@ namespace Orleans.Threading
         {
             this.options = options ?? throw new ArgumentNullException(nameof(options));
 
-            workQueue = new BlockingCollection<WorkItemWrapper>(options.PreserveOrder
-                ? (IProducerConsumerCollection<WorkItemWrapper>) new ConcurrentQueue<WorkItemWrapper>()
-                : new ConcurrentBag<WorkItemWrapper>());
+            workQueue = new BlockingCollection<WorkItem>(options.PreserveOrder
+                ? (IProducerConsumerCollection<WorkItem>) new ConcurrentQueue<WorkItem>()
+                : new ConcurrentBag<WorkItem>());
 
             statistic = new ThreadPoolTrackingStatistic(options.Name, options.LoggerFactory);
 
@@ -40,7 +40,7 @@ namespace Orleans.Threading
 
             options.CancellationTokenSource.Token.Register(() =>
             {
-                var chanceToGracefullyExit = WorkItemWrapper.NoOpWrapper;
+                var chanceToGracefullyExit = WorkItem.NoOp;
                 workQueue.Add(chanceToGracefullyExit);
                 workQueue.CompleteAdding();
             });
@@ -58,7 +58,7 @@ namespace Orleans.Threading
             // todo: WorkItem => Action / Runnable? 
             if (callback == null) throw new ArgumentNullException(nameof(callback));
 
-            var workItem = new WorkItemWrapper(callback, state, options.WorkItemExecutionTimeTreshold, options.WorkItemStatusProvider);
+            var workItem = new WorkItem(callback, state, options.WorkItemExecutionTimeTreshold, options.WorkItemStatusProvider);
 
             TrackRequestEnqueue(workItem);
 
@@ -75,8 +75,7 @@ namespace Orleans.Threading
             statistic.OnStartExecution();
             try
             {
-                while (!workQueue.IsCompleted &&
-                       (!context.CancellationTokenSource.IsCancellationRequested || options.DrainAfterCancel))
+                while (!workQueue.IsCompleted && (!context.CancellationTokenSource.IsCancellationRequested || options.DrainAfterCancel))
                 {
                     try
                     {
@@ -117,13 +116,6 @@ namespace Orleans.Threading
                 .QueueWorkItem(_ => ProcessWorkItems(context));
         }
 
-        private static int GetThreadSlotIndex(int threadIndex)
-        {
-            // false sharing prevention
-            const int padding = 64;
-            return threadIndex * padding;
-        }
-
         private WorkItemFiltersApplicant CreateWorkItemFilters()
         {
             return new WorkItemFiltersApplicant(new ExecutionFilter[]
@@ -132,25 +124,30 @@ namespace Orleans.Threading
                 new StatisticsTracker(this),
                 new ExecutingWorkItemsTracker(this),
                 new ExceptionHandler(log)
-            });
+            }.Union(options.ExecutionFilters ?? Array.Empty<ExecutionFilter>()));
+        }
+
+        private static int GetThreadSlotIndex(int threadIndex)
+        {
+            // false sharing prevention
+            const int padding = 64;
+            return threadIndex * padding;
         }
 
         #region StatisticsTracking
 
-        private void TrackRequestEnqueue(WorkItemWrapper workItem)
+        private void TrackRequestEnqueue(WorkItem workItem)
         {
             statistic.OnEnQueueRequest(1, WorkQueueCount, workItem);
         }
 
-        private void TrackRequestDequeue(WorkItemWrapper workItem)
+        private void TrackRequestDequeue(WorkItem workItem)
         {
             var waitTime = workItem.TimeSinceQueued;
             if (waitTime > options.DelayWarningThreshold && !System.Diagnostics.Debugger.IsAttached)
             {
                 SchedulerStatisticsGroup.NumLongQueueWaitTimes.Increment();
-                log.Warn(
-                    ErrorCode.SchedulerWorkerPoolThreadQueueWaitTime,
-                    SR.Queue_Item_WaitTime, waitTime, workItem.State);
+                log.Warn(ErrorCode.SchedulerWorkerPoolThreadQueueWaitTime, SR.Queue_Item_WaitTime, waitTime, workItem.State);
             }
 
             statistic.OnDeQueueRequest(workItem);
@@ -198,13 +195,13 @@ namespace Orleans.Threading
 
         private sealed class ExecutingWorkItemsTracker : ExecutionFilter
         {
-            private readonly WorkItemWrapper[] runningItems;
+            private readonly WorkItem[] runningItems;
 
             private readonly ILogger log;
 
             public ExecutingWorkItemsTracker(ThreadPoolExecutor executor)
             {
-                runningItems = new WorkItemWrapper[GetThreadSlotIndex(executor.options.DegreeOfParallelism)];
+                runningItems = new WorkItem[GetThreadSlotIndex(executor.options.DegreeOfParallelism)];
                 log = executor.log;
             }
 
@@ -288,9 +285,9 @@ namespace Orleans.Threading
         void Execute();
     }
 
-    internal class WorkItemWrapper : IExecutable
+    internal class WorkItem : IExecutable
     {
-        public static WorkItemWrapper NoOpWrapper = new WorkItemWrapper(s => { }, null, TimeSpan.MaxValue);
+        public static WorkItem NoOp = new WorkItem(s => { }, null, TimeSpan.MaxValue);
 
         private readonly WaitCallback callback;
 
@@ -302,10 +299,7 @@ namespace Orleans.Threading
 
         private ITimeInterval executionTime;
 
-        // for lightweight execution time tracking 
-        private DateTime executionStart;
-
-        public WorkItemWrapper(
+        public WorkItem(
             WaitCallback callback,
             object state,
             TimeSpan executionTimeTreshold,
@@ -328,13 +322,16 @@ namespace Orleans.Threading
             }
         }
 
+        // for lightweight execution time tracking 
+        public DateTime ExecutionStart { get; private set; }
+
         internal TimeSpan TimeSinceQueued => Utils.Since(enqueueTime);
 
         internal object State { get; }
 
         public void Execute()
         {
-            executionStart = DateTime.UtcNow;
+            ExecutionStart = DateTime.UtcNow;
             callback.Invoke(State);
         }
 
@@ -349,7 +346,7 @@ namespace Orleans.Threading
         internal string GetWorkItemStatus(bool detailed)
         {
             return string.Format(
-                ThreadPoolExecutor.SR.WorkItem_ExecutionTime, State, Utils.Since(executionStart),
+                ThreadPoolExecutor.SR.WorkItem_ExecutionTime, State, Utils.Since(ExecutionStart),
                 statusProvider?.Invoke(State, detailed));
         }
 
@@ -366,18 +363,18 @@ namespace Orleans.Threading
 
     internal class ExecutionContext : IExecutable
     {
-        public ExecutionContext(ThreadPoolExecutor.WorkItemFiltersApplicant workItemFilters, CancellationTokenSource cts, int threadSlot)
+        public ExecutionContext(ThreadPoolExecutor.WorkItemFiltersApplicant workItemFiltersApplicant, CancellationTokenSource cts, int threadSlot)
         {
-            WorkItemFilters = workItemFilters;
+            WorkItemFiltersApplicant = workItemFiltersApplicant;
             CancellationTokenSource = cts;
             ThreadSlot = threadSlot;
         }
 
-        public ThreadPoolExecutor.WorkItemFiltersApplicant WorkItemFilters { get; }
+        public ThreadPoolExecutor.WorkItemFiltersApplicant WorkItemFiltersApplicant { get; }
 
         public CancellationTokenSource CancellationTokenSource { get; }
 
-        public WorkItemWrapper WorkItem { get; set; }
+        public WorkItem WorkItem { get; set; }
 
         internal int ThreadSlot { get; }
 
@@ -419,7 +416,7 @@ namespace Orleans.Threading
             }
         }
 
-        public void OnDeQueueRequest(WorkItemWrapper workItem)
+        public void OnDeQueueRequest(WorkItem workItem)
         {
             if (ExecutorOptions.CollectDetailedQueueStatistics)
             {
@@ -427,7 +424,7 @@ namespace Orleans.Threading
             }
         }
 
-        public void OnEnQueueRequest(int i, int workQueueCount, WorkItemWrapper workItem)
+        public void OnEnQueueRequest(int i, int workQueueCount, WorkItem workItem)
         {
             if (ExecutorOptions.CollectDetailedQueueStatistics)
             {
