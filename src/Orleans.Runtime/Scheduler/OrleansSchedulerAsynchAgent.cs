@@ -32,7 +32,8 @@ namespace Orleans.Runtime.Scheduler
                 .WithPreserveOrder(false)
                 .WithWorkItemExecutionTimeTreshold(turnWarningLengthThreshold)
                 .WithDelayWarningThreshold(delayWarningThreshold)
-                .WithWorkItemStatusProvider(GetWorkItemStatus);
+                .WithWorkItemStatusProvider(GetWorkItemStatus)
+                .WithExecutionFilters(new SchedulerStatisticsTracker());
 
             if (!StatisticsCollector.CollectShedulerQueuesStats) return;
             queueTracking = new QueueTrackingStatistic(queueTrackingName);
@@ -78,6 +79,29 @@ namespace Orleans.Runtime.Scheduler
                 SchedulerStatisticsGroup.OnWorkItemDequeue();
             }
 #endif
+        }
+
+        private sealed class SchedulerStatisticsTracker : ExecutionFilter
+        {
+            public SchedulerStatisticsTracker() : base(
+                onActionExecuted: context =>
+                {
+                    if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectTurnsStats)
+                    {
+                        var workItem = context.WorkItem.State as IWorkItem;
+                        if (workItem == null)
+                        {
+                            return;
+                        }
+
+                        if (workItem.ItemType != WorkItemType.WorkItemGroup)
+                        {
+                            SchedulerStatisticsGroup.OnTurnExecutionEnd(Utils.Since(context.WorkItem.ExecutionStart));
+                        }
+                    }
+                })
+            {
+            }
         }
     }
 }
