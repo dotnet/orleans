@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
+using Orleans.Statistics;
 
 namespace Orleans.Runtime.Counters
 {
@@ -20,14 +21,20 @@ namespace Orleans.Runtime.Counters
         private bool overloadLatched;
         private bool overloadValue;
         private readonly RuntimeStatisticsGroup runtimeStats;
+        private readonly IAppEnvironmentStatistics appEnvironmentStatistics;
         private AsyncTaskSafeTimer tableReportTimer;
         private readonly ILogger logger;
         private float? cpuUsageLatch;
 
-        internal SiloPerformanceMetrics(RuntimeStatisticsGroup runtime, ILoggerFactory loggerFactory, NodeConfiguration cfg = null)
+        internal SiloPerformanceMetrics(
+            RuntimeStatisticsGroup runtime,
+            IAppEnvironmentStatistics appEnvironmentStatistics,
+            ILoggerFactory loggerFactory, 
+            NodeConfiguration cfg = null)
         {
             this.loggerFactory = loggerFactory;
             runtimeStats = runtime;
+            this.appEnvironmentStatistics = appEnvironmentStatistics;
             reportFrequency = TimeSpan.Zero;
             overloadLatched = false;
             overloadValue = false;
@@ -78,7 +85,7 @@ namespace Orleans.Runtime.Counters
 
         public long MemoryUsage 
         {
-            get { return runtimeStats.MemoryUsage; } 
+            get { return appEnvironmentStatistics.MemoryUsage; } 
         }
 
         public bool IsOverloaded

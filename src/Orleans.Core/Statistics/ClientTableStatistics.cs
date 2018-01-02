@@ -2,7 +2,7 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-
+using Orleans.Statistics;
 
 namespace Orleans.Runtime
 {
@@ -14,11 +14,16 @@ namespace Orleans.Runtime
 
         private readonly IntValueStatistic connectedGatewayCount;
         private readonly RuntimeStatisticsGroup runtimeStats;
-
+        private readonly IAppEnvironmentStatistics appEnvironmentStatistics;
         private AsyncTaskSafeTimer reportTimer;
         private readonly ILogger logger;
         private readonly ILogger timerLogger;
-        internal ClientTableStatistics(IMessageCenter mc, IClientMetricsDataPublisher metricsDataPublisher, RuntimeStatisticsGroup runtime, ILoggerFactory loggerFactory)
+        internal ClientTableStatistics(
+            IMessageCenter mc, 
+            IClientMetricsDataPublisher metricsDataPublisher, 
+            RuntimeStatisticsGroup runtime, 
+            IAppEnvironmentStatistics appEnvironmentStatistics,
+            ILoggerFactory loggerFactory)
         {
             this.mc = mc;
             this.metricsDataPublisher = metricsDataPublisher;
@@ -26,6 +31,7 @@ namespace Orleans.Runtime
             //async timer created through current class all share this logger for perf reasons
             this.timerLogger = loggerFactory.CreateLogger<AsyncTaskSafeTimer>();
             runtimeStats = runtime;
+            this.appEnvironmentStatistics = appEnvironmentStatistics;
             reportFrequency = TimeSpan.Zero;
             connectedGatewayCount = IntValueStatistic.Find(StatisticNames.CLIENT_CONNECTED_GATEWAY_COUNT);
         }
@@ -44,7 +50,7 @@ namespace Orleans.Runtime
 
         public long MemoryUsage
         {
-            get { return runtimeStats.MemoryUsage; }
+            get { return appEnvironmentStatistics.MemoryUsage; }
         }
         public long TotalPhysicalMemory
         {

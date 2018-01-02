@@ -11,6 +11,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Counters;
 using Orleans.Runtime.Scheduler;
+using Orleans.Statistics;
 using TestExtensions;
 using UnitTests.Grains;
 using UnitTests.TesterInternal;
@@ -36,7 +37,7 @@ namespace UnitTests.SchedulerTests
             loggerFactory = OrleansTaskSchedulerBasicTests.InitSchedulerLogging();
             context = new UnitTestSchedulingContext();
             this.runtimeStatisticsGroup = new RuntimeStatisticsGroup(loggerFactory);
-            this.performanceMetrics = new SiloPerformanceMetrics(this.runtimeStatisticsGroup, this.loggerFactory);
+            this.performanceMetrics = new SiloPerformanceMetrics(this.runtimeStatisticsGroup, new AppEnvironmentStatistics(), this.loggerFactory);
             masterScheduler = TestInternalHelper.InitializeSchedulerForTesting(context, this.performanceMetrics, loggerFactory);
         }
         

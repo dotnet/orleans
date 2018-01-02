@@ -9,6 +9,7 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Counters;
 using Orleans.Runtime.Scheduler;
+using Orleans.Statistics;
 using UnitTests.TesterInternal;
 using Xunit;
 using Xunit.Abstractions;
@@ -36,7 +37,7 @@ namespace UnitTests.SchedulerTests
             this.output = output;
             loggerFactory = OrleansTaskSchedulerBasicTests.InitSchedulerLogging();
             this.runtimeStatisticsGroup = new RuntimeStatisticsGroup(loggerFactory);
-            this.performanceMetrics = new SiloPerformanceMetrics(this.runtimeStatisticsGroup, this.loggerFactory);
+            this.performanceMetrics = new SiloPerformanceMetrics(this.runtimeStatisticsGroup, new AppEnvironmentStatistics(), this.loggerFactory);
             
         }
 

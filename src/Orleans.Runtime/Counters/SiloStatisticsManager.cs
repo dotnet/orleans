@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
+using Orleans.Statistics;
 
 namespace Orleans.Runtime.Counters
 {
@@ -18,7 +19,14 @@ namespace Orleans.Runtime.Counters
         private readonly ILogger logger;
         private readonly ILocalSiloDetails siloDetails;
 
-        public SiloStatisticsManager(NodeConfiguration nodeConfiguration, ILocalSiloDetails siloDetails, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory, IOptions<MessagingOptions> messagingOptions)
+        public SiloStatisticsManager(
+            NodeConfiguration nodeConfiguration, 
+            ILocalSiloDetails siloDetails, 
+            SerializationManager serializationManager, 
+            ITelemetryProducer telemetryProducer, 
+            IAppEnvironmentStatistics appEnvironmentStatistics,
+            ILoggerFactory loggerFactory, 
+            IOptions<MessagingOptions> messagingOptions)
         {
             this.siloDetails = siloDetails;
             MessagingStatisticsGroup.Init(true);
@@ -31,7 +39,7 @@ namespace Orleans.Runtime.Counters
             this.logger = loggerFactory.CreateLogger<SiloStatisticsManager>();
             runtimeStats = new RuntimeStatisticsGroup(loggerFactory);
             this.logStatistics = new LogStatistics(nodeConfiguration.StatisticsLogWriteInterval, true, serializationManager, loggerFactory);
-            this.MetricsTable = new SiloPerformanceMetrics(this.runtimeStats, loggerFactory, nodeConfiguration);
+            this.MetricsTable = new SiloPerformanceMetrics(this.runtimeStats, appEnvironmentStatistics, loggerFactory, nodeConfiguration);
             this.countersPublisher = new CountersStatistics(nodeConfiguration.StatisticsPerfCountersWriteInterval, telemetryProducer, loggerFactory);
         }
 
