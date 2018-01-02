@@ -38,7 +38,7 @@ namespace Orleans.Threading
 
             log = options.LoggerFactory.CreateLogger<ThreadPoolExecutor>();
 
-            options.CancellationToken.Register(() =>
+            options.CancellationTokenSource.Token.Register(() =>
             {
                 var chanceToGracefullyExit = WorkItemWrapper.NoOpWrapper;
                 workQueue.Add(chanceToGracefullyExit);
@@ -76,7 +76,7 @@ namespace Orleans.Threading
             try
             {
                 while (!workQueue.IsCompleted &&
-                       (!options.CancellationToken.IsCancellationRequested || options.DrainAfterCancel))
+                       (!options.CancellationTokenSource.IsCancellationRequested || options.DrainAfterCancel))
                 {
                     try
                     {
@@ -87,7 +87,6 @@ namespace Orleans.Threading
                         break;
                     }
 
-                    // todo: should use cancellation source (to be in execution context) 
                     try
                     {
                         context.Execute();
@@ -112,7 +111,7 @@ namespace Orleans.Threading
         {;
             new ThreadPoolThread(
                     options.Name + context.ThreadSlot,
-                    options.CancellationToken,
+                    options.CancellationTokenSource.Token,
                     options.LoggerFactory,
                     options.FaultHandler)
                 .QueueWorkItem(_ => ProcessWorkItems(context));

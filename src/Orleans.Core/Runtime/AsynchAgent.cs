@@ -179,7 +179,7 @@ namespace Orleans.Runtime
         internal static bool IsStarting { get; set; }
 
         protected virtual ThreadPoolExecutorOptions.Builder ExecutorOptionsBuilder =>
-            new ThreadPoolExecutorOptions.Builder(Name, GetType(), Cts.Token, loggerFactory, ExecutorFaultHandler);
+            new ThreadPoolExecutorOptions.Builder(Name, GetType(), Cts, loggerFactory, ExecutorFaultHandler);
 
         protected void ExecutorFaultHandler(Exception ex, string executorExplanation)
         {

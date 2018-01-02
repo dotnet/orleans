@@ -10,13 +10,13 @@ namespace Orleans.Threading
         protected ExecutorOptions(
             string name,
             Type stageType,
-            CancellationToken cancellationToken,
+            CancellationTokenSource cancellationTokenSource,
             ILoggerFactory loggerFactory,
             ExecutorFaultHandler faultHandler = null)
         {
             Name = name;
             StageType = stageType;
-            CancellationToken = cancellationToken;
+            CancellationTokenSource = cancellationTokenSource;
             LoggerFactory = loggerFactory;
             FaultHandler = faultHandler;
         }
@@ -27,7 +27,7 @@ namespace Orleans.Threading
 
         public string StageTypeName => StageType.Name; 
 
-        public CancellationToken CancellationToken { get; }
+        public CancellationTokenSource CancellationTokenSource { get; }
 
         public ILoggerFactory LoggerFactory { get; }
         
@@ -49,7 +49,7 @@ namespace Orleans.Threading
         public ThreadPoolExecutorOptions(
             string name,
             Type stageType,
-            CancellationToken ct,
+            CancellationTokenSource cts,
             ILoggerFactory loggerFactory,
             int degreeOfParallelism = 1,
             bool drainAfterCancel = false,
@@ -58,7 +58,7 @@ namespace Orleans.Threading
             TimeSpan? delayWarningThreshold = null,
             WorkItemStatusProvider workItemStatusProvider = null,
             ExecutorFaultHandler faultHandler = null)
-            : base(name, stageType, ct, loggerFactory, faultHandler)
+            : base(name, stageType, cts, loggerFactory, faultHandler)
         {
             DegreeOfParallelism = degreeOfParallelism;
             DrainAfterCancel = drainAfterCancel;
@@ -85,11 +85,11 @@ namespace Orleans.Threading
             public Builder(
                 string name,
                 Type stageType,
-                CancellationToken cancellationToken,
+                CancellationTokenSource cts,
                 ILoggerFactory loggerFactory,
                 ExecutorFaultHandler faultHandler = null)
             {
-                Options = new ThreadPoolExecutorOptions(name, stageType, cancellationToken, loggerFactory, faultHandler: faultHandler);
+                Options = new ThreadPoolExecutorOptions(name, stageType, cts, loggerFactory, faultHandler: faultHandler);
             }
 
             public ThreadPoolExecutorOptions Options { get; }

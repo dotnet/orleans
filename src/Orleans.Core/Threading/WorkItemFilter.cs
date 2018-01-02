@@ -8,6 +8,8 @@ namespace Orleans.Threading
     {
         private static readonly Action<T> NoOpFilter = _ => { };
 
+        private static readonly Func<Exception, T, bool> NoOpHandler = (e, c) => false;
+
         public ActionFilter(
             Action<T> onActionExecuting = null,
             Action<T> onActionExecuted = null,
@@ -15,7 +17,7 @@ namespace Orleans.Threading
         {
             OnActionExecuting = onActionExecuting ?? NoOpFilter;
             OnActionExecuted = onActionExecuted ?? NoOpFilter;
-            ExceptionHandler = exceptionHandler ?? ((e, c) => true);
+            ExceptionHandler = exceptionHandler ?? NoOpHandler;
         }
 
         public virtual Action<T> OnActionExecuting { get; }
@@ -46,24 +48,23 @@ namespace Orleans.Threading
             this.filters = filters.ToArray();
         }
 
-        public bool Execute(T action)
+        public void Execute(T action)
         {
-            return Execute(action, 0);
+            Execute(action, 0);
         }
 
-        private bool Execute(T action, int filterIndex)
+        private void Execute(T action, int filterIndex)
         {
             if (filterIndex >= filters.Length)
             {
                 action.Execute();
-                return true;
             }
 
             var filter = filters[filterIndex];
             try
             {
                 filter.OnActionExecuting(action);
-                return Execute(action, filterIndex + 1);
+                Execute(action, filterIndex + 1);
             }
             catch (Exception ex)
             {
@@ -76,8 +77,6 @@ namespace Orleans.Threading
             {
                 filter.OnActionExecuted(action);
             }
-
-            return true;
         }
     }
 }
