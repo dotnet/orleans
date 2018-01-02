@@ -1,130 +1,83 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading;
-using Microsoft.Extensions.Logging;
-// todo: dependency on runtime (due to logging)
-using Orleans.Runtime;
 
 namespace Orleans.Threading
 {
-    /// <summary>
-    /// Allows clear definition of action behavior wrappers
-    /// </summary>
-    internal abstract class WorkItemFilter
+    internal class ActionFilter<T> where T : IExecutable
     {
-        private static readonly Action<WorkItemWrapper> NoOpFilter = _ => { };
+        private static readonly Action<T> NoOpFilter = _ => { };
 
-        public WorkItemFilter(
-            Action<WorkItemWrapper> onActionExecuting = null,
-            Action<WorkItemWrapper> onActionExecuted = null,
-            Func<Exception, WorkItemWrapper, bool> exceptionHandler = null)
-            : this(onActionExecuting, onActionExecuted, exceptionHandler, null)
+        public ActionFilter(
+            Action<T> onActionExecuting = null,
+            Action<T> onActionExecuted = null,
+            Func<Exception, T, bool> exceptionHandler = null)
         {
-        }
-
-        private WorkItemFilter(
-            Action<WorkItemWrapper> onActionExecuting,
-            Action<WorkItemWrapper> onActionExecuted,
-            Func<Exception, WorkItemWrapper, bool> exceptionHandler,
-            WorkItemFilter next)
-        {
-            Next = next;
             OnActionExecuting = onActionExecuting ?? NoOpFilter;
             OnActionExecuted = onActionExecuted ?? NoOpFilter;
             ExceptionHandler = exceptionHandler ?? ((e, c) => true);
         }
 
-        public WorkItemFilter Next { get; private set; }
+        public Func<Exception, T, bool> ExceptionHandler { get; }
 
-        public Func<Exception, WorkItemWrapper, bool> ExceptionHandler { get; }
+        public Action<T> OnActionExecuting { get; }
 
-        public Action<WorkItemWrapper> OnActionExecuting { get; }
+        public Action<T> OnActionExecuted { get; }
+    }
 
-        public Action<WorkItemWrapper> OnActionExecuted { get; }
-
-        public bool ExecuteWorkItem(WorkItemWrapper workItem)
+    internal class WorkItemFilter : ActionFilter<WorkItemWrapper>
+    {
+        public WorkItemFilter(
+            Action<WorkItemWrapper> onActionExecuting = null,
+            Action<WorkItemWrapper> onActionExecuted = null,
+            Func<Exception, WorkItemWrapper, bool> exceptionHandler = null)
+            : base(onActionExecuting, onActionExecuted, exceptionHandler)
         {
-            return ExecuteWorkItem(workItem, Next);
+        }
+    }
+
+    internal class ActionFiltersApplicant<T> where T : IExecutable
+    {
+        private readonly ActionFilter<T>[] filters;
+
+        public ActionFiltersApplicant(IEnumerable<ActionFilter<T>> filters)
+        {
+            if (filters == null) throw new ArgumentNullException(nameof(filters));
+            this.filters = filters.ToArray();
         }
 
-        public bool ExecuteWorkItem(WorkItemWrapper workItem, WorkItemFilter next)
+        public bool Execute(T action)
         {
+            return Execute(action, 0);
+        }
+
+        private bool Execute(T action, int filterIndex)
+        {
+            if (filterIndex >= filters.Length)
+            {
+                action.Execute();
+                return true;
+            }
+
+            var filter = filters[filterIndex];
             try
             {
-                OnActionExecuting(workItem);
-                if (next == null)
-                {
-                    workItem.Execute();
-                    return true;
-                }
-                else
-                {
-                    return next.ExecuteWorkItem(workItem, next.Next);
-                }
+                filter.OnActionExecuting(action);
+                return Execute(action, filterIndex + 1);
             }
             catch (Exception ex)
             {
-                if (!ExceptionHandler(ex, workItem))
+                if (!filter.ExceptionHandler(ex, action))
                 {
                     throw;
                 }
             }
             finally
             {
-                OnActionExecuted(workItem);
+                filter.OnActionExecuted(action);
             }
 
             return true;
-        }
-
-        public static WorkItemFilter[] CreateChain(IEnumerable<Func<WorkItemFilter>> workItemsFactories)
-        {
-            WorkItemFilter previousItem = null;
-            var workItemFilters = new List<WorkItemFilter>();
-            foreach (var fact in workItemsFactories)
-            {
-                var workItem = fact();
-                if (previousItem != null)
-                {
-                    previousItem.Next = workItem;
-                }
-
-                previousItem = workItem;
-                workItemFilters.Add(workItem);
-            }
-            
-            return workItemFilters.ToArray();
-        }
-    }
-    
-    internal sealed class WorkerThreadStatisticsFilter : WorkItemFilter
-    {
-        public WorkerThreadStatisticsFilter() : base(
-            onActionExecuted: workItem =>
-            {
-#if TRACK_DETAILED_STATS // todo
-                if (todo.ItemType != WorkItemType.WorkItemGroup)
-                {
-                    if (StatisticsCollector.CollectTurnsStats)
-                    {
-                        //SchedulerStatisticsGroup.OnTurnExecutionEnd(CurrentStateTime.Elapsed);
-                        SchedulerStatisticsGroup.OnTurnExecutionEnd(Utils.Since(CurrentStateStarted));
-                    }
-                    if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                    {
-                        threadTracking.IncrementNumberOfProcessed();
-                    }
-                    CurrentWorkItem = null;
-                }
-                if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                {
-                    threadTracking.OnStopProcessing();
-                }
-#endif
-            })
-        {
         }
     }
 }

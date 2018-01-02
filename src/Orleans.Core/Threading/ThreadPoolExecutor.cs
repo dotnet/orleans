@@ -50,11 +50,12 @@ namespace Orleans.Threading
                 RunWorker(threadIndex);
             }
         }
-        
+
         public int WorkQueueCount => workQueue.Count;
 
         public void QueueWorkItem(WaitCallback callback, object state = null)
         {
+            // todo: WorkItem => Action / Runnable? 
             if (callback == null) throw new ArgumentNullException(nameof(callback));
 
             var workItem = new WorkItemWrapper(callback, state, options.WorkItemExecutionTimeTreshold, options.WorkItemStatusProvider);
@@ -72,7 +73,9 @@ namespace Orleans.Threading
                 if (workItem != null && workItem.IsFrozen())
                 {
                     healthy = false;
-                    log.Error(ErrorCode.ExecutorTurnTooLong, string.Format(SR.WorkItem_LongExecutionTime, workItem.GetWorkItemStatus(true)));
+                    log.Error(
+                        ErrorCode.ExecutorTurnTooLong, 
+                        string.Format(SR.WorkItem_LongExecutionTime, workItem.GetWorkItemStatus(true)));
                 }
             }
 
@@ -97,7 +100,7 @@ namespace Orleans.Threading
                         break;
                     }
 
-                    if (!work.ExecuteWithFilters(threadContext.WorkItemFilters))
+                    if (!threadContext.WorkItemFilters.Execute(work))
                     {
                         break;
                     }
@@ -117,10 +120,10 @@ namespace Orleans.Threading
         {
             var threadContext = new ExecutorThreadContext(CreateWorkItemFilters(GetThreadSlotIndex(threadIndex)));
             new ThreadPoolThread(
-                        options.Name + threadIndex,
-                        options.CancellationToken,
-                        options.LoggerFactory,
-                        options.FaultHandler)
+                    options.Name + threadIndex,
+                    options.CancellationToken,
+                    options.LoggerFactory,
+                    options.FaultHandler)
                 .QueueWorkItem(_ => ProcessWorkItems(threadContext));
         }
 
@@ -130,15 +133,15 @@ namespace Orleans.Threading
             const int padding = 64;
             return threadIndex * padding;
         }
-        
-        private WorkItemFilter[] CreateWorkItemFilters(int executorWorkItemSlotIndex)
+
+        private WorkItemFiltersApplicant CreateWorkItemFilters(int executorWorkItemSlotIndex)
         {
-            return WorkItemFilter.CreateChain(new Func<WorkItemFilter>[]
+            return new WorkItemFiltersApplicant(new WorkItemFilter[]
             {
-                () => new OuterExceptionHandler(log),
-                () => new StatisticsTracker(this),
-                () => new RunningWorkItemsTracker(this, executorWorkItemSlotIndex),
-                () => new ExceptionHandler(log)
+                new OuterExceptionHandler(log),
+                new StatisticsTracker(this),
+                new RunningWorkItemsTracker(this, executorWorkItemSlotIndex),
+                new ExceptionHandler(log)
             });
         }
 
@@ -165,7 +168,7 @@ namespace Orleans.Threading
 
         #endregion
 
-        internal sealed class OuterExceptionHandler : WorkItemFilter
+        private sealed class OuterExceptionHandler : WorkItemFilter
         {
             public OuterExceptionHandler(ILogger log) : base(
                 exceptionHandler: (ex, workItem) =>
@@ -194,7 +197,7 @@ namespace Orleans.Threading
                     executor.TrackRequestDequeue(workItem);
                     executor.statistic.OnStartProcessing();
                 },
-                onActionExecuted: workItem => 
+                onActionExecuted: workItem =>
                 {
                     executor.statistic.OnStopProcessing();
                     executor.statistic.IncrementNumberOfProcessed();
@@ -218,7 +221,7 @@ namespace Orleans.Threading
             }
         }
 
-        internal sealed class ExceptionHandler : WorkItemFilter
+        private sealed class ExceptionHandler : WorkItemFilter
         {
             public ExceptionHandler(ILogger log) : base(
                 exceptionHandler: (ex, workItem) =>
@@ -248,12 +251,19 @@ namespace Orleans.Threading
 
         private sealed class ExecutorThreadContext
         {
-            public ExecutorThreadContext(WorkItemFilter[] workItemFilters)
+            public ExecutorThreadContext(WorkItemFiltersApplicant workItemFilters)
             {
                 WorkItemFilters = workItemFilters;
             }
 
-            public WorkItemFilter[] WorkItemFilters { get; }
+            public WorkItemFiltersApplicant WorkItemFilters { get; }
+        }
+
+        private sealed class WorkItemFiltersApplicant : ActionFiltersApplicant<WorkItemWrapper>
+        {
+            public WorkItemFiltersApplicant(IEnumerable<ActionFilter<WorkItemWrapper>> filters) : base(filters)
+            {
+            }
         }
 
         internal static class SR
@@ -276,7 +286,12 @@ namespace Orleans.Threading
 
     internal delegate string WorkItemStatusProvider(object state, bool detailed);
 
-    internal class WorkItemWrapper
+    internal interface IExecutable
+    {
+        void Execute();
+    }
+
+    internal class WorkItemWrapper : IExecutable
     {
         public static WorkItemWrapper NoOpWorkItemWrapper = new WorkItemWrapper(s => { }, null, TimeSpan.MaxValue);
 
@@ -326,12 +341,7 @@ namespace Orleans.Threading
             callback.Invoke(State);
         }
 
-        public bool ExecuteWithFilters(IEnumerable<WorkItemFilter> actionFilters)
-        {
-            return actionFilters.First().ExecuteWorkItem(this);
-        }
-
-        public void EnsureExecutionTime() 
+        public void EnsureExecutionTime()
         {
             if (executionTime == null)
             {
