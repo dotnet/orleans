@@ -47,7 +47,7 @@ namespace Orleans.Threading
 
             for (var threadIndex = 0; threadIndex < options.DegreeOfParallelism; threadIndex++)
             {
-                RunWorker(new ExecutionContext(options.CancellationTokenSource, GetThreadSlotIndex(threadIndex)));
+                RunWorker(new ExecutionContext(options.CancellationTokenSource, CreateExecutionFiltersApplicant(), GetThreadSlotIndex(threadIndex)));
             }
         }
 
@@ -72,7 +72,6 @@ namespace Orleans.Threading
 
         private void ProcessWorkItems(ExecutionContext context)
         {
-            var filtersApplicant = CreateExecutionFiltersApplicant();
             statistic.OnStartExecution();
             try
             {
@@ -87,14 +86,7 @@ namespace Orleans.Threading
                         break;
                     }
 
-                    try
-                    {
-                        filtersApplicant.Apply(context);
-                    }
-                    finally
-                    {
-                        context.Reset();
-                    }
+                    context.ExecuteWithFilters();
                 }
             }
             catch (Exception ex)
@@ -367,24 +359,39 @@ namespace Orleans.Threading
 
     internal class ExecutionContext : IExecutable
     {
-        public ExecutionContext(CancellationTokenSource cts, int threadSlot)
+        private readonly ThreadPoolExecutor.ExecutionFiltersApplicant filtersApplicant;
+
+        public ExecutionContext(CancellationTokenSource cts, ThreadPoolExecutor.ExecutionFiltersApplicant filtersApplicant, int threadSlot)
         {
+            this.filtersApplicant = filtersApplicant;
             CancellationTokenSource = cts;
             ThreadSlot = threadSlot;
         }
-
+        
         public CancellationTokenSource CancellationTokenSource { get; }
 
         public WorkItem WorkItem { get; set; }
 
         internal int ThreadSlot { get; }
 
+        public void ExecuteWithFilters()
+        {
+            try
+            {
+                filtersApplicant.Apply(this);
+            }
+            finally
+            {
+                Reset();
+            }
+        }
+
         public void Execute()
         {
             WorkItem.Execute();
         }
 
-        public void Reset()
+        private void Reset()
         {
             WorkItem = null;
         }
