@@ -33,7 +33,7 @@ namespace Orleans.Runtime.Scheduler
                 .WithWorkItemExecutionTimeTreshold(turnWarningLengthThreshold)
                 .WithDelayWarningThreshold(delayWarningThreshold)
                 .WithWorkItemStatusProvider(GetWorkItemStatus)
-                .WithExecutionFilters(new SchedulerStatisticsTracker());
+                .WithExecutionFilters(new SchedulerStatisticsTracker(this));
 
             if (!StatisticsCollector.CollectShedulerQueuesStats) return;
             queueTracking = new QueueTrackingStatistic(queueTrackingName);
@@ -43,8 +43,6 @@ namespace Orleans.Runtime.Scheduler
         protected override void Process(IWorkItem request)
         {
             RuntimeContext.InitializeThread(scheduler);
-
-            TrackWorkItemDequeue();
             try
             {
                 RuntimeContext.SetExecutionContext(request.SchedulingContext, scheduler);
@@ -71,36 +69,38 @@ namespace Orleans.Runtime.Scheduler
             return workItem is WorkItemGroup group ? string.Format("WorkItemGroup Details: {0}", group.DumpStatus()) : string.Empty;
         }
 
-        private void TrackWorkItemDequeue()
-        {
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectGlobalShedulerStats)
-            {
-                SchedulerStatisticsGroup.OnWorkItemDequeue();
-            }
-#endif
-        }
-
         private sealed class SchedulerStatisticsTracker : ExecutionFilter
         {
-            public SchedulerStatisticsTracker() : base(
-                onActionExecuted: context =>
-                {
-                    if (ExecutorOptions.TRACK_DETAILED_STATS && StatisticsCollector.CollectTurnsStats)
-                    {
-                        var workItem = context.WorkItem.State as IWorkItem;
-                        if (workItem == null)
-                        {
-                            return;
-                        }
+            private readonly OrleansSchedulerAsynchAgent agent;
 
-                        if (workItem.ItemType != WorkItemType.WorkItemGroup)
-                        {
-                            SchedulerStatisticsGroup.OnTurnExecutionEnd(Utils.Since(context.WorkItem.ExecutionStart));
-                        }
-                    }
-                })
+            public SchedulerStatisticsTracker(OrleansSchedulerAsynchAgent agent)
             {
+                this.agent = agent;
+            }
+
+            public override Action<ExecutionContext> OnActionExecuting => context => TrackWorkItemDequeue();
+
+            public override Action<ExecutionContext> OnActionExecuted => context =>
+            {
+#if TRACK_DETAILED_STATS
+                if (StatisticsCollector.CollectTurnsStats)
+                {
+                    if (agent.GetWorkItemState(context).ItemType != WorkItemType.WorkItemGroup)
+                    {
+                        SchedulerStatisticsGroup.OnTurnExecutionEnd(Utils.Since(context.WorkItem.ExecutionStart));
+                    }
+                }
+#endif
+            };
+
+            private void TrackWorkItemDequeue()
+            {
+#if TRACK_DETAILED_STATS
+                if (StatisticsCollector.CollectGlobalShedulerStats)
+                {
+                    SchedulerStatisticsGroup.OnWorkItemDequeue();
+                }
+#endif
             }
         }
     }

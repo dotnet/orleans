@@ -48,12 +48,12 @@ namespace Orleans.Threading
             this.filters = filters.ToArray();
         }
 
-        public void Execute(T action)
+        public void Apply(T action)
         {
-            Execute(action, 0);
+            Apply(action, 0);
         }
 
-        private void Execute(T action, int filterIndex)
+        private void Apply(T action, int filterIndex)
         {
             if (filterIndex >= filters.Length)
             {
@@ -64,7 +64,7 @@ namespace Orleans.Threading
             try
             {
                 filter.OnActionExecuting(action);
-                Execute(action, filterIndex + 1);
+                Apply(action, filterIndex + 1);
             }
             catch (Exception ex)
             {

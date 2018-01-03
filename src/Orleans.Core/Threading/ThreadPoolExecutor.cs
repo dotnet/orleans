@@ -47,7 +47,7 @@ namespace Orleans.Threading
 
             for (var threadIndex = 0; threadIndex < options.DegreeOfParallelism; threadIndex++)
             {
-                RunWorker(new ExecutionContext(CreateWorkItemFilters(), options.CancellationTokenSource, GetThreadSlotIndex(threadIndex)));
+                RunWorker(new ExecutionContext(options.CancellationTokenSource, GetThreadSlotIndex(threadIndex)));
             }
         }
 
@@ -60,7 +60,7 @@ namespace Orleans.Threading
 
             var workItem = new WorkItem(callback, state, options.WorkItemExecutionTimeTreshold, options.WorkItemStatusProvider);
 
-            TrackRequestEnqueue(workItem);
+            statistic.OnEnQueueRequest(1, WorkQueueCount, workItem);
 
             workQueue.Add(workItem);
         }
@@ -72,6 +72,7 @@ namespace Orleans.Threading
 
         private void ProcessWorkItems(ExecutionContext context)
         {
+            var filtersApplicant = CreateExecutionFiltersApplicant();
             statistic.OnStartExecution();
             try
             {
@@ -88,7 +89,7 @@ namespace Orleans.Threading
 
                     try
                     {
-                        context.Execute();
+                        filtersApplicant.Apply(context);
                     }
                     finally
                     {
@@ -116,13 +117,13 @@ namespace Orleans.Threading
                 .QueueWorkItem(_ => ProcessWorkItems(context));
         }
 
-        private WorkItemFiltersApplicant CreateWorkItemFilters()
+        private ExecutionFiltersApplicant CreateExecutionFiltersApplicant()
         {
-            return new WorkItemFiltersApplicant(new ExecutionFilter[]
+            return new ExecutionFiltersApplicant(new ExecutionFilter[]
             {
                 new OuterExceptionHandler(log),
-                new StatisticsTracker(this),
-                new ExecutingWorkItemsTracker(this),
+                new StatisticsTracker(statistic, options.DelayWarningThreshold, log),
+                executingWorkTracker,
                 new ExceptionHandler(log)
             }.Union(options.ExecutionFilters ?? Array.Empty<ExecutionFilter>()));
         }
@@ -133,28 +134,7 @@ namespace Orleans.Threading
             const int padding = 64;
             return threadIndex * padding;
         }
-
-        #region StatisticsTracking
-
-        private void TrackRequestEnqueue(WorkItem workItem)
-        {
-            statistic.OnEnQueueRequest(1, WorkQueueCount, workItem);
-        }
-
-        private void TrackRequestDequeue(WorkItem workItem)
-        {
-            var waitTime = workItem.TimeSinceQueued;
-            if (waitTime > options.DelayWarningThreshold && !System.Diagnostics.Debugger.IsAttached)
-            {
-                SchedulerStatisticsGroup.NumLongQueueWaitTimes.Increment();
-                log.Warn(ErrorCode.SchedulerWorkerPoolThreadQueueWaitTime, SR.Queue_Item_WaitTime, waitTime, workItem.State);
-            }
-
-            statistic.OnDeQueueRequest(workItem);
-        }
-
-        #endregion
-
+        
         private sealed class OuterExceptionHandler : ExecutionFilter
         {
             public OuterExceptionHandler(ILogger log) : base(
@@ -178,18 +158,42 @@ namespace Orleans.Threading
 
         private sealed class StatisticsTracker : ExecutionFilter
         {
-            public StatisticsTracker(ThreadPoolExecutor executor) : base(
-                onActionExecuting: context =>
-                {
-                    executor.TrackRequestDequeue(context.WorkItem);
-                    executor.statistic.OnStartProcessing();
-                },
-                onActionExecuted: context =>
-                {
-                    executor.statistic.OnStopProcessing();
-                    executor.statistic.IncrementNumberOfProcessed();
-                })
+            private readonly ThreadPoolTrackingStatistic statistic;
+
+            private readonly TimeSpan delayWarningThreshold;
+
+            private readonly ILogger log;
+
+            public StatisticsTracker(ThreadPoolTrackingStatistic statistic, TimeSpan delayWarningThreshold, ILogger log)
             {
+                this.statistic = statistic;
+                this.delayWarningThreshold = delayWarningThreshold;
+                this.log = log;
+            }
+
+            public override Action<ExecutionContext> OnActionExecuting => (context) =>
+            {
+                TrackRequestDequeue(context.WorkItem);
+                statistic.OnStartProcessing();
+            };
+
+            public override Action<ExecutionContext> OnActionExecuted => (context) =>
+            {
+                statistic.OnStopProcessing();
+                statistic.IncrementNumberOfProcessed();
+            };
+
+            private void TrackRequestDequeue(WorkItem workItem)
+            {
+                var waitTime = workItem.TimeSinceQueued;
+                if (waitTime > delayWarningThreshold && !System.Diagnostics.Debugger.IsAttached)
+                {
+                    SchedulerStatisticsGroup.NumLongQueueWaitTimes.Increment();
+                    log.Warn(ErrorCode.SchedulerWorkerPoolThreadQueueWaitTime, SR.Queue_Item_WaitTime, waitTime,
+                        workItem.State);
+                }
+
+                statistic.OnDeQueueRequest(workItem);
             }
         }
 
@@ -255,9 +259,9 @@ namespace Orleans.Threading
             }
         }
 
-        internal sealed class WorkItemFiltersApplicant : ActionFiltersApplicant<ExecutionContext>
+        internal sealed class ExecutionFiltersApplicant : ActionFiltersApplicant<ExecutionContext>
         {
-            public WorkItemFiltersApplicant(IEnumerable<ExecutionFilter> filters) : base(filters)
+            public ExecutionFiltersApplicant(IEnumerable<ExecutionFilter> filters) : base(filters)
             {
             }
         }
@@ -363,14 +367,11 @@ namespace Orleans.Threading
 
     internal class ExecutionContext : IExecutable
     {
-        public ExecutionContext(ThreadPoolExecutor.WorkItemFiltersApplicant workItemFiltersApplicant, CancellationTokenSource cts, int threadSlot)
+        public ExecutionContext(CancellationTokenSource cts, int threadSlot)
         {
-            WorkItemFiltersApplicant = workItemFiltersApplicant;
             CancellationTokenSource = cts;
             ThreadSlot = threadSlot;
         }
-
-        public ThreadPoolExecutor.WorkItemFiltersApplicant WorkItemFiltersApplicant { get; }
 
         public CancellationTokenSource CancellationTokenSource { get; }
 
