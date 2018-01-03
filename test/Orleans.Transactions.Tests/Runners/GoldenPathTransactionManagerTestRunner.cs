@@ -31,7 +31,7 @@ namespace Orleans.Transactions.Tests
             await WaitForTransactionCommit(id, this.logMaintenanceInterval + this.storageDelay);
         }
 
-        [SkippableFact]
+        [SkippableFact(Skip = "Intermittent failure, jbragg investigating")]
         public async Task TransactionTimeout()
         {
             long id = this.transactionManager.StartTransaction(TimeSpan.FromTicks(this.logMaintenanceInterval.Ticks / 2));
