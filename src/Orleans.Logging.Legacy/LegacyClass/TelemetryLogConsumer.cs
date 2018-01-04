@@ -1,4 +1,5 @@
-﻿using Orleans.Runtime;
+﻿using Orleans.Logging.Legacy;
+using Orleans.Runtime;
 using System;
 using System.Net;
 
@@ -7,6 +8,7 @@ namespace Orleans.Extensions.Logging
     /// <summary>
     /// Forward trace log calls to the telemetry abstractions. This will be replaced by an ILoggerProvider in the future.
     /// </summary>
+    [Obsolete(OrleansLoggingUtils.ObsoleteMessageStringForLegacyLoggingInfrastructure)]
     public class TelemetryLogConsumer : ILogConsumer, IFlushableLogConsumer, ICloseableLogConsumer
     {
         private readonly ITelemetryProducer telemetryProducer;
@@ -26,7 +28,7 @@ namespace Orleans.Extensions.Logging
                 this.telemetryProducer.TrackException(exception);
             }
 
-            var logMessage = TraceParserUtils.FormatLogMessage(DateTime.UtcNow, severity, loggerType, caller, message, myIPEndPoint, exception, eventCode);
+            var logMessage = Orleans.Logging.Legacy.TraceParserUtils.FormatLogMessage(DateTime.UtcNow, severity, loggerType, caller, message, myIPEndPoint, exception, eventCode);
             this.telemetryProducer.TrackTrace(logMessage, severity);
 
 #pragma warning restore CS0618 // Type or member is obsolete

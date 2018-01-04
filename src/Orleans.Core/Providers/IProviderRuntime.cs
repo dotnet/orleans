@@ -15,15 +15,6 @@ namespace Orleans.Providers
     public interface IProviderRuntime
     {
         /// <summary>
-        /// Provides a logger to be used by the provider. 
-        /// </summary>
-        /// <param name="loggerName">Name of the logger being requested.</param>
-        /// <returns>Object reference to the requested logger.</returns>
-        /// <seealso cref="LoggerType"/>
-        //TODO: Mark it as [Obsolete] after all runtime has migrated
-        Logger GetLogger(string loggerName);
-
-        /// <summary>
         /// Provides the ServiceId this cluster is running as.
         /// ServiceId's are intended to be long lived Id values for a particular service which will remain constant 
         /// even if the service is started / redeployed multiple times during its operations life.

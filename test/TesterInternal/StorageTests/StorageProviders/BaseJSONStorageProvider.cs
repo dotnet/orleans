@@ -30,14 +30,6 @@ namespace Samples.StorageProviders
     public abstract class BaseJSONStorageProvider : IStorageProvider
     {
         /// <summary>
-        /// Logger object
-        /// </summary>
-        public Logger Log
-        {
-            get; protected set;
-        }
-
-        /// <summary>
         /// Storage provider name
         /// </summary>
         public string Name { get; protected set; }
@@ -64,7 +56,6 @@ namespace Samples.StorageProviders
         /// <returns>Completion promise for this operation.</returns>
         public virtual Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
         {
-            Log = providerRuntime.GetLogger(this.GetType().FullName);
             return Task.CompletedTask;
         }
 

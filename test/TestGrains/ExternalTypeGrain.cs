@@ -12,7 +12,7 @@ namespace UnitTests.Grains
     {
         public Task GetAbstractModel(IEnumerable<NameObjectCollectionBase> list)
         {
-            base.GetLogger().Verbose("GetAbstractModel: Success");
+            this.GetLogger().Verbose("GetAbstractModel: Success");
             return Task.CompletedTask;
         }
 

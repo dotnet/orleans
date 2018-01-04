@@ -19,7 +19,7 @@ namespace UnitTests.Grains
 
         public override async Task OnActivateAsync()
         {
-            logger = GetLogger();
+            logger = this.GetLogger();
             logger.Info("OnActivateAsync");
             watcher = GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
             Assert.False(doingActivate, "Activate method should have finished");
@@ -70,7 +70,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = GetLogger();
+            logger = this.GetLogger();
             logger.Info("OnActivateAsync");
             watcher = GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
             Assert.False(doingActivate, "Activate method should have finished");
@@ -129,7 +129,7 @@ namespace UnitTests.Grains
 
         public override async Task OnActivateAsync()
         {
-            logger = GetLogger();
+            logger = this.GetLogger();
             watcher = GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
 
             Assert.False(doingActivate, "Not doing Activate yet");
@@ -210,7 +210,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = GetLogger();
+            logger = this.GetLogger();
 
             var startMe =
                 new Task(
@@ -306,7 +306,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = GetLogger();
+            logger = this.GetLogger();
             logger.Info("OnActivateAsync");
             throw new ApplicationException("Thrown from Application-OnActivateAsync");
         }
@@ -342,7 +342,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = GetLogger();
+            logger = this.GetLogger();
             logger.Info("OnActivateAsync");
             throw new NotImplementedException("OnActivateAsync should not have been called");
         }
@@ -366,7 +366,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = GetLogger();
+            logger = this.GetLogger();
             logger.Info("OnActivateAsync");
             this.DeactivateOnIdle();
             return Task.CompletedTask;
@@ -394,7 +394,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = GetLogger();
+            logger = this.GetLogger();
             grain = GrainFactory.GetGrain<ITestGrain>(1);
             logger.Info("OnActivateAsync");
             grain = GrainFactory.GetGrain<ITestGrain>(1);

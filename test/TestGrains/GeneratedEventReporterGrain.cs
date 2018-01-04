@@ -15,7 +15,7 @@ namespace TestGrains
 
         public override Task OnActivateAsync()
         {
-            logger = base.GetLogger("GeneratedEventReporterGrain " + base.IdentityString);
+            logger = this.GetLogger("GeneratedEventReporterGrain " + base.IdentityString);
             logger.Info("OnActivateAsync");
 
             reports = new Dictionary<Tuple<string, string>, Dictionary<Guid, int>>();

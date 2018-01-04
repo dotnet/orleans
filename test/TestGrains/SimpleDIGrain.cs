@@ -110,7 +110,7 @@ namespace UnitTests.Grains
     public class InjectedService : IInjectedService, IDisposable
     {
         private readonly string instanceValue = Guid.NewGuid().ToString();
-        private readonly Logger logger;
+        private readonly ILogger logger;
 
         public Task<long> GetTicks()
         {
@@ -120,7 +120,7 @@ namespace UnitTests.Grains
 
         public InjectedService(ILoggerFactory loggerFactory)
         {
-            this.logger = new LoggerWrapper<InjectedService>(loggerFactory);
+            this.logger = loggerFactory.CreateLogger<InjectedService>();
         }
 
         public void Dispose()
@@ -138,11 +138,11 @@ namespace UnitTests.Grains
     public class InjectedScopedService : IInjectedScopedService, IDisposable
     {
         private readonly string instanceValue = Guid.NewGuid().ToString();
-        private readonly Logger logger;
+        private readonly ILogger logger;
 
         public InjectedScopedService(ILoggerFactory loggerFactory)
         {
-            this.logger = new LoggerWrapper<InjectedScopedService>(loggerFactory);
+            this.logger = loggerFactory.CreateLogger<InjectedScopedService>();
         }
 
         public void Dispose()

@@ -169,7 +169,7 @@ namespace Orleans.Transactions
                 {
                     foreach (var waiting in tx.WaitingTransactions)
                     {
-                        var cascading = new OrleansCascadingAbortException(waiting.Info.TransactionId, tx.TransactionId);
+                        var cascading = new OrleansCascadingAbortException(waiting.Info.TransactionId.ToString(), tx.TransactionId.ToString());
                         AbortTransaction(waiting.Info.TransactionId, cascading);
                     }
 
@@ -241,7 +241,7 @@ namespace Orleans.Transactions
 
                         if (abort)
                         {
-                            AbortTransaction(transactionInfo.TransactionId, new OrleansCascadingAbortException(transactionInfo.TransactionId, cascadingDependentId));
+                            AbortTransaction(transactionInfo.TransactionId, new OrleansCascadingAbortException(transactionInfo.TransactionId.ToString(), cascadingDependentId.ToString()));
                         }
                         else if (pending)
                         {
@@ -264,7 +264,7 @@ namespace Orleans.Transactions
             else
             {
                 // Don't have a record of the transaction any more so presumably it's aborted.
-                throw new OrleansTransactionAbortedException(transactionInfo.TransactionId, "Transaction presumed to be aborted");
+                throw new OrleansTransactionAbortedException(transactionInfo.TransactionId.ToString(), "Transaction presumed to be aborted");
             }
         }
 
@@ -644,7 +644,7 @@ namespace Orleans.Transactions
                 if (txRecord.Value.State == TransactionState.Started &&
                     txRecord.Value.ExpirationTime < now)
                 {
-                    AbortTransaction(txRecord.Key, new OrleansTransactionTimeoutException(txRecord.Key));
+                    AbortTransaction(txRecord.Key, new OrleansTransactionTimeoutException(txRecord.Key.ToString()));
                 }
             }
 

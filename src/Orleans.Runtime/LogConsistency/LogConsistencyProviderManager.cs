@@ -61,11 +61,6 @@ namespace Orleans.Runtime.LogConsistency
             return runtime.BindExtension<TExtension, TExtensionInterface>(newExtensionFunc);
         }
 
-        public Logger GetLogger(string loggerName)
-        {
-            return new LoggerWrapper(loggerName, this.loggerFactory);
-        }
-
         public Guid ServiceId
         {
             get { return runtime.ServiceId; }

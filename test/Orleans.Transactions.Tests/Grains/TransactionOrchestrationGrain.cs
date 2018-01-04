@@ -98,12 +98,12 @@ namespace Orleans.Transactions.Tests
                 TransactionalResourceVersion readVersion;
                 if (!TryGetVersion(info.TransactionId, out readVersion))
                 {
-                    throw new OrleansTransactionVersionDeletedException(info.TransactionId);
+                    throw new OrleansTransactionVersionDeletedException(info.TransactionId.ToString());
                 }
 
                 if (info.IsReadOnly && readVersion.TransactionId > this.stableVersion)
                 {
-                    throw new OrleansTransactionUnstableVersionException(info.TransactionId);
+                    throw new OrleansTransactionUnstableVersionException(info.TransactionId.ToString());
                 }
 
                 info.RecordRead(transactionalResource, readVersion, this.stableVersion);
@@ -112,7 +112,7 @@ namespace Orleans.Transactions.Tests
 
                 if (this.version.TransactionId > info.TransactionId || this.writeLowerBound >= info.TransactionId)
                 {
-                    throw new OrleansTransactionWaitDieException(info.TransactionId);
+                    throw new OrleansTransactionWaitDieException(info.TransactionId.ToString());
                 }
 
                 TransactionalResourceVersion nextVersion = TransactionalResourceVersion.Create(info.TransactionId,

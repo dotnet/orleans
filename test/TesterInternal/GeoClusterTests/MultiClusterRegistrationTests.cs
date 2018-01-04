@@ -163,7 +163,7 @@ namespace UnitTests.GeoClusterTests
             public int CallGrain(int i)
             {
                 var grainRef = this.GrainFactory.GetGrain<IClusterTestGrain>(i);
-                this.Client.Logger.Info("Call Grain {0}", grainRef);
+                this.Client.Logger().Info("Call Grain {0}", grainRef);
                 Task<int> toWait = grainRef.SayHelloAsync();
                 toWait.Wait();
                 return toWait.GetResult();
@@ -171,7 +171,7 @@ namespace UnitTests.GeoClusterTests
             public string GetRuntimeId(int i)
             {
                 var grainRef = this.GrainFactory.GetGrain<IClusterTestGrain>(i);
-                this.Client.Logger.Info("GetRuntimeId {0}", grainRef);
+                this.Client.Logger().Info("GetRuntimeId {0}", grainRef);
                 Task<string> toWait = grainRef.GetRuntimeId();
                 toWait.Wait();
                 return toWait.GetResult();
@@ -179,7 +179,7 @@ namespace UnitTests.GeoClusterTests
             public void Deactivate(int i)
             {
                 var grainRef = this.GrainFactory.GetGrain<IClusterTestGrain>(i);
-                this.Client.Logger.Info("Deactivate {0}", grainRef);
+                this.Client.Logger().Info("Deactivate {0}", grainRef);
                 Task toWait = grainRef.Deactivate();
                 toWait.GetResult();
             }
@@ -187,7 +187,7 @@ namespace UnitTests.GeoClusterTests
             public void EnableStreamNotifications(int i)
             {
                 var grainRef = this.GrainFactory.GetGrain<IClusterTestGrain>(i);
-                this.Client.Logger.Info("EnableStreamNotifications {0}", grainRef);
+                this.Client.Logger().Info("EnableStreamNotifications {0}", grainRef);
                 Task toWait = grainRef.EnableStreamNotifications();
                 toWait.GetResult();
             }
@@ -196,11 +196,11 @@ namespace UnitTests.GeoClusterTests
             public void Subscribe(int i, IClusterTestListener listener)
             {
                 var grainRef = this.GrainFactory.GetGrain<IClusterTestGrain>(i);
-                this.Client.Logger.Info("Create Listener object {0}", grainRef);
+                this.Client.Logger().Info("Create Listener object {0}", grainRef);
                 listeners.Add(listener);
                 var obj = this.GrainFactory.CreateObjectReference<IClusterTestListener>(listener).Result;
                 listeners.Add(obj);
-                this.Client.Logger.Info("Subscribe {0}", grainRef);
+                this.Client.Logger().Info("Subscribe {0}", grainRef);
                 Task toWait = grainRef.Subscribe(obj);
                 toWait.GetResult();
             }

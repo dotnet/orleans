@@ -19,7 +19,7 @@ namespace UnitTests.Grains
                 throw new ArgumentException("Primary key cannot be -2 for this test case");
 
             uniqueId = Guid.NewGuid();
-            logger = GetLogger("LivenessTestGrain " + uniqueId);
+            logger = this.GetLogger("LivenessTestGrain " + uniqueId);
             label = this.GetPrimaryKeyLong().ToString();
             logger.Info("OnActivateAsync");
 

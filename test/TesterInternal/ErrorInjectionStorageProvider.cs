@@ -4,6 +4,8 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace UnitTests.StorageTests
 {
@@ -57,6 +59,7 @@ namespace UnitTests.StorageTests
 
     public class ErrorInjectionStorageProvider : MockStorageProvider, IControllable
     {
+        private ILogger logger;
         public static void SetErrorInjection(string providerName, ErrorInjectionBehavior errorInjectionBehavior, IGrainFactory grainFactory)
         {
             IManagementGrain mgmtGrain = grainFactory.GetGrain<IManagementGrain>(0);
@@ -75,13 +78,13 @@ namespace UnitTests.StorageTests
         public void SetErrorInjection(ErrorInjectionBehavior errorInject)
         {
             ErrorInjection = errorInject;
-            Log.Info(0, "Set ErrorInjection to {0}", ErrorInjection);
+            logger.Info(0, "Set ErrorInjection to {0}", ErrorInjection);
         }
 
         public async override Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
         {
-            Log = providerRuntime.GetLogger(this.GetType().FullName);
-            Log.Info(0, "Init ErrorInjection={0}", ErrorInjection);
+            this.logger = providerRuntime.ServiceProvider.GetRequiredService<ILogger<ErrorInjectionStorageProvider>>();
+            logger.Info(0, "Init ErrorInjection={0}", ErrorInjection);
             try
             {
                 SetErrorInjection(ErrorInjectionBehavior.None);
@@ -89,14 +92,14 @@ namespace UnitTests.StorageTests
             }
             catch (Exception exc)
             {
-                Log.Error(0, "Unexpected error during Init", exc);
+                logger.Error(0, "Unexpected error during Init", exc);
                 throw;
             }
         }
 
         public async override Task Close()
         {
-            Log.Info(0, "Close ErrorInjection={0}", ErrorInjection);
+            logger.Info(0, "Close ErrorInjection={0}", ErrorInjection);
             try
             {
                 SetErrorInjection(ErrorInjectionBehavior.None);
@@ -104,14 +107,14 @@ namespace UnitTests.StorageTests
             }
             catch (Exception exc)
             {
-                Log.Error(0, "Unexpected error during Close", exc);
+                logger.Error(0, "Unexpected error during Close", exc);
                 throw;
             }
         }
 
         public async override Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
-            Log.Info(0, "ReadStateAsync for {0} {1} ErrorInjection={2}", grainType, grainReference, ErrorInjection);
+            logger.Info(0, "ReadStateAsync for {0} {1} ErrorInjection={2}", grainType, grainReference, ErrorInjection);
             try
             {
                 ThrowIfMatches(ErrorInjectionPoint.BeforeRead);
@@ -120,14 +123,14 @@ namespace UnitTests.StorageTests
             }
             catch (Exception exc)
             {
-                Log.Warn(0, "Injected error during ReadStateAsync for {0} {1} Exception = {2}", grainType, grainReference, exc);
+                logger.Warn(0, "Injected error during ReadStateAsync for {0} {1} Exception = {2}", grainType, grainReference, exc);
                 throw;
             }
         }
 
         public async override Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
-            Log.Info(0, "WriteStateAsync for {0} {1} ErrorInjection={0}", grainType, grainReference, ErrorInjection);
+            logger.Info(0, "WriteStateAsync for {0} {1} ErrorInjection={0}", grainType, grainReference, ErrorInjection);
             try
             {
                 ThrowIfMatches(ErrorInjectionPoint.BeforeWrite);
@@ -136,7 +139,7 @@ namespace UnitTests.StorageTests
             }
             catch (Exception exc)
             {
-                Log.Warn(0, "Injected error during WriteStateAsync for {0} {1} Exception = {2}", grainType, grainReference, exc);
+                logger.Warn(0, "Injected error during WriteStateAsync for {0} {1} Exception = {2}", grainType, grainReference, exc);
                 throw;
             }
         }

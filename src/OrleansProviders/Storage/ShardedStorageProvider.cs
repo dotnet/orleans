@@ -50,10 +50,6 @@ namespace Orleans.Storage
         /// <see cref="IProvider.Name"/>
         public string Name { get; private set; }
 
-        /// <summary> Logger used by this storage provider instance. </summary>
-        /// <see cref="IStorageProvider.Log"/>
-        public Logger Log { get; private set; }
-
         /// <summary>
         /// Return a hash value derived from the input grain type and id values.
         /// </summary>
@@ -79,7 +75,6 @@ namespace Orleans.Storage
             var loggerName = $"{this.GetType().FullName}.{Name}";
             var loggerFactory = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>();
             this.logger = loggerFactory.CreateLogger(loggerName);
-            Log = new LoggerWrapper(logger, loggerName, loggerFactory);
 
             var providers = new List<IStorageProvider>();
             int index = 0;

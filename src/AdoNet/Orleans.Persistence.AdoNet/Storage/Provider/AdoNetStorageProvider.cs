@@ -136,10 +136,6 @@ namespace Orleans.Storage
         /// </summary>
         public IStorageHasherPicker HashPicker { get; set; } = new StorageHasherPicker(new[] { new OrleansDefaultHasher() });
 
-        /// <summary> Logger used by this storage provider instance. </summary>
-        /// <see cref="IStorageProvider.Log"/>
-        public Logger Log { get; private set; }
-
         /// <summary> Name of this storage provider instance. </summary>
         /// <see cref="IProvider.Name"/>
         public string Name { get; private set; }
@@ -202,7 +198,6 @@ namespace Orleans.Storage
 
             var loggerFactory = providerRuntime.ServiceProvider.GetService<ILoggerFactory>();
             this.logger = loggerFactory.CreateLogger<AdoNetStorageProvider>();
-            Log = new LoggerWrapper(this.logger, this.GetType().FullName, loggerFactory);
             Name = name;
 
             logger.Info((int)RelationalStorageProviderCodes.RelationalProviderInitProvider, $"Initialized storage provider: ServiceId={ServiceId} ProviderName={Name} Invariant={Storage.InvariantName} ConnectionString={Storage.ConnectionString}.");

@@ -68,7 +68,7 @@ namespace UnitTests.Grains
 
         public override async Task OnActivateAsync()
         {
-            logger = GetLogger("StreamReliabilityTestGrain-" + this.IdentityString);
+            logger = this.GetLogger("StreamReliabilityTestGrain-" + this.IdentityString);
             logger.Info(String.Format("OnActivateAsync IsProducer = {0}, IsConsumer = {1}.",
                 State.IsProducer, State.ConsumerSubscriptionHandles != null && State.ConsumerSubscriptionHandles.Count > 0));
 
@@ -346,7 +346,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = GetLogger("StreamUnsubscribeTestGrain-" + this.IdentityString);
+            logger = this.GetLogger("StreamUnsubscribeTestGrain-" + this.IdentityString);
             logger.Info(String.Format("OnActivateAsync IsProducer = {0}, IsConsumer = {1}.",
                 State.IsProducer, State.ConsumerSubscriptionHandles != null && State.ConsumerSubscriptionHandles.Count > 0));
             return Task.CompletedTask;

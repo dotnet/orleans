@@ -894,7 +894,7 @@ namespace UnitTests
             Assert.Equal(numProviders, providerConfigs.Providers.Count); // Num provider configs
         }
     }
-
+#pragma warning disable 618
     public class DummyLogConsumer : ILogConsumer
     {
         public void Log(Severity severity, LoggerType loggerType, string caller, string message, IPEndPoint myIPEndPoint, Exception exception, int eventCode = 0)
@@ -902,6 +902,7 @@ namespace UnitTests
             throw new NotImplementedException();
         }
     }
+#pragma warning restore 618
 
     public class DummyMetricTelemetryConsumer : IMetricTelemetryConsumer
     {

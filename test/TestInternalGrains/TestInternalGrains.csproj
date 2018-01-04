@@ -5,6 +5,12 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <NoWarn>;1591;1591;618</NoWarn>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <NoWarn>;1591;1591;618</NoWarn>
+  </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="xunit.assert" Version="$(xUnitVersion)" />

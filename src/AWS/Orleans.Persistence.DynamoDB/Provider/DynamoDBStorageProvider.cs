@@ -52,11 +52,6 @@ namespace Orleans.Storage
         /// </summary>
         public string Name { get; private set; }
 
-        /// <summary>
-        /// Orleans Logger instance
-        /// </summary>
-        public Logger Log { get; private set; }
-
         private ILogger logger;
         private DynamoDBStorage storage;
         private SerializationManager serializationManager;
@@ -85,7 +80,6 @@ namespace Orleans.Storage
             var loggerFactory = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>();
             var loggerName = $"{this.GetType().FullName}.{name}";
             logger = loggerFactory.CreateLogger(loggerName);
-            Log = new LoggerWrapper(logger, loggerName, loggerFactory);
             var initMsg = string.Format("Init: Name={0} ServiceId={1} Table={2} DeleteStateOnClear={3}",
                 Name, serviceId, tableName, isDeleteStateOnClear);
 

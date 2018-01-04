@@ -25,7 +25,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = GetLogger();
+            logger = this.GetLogger();
             logger.Info(GetType().FullName + " created");
             return base.OnActivateAsync();
         }
@@ -66,7 +66,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = GetLogger();
+            logger = this.GetLogger();
             logger.Info(GetType().FullName + " created");
             return base.OnActivateAsync();
         }
@@ -185,7 +185,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = GetLogger();
+            logger = this.GetLogger();
             logger.Info(GetType().FullName + " created");
             return base.OnActivateAsync();
         }
@@ -274,7 +274,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = GetLogger();
+            logger = this.GetLogger();
             logger.Info(GetType().FullName + " created");
             return base.OnActivateAsync();
         }

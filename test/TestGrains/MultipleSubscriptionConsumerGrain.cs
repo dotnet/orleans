@@ -37,7 +37,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = base.GetLogger("MultipleSubscriptionConsumerGrain " + base.IdentityString);
+            logger = this.GetLogger("MultipleSubscriptionConsumerGrain " + base.IdentityString);
             logger.Info("OnActivateAsync");
             return Task.CompletedTask;
         }

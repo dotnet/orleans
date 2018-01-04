@@ -11,6 +11,7 @@ using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Storage;
+using Microsoft.Extensions.Logging;
 
 namespace UnitTests.StorageTests
 {
@@ -45,12 +46,11 @@ namespace UnitTests.StorageTests
         private ILocalDataStore StateStore;
         private SerializationManager serializationManager;
         private const string stateStoreKey = "State";
-
+        private ILogger logger;
         public string LastId { get; private set; }
         public object LastState { get; private set; }
 
         public string Name { get; private set; }
-        public Logger Log { get; protected set; }
 
         public MockStorageProvider()
             : this(2)
@@ -92,7 +92,7 @@ namespace UnitTests.StorageTests
         {
             lock (StateStore)
             {
-                Log.Info("Setting stored value {0} for {1} to {2}", name, grainReference, val);
+                this.logger.Info("Setting stored value {0} for {1} to {2}", name, grainReference, val);
                 var keys = MakeGrainStateKeys(grainType, grainReference);
                 var storedDict = StateStore.ReadRow(keys);
                 if (!storedDict.ContainsKey(stateStoreKey))
@@ -141,22 +141,22 @@ namespace UnitTests.StorageTests
         {
             this.Name = name;
             string loggerName = string.Format("Storage.{0}-{1}", this.GetType().Name, _id);
-            Log = providerRuntime.GetLogger(loggerName);
+            this.logger = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(loggerName);
 
-            Log.Info(0, "Init Name={0} Config={1}", name, config);
+            logger.Info(0, "Init Name={0} Config={1}", name, config);
             this.serializationManager = providerRuntime.ServiceProvider.GetRequiredService<SerializationManager>();
             Interlocked.Increment(ref initCount);
             
             //blocked by port HierarchicalKeyStore to coreclr
             StateStore = new HierarchicalKeyStore(numKeys);
             
-            Log.Info(0, "Finished Init Name={0} Config={1}", name, config);
+            logger.Info(0, "Finished Init Name={0} Config={1}", name, config);
             return Task.CompletedTask;
         }
 
         public virtual Task Close()
         {
-            Log.Info(0, "Close");
+            logger.Info(0, "Close");
             Interlocked.Increment(ref closeCount);
             StateStore.Clear();
             return Task.CompletedTask;
@@ -164,7 +164,7 @@ namespace UnitTests.StorageTests
 
         public virtual Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
-            Log.Info(0, "ReadStateAsync for {0} {1}", grainType, grainReference);
+            logger.Info(0, "ReadStateAsync for {0} {1}", grainType, grainReference);
             Interlocked.Increment(ref readCount);
             lock (StateStore)
             {
@@ -176,7 +176,7 @@ namespace UnitTests.StorageTests
 
         public virtual Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
-            Log.Info(0, "WriteStateAsync for {0} {1}", grainType, grainReference);
+            logger.Info(0, "WriteStateAsync for {0} {1}", grainType, grainReference);
             Interlocked.Increment(ref writeCount);
             lock (StateStore)
             {
@@ -192,7 +192,7 @@ namespace UnitTests.StorageTests
 
         public virtual Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
-            Log.Info(0, "ClearStateAsync for {0} {1}", grainType, grainReference);
+            logger.Info(0, "ClearStateAsync for {0} {1}", grainType, grainReference);
             Interlocked.Increment(ref deleteCount);
             var keys = MakeGrainStateKeys(grainType, grainReference);
             lock (StateStore)

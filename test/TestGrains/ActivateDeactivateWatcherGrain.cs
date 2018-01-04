@@ -18,7 +18,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            this.logger = GetLogger();
+            this.logger = this.GetLogger();
             return base.OnActivateAsync();
         }
 

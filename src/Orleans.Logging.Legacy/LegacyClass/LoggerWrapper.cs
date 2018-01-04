@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using Orleans.Logging.Legacy;
 using System;
 using System.Collections.Generic;
 using System.Net;
@@ -6,8 +7,8 @@ using System.Threading;
 
 namespace Orleans.Runtime
 {
-    //TODO: Mark it as [Obsolete] and internal after all runtime has migrated
-    public class LoggerWrapper<T> : Logger
+    [Obsolete(OrleansLoggingUtils.ObsoleteMessageStringForLegacyLoggingInfrastructure)]
+    internal class LoggerWrapper<T> : Logger
     {
         private readonly LoggerWrapper logger;
         public LoggerWrapper(ILoggerFactory loggerFactory)
@@ -34,9 +35,8 @@ namespace Orleans.Runtime
             this.logger.Log(errorCode, sev, format, args, exception);
         }
     }
-
-    //TODO: Mark it as [Obsolete] and internal after all runtime has migrated
-    public class LoggerWrapper : Logger
+    [Obsolete(OrleansLoggingUtils.ObsoleteMessageStringForLegacyLoggingInfrastructure)]
+    internal class LoggerWrapper : Logger
     {
         public override Severity SeverityLevel => this.maxSeverityLevel;
         public override string Name => this.name;

@@ -20,6 +20,7 @@ using Orleans.Streams.Core;
 using Orleans.Streams;
 using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Runtime
 {
@@ -114,7 +115,8 @@ namespace Orleans.Runtime
             IStreamProviderManager providerManager,
             IServiceProvider serviceProvider,
             CachedVersionSelectorManager versionSelectorManager,
-            ILoggerFactory loggerFactory)
+            ILoggerFactory loggerFactory,
+            IOptions<SchedulingOptions> schedulingOptions)
             : base(Constants.CatalogId, messageCenter.MyAddress, loggerFactory)
         {
             LocalSilo = localSiloDetails.SiloAddress;
@@ -136,7 +138,17 @@ namespace Orleans.Runtime
             logger = loggerFactory.CreateLogger<Catalog>();
             this.config = config.Globals;
             ActivationCollector = new ActivationCollector(config, loggerFactory);
-            this.Dispatcher = new Dispatcher(scheduler, messageCenter, this, config, placementDirectorsManager, grainDirectory, messageFactory, serializationManager, versionSelectorManager.CompatibilityDirectorManager, loggerFactory);
+            this.Dispatcher = new Dispatcher(scheduler,
+                messageCenter,
+                this,
+                config,
+                placementDirectorsManager,
+                grainDirectory,
+                messageFactory,
+                serializationManager,
+                versionSelectorManager.CompatibilityDirectorManager,
+                loggerFactory,
+                schedulingOptions);
             GC.GetTotalMemory(true); // need to call once w/true to ensure false returns OK value
 
             config.OnConfigChange("Globals/Activation", () => scheduler.RunOrQueueAction(Start, SchedulingContext), false);

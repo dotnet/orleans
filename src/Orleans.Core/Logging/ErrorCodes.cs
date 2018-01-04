@@ -338,7 +338,7 @@ namespace Orleans
         Runtime_Error_100329 = Runtime + 329,
         Runtime_Error_100330 = Runtime + 330,
         Runtime_Error_100331 = Runtime + 331,
-
+        
         SiloBase                        = Runtime + 400,
         SiloStarting                    = SiloBase + 1,
         SiloStarted                     = SiloBase + 2,
@@ -390,6 +390,7 @@ namespace Orleans
         SiloShutdownEventFailure        = SiloBase + 49,
         LifecycleStartFailure           = SiloBase + 50,
         LifecycleStopFailure            = SiloBase + 51,
+        SiloStartPerfMeasure            = SiloBase + 52,
 
         CatalogBase                     = Runtime + 500,
         CatalogNonExistingActivation1   = CatalogBase + 1,

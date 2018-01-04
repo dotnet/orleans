@@ -13,7 +13,7 @@ namespace UnitTests.Grains
 
         public override async Task OnActivateAsync()
         {
-            var logger = GetLogger($"{nameof(FilteredImplicitSubscriptionWithExtensionGrain)} {IdentityString}");
+            var logger = this.GetLogger($"{nameof(FilteredImplicitSubscriptionWithExtensionGrain)} {IdentityString}");
             logger.Info("OnActivateAsync");
             var streamProvider = GetStreamProvider("SMSProvider");
 

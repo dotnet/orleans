@@ -435,7 +435,9 @@ namespace Orleans.Runtime.Configuration
         public TimeSpan ClientRegistrationRefresh { get; set; }
 
         internal bool PerformDeadlockDetection { get; set; }
-
+        
+        public bool AllowCallChainReentrancy { get; set; }
+        
         public string DefaultPlacementStrategy { get; set; }
 
         public CompatibilityStrategy DefaultCompatibilityStrategy { get; set; }
@@ -521,6 +523,7 @@ namespace Orleans.Runtime.Configuration
         private static readonly TimeSpan DEFAULT_UNREGISTER_RACE_DELAY = TimeSpan.FromMinutes(1);
         private static readonly TimeSpan DEFAULT_CLIENT_REGISTRATION_REFRESH = TimeSpan.FromMinutes(5);
         public const bool DEFAULT_PERFORM_DEADLOCK_DETECTION = false;
+        public const bool DEFAULT_ALLOW_CALL_CHAIN_REENTRANCY = false;
         public static readonly string DEFAULT_PLACEMENT_STRATEGY = typeof(RandomPlacement).Name;
         public static readonly string DEFAULT_MULTICLUSTER_REGISTRATION_STRATEGY = typeof(GlobalSingleInstanceRegistration).Name;
         private static readonly TimeSpan DEFAULT_DEPLOYMENT_LOAD_PUBLISHER_REFRESH_TIME = TimeSpan.FromSeconds(1);
@@ -576,6 +579,7 @@ namespace Orleans.Runtime.Configuration
             ClientRegistrationRefresh = DEFAULT_CLIENT_REGISTRATION_REFRESH;
 
             PerformDeadlockDetection = DEFAULT_PERFORM_DEADLOCK_DETECTION;
+            AllowCallChainReentrancy = DEFAULT_ALLOW_CALL_CHAIN_REENTRANCY;
             reminderServiceType = ReminderServiceProviderType.NotSpecified;
             DefaultPlacementStrategy = DEFAULT_PLACEMENT_STRATEGY;
             DeploymentLoadPublisherRefreshTime = DEFAULT_DEPLOYMENT_LOAD_PUBLISHER_REFRESH_TIME;

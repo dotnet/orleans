@@ -53,11 +53,6 @@ namespace Orleans.Runtime.Storage
             return storageProviderLoader.GetProviders();
         }
 
-        public Logger GetLogger(string loggerName)
-        {
-            return new LoggerWrapper(loggerName, loggerFactory);
-        }
-
         public Guid ServiceId => providerRuntime.ServiceId;
 
         public string SiloIdentity => providerRuntime.SiloIdentity;

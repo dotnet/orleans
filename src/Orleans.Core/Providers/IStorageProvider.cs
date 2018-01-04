@@ -12,12 +12,6 @@ namespace Orleans.Storage
     /// </summary>
     public interface IStorageProvider : IProvider
     {
-        /// <summary>Logger used by this storage provider instance.</summary>
-        /// <returns>Reference to the Logger object used by this provider.</returns>
-        /// <seealso cref="Logger"/>
-       //TODO: Mark it as [Obsolete] after all runtime has migrated
-        Logger Log { get; }
-
         /// <summary>Read data function for this storage provider instance.</summary>
         /// <param name="grainType">Type of this grain [fully qualified class name]</param>
         /// <param name="grainReference">Grain reference object for this grain.</param>

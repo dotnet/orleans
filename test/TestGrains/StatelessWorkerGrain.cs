@@ -24,7 +24,7 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync()
         {
             activationGuid = Guid.NewGuid();
-            logger = GetLogger(String.Format("{0}", activationGuid));
+            logger = this.GetLogger(String.Format("{0}", activationGuid));
             logger.Info("Activate.");
             return Task.CompletedTask;
         }

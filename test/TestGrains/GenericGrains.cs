@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using Orleans;
@@ -568,13 +569,13 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            GetLogger().Verbose("***Activating*** {0}", this.GetPrimaryKey());
+            this.GetLogger().Verbose("***Activating*** {0}", this.GetPrimaryKey());
             return Task.CompletedTask;
         }
 
         public override Task OnDeactivateAsync()
         {
-            GetLogger().Verbose("***Deactivating*** {0}", this.GetPrimaryKey());
+            this.GetLogger().Verbose("***Deactivating*** {0}", this.GetPrimaryKey());
             return Task.CompletedTask;
         }
     }
@@ -629,6 +630,17 @@ namespace UnitTests.Grains
         public async Task<T> CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, T t, TimeSpan delay)
         {
             return await target.LongRunningTask(t, delay);
+        }
+
+        public async Task<T> FanOutOtherLongRunningTask(ILongRunningTaskGrain<T> target, T t, TimeSpan delay, int degreeOfParallelism)
+        {
+            var promises = Enumerable
+                .Range(0, degreeOfParallelism)
+                .Select(_ => target.LongRunningTask(t, delay))
+                .ToList();
+
+            await Task.WhenAll(promises);
+            return t;
         }
 
         public async Task CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, GrainCancellationToken tc, TimeSpan delay)

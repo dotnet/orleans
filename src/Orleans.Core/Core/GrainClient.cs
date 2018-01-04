@@ -311,20 +311,6 @@ namespace Orleans
         }
 
         /// <summary>
-        /// Provides logging facility for applications.
-        /// </summary>
-        /// <exception cref="InvalidOperationException">Thrown if Orleans runtime is not correctly initialized before this call.</exception>
-        [Obsolete(DeprecationMessage)]
-        public static Logger Logger
-        {
-            get
-            {
-                CheckInitialized();
-                return client.Logger;
-            }
-        }
-
-        /// <summary>
         /// Set a timeout for responses on this Orleans client.
         /// </summary>
         /// <param name="timeout"></param>

@@ -120,6 +120,7 @@ namespace Orleans.CodeGeneration
                 }
 
                 // STEP 5 : Finally call code generation
+                var stopWatch = Stopwatch.StartNew();
                 if (referencesOrleans)
                 {
                     if (!CodeGenerator.GenerateCode(options))
@@ -132,7 +133,8 @@ namespace Orleans.CodeGeneration
                     Console.WriteLine("ERROR: Orleans-CodeGen - the input assembly does not reference Orleans and therefore code can not be generated.");
                     return -2;
                 }
-
+                stopWatch.Stop();
+                Console.WriteLine($"Build time code generation for assembly {options.InputAssembly} took {stopWatch.ElapsedMilliseconds} milliseconds");
                 // DONE!
                 return 0;
             }
