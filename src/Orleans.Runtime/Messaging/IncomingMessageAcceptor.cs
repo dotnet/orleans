@@ -13,6 +13,7 @@ namespace Orleans.Runtime.Messaging
     {
         private readonly ConcurrentObjectPool<SaeaPoolWrapper> receiveEventArgsPool;
         private const int SocketBufferSize = 1024 * 128; // 128 kb
+        private const int PreambleMaxSize = 1024 * 4; // 4 kb
         private readonly IPEndPoint listenAddress;
         private Action<Message> sniffIncomingMessageHandler;
         private readonly LingerOption receiveLingerOption = new LingerOption(true, 0);
@@ -187,6 +188,12 @@ namespace Orleans.Runtime.Messaging
 
         private byte[] ReadFromSocket(Socket sock, int expected)
         {
+            if (expected > PreambleMaxSize)
+            {
+                Log.Warn(ErrorCode.GatewayAcceptor_InvalidSize,
+                    "Invalid expected size {0} while receiving connection preamble data from endpoint {1}.", expected, sock.RemoteEndPoint);
+                return null;
+            }
             var buffer = new byte[expected];
             int offset = 0;
             while (offset < buffer.Length)
