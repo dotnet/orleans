@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Grains;
+using Microsoft.Extensions.Logging;
+using Orleans;
 using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 using System;
@@ -20,6 +22,7 @@ namespace Silo
             var connectionString = File.ReadAllText("connection-string.txt");
 
             var config = new ClusterConfiguration();
+            config.Globals.ClusterId = "orleans-docker";
             config.Globals.DataConnectionString = connectionString;
             config.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
             config.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.AzureTable;
@@ -28,8 +31,8 @@ namespace Silo
             config.Defaults.ProxyGatewayEndpoint = new IPEndPoint(IPAddress.Any, 30000);
 
             silo = new SiloHostBuilder()
-                .AddApplicationPartsFromAppDomain()
-                .AddApplicationPartsFromBasePath()
+                .ConfigureApplicationParts(parts =>
+                        parts.AddApplicationPart(typeof(PingGrain).Assembly).WithReferences())
                 .UseConfiguration(config)
                 .ConfigureLogging(builder => builder.SetMinimumLevel(LogLevel.Warning).AddConsole())
                 .Build();
@@ -38,7 +41,6 @@ namespace Silo
 
             AssemblyLoadContext.Default.Unloading += context =>
             {
-                Console.WriteLine("ProcessExit fired");
                 Task.Run(StopSilo);
                 siloStopped.WaitOne();
             };
