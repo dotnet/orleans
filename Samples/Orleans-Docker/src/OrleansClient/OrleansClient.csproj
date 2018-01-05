@@ -9,6 +9,9 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp1.1</TargetFramework>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <NoWarn>;1591;1701</NoWarn>
+  </PropertyGroup>
   <ItemGroup>
     <None Update="Dockerfile">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

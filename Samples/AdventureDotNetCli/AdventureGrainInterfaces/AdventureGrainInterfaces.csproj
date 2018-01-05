@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net452</TargetFramework>
+    <AssemblyName>AdventureGrainInterfaces</AssemblyName>
+    <PackageId>AdventureGrainInterfaces</PackageId>
+    <NetStandardImplicitPackageVersion>1.6.0</NetStandardImplicitPackageVersion>
+  </PropertyGroup>
+
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net452' ">
+    <PackageReference Include="Microsoft.Orleans.Server" Version="1.2.2" />
+    <Reference Include="System" />
+    <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.OrleansSQLUtils" Version="2.0.0-beta3" />
+    <PackageReference Include="NETStandard.Library" Version="2.0.0" />
+    <PackageReference Include="System.Data.SqlClient" Version="4.4.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AdoNet\OrleansSQLUtils\OrleansSQLUtils.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Core\Orleans.Core.csproj" />
+    <ProjectReference Include="..\OrleansGrainInterfaces\OrleansGrainInterfaces.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp2.0</TargetFramework>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net452</TargetFramework>
+    <AssemblyName>AdventureSetup</AssemblyName>
+    <OutputType>Exe</OutputType>
+    <PackageId>AdventureSetup</PackageId>
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="OrleansConfiguration.xml" Exclude="bin\**;obj\**;**\*.xproj;packages\**;@(EmbeddedResource)" />
+    <None Update="AdventureMap.json;OrleansConfiguration.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AdventureGrainInterfaces\AdventureGrainInterfaces.csproj" />
+    <ProjectReference Include="..\AdventureGrains\AdventureGrains.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="1.0.2" />
+    <PackageReference Include="Microsoft.Orleans.OrleansRuntime" Version="1.2.2" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net452' ">
+    <Reference Include="System" />
+    <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+
+</Project>

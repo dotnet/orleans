@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Core" Version="2.0.0-beta3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OrleansGrainInterfaces\OrleansGrainInterfaces.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="OrleansGrainInterfaces\" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+  </PropertyGroup>
+
+</Project>
