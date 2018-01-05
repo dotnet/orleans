@@ -9,17 +9,6 @@ using LivenessProviderType = Orleans.Runtime.Configuration.GlobalConfiguration.L
 
 namespace Orleans.Runtime.MembershipService
 {
-    /// <summary>
-    /// LegacyMembershipConfigurator configure membership table in the legacy way, which is from global configuration
-    /// </summary>
-    public interface ILegacyMembershipConfigurator
-    {
-        /// <summary>
-        /// Configure the membership table in the legacy way 
-        /// </summary>
-        void ConfigureServices(GlobalConfiguration configuration, IServiceCollection services);
-    }
-
     internal static class LegacyMembershipConfigurator
     {
         /// <summary>

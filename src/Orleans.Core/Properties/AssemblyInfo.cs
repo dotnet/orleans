@@ -12,6 +12,7 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("Orleans.Reminders.AzureStorage")]
 [assembly: InternalsVisibleTo("Orleans.Reminders.DynamoDB")]
 [assembly: InternalsVisibleTo("Orleans.Runtime")]
+[assembly: InternalsVisibleTo("Orleans.Runtime.Abstractions")]
 [assembly: InternalsVisibleTo("Orleans.Statistics.AzureStorage")]
 [assembly: InternalsVisibleTo("Orleans.Streaming.AzureStorage")]
 [assembly: InternalsVisibleTo("Orleans.Streaming.EventHubs")]
