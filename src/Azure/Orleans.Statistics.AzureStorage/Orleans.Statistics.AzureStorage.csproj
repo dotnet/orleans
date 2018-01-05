@@ -26,11 +26,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <Folder Include="Utilities\" />
+    <Folder Include="Storage\" />
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Utilities\" />
-    <Folder Include="Storage\" />
+    <ProjectReference Include="..\..\Orleans.Core\Orleans.Core.csproj" />
   </ItemGroup>
 </Project>
