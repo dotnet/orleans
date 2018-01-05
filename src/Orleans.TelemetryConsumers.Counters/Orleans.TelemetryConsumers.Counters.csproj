@@ -23,7 +23,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
     <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" />
-    <ProjectReference Include="..\Orleans.Runtime\Orleans.Runtime.csproj" />
   </ItemGroup>
 
   <ItemGroup>
