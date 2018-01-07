@@ -116,7 +116,7 @@ namespace Orleans.Hosting
         /// </summary>
         /// <param name="builder">The builder.</param>
         /// <returns>The <see cref="ApplicationPartManager"/> for this instance.</returns>
-        public static ApplicationPartManager GetApplicationPartManager(this ISiloHostBuilder builder) => ApplicationPartManagerExtensions.GetApplicationPartManager(builder.Properties);
+        public static IApplicationPartManager GetApplicationPartManager(this ISiloHostBuilder builder) => ApplicationPartManagerExtensions.GetApplicationPartManager(builder.Properties);
         
         /// <summary>
         /// Configures the <see cref="ApplicationPartManager"/> using the given <see cref="Action{IApplicationPartBuilder}"/>.

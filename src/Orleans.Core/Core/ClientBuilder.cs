@@ -51,7 +51,7 @@ namespace Orleans
             ValidateSystemConfiguration(serviceProvider);
 
             // Construct and return the cluster client.
-            serviceProvider.GetService<SerializationManager>().RegisterSerializers(serviceProvider.GetService<ApplicationPartManager>());
+            serviceProvider.GetService<SerializationManager>().RegisterSerializers(serviceProvider.GetService<IApplicationPartManager>());
             serviceProvider.GetRequiredService<OutsideRuntimeClient>().ConsumeServices(serviceProvider);
             return serviceProvider.GetRequiredService<IClusterClient>();
         }

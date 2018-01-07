@@ -170,7 +170,7 @@ namespace Orleans.Serialization
             RegisterSerializationProviders(serializatonProviderOptionsValue.SerializationProviders);
         }
 
-        public void RegisterSerializers(ApplicationPartManager applicationPartManager)
+        public void RegisterSerializers(IApplicationPartManager applicationPartManager)
         {
             var serializerFeature = applicationPartManager.CreateAndPopulateFeature<SerializerFeature>();
             this.RegisterSerializers(serializerFeature);
