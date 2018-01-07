@@ -47,6 +47,16 @@ namespace Orleans.Runtime.Scheduler
             }
         }
 
+        protected override void OnEnqueue(IWorkItem request)
+        {
+            base.OnEnqueue(request);
+
+#if TRACK_DETAILED_STATS
+            if (StatisticsCollector.CollectGlobalShedulerStats)
+                SchedulerStatisticsGroup.OnWorkItemEnqueue();
+#endif
+        }
+
         protected override ThreadPoolExecutorOptions.Builder ExecutorOptionsBuilder => configureExecutorOptionsBuilder(base.ExecutorOptionsBuilder);
 
         private string GetWorkItemStatus(object item, bool detailed)

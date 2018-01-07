@@ -22,6 +22,7 @@ namespace Orleans.Runtime
                 return;
             }
 
+            OnEnqueue(request);
             executor.QueueWorkItem(ProcessAction, request);
         }
 
@@ -30,6 +31,8 @@ namespace Orleans.Runtime
         protected abstract void Process(T request);
 
         protected virtual bool DrainAfterCancel { get; } = false;
+
+        protected virtual void OnEnqueue(T request) { }
 
         protected override ThreadPoolExecutorOptions.Builder ExecutorOptionsBuilder => base.ExecutorOptionsBuilder
             .WithDrainAfterCancel(DrainAfterCancel);

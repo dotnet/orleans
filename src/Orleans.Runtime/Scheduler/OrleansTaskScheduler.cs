@@ -227,8 +227,6 @@ namespace Orleans.Runtime.Scheduler
 
         public void ScheduleExecution(IWorkItem workItem)
         {
-            TrackWorkItemEnqueue(workItem);
-
             if (workItem.IsSystemPriority)
             {
                 systemAgent.QueueRequest(workItem);
@@ -417,14 +415,6 @@ namespace Orleans.Runtime.Scheduler
                 logger.Info(ErrorCode.SchedulerStatistics, 
                     "OrleansTaskScheduler.PrintStatistics(): RunQueue={0}, WorkItems={1}, Directory:" + Environment.NewLine + "{2}",
                     RunQueueLength, WorkItemGroupCount, stats);
-        }
-
-        private void TrackWorkItemEnqueue(IWorkItem todo)
-        {
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectGlobalShedulerStats) // todo
-                SchedulerStatisticsGroup.OnWorkItemEnqueue();
-#endif
         }
 
         internal void DumpSchedulerStatus(bool alwaysOutput = true)
