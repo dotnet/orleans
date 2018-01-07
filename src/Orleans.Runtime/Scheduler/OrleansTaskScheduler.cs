@@ -60,8 +60,8 @@ namespace Orleans.Runtime.Scheduler
             TimeSpan turnWarningLengthThreshold, bool injectMoreWorkerThreads, LimitValue maxPendingItemsLimit, 
             ICorePerformanceMetrics performanceMetrics, ExecutorService executorService, ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger<OrleansTaskScheduler>();
             this.loggerFactory = loggerFactory;
+            this.logger = loggerFactory.CreateLogger<OrleansTaskScheduler>();
             cancellationTokenSource = new CancellationTokenSource();
             WorkItemGroup.ActivationSchedulingQuantum = activationSchedulingQuantum;
             applicationTurnsStopped = false;
@@ -69,17 +69,13 @@ namespace Orleans.Runtime.Scheduler
             TurnWarningLengthThreshold = turnWarningLengthThreshold;
             workgroupDirectory = new ConcurrentDictionary<ISchedulingContext, WorkItemGroup>();
 
-            var maxSystemThreads = 1;
+            const int maxSystemThreads = 1;
             maximumConcurrencyLevel = maxActiveThreads + maxSystemThreads;
 
-            OrleansSchedulerAsynchAgent CreateSchedulerAsynchAgent(
-                string agentName,
-                string queueName,
-                bool drainAfterCancel)
+            OrleansSchedulerAsynchAgent CreateSchedulerAsynchAgent(string agentName, bool drainAfterCancel)
             {
                 return new OrleansSchedulerAsynchAgent(
                     agentName,
-                    queueName,
                     executorService,
                     maxActiveThreads,
                     delayWarningThreshold,
@@ -89,9 +85,9 @@ namespace Orleans.Runtime.Scheduler
                     loggerFactory);
             }
 
-            mainAgent = CreateSchedulerAsynchAgent("OrleansSchedulerMainAgent", "Scheduler.LevelOne.MainQueue", false);
-            systemAgent = CreateSchedulerAsynchAgent("OrleansSchedulerSystemAgent", "Scheduler.LevelOne.SystemQueue", true);
-            
+            mainAgent = CreateSchedulerAsynchAgent("Scheduler.LevelOne.MainQueue", false);
+            systemAgent = CreateSchedulerAsynchAgent("Scheduler.LevelOne.SystemQueue", true);
+
             this.taskWorkItemLogger = loggerFactory.CreateLogger<TaskWorkItem>();
             logger.Info("Starting OrleansTaskScheduler with {0} Max Active application Threads and 1 system thread.", maxActiveThreads);
             IntValueStatistic.FindOrCreate(StatisticNames.SCHEDULER_WORKITEMGROUP_COUNT, () => WorkItemGroupCount);
@@ -426,25 +422,8 @@ namespace Orleans.Runtime.Scheduler
         private void TrackWorkItemEnqueue(IWorkItem todo)
         {
 #if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectGlobalShedulerStats)
+            if (StatisticsCollector.CollectGlobalShedulerStats) // todo
                 SchedulerStatisticsGroup.OnWorkItemEnqueue();
-
-            QueueTrackingStatistic queueTracking;
-            int workItemsCount;
-
-            if (todo.IsSystemPriority)
-            {
-                queueTracking = systemQueueTracking;
-                workItemsCount = systemExecutor.WorkQueueCount;
-            }
-            else
-            {
-                queueTracking = mainQueueTracking;
-                workItemsCount = mainExecutor.WorkQueueCount;
-            }
-
-            if (StatisticsCollector.CollectShedulerQueuesStats)
-                queueTracking.OnEnQueueRequest(1, workItemsCount);
 #endif
         }
 

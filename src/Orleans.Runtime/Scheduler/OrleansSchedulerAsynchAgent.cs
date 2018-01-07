@@ -7,15 +7,12 @@ namespace Orleans.Runtime.Scheduler
 {
     internal class OrleansSchedulerAsynchAgent : AsynchQueueAgent<IWorkItem>
     {
-        private readonly QueueTrackingStatistic queueTracking;
-
         private readonly TaskScheduler scheduler;
 
         private readonly ThreadPoolExecutorOptions.BuilderConfigurator configureExecutorOptionsBuilder;
 
         public OrleansSchedulerAsynchAgent(
             string name,
-            string queueTrackingName,
             ExecutorService executorService,
             int maxDegreeOfParalelism, 
             TimeSpan delayWarningThreshold, 
@@ -34,10 +31,6 @@ namespace Orleans.Runtime.Scheduler
                 .WithDelayWarningThreshold(delayWarningThreshold)
                 .WithWorkItemStatusProvider(GetWorkItemStatus)
                 .WithExecutionFilters(new SchedulerStatisticsTracker(this));
-
-            if (!StatisticsCollector.CollectShedulerQueuesStats) return;
-            queueTracking = new QueueTrackingStatistic(queueTrackingName);
-            queueTracking.OnStartExecution();
         }
 
         protected override void Process(IWorkItem request)
@@ -52,13 +45,6 @@ namespace Orleans.Runtime.Scheduler
             {
                 RuntimeContext.ResetExecutionContext();
             }
-        }
-
-        public override void Stop()
-        {
-            base.Stop();
-            if (!StatisticsCollector.CollectShedulerQueuesStats) return;
-            queueTracking.OnStopExecution();
         }
 
         protected override ThreadPoolExecutorOptions.Builder ExecutorOptionsBuilder => configureExecutorOptionsBuilder(base.ExecutorOptionsBuilder);
