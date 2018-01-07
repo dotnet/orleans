@@ -34,10 +34,9 @@ namespace Orleans.Threading
         public ILoggerFactory LoggerFactory { get; }
         
         public ExecutorFaultHandler FaultHandler { get; }
-        
+
         public const bool TRACK_DETAILED_STATS = false;
 
-        // todo: consider making StatisticsCollector.CollectThreadTimeTrackingStats static
         public static bool CollectDetailedThreadStatistics =
             TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats;
 

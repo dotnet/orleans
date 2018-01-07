@@ -55,12 +55,11 @@ namespace Orleans.Threading
 
         public void QueueWorkItem(WaitCallback callback, object state = null)
         {
-            // todo: WorkItem => Action / Runnable? 
             if (callback == null) throw new ArgumentNullException(nameof(callback));
 
             var workItem = new WorkItem(callback, state, options.WorkItemExecutionTimeTreshold, options.WorkItemStatusProvider);
 
-            statistic.OnEnQueueRequest(1, WorkQueueCount, workItem);
+            statistic.OnEnqueueRequest(1, WorkQueueCount, workItem);
 
             workQueue.Add(workItem);
         }
@@ -115,7 +114,7 @@ namespace Orleans.Threading
             {
                 new OuterExceptionHandler(log),
                 new StatisticsTracker(statistic, options.DelayWarningThreshold, log),
-                executingWorkTracker,
+                this.executingWorkTracker,
                 new ExceptionHandler(log)
             }.Union(options.ExecutionFilters ?? Array.Empty<ExecutionFilter>()));
         }
@@ -181,8 +180,7 @@ namespace Orleans.Threading
                 if (waitTime > delayWarningThreshold && !System.Diagnostics.Debugger.IsAttached)
                 {
                     SchedulerStatisticsGroup.NumLongQueueWaitTimes.Increment();
-                    log.Warn(ErrorCode.SchedulerWorkerPoolThreadQueueWaitTime, SR.Queue_Item_WaitTime, waitTime,
-                        workItem.State);
+                    log.Warn(ErrorCode.SchedulerWorkerPoolThreadQueueWaitTime, SR.Queue_Item_WaitTime, waitTime, workItem.State);
                 }
 
                 statistic.OnDeQueueRequest(workItem);
@@ -361,7 +359,10 @@ namespace Orleans.Threading
     {
         private readonly ThreadPoolExecutor.ExecutionFiltersApplicant filtersApplicant;
 
-        public ExecutionContext(CancellationTokenSource cts, ThreadPoolExecutor.ExecutionFiltersApplicant filtersApplicant, int threadSlot)
+        public ExecutionContext(
+            CancellationTokenSource cts,
+            ThreadPoolExecutor.ExecutionFiltersApplicant filtersApplicant,
+            int threadSlot)
         {
             this.filtersApplicant = filtersApplicant;
             CancellationTokenSource = cts;
@@ -432,7 +433,7 @@ namespace Orleans.Threading
             }
         }
 
-        public void OnEnQueueRequest(int i, int workQueueCount, WorkItem workItem)
+        public void OnEnqueueRequest(int i, int workQueueCount, WorkItem workItem)
         {
             if (ExecutorOptions.CollectDetailedQueueStatistics)
             {

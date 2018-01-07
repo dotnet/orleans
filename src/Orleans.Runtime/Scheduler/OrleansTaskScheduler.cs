@@ -431,9 +431,9 @@ namespace Orleans.Runtime.Scheduler
                 workgroupDirectory.Count,
                 applicationTurnsStopped ? "STOPPING" : "").AppendLine();
 
-            // todo: either remove or support 
+            // todo: either remove or support. At the time of writting is being used only in tests
             // sb.AppendLine("RunQueue:");
-            // RunQueue.DumpStatus(sb); ?? - woun't work without additional costs
+            // RunQueue.DumpStatus(sb); - woun't work without additional costs
             // Pool.DumpStatus(sb);
 
             foreach (var workgroup in workgroupDirectory.Values)

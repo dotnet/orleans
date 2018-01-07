@@ -371,17 +371,9 @@ namespace Orleans.Runtime.Scheduler
                     }
                     finally
                     {
-#if TRACK_DETAILED_STATS
-                        // todo: thread no longer contains threadTracking
-                        //if (StatisticsCollector.CollectTurnsStats)
-                        //    SchedulerStatisticsGroup.OnTurnExecutionEnd(Utils.Since(thread.CurrentStateStarted));
-                        
-                        //if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                        //    thread.threadTracking.IncrementNumberOfProcessed();
-#endif
                         totalItemsProcessed++;
                         var taskLength = stopwatch.Elapsed - taskStart;
-                        if (taskLength > OrleansTaskScheduler.TurnWarningLengthThreshold) // todo: remove hard reference
+                        if (taskLength > OrleansTaskScheduler.TurnWarningLengthThreshold)
                         {
                             SchedulerStatisticsGroup.NumLongRunningTurns.Increment();
                             log.Warn(ErrorCode.SchedulerTurnTooLong3, "Task {0} in WorkGroup {1} took elapsed time {2:g} for execution, which is longer than {3}. Running on thread {4}",

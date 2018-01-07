@@ -25,10 +25,6 @@ namespace Orleans.Runtime
         protected FaultBehavior OnFault;
         protected bool disposed;
 
-#if TRACK_DETAILED_STATS
-        internal protected ThreadTrackingStatistic threadTracking;
-#endif
-
         public ThreadState State { get; protected set; }
 
         internal string Name { get; private set; }
@@ -55,18 +51,12 @@ namespace Orleans.Runtime
             Lockable = new object();
             State = ThreadState.Unstarted;
             OnFault = FaultBehavior.IgnoreFault;
+
             this.loggerFactory = loggerFactory;
-            Log = loggerFactory.CreateLogger(Name);
-
+            this.Log = loggerFactory.CreateLogger(Name);
             this.executorService = executorService;
-            AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
 
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectThreadTimeTrackingStats)
-            {
-                threadTracking = new ThreadTrackingStatistic(Name);
-            }
-#endif
+            AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
         }
 
         protected AsynchAgent(ExecutorService executorService, ILoggerFactory loggerFactory)
