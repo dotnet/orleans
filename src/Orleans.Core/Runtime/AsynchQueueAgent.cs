@@ -36,7 +36,5 @@ namespace Orleans.Runtime
 
         protected override ThreadPoolExecutorOptions.Builder ExecutorOptionsBuilder => base.ExecutorOptionsBuilder
             .WithDrainAfterCancel(DrainAfterCancel);
-
-        //  trackQueueStatistic, from OrleansTaskScheduler todo: add? 
     }
 }
