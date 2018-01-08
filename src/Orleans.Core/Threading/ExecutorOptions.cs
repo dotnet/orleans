@@ -35,13 +35,11 @@ namespace Orleans.Threading
         
         public ExecutorFaultHandler FaultHandler { get; }
 
-        public const bool TRACK_DETAILED_STATS = false;
+        public static readonly bool TRACK_DETAILED_STATS = false;
 
-        public static bool CollectDetailedThreadStatistics =
-            TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats;
+        public static bool CollectDetailedThreadStatistics = TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats;
 
-        public static bool CollectDetailedQueueStatistics =
-            TRACK_DETAILED_STATS && StatisticsCollector.CollectQueueStats;
+        public static bool CollectDetailedQueueStatistics = TRACK_DETAILED_STATS && StatisticsCollector.CollectQueueStats;
     }
 
 
@@ -117,8 +115,7 @@ namespace Orleans.Threading
                 return this;
             }
 
-            public Builder WithWorkItemExecutionTimeTreshold(
-                TimeSpan workItemExecutionTimeTreshold)
+            public Builder WithWorkItemExecutionTimeTreshold(TimeSpan workItemExecutionTimeTreshold)
             {
                 Options.WorkItemExecutionTimeTreshold = workItemExecutionTimeTreshold;
                 return this;
