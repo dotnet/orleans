@@ -46,7 +46,7 @@ namespace Orleans.Threading
 
             for (var threadIndex = 0; threadIndex < options.DegreeOfParallelism; threadIndex++)
             {
-                RunWorker(new ExecutionContext(options.CancellationTokenSource, CreateExecutionFiltersApplicant(), GetThreadSlotIndex(threadIndex)));
+                RunWorker(new ExecutionContext(options.CancellationTokenSource, CreateExecutionFiltersApplicant(), threadIndex));
             }
         }
 
@@ -100,7 +100,7 @@ namespace Orleans.Threading
         private void RunWorker(ExecutionContext context)
         {
             new ThreadPoolThread(
-                    options.Name + context.ThreadSlot,
+                    options.Name + context.ThreadIndex,
                     options.CancellationTokenSource.Token,
                     options.LoggerFactory,
                     options.FaultHandler)
@@ -161,13 +161,6 @@ namespace Orleans.Threading
             }
         }
 
-        private static int GetThreadSlotIndex(int threadIndex)
-        {
-            // false sharing prevention
-            const int padding = 64;
-            return threadIndex * padding;
-        }
-
         private sealed class StatisticsTracker : ExecutionFilter
         {
             private readonly ThreadPoolTrackingStatistic statistic;
@@ -216,13 +209,15 @@ namespace Orleans.Threading
 
             public ExecutingWorkItemsTracker(ThreadPoolExecutor executor)
             {
-                runningItems = new WorkItem[GetThreadSlotIndex(executor.options.DegreeOfParallelism)];
+                runningItems = new WorkItem[GetThreadSlot(executor.options.DegreeOfParallelism)];
                 log = executor.log;
             }
 
-            public override Action<ExecutionContext> OnActionExecuting => context => runningItems[context.ThreadSlot] = context.WorkItem;
+            public override Action<ExecutionContext> OnActionExecuting =>
+                context => runningItems[GetThreadSlot(context.ThreadIndex)] = context.WorkItem;
 
-            public override Action<ExecutionContext> OnActionExecuted => context => runningItems[context.ThreadSlot] = null;
+            public override Action<ExecutionContext> OnActionExecuted =>
+                context => runningItems[GetThreadSlot(context.ThreadIndex)] = null;
 
             public bool HasFrozenWork()
             {
@@ -239,6 +234,13 @@ namespace Orleans.Threading
                 }
 
                 return frozen;
+            }
+
+            private static int GetThreadSlot(int threadIndex)
+            {
+                // false sharing prevention
+                const int padding = 64;
+                return threadIndex * padding;
             }
         }
 
@@ -348,18 +350,18 @@ namespace Orleans.Threading
         public ExecutionContext(
             CancellationTokenSource cts,
             ActionFiltersApplicant<ExecutionContext> filtersApplicant,
-            int threadSlot)
+            int threadIndex)
         {
             this.filtersApplicant = filtersApplicant;
             CancellationTokenSource = cts;
-            ThreadSlot = threadSlot;
+            ThreadIndex = threadIndex;
         }
         
         public CancellationTokenSource CancellationTokenSource { get; }
 
         public WorkItem WorkItem { get; set; }
 
-        internal int ThreadSlot { get; }
+        internal int ThreadIndex { get; }
 
         public void ExecuteWithFilters()
         {
