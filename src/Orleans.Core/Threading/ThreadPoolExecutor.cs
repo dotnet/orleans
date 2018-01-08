@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using Microsoft.Extensions.Logging;
@@ -12,7 +11,7 @@ namespace Orleans.Threading
     /// <summary>
     /// Essentially FixedThreadPool
     /// </summary>
-    internal class ThreadPoolExecutor : IExecutor
+    internal class ThreadPoolExecutor : IExecutor, IHealthCheckable
     {
         private readonly BlockingCollection<WorkItem> workQueue;
 
@@ -108,15 +107,58 @@ namespace Orleans.Threading
                 .QueueWorkItem(_ => ProcessWorkItems(context));
         }
 
-        private ExecutionFiltersApplicant CreateExecutionFiltersApplicant()
+        private ActionFiltersApplicant<ExecutionContext> CreateExecutionFiltersApplicant()
         {
-            return new ExecutionFiltersApplicant(new ExecutionFilter[]
+            var outerExceptionHandler = new ActionLambdaFilter<ExecutionContext>(
+                exceptionHandler: (ex, context) =>
             {
-                new OuterExceptionHandler(log),
+                if (ex is ThreadAbortException)
+                {
+                    if (log.IsEnabled(LogLevel.Debug)) log.Debug(SR.On_Thread_Abort_Exit, ex);
+                    Thread.ResetAbort();
+                }
+                else
+                {
+                    LogThreadOnException(ex, context);
+                }
+
+                return false;
+            });
+
+            var innerExceptionHandler = new ActionLambdaFilter<ExecutionContext>(
+                exceptionHandler: (ex, context) =>
+            {
+                if (ex is ThreadAbortException tae)
+                {
+                    if (tae.ExceptionState != null && tae.ExceptionState.Equals(true))
+                    {
+                        Thread.ResetAbort();
+                    }
+                    else
+                    {
+                        log.Error(ErrorCode.Runtime_Error_100029, SR.Thread_On_Abort_Propagate, ex);
+                    }
+                }
+                else
+                {
+                    LogThreadOnException(ex, context);
+                }
+
+                return true;
+            });
+
+            return new ActionFiltersApplicant<ExecutionContext>(new ActionFilter<ExecutionContext>[]
+            {
+                outerExceptionHandler, 
                 new StatisticsTracker(statistic, options.DelayWarningThreshold, log),
-                this.executingWorkTracker,
-                new ExceptionHandler(log)
+                executingWorkTracker,
+                innerExceptionHandler
             }.Union(options.ExecutionFilters ?? Array.Empty<ExecutionFilter>()));
+
+            void LogThreadOnException(Exception ex, ExecutionContext context)
+            {
+                log.Error(ErrorCode.Runtime_Error_100030, string.Format(SR.Thread_On_Exception, context.WorkItem.State), ex);
+            }
         }
 
         private static int GetThreadSlotIndex(int threadIndex)
@@ -124,27 +166,6 @@ namespace Orleans.Threading
             // false sharing prevention
             const int padding = 64;
             return threadIndex * padding;
-        }
-        
-        private sealed class OuterExceptionHandler : ExecutionFilter
-        {
-            public OuterExceptionHandler(ILogger log) : base(
-                exceptionHandler: (ex, context) =>
-                {
-                    if (ex is ThreadAbortException)
-                    {
-                        if (log.IsEnabled(LogLevel.Debug)) log.Debug(SR.On_Thread_Abort_Exit, ex);
-                        Thread.ResetAbort();
-                    }
-                    else
-                    {
-                        log.Error(ErrorCode.Runtime_Error_100030, string.Format(SR.Thread_On_Exception, context.WorkItem.State), ex);
-                    }
-
-                    return false;
-                })
-            {
-            }
         }
 
         private sealed class StatisticsTracker : ExecutionFilter
@@ -162,13 +183,13 @@ namespace Orleans.Threading
                 this.log = log;
             }
 
-            public override Action<ExecutionContext> OnActionExecuting => (context) =>
+            public override Action<ExecutionContext> OnActionExecuting => context =>
             {
                 TrackRequestDequeue(context.WorkItem);
                 statistic.OnStartProcessing();
             };
 
-            public override Action<ExecutionContext> OnActionExecuted => (context) =>
+            public override Action<ExecutionContext> OnActionExecuted => context =>
             {
                 statistic.OnStopProcessing();
                 statistic.IncrementNumberOfProcessed();
@@ -218,41 +239,6 @@ namespace Orleans.Threading
                 }
 
                 return frozen;
-            }
-        }
-
-        private sealed class ExceptionHandler : ExecutionFilter
-        {
-            public ExceptionHandler(ILogger log) : base(
-                exceptionHandler: (ex, context) =>
-                {
-                    var tae = ex as ThreadAbortException;
-                    if (tae != null)
-                    {
-                        if (tae.ExceptionState != null && tae.ExceptionState.Equals(true))
-                        {
-                            Thread.ResetAbort();
-                        }
-                        else
-                        {
-                            log.Error(ErrorCode.Runtime_Error_100029, SR.Thread_On_Abort_Propagate, ex);
-                        }
-                    }
-                    else
-                    {
-                        log.Error(ErrorCode.Runtime_Error_100030, string.Format(SR.Thread_On_Exception, context.WorkItem.State), ex);
-                    }
-
-                    return true;
-                })
-            {
-            }
-        }
-
-        internal sealed class ExecutionFiltersApplicant : ActionFiltersApplicant<ExecutionContext>
-        {
-            public ExecutionFiltersApplicant(IEnumerable<ExecutionFilter> filters) : base(filters)
-            {
             }
         }
 
@@ -357,11 +343,11 @@ namespace Orleans.Threading
 
     internal class ExecutionContext : IExecutable
     {
-        private readonly ThreadPoolExecutor.ExecutionFiltersApplicant filtersApplicant;
+        private readonly ActionFiltersApplicant<ExecutionContext> filtersApplicant;
 
         public ExecutionContext(
             CancellationTokenSource cts,
-            ThreadPoolExecutor.ExecutionFiltersApplicant filtersApplicant,
+            ActionFiltersApplicant<ExecutionContext> filtersApplicant,
             int threadSlot)
         {
             this.filtersApplicant = filtersApplicant;

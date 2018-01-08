@@ -1,11 +1,8 @@
-﻿using System;
-using System.Threading;
-using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
+﻿using System.Threading;
 
 namespace Orleans.Threading
 {
-    internal interface IExecutor : IHealthCheckable // todo: move IHealthCheckable to ThreadPoolExecutor
+    internal interface IExecutor
     {
         /// <summary>
         /// Executes the given command at some time in the future.  The command
