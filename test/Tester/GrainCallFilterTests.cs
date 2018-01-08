@@ -1,8 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Runtime;
@@ -26,6 +27,7 @@ namespace UnitTests.General
             {
                 builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
                 builder.AddSiloBuilderConfigurator<SiloInvokerTestSiloBuilderConfigurator>();
+                builder.AddClientBuilderConfigurator<ClientConfigurator>();
                 builder.ConfigureLegacyConfiguration(legacy =>
                 {
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
@@ -39,9 +41,8 @@ namespace UnitTests.General
             {
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
-                    hostBuilder.ConfigureServices((hostBuilderContext, services) =>
-                    {
-                        services.AddGrainCallFilter(context =>
+                    hostBuilder
+                        .AddIncomingGrainCallFilter(context =>
                         {
                             if (string.Equals(context.Method.Name, nameof(IGrainCallFilterTestGrain.GetRequestContext)))
                             {
@@ -50,17 +51,48 @@ namespace UnitTests.General
                             }
 
                             return context.Invoke();
-                        });
+                        })
+                        .AddIncomingGrainCallFilter<GrainCallFilterWithDependencies>()
+                        .AddOutgoingGrainCallFilter(async ctx =>
+                        {
+                            if (ctx.Method?.Name == "Echo")
+                            {
+                                // Concatenate the input to itself.
+                                var orig = (string) ctx.Arguments[0];
+                                ctx.Arguments[0] = orig + orig;
+                            }
 
-                        services.AddGrainCallFilter<GrainCallFilterWithDependencies>();
+                            await ctx.Invoke();
+                        });
+                }
+            }
+
+            private class ClientConfigurator : IClientBuilderConfigurator
+            {
+                public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+                {
+                    clientBuilder.AddOutgoingGrainCallFilter(async ctx =>
+                    {
+                        if (ctx.Method?.DeclaringType == typeof(IOutgoingMethodInterceptionGrain))
+                        {
+                            ctx.Arguments[1] = ((string) ctx.Arguments[1]).ToUpperInvariant();
+                        }
+
+                        await ctx.Invoke();
+
+                        if (ctx.Method?.DeclaringType == typeof(IOutgoingMethodInterceptionGrain))
+                        {
+                            var result = (Dictionary<string, object>) ctx.Result;
+                            result["orig"] = result["result"];
+                            result["result"] = "intercepted!";
+                        }
                     });
                 }
-
             }
         }
 
         [SuppressMessage("ReSharper", "NotAccessedField.Local")]
-        public class GrainCallFilterWithDependencies : IGrainCallFilter
+        public class GrainCallFilterWithDependencies : IIncomingGrainCallFilter
         {
             private readonly SerializationManager serializationManager;
             private readonly Silo silo;
@@ -93,12 +125,34 @@ namespace UnitTests.General
         {
             this.fixture = fixture;
         }
+        
+        /// <summary>
+        /// Ensures that grain call filters are invoked around method calls in the correct order.
+        /// </summary>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        [Fact]
+        public async Task GrainCallFilter_Outgoing_Test()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<IOutgoingMethodInterceptionGrain>(random.Next());
+            var grain2 = this.fixture.GrainFactory.GetGrain<IMethodInterceptionGrain>(random.Next());
+
+            // This grain method reads the context and returns it
+            var result = await grain.EchoViaOtherGrain(grain2, "ab");
+
+            // Original arg should have been:
+            // 1. Converted to upper case on the way out of the client: ab -> AB.
+            // 2. Doubled on the way out of grain1: AB -> ABAB.
+            // 3. Reversed on the wya in to grain2: ABAB -> BABA.
+            Assert.Equal("BABA", result["orig"] as string);
+            Assert.NotNull(result["result"]);
+            Assert.Equal("intercepted!", result["result"]);
+        }
 
         /// <summary>
         /// Ensures that grain call filters are invoked around method calls in the correct order.
         /// </summary>
         [Fact]
-        public async Task GrainCallFilter_Order_Test()
+        public async Task GrainCallFilter_Incoming_Order_Test()
         {
             var grain = this.fixture.GrainFactory.GetGrain<IGrainCallFilterTestGrain>(random.Next());
 
@@ -112,7 +166,7 @@ namespace UnitTests.General
         /// Ensures that the invocation interceptor is invoked for stream subscribers.
         /// </summary>
         [Fact]
-        public async Task GrainCallFilter_Stream_Test()
+        public async Task GrainCallFilter_Incoming_Stream_Test()
         {
             var streamProvider = this.fixture.Client.GetStreamProvider("SMSProvider");
             var id = Guid.NewGuid();
@@ -130,7 +184,7 @@ namespace UnitTests.General
         /// Tests that some invalid usages of invoker interceptors are denied.
         /// </summary>
         [Fact]
-        public async Task GrainCallFilter_InvalidOrder_Test()
+        public async Task GrainCallFilter_Incoming_InvalidOrder_Test()
         {
             var grain = this.fixture.GrainFactory.GetGrain<IGrainCallFilterTestGrain>(0);
 
@@ -146,7 +200,7 @@ namespace UnitTests.General
         /// Tests filters on just the grain level.
         /// </summary>
         [Fact]
-        public async Task GrainCallFilter_GrainLevel_Test()
+        public async Task GrainCallFilter_Incoming_GrainLevel_Test()
         {
             var grain = this.fixture.GrainFactory.GetGrain<IMethodInterceptionGrain>(0);
             var result = await grain.One();
@@ -166,7 +220,7 @@ namespace UnitTests.General
         /// Tests filters on generic grains.
         /// </summary>
         [Fact]
-        public async Task GrainCallFilter_GenericGrain_Test()
+        public async Task GrainCallFilter_Incoming_GenericGrain_Test()
         {
             var grain = this.fixture.GrainFactory.GetGrain<IGenericMethodInterceptionGrain<int>>(0);
             var result = await grain.GetInputAsString(679);
@@ -181,7 +235,7 @@ namespace UnitTests.General
         /// Tests filters on grains which implement multiple of the same generic interface.
         /// </summary>
         [Fact]
-        public async Task GrainCallFilter_ConstructedGenericInheritance_Test()
+        public async Task GrainCallFilter_Incoming_ConstructedGenericInheritance_Test()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ITrickyMethodInterceptionGrain>(0);
 
@@ -203,7 +257,7 @@ namespace UnitTests.General
         /// Tests that grain call filters can handle exceptions.
         /// </summary>
         [Fact]
-        public async Task GrainCallFilter_ExceptionHandling_Test()
+        public async Task GrainCallFilter_Incoming_ExceptionHandling_Test()
         {
             var grain = this.fixture.GrainFactory.GetGrain<IMethodInterceptionGrain>(random.Next());
 
@@ -218,7 +272,7 @@ namespace UnitTests.General
         /// Tests that grain call filters can throw exceptions.
         /// </summary>
         [Fact]
-        public async Task GrainCallFilter_FilterThrows_Test()
+        public async Task GrainCallFilter_Incoming_FilterThrows_Test()
         {
             var grain = this.fixture.GrainFactory.GetGrain<IMethodInterceptionGrain>(random.Next());
             
@@ -232,7 +286,7 @@ namespace UnitTests.General
         /// an exception is thrown on the caller.
         /// </summary>
         [Fact]
-        public async Task GrainCallFilter_SetIncorrectResultType_Test()
+        public async Task GrainCallFilter_Incoming_SetIncorrectResultType_Test()
         {
             var grain = this.fixture.GrainFactory.GetGrain<IMethodInterceptionGrain>(random.Next());
 

@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System.Collections.Generic;
+using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 
 namespace UnitTests.GrainInterfaces
@@ -15,6 +16,11 @@ namespace UnitTests.GrainInterfaces
         Task<string> Throw();
         Task<string> IncorrectResultType();
         Task FilterThrows();
+    }
+    
+    public interface IOutgoingMethodInterceptionGrain : IGrainWithIntegerKey
+    {
+        Task<Dictionary<string, object>> EchoViaOtherGrain(IMethodInterceptionGrain otherGrain, string message);
     }
 
     public interface IGenericMethodInterceptionGrain<in T> : IGrainWithIntegerKey, IMethodFromAnotherInterface
