@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using Microsoft.Extensions.Logging;
@@ -46,7 +47,7 @@ namespace Orleans.Threading
 
             for (var threadIndex = 0; threadIndex < options.DegreeOfParallelism; threadIndex++)
             {
-                RunWorker(new ExecutionContext(options.CancellationTokenSource, CreateExecutionFiltersApplicant(), threadIndex));
+                RunWorker(new ExecutionContext(CreateExecutionFilters(), options.CancellationTokenSource, threadIndex));
             }
         }
 
@@ -107,7 +108,7 @@ namespace Orleans.Threading
                 .QueueWorkItem(_ => ProcessWorkItems(context));
         }
 
-        private ActionFiltersApplicant<ExecutionContext> CreateExecutionFiltersApplicant()
+        private ActionFilter<ExecutionContext>[] CreateExecutionFilters()
         {
             var outerExceptionHandler = new ActionLambdaFilter<ExecutionContext>(
                 exceptionHandler: (ex, context) =>
@@ -147,13 +148,13 @@ namespace Orleans.Threading
                 return true;
             });
 
-            return new ActionFiltersApplicant<ExecutionContext>(new ActionFilter<ExecutionContext>[]
+            return new ActionFilter<ExecutionContext>[]
             {
-                outerExceptionHandler, 
+                outerExceptionHandler,
                 new StatisticsTracker(statistic, options.DelayWarningThreshold, log),
                 executingWorkTracker,
                 innerExceptionHandler
-            }.Union(options.ExecutionFilters ?? Array.Empty<ExecutionFilter>()));
+            }.Union(options.ExecutionFilters ?? Array.Empty<ExecutionFilter>()).ToArray();
 
             void LogThreadOnException(Exception ex, ExecutionContext context)
             {
@@ -348,15 +349,15 @@ namespace Orleans.Threading
         private readonly ActionFiltersApplicant<ExecutionContext> filtersApplicant;
 
         public ExecutionContext(
+            IEnumerable<ActionFilter<ExecutionContext>> executionFilters,
             CancellationTokenSource cts,
-            ActionFiltersApplicant<ExecutionContext> filtersApplicant,
             int threadIndex)
         {
-            this.filtersApplicant = filtersApplicant;
+            filtersApplicant = new ActionFiltersApplicant<ExecutionContext>(executionFilters);
             CancellationTokenSource = cts;
             ThreadIndex = threadIndex;
         }
-        
+
         public CancellationTokenSource CancellationTokenSource { get; }
 
         public WorkItem WorkItem { get; set; }
