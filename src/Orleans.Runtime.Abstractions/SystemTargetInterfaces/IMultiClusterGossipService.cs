@@ -1,10 +1,11 @@
 ﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.MultiCluster;
+using Orleans.Runtime.MultiClusterNetwork;
 
 namespace Orleans.Runtime
 {
-    internal interface IMultiClusterGossipService : ISystemTarget
+    public interface IMultiClusterGossipService : ISystemTarget
     {
         /// <summary>One-way small-scale gossip: send partial data to recipient</summary>
         /// <param name="gossipData">The gossip data</param>
@@ -30,5 +31,10 @@ namespace Orleans.Runtime
 
 
     // placeholder interface for gossip data. Actual implementation is in Orleans.Runtime.
-    internal interface IMultiClusterGossipData { }
+    public interface IMultiClusterGossipData
+    {
+        MultiClusterConfiguration Configuration { get; }
+        IReadOnlyDictionary<SiloAddress, GatewayEntry> Gateways { get; }
+        bool IsEmpty { get; }
+    }
 }

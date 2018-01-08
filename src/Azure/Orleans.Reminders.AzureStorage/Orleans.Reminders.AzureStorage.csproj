@@ -26,10 +26,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <Folder Include="Storage\" />
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Storage\" />
+    <ProjectReference Include="..\..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
   </ItemGroup>
 </Project>

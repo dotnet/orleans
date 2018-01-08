@@ -1,13 +1,13 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <PackageId>Microsoft.Orleans.OrleansRuntime</PackageId>
-    <Title>Microsoft Orleans Runtime</Title>
-    <Description>Core runtime library of Microsoft Orleans that hosts and executes grains within a silo.</Description>
-  </PropertyGroup>
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Runtime.Abstractions</PackageId>
+    <Title>Microsoft Orleans Runtime Abstractions</Title>
+    <Description>Library with core types shared between silo and extensions.</Description>
+  </PropertyGroup>
+  <PropertyGroup>
     <RootNamespace>Orleans.Runtime</RootNamespace>
-    <AssemblyName>Orleans.Runtime</AssemblyName>
+    <AssemblyName>Orleans.Runtime.Abstractions</AssemblyName>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
@@ -17,6 +17,5 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" />
-    <ProjectReference Include="..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
   </ItemGroup>
 </Project>

@@ -32,7 +32,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
         /// </summary>
         /// <param name="data">The data to update</param>
         /// <returns></returns>
-        Task Publish(MultiClusterData data);
+        Task Publish(IMultiClusterGossipData data);
 
          /// <summary>
         /// Two-way bulk gossip.
@@ -41,7 +41,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
         /// </summary>
         /// <param name="gossipdata">The gossip data to compare to the current contents, and store if newer, or not there</param>
         /// <returns>returns all stored data that is newer, or not part of, the gossipdata</returns>
-        Task<MultiClusterData> Synchronize(MultiClusterData gossipdata);
+        Task<IMultiClusterGossipData> Synchronize(IMultiClusterGossipData gossipdata);
 
     }
  

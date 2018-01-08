@@ -34,10 +34,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Orleans.Runtime\Orleans.Runtime.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Folder Include="Storage\" />
   </ItemGroup>
 
@@ -82,5 +78,9 @@
       <Pack>true</Pack>
       <PackagePath>lib\$(TargetFramework)\SQLServer\</PackagePath>
     </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
   </ItemGroup>
 </Project>

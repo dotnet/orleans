@@ -131,7 +131,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
         /// </summary>
         /// <param name="source">The source data to apply to the data in this object</param>
         /// <returns>The updated data</returns>
-        public MultiClusterData Merge(MultiClusterData source)
+        public MultiClusterData Merge(IMultiClusterGossipData source)
         {
             MultiClusterData ignore;
             return Merge(source, out ignore);
@@ -144,7 +144,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
         /// <param name="source">The source data to apply to the data in this object</param>
         /// <param name="delta">A delta of what changes were actually applied, used for change listeners</param>
         /// <returns>The updated data</returns>
-        public MultiClusterData Merge(MultiClusterData source, out MultiClusterData delta)
+        public MultiClusterData Merge(IMultiClusterGossipData source, out MultiClusterData delta)
         {
             //--  configuration 
             var sourceConf = source.Configuration;
