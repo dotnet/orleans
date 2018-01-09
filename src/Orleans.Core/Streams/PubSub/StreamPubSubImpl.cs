@@ -75,14 +75,7 @@ namespace Orleans.Streams
             }
             else
             {
-                List<StreamSubscription> implicitSubs = new List<StreamSubscription>();
-                //implicit pubsub requires a non-empty nor null namespace, so if the namespace is null or empty, there won't be any 
-                // subscription for that stream in implicitPubSub. Skip it to avoid unnecessary exception thrown
-                if (implicitPubSub.IsImplicitSubscribeEligibleStreamNameSpace(streamId))
-                {
-                    implicitSubs = await implicitPubSub.GetAllSubscriptions(streamId);
-                }
-                
+                var implicitSubs = await implicitPubSub.GetAllSubscriptions(streamId);
                 var explicitSubs = await explicitPubSub.GetAllSubscriptions(streamId);
                 return implicitSubs.Concat(explicitSubs).ToList();
             }
