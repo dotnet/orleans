@@ -96,6 +96,7 @@ namespace Orleans.Runtime
                     Cts = new CancellationTokenSource();
                 }
 
+                LogStatus(Log, "Starting AsyncAgent {0} on managed thread {1}", Name, Thread.CurrentThread.ManagedThreadId);
                 EnsureExecutorInitialized();
                 OnStart();
                 State = ThreadState.Running;
@@ -217,6 +218,20 @@ namespace Orleans.Runtime
                     break;
                 default:
                     throw new NotImplementedException();
+            }
+        }
+
+        private static void LogStatus(ILogger log, string msg, params object[] args)
+        {
+            if (IsStarting)
+            {
+                // Reduce log noise during silo startup
+                if (log.IsEnabled(LogLevel.Debug)) log.Debug(msg, args);
+            }
+            else
+            {
+                // Changes in agent threads during all operations aside for initial creation are usually important diag events.
+                log.Info(msg, args);
             }
         }
 

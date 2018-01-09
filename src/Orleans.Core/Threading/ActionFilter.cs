@@ -65,6 +65,7 @@ namespace Orleans.Threading
             if (filterIndex >= filters.Length)
             {
                 action.Execute();
+                return;
             }
 
             var filter = filters[filterIndex];

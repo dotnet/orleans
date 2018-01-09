@@ -33,7 +33,7 @@ namespace Orleans.Threading
          }
 
         public string Name { get; }
-        
+
         public void QueueWorkItem(WaitCallback callback, object state = null)
         {
             if (callback == null) throw new ArgumentNullException(nameof(callback));
@@ -62,7 +62,7 @@ namespace Orleans.Threading
                 Name = Name
             }.Start();
         }
-        
+
         private void HandleExecutionException(Exception exc)
         {
             if (cancellationToken.IsCancellationRequested) return;

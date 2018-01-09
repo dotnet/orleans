@@ -120,7 +120,7 @@ namespace Orleans.Threading
                 }
                 else
                 {
-                    LogThreadOnException(ex, context);
+                    log.Error(ErrorCode.Runtime_Error_100031, SR.Exception_Bubbled_Up, ex);
                 }
 
                 return false;
@@ -142,7 +142,7 @@ namespace Orleans.Threading
                 }
                 else
                 {
-                    LogThreadOnException(ex, context);
+                    log.Error(ErrorCode.Runtime_Error_100030, string.Format(SR.Thread_On_Exception, context.WorkItem.State), ex);
                 }
 
                 return true;
@@ -155,11 +155,6 @@ namespace Orleans.Threading
                 executingWorkTracker,
                 innerExceptionHandler
             }.Union(options.ExecutionFilters ?? Array.Empty<ExecutionFilter>()).ToArray();
-
-            void LogThreadOnException(Exception ex, ExecutionContext context)
-            {
-                log.Error(ErrorCode.Runtime_Error_100030, string.Format(SR.Thread_On_Exception, context.WorkItem.State), ex);
-            }
         }
 
         private sealed class StatisticsTracker : ExecutionFilter
@@ -192,7 +187,7 @@ namespace Orleans.Threading
             private void TrackRequestDequeue(WorkItem workItem)
             {
                 var waitTime = workItem.TimeSinceQueued;
-                if (waitTime > delayWarningThreshold && !System.Diagnostics.Debugger.IsAttached)
+                if (waitTime > delayWarningThreshold && !System.Diagnostics.Debugger.IsAttached && workItem.State != null)
                 {
                     SchedulerStatisticsGroup.NumLongQueueWaitTimes.Increment();
                     log.Warn(ErrorCode.SchedulerWorkerPoolThreadQueueWaitTime, SR.Queue_Item_WaitTime, waitTime, workItem.State);
@@ -260,6 +255,8 @@ namespace Orleans.Threading
             public const string Thread_On_Exception = "Thread caught an exception thrown from task {0}.";
 
             public const string Thread_On_Abort_Propagate = "Caught thread abort exception, allowing it to propagate outwards.";
+
+            public const string Exception_Bubbled_Up = "Exception bubbled up to worker thread";
         }
     }
 
@@ -335,12 +332,7 @@ namespace Orleans.Threading
 
         internal bool IsFrozen()
         {
-            if (ExecutionTime != null)
-            {
-                return ExecutionTime.Elapsed > executionTimeTreshold;
-            }
-
-            return false;
+            return Utils.Since(ExecutionStart) > executionTimeTreshold;
         }
     }
 

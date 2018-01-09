@@ -26,7 +26,7 @@ namespace Orleans.Runtime
             executor.QueueWorkItem(ProcessAction, request);
         }
 
-        public int Count => executor.WorkQueueCount;
+        public int Count => executor?.WorkQueueCount ?? 0;
 
         protected abstract void Process(T request);
 
@@ -36,5 +36,10 @@ namespace Orleans.Runtime
 
         protected override ThreadPoolExecutorOptions.Builder ExecutorOptionsBuilder => base.ExecutorOptionsBuilder
             .WithDrainAfterCancel(DrainAfterCancel);
+
+        protected T GetWorkItemState(Threading.ExecutionContext context)
+        {
+            return (T)context.WorkItem.State;
+        }
     }
 }

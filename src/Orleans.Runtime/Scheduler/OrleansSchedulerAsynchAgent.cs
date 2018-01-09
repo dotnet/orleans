@@ -74,7 +74,7 @@ namespace Orleans.Runtime.Scheduler
                 this.agent = agent;
             }
 
-            public override Action<ExecutionContext> OnActionExecuting => context => TrackWorkItemDequeue();
+            public override Action<ExecutionContext> OnActionExecuting => TrackWorkItemDequeue;
 
             public override Action<ExecutionContext> OnActionExecuted => context =>
             {
@@ -89,9 +89,18 @@ namespace Orleans.Runtime.Scheduler
 #endif
             };
 
-            private void TrackWorkItemDequeue()
+            private void TrackWorkItemDequeue(ExecutionContext context)
             {
 #if TRACK_DETAILED_STATS
+                var todo = agent.GetWorkItemState(context);
+                if (todo.ItemType != WorkItemType.WorkItemGroup)
+                {
+                    if (StatisticsCollector.CollectTurnsStats)
+                    {
+                        SchedulerStatisticsGroup.OnThreadStartsTurnExecution(context.ThreadIndex, todo.SchedulingContext);
+                    }
+                }
+
                 if (StatisticsCollector.CollectGlobalShedulerStats)
                 {
                     SchedulerStatisticsGroup.OnWorkItemDequeue();
