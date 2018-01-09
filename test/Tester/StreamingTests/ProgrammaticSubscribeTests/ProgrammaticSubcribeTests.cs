@@ -49,6 +49,17 @@ namespace Tester.StreamingTests
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        public async Task Programmatic_Subscribe_CanUseNullNamespace()
+        {
+            var subGrain = this.fixture.GrainFactory.GetGrain<ISubscribeGrain>(Guid.NewGuid());
+            var streamId = new FullStreamIdentity(Guid.NewGuid(), null, StreamProviderName);
+            await subGrain.AddSubscription<IPassive_ConsumerGrain>(streamId,
+                Guid.NewGuid());
+            var subscriptions = await subGrain.GetSubscriptions(streamId);
+            await subGrain.RemoveSubscription(streamId, subscriptions.First().SubscriptionId);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task StreamingTests_Consumer_Producer_Subscribe()
         {
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
@@ -98,7 +109,7 @@ namespace Tester.StreamingTests
             //the subscription to remove
             var subscription = subscriptions[0];
             // remove subscription
-            await subGrain.RemoveSubscription(subscription);
+            await subGrain.RemoveSubscription(streamId, subscription.SubscriptionId);
             var numProducedWhenUnSub = await producer.GetNumberProduced();
             var consumerUnSub = this.fixture.GrainFactory.GetGrain<IPassive_ConsumerGrain>(subscription.GrainId.PrimaryKey);
             var consumerNormal = this.fixture.GrainFactory.GetGrain<IPassive_ConsumerGrain>(subscriptions[1].GrainId.PrimaryKey);
@@ -138,7 +149,7 @@ namespace Tester.StreamingTests
             Assert.True(expectedSubscriptionIds.SetEquals(subscriptionIds));
 
              //remove one subscription
-            await subGrain.RemoveSubscription(expectedSubscriptions[0]);
+            await subGrain.RemoveSubscription(streamId, expectedSubscriptions[0].SubscriptionId);
             expectedSubscriptions = expectedSubscriptions.GetRange(1, 1);
             subscriptions = await subGrain.GetSubscriptions(streamId);
             expectedSubscriptionIds = expectedSubscriptions.Select(sub => sub.SubscriptionId).ToSet();
