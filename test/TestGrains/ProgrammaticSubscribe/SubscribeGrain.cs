@@ -17,7 +17,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
     {
         Task<List<StreamSubscription>> SetupStreamingSubscriptionForStream<TGrainInterface>(FullStreamIdentity streamIdentity, int grainCount)
             where TGrainInterface : IGrainWithGuidKey;
-        Task RemoveSubscription(StreamSubscription subscription);
+        Task RemoveSubscription(FullStreamIdentity streamId, Guid subscriptionId);
         Task<StreamSubscription> AddSubscription<TGrainInterface>(FullStreamIdentity streamId, Guid grainId)
             where TGrainInterface : IGrainWithGuidKey;
         Task<IEnumerable<StreamSubscription>> GetSubscriptions(FullStreamIdentity streamIdentity);
@@ -64,10 +64,10 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
             return subManager.GetSubscriptions(streamIdentity.ProviderName, streamIdentity);
         }
 
-        public async Task RemoveSubscription(StreamSubscription subscription)
+        public async Task RemoveSubscription(FullStreamIdentity streamId, Guid subscriptionId)
         {
             var subManager = this.ServiceProvider.GetService<IStreamSubscriptionManagerAdmin>().GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
-            await subManager.RemoveSubscription(subscription.StreamProviderName, subscription.StreamId, subscription.SubscriptionId);
+            await subManager.RemoveSubscription(streamId.ProviderName, streamId, subscriptionId);
         }
     }
 

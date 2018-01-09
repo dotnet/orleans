@@ -97,6 +97,11 @@ namespace Orleans.Streams
             return implicitTable.IsImplicitSubscriber(GrainExtensions.GetGrainId(addressable), streamId);
         }
 
+        internal bool IsImplicitSubscribeEligibleStreamNameSpace(StreamId streamId)
+        {
+            return !string.IsNullOrEmpty(streamId.Namespace);
+        }
+
         internal bool IsImplicitSubscriber(GuidId subscriptionId, StreamId streamId)
         {
             return SubscriptionMarker.IsImplicitSubscription(subscriptionId.Guid);
