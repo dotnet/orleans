@@ -1,23 +1,20 @@
-﻿using Orleans.Runtime;
-using System;
-using Microsoft.Extensions.DependencyInjection;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Orleans.Streams.Core;
+﻿using System;
 using System.Reflection;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Orleans.Runtime;
+using Orleans.Streams.Core;
 
 namespace Orleans.Streams
 {
     internal class StreamSubscriptionChangeHandler
     {
-        private IStreamProviderManager providerManager;
+        private readonly IServiceProvider services;
         private Dictionary<Type, IStreamSubscriptionObserverProxy> subscriptionObserverMap;
 
-        public StreamSubscriptionChangeHandler(IStreamProviderManager providerManager, Dictionary<Type, IStreamSubscriptionObserverProxy> observerMap)
+        public StreamSubscriptionChangeHandler(IServiceProvider services, Dictionary<Type, IStreamSubscriptionObserverProxy> observerMap)
         {
-            this.providerManager = providerManager;
+            this.services = services;
             this.subscriptionObserverMap = observerMap;
         }
 
@@ -34,7 +31,7 @@ namespace Orleans.Streams
             IStreamSubscriptionObserverProxy observerProxy;
             if (TryGetStreamSubscriptionObserverProxyForType(messageType, out observerProxy))
             {
-                var streamProvider = this.providerManager.GetStreamProvider(streamId.ProviderName);
+                var streamProvider = this.services.GetServiceByName<IStreamProvider>(streamId.ProviderName);
 
                 await observerProxy.OnSubscribed(streamId, subscriptionId, streamProvider);
             }

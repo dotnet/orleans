@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Runtime.Legacy.Tests</PackageId>
+    <Title>Microsoft Orleans Test Legacy Runtime Library</Title>
+    <Description>Test library of Microsoft Orleans for legacy runtime support.</Description>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Orleans.Runtime.Legacy.Tests</AssemblyName>
+    <RootNamespace>Orleans.Runtime.Legacy.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentAssertions" Version="$(FluentAssertionsVersion)" />
+    <PackageReference Include="xunit" Version="$(xUnitVersion)" />
+    <PackageReference Include="Xunit.SkippableFact" Version="$(XunitSkippableFactVersion)" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Core.Legacy\Orleans.Core.Legacy.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Core\Orleans.Core.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Runtime.Legacy\Orleans.Runtime.Legacy.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
+    <ProjectReference Include="..\TestExtensions\TestExtensions.csproj" />
+    <ProjectReference Include="..\TestGrains\TestGrains.csproj" />
+    <ProjectReference Include="..\TestInterfaces\TestInterfaces.csproj" />
+    <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj" />
+  </ItemGroup>
+
+</Project>

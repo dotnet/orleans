@@ -4,12 +4,19 @@ using System.Text;
 
 namespace Orleans.Runtime
 {
+    public interface IKeyedService<TKey, out TService> : IEquatable<TKey>
+    {
+        TKey Key { get; }
+        TService GetService(IServiceProvider services);
+    }
+    
     /// <summary>
     /// Collection of services that can be disambiguated by key
     /// </summary>
-    public interface IKeyedServiceCollection<in TKey, out TService>
+    public interface IKeyedServiceCollection<TKey, out TService>
         where TService : class
     {
+        IEnumerable<IKeyedService<TKey, TService>> GetServices(IServiceProvider services);
         TService GetService(IServiceProvider services, TKey key);
     }
 

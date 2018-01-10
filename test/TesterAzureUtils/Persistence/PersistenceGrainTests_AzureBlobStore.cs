@@ -9,8 +9,6 @@ using Xunit;
 using Xunit.Abstractions;
 using Orleans.Runtime.Configuration;
 using System.Collections.Generic;
-using Orleans.Providers;
-using System.Linq;
 using TestExtensions;
 
 // ReSharper disable RedundantAssignment
@@ -47,22 +45,7 @@ namespace Tester.AzureUtils.Persistence
                 options.ClusterConfiguration.AddAzureBlobStorageProvider("AzureStore1", options.ClusterConfiguration.Globals.DataConnectionString);
                 options.ClusterConfiguration.AddAzureBlobStorageProvider("AzureStore2", options.ClusterConfiguration.Globals.DataConnectionString);
                 options.ClusterConfiguration.AddAzureBlobStorageProvider("AzureStore3", options.ClusterConfiguration.Globals.DataConnectionString);
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.ShardedStorageProvider>("ShardedAzureStore");
 
-                IProviderConfiguration providerConfig;
-                if (options.ClusterConfiguration.Globals.TryGetProviderConfiguration("Orleans.Storage.ShardedStorageProvider", "ShardedAzureStore", out providerConfig))
-                {
-                    var providerCategoriess = options.ClusterConfiguration.Globals.ProviderConfigurations;
-
-                    var providers = providerCategoriess.SelectMany(o => o.Value.Providers);
-
-                    IProviderConfiguration provider1 = GetNamedProviderConfigForShardedProvider(providers, "AzureStore1");
-                    IProviderConfiguration provider2 = GetNamedProviderConfigForShardedProvider(providers, "AzureStore2");
-                    IProviderConfiguration provider3 = GetNamedProviderConfigForShardedProvider(providers, "AzureStore3");
-                    providerConfig.AddChildConfiguration(provider1);
-                    providerConfig.AddChildConfiguration(provider2);
-                    providerConfig.AddChildConfiguration(provider3);
-                }
                 return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>().UseClientBuilderFactory(ClientBuilderFactory);
             }
         }
@@ -149,10 +132,14 @@ namespace Tester.AzureUtils.Persistence
         }
 
       
-        [SkippableFact, TestCategory("Functional")]
-        public Task Persistence_Silo_StorageProvider_AzureBlobStore()
+        [SkippableTheory, TestCategory("Functional")]
+        [InlineData("AzureStore")]
+        [InlineData("AzureStore1")]
+        [InlineData("AzureStore2")]
+        [InlineData("AzureStore3")]
+        public Task Persistence_Silo_StorageProvider_AzureBlobStore(string providerName)
         {
-            return base.Persistence_Silo_StorageProvider_Azure(typeof(AzureBlobStorage));
+            return base.Persistence_Silo_StorageProvider_Azure(providerName);
         }
 
     }

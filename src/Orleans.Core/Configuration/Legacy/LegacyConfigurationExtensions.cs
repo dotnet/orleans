@@ -6,11 +6,15 @@ using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime;
+using Orleans.Providers;
 
 namespace Orleans.Configuration
 {
     internal static class LegacyConfigurationExtensions
     {
+        private const int ClusterClientDefaultProviderInitStage = 1000;
+        private const int ClusterClientDefaultProviderStartStage = 2000;
+
         public static IServiceCollection AddLegacyClientConfigurationSupport(this IServiceCollection services, ClientConfiguration configuration)
         {
             if (services.Any(service => service.ServiceType == typeof(ClientConfiguration)))
@@ -53,6 +57,9 @@ namespace Orleans.Configuration
 
             // GatewayProvider
             LegacyGatewayListProviderConfigurator.ConfigureServices(configuration, services);
+
+            // Register providers
+            LegacyProviderConfigurator<IClusterClientLifecycle>.ConfigureServices(configuration.ProviderConfigurations, services, ClusterClientDefaultProviderInitStage, ClusterClientDefaultProviderStartStage);
 
             return services;
         }

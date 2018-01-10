@@ -214,14 +214,6 @@ namespace Orleans.Runtime.Management
             }
         }
 
-        public async Task UpdateStreamProviders(SiloAddress[] hostIds, IDictionary<string, ProviderCategoryConfiguration> streamProviderConfigurations)
-        {
-            SiloAddress[] silos = GetSiloAddresses(hostIds);
-            List<Task> actionPromises = PerformPerSiloAction(silos,
-                s => GetSiloControlReference(s).UpdateStreamProviders(streamProviderConfigurations));
-            await Task.WhenAll(actionPromises);
-        }
-
         public async Task<string[]> GetActiveGrainTypes(SiloAddress[] hostsIds=null)
         {
             if (hostsIds == null)

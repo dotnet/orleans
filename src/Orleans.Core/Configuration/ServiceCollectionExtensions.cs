@@ -101,6 +101,12 @@ namespace Orleans.Configuration
             return services.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>();
         }
 
+        public static bool IsInCollection<T>(this IServiceCollection services)
+        {
+            return services.Any(s => s.ServiceType == typeof(T));
+        }
+
+
         private class GrainCallFilterWrapper : IGrainCallFilter
         {
             private readonly GrainCallFilterDelegate interceptor;

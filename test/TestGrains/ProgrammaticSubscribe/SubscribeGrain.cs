@@ -1,12 +1,9 @@
 ﻿using Orleans.Streams;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
-using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Streams.Core;
 using Orleans.Streams.PubSub;
@@ -45,7 +42,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
         public Task<bool> CanGetSubscriptionManager(string providerName)
         {
             IStreamSubscriptionManager manager;
-            return Task.FromResult(this.ServiceProvider.GetService<IStreamProviderManager>().GetStreamProvider(providerName).TryGetStreamSubscrptionManager(out manager));
+            return Task.FromResult(this.ServiceProvider.GetServiceByName<IStreamProvider>(providerName).TryGetStreamSubscrptionManager(out manager));
         }
 
         public async Task<StreamSubscription> AddSubscription<TGrainInterface>(FullStreamIdentity streamId, Guid grainId)

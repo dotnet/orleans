@@ -3,7 +3,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
@@ -22,7 +21,9 @@ namespace UnitTests.General
     {
         public enum Commands
         {
-            InitCount = 1
+            Base = 100,
+            InitCount = Base + 1,
+            QueryName = Base + 2
         }
 
         private int initCount;
@@ -64,6 +65,8 @@ namespace UnitTests.General
             {
                 case Commands.InitCount:
                     return Task.FromResult<object>(this.InitCount);
+                case Commands.QueryName:
+                    return Task.FromResult<object>(this.Name);
                 default:
                     return Task.FromResult<object>(true);
             }
@@ -108,11 +111,8 @@ namespace UnitTests.General
         }
     }
 
-    public class LocalGrainInitBootstrapper : MarshalByRefObject, IBootstrapProvider
+    public class LocalGrainInitBootstrapper : MockBootstrapProvider
     {
-        public string Name { get; private set; }
-        private ILogger logger;
-
         public LocalGrainInitBootstrapper()
         {
 #if DEBUG
@@ -121,31 +121,22 @@ namespace UnitTests.General
 #endif
         }
 
-        public virtual async Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
+        public override async Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
         {
-            Name = name;
-            logger = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>()
-                .CreateLogger(this.GetType().FullName);
-            logger.Info("Init Name={0}", Name);
-
+            await base.Init(name, providerRuntime, config);
             ILocalContentGrain grain = providerRuntime.GrainFactory.GetGrain<ILocalContentGrain>(Guid.NewGuid());
             // issue any grain call to activate this grain.
             await grain.Init();
             logger.Info("Finished Init Name={0}", name);
         }
-
-        public Task Close()
-        {
-            logger.Info("Close Name={0}", Name);
-            return Task.CompletedTask;
-        }
     }
 
-    public class ControllableBootstrapProvider : MockBootstrapProvider, IControllable
+    public class ControllableBootstrapProvider : MockBootstrapProvider
     {
         public new enum Commands
         {
-            EchoArg = 2
+            Base = 200,
+            EchoArg = Base + 1
         }
 
         private Guid serviceId;

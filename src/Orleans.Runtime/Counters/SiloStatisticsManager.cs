@@ -42,13 +42,12 @@ namespace Orleans.Runtime.Counters
             if (useExternalMetricsProvider)
             {
                 var extType = nodeConfig.StatisticsProviderName;
-                var metricsProvider = silo.StatisticsProviderManager.GetProvider(extType);
-                var metricsDataPublisher = metricsProvider as ISiloMetricsDataPublisher;
+                var metricsDataPublisher = silo.Services.GetServiceByName<ISiloMetricsDataPublisher>(extType);
                 if (metricsDataPublisher == null)
                 {
                     var msg = String.Format("Trying to create {0} as a silo metrics publisher, but the provider is not available."
                         + " Expected type = {1} Actual type = {2}",
-                        extType, typeof(IStatisticsPublisher), metricsProvider.GetType());
+                        extType, typeof(IStatisticsPublisher), metricsDataPublisher.GetType());
                     throw new InvalidOperationException(msg);
                 }
                 var configurableMetricsDataPublisher = metricsDataPublisher as IConfigurableSiloMetricsDataPublisher;
@@ -81,13 +80,12 @@ namespace Orleans.Runtime.Counters
             if (useExternalStatsProvider)
             {
                 var extType = nodeConfig.StatisticsProviderName;
-                var statsProvider = silo.StatisticsProviderManager.GetProvider(extType);
-                var statsDataPublisher = statsProvider as IStatisticsPublisher;
+                var statsDataPublisher = silo.Services.GetServiceByName<IStatisticsPublisher>(extType);
                 if (statsDataPublisher == null)
                 {
                     var msg = String.Format("Trying to create {0} as a silo statistics publisher, but the provider is not available."
                         + " Expected type = {1} Actual type = {2}",
-                        extType, typeof(IStatisticsPublisher), statsProvider.GetType());
+                        extType, typeof(IStatisticsPublisher), statsDataPublisher.GetType());
                     throw new InvalidOperationException(msg);
                 }
                 var configurableStatsDataPublisher = statsDataPublisher as IConfigurableStatisticsPublisher;

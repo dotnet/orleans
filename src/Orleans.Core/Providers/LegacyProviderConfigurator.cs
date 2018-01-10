@@ -1,0 +1,162 @@
+﻿using System;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Orleans.LogConsistency;
+using Orleans.Runtime.Configuration;
+using Orleans.Storage;
+using Orleans.Streams;
+using System.Collections.Generic;
+using System.Linq;
+using Orleans.Runtime;
+
+namespace Orleans.Providers
+{
+    public class LegacyProviderConfigurator
+    {
+        public const string InitStageName = "ProviderInitStage";
+        public const string StartStageName = "ProviderStartStage";
+        internal const string SchedulingContextName = "Fallback";
+        internal delegate Task QueueTask(Func<Task> taskFunc);
+    }
+
+    internal static class LegacyProviderConfigurator<TLifeCycle>
+        where TLifeCycle : ILifecycleObservable
+    {
+        /// <summary>
+        /// Legacy way to configure providers. Will need to move to a legacy package in the future
+        /// </summary>
+        /// <returns></returns>
+        internal static void ConfigureServices(IDictionary<string, ProviderCategoryConfiguration> providerConfigurations, IServiceCollection services, int defaultInitStage, int defaultStartStage)
+        {
+            // if already added providers or nothing to add, skipp
+            if (services.Any(s => s.ServiceType == typeof(ProviderTypeLookup))
+                || providerConfigurations.Count == 0)
+                return;
+
+            services.AddSingleton<ProviderTypeLookup>();
+
+            foreach (var providerGroup in providerConfigurations.GroupBy(p => p.Key))
+            {
+                if (providerGroup.Key == ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME)
+                {
+                    foreach (IProviderConfiguration providerConfig in providerGroup.SelectMany(kvp => kvp.Value.Providers.Values))
+                    {
+                        RegisterProvider<IStreamProvider>(providerConfig, services, defaultInitStage, defaultStartStage);
+                    }
+                }
+                else if (providerGroup.Key == ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME)
+                {
+                    services.AddSingleton<IStorageProvider>(sp => sp.GetServiceByName<IStorageProvider>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
+                    foreach (IProviderConfiguration providerConfig in providerGroup.SelectMany(kvp => kvp.Value.Providers.Values))
+                    {
+                        RegisterProvider<IStorageProvider>(providerConfig, services, defaultInitStage, defaultStartStage);
+                    }
+                }
+                else if (providerGroup.Key == ProviderCategoryConfiguration.LOG_CONSISTENCY_PROVIDER_CATEGORY_NAME)
+                {
+                    services.AddSingleton<ILogConsistencyProvider>(sp => sp.GetServiceByName<ILogConsistencyProvider>(ProviderConstants.DEFAULT_LOG_CONSISTENCY_PROVIDER_NAME));
+                    foreach (IProviderConfiguration providerConfig in providerGroup.SelectMany(kvp => kvp.Value.Providers.Values))
+                    {
+                        RegisterProvider<ILogConsistencyProvider>(providerConfig, services, defaultInitStage, defaultStartStage);
+                    }
+                }
+                else if (providerGroup.Key == ProviderCategoryConfiguration.STATISTICS_PROVIDER_CATEGORY_NAME)
+                {
+                    foreach (IProviderConfiguration providerConfig in providerGroup.SelectMany(kvp => kvp.Value.Providers.Values))
+                    {
+                        RegisterProvider<IStatisticsPublisher>(providerConfig, services, defaultInitStage, defaultStartStage);
+                    }
+                }
+                else
+                {
+                    foreach (IProviderConfiguration providerConfig in providerGroup.SelectMany(kvp => kvp.Value.Providers.Values))
+                    {
+                        RegisterProvider<IProvider>(providerConfig, services, defaultInitStage, defaultStartStage);
+                    }
+                }
+            }
+        }
+
+        private class ProviderLifecycleParticipant<TService> : ILifecycleParticipant<TLifeCycle>
+            where TService : class
+        {
+            private readonly ILogger logger;
+            private readonly IProviderConfiguration config;
+            private readonly IServiceProvider services;
+            private readonly LegacyProviderConfigurator.QueueTask schedualer;
+            private readonly int defaultInitStage;
+            private int initStage;
+            private readonly int defaultStartStage;
+            private int startStage;
+
+            public ProviderLifecycleParticipant(IProviderConfiguration config, IServiceProvider services, ILoggerFactory loggerFactory, int defaultInitStage, int defaultStartStage)
+            {
+                this.logger = loggerFactory.CreateLogger($"{config.Type}-{config.Name}");
+                this.services = services;
+                this.config = config;
+                this.defaultInitStage = defaultInitStage;
+                this.defaultStartStage = defaultStartStage;
+                this.schedualer = services.GetService<LegacyProviderConfigurator.QueueTask>();
+            }
+
+            public virtual void Participate(TLifeCycle lifecycle)
+            {
+                this.initStage = this.config.GetIntProperty(LegacyProviderConfigurator.InitStageName, this.defaultInitStage);
+                lifecycle.Subscribe(this.initStage, Init, Finit);
+                this.startStage = this.config.GetIntProperty(LegacyProviderConfigurator.StartStageName, this.defaultStartStage);
+                lifecycle.Subscribe(this.startStage, Start);
+
+            }
+
+            private async Task Init(CancellationToken ct)
+            {
+                var stopWatch = Stopwatch.StartNew();
+                IProvider provider = this.services.GetServiceByName<TService>(this.config.Name) as IProvider;
+                IProviderRuntime runtime = this.services.GetRequiredService<IProviderRuntime>();
+                await schedual(() => provider.Init(this.config.Name, runtime, this.config));
+                stopWatch.Stop();
+                this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Initializing in stage {this.initStage} took {stopWatch.ElapsedMilliseconds} Milliseconds");
+            }
+
+            private async Task Finit(CancellationToken ct)
+            {
+                var stopWatch = Stopwatch.StartNew();
+                IProvider provider = this.services.GetServiceByName<TService>(this.config.Name) as IProvider;
+                await schedual(() => provider.Close());
+                stopWatch.Stop();
+                this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Closing in stage {this.initStage} took {stopWatch.ElapsedMilliseconds} Milliseconds");
+            }
+
+            private async Task Start(CancellationToken ct)
+            {
+                var stopWatch = Stopwatch.StartNew();
+                IStreamProviderImpl provider = this.services.GetServiceByName<TService>(this.config.Name) as IStreamProviderImpl;
+                if (provider == null) return;
+                await schedual(() => provider.Start());
+                stopWatch.Stop();
+                this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Starting in stage {this.startStage} took {stopWatch.ElapsedMilliseconds} Milliseconds");
+            }
+
+            private Task schedual(Func<Task> taskFunc)
+            {
+                return this.schedualer != null
+                    ? this.schedualer.Invoke(taskFunc)
+                    : taskFunc();
+            }
+        }
+
+        private static void RegisterProvider<TService>(IProviderConfiguration config, IServiceCollection services, int defaultInitStage, int defaultStartStage)
+            where TService : class
+        {
+            services.AddSingletonNamedService<TService>(config.Name, (s, n) => {
+                Type providerType = s.GetRequiredService<ProviderTypeLookup>().GetType(config.Type);
+                return Activator.CreateInstance(providerType) as TService;
+            });
+            services.AddSingletonNamedService<ILifecycleParticipant<TLifeCycle>>(config.Name, (s, n) => new ProviderLifecycleParticipant<TService>(config, s, s.GetRequiredService<ILoggerFactory>(), defaultInitStage, defaultStartStage));
+            services.AddSingletonNamedService<IControllable>(config.Name, (s, n) => s.GetServiceByName<TService>(n) as IControllable);
+        }
+    }
+}

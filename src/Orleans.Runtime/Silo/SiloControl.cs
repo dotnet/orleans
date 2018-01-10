@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
@@ -25,11 +26,10 @@ namespace Orleans.Runtime
         private readonly Catalog catalog;
         private readonly GrainTypeManager grainTypeManager;
         private readonly ISiloPerformanceMetrics siloMetrics;
-        private readonly ProviderManagerSystemTarget providerManagerSystemTarget;
-        private readonly ICollection<IProviderManager> providerManagers;
         private readonly CachedVersionSelectorManager cachedVersionSelectorManager;
         private readonly CompatibilityDirectorManager compatibilityDirectorManager;
         private readonly VersionSelectorManager selectorManager;
+        private readonly Dictionary<Tuple<string,string>, IControllable> controllables;
 
         public SiloControl(
             ILocalSiloDetails localSiloDetails,
@@ -39,11 +39,10 @@ namespace Orleans.Runtime
             Catalog catalog,
             GrainTypeManager grainTypeManager,
             ISiloPerformanceMetrics siloMetrics,
-            IEnumerable<IProviderManager> providerManagers,
-            ProviderManagerSystemTarget providerManagerSystemTarget,
             CachedVersionSelectorManager cachedVersionSelectorManager, 
             CompatibilityDirectorManager compatibilityDirectorManager,
             VersionSelectorManager selectorManager,
+            IServiceProvider services,
             ILoggerFactory loggerFactory)
             : base(Constants.SiloControlId, localSiloDetails.SiloAddress, loggerFactory)
         {
@@ -56,11 +55,20 @@ namespace Orleans.Runtime
             this.catalog = catalog;
             this.grainTypeManager = grainTypeManager;
             this.siloMetrics = siloMetrics;
-            this.providerManagerSystemTarget = providerManagerSystemTarget;
-            this.providerManagers = providerManagers.ToList();
             this.cachedVersionSelectorManager = cachedVersionSelectorManager;
             this.compatibilityDirectorManager = compatibilityDirectorManager;
             this.selectorManager = selectorManager;
+            this.controllables = new Dictionary<Tuple<string, string>, IControllable>();
+            IEnumerable<IKeyedServiceCollection<string, IControllable>> namedIControllableCollections = services.GetServices<IKeyedServiceCollection<string, IControllable>>();
+            foreach (IKeyedService<string, IControllable> keyedService in namedIControllableCollections.SelectMany(c => c.GetServices(services)))
+            {
+                IControllable controllable = keyedService.GetService(services);
+                if(controllable != null)
+                {
+                    this.controllables.Add(Tuple.Create(controllable.GetType().FullName, keyedService.Key), controllable);
+                }
+            }
+
         }
 
         #region Implementation of ISiloControl
@@ -130,16 +138,6 @@ namespace Orleans.Runtime
             return Task.CompletedTask;
         }
 
-        /// <inheritdoc />
-        public async Task UpdateStreamProviders(IDictionary<string, ProviderCategoryConfiguration> streamProviderConfigurations)
-        {
-            IStreamProviderManagerAgent streamProviderUpdateAgent =
-                RuntimeClient.InternalGrainFactory.GetSystemTarget<IStreamProviderManagerAgent>(Constants.StreamProviderManagerAgentSystemTargetId, this.localSiloDetails.SiloAddress);
-
-            await this.providerManagerSystemTarget.ScheduleTask(() => streamProviderUpdateAgent.UpdateStreamProviders(streamProviderConfigurations))
-                .WithTimeout(TimeSpan.FromSeconds(25));
-        }
-
         public Task<int> GetActivationCount()
         {
             return Task.FromResult(this.catalog.ActivationCount);
@@ -147,36 +145,14 @@ namespace Orleans.Runtime
 
         public Task<object> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg)
         {
-            IProvider provider = null;
-            foreach (var providerManager in this.providerManagers)
+            IControllable controllable;
+            if(!this.controllables.TryGetValue(Tuple.Create(providerTypeFullName, providerName), out controllable))
             {
-                try
-                {
-                    var candidate = providerManager.GetProvider(providerName);
-                    if (string.Equals(providerTypeFullName, candidate?.GetType()?.FullName))
-                    {
-                        provider = candidate;
-                        break;
-                    }
-                }
-                catch (Exception)
-                {
-                }
-            }
-            if (provider == null)
-            {
-                string error = $"Could not find provider for type {providerTypeFullName} and name {providerName}.";
+                string error = $"Could not find a controllable service for type {providerTypeFullName} and name {providerName}.";
                 logger.Error(ErrorCode.Provider_ProviderNotFound, error);
                 throw new ArgumentException(error);
             }
 
-            IControllable controllable = provider as IControllable;
-            if (controllable == null)
-            {
-                string error = $"The found provider of type {providerTypeFullName} and name {providerName} is not controllable.";
-                logger.Error(ErrorCode.Provider_ProviderNotControllable, error);
-                throw new ArgumentException(error);
-            }
             return controllable.ExecuteCommand(command, arg);
         }
 
