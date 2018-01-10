@@ -88,10 +88,6 @@ namespace Orleans.Threading
                     context.ExecuteWithFilters();
                 }
             }
-            catch (Exception ex)
-            {
-                log.Error(ErrorCode.ExecutorWorkerThreadExc, SR.Executor_Thread_Caugth_Exception, ex);
-            }
             finally
             {
                 statistic.OnStopExecution();
@@ -123,6 +119,7 @@ namespace Orleans.Threading
                     log.Error(ErrorCode.Runtime_Error_100031, SR.Exception_Bubbled_Up, ex);
                 }
 
+                context.CancellationTokenSource.Cancel();
                 return false;
             });
 
@@ -135,7 +132,7 @@ namespace Orleans.Threading
                     {
                         Thread.ResetAbort();
                     }
-                    else
+                    else if (!context.CancellationTokenSource.IsCancellationRequested)
                     {
                         log.Error(ErrorCode.Runtime_Error_100029, SR.Thread_On_Abort_Propagate, ex);
                     }
@@ -245,8 +242,6 @@ namespace Orleans.Threading
             public const string WorkItem_ExecutionTime = "WorkItem={0} Executing for {1} {2}";
 
             public const string WorkItem_LongExecutionTime = "Work item {0} has been executing for long time.";
-
-            public const string Executor_Thread_Caugth_Exception = "Executor thread caugth exception:";
 
             public const string Queue_Item_WaitTime = "Queue wait time of {0} for Item {1}";
 
