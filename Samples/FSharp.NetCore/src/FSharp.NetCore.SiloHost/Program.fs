@@ -16,8 +16,9 @@ let buildSiloHost () =
         let builder = SiloHostBuilder()
                         .UseConfiguration(config)
                         .ConfigureApplicationParts(fun parts -> 
-                            parts.AddApplicationPart(typeof<HelloGrain>.Assembly).WithCodeGeneration() |> ignore
-                            parts.AddApplicationPart(typeof<IHello>.Assembly).WithCodeGeneration() |> ignore)
+                            parts.AddApplicationPart(typeof<HelloGrain>.Assembly)
+                                 .AddApplicationPart(typeof<IHello>.Assembly)
+                                 .WithCodeGeneration() |> ignore)
                         .ConfigureLogging(fun logging -> logging.AddConsole() |> ignore)
         return builder.Build()
     }
