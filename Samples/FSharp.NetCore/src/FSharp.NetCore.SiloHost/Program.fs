@@ -4,6 +4,8 @@ open Orleans
 open Orleans.Runtime.Configuration
 open Orleans.Hosting
 open System
+open FSharp.NetCore.Grians
+open FSharp.NetCore.Interfaces
 
 
 let buildSiloHost () =
@@ -13,9 +15,9 @@ let buildSiloHost () =
 
         let builder = SiloHostBuilder()
                         .UseConfiguration(config)
-                        .ConfigureApplicationParts(fun parts -> parts.AddFromApplicationBaseDirectory().WithCodeGeneration() |> ignore) 
-                        // ths following way not works, got `Orleans.Runtime.OrleansException: Cannot find an invoker for interface FSharp.NetCore.Interfaces+IHello`
-                        // .ConfigureApplicationParts(fun parts -> parts.AddApplicationPart((typeof<HelloGrain>).Assembly).WithCodeGeneration() |> ignore)
+                        .ConfigureApplicationParts(fun parts -> 
+                            parts.AddApplicationPart(typeof<HelloGrain>.Assembly).WithCodeGeneration() |> ignore
+                            parts.AddApplicationPart(typeof<IHello>.Assembly).WithCodeGeneration() |> ignore)
                         .ConfigureLogging(fun logging -> logging.AddConsole() |> ignore)
         return builder.Build()
     }
