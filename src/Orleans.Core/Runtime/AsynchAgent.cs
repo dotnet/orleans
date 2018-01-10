@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -14,6 +15,8 @@ namespace Orleans.Runtime
             RestartOnFault, // Restart the agent if it faults
             IgnoreFault     // Allow the agent to stop if it faults, but take no other action (other than logging)
         }
+
+        private readonly ExecutorFaultHandler executorFaultHandler;
 
         protected readonly ExecutorService executorService;
         protected ThreadPoolExecutor executor;
@@ -55,8 +58,7 @@ namespace Orleans.Runtime
             this.loggerFactory = loggerFactory;
             this.Log = loggerFactory.CreateLogger(Name);
             this.executorService = executorService;
-
-            AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
+            this.executorFaultHandler = new ExecutorFaultHandler(this);
         }
 
         protected AsynchAgent(ExecutorService executorService, ILoggerFactory loggerFactory)
@@ -96,6 +98,7 @@ namespace Orleans.Runtime
                     Cts = new CancellationTokenSource();
                 }
 
+                AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
                 LogStatus(Log, "Starting AsyncAgent {0} on managed thread {1}", Name, Thread.CurrentThread.ManagedThreadId);
                 EnsureExecutorInitialized();
                 OnStart();
@@ -170,14 +173,36 @@ namespace Orleans.Runtime
         internal static bool IsStarting { get; set; }
 
         protected virtual ThreadPoolExecutorOptions.Builder ExecutorOptionsBuilder =>
-            new ThreadPoolExecutorOptions.Builder(Name, GetType(), Cts, loggerFactory, ExecutorFaultHandler);
+            new ThreadPoolExecutorOptions.Builder(Name, GetType(), Cts, loggerFactory).WithExecutionFilters(executorFaultHandler);
 
-        protected void ExecutorFaultHandler(Exception ex)
+        private sealed class ExecutorFaultHandler : ExecutionFilter
+        {
+            private readonly AsynchAgent agent;
+
+            public ExecutorFaultHandler(AsynchAgent agent)
+            {
+                this.agent = agent;
+            }
+
+            public override Func<Exception, Threading.ExecutionContext, bool> ExceptionHandler => (ex, context) =>
+            {
+                context.CancellationTokenSource.Cancel();
+                agent.HandleFault(ex);
+                return true;
+            };
+        }
+
+        protected void HandleFault(Exception ex)
         {
             State = ThreadState.Stopped;
+            if (ex is ThreadAbortException)
+            {
+                return;
+            }
+
             LogExecutorError(ex);
 
-            if (OnFault == FaultBehavior.RestartOnFault)
+            if (OnFault == FaultBehavior.RestartOnFault && !Cts.IsCancellationRequested)
             {
                 try
                 {

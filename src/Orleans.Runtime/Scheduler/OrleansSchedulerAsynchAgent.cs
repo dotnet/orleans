@@ -1,7 +1,9 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Threading;
+using ExecutionContext = Orleans.Threading.ExecutionContext;
 
 namespace Orleans.Runtime.Scheduler
 {
@@ -22,7 +24,6 @@ namespace Orleans.Runtime.Scheduler
             ILoggerFactory loggerFactory) : base(name, executorService, loggerFactory)
         {
             this.scheduler = scheduler;
-
             configureExecutorOptionsBuilder = builder => builder
                 .WithDegreeOfParallelism(maxDegreeOfParalelism)
                 .WithDrainAfterCancel(drainAfterCancel)
@@ -30,7 +31,10 @@ namespace Orleans.Runtime.Scheduler
                 .WithWorkItemExecutionTimeTreshold(turnWarningLengthThreshold)
                 .WithDelayWarningThreshold(delayWarningThreshold)
                 .WithWorkItemStatusProvider(GetWorkItemStatus)
-                .WithExecutionFilters(new SchedulerStatisticsTracker(this));
+                .WithExecutionFilters(
+                    new OuterExceptionHandler(Log),
+                    new SchedulerStatisticsTracker(this),
+                    new InnerExceptionHandler(Log));
         }
 
         protected override void Process(IWorkItem request)
@@ -63,6 +67,66 @@ namespace Orleans.Runtime.Scheduler
         {
             if (!detailed || !(item is IWorkItem workItem)) return string.Empty;
             return workItem is WorkItemGroup group ? string.Format("WorkItemGroup Details: {0}", group.DumpStatus()) : string.Empty;
+        }
+
+        private sealed class OuterExceptionHandler : ExecutionFilter
+        {
+            private readonly ILogger log;
+
+            public OuterExceptionHandler(ILogger log)
+            {
+                this.log = log;
+            }
+
+            public override Func<Exception, ExecutionContext, bool> ExceptionHandler => (ex, context) =>
+            {
+                if (ex is ThreadAbortException)
+                {
+                    if (log.IsEnabled(LogLevel.Debug)) log.Debug("Received thread abort exception - exiting. {0}.", ex);
+                    Thread.ResetAbort();
+                }
+                else
+                {
+                    log.Error(ErrorCode.Runtime_Error_100031, "Exception bubbled up to worker thread", ex);
+                }
+
+                context.CancellationTokenSource.Cancel();
+                return true;
+            };
+        }
+
+        private sealed class InnerExceptionHandler : ExecutionFilter
+        {
+            private readonly ILogger log;
+
+            public InnerExceptionHandler(ILogger log)
+            {
+                this.log = log;
+            }
+
+            public override Func<Exception, ExecutionContext, bool> ExceptionHandler => (ex, context) =>
+            {
+                if (ex is ThreadAbortException tae)
+                {
+                    // The current turn was aborted (indicated by the exception state being set to true).
+                    // In this case, we just reset the abort so that life continues. No need to do anything else.
+                    if (tae.ExceptionState != null && tae.ExceptionState.Equals(true))
+                    {
+                        Thread.ResetAbort();
+                    }
+                    else if (!context.CancellationTokenSource.IsCancellationRequested)
+                    {
+                        log.Error(ErrorCode.Runtime_Error_100029, ThreadPoolExecutor.SR.Thread_On_Abort_Propagate, ex);
+                    }
+                }
+                else
+                {
+                    log.Error(ErrorCode.Runtime_Error_100030, 
+                        string.Format("Thread caught an exception thrown from task {0}", context.WorkItem.State), ex);
+                }
+
+                return true;
+            };
         }
 
         private sealed class SchedulerStatisticsTracker : ExecutionFilter

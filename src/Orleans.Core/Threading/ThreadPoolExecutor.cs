@@ -88,6 +88,15 @@ namespace Orleans.Threading
                     context.ExecuteWithFilters();
                 }
             }
+            catch (Exception ex)
+            {
+                if (ex is ThreadAbortException)
+                {
+                    return;
+                }
+
+                log.Error(ErrorCode.ExecutorProcessingError, string.Format(SR.Executor_On_Exception, options.Name), ex);
+            }
             finally
             {
                 statistic.OnStopExecution();
@@ -105,53 +114,23 @@ namespace Orleans.Threading
 
         private ActionFilter<ExecutionContext>[] CreateExecutionFilters()
         {
-            var outerExceptionHandler = new ActionLambdaFilter<ExecutionContext>(
+            var threadAbortExceptionHandler = new ActionLambdaFilter<ExecutionContext>(
                 exceptionHandler: (ex, context) =>
             {
-                if (ex is ThreadAbortException)
-                {
-                    if (log.IsEnabled(LogLevel.Debug)) log.Debug(SR.On_Thread_Abort_Exit, ex);
-                    Thread.ResetAbort();
-                }
-                else
-                {
-                    log.Error(ErrorCode.Runtime_Error_100031, SR.Exception_Bubbled_Up, ex);
-                    options.FaultHandler?.Invoke(ex);
-                }
+                if (!(ex is ThreadAbortException)) return false;
 
+                if (log.IsEnabled(LogLevel.Debug)) log.Debug(SR.On_Thread_Abort_Exit, ex);
+                Thread.ResetAbort();
                 context.CancellationTokenSource.Cancel();
-                return true;
-            });
-
-            var innerExceptionHandler = new ActionLambdaFilter<ExecutionContext>(
-                exceptionHandler: (ex, context) =>
-            {
-                if (ex is ThreadAbortException tae)
-                {
-                    if (tae.ExceptionState != null && tae.ExceptionState.Equals(true))
-                    {
-                        Thread.ResetAbort();
-                    }
-                    else if (!context.CancellationTokenSource.IsCancellationRequested)
-                    {
-                        log.Error(ErrorCode.Runtime_Error_100029, SR.Thread_On_Abort_Propagate, ex);
-                    }
-                }
-                else
-                {
-                    log.Error(ErrorCode.Runtime_Error_100030, string.Format(SR.Thread_On_Exception, context.WorkItem.State), ex);
-                }
-
                 return true;
             });
 
             return new ActionFilter<ExecutionContext>[]
             {
-                outerExceptionHandler,
+                threadAbortExceptionHandler,
                 new StatisticsTracker(statistic, options.DelayWarningThreshold, log),
-                executingWorkTracker,
-                innerExceptionHandler
-            }.Union(options.ExecutionFilters ?? Array.Empty<ExecutionFilter>()).ToArray();
+                executingWorkTracker
+            }.Union(options.ExecutionFilters).ToArray();
         }
 
         private sealed class StatisticsTracker : ExecutionFilter
@@ -247,7 +226,7 @@ namespace Orleans.Threading
 
             public const string On_Thread_Abort_Exit = "Received thread abort exception - exiting. {0}.";
 
-            public const string Thread_On_Exception = "Thread caught an exception thrown from task {0}.";
+            public const string Executor_On_Exception = "Executor {0} caught an exception.";
 
             public const string Thread_On_Abort_Propagate = "Caught thread abort exception, allowing it to propagate outwards.";
 

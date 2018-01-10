@@ -13,14 +13,12 @@ namespace Orleans.Threading
             string name,
             Type stageType,
             CancellationTokenSource cancellationTokenSource,
-            ILoggerFactory loggerFactory,
-            ExecutorFaultHandler faultHandler = null)
+            ILoggerFactory loggerFactory)
         {
             Name = name;
             StageType = stageType;
             CancellationTokenSource = cancellationTokenSource;
             LoggerFactory = loggerFactory;
-            FaultHandler = faultHandler;
         }
 
         public string Name { get; }
@@ -32,8 +30,6 @@ namespace Orleans.Threading
         public CancellationTokenSource CancellationTokenSource { get; }
 
         public ILoggerFactory LoggerFactory { get; }
-        
-        public ExecutorFaultHandler FaultHandler { get; }
 
         public static readonly bool TRACK_DETAILED_STATS = false;
 
@@ -56,9 +52,8 @@ namespace Orleans.Threading
             TimeSpan? workItemExecutionTimeTreshold = null,
             TimeSpan? delayWarningThreshold = null,
             WorkItemStatusProvider workItemStatusProvider = null,
-            ExecutorFaultHandler faultHandler = null,
             IEnumerable<ExecutionFilter> executionFilters = null)
-            : base(name, stageType, cts, loggerFactory, faultHandler)
+            : base(name, stageType, cts, loggerFactory)
         {
             DegreeOfParallelism = degreeOfParallelism;
             DrainAfterCancel = drainAfterCancel;
@@ -66,7 +61,7 @@ namespace Orleans.Threading
             WorkItemExecutionTimeTreshold = workItemExecutionTimeTreshold ?? TimeSpan.MaxValue;
             DelayWarningThreshold = delayWarningThreshold ?? TimeSpan.MaxValue;
             WorkItemStatusProvider = workItemStatusProvider;
-            ExecutionFilters = executionFilters?.ToArray();
+            ExecutionFilters = executionFilters?.ToArray() ?? Array.Empty<ExecutionFilter>();
         }
 
         public IReadOnlyCollection<ExecutionFilter> ExecutionFilters { get; private set; }
@@ -89,10 +84,9 @@ namespace Orleans.Threading
                 string name,
                 Type stageType,
                 CancellationTokenSource cts,
-                ILoggerFactory loggerFactory,
-                ExecutorFaultHandler faultHandler = null)
+                ILoggerFactory loggerFactory)
             {
-                Options = new ThreadPoolExecutorOptions(name, stageType, cts, loggerFactory, faultHandler: faultHandler);
+                Options = new ThreadPoolExecutorOptions(name, stageType, cts, loggerFactory);
             }
 
             public ThreadPoolExecutorOptions Options { get; }
@@ -127,9 +121,15 @@ namespace Orleans.Threading
                 return this;
             }
 
+            public Builder WithExecutionFilters(IEnumerable<ExecutionFilter> executionFilters)
+            {
+                AddExecutionFilters(executionFilters);
+                return this;
+            }
+
             public Builder WithExecutionFilters(params ExecutionFilter[] executionFilters)
             {
-                Options.ExecutionFilters = executionFilters.ToArray();
+                AddExecutionFilters(executionFilters);
                 return this;
             }
 
@@ -138,10 +138,15 @@ namespace Orleans.Threading
                 Options.WorkItemStatusProvider = workItemStatusProvider;
                 return this;
             }
+
+            private void AddExecutionFilters(IEnumerable<ExecutionFilter> executionFilters)
+            {
+                Options.ExecutionFilters = Options.ExecutionFilters.Union(executionFilters).ToArray();
+            }
         }
 
         public delegate Builder BuilderConfigurator(Builder builder);
     }
 
-    internal delegate void ExecutorFaultHandler(Exception ex);
+    internal delegate bool ExecutorFaultHandler(Exception ex, ExecutionContext context);
 }
