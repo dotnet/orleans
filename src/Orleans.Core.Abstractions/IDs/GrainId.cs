@@ -22,7 +22,7 @@ namespace Orleans.Runtime
 
         public bool IsClient { get { return Category == UniqueKey.Category.Client || Category == UniqueKey.Category.GeoClient; } }
 
-        private GrainId(UniqueKey key)
+        internal GrainId(UniqueKey key)
             : base(key)
         {
         }
@@ -215,13 +215,7 @@ namespace Orleans.Runtime
         // same as ToString, just full primary key and type code
         private string ToStringImpl(bool detailed)
         {
-            string name = string.Empty;
-#if ABSTRACTIONS_TODO
-            if (Constants.TryGetSystemGrainName(this, out name))
-            {
-                return name;
-            }
-#endif
+            // TODO Get name of system/target grain + name of the grain type
 
             var keyString = Key.ToString();
             // this should grab the least-significant half of n1, suffixing it with the key extension.
@@ -249,17 +243,12 @@ namespace Orleans.Runtime
                 case UniqueKey.Category.GeoClient:
                     fullString = string.Format("*gcl/{0}/{1}", Key.KeyExt, idString);
                     break;
-                case UniqueKey.Category.SystemTarget:
-#if ABSTRACTIONS_TODO
-                    string explicitName = Constants.SystemTargetName(this);
-                    if (TypeCode != 0)
-                    {
-                        var typeStr = TypeCode.ToString("X");
-                        return String.Format("{0}/{1}/{2}", explicitName, typeStr, idString);
-                    }
-                    fullString = explicitName;
+                case UniqueKey.Category.SystemGrain:
+                    fullString = $"*/sgn/{Key.PrimaryKeyToGuid()}/{idString}";
                     break;
-#endif
+                case UniqueKey.Category.SystemTarget:
+                    fullString = $"*/stg/{Key.N1}/{idString}";
+                    break;
                 default:
                     fullString = "???/" + idString;
                     break;
