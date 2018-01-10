@@ -51,16 +51,16 @@ namespace Orleans.Threading
             bool preserveOrder = true,
             TimeSpan? workItemExecutionTimeTreshold = null,
             TimeSpan? delayWarningThreshold = null,
-            WorkItemStatusProvider workItemStatusProvider = null,
+            WorkItem.StatusProvider workItemStatusProvider = null,
             IEnumerable<ExecutionFilter> executionFilters = null)
             : base(name, stageType, cts, loggerFactory)
         {
             DegreeOfParallelism = degreeOfParallelism;
             DrainAfterCancel = drainAfterCancel;
             PreserveOrder = preserveOrder;
+            WorkItemStatusProvider = workItemStatusProvider;
             WorkItemExecutionTimeTreshold = workItemExecutionTimeTreshold ?? TimeSpan.MaxValue;
             DelayWarningThreshold = delayWarningThreshold ?? TimeSpan.MaxValue;
-            WorkItemStatusProvider = workItemStatusProvider;
             ExecutionFilters = executionFilters?.ToArray() ?? Array.Empty<ExecutionFilter>();
         }
 
@@ -76,7 +76,7 @@ namespace Orleans.Threading
 
         public TimeSpan DelayWarningThreshold { get; private set; }
 
-        public WorkItemStatusProvider WorkItemStatusProvider { get; private set; }
+        public WorkItem.StatusProvider WorkItemStatusProvider { get; private set; }
 
         public class Builder
         {
@@ -133,7 +133,7 @@ namespace Orleans.Threading
                 return this;
             }
 
-            public Builder WithWorkItemStatusProvider(WorkItemStatusProvider workItemStatusProvider)
+            public Builder WithWorkItemStatusProvider(WorkItem.StatusProvider workItemStatusProvider)
             {
                 Options.WorkItemStatusProvider = workItemStatusProvider;
                 return this;

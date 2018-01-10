@@ -245,7 +245,7 @@ namespace Orleans.Threading
 
         private readonly WaitCallback callback;
 
-        private readonly WorkItemStatusProvider statusProvider;
+        private readonly StatusProvider statusProvider;
 
         private readonly TimeSpan executionTimeTreshold;
 
@@ -257,12 +257,12 @@ namespace Orleans.Threading
             WaitCallback callback,
             object state,
             TimeSpan executionTimeTreshold,
-            WorkItemStatusProvider statusProvider = null)
+            StatusProvider statusProvider = null)
         {
             this.callback = callback;
             this.State = state;
             this.executionTimeTreshold = executionTimeTreshold;
-            this.statusProvider = statusProvider;
+            this.statusProvider = statusProvider ?? NoOpStatusProvider;
             this.enqueueTime = DateTime.UtcNow;
         }
 
@@ -308,6 +308,10 @@ namespace Orleans.Threading
         {
             return Utils.Since(ExecutionStart) > executionTimeTreshold;
         }
+
+        internal delegate string StatusProvider(object state, bool detailed);
+
+        private static readonly StatusProvider NoOpStatusProvider = (s, d) => string.Empty;
     }
 
     internal class ExecutionContext : IExecutable
@@ -428,6 +432,4 @@ namespace Orleans.Threading
             }
         }
     }
-
-    internal delegate string WorkItemStatusProvider(object state, bool detailed);
 }
