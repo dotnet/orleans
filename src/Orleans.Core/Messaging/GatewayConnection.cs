@@ -308,6 +308,8 @@ namespace Orleans.Messaging
             }
         }
 
+        protected override bool DrainAfterCancel => true;
+
         private void RerouteMessage(Message msg)
         {
             msg.TargetActivation = null;
