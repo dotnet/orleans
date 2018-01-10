@@ -38,11 +38,14 @@ namespace Orleans.Streams
         // if this extension is attached to a cosnumer grain which implements IOnSubscriptionActioner,
         // then this will be not null, otherwise, it will be null
         [NonSerialized]
-        private readonly StreamSubscriptionChangeHandler subscriptionChangeHandler;
+        private readonly IStreamSubscriptionObserver streamSubscriptionObserver;
 
-        internal StreamConsumerExtension(IStreamProviderRuntime providerRt, StreamSubscriptionChangeHandler streamSubscriptionChangeHandler = null)
+        [NonSerialized]
+        private readonly IStreamSubscriptionHandleFactory subscriptionHandlerFactory;
+        internal StreamConsumerExtension(IStreamProviderRuntime providerRt, IStreamSubscriptionObserver streamSubscriptionObserver = null, IStreamSubscriptionHandleFactory handleFactory = null)
         {
-            this.subscriptionChangeHandler = streamSubscriptionChangeHandler;
+            this.streamSubscriptionObserver = streamSubscriptionObserver;
+            this.subscriptionHandlerFactory = handleFactory;
             providerRuntime = providerRt;
             allStreamObservers = new ConcurrentDictionary<GuidId, IStreamSubscriptionHandle>();
             logger = providerRt.ServiceProvider.GetRequiredService<ILogger<StreamConsumerExtension>>();
@@ -93,9 +96,9 @@ namespace Orleans.Streams
             {
                 return await observer.DeliverItem(item, currentToken, handshakeToken);
             }
-            else if(this.subscriptionChangeHandler != null)
+            else if(this.streamSubscriptionObserver != null)
             {
-                await this.subscriptionChangeHandler.HandleNewSubscription(subscriptionId, streamId, item.GetType());
+                await this.streamSubscriptionObserver.OnSubscribed(subscriptionId, streamId, streamId.ProviderName, this.subscriptionHandlerFactory);
                 //check if an observer were attached after handling the new subscription, deliver on it if attached
                 if (allStreamObservers.TryGetValue(subscriptionId, out observer))
                 {
@@ -119,9 +122,9 @@ namespace Orleans.Streams
             {
                 return await observer.DeliverBatch(batch.Value, handshakeToken);
             }
-            else if(this.subscriptionChangeHandler != null)
+            else if(this.streamSubscriptionObserver != null)
             {
-                await this.subscriptionChangeHandler.HandleNewSubscription(subscriptionId, streamId, batch.Value.GetType());
+                await this.streamSubscriptionObserver.OnSubscribed(subscriptionId, streamId, streamId.ProviderName, this.subscriptionHandlerFactory);
                 // check if an observer were attached after handling the new subscription, deliver on it if attached
                 if (allStreamObservers.TryGetValue(subscriptionId, out observer))
                 {

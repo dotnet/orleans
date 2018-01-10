@@ -106,4 +106,18 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
             return theProducer.OnNextAsync(new Apple(this.numProducedItems));
         }
     }
+
+    public class Apple : IFruit
+    {
+        int number;
+        public Apple(int number)
+        {
+            this.number = number;
+        }
+
+        public int GetNumber()
+        {
+            return number;
+        }
+    }
 }
