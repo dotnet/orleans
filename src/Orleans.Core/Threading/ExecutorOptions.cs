@@ -143,5 +143,5 @@ namespace Orleans.Threading
         public delegate Builder BuilderConfigurator(Builder builder);
     }
 
-    internal delegate void ExecutorFaultHandler(Exception ex, string executorExplanation);
+    internal delegate void ExecutorFaultHandler(Exception ex);
 }

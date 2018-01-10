@@ -172,10 +172,10 @@ namespace Orleans.Runtime
         protected virtual ThreadPoolExecutorOptions.Builder ExecutorOptionsBuilder =>
             new ThreadPoolExecutorOptions.Builder(Name, GetType(), Cts, loggerFactory, ExecutorFaultHandler);
 
-        protected void ExecutorFaultHandler(Exception ex, string executorExplanation)
+        protected void ExecutorFaultHandler(Exception ex)
         {
             State = ThreadState.Stopped;
-            LogExecutorError(ex, executorExplanation);
+            LogExecutorError(ex);
 
             if (OnFault == FaultBehavior.RestartOnFault)
             {
@@ -199,9 +199,9 @@ namespace Orleans.Runtime
             }
         }
 
-        private void LogExecutorError(Exception exc, string executorDetails)
+        private void LogExecutorError(Exception exc)
         {
-            var logMessagePrefix = executorDetails;
+            var logMessagePrefix = $"Asynch agent {Name} encountered unexpected exception";
             switch (OnFault)
             {
                 case FaultBehavior.CrashOnFault:

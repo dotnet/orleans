@@ -99,8 +99,7 @@ namespace Orleans.Threading
             new ThreadPoolThread(
                     options.Name + context.ThreadIndex,
                     options.CancellationTokenSource.Token,
-                    options.LoggerFactory,
-                    options.FaultHandler)
+                    options.LoggerFactory)
                 .QueueWorkItem(_ => ProcessWorkItems(context));
         }
 
@@ -117,10 +116,11 @@ namespace Orleans.Threading
                 else
                 {
                     log.Error(ErrorCode.Runtime_Error_100031, SR.Exception_Bubbled_Up, ex);
+                    options.FaultHandler?.Invoke(ex);
                 }
 
                 context.CancellationTokenSource.Cancel();
-                return false;
+                return true;
             });
 
             var innerExceptionHandler = new ActionLambdaFilter<ExecutionContext>(

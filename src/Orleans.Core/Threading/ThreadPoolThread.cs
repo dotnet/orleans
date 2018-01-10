@@ -11,20 +11,16 @@ namespace Orleans.Threading
 
         private readonly ThreadTrackingStatistic threadTracking;
 
-        private readonly ExecutorFaultHandler faultHandler;
-
         private readonly ILogger log;
 
         public ThreadPoolThread(
             string name,
             CancellationToken cancellationToken,
-            ILoggerFactory loggerFactory,
-            ExecutorFaultHandler faultHandler = null)
+            ILoggerFactory loggerFactory)
         {
             this.Name = name;
             this.cancellationToken = cancellationToken;
             this.log = loggerFactory.CreateLogger<ThreadPoolThread>();
-            this.faultHandler = faultHandler;
 
             if (ExecutorOptions.CollectDetailedThreadStatistics)
             {
@@ -67,16 +63,7 @@ namespace Orleans.Threading
         {
             if (cancellationToken.IsCancellationRequested) return;
 
-            var explanation = string.Format(SR.Thread_On_Exception, Name);
-
-            if (faultHandler != null)
-            {
-                faultHandler(exc, explanation);
-            }
-            else
-            {
-                log.LogError(exc, explanation);
-            }
+            log.LogError(exc, SR.Thread_On_Exception, Name);
         }
 
         private void TrackExecutionStart()
