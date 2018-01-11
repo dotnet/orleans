@@ -440,13 +440,14 @@ namespace Orleans.Runtime
 
 
             var siloProviderRuntime = Services.GetRequiredService<SiloProviderRuntime>();
+            StatisticsOptions statisticsOptions = Services.GetRequiredService<IOptions<StatisticsOptions>>().Value;
             runtimeClient.CurrentStreamProviderRuntime = siloProviderRuntime;
             await StartAsyncTaskWithPerfAnalysis("Load StatisticProviders", LoadStatsProvider, stopWatch);
             async Task LoadStatsProvider()
             {
                 // can call SetSiloMetricsTableDataManager only after MessageCenter is created (dependency on this.SiloAddress).
-                await siloStatistics.SetSiloStatsTableDataManager(this, LocalConfig).WithTimeout(initTimeout);
-                await siloStatistics.SetSiloMetricsTableDataManager(this, LocalConfig).WithTimeout(initTimeout);
+                await siloStatistics.SetSiloStatsTableDataManager(this, statisticsOptions).WithTimeout(initTimeout);
+                await siloStatistics.SetSiloMetricsTableDataManager(this, statisticsOptions).WithTimeout(initTimeout);
             }
             
             // This has to follow the above steps that start the runtime components
@@ -516,7 +517,8 @@ namespace Orleans.Runtime
 
             try
             {
-                StartTaskWithPerfAnalysis("Start silo statistics", () => this.siloStatistics.Start(this.LocalConfig), stopWatch);
+                StatisticsOptions statisticsOptions = Services.GetRequiredService<IOptions<StatisticsOptions>>().Value;
+                StartTaskWithPerfAnalysis("Start silo statistics", () => this.siloStatistics.Start(statisticsOptions), stopWatch);
                 logger.Debug("Silo statistics manager started successfully.");
 
                 // Finally, initialize the deployment load collector, for grains with load-based placement

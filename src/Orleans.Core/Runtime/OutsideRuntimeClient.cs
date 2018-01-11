@@ -233,7 +233,10 @@ namespace Orleans
                 },
                 ct).Ignore();
             grainInterfaceMap = await transport.GetTypeCodeMap(this.InternalGrainFactory);
-            
+
+            await ClientStatistics.Start(transport, clientId)
+                .WithTimeout(initTimeout);
+
             await StreamingInitialize();
         }
 

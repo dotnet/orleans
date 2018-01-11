@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.Hosting;
@@ -38,17 +39,9 @@ namespace Orleans.Runtime
         {
             runtimeStats.Start();
 
-            // Configure Metrics
-            if (!string.IsNullOrEmpty(statisticsOptions.ProviderName))
+            IClientMetricsDataPublisher metricsDataPublisher = this.serviceProvider.GetService<IClientMetricsDataPublisher>();
+            if (metricsDataPublisher != null)
             {
-                var extType = statisticsOptions.ProviderName;
-                IClientMetricsDataPublisher metricsDataPublisher = this.serviceProvider.GetServiceByName<IClientMetricsDataPublisher>(extType);
-                if (metricsDataPublisher == null)
-                {
-                    var msg = String.Format("Trying to create {0} as a metrics publisher, but the provider is not configured."
-                        , extType);
-                    throw new ArgumentException(msg, "ProviderType (configuration)");
-                }
                 var configurableMetricsDataPublisher = metricsDataPublisher as IConfigurableClientMetricsDataPublisher;
                 if (configurableMetricsDataPublisher != null)
                 {
@@ -74,7 +67,7 @@ namespace Orleans.Runtime
             // Configure Statistics
             if (statisticsOptions.WriteLogStatisticsToTable)
             {
-                IStatisticsPublisher statsProvider = this.serviceProvider.GetServiceByName<IStatisticsPublisher>(statisticsOptions.ProviderName);
+                IStatisticsPublisher statsProvider = this.serviceProvider.GetService<IStatisticsPublisher>();
                 if (statsProvider != null)
                 {
                     logStatistics.StatsTablePublisher = statsProvider;

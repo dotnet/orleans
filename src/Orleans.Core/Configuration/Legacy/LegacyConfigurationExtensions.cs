@@ -88,7 +88,6 @@ namespace Orleans.Configuration
             options.LogWriteInterval = configuration.StatisticsLogWriteInterval;
             options.WriteLogStatisticsToTable = configuration.StatisticsWriteLogStatisticsToTable;
             options.CollectionLevel = configuration.StatisticsCollectionLevel;
-            options.ProviderName = configuration.StatisticsProviderName;
         }
     }
 }

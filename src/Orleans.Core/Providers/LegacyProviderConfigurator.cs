@@ -65,9 +65,15 @@ namespace Orleans.Providers
                 }
                 else if (providerGroup.Key == ProviderCategoryConfiguration.STATISTICS_PROVIDER_CATEGORY_NAME)
                 {
-                    foreach (IProviderConfiguration providerConfig in providerGroup.SelectMany(kvp => kvp.Value.Providers.Values))
+                    IProviderConfiguration providerConfig = providerGroup.SelectMany(kvp => kvp.Value.Providers.Values).FirstOrDefault();
+                    if(providerConfig != null)
                     {
-                        RegisterProvider<IStatisticsPublisher>(providerConfig, services, defaultInitStage, defaultStartStage);
+                        // Looks like we only support a single statistics provider that can be any of the publisher interfaces. fml
+                        // TODO: Kill our statistics system.. please!?
+                        services.AddSingleton<IStatisticsPublisher>(sp => sp.GetServiceByName<IProvider>(providerConfig.Name) as IStatisticsPublisher);
+                        services.AddSingleton<ISiloMetricsDataPublisher>(sp => sp.GetServiceByName<IProvider>(providerConfig.Name) as ISiloMetricsDataPublisher);
+                        services.AddSingleton<IClientMetricsDataPublisher>(sp => sp.GetServiceByName<IProvider>(providerConfig.Name) as IClientMetricsDataPublisher);
+                        RegisterProvider<IProvider>(providerConfig, services, defaultInitStage, defaultStartStage);
                     }
                 }
                 else
@@ -105,7 +111,7 @@ namespace Orleans.Providers
             public virtual void Participate(TLifeCycle lifecycle)
             {
                 this.initStage = this.config.GetIntProperty(LegacyProviderConfigurator.InitStageName, this.defaultInitStage);
-                lifecycle.Subscribe(this.initStage, Init, Finit);
+                lifecycle.Subscribe(this.initStage, Init, Close);
                 this.startStage = this.config.GetIntProperty(LegacyProviderConfigurator.StartStageName, this.defaultStartStage);
                 lifecycle.Subscribe(this.startStage, Start);
 
@@ -121,7 +127,7 @@ namespace Orleans.Providers
                 this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Initializing in stage {this.initStage} took {stopWatch.ElapsedMilliseconds} Milliseconds");
             }
 
-            private async Task Finit(CancellationToken ct)
+            private async Task Close(CancellationToken ct)
             {
                 var stopWatch = Stopwatch.StartNew();
                 IProvider provider = this.services.GetServiceByName<TService>(this.config.Name) as IProvider;

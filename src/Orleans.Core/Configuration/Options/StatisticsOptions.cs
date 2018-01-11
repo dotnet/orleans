@@ -37,10 +37,5 @@ namespace Orleans.Hosting
         /// The CollectionLevel property specifies the verbosity level of statistics to collect. The default is Info.
         /// </summary>
         public StatisticsLevel CollectionLevel { get; set; } = StatisticsLevel.Info;
-
-        /// <summary>
-        /// The ProviderName property specifies the name of the configured statistics provider.
-        /// </summary>
-        public string ProviderName { get; set; }
     }
 }

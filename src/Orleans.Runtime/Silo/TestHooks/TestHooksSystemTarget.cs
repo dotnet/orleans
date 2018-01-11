@@ -39,7 +39,7 @@ namespace Orleans.Runtime.TestHooks
             return Task.FromResult(consistentRingProvider.ToString());
         }
 
-        public Task<bool> HasStatisticsProvider(string providerName) => Task.FromResult(this.host.Services.GetServiceByName<IStatisticsPublisher>(providerName) != null);
+        public Task<bool> HasStatisticsProvider() => Task.FromResult(this.host.Services.GetServices<IStatisticsPublisher>() != null);
 
         public Task<Guid> GetServiceId() => Task.FromResult(this.host.Services.GetRequiredService<IOptions<SiloOptions>>().Value.ServiceId);
 
