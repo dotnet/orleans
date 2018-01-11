@@ -244,10 +244,10 @@ namespace Orleans.Runtime
                     fullString = $"*gcl/{Key.KeyExt}/{idString}";
                     break;
                 case UniqueKey.Category.SystemGrain:
-                    fullString = $"*/sgn/{Key.PrimaryKeyToGuid()}/{idString}";
+                    fullString = $"*sgn/{Key.PrimaryKeyToGuid()}/{idString}";
                     break;
                 case UniqueKey.Category.SystemTarget:
-                    fullString = $"*/stg/{Key.N1}/{idString}";
+                    fullString = $"*stg/{Key.N1}/{idString}";
                     break;
                 default:
                     fullString = "???/" + idString;
