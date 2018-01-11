@@ -1,6 +1,6 @@
 {
   "homepages": [],
-  "source_base_path": "c:/GitHub/sergeybykov/orleans/src",
+  "source_base_path": "C:/GitHub/sergeybykov/orleans-2/src",
   "xrefmap": "xrefmap.yml",
   "files": [
     {
@@ -795,7 +795,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Grain-Versioning/Grain-versioning.html",
-          "hash": "NYT1eud5+qwnOjOelgbC/Q=="
+          "hash": "dlbqkJIClr+0NucOR33DTQ=="
         }
       },
       "is_incremental": false,
@@ -1998,6 +1998,9 @@
       "version": ""
     },
     {
+      "log_codes": [
+        "InvalidYamlHeader"
+      ],
       "type": "index",
       "source_relative_path": "index.md",
       "output": {
@@ -2025,7 +2028,8 @@
   "incremental_info": [
     {
       "status": {
-        "can_incremental": true,
+        "can_incremental": false,
+        "details": "Cannot build incrementally because last build info is missing.",
         "incrementalPhase": "build"
       },
       "processors": {
@@ -2040,7 +2044,7 @@
           "incrementalPhase": "build"
         },
         "ConceptualDocumentProcessor": {
-          "can_incremental": true,
+          "can_incremental": false,
           "incrementalPhase": "build"
         }
       }
