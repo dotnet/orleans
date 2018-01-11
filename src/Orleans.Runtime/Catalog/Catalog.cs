@@ -99,7 +99,6 @@ namespace Orleans.Runtime
         private readonly SerializationManager serializationManager;
         private readonly CachedVersionSelectorManager versionSelectorManager;
         private readonly ILoggerFactory loggerFactory;
-        private readonly IStreamSubscriptionHandleFactory streamSubscriptionHandleFactory;
         public Catalog(
             ILocalSiloDetails localSiloDetails,
             ILocalGrainDirectory grainDirectory,
@@ -118,8 +117,7 @@ namespace Orleans.Runtime
             IServiceProvider serviceProvider,
             CachedVersionSelectorManager versionSelectorManager,
             ILoggerFactory loggerFactory,
-            IOptions<SchedulingOptions> schedulingOptions,
-            IStreamSubscriptionHandleFactory streamSubscriptionHandleFactory)
+            IOptions<SchedulingOptions> schedulingOptions)
             : base(Constants.CatalogId, messageCenter.MyAddress, loggerFactory)
         {
             LocalSilo = localSiloDetails.SiloAddress;
@@ -139,7 +137,6 @@ namespace Orleans.Runtime
             this.serviceProvider = serviceProvider;
             this.providerManager = providerManager;
             logger = loggerFactory.CreateLogger<Catalog>();
-            this.streamSubscriptionHandleFactory = streamSubscriptionHandleFactory;
             this.config = config.Globals;
             ActivationCollector = new ActivationCollector(config, loggerFactory);
             this.Dispatcher = new Dispatcher(scheduler,
@@ -742,7 +739,7 @@ namespace Orleans.Runtime
             var invoker = InsideRuntimeClient.TryGetExtensionInvoker(this.GrainTypeManager, typeof(IStreamConsumerExtension));
             if (invoker == null)
                 throw new InvalidOperationException("Extension method invoker was not generated for an extension interface");
-            var handler = new StreamConsumerExtension(this.providerRuntime, observer, this.streamSubscriptionHandleFactory);
+            var handler = new StreamConsumerExtension(this.providerRuntime, observer, this.providerManager);
             result.TryAddExtension(invoker, handler);
         }
 

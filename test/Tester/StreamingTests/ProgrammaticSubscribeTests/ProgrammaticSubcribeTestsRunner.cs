@@ -20,11 +20,11 @@ using UnitTests.Grains.ProgrammaticSubscribe;
 
 namespace Tester.StreamingTests
 {
-    public abstract class ProgrammaticSubcribeTestsRunner
+    public abstract class ProgrammaticSubcribeTestsRunner : IDisposable
     {
-        private readonly TestCluster testCluster;
-        private readonly ILogger logger;
-        private readonly SubscriptionManager subscriptionManager;
+        protected TestCluster testCluster;
+        private ILogger logger;
+        private SubscriptionManager subscriptionManager;
         public const string StreamProviderName = "StreamProvider1";
         public const string StreamProviderName2 = "StreamProvider2";
         public ProgrammaticSubcribeTestsRunner(TestCluster testCluster)
@@ -295,6 +295,13 @@ namespace Tester.StreamingTests
             {
                 return numProduced == numConsumed;
             }
+        }
+
+        public virtual void Dispose()
+        {
+            this.testCluster = null;
+            this.subscriptionManager = null;
+            this.logger = null;
         }
     }
 

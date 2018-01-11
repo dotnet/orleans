@@ -9,6 +9,6 @@ namespace Orleans.Streams.Core
 {
     public interface IStreamSubscriptionObserver
     {
-        Task OnSubscribed(GuidId subscriptionId, IStreamIdentity streamId, string streamProviderName, IStreamSubscriptionHandleFactory handleFactory);
+        Task OnSubscribed(IStreamSubscriptionHandleFactory handleFactory);
     }
 }
