@@ -78,7 +78,7 @@ namespace Orleans.Runtime.Scheduler
                 this.log = log;
             }
 
-            public override Func<Exception, ExecutionContext, bool> ExceptionHandler => (ex, context) =>
+            public override bool ExceptionHandler(Exception ex, ExecutionContext context)
             {
                 if (ex is ThreadAbortException)
                 {
@@ -92,7 +92,7 @@ namespace Orleans.Runtime.Scheduler
 
                 context.CancellationTokenSource.Cancel();
                 return true;
-            };
+            }
         }
 
         private sealed class InnerExceptionHandler : ExecutionFilter
@@ -104,7 +104,7 @@ namespace Orleans.Runtime.Scheduler
                 this.log = log;
             }
 
-            public override Func<Exception, ExecutionContext, bool> ExceptionHandler => (ex, context) =>
+            public override bool ExceptionHandler(Exception ex, ExecutionContext context)
             {
                 if (ex is ThreadAbortException tae)
                 {
@@ -126,7 +126,7 @@ namespace Orleans.Runtime.Scheduler
                 }
 
                 return true;
-            };
+            }
         }
 
         private sealed class SchedulerStatisticsTracker : ExecutionFilter
@@ -138,9 +138,12 @@ namespace Orleans.Runtime.Scheduler
                 this.agent = agent;
             }
 
-            public override Action<ExecutionContext> OnActionExecuting => TrackWorkItemDequeue;
+            public override void OnActionExecuting(ExecutionContext context)
+            {
+                TrackWorkItemDequeue(context);
+            }
 
-            public override Action<ExecutionContext> OnActionExecuted => context =>
+            public override void OnActionExecuted(ExecutionContext context)
             {
 #if TRACK_DETAILED_STATS
                 if (StatisticsCollector.CollectTurnsStats)
@@ -151,7 +154,7 @@ namespace Orleans.Runtime.Scheduler
                     }
                 }
 #endif
-            };
+            }
 
             private void TrackWorkItemDequeue(ExecutionContext context)
             {

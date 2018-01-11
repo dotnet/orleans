@@ -148,17 +148,17 @@ namespace Orleans.Threading
                 this.log = log;
             }
 
-            public override Action<ExecutionContext> OnActionExecuting => context =>
+            public override void OnActionExecuting(ExecutionContext context)
             {
                 TrackRequestDequeue(context.WorkItem);
                 statistic.OnStartProcessing();
-            };
+            }
 
-            public override Action<ExecutionContext> OnActionExecuted => context =>
+            public override void OnActionExecuted(ExecutionContext context)
             {
                 statistic.OnStopProcessing();
                 statistic.IncrementNumberOfProcessed();
-            };
+            }
 
             private void TrackRequestDequeue(WorkItem workItem)
             {
@@ -185,11 +185,15 @@ namespace Orleans.Threading
                 log = executor.log;
             }
 
-            public override Action<ExecutionContext> OnActionExecuting =>
-                context => runningItems[GetThreadSlot(context.ThreadIndex)] = context.WorkItem;
+            public override void OnActionExecuting(ExecutionContext context)
+            {
+                runningItems[GetThreadSlot(context.ThreadIndex)] = context.WorkItem;
+            }
 
-            public override Action<ExecutionContext> OnActionExecuted =>
-                context => runningItems[GetThreadSlot(context.ThreadIndex)] = null;
+            public override void OnActionExecuted(ExecutionContext context)
+            {
+                runningItems[GetThreadSlot(context.ThreadIndex)] = null;
+            }
 
             public bool HasFrozenWork()
             {
@@ -229,8 +233,6 @@ namespace Orleans.Threading
             public const string Executor_On_Exception = "Executor {0} caught an exception.";
 
             public const string Thread_On_Abort_Propagate = "Caught thread abort exception, allowing it to propagate outwards.";
-
-            public const string Exception_Bubbled_Up = "Exception bubbled up to worker thread";
         }
     }
 

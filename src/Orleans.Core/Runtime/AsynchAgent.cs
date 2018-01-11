@@ -184,12 +184,12 @@ namespace Orleans.Runtime
                 this.agent = agent;
             }
 
-            public override Func<Exception, Threading.ExecutionContext, bool> ExceptionHandler => (ex, context) =>
+            public override bool ExceptionHandler(Exception ex, Threading.ExecutionContext context)
             {
                 context.CancellationTokenSource.Cancel();
                 agent.HandleFault(ex);
                 return true;
-            };
+            }
         }
 
         protected void HandleFault(Exception ex)

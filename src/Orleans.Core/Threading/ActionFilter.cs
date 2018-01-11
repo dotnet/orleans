@@ -6,19 +6,24 @@ namespace Orleans.Threading
 {
     internal class ActionFilter<T> where T : IExecutable
     {
-        protected static readonly Action<T> NoOpFilter = _ => { };
+        public virtual void OnActionExecuting(T executable) { }
 
-        protected static readonly Func<Exception, T, bool> NoOpHandler = (e, c) => false;
+        public virtual void OnActionExecuted(T executable) { }
 
-        public virtual Action<T> OnActionExecuting { get; } = NoOpFilter;
-
-        public virtual Action<T> OnActionExecuted { get; } = NoOpFilter;
-
-        public virtual Func<Exception, T, bool> ExceptionHandler { get; } = NoOpHandler;
+        public virtual bool ExceptionHandler(Exception ex, T executable)
+        {
+            return false;
+        }
     }
 
-    internal class ActionLambdaFilter<T> : ActionFilter<T> where T : IExecutable
+    internal sealed class ActionLambdaFilter<T> : ActionFilter<T> where T : IExecutable
     {
+        private readonly Action<T> onActionExecuting;
+
+        private readonly Action<T> onActionExecuted;
+
+        private readonly Func<Exception, T, bool> exceptionHandler;
+
         public ActionLambdaFilter(
             Action<T> onActionExecuting = null,
             Action<T> onActionExecuted = null,
@@ -29,16 +34,29 @@ namespace Orleans.Threading
                 throw new ArgumentNullException("Lambda filter requires at least one non-null parameter to be functional");
             }
 
-            OnActionExecuting = onActionExecuting ?? NoOpFilter;
-            OnActionExecuted = onActionExecuted ?? NoOpFilter;
-            ExceptionHandler = exceptionHandler ?? NoOpHandler;
+            this.onActionExecuting = onActionExecuting ?? NoOpFilter;
+            this.onActionExecuted = onActionExecuted ?? NoOpFilter;
+            this.exceptionHandler = exceptionHandler ?? NoOpHandler;
         }
 
-        public sealed override Action<T> OnActionExecuting { get; }
+        public override void OnActionExecuting(T executable)
+        {
+            onActionExecuting(executable);
+        }
 
-        public sealed override Action<T> OnActionExecuted { get; }
+        public override void OnActionExecuted(T executable)
+        {
+            onActionExecuted(executable);
+        }
 
-        public sealed override Func<Exception, T, bool> ExceptionHandler { get; }
+        public override bool ExceptionHandler(Exception ex, T executable)
+        {
+            return exceptionHandler(ex, executable);
+        }
+
+        private static readonly Action<T> NoOpFilter = _ => { };
+
+        private static readonly Func<Exception, T, bool> NoOpHandler = (e, c) => false;
     }
 
     internal class ExecutionFilter : ActionFilter<ExecutionContext>

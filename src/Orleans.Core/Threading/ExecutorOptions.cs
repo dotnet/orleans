@@ -121,15 +121,9 @@ namespace Orleans.Threading
                 return this;
             }
 
-            public Builder WithExecutionFilters(IEnumerable<ExecutionFilter> executionFilters)
-            {
-                AddExecutionFilters(executionFilters);
-                return this;
-            }
-
             public Builder WithExecutionFilters(params ExecutionFilter[] executionFilters)
             {
-                AddExecutionFilters(executionFilters);
+                Options.ExecutionFilters = Options.ExecutionFilters.Union(executionFilters).ToArray();
                 return this;
             }
 
@@ -137,11 +131,6 @@ namespace Orleans.Threading
             {
                 Options.WorkItemStatusProvider = workItemStatusProvider;
                 return this;
-            }
-
-            private void AddExecutionFilters(IEnumerable<ExecutionFilter> executionFilters)
-            {
-                Options.ExecutionFilters = Options.ExecutionFilters.Union(executionFilters).ToArray();
             }
         }
 
