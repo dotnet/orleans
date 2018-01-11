@@ -4,30 +4,25 @@ open Orleans
 open Orleans.Runtime.Configuration
 open Orleans.Hosting
 open System
-open FSharp.NetCore.Grians
+open FSharp.NetCore.Grains
 open FSharp.NetCore.Interfaces
 
-
 let buildSiloHost () =
-    task {
-        let config = ClusterConfiguration.LocalhostPrimarySilo()
-        config.AddMemoryStorageProvider() |> ignore
-
-        let builder = SiloHostBuilder()
-                        .UseConfiguration(config)
-                        .ConfigureApplicationParts(fun parts -> 
-                            parts.AddApplicationPart(typeof<HelloGrain>.Assembly)
-                                 .AddApplicationPart(typeof<IHello>.Assembly)
-                                 .WithCodeGeneration() |> ignore)
-                        .ConfigureLogging(fun logging -> logging.AddConsole() |> ignore)
-        return builder.Build()
-    }
+      let config = ClusterConfiguration.LocalhostPrimarySilo()
+      config.AddMemoryStorageProvider() |> ignore
+      SiloHostBuilder()
+        .UseConfiguration(config)
+        .ConfigureApplicationParts(fun parts -> 
+            parts.AddApplicationPart(typeof<HelloGrain>.Assembly)
+                  .AddApplicationPart(typeof<IHello>.Assembly)
+                  .WithCodeGeneration() |> ignore)
+        .ConfigureLogging(fun logging -> logging.AddConsole() |> ignore)
+        .Build()
 
 [<EntryPoint>]
 let main _ =
-    printfn "Hello World from F#!"
     let t = task {
-        let! host = buildSiloHost ()
+        let host = buildSiloHost ()
         do! host.StartAsync ()
 
         printfn "Press any keys to terminate..."
@@ -37,6 +32,7 @@ let main _ =
 
         printfn "SiloHost is stopped"
     }
+
     t.Wait()
 
     0

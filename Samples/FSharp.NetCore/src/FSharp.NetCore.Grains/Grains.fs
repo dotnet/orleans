@@ -1,6 +1,6 @@
 namespace FSharp.NetCore
 
-module Grians =
+module Grains =
 
     open System.Threading.Tasks
     open Orleans
@@ -11,5 +11,3 @@ module Grians =
         interface IHello with 
             member this.SayHello (greeting : string) : Task<string> = 
                 greeting |> sprintf "You said: %s, I say: Hello!" |> Task.FromResult
-
-

@@ -10,8 +10,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\FSharp.NetCore.Grains\FSharp.NetCore.Grains.fsproj" />
     <ProjectReference Include="..\FSharp.NetCore.Interfaces\FSharp.NetCore.Interfaces.fsproj" />
-    <ProjectReference Include="..\FSharp.NetCore.Grians\FSharp.NetCore.Grians.fsproj" />
   </ItemGroup>
   
   <ItemGroup>

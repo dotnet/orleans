@@ -7,15 +7,12 @@ open Orleans.Hosting
 open FSharp.NetCore.Interfaces
 
 let buildClient () =
-    task {
-        let config = ClientConfiguration.LocalhostSilo()
-        let client = ClientBuilder()
-                        .UseConfiguration(config)
-                        .ConfigureApplicationParts(fun parts -> parts.AddApplicationPart((typeof<IHello>).Assembly).WithCodeGeneration() |> ignore )
-                        .ConfigureLogging(fun logging -> logging.AddConsole() |> ignore)
-                        .Build()
-        return client
-    }
+      let config = ClientConfiguration.LocalhostSilo()
+      ClientBuilder()
+        .UseConfiguration(config)
+        .ConfigureApplicationParts(fun parts -> parts.AddApplicationPart((typeof<IHello>).Assembly).WithCodeGeneration() |> ignore )
+        .ConfigureLogging(fun logging -> logging.AddConsole() |> ignore)
+        .Build()
 
 let worker (client : IClusterClient) =
     task {
@@ -26,10 +23,8 @@ let worker (client : IClusterClient) =
 
 [<EntryPoint>]
 let main _ =
-    printfn "Hello World from F#!"
-
     let t = task {
-        use! client = buildClient ()
+        use client = buildClient()
         do! client.Connect()
         printfn "Client successfully connect to silo host"
         do! worker client
