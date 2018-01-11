@@ -2,7 +2,7 @@
 
 > [!WARNING]
 > This page describes how to use grain interface versioning. The versioning of
-> Grain state it out of scope.
+> Grain state is out of scope.
 
 ## Overview
 On a given cluster, silos can support different versions of a grain type.
