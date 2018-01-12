@@ -31,7 +31,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
         }
 
         public ProgrammaticSubscribeTestSMSStreamProvider(ITestOutputHelper output, Fixture fixture)
-            :base(fixture.HostedCluster)
+            :base(fixture)
         {
         }
     }

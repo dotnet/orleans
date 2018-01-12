@@ -90,7 +90,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             await AddSimpleStreamProviderAndUpdate(new List<String>() { StreamProviderName });
 
             //set up producer1 
-            var producer = this.GrainFactory.GetGrain<ITypedProducerGrainProducingInt>(Guid.NewGuid());
+            var producer = this.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
             await producer.StartPeriodicProducing();

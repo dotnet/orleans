@@ -17,13 +17,13 @@ using Xunit.Abstractions;
 namespace Tester.AzureUtils.Streaming
 {
     [TestCategory("BVT"), TestCategory("Streaming"), TestCategory("Functional"), TestCategory("AQStreaming")]
-    public class ProgrammaticSubscribeTestAQStreamProvider : ProgrammaticSubcribeTestsRunner, IClassFixture<ProgrammaticSubscribeTestAQStreamProvider.Fixture>
+    public class AQProgrammaticSubscribeTest : ProgrammaticSubcribeTestsRunner, IClassFixture<AQProgrammaticSubscribeTest.Fixture>
     {
-        public class Fixture : BaseTestClusterFixture
+        private Fixture fixture;
+        public class Fixture : BaseAzureTestClusterFixture
         {
             protected override TestCluster CreateTestCluster()
             {
-                TestUtils.CheckForAzureStorage();
                 var options = new TestClusterOptions(2);
                 options.ClusterConfiguration.AddMemoryStorageProvider("Default");
                 options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
@@ -35,15 +35,17 @@ namespace Tester.AzureUtils.Streaming
 
         public override void Dispose()
         {
-            var clusterId = this.testCluster.ClusterId;
+            base.Dispose();
+            var clusterId = this.fixture.HostedCluster.ClusterId;
             AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, StreamProviderName, clusterId, TestDefaultConfiguration.DataConnectionString).Wait();
             AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, StreamProviderName2, clusterId, TestDefaultConfiguration.DataConnectionString).Wait();
-            base.Dispose();
         }
 
-        public ProgrammaticSubscribeTestAQStreamProvider(ITestOutputHelper output, Fixture fixture)
-            : base(fixture.HostedCluster)
+        public AQProgrammaticSubscribeTest(ITestOutputHelper output, Fixture fixture)
+            : base(fixture)
         {
+            fixture.EnsurePreconditionsMet();
+            this.fixture = fixture;
         }
     }
 

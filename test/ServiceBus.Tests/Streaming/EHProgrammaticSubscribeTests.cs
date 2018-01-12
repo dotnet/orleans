@@ -22,7 +22,7 @@ using Xunit.Abstractions;
 namespace ServiceBus.Tests.Streaming
 {
     [TestCategory("EventHub"), TestCategory("Streaming")]
-    public class ProgrammaticSubscribeTestEHProvider : ProgrammaticSubcribeTestsRunner, IClassFixture<ProgrammaticSubscribeTestEHProvider.Fixture>
+    public class EHProgrammaticSubscribeTest : ProgrammaticSubcribeTestsRunner, IClassFixture<EHProgrammaticSubscribeTest.Fixture>
     {
         private const string EHPath = "ehorleanstest";
         private const string EHConsumerGroup = "orleansnightly";
@@ -73,8 +73,8 @@ namespace ServiceBus.Tests.Streaming
             }
         }
 
-        public ProgrammaticSubscribeTestEHProvider(ITestOutputHelper output, Fixture fixture)
-            : base(fixture.HostedCluster)
+        public EHProgrammaticSubscribeTest(ITestOutputHelper output, Fixture fixture)
+            : base(fixture)
         {
         }
 
