@@ -59,13 +59,13 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             await producer.StartPeriodicProducing();
 
             int numProduced = 0;
-            await TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTests.ProducerHasProducedSinceLastCheck(numProduced, producer, lastTry), _timeout);
+            await TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTestsRunner.ProducerHasProducedSinceLastCheck(numProduced, producer, lastTry), _timeout);
             await producer.StopPeriodicProducing();
 
             var tasks = new List<Task>();
             foreach (var consumer in consumers)
             {
-                tasks.Add(TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTests.CheckCounters(new List<ITypedProducerGrain> { producer },
+                tasks.Add(TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTestsRunner.CheckCounters(new List<ITypedProducerGrain> { producer },
                     consumer, lastTry, this.Logger), _timeout));
             }
             await Task.WhenAll(tasks);
@@ -90,13 +90,13 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             await AddSimpleStreamProviderAndUpdate(new List<String>() { StreamProviderName });
 
             //set up producer1 
-            var producer = this.GrainFactory.GetGrain<ITypedProducerGrainProducingInt>(Guid.NewGuid());
+            var producer = this.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
             await producer.StartPeriodicProducing();
 
             int numProduced = 0;
-            await TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTests.ProducerHasProducedSinceLastCheck(numProduced, producer, lastTry), _timeout);
+            await TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTestsRunner.ProducerHasProducedSinceLastCheck(numProduced, producer, lastTry), _timeout);
 
             //set up stream2 and StreamProvider2
             await AddSimpleStreamProviderAndUpdate(new List<String>() { StreamProviderName2 });
@@ -109,7 +109,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
 
             await producer2.StartPeriodicProducing();
 
-            await TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTests.ProducerHasProducedSinceLastCheck(numProduced, producer2, lastTry), _timeout);
+            await TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTestsRunner.ProducerHasProducedSinceLastCheck(numProduced, producer2, lastTry), _timeout);
 
             //stop producing
             await producer2.StopPeriodicProducing();
@@ -118,7 +118,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             var tasks = new List<Task>();
             foreach (var consumer in consumers)
             {
-                tasks.Add(TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTests.CheckCounters(new List<ITypedProducerGrain> { producer, producer2 },
+                tasks.Add(TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTestsRunner.CheckCounters(new List<ITypedProducerGrain> { producer, producer2 },
                     consumer, lastTry, this.Logger), _timeout));
             }
             await Task.WhenAll(tasks);

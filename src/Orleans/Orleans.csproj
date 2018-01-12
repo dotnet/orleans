@@ -182,6 +182,7 @@
     <Compile Include="Serialization\RemoteNonDeserializableException.cs" />
     <Compile Include="Serialization\TypeSerializer.cs" />
     <Compile Include="Streams\Core\ImplicitConsumerGrainExtensions.cs" />
+    <Compile Include="Streams\Core\IStreamSubscriptionHandleFactory.cs" />
     <Compile Include="Streams\Core\IStreamSubscriptionObserver.cs" />
     <Compile Include="Streams\Core\IStreamSubscriptionManager.cs" />
     <Compile Include="Streams\Core\IStreamSubscriptionManagerAdmin.cs" />
@@ -189,7 +190,7 @@
     <Compile Include="Streams\Core\StreamSubscription.cs" />
     <Compile Include="Streams\Core\StreamSubscriptionManager.cs" />
     <Compile Include="Streams\Core\StreamSubscriptionManagerAdmin.cs" />
-    <Compile Include="Streams\Internal\StreamSubscriptionChangeHandler.cs" />
+    <Compile Include="Streams\Internal\StreamSubsriptionHandlerFactory.cs" />
     <Compile Include="Streams\Predicates\AllStreamNamespacesPredicate.cs" />
     <Compile Include="Streams\Predicates\ExactMatchStreamNamespacePredicate.cs" />
     <Compile Include="Streams\Predicates\RegexStreamNamespacePredicate.cs" />
