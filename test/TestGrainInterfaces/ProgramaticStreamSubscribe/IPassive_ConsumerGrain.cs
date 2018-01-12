@@ -14,7 +14,7 @@ namespace UnitTests.GrainInterfaces
     /// Consumer grain which passively reacts to subscriptions which was made on behalf of
     /// it using Programmatic Subscribing 
     /// </summary>
-    public interface IPassive_ConsumerGrain: IGrainWithGuidKey, IStreamSubscriptionObserver<int>, IStreamSubscriptionObserver<IFruit>
+    public interface IPassive_ConsumerGrain: IGrainWithGuidKey, IStreamSubscriptionObserver
     {
         Task StopConsuming();
         Task<int> GetCountOfOnAddFuncCalled();
@@ -22,7 +22,7 @@ namespace UnitTests.GrainInterfaces
     }
 
     //the consumer grain marker interface which would unsubscribe on any subscription added by StreamSubscriptionManager
-    public interface IJerk_ConsumerGrain : IGrainWithGuidKey, IStreamSubscriptionObserver<int>
+    public interface IJerk_ConsumerGrain : IGrainWithGuidKey, IStreamSubscriptionObserver
     {
     }
 
@@ -53,19 +53,5 @@ namespace UnitTests.GrainInterfaces
     public interface IFruit
     {
         int GetNumber();
-    }
-
-    public class Apple : IFruit
-    {
-        int number;
-        public Apple(int number)
-        {
-            this.number = number;
-        }
-
-        public int GetNumber()
-        {
-            return number;
-        }
     }
 }

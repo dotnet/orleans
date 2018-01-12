@@ -7,8 +7,8 @@ using System.Threading.Tasks;
 
 namespace Orleans.Streams.Core
 {
-    public interface IStreamSubscriptionObserver<T> 
+    public interface IStreamSubscriptionObserver
     {
-        Task OnSubscribed(StreamSubscriptionHandle<T> handle);
+        Task OnSubscribed(IStreamSubscriptionHandleFactory handleFactory);
     }
 }
