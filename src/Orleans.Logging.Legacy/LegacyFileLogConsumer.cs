@@ -2,6 +2,7 @@
 using System;
 using System.IO;
 using System.Net;
+using System.Text;
 
 namespace Orleans.Logging.Legacy
 {
@@ -17,7 +18,8 @@ namespace Orleans.Logging.Legacy
 
         public LegacyFileLogConsumer(string fileName)
         {
-            logOutput = new StreamWriter(File.Open(fileName, FileMode.Append, FileAccess.Write, FileShare.Write));
+            this.logFileName = fileName;
+            logOutput = new StreamWriter(File.Open(fileName, FileMode.Append, FileAccess.Write, FileShare.ReadWrite), Encoding.UTF8);
         }
 
         public void Log(
