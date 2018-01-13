@@ -10,7 +10,7 @@ namespace Orleans.Runtime
 {
     internal class GrainReferenceRuntime : IGrainReferenceRuntime
     {
-        private const bool USE_DEBUG_CONTEXT = true;
+        private const bool USE_DEBUG_CONTEXT = false;
         private const bool USE_DEBUG_CONTEXT_PARAMS = false;
         private static ConcurrentDictionary<int, string> debugContexts = new ConcurrentDictionary<int, string>();
 
