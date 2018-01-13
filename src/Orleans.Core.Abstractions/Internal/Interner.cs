@@ -57,6 +57,8 @@ namespace Orleans.Core.Abstractions.Internal
         [NonSerialized]
         private readonly ConcurrentDictionary<K, WeakReference<T>> internCache;
 
+        private static readonly Func<T, T> NoOpCreatorFunc = o => o;
+
         public Interner()
             : this(InternerConstants.SIZE_SMALL)
         {
@@ -87,6 +89,11 @@ namespace Orleans.Core.Abstractions.Internal
         /// <returns>Object with specified key - either previous cached copy or newly created</returns>
         public T FindOrCreate(K key, Func<K, T> creatorFunc)
         {
+            return FindOrCreate(key, creatorFunc, key);
+        }
+
+        private T FindOrCreate<TState>(K key, Func<TState, T> creatorFunc, TState state)
+        {
             T result;
             WeakReference<T> cacheEntry;
 
@@ -96,7 +103,7 @@ namespace Orleans.Core.Abstractions.Internal
             // If no cache entry exists, create and insert a new one using the creator function.
             if (cacheEntry == null)
             {
-                result = creatorFunc(key);
+                result = creatorFunc(state);
                 cacheEntry = new WeakReference<T>(result);
                 internCache[key] = cacheEntry;
                 return result;
@@ -107,7 +114,7 @@ namespace Orleans.Core.Abstractions.Internal
             if (result == null)
             {
                 // Create new object and ensure the entry is still valid by re-inserting it into the cache.
-                result = creatorFunc(key);
+                result = creatorFunc(state);
                 cacheEntry.SetTarget(result);
                 internCache[key] = cacheEntry;
             }
@@ -123,8 +130,7 @@ namespace Orleans.Core.Abstractions.Internal
         public bool TryFind(K key, out T obj)
         {
             obj = null;
-            WeakReference<T> cacheEntry;
-            return internCache.TryGetValue(key, out cacheEntry) && cacheEntry != null && cacheEntry.TryGetTarget(out obj);
+            return internCache.TryGetValue(key, out var cacheEntry) && cacheEntry != null && cacheEntry.TryGetTarget(out obj);
         }
 
         /// <summary>
@@ -135,7 +141,7 @@ namespace Orleans.Core.Abstractions.Internal
         /// <returns>Object with specified key - either previous cached copy or justed passed in</returns>
         public T Intern(K key, T obj)
         {
-            return FindOrCreate(key, _ => obj);
+            return FindOrCreate(key, NoOpCreatorFunc, obj);
         }
 
         public void StopAndClear()
