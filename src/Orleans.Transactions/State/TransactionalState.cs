@@ -72,14 +72,14 @@ namespace Orleans.Transactions
         /// </summary>
         public void Save()
         {
-            var info = TransactionContext.GetTransactionInfo();
+            var info = TransactionContext.GetRequiredTransactionInfo<TransactionInfo>();
 
             if(this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("Write {0}", info);
 
             if (info.IsReadOnly)
             {
                 // For obvious reasons...
-                throw new OrleansReadOnlyViolatedException(info.TransactionId);
+                throw new OrleansReadOnlyViolatedException(info.TransactionId.ToString());
             }
 
             Rollback();
@@ -93,7 +93,7 @@ namespace Orleans.Transactions
             if (this.version.TransactionId > info.TransactionId || this.highestReadTransactionId >= info.TransactionId)
             {
                 // Prevent cycles. Wait-die
-                throw new OrleansTransactionWaitDieException(info.TransactionId);
+                throw new OrleansTransactionWaitDieException(info.TransactionId.ToString());
             }
 
             TransactionalResourceVersion nextVersion = TransactionalResourceVersion.Create(info.TransactionId,
@@ -345,7 +345,7 @@ namespace Orleans.Transactions
         private TState GetState()
         {
 
-            var info = TransactionContext.GetTransactionInfo();
+            var info = TransactionContext.GetRequiredTransactionInfo<TransactionInfo>();
 
             Rollback();
 
@@ -359,12 +359,12 @@ namespace Orleans.Transactions
             if (!TryGetVersion(info.TransactionId, out TState readState, out TransactionalResourceVersion readVersion))
             {
                 // This can only happen if old versions are gone due to checkpointing.
-                throw new OrleansTransactionVersionDeletedException(info.TransactionId);
+                throw new OrleansTransactionVersionDeletedException(info.TransactionId.ToString());
             }
 
             if (info.IsReadOnly && readVersion.TransactionId > this.metadata.StableVersion.TransactionId)
             {
-                throw new OrleansTransactionUnstableVersionException(info.TransactionId);
+                throw new OrleansTransactionUnstableVersionException(info.TransactionId.ToString());
             }
 
             info.RecordRead(transactionalResource, readVersion, this.metadata.StableVersion.TransactionId);

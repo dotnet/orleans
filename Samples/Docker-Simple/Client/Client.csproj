@@ -12,8 +12,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Orleans.Client" Version="2.0.0-beta1" />
-    <PackageReference Include="Microsoft.Orleans.OrleansAzureUtils" Version="2.0.0-beta1" />
+    <PackageReference Include="Microsoft.Orleans.Client" Version="2.0.0-beta3" />
+    <PackageReference Include="Microsoft.Orleans.OrleansAzureUtils" Version="2.0.0-beta3" />
   </ItemGroup>
 
   <ItemGroup>

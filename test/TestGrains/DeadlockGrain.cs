@@ -40,13 +40,13 @@ namespace UnitTests.Grains
 
         public Task CallNext_1(List<Tuple<long, bool>> callChain, int currCallIndex)
         {
-            GetLogger(Id).Info("Inside grain {0} CallNext_1().", Id);
+            this.GetLogger(Id).Info("Inside grain {0} CallNext_1().", Id);
             return DeadlockGrain.CallNext(GrainFactory, callChain, currCallIndex);
         }
 
         public Task CallNext_2(List<Tuple<long, bool>> callChain, int currCallIndex)
         {
-            GetLogger(Id).Info("Inside grain {0} CallNext_2().", Id);
+            this.GetLogger(Id).Info("Inside grain {0} CallNext_2().", Id);
             return DeadlockGrain.CallNext(GrainFactory, callChain, currCallIndex);
         }
     }
@@ -58,13 +58,13 @@ namespace UnitTests.Grains
 
         public Task CallNext_1(List<Tuple<long, bool>> callChain, int currCallIndex)
         {
-            GetLogger(Id).Info("Inside grain {0} CallNext_1()", Id);
+            this.GetLogger(Id).Info("Inside grain {0} CallNext_1()", Id);
             return DeadlockGrain.CallNext(GrainFactory, callChain, currCallIndex);
         }
 
         public Task CallNext_2(List<Tuple<long, bool>> callChain, int currCallIndex)
         {
-            GetLogger(Id).Info("Inside grain {0} CallNext_2()", Id);
+            this.GetLogger(Id).Info("Inside grain {0} CallNext_2()", Id);
             return DeadlockGrain.CallNext(GrainFactory, callChain, currCallIndex);
         }
     }

@@ -1,12 +1,10 @@
 ﻿using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
-using Orleans;
-using OrleansAWSUtils.Storage;
 using System;
 using System.Collections.Generic;
 using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
-using Xunit;
+using Orleans.AWSUtils.Tests;
 
 namespace AWSUtils.Tests.StorageTests
 {

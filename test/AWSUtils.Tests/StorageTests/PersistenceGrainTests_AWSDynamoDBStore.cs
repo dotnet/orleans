@@ -9,7 +9,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using TesterInternal;
-using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Xunit.Abstractions;
@@ -44,11 +43,11 @@ namespace AWSUtils.Tests.StorageTests
                     options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("lowercase");
 
                     options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                    options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.DynamoDBStorageProvider>("DDBStore", new Dictionary<string, string> { { "DeleteStateOnClear", "true" }, { "DataConnectionString", dataConnectionString } });
-                    options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.DynamoDBStorageProvider>("DDBStore1", new Dictionary<string, string> { { "DataConnectionString", dataConnectionString } });
-                    options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.DynamoDBStorageProvider>("DDBStore2", new Dictionary<string, string> { { "DataConnectionString", dataConnectionString } });
-                    options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.DynamoDBStorageProvider>("DDBStore3", new Dictionary<string, string> { { "DataConnectionString", dataConnectionString } });
-                    options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.ShardedStorageProvider>("ShardedDDBStore");
+                    options.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("DDBStore", new Dictionary<string, string> { { "DeleteStateOnClear", "true" }, { "DataConnectionString", dataConnectionString } });
+                    options.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("DDBStore1", new Dictionary<string, string> { { "DataConnectionString", dataConnectionString } });
+                    options.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("DDBStore2", new Dictionary<string, string> { { "DataConnectionString", dataConnectionString } });
+                    options.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("DDBStore3", new Dictionary<string, string> { { "DataConnectionString", dataConnectionString } });
+                    options.ClusterConfiguration.Globals.RegisterStorageProvider<ShardedStorageProvider>("ShardedDDBStore");
 
                     IProviderConfiguration providerConfig;
                     if (options.ClusterConfiguration.Globals.TryGetProviderConfiguration("Orleans.Storage.ShardedStorageProvider", "ShardedDDBStore", out providerConfig))

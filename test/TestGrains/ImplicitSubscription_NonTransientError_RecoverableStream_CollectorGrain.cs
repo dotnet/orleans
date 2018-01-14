@@ -32,7 +32,7 @@ namespace TestGrains
 
         public override async Task OnActivateAsync()
         {
-            logger = base.GetLogger("RecoverableStreamCollectorGrain " + base.IdentityString);
+            logger = this.GetLogger("RecoverableStreamCollectorGrain " + base.IdentityString);
             logger.Info("OnActivateAsync");
 
             await ReadStateAsync();

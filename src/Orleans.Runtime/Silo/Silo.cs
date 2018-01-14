@@ -68,7 +68,6 @@ namespace Orleans.Runtime
         private readonly IncomingMessageAgent incomingPingAgent;
         private readonly ILogger logger;
         private TypeManager typeManager;
-
         private readonly TaskCompletionSource<int> siloTerminatedTask =
             new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly SiloStatisticsManager siloStatistics;
@@ -143,7 +142,6 @@ namespace Orleans.Runtime
             // Temporarily still require this. Hopefuly gone when 2.0 is released.
             this.legacyConfiguration = services.GetRequiredService<LegacyConfigurationWrapper>();
             this.siloDetails = siloDetails;
-
             this.SystemStatus = SystemStatus.Creating;
             AsynchAgent.IsStarting = true; // todo. use ISiloLifecycle instead?
 
@@ -161,7 +159,7 @@ namespace Orleans.Runtime
 
             var localEndpoint = this.siloDetails.SiloAddress.Endpoint;
 
-            services.GetService<SerializationManager>().RegisterSerializers(services.GetService<ApplicationPartManager>());
+            services.GetService<SerializationManager>().RegisterSerializers(services.GetService<IApplicationPartManager>());
 
             this.Services = services;
             this.Services.InitializeSiloUnobservedExceptionsHandler();
@@ -395,126 +393,189 @@ namespace Orleans.Runtime
             AppDomain.CurrentDomain.ProcessExit += HandleProcessExit;
             if (GlobalConfig.FastKillOnCancelKeyPress)
                 Console.CancelKeyPress += HandleProcessExit;
-
             //TODO: setup thead pool directly to lifecycle
-            ConfigureThreadPoolAndServicePointSettings();
-
+            StartTaskWithPerfAnalysis("ConfigureThreadPoolAndServicePointSettings",
+                this.ConfigureThreadPoolAndServicePointSettings, Stopwatch.StartNew());
             return Task.CompletedTask;
+        }
+
+        private void StartTaskWithPerfAnalysis(string taskName, Action task, Stopwatch stopWatch)
+        {
+            stopWatch.Restart();
+            task.Invoke();
+            stopWatch.Stop();
+            this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"{taskName} took {stopWatch.ElapsedMilliseconds} Milliseconds to finish");
+        }
+
+        private async Task StartAsyncTaskWithPerfAnalysis(string taskName, Func<Task> task, Stopwatch stopWatch)
+        {
+            stopWatch.Restart();
+            await task.Invoke();
+            stopWatch.Stop();
+            this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"{taskName} took {stopWatch.ElapsedMilliseconds} Milliseconds to finish");
         }
 
         private async Task OnRuntimeServicesStart(CancellationToken ct)
         {
             //TODO: Setup all (or as many as possible) of the class started in this call to work directly with lifecyce
-
+            var stopWatch = Stopwatch.StartNew();
             // The order of these 4 is pretty much arbitrary.
-            scheduler.Start();
-            messageCenter.Start();
-            incomingPingAgent.Start();
-            incomingSystemAgent.Start();
-            incomingAgent.Start();
+            StartTaskWithPerfAnalysis("Start Scheduler", scheduler.Start, stopWatch);
+            StartTaskWithPerfAnalysis("Start Message center",messageCenter.Start,stopWatch);
+            StartTaskWithPerfAnalysis("Start Incoming message agents", IncomingMessageAgentsStart, stopWatch);
+            void IncomingMessageAgentsStart()
+            {
+                incomingPingAgent.Start();
+                incomingSystemAgent.Start();
+                incomingAgent.Start();
+            } 
 
-            LocalGrainDirectory.Start();
+            StartTaskWithPerfAnalysis("Start local grain directory", LocalGrainDirectory.Start,stopWatch);
 
             // Set up an execution context for this thread so that the target creation steps can use asynch values.
             RuntimeContext.InitializeMainThread();
 
-            // Initialize the implicit stream subscribers table.
-            var implicitStreamSubscriberTable = Services.GetRequiredService<ImplicitStreamSubscriberTable>();
-            var grainTypeManager = Services.GetRequiredService<GrainTypeManager>();
-            implicitStreamSubscriberTable.InitImplicitStreamSubscribers(grainTypeManager.GrainClassTypeData.Select(t => t.Value.Type).ToArray());
+            StartTaskWithPerfAnalysis("Init implicit stream subscribe table", InitImplicitStreamSubscribeTable, stopWatch);
+            void InitImplicitStreamSubscribeTable()
+            {             
+                // Initialize the implicit stream subscribers table.
+                var implicitStreamSubscriberTable = Services.GetRequiredService<ImplicitStreamSubscriberTable>();
+                var grainTypeManager = Services.GetRequiredService<GrainTypeManager>();
+                implicitStreamSubscriberTable.InitImplicitStreamSubscribers(grainTypeManager.GrainClassTypeData.Select(t => t.Value.Type).ToArray());
+            }
+
 
             var siloProviderRuntime = Services.GetRequiredService<SiloProviderRuntime>();
             runtimeClient.CurrentStreamProviderRuntime = siloProviderRuntime;
-            statisticsProviderManager = this.Services.GetRequiredService<StatisticsProviderManager>();
-            string statsProviderName =  await statisticsProviderManager.LoadProvider(GlobalConfig.ProviderConfigurations)
-                .WithTimeout(initTimeout);
-            if (statsProviderName != null)
-                LocalConfig.StatisticsProviderName = statsProviderName;
+            await StartAsyncTaskWithPerfAnalysis("Load StatisticProviders", LoadStatsProvider, stopWatch);
+            async Task LoadStatsProvider()
+            {
+                statisticsProviderManager = this.Services.GetRequiredService<StatisticsProviderManager>();
+                string statsProviderName = await statisticsProviderManager.LoadProvider(GlobalConfig.ProviderConfigurations)
+                    .WithTimeout(initTimeout);
+                if (statsProviderName != null)
+                    LocalConfig.StatisticsProviderName = statsProviderName;
 
-            // can call SetSiloMetricsTableDataManager only after MessageCenter is created (dependency on this.SiloAddress).
-            await siloStatistics.SetSiloStatsTableDataManager(this, LocalConfig).WithTimeout(initTimeout);
-            await siloStatistics.SetSiloMetricsTableDataManager(this, LocalConfig).WithTimeout(initTimeout);
-
-
+                // can call SetSiloMetricsTableDataManager only after MessageCenter is created (dependency on this.SiloAddress).
+                await siloStatistics.SetSiloStatsTableDataManager(this, LocalConfig).WithTimeout(initTimeout);
+                await siloStatistics.SetSiloMetricsTableDataManager(this, LocalConfig).WithTimeout(initTimeout);
+            }
+            
             // This has to follow the above steps that start the runtime components
-            CreateSystemTargets();
-
-            await InjectDependencies();
+            await StartAsyncTaskWithPerfAnalysis("Create system targets and inject dependencies", () =>
+            {
+                CreateSystemTargets();
+                return InjectDependencies();
+            }, stopWatch);
 
             // Validate the configuration.
             GlobalConfig.Application.ValidateConfiguration(logger);
 
-            // Initialize storage providers once we have a basic silo runtime environment operating
-            storageProviderManager = this.Services.GetRequiredService<StorageProviderManager>();
-            await scheduler.QueueTask(
-                () => storageProviderManager.LoadStorageProviders(GlobalConfig.ProviderConfigurations),
-                providerManagerSystemTarget.SchedulingContext)
+            await StartAsyncTaskWithPerfAnalysis("Init StorageProviders", InitStorageProviders, stopWatch);
+            async Task InitStorageProviders()
+            {
+                // Initialize storage providers once we have a basic silo runtime environment operating
+                storageProviderManager = this.Services.GetRequiredService<StorageProviderManager>();
+                await scheduler.QueueTask(
+                        () => storageProviderManager.LoadStorageProviders(GlobalConfig.ProviderConfigurations),
+                        providerManagerSystemTarget.SchedulingContext)
                     .WithTimeout(initTimeout);
+            }
 
-            ITransactionAgent transactionAgent = this.Services.GetRequiredService<ITransactionAgent>();
-            ISchedulingContext transactionAgentContext = (transactionAgent as SystemTarget)?.SchedulingContext;
-            await scheduler.QueueTask(transactionAgent.Start, transactionAgentContext)
-                        .WithTimeout(initTimeout);
+            await StartAsyncTaskWithPerfAnalysis("Init transaction agent", InitTransactionAgent, stopWatch);
+            async Task InitTransactionAgent()
+            {
+                ITransactionAgent transactionAgent = this.Services.GetRequiredService<ITransactionAgent>();
+                ISchedulingContext transactionAgentContext = (transactionAgent as SystemTarget)?.SchedulingContext;
+                await scheduler.QueueTask(transactionAgent.Start, transactionAgentContext)
+                    .WithTimeout(initTimeout);
+            }
 
             var versionStore = Services.GetService<IVersionStore>() as GrainVersionStore;
             versionStore?.SetStorageManager(storageProviderManager);
-            logger.Debug("Storage provider manager created successfully."); 
+            logger.Debug("Storage provider manager created successfully.");
 
-            // Initialize log consistency providers once we have a basic silo runtime environment operating
-            logConsistencyProviderManager = this.Services.GetRequiredService<LogConsistencyProviderManager>();
-            await scheduler.QueueTask(
-                () => logConsistencyProviderManager.LoadLogConsistencyProviders(GlobalConfig.ProviderConfigurations),
-                providerManagerSystemTarget.SchedulingContext)
+            await StartAsyncTaskWithPerfAnalysis("Init LogConsistencyProviders", InitLogConsistencyProviders,
+                stopWatch);
+            async Task InitLogConsistencyProviders()
+            {
+                // Initialize log consistency providers once we have a basic silo runtime environment operating
+                logConsistencyProviderManager = this.Services.GetRequiredService<LogConsistencyProviderManager>();
+                await scheduler.QueueTask(
+                        () => logConsistencyProviderManager.LoadLogConsistencyProviders(GlobalConfig.ProviderConfigurations),
+                        providerManagerSystemTarget.SchedulingContext)
                     .WithTimeout(initTimeout);
-            logger.Debug("Log consistency provider manager created successfully."); 
+                logger.Debug("Log consistency provider manager created successfully.");
+            }
 
-            // Load and init stream providers before silo becomes active
-            var siloStreamProviderManager = (StreamProviderManager) this.Services.GetRequiredService<IStreamProviderManager>();
-            await scheduler.QueueTask(
-                () => siloStreamProviderManager.LoadStreamProviders(GlobalConfig.ProviderConfigurations, siloProviderRuntime),
-                    providerManagerSystemTarget.SchedulingContext)
-                        .WithTimeout(initTimeout);
-            runtimeClient.CurrentStreamProviderManager = siloStreamProviderManager;
-            logger.Debug("Stream provider manager created successfully."); 
+            await StartAsyncTaskWithPerfAnalysis("Init StreamProviders", InitStreamProviders, stopWatch);
+            async Task InitStreamProviders()
+            {
+                // Load and init stream providers before silo becomes active
+                var siloStreamProviderManager = (StreamProviderManager)this.Services.GetRequiredService<IStreamProviderManager>();
+                await scheduler.QueueTask(
+                        () => siloStreamProviderManager.LoadStreamProviders(GlobalConfig.ProviderConfigurations, siloProviderRuntime),
+                        providerManagerSystemTarget.SchedulingContext)
+                    .WithTimeout(initTimeout);
+                runtimeClient.CurrentStreamProviderManager = siloStreamProviderManager;
+                logger.Debug("Stream provider manager created successfully.");
+            }
 
             // Load and init grain services before silo becomes active.
-            await CreateGrainServices(GlobalConfig.GrainServiceConfigurations);
+            await StartAsyncTaskWithPerfAnalysis("Init grain services",
+                () => CreateGrainServices(GlobalConfig.GrainServiceConfigurations), stopWatch);
 
             this.membershipOracleContext = (this.membershipOracle as SystemTarget)?.SchedulingContext ??
                                        this.providerManagerSystemTarget.SchedulingContext;
-            await scheduler.QueueTask(() => this.membershipOracle.Start(), this.membershipOracleContext)
-                .WithTimeout(initTimeout);
-            logger.Debug("Local silo status oracle created successfully."); 
-            await scheduler.QueueTask(this.membershipOracle.BecomeActive, this.membershipOracleContext)
-                .WithTimeout(initTimeout);
-            logger.Debug("Local silo status oracle became active successfully."); 
-            await scheduler.QueueTask(() => this.typeManager.Initialize(versionStore), this.typeManager.SchedulingContext)
-                .WithTimeout(this.initTimeout);
+            await StartAsyncTaskWithPerfAnalysis("Start local silo status oracle", StartMembershipOracle, stopWatch);
+
+            async Task StartMembershipOracle()
+            {
+                await scheduler.QueueTask(() => this.membershipOracle.Start(), this.membershipOracleContext)
+                    .WithTimeout(initTimeout);
+                logger.Debug("Local silo status oracle created successfully.");
+                await scheduler.QueueTask(this.membershipOracle.BecomeActive, this.membershipOracleContext)
+                    .WithTimeout(initTimeout);
+                logger.Debug("Local silo status oracle became active successfully.");
+            }
+
+            await StartAsyncTaskWithPerfAnalysis("Init type manager", () => scheduler
+                .QueueTask(() => this.typeManager.Initialize(versionStore), this.typeManager.SchedulingContext)
+                .WithTimeout(this.initTimeout), stopWatch);
 
             //if running in multi cluster scenario, start the MultiClusterNetwork Oracle
-            if (this.multiClusterOracle != null) 
+            if (this.multiClusterOracle != null)
             {
-                logger.Info("Starting multicluster oracle with my ServiceId={0} and ClusterId={1}.",
-                    this.siloOptions.ServiceId, this.siloOptions.ClusterId);
+                await StartAsyncTaskWithPerfAnalysis("Start multicluster oracle", StartMultiClusterOracle, stopWatch);
+                async Task StartMultiClusterOracle()
+                {
+                    logger.Info("Starting multicluster oracle with my ServiceId={0} and ClusterId={1}.",
+                        this.siloOptions.ServiceId, this.siloOptions.ClusterId);
 
-                this.multiClusterOracleContext = (multiClusterOracle as SystemTarget)?.SchedulingContext ??
-                                                          this.providerManagerSystemTarget.SchedulingContext;
-                await scheduler.QueueTask(() => multiClusterOracle.Start(), multiClusterOracleContext)
-                                    .WithTimeout(initTimeout);
-                logger.Debug("multicluster oracle created successfully."); 
+                    this.multiClusterOracleContext = (multiClusterOracle as SystemTarget)?.SchedulingContext ??
+                                                     this.providerManagerSystemTarget.SchedulingContext;
+                    await scheduler.QueueTask(() => multiClusterOracle.Start(), multiClusterOracleContext)
+                        .WithTimeout(initTimeout);
+                    logger.Debug("multicluster oracle created successfully.");
+                }
             }
 
             try
             {
-                this.siloStatistics.Start(this.LocalConfig);
+                StartTaskWithPerfAnalysis("Start silo statistics", ()=>this.siloStatistics.Start(this.LocalConfig), stopWatch);
                 logger.Debug("Silo statistics manager started successfully."); 
 
                 // Finally, initialize the deployment load collector, for grains with load-based placement
-                var deploymentLoadPublisher = Services.GetRequiredService<DeploymentLoadPublisher>();
-                await this.scheduler.QueueTask(deploymentLoadPublisher.Start, deploymentLoadPublisher.SchedulingContext)
-                    .WithTimeout(this.initTimeout);
-                logger.Debug("Silo deployment load publisher started successfully."); 
+                await StartAsyncTaskWithPerfAnalysis("Start deployment load collector", StartDeploymentLoadCollector, stopWatch);
+                async Task StartDeploymentLoadCollector()
+                {
+                    var deploymentLoadPublisher = Services.GetRequiredService<DeploymentLoadPublisher>();
+                    await this.scheduler.QueueTask(deploymentLoadPublisher.Start, deploymentLoadPublisher.SchedulingContext)
+                        .WithTimeout(this.initTimeout);
+                    logger.Debug("Silo deployment load publisher started successfully.");
+                }
 
+            
                 // Start background timer tick to watch for platform execution stalls, such as when GC kicks in
                 this.platformWatchdog = new Watchdog(this.LocalConfig.StatisticsLogWriteInterval, this.healthCheckParticipants, this.executorService, this.loggerFactory);
                 this.platformWatchdog.Start();
@@ -522,34 +583,49 @@ namespace Orleans.Runtime
 
                 if (this.reminderService != null)
                 {
-                    // so, we have the view of the membership in the consistentRingProvider. We can start the reminder service
-                    this.reminderServiceContext = (this.reminderService as SystemTarget)?.SchedulingContext ??
-                                                           this.providerManagerSystemTarget.SchedulingContext;
-                    await this.scheduler.QueueTask(this.reminderService.Start, this.reminderServiceContext)
+                    await StartAsyncTaskWithPerfAnalysis("Start reminder service", StartReminderService, stopWatch);
+                    async Task StartReminderService()
+                    {
+                        // so, we have the view of the membership in the consistentRingProvider. We can start the reminder service
+                        this.reminderServiceContext = (this.reminderService as SystemTarget)?.SchedulingContext ??
+                                                      this.providerManagerSystemTarget.SchedulingContext;
+                        await this.scheduler.QueueTask(this.reminderService.Start, this.reminderServiceContext)
+                            .WithTimeout(this.initTimeout);
+                        this.logger.Debug("Reminder service started successfully.");
+                    }
+                }
+                await StartAsyncTaskWithPerfAnalysis("App boostrap", AppBootstrap, stopWatch);
+                async Task AppBootstrap()
+                {
+                    this.bootstrapProviderManager = this.Services.GetRequiredService<BootstrapProviderManager>();
+                    await this.scheduler.QueueTask(
+                            () => this.bootstrapProviderManager.LoadAppBootstrapProviders(siloProviderRuntime, this.GlobalConfig.ProviderConfigurations),
+                            this.providerManagerSystemTarget.SchedulingContext)
                         .WithTimeout(this.initTimeout);
-                    this.logger.Debug("Reminder service started successfully.");
+                    this.BootstrapProviders = this.bootstrapProviderManager.GetProviders(); // Data hook for testing & diagnotics
+
+                    logger.Debug("App bootstrap calls done successfully.");
                 }
 
-                this.bootstrapProviderManager = this.Services.GetRequiredService<BootstrapProviderManager>();
-                await this.scheduler.QueueTask(
-                    () => this.bootstrapProviderManager.LoadAppBootstrapProviders(siloProviderRuntime, this.GlobalConfig.ProviderConfigurations),
-                    this.providerManagerSystemTarget.SchedulingContext)
+                await StartAsyncTaskWithPerfAnalysis("Start StreamProviders", StartStreamProviders, stopWatch);
+                async Task StartStreamProviders()
+                {
+                    // Start stream providers after silo is active (so the pulling agents don't start sending messages before silo is active).
+                    // also after bootstrap provider started so bootstrap provider can initialize everything stream before events from this silo arrive.
+                    var siloStreamProviderManager = (StreamProviderManager)this.Services.GetRequiredService<IStreamProviderManager>();
+                    await this.scheduler.QueueTask(siloStreamProviderManager.StartStreamProviders, this.providerManagerSystemTarget.SchedulingContext)
                         .WithTimeout(this.initTimeout);
-                this.BootstrapProviders = this.bootstrapProviderManager.GetProviders(); // Data hook for testing & diagnotics
+                    logger.Debug("Stream providers started successfully.");
+                }
 
-                logger.Debug("App bootstrap calls done successfully."); 
-
-                // Start stream providers after silo is active (so the pulling agents don't start sending messages before silo is active).
-                // also after bootstrap provider started so bootstrap provider can initialize everything stream before events from this silo arrive.
-                await this.scheduler.QueueTask(siloStreamProviderManager.StartStreamProviders, this.providerManagerSystemTarget.SchedulingContext)
-                    .WithTimeout(this.initTimeout);
-                logger.Debug("Stream providers started successfully."); 
-
-                // Now that we're active, we can start the gateway
-                var mc = this.messageCenter as MessageCenter;
-                mc?.StartGateway(this.Services.GetRequiredService<ClientObserverRegistrar>());
-               logger.Debug("Message gateway service started successfully."); 
-
+                StartTaskWithPerfAnalysis("Start gateway", StartGateway, stopWatch);
+                void StartGateway()
+                {
+                    // Now that we're active, we can start the gateway
+                    var mc = this.messageCenter as MessageCenter;
+                    mc?.StartGateway(this.Services.GetRequiredService<ClientObserverRegistrar>());
+                    logger.Debug("Message gateway service started successfully.");
+                }
                 this.SystemStatus = SystemStatus.Running;
             }
             catch (Exception exc)

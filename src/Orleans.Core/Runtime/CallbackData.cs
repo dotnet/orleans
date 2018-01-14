@@ -32,7 +32,7 @@ namespace Orleans.Runtime
         private ITimeInterval timeSinceIssued;
         private readonly ILogger logger;
         private readonly ILogger timerLogger;
-        public TransactionInfo TransactionInfo { get; set; }
+        public ITransactionInfo TransactionInfo { get; set; }
 
         public Message Message { get; set; } // might hold metadata used by response pipeline
 

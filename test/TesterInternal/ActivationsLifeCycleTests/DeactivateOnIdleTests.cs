@@ -185,7 +185,6 @@ namespace UnitTests.ActivationsLifeCycleTests
         {
             var options = new TestClusterOptions(2);
             options.ClusterConfiguration.Globals.MaxForwardCount = forwardCount;
-            options.ClusterConfiguration.Defaults.Generation = 13;
             // For this test we only want to talk to the primary
             options.ClientConfiguration.Gateways.RemoveAt(1);
             Initialize(options);

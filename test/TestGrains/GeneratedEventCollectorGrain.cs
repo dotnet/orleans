@@ -20,7 +20,7 @@ namespace TestGrains
 
         public override async Task OnActivateAsync()
         {
-            logger = base.GetLogger("GeneratedEvenCollectorGrain " + base.IdentityString);
+            logger = this.GetLogger("GeneratedEvenCollectorGrain " + base.IdentityString);
             logger.Info("OnActivateAsync");
 
             var streamProvider = GetStreamProvider(GeneratedStreamTestConstants.StreamProviderName);

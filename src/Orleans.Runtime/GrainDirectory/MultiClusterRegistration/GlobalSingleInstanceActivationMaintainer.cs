@@ -22,7 +22,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly IInternalGrainFactory grainFactory;
         private readonly TimeSpan period;
         private readonly IMultiClusterOracle multiClusterOracle;
-        private readonly SiloOptions siloOptions;
+        private readonly ILocalSiloDetails siloDetails;
         private readonly MultiClusterOptions multiClusterOptions;
 
         // scanning the entire directory for doubtful activations is too slow.
@@ -37,7 +37,7 @@ namespace Orleans.Runtime.GrainDirectory
             IInternalGrainFactory grainFactory,
             IMultiClusterOracle multiClusterOracle,
             ExecutorService executorService,
-            IOptions<SiloOptions> siloOptions,
+            ILocalSiloDetails siloDetails,
             IOptions<MultiClusterOptions> multiClusterOptions,
             ILoggerFactory loggerFactory)
             : base(executorService, loggerFactory)
@@ -46,7 +46,7 @@ namespace Orleans.Runtime.GrainDirectory
             this.logger = logger;
             this.grainFactory = grainFactory;
             this.multiClusterOracle = multiClusterOracle;
-            this.siloOptions = siloOptions.Value;
+            this.siloDetails = siloDetails;
             this.multiClusterOptions = multiClusterOptions.Value;
             this.period = config.GlobalSingleInstanceRetryInterval;
             logger.Debug("GSIP:M GlobalSingleInstanceActivationMaintainer Started, Period = {0}", period);
@@ -90,7 +90,7 @@ namespace Orleans.Runtime.GrainDirectory
             if (!this.multiClusterOptions.HasMultiClusterNetwork)
                 return;
 
-            var myClusterId = this.siloOptions.ClusterId;
+            var myClusterId = this.siloDetails.ClusterId;
 
             while (router.Running)
             {
@@ -198,7 +198,7 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     var clusterGatewayAddress = this.multiClusterOracle.GetRandomClusterGateway(remotecluster);
                     var clusterGrainDir = this.grainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
-                    var r = await clusterGrainDir.ProcessActivationRequestBatch(addresses.Select(a => a.Grain).ToArray(), this.siloOptions.ClusterId);
+                    var r = await clusterGrainDir.ProcessActivationRequestBatch(addresses.Select(a => a.Grain).ToArray(), this.siloDetails.ClusterId);
                     batchResponses.Add(r);
                 }
                 catch (Exception e)

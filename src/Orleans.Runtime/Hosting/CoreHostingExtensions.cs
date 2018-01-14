@@ -17,8 +17,24 @@ namespace Orleans.Hosting
         /// Configure the container to use Orleans, including the default silo name & services.
         /// </summary>
         /// <param name="builder">The host builder.</param>
+        /// <param name="configureOptions">The delegate that configures the options.</param>
         /// <returns>The host builder.</returns>
-        public static ISiloHostBuilder ConfigureOrleans(this ISiloHostBuilder builder)
+        public static ISiloHostBuilder ConfigureOrleans(this ISiloHostBuilder builder, Action<SiloOptions> configureOptions)
+        {
+            var optionsConfigurator = configureOptions != null
+                ? ob => ob.Configure(configureOptions)
+                : default(Action<OptionsBuilder<SiloOptions>>);
+
+            return builder.ConfigureOrleans(optionsConfigurator);
+        }
+
+        /// <summary>
+        /// Configure the container to use Orleans, including the default silo name & services.
+        /// </summary>
+        /// <param name="builder">The host builder.</param>
+        /// <param name="configureOptions">The delegate that configures the options using the options builder.</param>
+        /// <returns>The host builder.</returns>
+        public static ISiloHostBuilder ConfigureOrleans(this ISiloHostBuilder builder, Action<OptionsBuilder<SiloOptions>> configureOptions = null)
         {
             builder.ConfigureServices((context, services) =>
             {
@@ -33,6 +49,8 @@ namespace Orleans.Hosting
 
                     context.Properties.Add("OrleansServicesAdded", true);
                 }
+
+                configureOptions?.Invoke(services.AddOptions<SiloOptions>());
             });
             return builder;
         }

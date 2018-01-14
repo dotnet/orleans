@@ -3,7 +3,6 @@ using Orleans.Providers.Streams;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
-using OrleansAWSUtils.Streams;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -12,6 +11,7 @@ using Tester.StreamingTests;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
+using OrleansAWSUtils.Streams;
 
 namespace AWSUtils.Tests.Streaming
 {

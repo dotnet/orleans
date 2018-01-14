@@ -21,7 +21,7 @@ namespace UnitTests.Grains
             if (this.GetPrimaryKeyLong() == -2)
                 throw new ArgumentException("Primary key cannot be -2 for this test case");
 
-            logger = base.GetLogger("StressTestGrain " + base.RuntimeIdentity);
+            logger = this.GetLogger("StressTestGrain " + base.RuntimeIdentity);
             label = this.GetPrimaryKeyLong().ToString();
             logger.Info("OnActivateAsync");
 
@@ -112,7 +112,7 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync()
         {
             label = this.GetPrimaryKeyLong().ToString();
-            logger = base.GetLogger("ReentrantStressTestGrain " + base.Data.Address.ToString());
+            logger = this.GetLogger("ReentrantStressTestGrain " + base.Data.Address.ToString());
             logger.Info("OnActivateAsync");
             return Task.CompletedTask;
         }
@@ -267,7 +267,7 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync()
         {
             label = this.GetPrimaryKeyLong().ToString();
-            logger = base.GetLogger("ReentrantLocalStressTestGrain " + base.Data.Address.ToString());
+            logger = this.GetLogger("ReentrantLocalStressTestGrain " + base.Data.Address.ToString());
             logger.Info("OnActivateAsync");
             return Task.CompletedTask;
         }

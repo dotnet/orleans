@@ -6,7 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.SqlUtils;
+using Orleans.Tests.SqlUtils;
 using TestExtensions;
 using UnitTests.General;
 using Xunit;

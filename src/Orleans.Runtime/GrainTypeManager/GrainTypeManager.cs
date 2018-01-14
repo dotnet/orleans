@@ -37,7 +37,7 @@ namespace Orleans.Runtime
 
         public GrainTypeManager(
             ILocalSiloDetails siloDetails,
-            ApplicationPartManager applicationPartManager,
+            IApplicationPartManager applicationPartManager,
             DefaultPlacementStrategy defaultPlacementStrategy,
             SerializationManager serializationManager,
             MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager,

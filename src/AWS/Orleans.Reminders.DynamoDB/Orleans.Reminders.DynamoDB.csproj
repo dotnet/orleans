@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Reminders.DynamoDB</PackageId>
+    <Title>Microsoft Orleans Reminders DynamoDB</Title>
+    <Description>Microsoft Orleans reminders provider for AWS DynamoDB</Description>
+    <PackageTags>$(PackageTags) AWS DynamoDB</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Orleans.Reminders.DynamoDB</AssemblyName>
+    <RootNamespace>Orleans.Reminders.DynamoDB</RootNamespace>
+    <DefineConstants>$(DefineConstants);REMINDERS_DYNAMODB</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\Storage\DynamoDBStorage.cs" Link="Storage\DynamoDBStorage.cs" />
+    <Compile Include="..\Shared\AWSUtils.cs" Link="AWSUtils.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AWSSDK.DynamoDBv2" Version="$(AWSSDKDynamoDBv2Version)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Storage" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

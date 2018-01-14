@@ -5,7 +5,6 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using AccountTransfer.Interfaces;
-using Orleans.Transactions.Abstractions;
 
 namespace OrleansClient
 {
@@ -49,9 +48,7 @@ namespace OrleansClient
                     var config = ClientConfiguration.LocalhostSilo();
                     client = new ClientBuilder()
                         .UseConfiguration(config)
-                        .AddApplicationPartsFromReferences(typeof(IATMGrain).Assembly)
-                        // this is a bug Microsoft.Orleans.Transactions should not be necessary on the client.
-                        .AddApplicationPartsFromReferences(typeof(ITransactionalStateConfiguration).Assembly)
+                        .ConfigureApplicationParts(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory())
                         .ConfigureLogging(logging => logging.AddConsole())
                         .Build();
 

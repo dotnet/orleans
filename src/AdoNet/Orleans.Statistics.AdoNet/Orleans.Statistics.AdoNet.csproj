@@ -1,0 +1,86 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Statistics.AdoNet</PackageId>
+    <Title>Microsoft Orleans Statistics ADO.NET Providers</Title>
+    <Description>Microsoft Orleans statistics provider for ADO.NET Providers</Description>
+    <PackageTags>$(PackageTags) ADO.NET SQL MySQL PostgreSQL Oracle</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Orleans.Statistics.AdoNet</AssemblyName>
+    <RootNamespace>Orleans.Statistics.AdoNet</RootNamespace>
+    <DefineConstants>$(DefineConstants);STATISTICS_ADONET</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\Storage\AdoNetInvariants.cs" Link="Storage\AdoNetInvariants.cs" />
+    <Compile Include="..\Shared\Storage\DbConnectionFactory.cs" Link="Storage\DbConnectionFactory.cs" />
+    <Compile Include="..\Shared\Storage\DbExtensions.cs" Link="Storage\DbExtensions.cs" />
+    <Compile Include="..\Shared\Storage\DbConstantsStore.cs" Link="Storage\DbConstantsStore.cs" />
+    <Compile Include="..\Shared\Storage\DbStoredQueries.cs" Link="Storage\DbStoredQueries.cs" />
+    <Compile Include="..\Shared\Storage\ICommandInterceptor.cs" Link="Storage\ICommandInterceptor.cs" />
+    <Compile Include="..\Shared\Storage\IRelationalStorage.cs" Link="Storage\IRelationalStorage.cs" />
+    <Compile Include="..\Shared\Storage\NoOpDatabaseCommandInterceptor.cs" Link="Storage\NoOpDatabaseCommandInterceptor.cs" />
+    <Compile Include="..\Shared\Storage\OracleDatabaseCommandInterceptor.cs" Link="Storage\OracleDatabaseCommandInterceptor.cs" />
+    <Compile Include="..\Shared\Storage\OrleansRelationalDownloadStream.cs" Link="Storage\OrleansRelationalDownloadStream.cs" />
+    <Compile Include="..\Shared\Storage\RelationalOrleansQueries.cs" Link="Storage\RelationalOrleansQueries.cs" />
+    <Compile Include="..\Shared\Storage\RelationalStorage.cs" Link="Storage\RelationalStorage.cs" />
+    <Compile Include="..\Shared\Storage\RelationalStorageExtensions.cs" Link="Storage\RelationalStorageExtensions.cs" />
+    <Compile Include="..\Shared\Storage\SqlFormatProvider.cs" Link="Storage\SqlFormatProvider.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Data.Common" Version="$(SystemRuntimeVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Storage\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="MySQL-Statistics.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>true</Pack>
+      <PackagePath>lib\$(TargetFramework)\MySQL\</PackagePath>
+    </None>
+    <None Include="Oracle-Statistics.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>true</Pack>
+      <PackagePath>lib\$(TargetFramework)\Oracle\</PackagePath>
+    </None>
+    <None Include="PostgreSQL-Statistics.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>true</Pack>
+      <PackagePath>lib\$(TargetFramework)\PostgreSQL\</PackagePath>
+    </None>
+    <None Include="SQLServer-Statistics.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>true</Pack>
+      <PackagePath>lib\$(TargetFramework)\SQLServer\</PackagePath>
+    </None>
+    <None Include="..\Shared\MySQL-Main.sql" Link="MySQL-Main.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>true</Pack>
+      <PackagePath>lib\$(TargetFramework)\MySQL\</PackagePath>
+    </None>
+    <None Include="..\Shared\Oracle-Main.sql" Link="Oracle-Main.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>true</Pack>
+      <PackagePath>lib\$(TargetFramework)\Oracle\</PackagePath>
+    </None>
+    <None Include="..\Shared\PostgreSQL-Main.sql" Link="PostgreSQL-Main.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>true</Pack>
+      <PackagePath>lib\$(TargetFramework)\PostgreSQL\</PackagePath>
+    </None>
+    <None Include="..\Shared\SQLServer-Main.sql" Link="SQLServer-Main.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>true</Pack>
+      <PackagePath>lib\$(TargetFramework)\SQLServer\</PackagePath>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Orleans.Core\Orleans.Core.csproj" />
+  </ItemGroup>
+</Project>

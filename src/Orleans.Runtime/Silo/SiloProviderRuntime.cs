@@ -57,11 +57,6 @@ namespace Orleans.Runtime.Providers
             this.combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(this.grainBasedPubSub, tmp);
         }
 
-        public Logger GetLogger(string loggerName)
-        {
-            return new LoggerWrapper(loggerName, this.loggerFactory);
-        }
-
         public SiloAddress ExecutingSiloAddress => this.siloStatusOracle.SiloAddress;
 
         public void RegisterSystemTarget(ISystemTarget target)

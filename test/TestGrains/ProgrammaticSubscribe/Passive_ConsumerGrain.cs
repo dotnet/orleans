@@ -2,6 +2,7 @@
 using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.Streams;
+using Orleans.Streams.Core;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -13,15 +14,15 @@ namespace UnitTests.Grains
     {
         internal Logger logger;
         private List<ICounterObserver> consumerObservers;
-        private List<IExternalStreamSubscriptionHandle> consumerHandles;
+        private List<StreamSubscriptionHandle<IFruit>> consumerHandles;
         private int onAddCalledCount;
         public override Task OnActivateAsync()
         {
-            logger = base.GetLogger(this.GetType().Name + base.IdentityString);
+            logger = this.GetLogger(this.GetType().Name + base.IdentityString);
             logger.Info("OnActivateAsync");
             onAddCalledCount = 0;
             consumerObservers = new List<ICounterObserver>();
-            consumerHandles = new List<IExternalStreamSubscriptionHandle>();
+            consumerHandles = new List<StreamSubscriptionHandle<IFruit>>();
             return Task.CompletedTask;
         }
 
@@ -59,23 +60,13 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public async Task OnSubscribed(StreamSubscriptionHandle<int> handle)
-        {
-            logger.Info("OnAdd");
-            this.onAddCalledCount++;
-            var observer = new CounterObserver<int>(this.logger);
-            var newhandle = new ExternalStreamSubscriptionHandle<int>(await handle.ResumeAsync(observer)) as IExternalStreamSubscriptionHandle;
-            this.consumerHandles.Add(newhandle);
-            this.consumerObservers.Add(observer);
-        }
-
-        public async Task OnSubscribed(StreamSubscriptionHandle<IFruit> handle)
+        public async Task OnSubscribed(IStreamSubscriptionHandleFactory handleFactory)
         {
             logger.Info("OnAdd");
             this.onAddCalledCount++;
             var observer = new CounterObserver<IFruit>(this.logger);
-            var newhandle = new ExternalStreamSubscriptionHandle<IFruit>(await handle.ResumeAsync(observer)) as IExternalStreamSubscriptionHandle;
-            this.consumerHandles.Add(newhandle);
+            var newhandle = handleFactory.Create<IFruit>();
+            this.consumerHandles.Add(await newhandle.ResumeAsync(observer));
             this.consumerObservers.Add(observer);
         }
     }
@@ -83,17 +74,17 @@ namespace UnitTests.Grains
     public class Jerk_ConsumerGrain : Grain, IJerk_ConsumerGrain
     {
         internal Logger logger;
-
         public override Task OnActivateAsync()
         {
-            logger = base.GetLogger("Jerk_ConsumerGrain" + base.IdentityString);
+            logger = this.GetLogger("Jerk_ConsumerGrain" + base.IdentityString);
             logger.Info("OnActivateAsync");
             return Task.CompletedTask;
         }
 
         //Jerk_ConsumerGrai would unsubscrube on any subscription added to it
-        public async Task OnSubscribed(StreamSubscriptionHandle<int> handle)
+        public async Task OnSubscribed(IStreamSubscriptionHandleFactory handleFactory)
         {
+            var handle = handleFactory.Create<int>();
             await handle.UnsubscribeAsync();
         }
     }

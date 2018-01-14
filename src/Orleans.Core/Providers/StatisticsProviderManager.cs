@@ -88,11 +88,6 @@ namespace Orleans.Providers
             }
         }
 
-        public Logger GetLogger(string loggerName)
-        {
-            return new LoggerWrapper(loggerName, this.loggerFactory);
-        }
-
         public Guid ServiceId
         {
             get { return runtime.ServiceId; }

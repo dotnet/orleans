@@ -21,7 +21,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
         private static readonly TimeSpan defaultFirePeriod = TimeSpan.FromMilliseconds(10);
         public override Task OnActivateAsync()
         {
-            logger = base.GetLogger(this.GetType() + base.IdentityString);
+            logger = this.GetLogger(this.GetType() + base.IdentityString);
             logger.Info("OnActivateAsync");
             numProducedItems = 0;
             return Task.CompletedTask;
@@ -104,6 +104,20 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
         protected override Task ProducerOnNextAsync(IAsyncStream<Apple> theProducer)
         {
             return theProducer.OnNextAsync(new Apple(this.numProducedItems));
+        }
+    }
+
+    public class Apple : IFruit
+    {
+        int number;
+        public Apple(int number)
+        {
+            this.number = number;
+        }
+
+        public int GetNumber()
+        {
+            return number;
         }
     }
 }

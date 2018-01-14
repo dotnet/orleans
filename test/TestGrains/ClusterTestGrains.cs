@@ -24,7 +24,7 @@ namespace UnitTests.Grains
         {
             await base.OnActivateAsync();
             string id = this.GetPrimaryKeyLong().ToString();
-            logger = GetLogger(String.Format("{0}-{1}", GetType().Name, id));
+            logger = this.GetLogger(String.Format("{0}-{1}", GetType().Name, id));
             logger.Info("Activate.");
         }
 
@@ -116,7 +116,7 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync()
         {
             string id = this.GetPrimaryKeyLong().ToString();
-            logger = GetLogger(String.Format("{0}-{1}", GetType().Name, id));
+            logger = this.GetLogger(String.Format("{0}-{1}", GetType().Name, id));
             logger.Info("Activate.");
             return Task.CompletedTask;
         }

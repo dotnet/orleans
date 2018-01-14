@@ -311,7 +311,7 @@ namespace Orleans.Runtime
             return Direction != Directions.OneWay && !id.IsSystemTarget && !Constants.IsSystemGrain(id);
         }
 
-        public TransactionInfo TransactionInfo
+        public ITransactionInfo TransactionInfo
         {
             get { return Headers.TransactionInfo; }
             set { Headers.TransactionInfo = value; }
@@ -790,7 +790,7 @@ namespace Orleans.Runtime
             private bool _isNewPlacement;
             private bool _isUsingIfaceVersion;
             private ResponseTypes _result;
-            private TransactionInfo _transactionInfo;
+            private ITransactionInfo _transactionInfo;
             private TimeSpan? _timeToLive;
             private string _debugContext;
             private List<ActivationAddress> _cacheInvalidationHeader;
@@ -986,7 +986,7 @@ namespace Orleans.Runtime
                 }
             }
 
-            public TransactionInfo TransactionInfo
+            public ITransactionInfo TransactionInfo
             {
                 get { return _transactionInfo; }
                 set
@@ -1246,7 +1246,7 @@ namespace Orleans.Runtime
                 }
 
                 if ((headers & Headers.TRANSACTION_INFO) != Headers.NONE)
-                    SerializationManager.SerializeInner(input.TransactionInfo, context, typeof(TransactionInfo));
+                    SerializationManager.SerializeInner(input.TransactionInfo, context, typeof(ITransactionInfo));
             }
 
             [DeserializerMethod]
@@ -1356,7 +1356,7 @@ namespace Orleans.Runtime
                 result.IsTransactionRequired = (headers & Headers.IS_TRANSACTION_REQUIRED) != Headers.NONE;
 
                 if ((headers & Headers.TRANSACTION_INFO) != Headers.NONE)
-                    result.TransactionInfo = SerializationManager.DeserializeInner<TransactionInfo>(context);
+                    result.TransactionInfo = SerializationManager.DeserializeInner<ITransactionInfo>(context);
 
                 return result;
             }

@@ -75,10 +75,6 @@ namespace Orleans.Storage
         /// <see cref="IProvider.Name"/>
         public string Name { get; private set; }
 
-        /// <summary> Logger used by this storage provider instance. </summary>
-        /// <see cref="IStorageProvider.Log"/>
-        public Logger Log { get; private set; }
-
         private ILogger logger;
         /// <summary> Default constructor </summary>
         public AzureTableStorage()
@@ -107,7 +103,6 @@ namespace Orleans.Storage
             var loggerFactory = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>();
             var loggerName = $"{this.GetType().FullName}.{Name}";
             logger = loggerFactory.CreateLogger(loggerName);
-            Log = new LoggerWrapper(logger, loggerName, loggerFactory);
             var initMsg = string.Format("Init: Name={0} ServiceId={1} Table={2} DeleteStateOnClear={3}",
                 Name, serviceId, tableName, isDeleteStateOnClear);
 

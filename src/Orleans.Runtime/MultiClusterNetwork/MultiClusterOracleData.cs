@@ -76,7 +76,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
             }
         }
 
-        public MultiClusterData ApplyDataAndNotify(MultiClusterData data)
+        public IMultiClusterGossipData ApplyDataAndNotify(IMultiClusterGossipData data)
         {
             if (data.IsEmpty)
                 return data;

@@ -30,9 +30,6 @@ namespace Orleans.EventSourcing.StateStorage
         public string Name { get; private set; }
 
         /// <inheritdoc/>
-        public Logger Log { get; private set; }
-
-        /// <inheritdoc/>
         public bool UsesStorageProvider
         {
             get
@@ -54,7 +51,6 @@ namespace Orleans.EventSourcing.StateStorage
             var loggerName = $"{this.GetType().FullName}.{Name}";
             var loggerFactory = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>();
             this.logger = loggerFactory.CreateLogger(loggerName);
-            Log = new LoggerWrapper(logger, loggerName, loggerFactory);
 
             logger.Info("Init");
 

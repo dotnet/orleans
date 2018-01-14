@@ -53,7 +53,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = base.GetLogger();
+            logger = this.GetLogger();
             return Task.CompletedTask;
         }
 

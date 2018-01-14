@@ -53,11 +53,6 @@ namespace Orleans.Storage
         private JsonSerializerSettings jsonSettings;
 
         private CloudBlobContainer container;
-
-        /// <summary> Logger used by this storage provider instance. </summary>
-        /// <see cref="IStorageProvider.Log"/>
-        public Logger Log { get; private set; }
-
         private ILogger logger;
         /// <summary> Name of this storage provider instance. </summary>
         /// <see cref="IProvider.Name"/>
@@ -70,7 +65,6 @@ namespace Orleans.Storage
             var loggerFactory = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>();
             var loggerName = $"{this.GetType().FullName}.{name}";
             this.logger = loggerFactory.CreateLogger(loggerName);
-            Log = new LoggerWrapper(logger, loggerName, loggerFactory);
 
             try
             {

@@ -20,7 +20,7 @@ namespace UnitTests.Grains
         public StreamSubscriptionHandle<int> ConsumerHandle { get; set; }
         public override Task OnActivateAsync()
         {
-            logger = base.GetLogger(this.GetType().Name + base.IdentityString);
+            logger = this.GetLogger(this.GetType().Name + base.IdentityString);
             logger.Info("OnActivateAsync");
             ConsumerHandle = null;
             return Task.CompletedTask;

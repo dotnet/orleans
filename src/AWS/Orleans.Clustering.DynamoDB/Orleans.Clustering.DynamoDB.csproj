@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Clustering.DynamoDB</PackageId>
+    <Title>Microsoft Orleans clustering provider for AWS DynamoDB</Title>
+    <Description>Microsoft Orleans clustering provider backed by AWS DynamoDB</Description>
+    <PackageTags>$(PackageTags) AWS DynamoDB</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Orleans.Clustering.DynamoDB</AssemblyName>
+    <RootNamespace>Orleans.Clustering.DynamoDB</RootNamespace>
+    <DefineConstants>$(DefineConstants);CLUSTERING_DYNAMODB</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\Storage\DynamoDBStorage.cs" Link="Storage\DynamoDBStorage.cs" />
+    <Compile Include="..\Shared\AWSUtils.cs" Link="AWSUtils.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AWSSDK.DynamoDBv2" Version="$(AWSSDKDynamoDBv2Version)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
+    <ProjectReference Include="..\..\OrleansProviders\OrleansProviders.csproj" />
+  </ItemGroup>
+</Project>

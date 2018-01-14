@@ -1,5 +1,5 @@
 ﻿using System.Threading.Tasks;
-using Orleans.SqlUtils;
+using Orleans.Tests.SqlUtils;
 using TestExtensions;
 using Xunit;
 

@@ -3,6 +3,8 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Storage
 {
@@ -52,7 +54,8 @@ namespace Orleans.Storage
 
             string latencyParam = config.Properties[LATENCY_PARAM_STRING];
             latency = latencyParam == null ? DefaultLatency : TimeSpan.Parse(latencyParam);
-            Log.Info("Init: Fixed Store Latency={0}", latency);
+            var logger = providerRuntime.ServiceProvider.GetRequiredService<ILogger<MemoryStorageWithLatency>>();
+            logger.Info("Init: Fixed Store Latency={0}", latency);
 
             mockCallsOnly = config.Properties.ContainsKey(MOCK_CALLS_PARAM_STRING) &&
                 "true".Equals(config.Properties[MOCK_CALLS_PARAM_STRING], StringComparison.OrdinalIgnoreCase);

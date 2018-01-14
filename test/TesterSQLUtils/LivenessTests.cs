@@ -1,5 +1,5 @@
 ﻿using Orleans.Runtime.Configuration;
-using Orleans.SqlUtils;
+using Orleans.Tests.SqlUtils;
 using Orleans.TestingHost;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;

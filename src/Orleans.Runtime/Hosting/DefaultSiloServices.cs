@@ -74,10 +74,9 @@ namespace Orleans.Hosting
             services.TryAddTransient<DynamicClusterConfigDeploymentBalancer>();
             services.TryAddTransient<ClusterConfigDeploymentLeaseBasedBalancer>();
             services.TryAddTransient<ConsistentRingQueueBalancer>();
-            services.TryAddTransient(typeof(IStreamSubscriptionObserver<>), typeof(StreamSubscriptionObserverProxy<>));
+            services.TryAddSingleton<IStreamSubscriptionHandleFactory, StreamSubscriptionHandlerFactory>();
 
             services.TryAddSingleton<ProviderManagerSystemTarget>();
-            services.TryAddSingleton<SiloUnobservedExceptionsHandler>();
             services.TryAddSingleton<StatisticsProviderManager>();
             services.AddFromExisting<IProviderManager, StatisticsProviderManager>();
 
@@ -97,8 +96,6 @@ namespace Orleans.Hosting
             services.AddFromExisting<IProviderManager, BootstrapProviderManager>();
             services.TryAddSingleton<LoadedProviderTypeLoaders>();
             services.AddLogging();
-            //temporary change until runtime moved away from Logger
-            services.TryAddSingleton(typeof(LoggerWrapper<>));
             services.TryAddSingleton<ITimerRegistry, TimerRegistry>();
             services.TryAddSingleton<IReminderRegistry, ReminderRegistry>();
             services.TryAddSingleton<StreamProviderManager>();
@@ -224,7 +221,7 @@ namespace Orleans.Hosting
 
             // Application Parts
             var applicationPartManager = context.GetApplicationPartManager();
-            services.TryAddSingleton<ApplicationPartManager>(applicationPartManager);
+            services.TryAddSingleton<IApplicationPartManager>(applicationPartManager);
             applicationPartManager.AddApplicationPart(new AssemblyPart(typeof(RuntimeVersion).Assembly) {IsFrameworkAssembly = true});
             applicationPartManager.AddApplicationPart(new AssemblyPart(typeof(Silo).Assembly) {IsFrameworkAssembly = true});
             applicationPartManager.AddFeatureProvider(new BuiltInTypesSerializationFeaturePopulator());

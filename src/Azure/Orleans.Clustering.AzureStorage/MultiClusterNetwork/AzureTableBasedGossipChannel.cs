@@ -47,7 +47,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
         #region IGossipChannel
 
-        public async Task Publish(MultiClusterData data)
+        public async Task Publish(IMultiClusterGossipData data)
         {
             logger.Debug("-Publish data:{0}", data);
             // this is (almost) always called with just one item in data to be written back
@@ -73,7 +73,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
             await Task.WhenAll(tasks);
         }
 
-        public async Task<MultiClusterData> Synchronize(MultiClusterData pushed)
+        public async Task<IMultiClusterGossipData> Synchronize(IMultiClusterGossipData pushed)
         {
             logger.Debug("-Synchronize pushed:{0}", pushed);
 

@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Streaming.SQS</PackageId>
+    <Title>Microsoft Orleans Streaming AWS SQS</Title>
+    <Description>Microsoft Orleans streaming provider for AWS SQS</Description>
+    <PackageTags>$(PackageTags) AWS SQS</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Orleans.Streaming.SQS</AssemblyName>
+    <RootNamespace>Orleans.Streaming.SQS</RootNamespace>
+    <DefineConstants>$(DefineConstants);STREAMING_SQS</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\AWSUtils.cs" Link="AWSUtils.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AWSSDK.SQS" Version="$(AWSSDKSQSVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Orleans.Core\Orleans.Core.csproj" />
+    <ProjectReference Include="..\..\OrleansProviders\OrleansProviders.csproj" />
+  </ItemGroup>
+</Project>

@@ -4,7 +4,7 @@ using System.Data.Common;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Orleans.SqlUtils;
+using Orleans.Tests.SqlUtils;
 using Tester.RelationalUtilities;
 
 namespace UnitTests.General
@@ -47,7 +47,7 @@ namespace UnitTests.General
         /// <summary>
         /// The script that creates Orleans schema in the database, usually CreateOrleansTables_xxxx.sql
         /// </summary>
-        protected abstract string SetupSqlScriptFileName { get; }
+        protected abstract string[] SetupSqlScriptFileNames { get; }
 
         /// <summary>
         /// A query template to create a database with a given name.
@@ -109,8 +109,19 @@ namespace UnitTests.General
 
             Console.WriteLine("Creating database tables...");
 
-            var setupScript = File.ReadAllText(testStorage.SetupSqlScriptFileName);
+            var setupScript = String.Empty;
+
+            // Concatenate scripts
+            foreach (var fileName in testStorage.SetupSqlScriptFileNames)
+            {
+                setupScript += File.ReadAllText(fileName);
+
+                // Just in case add a CRLF between files, but they should end in a new line.
+                setupScript += "\r\n";
+            }
+
             await testStorage.ExecuteSetupScript(setupScript, testDatabaseName);
+
             Console.WriteLine("Initializing relational databases done.");
 
             return testStorage;

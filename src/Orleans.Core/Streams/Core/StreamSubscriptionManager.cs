@@ -30,7 +30,7 @@ namespace Orleans.Streams.Core
 
         public async Task RemoveSubscription(string streamProviderName, IStreamIdentity streamId, Guid subscriptionId)
         {
-            await streamPubSub.UnregisterConsumer(GuidId.GetGuidId(subscriptionId), (StreamId)streamId, streamProviderName);
+            await streamPubSub.UnregisterConsumer(GuidId.GetGuidId(subscriptionId), StreamId.GetStreamId(streamId.Guid, streamProviderName, streamId.Namespace), streamProviderName);
         }
 
         public Task<IEnumerable<StreamSubscription>> GetSubscriptions(string streamProviderName, IStreamIdentity streamIdentity)

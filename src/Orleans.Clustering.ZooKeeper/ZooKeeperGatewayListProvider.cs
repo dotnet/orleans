@@ -26,11 +26,12 @@ namespace Orleans.Runtime.Membership
         private string deploymentConnectionString;
         private TimeSpan maxStaleness;
         public ZooKeeperGatewayListProvider(ILogger<ZooKeeperGatewayListProvider> logger, ClientConfiguration clientConfiguration,
-            IOptions<ZooKeeperGatewayListProviderOptions> options)
+            IOptions<ZooKeeperGatewayListProviderOptions> options,
+            IOptions<ClusterClientOptions> clusterClientOptions)
         {
             watcher = new ZooKeeperWatcher(logger);
 
-            deploymentPath = "/" + clientConfiguration.ClusterId;
+            deploymentPath = "/" + clusterClientOptions.Value.ClusterId;
             deploymentConnectionString = options.Value.ConnectionString + deploymentPath;
             maxStaleness = clientConfiguration.GatewayListRefreshPeriod;
         }

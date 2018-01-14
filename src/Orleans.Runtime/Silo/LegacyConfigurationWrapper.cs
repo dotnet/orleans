@@ -14,11 +14,6 @@ namespace Orleans.Runtime
                 "Defaults",
                 () => this.NodeConfig = this.ClusterConfig.GetOrCreateNodeConfigurationForSilo(siloName));
 
-            if (this.NodeConfig.Generation == 0)
-            {
-                this.NodeConfig.Generation = SiloAddress.AllocateNewGeneration();
-            }
-
             this.NodeConfig.InitNodeSettingsFromGlobals(config);
             this.Type = this.NodeConfig.IsPrimaryNode ? Silo.SiloType.Primary : Silo.SiloType.Secondary;
         }

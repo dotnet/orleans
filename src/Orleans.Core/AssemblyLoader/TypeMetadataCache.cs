@@ -23,7 +23,7 @@ namespace Orleans.Runtime
         /// </summary>
         private readonly Dictionary<Type, Type> grainToReferenceMapping = new Dictionary<Type, Type>();
 
-        public TypeMetadataCache(ApplicationPartManager applicationPartManager)
+        public TypeMetadataCache(IApplicationPartManager applicationPartManager)
         {
             var grainInterfaceFeature = applicationPartManager.CreateAndPopulateFeature<GrainInterfaceFeature>();
             foreach (var grain in grainInterfaceFeature.Interfaces)

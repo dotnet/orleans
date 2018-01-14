@@ -11,7 +11,6 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
-using UnitTests.StorageTests;
 using Xunit;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -41,6 +40,7 @@ namespace UnitTests.MembershipTests
         protected readonly string connectionString;
         protected ILoggerFactory loggerFactory;
         protected IOptions<SiloOptions> siloOptions;
+        protected IOptions<ClusterClientOptions> clientOptions;
         protected const string testDatabaseName = "OrleansMembershipTest";//for relational storage
         protected readonly ClientConfiguration clientConfiguration;
         protected MembershipTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment, LoggerFilterOptions filters)
@@ -55,7 +55,8 @@ namespace UnitTests.MembershipTests
 
             fixture.InitializeConnectionStringAccessor(GetConnectionString);
             this.connectionString = fixture.ConnectionString;
-            this.siloOptions = Options.Create(new SiloOptions() { ClusterId = this.clusterId });
+            this.siloOptions = Options.Create(new SiloOptions { ClusterId = this.clusterId });
+            this.clientOptions = Options.Create(new ClusterClientOptions { ClusterId = this.clusterId });
             var adoVariant = GetAdoInvariant();
 
             membershipTable = CreateMembershipTable(logger);
@@ -409,6 +410,8 @@ namespace UnitTests.MembershipTests
         }
 
         private static int generation;
+
+
         // Utility methods
         private static MembershipEntry CreateMembershipEntryForTest()
         {

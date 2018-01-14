@@ -19,7 +19,7 @@ namespace UnitTests.Grains
         {
             EventDelay = 1000;
             Observers = new ObserverSubscriptionManager<ISimpleGrainObserver>();
-            logger = GetLogger(String.Format("{0}-{1}-{2}", typeof(SimpleObserverableGrain).Name, base.IdentityString, base.RuntimeIdentity));
+            logger = this.GetLogger(String.Format("{0}-{1}-{2}", typeof(SimpleObserverableGrain).Name, base.IdentityString, base.RuntimeIdentity));
             logger.Info("Activate.");
             return Task.CompletedTask;
         }

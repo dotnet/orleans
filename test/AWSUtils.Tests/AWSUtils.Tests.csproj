@@ -2,7 +2,12 @@
   <PropertyGroup>
     <RootNamespace>AWSUtils.Tests</RootNamespace>
     <AssemblyName>AWSUtils.Tests</AssemblyName>
+    <DefineConstants>$(DefineConstants);AWSUTILS_TESTS</DefineConstants>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\src\AWS\Shared\AWSUtils.cs" Link="AWSUtils.cs" />
+    <Compile Include="..\..\src\AWS\Shared\Storage\DynamoDBStorage.cs" Link="Storage\DynamoDBStorage.cs" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="FluentAssertions" Version="$(FluentAssertionsVersion)" />
@@ -13,9 +18,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\AWS\Orleans.Clustering.DynamoDB\Orleans.Clustering.DynamoDB.csproj" />
     <ProjectReference Include="..\..\src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\Orleans.CodeGeneration\Orleans.CodeGeneration.csproj" />
-    <ProjectReference Include="..\..\src\OrleansAWSUtils\OrleansAWSUtils.csproj" />
+    <ProjectReference Include="..\..\src\AWS\Orleans.Persistence.DynamoDB\Orleans.Persistence.DynamoDB.csproj" />
+    <ProjectReference Include="..\..\src\AWS\Orleans.Reminders.DynamoDB\Orleans.Reminders.DynamoDB.csproj" />
+    <ProjectReference Include="..\..\src\AWS\Orleans.Streaming.SQS\Orleans.Streaming.SQS.csproj" />
     <ProjectReference Include="..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
     <ProjectReference Include="..\TesterInternal\TesterInternal.csproj" />
     <ProjectReference Include="..\Tester\Tester.csproj" />
@@ -35,5 +43,8 @@
     <None Update="Config_AWS_DynamoDB_Storage.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Storage\" />
   </ItemGroup>
 </Project>

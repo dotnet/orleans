@@ -8,7 +8,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Membership;
 using Orleans.Runtime.MembershipService;
-using Orleans.SqlUtils;
+using Orleans.Tests.SqlUtils;
 using OrleansSQLUtils.Configuration;
 using TestExtensions;
 using UnitTests.General;
@@ -52,7 +52,7 @@ namespace UnitTests.MembershipTests
                 ConnectionString = this.connectionString,
                 AdoInvariant = GetAdoInvariant()
             };
-            return new SqlGatewayListProvider(loggerFactory.CreateLogger<SqlGatewayListProvider>(), this.GrainReferenceConverter, this.clientConfiguration, Options.Create(options));
+            return new SqlGatewayListProvider(loggerFactory.CreateLogger<SqlGatewayListProvider>(), this.GrainReferenceConverter, this.clientConfiguration, Options.Create(options), this.clientOptions);
         }
 
         protected override string GetAdoInvariant()

@@ -31,7 +31,7 @@ namespace Orleans.Transactions.Tests
             await WaitForTransactionCommit(id, this.logMaintenanceInterval + this.storageDelay);
         }
 
-        [SkippableFact]
+        [SkippableFact(Skip = "Intermittent failure, jbragg investigating")]
         public async Task TransactionTimeout()
         {
             long id = this.transactionManager.StartTransaction(TimeSpan.FromTicks(this.logMaintenanceInterval.Ticks / 2));
@@ -105,11 +105,11 @@ namespace Orleans.Transactions.Tests
             OrleansTransactionAbortedException abort;
             Assert.True(this.transactionManager.GetTransactionStatus(id2, out abort) == TransactionStatus.InProgress);
 
-            this.transactionManager.AbortTransaction(id1, new OrleansTransactionAbortedException(id1));
+            this.transactionManager.AbortTransaction(id1, new OrleansTransactionAbortedException(id1.ToString()));
 
             var e = await Assert.ThrowsAsync<OrleansCascadingAbortException>(() => WaitForTransactionCommit(id2, this.logMaintenanceInterval + this.storageDelay));
-            Assert.True(e.TransactionId == id2);
-            Assert.True(e.DependentTransactionId == id1);
+            Assert.True(e.TransactionId == id2.ToString());
+            Assert.True(e.DependentTransactionId == id1.ToString());
         }
 
         private async Task WaitForTransactionCommit(long transactionId, TimeSpan timeout)
@@ -126,7 +126,7 @@ namespace Orleans.Transactions.Tests
                     case TransactionStatus.Aborted:
                         throw e;
                     case TransactionStatus.Unknown:
-                        throw new OrleansTransactionInDoubtException(transactionId);
+                        throw new OrleansTransactionInDoubtException(transactionId.ToString());
                     default:
                         Assert.True(result == TransactionStatus.InProgress);
                         await Task.Delay(logMaintenanceInterval);

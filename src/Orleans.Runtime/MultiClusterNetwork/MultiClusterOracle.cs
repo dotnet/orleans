@@ -33,7 +33,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
         private readonly IInternalGrainFactory grainFactory;
         private MultiClusterConfiguration injectedConfig;
         private readonly ILoggerFactory loggerFactory;
-        public MultiClusterOracle(ILocalSiloDetails siloDetails, MultiClusterGossipChannelFactory channelFactory, ISiloStatusOracle siloStatusOracle, IInternalGrainFactory grainFactory, ILoggerFactory loggerFactory, IOptions<SiloOptions> siloOptions, IOptions<MultiClusterOptions> multiClusterOptions)
+        public MultiClusterOracle(ILocalSiloDetails siloDetails, MultiClusterGossipChannelFactory channelFactory, ISiloStatusOracle siloStatusOracle, IInternalGrainFactory grainFactory, ILoggerFactory loggerFactory, IOptions<MultiClusterOptions> multiClusterOptions)
             : base(Constants.MultiClusterOracleId, siloDetails.SiloAddress, loggerFactory)
         {
             this.loggerFactory = loggerFactory;
@@ -43,7 +43,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
             logger = loggerFactory.CreateLogger<MultiClusterOracle>();
             localData = new MultiClusterOracleData(logger, grainFactory);
-            clusterId = siloOptions.Value.ClusterId;
+            clusterId = siloDetails.ClusterId;
             var multiClusterOptionsSnapshot = multiClusterOptions.Value;
             defaultMultiCluster = multiClusterOptionsSnapshot.DefaultMultiCluster?.ToList();
             random = new SafeRandom();
@@ -454,7 +454,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
             return result;
         }
 
-        private void PublishMyStatusToNewDestinations(MultiClusterData delta)
+        private void PublishMyStatusToNewDestinations(IMultiClusterGossipData delta)
         {
             // for quicker convergence, we publish active local status information
             // immediately when we learn about a new destination
@@ -529,7 +529,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
             // set this flag to request a full gossip (synchronize)
             protected bool doSynchronize = false;
 
-            public void Publish(MultiClusterData data)
+            public void Publish(IMultiClusterGossipData data)
             {
                 // add the data to the data waiting to be published
                 toPublish = toPublish.Merge(data);

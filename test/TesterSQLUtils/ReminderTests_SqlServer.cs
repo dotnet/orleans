@@ -4,7 +4,7 @@ using System;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime.Configuration;
-using Orleans.SqlUtils;
+using Orleans.Tests.SqlUtils;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;

@@ -11,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Newtonsoft.Json;
 using NSubstitute;
+using Orleans;
 using Orleans.Hosting;
 using Orleans.Hosting.ServiceFabric;
 using Orleans.Runtime.Configuration;
@@ -32,7 +33,7 @@ namespace TestServiceFabric
             Dns.GetHostName());
 
         private readonly MockServiceContext serviceContext;
-        private readonly ClusterConfiguration clusterConfig = new ClusterConfiguration { Defaults = { Generation = 864 } };
+        private readonly ClusterConfiguration clusterConfig = new ClusterConfiguration();
 
         public OrleansCommunicationListenerTests()
         {
@@ -70,6 +71,7 @@ namespace TestServiceFabric
 
                     // Our cluster configuration is what feeds the endpoint info, so add it.
                     builder.UseConfiguration(this.clusterConfig);
+                    builder.ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory());
                 });
             
             var result = await listener.OpenAsync(CancellationToken.None);
@@ -78,11 +80,11 @@ namespace TestServiceFabric
             var publishedEndpoints = JsonConvert.DeserializeObject<FabricSiloInfo>(result);
 
             var siloAddress = publishedEndpoints.SiloAddress;
-            siloAddress.Generation.ShouldBeEquivalentTo(864);
+            siloAddress.Generation.Should().NotBe(0);
             siloAddress.Endpoint.Port.ShouldBeEquivalentTo(9082);
 
             var gatewayAddress = publishedEndpoints.GatewayAddress;
-            gatewayAddress.Generation.ShouldBeEquivalentTo(864);
+            gatewayAddress.Generation.Should().Be(0);
             gatewayAddress.Endpoint.Port.ShouldBeEquivalentTo(8888);
 
             await siloHost.ReceivedWithAnyArgs(1).StartAsync(Arg.Is<CancellationToken>(c => !c.IsCancellationRequested));
@@ -134,6 +136,7 @@ namespace TestServiceFabric
 
                     // Our cluster configuration is what feeds the endpoint info, so add it.
                     builder.UseConfiguration(this.clusterConfig);
+                    builder.ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory());
                 });
 
             await listener.OpenAsync(CancellationToken.None);
@@ -168,6 +171,7 @@ namespace TestServiceFabric
 
                     // Our cluster configuration is what feeds the endpoint info, so add it.
                     builder.UseConfiguration(this.clusterConfig);
+                    builder.ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory());
                 });
 
             await listener.OpenAsync(CancellationToken.None);

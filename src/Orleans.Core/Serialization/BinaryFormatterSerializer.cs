@@ -4,6 +4,7 @@ using System.IO;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
+using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
@@ -102,10 +103,14 @@ namespace Orleans.Serialization
         {
             public static readonly SerializationBinder Instance = new DynamicBinder();
 
+            private readonly CachedTypeResolver typeResolver = new CachedTypeResolver();
             private readonly Dictionary<string, Assembly> assemblies = new Dictionary<string, Assembly>();
 
             public override Type BindToType(string assemblyName, string typeName)
             {
+                var fullName = !string.IsNullOrWhiteSpace(assemblyName) ? typeName + ',' + assemblyName : typeName;
+                if (typeResolver.TryResolveType(fullName, out var type)) return type;
+
                 lock (this.assemblies)
                 {
                     Assembly result;

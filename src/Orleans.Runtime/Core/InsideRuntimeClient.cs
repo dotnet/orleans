@@ -52,8 +52,9 @@ namespace Orleans.Runtime
         private readonly MessageFactory messageFactory;
         private readonly Lazy<ITransactionAgent> transactionAgent;
         private IGrainReferenceRuntime grainReferenceRuntime;
-        private IGrainCancellationTokenRuntime cancellationTokenRuntime;
-        
+        private readonly IGrainCancellationTokenRuntime cancellationTokenRuntime;
+        private readonly SchedulingOptions schedulingOptions;
+
         public InsideRuntimeClient(
             ILocalSiloDetails siloDetails,
             ClusterConfiguration config,
@@ -66,7 +67,8 @@ namespace Orleans.Runtime
             Factory<ITransactionAgent> transactionAgent,
             ILoggerFactory loggerFactory,
             IOptions<SiloMessagingOptions> messagingOptions,
-            IGrainCancellationTokenRuntime cancellationTokenRuntime)
+            IGrainCancellationTokenRuntime cancellationTokenRuntime,
+            IOptions<SchedulingOptions> schedulerOptions)
         {
             this.ServiceProvider = serviceProvider;
             this.SerializationManager = serializationManager;
@@ -89,6 +91,7 @@ namespace Orleans.Runtime
             this.callbackDataLogger = loggerFactory.CreateLogger<CallbackData>();
             this.timerLogger = loggerFactory.CreateLogger<SafeTimer>();
             this.cancellationTokenRuntime = cancellationTokenRuntime;
+            this.schedulingOptions = schedulerOptions.Value;
         }
         
         public IServiceProvider ServiceProvider { get; }
@@ -312,7 +315,7 @@ namespace Orleans.Runtime
                 }
 
                 RequestContextExtensions.Import(message.RequestContextData);
-                if (Config.Globals.PerformDeadlockDetection && !message.TargetGrain.IsSystemTarget)
+                if (schedulingOptions.PerformDeadlockDetection && !message.TargetGrain.IsSystemTarget)
                 {
                     UpdateDeadlockInfoInRequestContext(new RequestInvocationHistory(message.TargetGrain, message.TargetActivation, message.DebugContext));
                     // RequestContext is automatically saved in the msg upon send and propagated to the next hop
@@ -320,7 +323,7 @@ namespace Orleans.Runtime
                 }
 
                 bool startNewTransaction = false;
-                TransactionInfo transactionInfo = message.TransactionInfo;
+                ITransactionInfo transactionInfo = message.TransactionInfo;
 
                 if (message.IsTransactionRequired && transactionInfo == null)
                 {
@@ -388,7 +391,7 @@ namespace Orleans.Runtime
                         if (startNewTransaction)
                         {
                             var abortException = (exc1 as OrleansTransactionAbortedException) ?? 
-                                new OrleansTransactionAbortedException(transactionInfo.TransactionId, exc1);
+                                new OrleansTransactionAbortedException(transactionInfo.TransactionId.ToString(), exc1);
                             this.transactionAgent.Value.Abort(transactionInfo, abortException);
                             exc1 = abortException;
                         }
@@ -419,9 +422,9 @@ namespace Orleans.Runtime
                 }
 
                 transactionInfo = TransactionContext.GetTransactionInfo();
-                if (transactionInfo != null && transactionInfo.ReconcilePending() > 0)
+                if (transactionInfo != null && ! transactionInfo.ReconcilePending(out var numberOrphans))
                 {
-                    var abortException = new OrleansOrphanCallException(transactionInfo.TransactionId, transactionInfo.PendingCalls);
+                    var abortException = new OrleansOrphanCallException(transactionInfo.TransactionId.ToString(), numberOrphans);
                     // Can't exit before the transaction completes.
                     TransactionContext.GetTransactionInfo().IsAborted = true;
                     if (startNewTransaction)
@@ -465,7 +468,7 @@ namespace Orleans.Runtime
                         // Must abort the transaction on exceptions
                         TransactionContext.GetTransactionInfo().IsAborted = true;
                         var abortException = (exc2 as OrleansTransactionAbortedException) ??
-                            new OrleansTransactionAbortedException(TransactionContext.GetTransactionInfo().TransactionId, exc2);
+                            new OrleansTransactionAbortedException(TransactionContext.GetTransactionInfo().TransactionId.ToString(), exc2);
                         this.transactionAgent.Value.Abort(TransactionContext.GetTransactionInfo(), abortException);
                     }
                 }
@@ -722,8 +725,11 @@ namespace Orleans.Runtime
 
         private Task OnRuntimeInitializeStart(CancellationToken tc)
         {
+            var stopWatch = Stopwatch.StartNew();
             typeManager.Start();
             GrainTypeResolver = typeManager.GetTypeCodeMap();
+            stopWatch.Stop();
+            this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Start InsideRuntimeClient took {stopWatch.ElapsedMilliseconds} Milliseconds");
             return Task.CompletedTask;
         }
 

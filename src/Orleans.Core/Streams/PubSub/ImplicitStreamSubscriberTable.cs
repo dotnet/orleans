@@ -66,7 +66,7 @@ namespace Orleans.Streams
         /// <exception cref="System.InvalidOperationException">Internal invariant violation.</exception>
         internal IDictionary<Guid, IStreamConsumerExtension> GetImplicitSubscribers(StreamId streamId, IInternalGrainFactory grainFactory)
         {
-            if (string.IsNullOrWhiteSpace(streamId.Namespace))
+            if (!IsImplicitSubscribeEligibleNameSpace(streamId.Namespace))
             {
                 throw new ArgumentException("The stream ID doesn't have an associated namespace.", nameof(streamId));
             }
@@ -173,9 +173,14 @@ namespace Orleans.Streams
             return SubscriptionMarker.MarkAsImplictSubscriptionId(new Guid(grainIdTypeCode, s1, s2, tail.ToArray()));
         }
 
+        internal static bool IsImplicitSubscribeEligibleNameSpace(string streamNameSpace)
+        {
+            return !string.IsNullOrWhiteSpace(streamNameSpace);
+        }
+
         private bool HasImplicitSubscription(string streamNamespace, int grainIdTypeCode)
         {
-            if (String.IsNullOrWhiteSpace(streamNamespace))
+            if (!IsImplicitSubscribeEligibleNameSpace(streamNamespace))
             {
                 return false;
             }

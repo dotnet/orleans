@@ -32,7 +32,7 @@ namespace Orleans.Runtime
 
         protected virtual bool TryPerformUncachedTypeResolution(string name, out Type type)
         {
-            IEnumerable<Assembly> assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
             if (!this.TryPerformUncachedTypeResolution(name, out type, assemblies)) return false;
 
             if (type.Assembly.ReflectionOnly) throw new InvalidOperationException(string.Format("Type resolution for {0} yielded reflection-only type.", name));
@@ -52,19 +52,12 @@ namespace Orleans.Runtime
             if (!ReferenceEquals(entry, type)) throw new InvalidOperationException("inconsistent type name association");
         }
 
-        private bool TryPerformUncachedTypeResolution(string fullName, out Type type, IEnumerable<Assembly> assemblies)
+        private bool TryPerformUncachedTypeResolution(string fullName, out Type type, Assembly[] assemblies)
         {
             if (null == assemblies) throw new ArgumentNullException("assemblies");
             if (string.IsNullOrWhiteSpace(fullName)) throw new ArgumentException("A type name must not be null nor consist of only whitespace.", "fullName");
-
-            foreach (var assembly in assemblies)
-            {
-                type = assembly.GetType(fullName, false);
-                if (type != null)
-                {
-                    return true;
-                }
-            }
+            
+            if (TryResolveFromAllAssemblies(fullName, out type, assemblies)) return true;
 
             type = Type.GetType(fullName, throwOnError: false) ?? Type.GetType(
                        fullName,
@@ -87,8 +80,10 @@ namespace Orleans.Runtime
 
                 if (this.assemblyCache.TryGetValue(fullAssemblyName, out result)) return result;
 
-                result = Assembly.Load(assemblyName);
+                result = Assembly.Load(RemapAssemblyName(assemblyName));
                 var resultName = result.GetName();
+                this.assemblyCache[assemblyName.Name] = result;
+                this.assemblyCache[assemblyName.FullName] = result;
                 this.assemblyCache[resultName.Name] = result;
                 this.assemblyCache[resultName.FullName] = result;
                 return result;
@@ -96,7 +91,57 @@ namespace Orleans.Runtime
 
             Type ResolveType(Assembly asm, string name, bool ignoreCase)
             {
+                if (TryResolveFromAllAssemblies(name, out var result, assemblies)) return result;
                 return asm?.GetType(name, throwOnError: false, ignoreCase: ignoreCase) ?? Type.GetType(name, throwOnError: false, ignoreCase: ignoreCase);
+            }
+        }
+
+        private static bool TryResolveFromAllAssemblies(string fullName, out Type type, Assembly[] assemblies)
+        {
+            foreach (var assembly in assemblies)
+            {
+                type = assembly.GetType(fullName, false);
+                if (type != null)
+                {
+                    return true;
+                }
+            }
+
+            // For types in an Orleans namespace, allow remapping the assembly to another assembly.
+            // This is in order to support migration from version 1.x to 2.x, during which assemblies
+            // were split and renamed.
+            if (fullName.StartsWith("Orleans."))
+            {
+                var asmSeparator = fullName.LastIndexOf(',');
+                if (asmSeparator > -1)
+                {
+                    var shortName = fullName.Substring(0, asmSeparator).Trim();
+                    foreach (var assembly in assemblies)
+                    {
+                        type = assembly.GetType(shortName, false);
+                        if (type != null)
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            type = null;
+
+            return false;
+        }
+
+        AssemblyName RemapAssemblyName(AssemblyName assemblyName)
+        {
+            switch (assemblyName.Name)
+            {
+                case "Orleans":
+                    return new AssemblyName("Orleans.Core");
+                case "OrleansRuntime":
+                    return new AssemblyName("Orleans.Runtime");
+                default:
+                    return assemblyName;
             }
         }
     }
