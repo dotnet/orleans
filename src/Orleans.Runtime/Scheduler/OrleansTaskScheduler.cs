@@ -69,15 +69,15 @@ namespace Orleans.Runtime.Scheduler
             TurnWarningLengthThreshold = turnWarningLengthThreshold;
             workgroupDirectory = new ConcurrentDictionary<ISchedulingContext, WorkItemGroup>();
 
-            const int maxSystemThreads = 1;
+            const int maxSystemThreads = 2;
             maximumConcurrencyLevel = maxActiveThreads + maxSystemThreads;
 
-            OrleansSchedulerAsynchAgent CreateSchedulerAsynchAgent(string agentName, bool drainAfterCancel)
+            OrleansSchedulerAsynchAgent CreateSchedulerAsynchAgent(string agentName, bool drainAfterCancel, int degreeOfParallelism)
             {
                 return new OrleansSchedulerAsynchAgent(
                     agentName,
                     executorService,
-                    maxActiveThreads,
+                    degreeOfParallelism,
                     delayWarningThreshold,
                     turnWarningLengthThreshold,
                     this,
@@ -85,8 +85,8 @@ namespace Orleans.Runtime.Scheduler
                     loggerFactory);
             }
 
-            mainAgent = CreateSchedulerAsynchAgent("Scheduler.LevelOne.MainQueue", false);
-            systemAgent = CreateSchedulerAsynchAgent("Scheduler.LevelOne.SystemQueue", true);
+            mainAgent = CreateSchedulerAsynchAgent("Scheduler.LevelOne.MainQueue", false, maxActiveThreads);
+            systemAgent = CreateSchedulerAsynchAgent("Scheduler.LevelOne.SystemQueue", true, maxSystemThreads);
 
             this.taskWorkItemLogger = loggerFactory.CreateLogger<TaskWorkItem>();
             logger.Info("Starting OrleansTaskScheduler with {0} Max Active application Threads and 1 system thread.", maxActiveThreads);
