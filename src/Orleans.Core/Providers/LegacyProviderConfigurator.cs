@@ -100,7 +100,7 @@ namespace Orleans.Providers
 
             public ProviderLifecycleParticipant(IProviderConfiguration config, IServiceProvider services, ILoggerFactory loggerFactory, int defaultInitStage, int defaultStartStage)
             {
-                this.logger = loggerFactory.CreateLogger($"{config.Type}-{config.Name}");
+                this.logger = loggerFactory.CreateLogger(config.Type);
                 this.services = services;
                 this.config = config;
                 this.defaultInitStage = defaultInitStage;
@@ -122,18 +122,18 @@ namespace Orleans.Providers
                 var stopWatch = Stopwatch.StartNew();
                 IProvider provider = this.services.GetServiceByName<TService>(this.config.Name) as IProvider;
                 IProviderRuntime runtime = this.services.GetRequiredService<IProviderRuntime>();
-                await schedual(() => provider.Init(this.config.Name, runtime, this.config));
+                await Schedule(() => provider.Init(this.config.Name, runtime, this.config));
                 stopWatch.Stop();
-                this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Initializing in stage {this.initStage} took {stopWatch.ElapsedMilliseconds} Milliseconds");
+                this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Initializing provider {this.config.Name} of type {this.config.Type} in stage {this.initStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");
             }
 
             private async Task Close(CancellationToken ct)
             {
                 var stopWatch = Stopwatch.StartNew();
                 IProvider provider = this.services.GetServiceByName<TService>(this.config.Name) as IProvider;
-                await schedual(() => provider.Close());
+                await Schedule(() => provider.Close());
                 stopWatch.Stop();
-                this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Closing in stage {this.initStage} took {stopWatch.ElapsedMilliseconds} Milliseconds");
+                this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Closing provider {this.config.Name} of type {this.config.Type} in stage {this.initStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");
             }
 
             private async Task Start(CancellationToken ct)
@@ -141,12 +141,12 @@ namespace Orleans.Providers
                 var stopWatch = Stopwatch.StartNew();
                 IStreamProviderImpl provider = this.services.GetServiceByName<TService>(this.config.Name) as IStreamProviderImpl;
                 if (provider == null) return;
-                await schedual(() => provider.Start());
+                await Schedule(() => provider.Start());
                 stopWatch.Stop();
-                this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Starting in stage {this.startStage} took {stopWatch.ElapsedMilliseconds} Milliseconds");
+                this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Starting provider {this.config.Name} of type {this.config.Type} in stage {this.startStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");
             }
 
-            private Task schedual(Func<Task> taskFunc)
+            private Task Schedule(Func<Task> taskFunc)
             {
                 return this.schedule != null
                     ? this.schedule.Invoke(taskFunc)
