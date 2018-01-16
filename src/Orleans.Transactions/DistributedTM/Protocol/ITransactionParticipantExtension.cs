@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 
-namespace Orleans.Transactions
+namespace Orleans.Transactions.DistributedTM
 {
     /// <summary>
     /// This is a grain extension interface that allows a grain to be a participant in a transaction.

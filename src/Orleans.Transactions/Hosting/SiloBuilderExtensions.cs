@@ -68,5 +68,27 @@ namespace Orleans.Hosting
             return services;
         }
 
+
+        /// <summary>
+        /// Configure cluster to use the distributed TM algorithm
+        /// </summary>
+        public static ISiloHostBuilder UseDistributedTM(this ISiloHostBuilder builder)
+        {
+            return builder.ConfigureServices(services => services.UseDistributedTM());
+        }
+
+        /// <summary>
+        /// Configure cluster to use the distributed TM algorithm
+        /// </summary>
+        public static IServiceCollection UseDistributedTM(this IServiceCollection services)
+        {
+            services.TryAddSingleton<ITransactionAgent, Transactions.DistributedTM.TransactionAgent>();
+            services.TryAddSingleton(typeof(ITransactionDataCopier<>), typeof(DefaultTransactionDataCopier<>));
+            services.AddSingleton<IAttributeToFactoryMapper<TransactionalStateAttribute>, Orleans.Transactions.DistributedTM.TransactionalStateAttributeMapper>();
+            services.TryAddTransient<Orleans.Transactions.DistributedTM.ITransactionalStateFactory, Orleans.Transactions.DistributedTM.TransactionalStateFactory>();
+            services.TryAddTransient<Orleans.Transactions.DistributedTM.INamedTransactionalStateStorageFactory, Orleans.Transactions.DistributedTM.NamedTransactionalStateStorageFactory>();
+            services.AddTransient(typeof(ITransactionalState<>), typeof(TransactionalState<>));
+            return services;
+        }
     }
 }

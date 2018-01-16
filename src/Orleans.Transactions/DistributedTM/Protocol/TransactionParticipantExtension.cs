@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace Orleans.Transactions
+namespace Orleans.Transactions.DistributedTM
 {
     public class TransactionParticipantExtension : ITransactionParticipantExtension
     {

@@ -70,13 +70,6 @@ namespace Orleans.Transactions
             // Meant to help humans when debugging or reading traces
             return resource.GetHashCode().ToString("x4").Substring(0,4);
         }
-
-        public static string ToShortString(this ITransactionParticipant participant)
-        {
-            // Meant to help humans when debugging or reading traces
-            return participant.GetHashCode().ToString("x4").Substring(0, 4);
-        }
-
     }
 
 }
