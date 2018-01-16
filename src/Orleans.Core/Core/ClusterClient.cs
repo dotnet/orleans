@@ -46,14 +46,14 @@ namespace Orleans
             //set PropagateActivityId flag from node cofnig
             RequestContext.PropagateActivityId = configuration.PropagateActivityId;
 
-            // register all lifecycles
+            // register all lifecycle participants
             IEnumerable<ILifecycleParticipant<IClusterClientLifecycle>> lifecycleParticipants = this.ServiceProvider.GetServices<ILifecycleParticipant<IClusterClientLifecycle>>();
             foreach (ILifecycleParticipant<IClusterClientLifecycle> participant in lifecycleParticipants)
             {
                 participant.Participate(clusterClientLifecycle);
             }
 
-            // register all named lifecycles
+            // register all named lifecycle participants
             IEnumerable<IKeyedServiceCollection<string, ILifecycleParticipant<IClusterClientLifecycle>>> namedLifecycleParticipantCollections = this.ServiceProvider.GetServices<IKeyedServiceCollection<string, ILifecycleParticipant<IClusterClientLifecycle>>>();
             foreach (ILifecycleParticipant<IClusterClientLifecycle> participant in namedLifecycleParticipantCollections
                 .SelectMany(c => c.GetServices(this.ServiceProvider)
@@ -103,9 +103,10 @@ namespace Orleans
                 throw new ArgumentNullException(nameof(name));
             }
 
-            return this.runtimeClient.ServiceProvider.GetServiceByName<IStreamProvider>(name);
+            return this.runtimeClient.ServiceProvider.GetServiceByName<IStreamProvider>(name)
+                ?? throw new KeyNotFoundException(name);
         }
-        
+
         /// <inheritdoc />
         public async Task Connect()
         {

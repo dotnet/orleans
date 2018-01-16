@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
-using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Streams.Core;
@@ -40,12 +39,9 @@ namespace Orleans.Streams
         [NonSerialized]
         private readonly IStreamSubscriptionObserver streamSubscriptionObserver;
 
-        [NonSerialized]
-        private IStreamProviderManager providerManager;
-        internal StreamConsumerExtension(IStreamProviderRuntime providerRt, IStreamSubscriptionObserver streamSubscriptionObserver = null, IStreamProviderManager providerManager = null)
+        internal StreamConsumerExtension(IStreamProviderRuntime providerRt, IStreamSubscriptionObserver streamSubscriptionObserver = null)
         {
             this.streamSubscriptionObserver = streamSubscriptionObserver;
-            this.providerManager = providerManager;
             providerRuntime = providerRt;
             allStreamObservers = new ConcurrentDictionary<GuidId, IStreamSubscriptionHandle>();
             logger = providerRt.ServiceProvider.GetRequiredService<ILogger<StreamConsumerExtension>>();
@@ -98,12 +94,16 @@ namespace Orleans.Streams
             }
             else if(this.streamSubscriptionObserver != null)
             {
-                var subscriptionHandlerFactory = new StreamSubscriptionHandlerFactory(this.providerManager, streamId, streamId.ProviderName, subscriptionId);
-                await this.streamSubscriptionObserver.OnSubscribed(subscriptionHandlerFactory);
-                //check if an observer were attached after handling the new subscription, deliver on it if attached
-                if (allStreamObservers.TryGetValue(subscriptionId, out observer))
+                var streamProvider = this.providerRuntime.ServiceProvider.GetServiceByName<IStreamProvider>(streamId.ProviderName);
+                if(streamProvider != null)
                 {
-                    return await observer.DeliverItem(item, currentToken, handshakeToken);
+                    var subscriptionHandlerFactory = new StreamSubscriptionHandlerFactory(streamProvider, streamId, streamId.ProviderName, subscriptionId);
+                    await this.streamSubscriptionObserver.OnSubscribed(subscriptionHandlerFactory);
+                    //check if an observer were attached after handling the new subscription, deliver on it if attached
+                    if (allStreamObservers.TryGetValue(subscriptionId, out observer))
+                    {
+                        return await observer.DeliverItem(item, currentToken, handshakeToken);
+                    }
                 }
             }
 
@@ -125,12 +125,16 @@ namespace Orleans.Streams
             }
             else if(this.streamSubscriptionObserver != null)
             {
-                var subscriptionHandlerFactory = new StreamSubscriptionHandlerFactory(this.providerManager, streamId, streamId.ProviderName, subscriptionId);
-                await this.streamSubscriptionObserver.OnSubscribed(subscriptionHandlerFactory);
-                // check if an observer were attached after handling the new subscription, deliver on it if attached
-                if (allStreamObservers.TryGetValue(subscriptionId, out observer))
+                var streamProvider = this.providerRuntime.ServiceProvider.GetServiceByName<IStreamProvider>(streamId.ProviderName);
+                if (streamProvider != null)
                 {
-                    return await observer.DeliverBatch(batch.Value, handshakeToken);
+                    var subscriptionHandlerFactory = new StreamSubscriptionHandlerFactory(streamProvider, streamId, streamId.ProviderName, subscriptionId);
+                    await this.streamSubscriptionObserver.OnSubscribed(subscriptionHandlerFactory);
+                    // check if an observer were attached after handling the new subscription, deliver on it if attached
+                    if (allStreamObservers.TryGetValue(subscriptionId, out observer))
+                    {
+                        return await observer.DeliverBatch(batch.Value, handshakeToken);
+                    }
                 }
             }
 

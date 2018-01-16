@@ -50,14 +50,7 @@ namespace Orleans.Runtime.TestHooks
 
         public Task<bool> HasStreamProvider(string providerName)
         {
-            try
-            {
-                return Task.FromResult(this.host.Services.GetServiceByName<IStreamProvider>(providerName) != null);
-            }
-            catch (KeyNotFoundException)
-            {
-                return Task.FromResult(false);
-            }
+            return Task.FromResult(this.host.Services.GetServiceByName<IStreamProvider>(providerName) != null);
         }
 
         public Task<ICollection<string>> GetStorageProviderNames()
@@ -72,20 +65,18 @@ namespace Orleans.Runtime.TestHooks
             return Task.FromResult<ICollection<string>>(streamProviderCollection.GetServices(this.host.Services).Select(keyedService => keyedService.Key).ToArray());
         }
 
-        public Task<ICollection<string>> GetAllSiloProviderNames()
+        public async Task<ICollection<string>> GetAllSiloProviderNames()
         {
             List<string> allProviders = new List<string>();
 
-            var storageProviderCollection = this.host.Services.GetRequiredService<IKeyedServiceCollection<string,IStorageProvider>>();
-            allProviders.AddRange(storageProviderCollection.GetServices(this.host.Services).Select(keyedService => keyedService.Key));
+            allProviders.AddRange(await GetStorageProviderNames());
 
-            var streamProviderCollection = this.host.Services.GetRequiredService<IKeyedServiceCollection<string, IStreamProvider>>(); ;
-            allProviders.AddRange(streamProviderCollection.GetServices(this.host.Services).Select(keyedService => keyedService.Key));
+            allProviders.AddRange(await GetStorageProviderNames());
 
             var statisticsPublisherCollection = this.host.Services.GetRequiredService<IKeyedServiceCollection<string, IStatisticsPublisher>>(); ;
             allProviders.AddRange(statisticsPublisherCollection.GetServices(this.host.Services).Select(keyedService => keyedService.Key));
 
-            return Task.FromResult<ICollection<string>>(allProviders);
+            return allProviders;
         }
 
         public Task<int> UnregisterGrainForTesting(GrainId grain) => Task.FromResult(this.host.Services.GetRequiredService<Catalog>().UnregisterGrainForTesting(grain));

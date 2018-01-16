@@ -120,7 +120,7 @@ namespace Orleans.Hosting
                 options.PerformDeadlockDetection = config.PerformDeadlockDetection;
             });
 
-            services.TryAddSingleton<LegacyProviderConfigurator.QueueTask>(sp =>
+            services.TryAddSingleton<LegacyProviderConfigurator.ScheduleTask>(sp =>
             {
                 OrleansTaskScheduler scheduler = sp.GetRequiredService<OrleansTaskScheduler>();
                 SystemTarget fallbackSystemTarget = sp.GetRequiredService<FallbackSystemTarget>();

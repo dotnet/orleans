@@ -18,8 +18,8 @@ namespace Orleans.Providers
     {
         public const string InitStageName = "ProviderInitStage";
         public const string StartStageName = "ProviderStartStage";
-        internal const string SchedulingContextName = "Fallback";
-        internal delegate Task QueueTask(Func<Task> taskFunc);
+        // Optional task scheduling behavior, may not always be set.
+        internal delegate Task ScheduleTask(Func<Task> taskFunc);
     }
 
     internal static class LegacyProviderConfigurator<TLifeCycle>
@@ -92,7 +92,7 @@ namespace Orleans.Providers
             private readonly ILogger logger;
             private readonly IProviderConfiguration config;
             private readonly IServiceProvider services;
-            private readonly LegacyProviderConfigurator.QueueTask schedualer;
+            private readonly LegacyProviderConfigurator.ScheduleTask schedule;
             private readonly int defaultInitStage;
             private int initStage;
             private readonly int defaultStartStage;
@@ -105,7 +105,7 @@ namespace Orleans.Providers
                 this.config = config;
                 this.defaultInitStage = defaultInitStage;
                 this.defaultStartStage = defaultStartStage;
-                this.schedualer = services.GetService<LegacyProviderConfigurator.QueueTask>();
+                this.schedule = services.GetService<LegacyProviderConfigurator.ScheduleTask>();
             }
 
             public virtual void Participate(TLifeCycle lifecycle)
@@ -148,8 +148,8 @@ namespace Orleans.Providers
 
             private Task schedual(Func<Task> taskFunc)
             {
-                return this.schedualer != null
-                    ? this.schedualer.Invoke(taskFunc)
+                return this.schedule != null
+                    ? this.schedule.Invoke(taskFunc)
                     : taskFunc();
             }
         }

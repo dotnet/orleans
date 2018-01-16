@@ -243,13 +243,13 @@ namespace Orleans.Runtime
 
             var fullSiloLifecycle = this.Services.GetRequiredService<SiloLifecycle>();
             this.siloLifecycle = fullSiloLifecycle;
-            // register all lifecycles
+            // register all lifecycle participants
             IEnumerable<ILifecycleParticipant<ISiloLifecycle>> lifecycleParticipants = this.Services.GetServices<ILifecycleParticipant<ISiloLifecycle>>();
             foreach(ILifecycleParticipant<ISiloLifecycle> participant in lifecycleParticipants)
             {
                 participant.Participate(fullSiloLifecycle);
             }
-            // register all named lifecycles
+            // register all named lifecycle participants
             IEnumerable<IKeyedServiceCollection<string, ILifecycleParticipant<ISiloLifecycle>>> namedLifecycleParticipantCollections = this.Services.GetServices<IKeyedServiceCollection<string,ILifecycleParticipant<ISiloLifecycle>>>();
             foreach (ILifecycleParticipant<ISiloLifecycle> participant in namedLifecycleParticipantCollections
                 .SelectMany(c => c.GetServices(this.Services)

@@ -49,7 +49,6 @@ namespace Orleans.Providers
         /// </summary>
         string Name { get; }
 
-        void AddChildConfiguration(IProviderConfiguration config);
         /// <summary>
         /// Configuration properties for this provider instance, as name-value pairs.
         /// </summary>

@@ -78,7 +78,7 @@ namespace UnitTests.StorageTests.Relational
                             properties["DataConnectionString"] = Storage.Storage.ConnectionString;
                             properties["AdoInvariant"] = storageInvariant;
 
-                            var config = new ProviderConfiguration(properties, null);
+                            var config = new ProviderConfiguration(properties);
                             var storageProvider = new AdoNetStorageProvider();
                             await storageProvider.Init(storageInvariant + "_StorageProvider", DefaultProviderRuntime, config);
 

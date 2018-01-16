@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Reflection;
 using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -19,7 +18,6 @@ using Orleans.Serialization;
 using Orleans.Streams.Core;
 using Orleans.Streams;
 using System.Runtime.ExceptionServices;
-using System.Runtime.InteropServices.ComTypes;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -736,12 +734,7 @@ namespace Orleans.Runtime
             var invoker = InsideRuntimeClient.TryGetExtensionInvoker(this.GrainTypeManager, typeof(IStreamConsumerExtension));
             if (invoker == null)
                 throw new InvalidOperationException("Extension method invoker was not generated for an extension interface");
-<<<<<<< HEAD
-            var subscriptionChangeHandler = new StreamSubscriptionChangeHandler(this.serviceProvider, observerProxyMap);
-            var handler = new StreamConsumerExtension(this.providerRuntime, subscriptionChangeHandler);
-=======
-            var handler = new StreamConsumerExtension(this.providerRuntime, observer, this.providerManager);
->>>>>>> af7875354bfc2cbaae2835bf2cdd7acd98e3e6b2
+            var handler = new StreamConsumerExtension(this.providerRuntime, observer);
             result.TryAddExtension(invoker, handler);
         }
 

@@ -23,7 +23,7 @@ namespace Orleans.Runtime.Versions
         {
             this.grainFactory = grainFactory;
             this.clusterId = siloDetails.ClusterId;
-            this.IsEnabled = services.GetServices<IKeyedService<string,IStorageProvider>>().Any(s => s.Equals(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
+            this.IsEnabled = services.GetService<IStorageProvider>() != null;
         }
 
         public async Task SetCompatibilityStrategy(CompatibilityStrategy strategy)

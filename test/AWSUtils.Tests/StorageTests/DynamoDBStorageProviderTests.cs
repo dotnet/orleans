@@ -28,7 +28,7 @@ namespace AWSUtils.Tests.StorageTests
 
             var properties = new Dictionary<string, string>();
             properties["DataConnectionString"] = $"Service={AWSTestConstants.Service}";
-            var config = new ProviderConfiguration(properties, null);
+            var config = new ProviderConfiguration(properties);
             var provider = new DynamoDBStorageProvider();
             provider.Init("DynamoDBStorageProviderTests", DefaultProviderRuntime, config).Wait();
             PersistenceStorageTests = new CommonStorageTests(fixture.InternalGrainFactory, provider);

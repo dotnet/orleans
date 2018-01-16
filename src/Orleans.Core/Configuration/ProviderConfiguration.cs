@@ -15,17 +15,9 @@ namespace Orleans.Runtime.Configuration
     public class ProviderConfiguration : IProviderConfiguration
     {
         private IDictionary<string, string> properties;
-        private readonly IList<ProviderConfiguration> childConfigurations = new List<ProviderConfiguration>();
-        [NonSerialized]
-        private IList<IProvider> childProviders;
 
         public string Type { get; private set; }
         public string Name { get; private set; }
-
-        public void AddChildConfiguration(IProviderConfiguration config)
-        {
-            childConfigurations.Add(config as ProviderConfiguration);
-        }
 
         private ReadOnlyDictionary<string, string> readonlyCopyOfProperties;
         /// <summary>
@@ -56,10 +48,9 @@ namespace Orleans.Runtime.Configuration
         }
 
         // for testing purposes
-        internal ProviderConfiguration(IDictionary<string, string> properties, IList<IProvider> childProviders)
+        internal ProviderConfiguration(IDictionary<string, string> properties)
         {
             this.properties = properties ?? new Dictionary<string, string>(1);
-            this.childProviders = childProviders;
         }
 
         // Load from an element with the format <Provider Type="..." Name="...">...</Provider>
@@ -112,7 +103,7 @@ namespace Orleans.Runtime.Configuration
                 }
             }
 
-            LoadProviderConfigurations(child, nsManager, alreadyLoaded, c => childConfigurations.Add(c));
+            LoadProviderConfigurations(child, nsManager, alreadyLoaded, c => { });
         }
 
         internal static void LoadProviderConfigurations(XmlElement root, XmlNamespaceManager nsManager,

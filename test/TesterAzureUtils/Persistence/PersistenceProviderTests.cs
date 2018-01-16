@@ -41,7 +41,7 @@ namespace Tester.AzureUtils.Persistence
             const string testName = nameof(PersistenceProvider_Mock_WriteRead);
 
             IStorageProvider store = new MockStorageProvider();
-            var cfg = new ProviderConfiguration(providerCfgProps, null);
+            var cfg = new ProviderConfiguration(providerCfgProps);
             await store.Init(testName, this.providerRuntime, cfg);
 
             await Test_PersistenceProvider_WriteRead(testName, store);
@@ -54,7 +54,7 @@ namespace Tester.AzureUtils.Persistence
 
             IStorageProvider store = new OrleansFileStorage();
             providerCfgProps.Add("RootDirectory", "Data");
-            var cfg = new ProviderConfiguration(providerCfgProps, null);
+            var cfg = new ProviderConfiguration(providerCfgProps);
             await store.Init(testName, this.providerRuntime, cfg);
 
             await Test_PersistenceProvider_WriteRead(testName, store);
@@ -68,7 +68,7 @@ namespace Tester.AzureUtils.Persistence
 
             IStorageProvider store = new AzureTableStorage();
             providerCfgProps.Add("DataConnectionString", TestDefaultConfiguration.DataConnectionString);
-            var cfg = new ProviderConfiguration(providerCfgProps, null);
+            var cfg = new ProviderConfiguration(providerCfgProps);
             await store.Init(testName, this.providerRuntime, cfg);
 
             await Test_PersistenceProvider_Read(testName, store);
@@ -209,7 +209,7 @@ namespace Tester.AzureUtils.Persistence
             IStorageProvider store = new MemoryStorageWithLatency();
             providerCfgProps.Add("Latency", expectedLatency.ToString());
             providerCfgProps.Add("MockCalls", "true");
-            var cfg = new ProviderConfiguration(providerCfgProps, null);
+            var cfg = new ProviderConfiguration(providerCfgProps);
             await store.Init(testName, this.providerRuntime, cfg);
 
             GrainReference reference = this.fixture.InternalGrainFactory.GetGrain(GrainId.NewId());
@@ -276,7 +276,7 @@ namespace Tester.AzureUtils.Persistence
             var store = new AzureTableStorage();
             providerCfgProps["DataConnectionString"] = TestDefaultConfiguration.DataConnectionString;
             providerCfgProps["UseJsonFormat"] = useJson;
-            var cfg = new ProviderConfiguration(providerCfgProps, null);
+            var cfg = new ProviderConfiguration(providerCfgProps);
             await store.Init(testName, this.providerRuntime, cfg);
             return store;
         }

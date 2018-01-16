@@ -79,7 +79,7 @@ namespace Orleans.TestingHost
         }
 
         /// <summary>Find the named storage provider loaded in this silo. </summary>
-        internal IStorageProvider GetStorageProvider(string name) => CheckReturnBoundaryReference("storage provider", this.host.Services.GetServiceByName<IStorageProvider>(name));
+        internal IStorageProvider GetStorageProvider(string name) => CheckReturnBoundaryReference("storage provider", this.host.Services.GetServiceByName<IStorageProvider>(name) ?? throw new KeyNotFoundException(name) );
 
         private static T CheckReturnBoundaryReference<T>(string what, T obj) where T : class
         {

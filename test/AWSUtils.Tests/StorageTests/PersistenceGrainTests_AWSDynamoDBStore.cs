@@ -205,7 +205,7 @@ namespace AWSUtils.Tests.StorageTests
             Dictionary<string, string> providerCfgProps = new Dictionary<string, string>();
             var store = new DynamoDBStorageProvider();
             providerCfgProps["DataConnectionString"] = DataConnectionString;
-            var cfg = new ProviderConfiguration(providerCfgProps, null);
+            var cfg = new ProviderConfiguration(providerCfgProps);
             await store.Init(storageName, runtime, cfg);
             return store;
         }

@@ -75,7 +75,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<IStreamSubscriptionHandleFactory, StreamSubscriptionHandlerFactory>();
 
             services.TryAddSingleton<FallbackSystemTarget>();
-            services.TryAddSingleton<SiloUnobservedExceptionsHandler>();
 
             services.AddLogging();
             services.TryAddSingleton<ITimerRegistry, TimerRegistry>();
