@@ -14,15 +14,15 @@ namespace Orleans.Runtime
 
         private static Interner<UniqueKey, GrainId> grainIdInternCache;
 
-        public UniqueKey.Category Category { get { return Key.IdCategory; } }
+        public UniqueKey.Category Category => Key.IdCategory;
 
-        public bool IsSystemTarget { get { return Key.IsSystemTargetKey; } }
+        public bool IsSystemTarget => Key.IsSystemTargetKey; 
 
-        public bool IsGrain { get { return Category == UniqueKey.Category.Grain || Category == UniqueKey.Category.KeyExtGrain; } }
+        public bool IsGrain => Category == UniqueKey.Category.Grain || Category == UniqueKey.Category.KeyExtGrain; 
 
-        public bool IsClient { get { return Category == UniqueKey.Category.Client || Category == UniqueKey.Category.GeoClient; } }
+        public bool IsClient => Category == UniqueKey.Category.Client || Category == UniqueKey.Category.GeoClient; 
 
-        private GrainId(UniqueKey key)
+        internal GrainId(UniqueKey key)
             : base(key)
         {
         }
@@ -215,13 +215,7 @@ namespace Orleans.Runtime
         // same as ToString, just full primary key and type code
         private string ToStringImpl(bool detailed)
         {
-            string name = string.Empty;
-#if ABSTRACTIONS_TODO
-            if (Constants.TryGetSystemGrainName(this, out name))
-            {
-                return name;
-            }
-#endif
+            // TODO Get name of system/target grain + name of the grain type
 
             var keyString = Key.ToString();
             // this should grab the least-significant half of n1, suffixing it with the key extension.
@@ -241,25 +235,20 @@ namespace Orleans.Runtime
                 case UniqueKey.Category.KeyExtGrain:
                     var typeString = TypeCode.ToString("X");
                     if (!detailed) typeString = typeString.Substring(Math.Max(0, typeString.Length - 8));
-                    fullString = String.Format("*grn/{0}/{1}", typeString, idString);
+                    fullString = $"*grn/{typeString}/{idString}";
                     break;
                 case UniqueKey.Category.Client:
-                    fullString = "*cli/" + idString;
+                    fullString = $"*cli/{idString}";
                     break;
                 case UniqueKey.Category.GeoClient:
-                    fullString = string.Format("*gcl/{0}/{1}", Key.KeyExt, idString);
+                    fullString = $"*gcl/{Key.KeyExt}/{idString}";
+                    break;
+                case UniqueKey.Category.SystemGrain:
+                    fullString = $"*sgn/{Key.PrimaryKeyToGuid()}/{idString}";
                     break;
                 case UniqueKey.Category.SystemTarget:
-#if ABSTRACTIONS_TODO
-                    string explicitName = Constants.SystemTargetName(this);
-                    if (TypeCode != 0)
-                    {
-                        var typeStr = TypeCode.ToString("X");
-                        return String.Format("{0}/{1}/{2}", explicitName, typeStr, idString);
-                    }
-                    fullString = explicitName;
+                    fullString = $"*stg/{Key.N1}/{idString}";
                     break;
-#endif
                 default:
                     fullString = "???/" + idString;
                     break;

@@ -72,7 +72,7 @@ namespace Orleans.Hosting
             services.TryAddTransient<DynamicClusterConfigDeploymentBalancer>();
             services.TryAddTransient<ClusterConfigDeploymentLeaseBasedBalancer>();
             services.TryAddTransient<ConsistentRingQueueBalancer>();
-            services.TryAddTransient(typeof(IStreamSubscriptionObserver<>), typeof(StreamSubscriptionObserverProxy<>));
+            services.TryAddSingleton<IStreamSubscriptionHandleFactory, StreamSubscriptionHandlerFactory>();
 
             services.TryAddSingleton<FallbackSystemTarget>();
             services.TryAddSingleton<SiloUnobservedExceptionsHandler>();

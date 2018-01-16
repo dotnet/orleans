@@ -69,8 +69,6 @@ namespace Orleans.AWSUtils.Tests
         public DynamoDBStorage(ILoggerFactory loggerFactory, string accessKey, string secretKey, string service, int readCapacityUnits = DefaultReadCapacityUnits,
             int writeCapacityUnits = DefaultWriteCapacityUnits)
         {
-            if(accessKey == null) throw new ArgumentNullException(nameof(accessKey));
-            if(secretKey == null) throw new ArgumentNullException(nameof(secretKey));
             if (service == null) throw new ArgumentNullException(nameof(service));
             this.accessKey = accessKey;
             this.secretKey = secretKey;
