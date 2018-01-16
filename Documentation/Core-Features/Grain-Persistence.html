@@ -157,7 +157,7 @@ Currently following databases are supported:</p>
 <pre><code>Install-Package Microsoft.Orleans.OrleansSqlUtils
 </code></pre><p>Under the folder where the package gets installed alongside your project, you will
 find different SQL scripts for the supported database vendors. You can also get
-them from the <a href="https://github.com/dotnet/orleans/tree/master/src/OrleansSQLUtils">OrleansSQLUtils repository</a>.
+them from the <a href="https://github.com/dotnet/orleans/tree/master/src/AdoNet/Shared">OrleansSQLUtils repository</a>.
 Create a database, and then run the appropriate script to create the tables.</p>
 <p>The next steps are to install a second NuGet package (see table below) specific to the
 database vendor you want, and to configure the storage provider either programmatically or
@@ -175,28 +175,28 @@ via XML configuration.</p>
 <tbody>
 <tr>
 <td>SQL Server</td>
-<td><a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/CreateOrleansTables_SQLServer.sql">CreateOrleansTables_SQLServer.sql</a></td>
+<td><a href="https://github.com/dotnet/orleans/blob/master/src/AdoNet/Shared/SQLServer-Main.sql">CreateOrleansTables_SQLServer.sql</a></td>
 <td><a href="https://www.nuget.org/packages/System.Data.SqlClient/">System.Data.SqlClient</a></td>
 <td>System.Data.SqlClient</td>
 <td></td>
 </tr>
 <tr>
 <td>MySQL / MariaDB</td>
-<td><a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/CreateOrleansTables_MySQL.sql">CreateOrleansTables_MySQL.sql</a></td>
+<td><a href="https://github.com/dotnet/orleans/blob/master/src/AdoNet/Shared/MySQL-Main.sql">CreateOrleansTables_MySQL.sql</a></td>
 <td><a href="https://www.nuget.org/packages/MySql.Data/">MySql.Data</a></td>
 <td>MySql.Data.MySqlClient</td>
 <td></td>
 </tr>
 <tr>
 <td>PostgreSQL</td>
-<td><a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/CreateOrleansTables_PostgreSQL.sql">CreateOrleansTables_PostgreSQL.sql</a></td>
+<td><a href="https://github.com/dotnet/orleans/blob/master/src/AdoNet/Shared/PostgreSQL-Main.sql">CreateOrleansTables_PostgreSQL.sql</a></td>
 <td><a href="https://www.nuget.org/packages/Npgsql/">Npgsql</a></td>
 <td>Npgsql</td>
 <td></td>
 </tr>
 <tr>
 <td>Oracle</td>
-<td><a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/CreateOrleansTables_Oracle.sql">CreateOrleansTables_Oracle.sql</a></td>
+<td><a href="https://github.com/dotnet/orleans/blob/master/src/AdoNet/Shared/Oracle-Main.sql">CreateOrleansTables_Oracle.sql</a></td>
 <td><a href="https://www.nuget.org/packages/Oracle.ManagedDataAccess/">ODP.net</a></td>
 <td>Oracle.DataAccess.Client</td>
 <td>No .net Core support</td>

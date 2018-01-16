@@ -1,6 +1,6 @@
 {
   "homepages": [],
-  "source_base_path": "C:/GitHub/sergeybykov/orleans-2/src",
+  "source_base_path": "c:/GitHub/sergeybykov/orleans/src",
   "xrefmap": "xrefmap.yml",
   "files": [
     {
@@ -342,7 +342,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Core-Features/Grain-Persistence.html",
-          "hash": "V4hvDrtXxfNSFWNySFJuMg=="
+          "hash": "LiXamJPqn4whPJqpI8KVrA=="
         }
       },
       "is_incremental": false,
@@ -450,7 +450,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Configuration-Guide/index.html",
-          "hash": "vWAU6ksyV0/1vXiDjumBEA=="
+          "hash": "aobHxB6tGOOAXnB2adAODw=="
         }
       },
       "is_incremental": false,
@@ -1883,7 +1883,7 @@
       "output": {
         ".html": {
           "relative_path": "Tutorials/Failure-Handling.html",
-          "hash": "kd4imwh7aJaJLRg+dWFLMg=="
+          "hash": "x1VxU1Ez86v5ESXfIMVdQQ=="
         }
       },
       "is_incremental": false,
