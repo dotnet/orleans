@@ -20,7 +20,7 @@ using UnitTests.Grains.ProgrammaticSubscribe;
 
 namespace Tester.StreamingTests
 {
-    public abstract class ProgrammaticSubcribeTestsRunner : IDisposable
+    public abstract class ProgrammaticSubcribeTestsRunner 
     {
         private BaseTestClusterFixture fixture;
         public const string StreamProviderName = "StreamProvider1";
@@ -296,11 +296,6 @@ namespace Tester.StreamingTests
             {
                 return numProduced == numConsumed;
             }
-        }
-
-        public virtual void Dispose()
-        {
-            this.fixture = null;
         }
     }
 

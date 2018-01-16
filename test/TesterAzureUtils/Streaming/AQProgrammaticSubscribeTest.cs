@@ -31,14 +31,14 @@ namespace Tester.AzureUtils.Streaming
                 options.ClusterConfiguration.AddAzureQueueStreamProviderV2(StreamProviderName2);
                 return new TestCluster(options);
             }
-        }
 
-        public override void Dispose()
-        {
-            base.Dispose();
-            var clusterId = this.fixture.HostedCluster.ClusterId;
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, StreamProviderName, clusterId, TestDefaultConfiguration.DataConnectionString).Wait();
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, StreamProviderName2, clusterId, TestDefaultConfiguration.DataConnectionString).Wait();
+            public override void Dispose()
+            {
+                base.Dispose();
+                var clusterId = this.HostedCluster.ClusterId;
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, StreamProviderName, clusterId, TestDefaultConfiguration.DataConnectionString).Wait();
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, StreamProviderName2, clusterId, TestDefaultConfiguration.DataConnectionString).Wait();
+            }
         }
 
         public AQProgrammaticSubscribeTest(ITestOutputHelper output, Fixture fixture)
