@@ -19,7 +19,7 @@ namespace Orleans.Transactions.Tests
             return TestGrain(transactionTestGrainClassName, Guid.NewGuid());
         }
 
-        protected ITransactionTestGrain TestGrain(string transactionTestGrainClassName, Guid id)
+        protected virtual ITransactionTestGrain TestGrain(string transactionTestGrainClassName, Guid id)
         {
             return grainFactory.GetGrain<ITransactionTestGrain>(id, transactionTestGrainClassName);
         }
