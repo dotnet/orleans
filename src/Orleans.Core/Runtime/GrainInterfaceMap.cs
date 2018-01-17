@@ -71,6 +71,8 @@ namespace Orleans.Runtime
         private readonly HashSet<int> unordered;
 
         private readonly Dictionary<int, GrainClassData> implementationIndex;
+        private readonly Dictionary<int, PlacementStrategy> placementStrategiesIndex;
+        private readonly Dictionary<int, MultiClusterRegistrationStrategy> registrationStrategiesIndex;
 
         [NonSerialized] // Client shouldn't need this
         private readonly Dictionary<string, string> primaryImplementations;
@@ -96,6 +98,8 @@ namespace Orleans.Runtime
             typeToInterfaceData = new Dictionary<string, GrainInterfaceData>();
             primaryImplementations = new Dictionary<string, string>();
             implementationIndex = new Dictionary<int, GrainClassData>();
+            placementStrategiesIndex = new Dictionary<int, PlacementStrategy>();
+            registrationStrategiesIndex = new Dictionary<int, MultiClusterRegistrationStrategy>();
             unordered = new HashSet<int>();
             this.localTestMode = localTestMode;
             this.defaultPlacementStrategy = defaultPlacementStrategy;
@@ -133,6 +137,22 @@ namespace Orleans.Runtime
                     implementationIndex.Add(kvp.Key, kvp.Value);
                 }
             }
+
+            foreach (var kvp in map.placementStrategiesIndex)
+            {
+                if (!placementStrategiesIndex.ContainsKey(kvp.Key))
+                {
+                    placementStrategiesIndex.Add(kvp.Key, kvp.Value);
+                }
+            }
+
+            foreach (var kvp in map.registrationStrategiesIndex)
+            {
+                if (!registrationStrategiesIndex.ContainsKey(kvp.Key))
+                {
+                    registrationStrategiesIndex.Add(kvp.Key, kvp.Value);
+                }
+            }
         }
 
         internal void AddEntry(Type iface, Type grain, PlacementStrategy placement, MultiClusterRegistrationStrategy registrationStrategy, bool primaryImplementation)
@@ -146,9 +166,13 @@ namespace Orleans.Runtime
 
                 var grainInterfaceData = GetOrAddGrainInterfaceData(iface, isGenericGrainClass);
 
-                var implementation = new GrainClassData(grainTypeCode, grainName, isGenericGrainClass, placement, registrationStrategy);
+                var implementation = new GrainClassData(grainTypeCode, grainName, isGenericGrainClass);
                 if (!implementationIndex.ContainsKey(grainTypeCode))
                     implementationIndex.Add(grainTypeCode, implementation);
+                if (!placementStrategiesIndex.ContainsKey(grainTypeCode))
+                    placementStrategiesIndex.Add(grainTypeCode, placement);
+                if (!registrationStrategiesIndex.ContainsKey(grainTypeCode))
+                    registrationStrategiesIndex.Add(grainTypeCode, registrationStrategy);
 
                 grainInterfaceData.AddImplementation(implementation, primaryImplementation);
                 if (primaryImplementation)
@@ -246,8 +270,8 @@ namespace Orleans.Runtime
 
                 var implementation = implementationIndex[typeCode];
                 grainClass = implementation.GetClassName(genericArguments);
-                placement = implementation.PlacementStrategy ?? this.defaultPlacementStrategy;
-                registrationStrategy = implementation.RegistrationStrategy;
+                placement = placementStrategiesIndex[typeCode];
+                registrationStrategy = registrationStrategiesIndex[typeCode];
                 return true;
             }
         }
@@ -406,24 +430,18 @@ namespace Orleans.Runtime
         [NonSerialized]
         private readonly Dictionary<string, string> genericClassNames;
 
-        private readonly PlacementStrategy placementStrategy;
-        private readonly MultiClusterRegistrationStrategy registrationStrategy;
         private readonly bool isGeneric;
 
         internal int GrainTypeCode { get; private set; }
         internal string GrainClass { get; private set; }
-        internal PlacementStrategy PlacementStrategy { get { return placementStrategy; } }
         internal bool IsGeneric { get { return isGeneric; } }
-        public MultiClusterRegistrationStrategy RegistrationStrategy { get { return registrationStrategy; } }
 
-        internal GrainClassData(int grainTypeCode, string grainClass, bool isGeneric, PlacementStrategy placement, MultiClusterRegistrationStrategy registrationStrategy)
+        internal GrainClassData(int grainTypeCode, string grainClass, bool isGeneric)
         {
             GrainTypeCode = grainTypeCode;
             GrainClass = grainClass;
             this.isGeneric = isGeneric;
             genericClassNames = new Dictionary<string, string>(); // TODO: initialize only for generic classes
-            placementStrategy = placement;
-            this.registrationStrategy = registrationStrategy;
         }
 
         internal string GetClassName(string typeArguments)
