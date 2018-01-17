@@ -146,7 +146,7 @@ namespace Orleans.Runtime
 
                 var grainInterfaceData = GetOrAddGrainInterfaceData(iface, isGenericGrainClass);
 
-                var implementation = new GrainClassData(grainTypeCode, grainName, isGenericGrainClass, grainInterfaceData, placement, registrationStrategy);
+                var implementation = new GrainClassData(grainTypeCode, grainName, isGenericGrainClass, placement, registrationStrategy);
                 if (!implementationIndex.ContainsKey(grainTypeCode))
                     implementationIndex.Add(grainTypeCode, implementation);
 
@@ -403,7 +403,6 @@ namespace Orleans.Runtime
     [Serializable]
     internal sealed class GrainClassData
     {
-        private readonly GrainInterfaceMap.GrainInterfaceData interfaceData;
         [NonSerialized]
         private readonly Dictionary<string, string> genericClassNames;
 
@@ -414,16 +413,14 @@ namespace Orleans.Runtime
         internal int GrainTypeCode { get; private set; }
         internal string GrainClass { get; private set; }
         internal PlacementStrategy PlacementStrategy { get { return placementStrategy; } }
-        internal GrainInterfaceMap.GrainInterfaceData InterfaceData { get { return interfaceData; } }
         internal bool IsGeneric { get { return isGeneric; } }
         public MultiClusterRegistrationStrategy RegistrationStrategy { get { return registrationStrategy; } }
 
-        internal GrainClassData(int grainTypeCode, string grainClass, bool isGeneric, GrainInterfaceMap.GrainInterfaceData interfaceData, PlacementStrategy placement, MultiClusterRegistrationStrategy registrationStrategy)
+        internal GrainClassData(int grainTypeCode, string grainClass, bool isGeneric, PlacementStrategy placement, MultiClusterRegistrationStrategy registrationStrategy)
         {
             GrainTypeCode = grainTypeCode;
             GrainClass = grainClass;
             this.isGeneric = isGeneric;
-            this.interfaceData = interfaceData;
             genericClassNames = new Dictionary<string, string>(); // TODO: initialize only for generic classes
             placementStrategy = placement;
             this.registrationStrategy = registrationStrategy;
