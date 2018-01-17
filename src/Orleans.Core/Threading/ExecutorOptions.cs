@@ -52,7 +52,8 @@ namespace Orleans.Threading
             TimeSpan? workItemExecutionTimeTreshold = null,
             TimeSpan? delayWarningThreshold = null,
             WorkItem.StatusProvider workItemStatusProvider = null,
-            IEnumerable<ExecutionFilter> executionFilters = null)
+            IEnumerable<ExecutionActionFilter> actionFilters = null,
+            IEnumerable<ExecutionExceptionFilter> exceptionFilters = null)
             : base(name, stageType, cts, loggerFactory)
         {
             DegreeOfParallelism = degreeOfParallelism;
@@ -61,10 +62,13 @@ namespace Orleans.Threading
             WorkItemStatusProvider = workItemStatusProvider;
             WorkItemExecutionTimeTreshold = workItemExecutionTimeTreshold ?? TimeSpan.MaxValue;
             DelayWarningThreshold = delayWarningThreshold ?? TimeSpan.MaxValue;
-            ExecutionFilters = executionFilters?.ToArray() ?? Array.Empty<ExecutionFilter>();
+            ExecutionFilters = actionFilters?.ToArray() ?? Array.Empty<ExecutionActionFilter>();
+            ExceptionFilters = exceptionFilters?.ToArray() ?? Array.Empty<ExecutionExceptionFilter>();
         }
 
-        public IReadOnlyCollection<ExecutionFilter> ExecutionFilters { get; private set; }
+        public IReadOnlyCollection<ExecutionActionFilter> ExecutionFilters { get; private set; }
+
+        public IReadOnlyCollection<ExecutionExceptionFilter> ExceptionFilters { get; private set; }
 
         public int DegreeOfParallelism { get; private set; }
 
@@ -121,9 +125,15 @@ namespace Orleans.Threading
                 return this;
             }
 
-            public Builder WithExecutionFilters(params ExecutionFilter[] executionFilters)
+            public Builder WithActionFilters(params ExecutionActionFilter[] filters)
             {
-                Options.ExecutionFilters = Options.ExecutionFilters.Union(executionFilters).ToArray();
+                Options.ExecutionFilters = Options.ExecutionFilters.Union(filters).ToArray();
+                return this;
+            }
+
+            public Builder WithExceptionFilters(params ExecutionExceptionFilter[] filters)
+            {
+                Options.ExceptionFilters = Options.ExceptionFilters.Union(filters).ToArray();
                 return this;
             }
 

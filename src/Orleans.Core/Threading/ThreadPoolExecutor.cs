@@ -47,7 +47,7 @@ namespace Orleans.Threading
 
             for (var threadIndex = 0; threadIndex < options.DegreeOfParallelism; threadIndex++)
             {
-                RunWorker(new ExecutionContext(CreateExecutionFilters(), options.CancellationTokenSource, threadIndex));
+                RunWorker(threadIndex);
             }
         }
 
@@ -103,37 +103,53 @@ namespace Orleans.Threading
             }
         }
 
-        private void RunWorker(ExecutionContext context)
+        private void RunWorker(int index)
         {
+            var actionFilters = new ActionFilter<ExecutionContext>[]
+            {
+                new StatisticsTracker(statistic, options.DelayWarningThreshold, log),
+                executingWorkTracker
+            }.Union(options.ExecutionFilters);
+
+            var exceptionFilters = new[] { new ThreadAbortHandler(log) }.Union(options.ExceptionFilters);
+
+            var context = new ExecutionContext(
+                actionFilters,
+                exceptionFilters,
+                options.CancellationTokenSource,
+                index);
+
             new ThreadPoolThread(
-                    options.Name + context.ThreadIndex,
+                    options.Name + index,
                     options.CancellationTokenSource.Token,
                     options.LoggerFactory)
                 .QueueWorkItem(_ => ProcessWorkItems(context));
         }
 
-        private ActionFilter<ExecutionContext>[] CreateExecutionFilters()
+        private sealed class ThreadAbortHandler : ExecutionExceptionFilter
         {
-            var threadAbortExceptionHandler = new ActionLambdaFilter<ExecutionContext>(
-                exceptionHandler: (ex, context) =>
+            private readonly ILogger log;
+
+            public ThreadAbortHandler(ILogger log)
             {
-                if (!(ex is ThreadAbortException)) return false;
+                this.log = log;
+            }
+
+            public override bool ExceptionHandler(Exception ex, ExecutionContext context)
+            {
+                if (!(ex is ThreadAbortException))
+                {
+                    return false;
+                }
 
                 if (log.IsEnabled(LogLevel.Debug)) log.Debug(SR.On_Thread_Abort_Exit, ex);
                 Thread.ResetAbort();
                 context.CancellationTokenSource.Cancel();
                 return true;
-            });
-
-            return new ActionFilter<ExecutionContext>[]
-            {
-                threadAbortExceptionHandler,
-                new StatisticsTracker(statistic, options.DelayWarningThreshold, log),
-                executingWorkTracker
-            }.Union(options.ExecutionFilters).ToArray();
+            }
         }
 
-        private sealed class StatisticsTracker : ExecutionFilter
+        private sealed class StatisticsTracker : ExecutionActionFilter
         {
             private readonly ThreadPoolTrackingStatistic statistic;
 
@@ -173,7 +189,7 @@ namespace Orleans.Threading
             }
         }
 
-        private sealed class ExecutingWorkItemsTracker : ExecutionFilter
+        private sealed class ExecutingWorkItemsTracker : ExecutionActionFilter
         {
             private readonly WorkItem[] runningItems;
 
@@ -318,14 +334,15 @@ namespace Orleans.Threading
 
     internal class ExecutionContext : IExecutable
     {
-        private readonly ActionFiltersApplicant<ExecutionContext> filtersApplicant;
+        private readonly FiltersApplicant<ExecutionContext> filtersApplicant;
 
         public ExecutionContext(
-            IEnumerable<ActionFilter<ExecutionContext>> executionFilters,
+            IEnumerable<ActionFilter<ExecutionContext>> actionFilters,
+            IEnumerable<ExceptionFilter<ExecutionContext>> exceptionFilters,
             CancellationTokenSource cts,
             int threadIndex)
         {
-            filtersApplicant = new ActionFiltersApplicant<ExecutionContext>(executionFilters);
+            filtersApplicant = new FiltersApplicant<ExecutionContext>(actionFilters, exceptionFilters);
             CancellationTokenSource = cts;
             ThreadIndex = threadIndex;
         }

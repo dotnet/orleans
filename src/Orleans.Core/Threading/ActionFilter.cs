@@ -9,7 +9,10 @@ namespace Orleans.Threading
         public virtual void OnActionExecuting(T executable) { }
 
         public virtual void OnActionExecuted(T executable) { }
+    }
 
+    internal class ExceptionFilter<T> where T : IExecutable
+    {
         public virtual bool ExceptionHandler(Exception ex, T executable)
         {
             return false;
@@ -22,21 +25,15 @@ namespace Orleans.Threading
 
         private readonly Action<T> onActionExecuted;
 
-        private readonly Func<Exception, T, bool> exceptionHandler;
-
-        public ActionLambdaFilter(
-            Action<T> onActionExecuting = null,
-            Action<T> onActionExecuted = null,
-            Func<Exception, T, bool> exceptionHandler = null)
+        public ActionLambdaFilter(Action<T> onActionExecuting = null, Action<T> onActionExecuted = null)
         {
-            if (onActionExecuting == null && onActionExecuted == null && exceptionHandler == null)
+            if (onActionExecuting == null && onActionExecuted == null)
             {
                 throw new ArgumentNullException("Lambda filter requires at least one non-null parameter to be functional");
             }
 
             this.onActionExecuting = onActionExecuting ?? NoOpFilter;
             this.onActionExecuted = onActionExecuted ?? NoOpFilter;
-            this.exceptionHandler = exceptionHandler ?? NoOpHandler;
         }
 
         public override void OnActionExecuting(T executable)
@@ -49,59 +46,63 @@ namespace Orleans.Threading
             onActionExecuted(executable);
         }
 
-        public override bool ExceptionHandler(Exception ex, T executable)
-        {
-            return exceptionHandler(ex, executable);
-        }
-
         private static readonly Action<T> NoOpFilter = _ => { };
-
-        private static readonly Func<Exception, T, bool> NoOpHandler = (e, c) => false;
     }
 
-    internal class ExecutionFilter : ActionFilter<ExecutionContext>
+    internal class ExecutionActionFilter : ActionFilter<ExecutionContext>
     {
     }
-    
-    internal class ActionFiltersApplicant<T> where T : IExecutable
-    {
-        private readonly ActionFilter<T>[] filters;
 
-        public ActionFiltersApplicant(IEnumerable<ActionFilter<T>> filters)
+    internal class ExecutionExceptionFilter : ExceptionFilter<ExecutionContext>
+    {
+    }
+
+    internal class FiltersApplicant<T> where T : IExecutable
+    {
+        private readonly ActionFilter<T>[] actionFilters;
+
+        private readonly ActionFilter<T>[] reverseOrderActionFilters;
+
+        private readonly ExceptionFilter<T>[] exceptionFilters;
+
+        public FiltersApplicant(
+            IEnumerable<ActionFilter<T>> actionFilters, 
+            IEnumerable<ExceptionFilter<T>> exceptionFilters)
         {
-            if (filters == null) throw new ArgumentNullException(nameof(filters));
-            this.filters = filters.ToArray();
+            this.actionFilters = actionFilters.ToArray();
+            this.reverseOrderActionFilters = this.actionFilters.Reverse().ToArray();
+            this.exceptionFilters = exceptionFilters.ToArray();
         }
 
         public void Apply(T action)
         {
-            Apply(action, 0);
-        }
-
-        private void Apply(T action, int filterIndex)
-        {
-            if (filterIndex >= filters.Length)
-            {
-                action.Execute();
-                return;
-            }
-
-            var filter = filters[filterIndex];
-            try
+            foreach (var filter in actionFilters)
             {
                 filter.OnActionExecuting(action);
-                Apply(action, filterIndex + 1);
+            }
+
+            try
+            {
+                action.Execute();
             }
             catch (Exception ex)
             {
-                if (!filter.ExceptionHandler(ex, action))
+                foreach (var filter in exceptionFilters)
                 {
-                    throw;
+                    if (filter.ExceptionHandler(ex, action))
+                    {
+                        return;
+                    }
                 }
+
+                throw;
             }
             finally
             {
-                filter.OnActionExecuted(action);
+                foreach (var filter in reverseOrderActionFilters)
+                {
+                    filter.OnActionExecuted(action);
+                }
             }
         }
     }

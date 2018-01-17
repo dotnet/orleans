@@ -173,9 +173,9 @@ namespace Orleans.Runtime
         internal static bool IsStarting { get; set; }
 
         protected virtual ThreadPoolExecutorOptions.Builder ExecutorOptionsBuilder =>
-            new ThreadPoolExecutorOptions.Builder(Name, GetType(), Cts, loggerFactory).WithExecutionFilters(executorFaultHandler);
+            new ThreadPoolExecutorOptions.Builder(Name, GetType(), Cts, loggerFactory).WithExceptionFilters(executorFaultHandler);
 
-        private sealed class ExecutorFaultHandler : ExecutionFilter
+        private sealed class ExecutorFaultHandler : ExecutionExceptionFilter
         {
             private readonly AsynchAgent agent;
 

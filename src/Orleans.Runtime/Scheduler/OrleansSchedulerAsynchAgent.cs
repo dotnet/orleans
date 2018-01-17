@@ -31,9 +31,9 @@ namespace Orleans.Runtime.Scheduler
                 .WithWorkItemExecutionTimeTreshold(turnWarningLengthThreshold)
                 .WithDelayWarningThreshold(delayWarningThreshold)
                 .WithWorkItemStatusProvider(GetWorkItemStatus)
-                .WithExecutionFilters(
+                .WithActionFilters(new SchedulerStatisticsTracker(this))
+                .WithExceptionFilters(
                     new OuterExceptionHandler(Log),
-                    new SchedulerStatisticsTracker(this),
                     new InnerExceptionHandler(Log));
         }
 
@@ -69,7 +69,7 @@ namespace Orleans.Runtime.Scheduler
             return workItem is WorkItemGroup group ? string.Format("WorkItemGroup Details: {0}", group.DumpStatus()) : string.Empty;
         }
 
-        private sealed class OuterExceptionHandler : ExecutionFilter
+        private sealed class OuterExceptionHandler : ExecutionExceptionFilter
         {
             private readonly ILogger log;
 
@@ -95,7 +95,7 @@ namespace Orleans.Runtime.Scheduler
             }
         }
 
-        private sealed class InnerExceptionHandler : ExecutionFilter
+        private sealed class InnerExceptionHandler : ExecutionExceptionFilter
         {
             private readonly ILogger log;
 
@@ -129,7 +129,7 @@ namespace Orleans.Runtime.Scheduler
             }
         }
 
-        private sealed class SchedulerStatisticsTracker : ExecutionFilter
+        private sealed class SchedulerStatisticsTracker : ExecutionActionFilter
         {
             private readonly OrleansSchedulerAsynchAgent agent;
 
