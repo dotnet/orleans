@@ -727,13 +727,12 @@ namespace Orleans.Runtime
         {
             var stopWatch = Stopwatch.StartNew();
             typeManager.Start();
-            GrainTypeResolver = typeManager.GetTypeCodeMap();
             stopWatch.Stop();
             this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Start InsideRuntimeClient took {stopWatch.ElapsedMilliseconds} Milliseconds");
             return Task.CompletedTask;
         }
 
-        public IGrainTypeResolver GrainTypeResolver { get; private set; }
+        public IGrainTypeResolver GrainTypeResolver => typeManager.ClusterGrainInterfaceMap;
 
 
         public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)
