@@ -27,7 +27,7 @@ namespace Orleans.Logging
         /// <param name="fileName"></param>
         public FileLoggingOutput(string fileName)
         {
-            logOutput = new StreamWriter(File.Open(fileName, FileMode.Append, FileAccess.Write, FileShare.Write));
+            logOutput = new StreamWriter(File.Open(fileName, FileMode.Append, FileAccess.Write, FileShare.ReadWrite), Encoding.UTF8);
             this.logFileName = fileName;
         }
 
