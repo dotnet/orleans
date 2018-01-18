@@ -43,7 +43,7 @@ namespace Orleans
         internal ClientStatisticsManager ClientStatistics;
         private GrainId clientId;
         private readonly GrainId handshakeClientId;
-        private IGrainTypeResolver grainInterfaceMap;
+        private IGrainTypeResolver grainTypeResolver;
         private ThreadTrackingStatistic incomingMessagesThreadTimeTracking;
         private readonly Func<Message, bool> tryResendMessage;
         private readonly Action<Message> unregisterCallback;
@@ -232,7 +232,7 @@ namespace Orleans
                     }
                 },
                 ct).Ignore();
-            grainInterfaceMap = await transport.GetTypeCodeMap(this.InternalGrainFactory);
+            grainTypeResolver = await transport.GetGrainTypeResolver(this.InternalGrainFactory);
 
             await ClientStatistics.Start(transport, clientId)
                 .WithTimeout(initTimeout);
@@ -840,7 +840,7 @@ namespace Orleans
 
         public IGrainTypeResolver GrainTypeResolver
         {
-            get { return grainInterfaceMap; }
+            get { return grainTypeResolver; }
         }
 
         public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)
