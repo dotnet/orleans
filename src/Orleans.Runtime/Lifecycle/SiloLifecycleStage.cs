@@ -17,7 +17,7 @@ namespace Orleans.Runtime
         RuntimeServices = 2000,
 
         /// <summary>
-        /// Start runtime services
+        /// Initialize runtime storage
         /// </summary>
         RuntimeStorageServices = 3000,
 

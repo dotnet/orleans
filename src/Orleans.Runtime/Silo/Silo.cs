@@ -247,15 +247,15 @@ namespace Orleans.Runtime
             IEnumerable<ILifecycleParticipant<ISiloLifecycle>> lifecycleParticipants = this.Services.GetServices<ILifecycleParticipant<ISiloLifecycle>>();
             foreach(ILifecycleParticipant<ISiloLifecycle> participant in lifecycleParticipants)
             {
-                participant.Participate(fullSiloLifecycle);
+                participant?.Participate(fullSiloLifecycle);
             }
             // register all named lifecycle participants
-            IEnumerable<IKeyedServiceCollection<string, ILifecycleParticipant<ISiloLifecycle>>> namedLifecycleParticipantCollections = this.Services.GetServices<IKeyedServiceCollection<string,ILifecycleParticipant<ISiloLifecycle>>>();
-            foreach (ILifecycleParticipant<ISiloLifecycle> participant in namedLifecycleParticipantCollections
-                .SelectMany(c => c.GetServices(this.Services)
-                .Select(s => s.GetService(this.Services))))
+            IKeyedServiceCollection<string, ILifecycleParticipant<ISiloLifecycle>> namedLifecycleParticipantCollection = this.Services.GetService<IKeyedServiceCollection<string,ILifecycleParticipant<ISiloLifecycle>>>();
+            foreach (ILifecycleParticipant<ISiloLifecycle> participant in namedLifecycleParticipantCollection
+                ?.GetServices(this.Services)
+                ?.Select(s => s.GetService(this.Services)))
             {
-                participant.Participate(fullSiloLifecycle);
+                participant?.Participate(fullSiloLifecycle);
             }
 
             // add self to lifecycle
@@ -710,23 +710,22 @@ namespace Orleans.Runtime
         {
             if (!cancellationToken.IsCancellationRequested)
             {
-                // 3: Deactivate all grains
+                // Deactivate all grains
                 SafeExecute(() => catalog.DeactivateAllActivations().WaitWithThrow(stopTimeout));
             }
 
-            // 3: Stop the gateway
+            // Stop the gateway
             SafeExecute(messageCenter.StopAcceptingClientMessages);
 
-            // 4: Start rejecting all silo to silo application messages
+            // Start rejecting all silo to silo application messages
             SafeExecute(messageCenter.BlockApplicationMessages);
 
-            // 5: Stop scheduling/executing application turns
+            // Stop scheduling/executing application turns
             SafeExecute(scheduler.StopApplicationTurns);
 
-            // 6: Directory: Speed up directory handoff
+            // Directory: Speed up directory handoff
             // will be started automatically when directory receives SiloStatusChangeNotification(Stopping)
 
-            // 7:
             SafeExecute(() => LocalGrainDirectory.StopPreparationCompletion.WaitWithThrow(stopTimeout));
 
             return Task.CompletedTask;

@@ -160,9 +160,7 @@ namespace Orleans.Streams
 
         private IInternalStreamProvider GetStreamProvider()
         {
-            var streamProvider = this.runtimeClient.ServiceProvider.GetServiceByName<IStreamProvider>(streamId.ProviderName)
-                ?? throw new KeyNotFoundException(streamId.ProviderName);
-            return streamProvider as IInternalStreamProvider;
+            return this.runtimeClient.ServiceProvider.GetRequiredServiceByName<IStreamProvider>(streamId.ProviderName) as IInternalStreamProvider;
         }
 
         #region IComparable<IAsyncStream<T>> Members

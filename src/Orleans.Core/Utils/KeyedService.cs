@@ -27,18 +27,17 @@ namespace Orleans.Runtime
     public class KeyedSingletonService<TKey, TService> : IKeyedService<TKey, TService>
     where TService : class
     {
-        Func<IServiceProvider, TKey, TService> factory;
-        private TService instance;
+        private Lazy<TService> instance;
 
         public TKey Key { get; }
 
-        public KeyedSingletonService(TKey key, Func<IServiceProvider, TKey, TService> factory)
+        public KeyedSingletonService(TKey key, IServiceProvider services, Func<IServiceProvider, TKey, TService> factory)
         {
             this.Key = key;
-            this.factory = factory;
+            this.instance = new Lazy<TService>(() => factory(services, Key));
         }
 
-        public TService GetService(IServiceProvider services) => this.instance ?? (this.instance = factory(services, Key));
+        public TService GetService(IServiceProvider services) => this.instance.Value;
 
         public bool Equals(TKey other)
         {
@@ -50,8 +49,8 @@ namespace Orleans.Runtime
         where TInstance : TService
         where TService : class
     {
-        public KeyedSingletonService(TKey key)
-            : base(key, (services, k) => services.GetService<TInstance>())
+        public KeyedSingletonService(TKey key, IServiceProvider services)
+            : base(key, services, (sp, k) => sp.GetService<TInstance>())
         {
         }
     }
@@ -89,7 +88,7 @@ namespace Orleans.Runtime
         public static void AddSingletonKeyedService<TKey, TService>(this IServiceCollection collection, TKey key, Func<IServiceProvider, TKey, TService> factory)
             where TService : class
         {
-            collection.AddSingleton<IKeyedService<TKey, TService>>(sp => new KeyedSingletonService<TKey, TService>(key, factory));
+            collection.AddSingleton<IKeyedService<TKey, TService>>(sp => new KeyedSingletonService<TKey, TService>(key, sp, factory));
         }
 
         /// <summary>
@@ -100,7 +99,7 @@ namespace Orleans.Runtime
             where TService : class
         {
             collection.TryAddTransient<TInstance>();
-            collection.AddSingleton<IKeyedService<TKey, TService>>(sp => new KeyedSingletonService<TKey, TService, TInstance>(key));
+            collection.AddSingleton<IKeyedService<TKey, TService>>(sp => new KeyedSingletonService<TKey, TService, TInstance>(key, sp));
         }
 
         /// <summary>

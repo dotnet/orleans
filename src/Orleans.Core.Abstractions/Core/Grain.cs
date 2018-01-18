@@ -185,8 +185,7 @@ namespace Orleans
                 throw new ArgumentNullException(nameof(name));
                 
             EnsureRuntime();
-            return this.ServiceProvider.GetServiceByName<IStreamProvider>(name)
-                ?? throw new KeyNotFoundException(name);
+            return this.ServiceProvider.GetRequiredServiceByName<IStreamProvider>(name);
         }
 
         /// <summary>

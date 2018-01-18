@@ -50,16 +50,16 @@ namespace Orleans
             IEnumerable<ILifecycleParticipant<IClusterClientLifecycle>> lifecycleParticipants = this.ServiceProvider.GetServices<ILifecycleParticipant<IClusterClientLifecycle>>();
             foreach (ILifecycleParticipant<IClusterClientLifecycle> participant in lifecycleParticipants)
             {
-                participant.Participate(clusterClientLifecycle);
+                participant?.Participate(clusterClientLifecycle);
             }
 
             // register all named lifecycle participants
-            IEnumerable<IKeyedServiceCollection<string, ILifecycleParticipant<IClusterClientLifecycle>>> namedLifecycleParticipantCollections = this.ServiceProvider.GetServices<IKeyedServiceCollection<string, ILifecycleParticipant<IClusterClientLifecycle>>>();
+            IKeyedServiceCollection<string, ILifecycleParticipant<IClusterClientLifecycle>> namedLifecycleParticipantCollections = this.ServiceProvider.GetService<IKeyedServiceCollection<string, ILifecycleParticipant<IClusterClientLifecycle>>>();
             foreach (ILifecycleParticipant<IClusterClientLifecycle> participant in namedLifecycleParticipantCollections
-                .SelectMany(c => c.GetServices(this.ServiceProvider)
-                .Select(s => s.GetService(this.ServiceProvider))))
+                ?.GetServices(this.ServiceProvider)
+                ?.Select(s => s?.GetService(this.ServiceProvider)))
             {
-                participant.Participate(clusterClientLifecycle);
+                participant?.Participate(clusterClientLifecycle);
             }
         }
 
@@ -103,8 +103,7 @@ namespace Orleans
                 throw new ArgumentNullException(nameof(name));
             }
 
-            return this.runtimeClient.ServiceProvider.GetServiceByName<IStreamProvider>(name)
-                ?? throw new KeyNotFoundException(name);
+            return this.runtimeClient.ServiceProvider.GetRequiredServiceByName<IStreamProvider>(name);
         }
 
         /// <inheritdoc />

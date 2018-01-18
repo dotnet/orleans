@@ -22,8 +22,8 @@ namespace Orleans.Providers
         internal delegate Task ScheduleTask(Func<Task> taskFunc);
     }
 
-    internal static class LegacyProviderConfigurator<TLifeCycle>
-        where TLifeCycle : ILifecycleObservable
+    internal static class LegacyProviderConfigurator<TLifecycle>
+        where TLifecycle : ILifecycleObservable
     {
         /// <summary>
         /// Legacy way to configure providers. Will need to move to a legacy package in the future
@@ -86,7 +86,7 @@ namespace Orleans.Providers
             }
         }
 
-        private class ProviderLifecycleParticipant<TService> : ILifecycleParticipant<TLifeCycle>
+        private class ProviderLifecycleParticipant<TService> : ILifecycleParticipant<TLifecycle>
             where TService : class
         {
             private readonly ILogger logger;
@@ -108,7 +108,7 @@ namespace Orleans.Providers
                 this.schedule = services.GetService<LegacyProviderConfigurator.ScheduleTask>();
             }
 
-            public virtual void Participate(TLifeCycle lifecycle)
+            public virtual void Participate(TLifecycle lifecycle)
             {
                 this.initStage = this.config.GetIntProperty(LegacyProviderConfigurator.InitStageName, this.defaultInitStage);
                 lifecycle.Subscribe(this.initStage, Init, Close);
@@ -161,7 +161,7 @@ namespace Orleans.Providers
                 Type providerType = s.GetRequiredService<ProviderTypeLookup>().GetType(config.Type);
                 return Activator.CreateInstance(providerType) as TService;
             });
-            services.AddSingletonNamedService<ILifecycleParticipant<TLifeCycle>>(config.Name, (s, n) => new ProviderLifecycleParticipant<TService>(config, s, s.GetRequiredService<ILoggerFactory>(), defaultInitStage, defaultStartStage));
+            services.AddSingletonNamedService<ILifecycleParticipant<TLifecycle>>(config.Name, (s, n) => new ProviderLifecycleParticipant<TService>(config, s, s.GetRequiredService<ILoggerFactory>(), defaultInitStage, defaultStartStage));
             services.AddSingletonNamedService<IControllable>(config.Name, (s, n) => s.GetServiceByName<TService>(n) as IControllable);
         }
     }
