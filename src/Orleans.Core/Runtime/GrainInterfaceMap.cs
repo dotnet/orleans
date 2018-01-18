@@ -7,65 +7,12 @@ using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime
 {
-    internal interface IGrainTypeResolver
-    {
-        bool TryGetGrainClassData(Type grainInterfaceType, out GrainClassData implementation, string grainClassNamePrefix);
-        bool TryGetGrainClassData(int grainInterfaceId, out GrainClassData implementation, string grainClassNamePrefix);
-        bool TryGetGrainClassData(string grainImplementationClassName, out GrainClassData implementation);
-        bool IsUnordered(int grainTypeCode);
-        string GetLoadedGrainAssemblies();
-    }
-
     /// <summary>
     /// Internal data structure that holds a grain interfaces to grain classes map.
     /// </summary>
     [Serializable]
     internal class GrainInterfaceMap : IGrainTypeResolver
     {
-        /// <summary>
-        /// Metadata for a grain interface
-        /// </summary>
-        [Serializable]
-        internal class GrainInterfaceData
-        {
-            [NonSerialized]
-            private readonly Type iface;
-            private readonly HashSet<GrainClassData> implementations;
-
-            internal Type Interface { get { return iface; } }
-            internal int InterfaceId { get; private set; }
-            internal ushort InterfaceVersion { get; private set; }
-            internal string GrainInterface { get; private set; }
-            internal GrainClassData[] Implementations { get { return implementations.ToArray(); } }
-            internal GrainClassData PrimaryImplementation { get; private set; }
-
-            internal GrainInterfaceData(int interfaceId, ushort interfaceVersion, Type iface, string grainInterface)
-            {
-                InterfaceId = interfaceId;
-                InterfaceVersion = interfaceVersion;
-                this.iface = iface;
-                GrainInterface = grainInterface;
-                implementations = new HashSet<GrainClassData>();
-            }
-
-            internal void AddImplementation(GrainClassData implementation, bool primaryImplemenation = false)
-            {
-                lock (this)
-                {
-                    if (!implementations.Contains(implementation))
-                        implementations.Add(implementation);
-
-                    if (primaryImplemenation)
-                        PrimaryImplementation = implementation;
-                }
-            }
-
-            public override string ToString()
-            {
-                return String.Format("{0}:{1}", GrainInterface, InterfaceId);
-            }
-        }
-
         private readonly Dictionary<string, GrainInterfaceData> typeToInterfaceData;
         private readonly Dictionary<int, GrainInterfaceData> table;
         private readonly HashSet<int> unordered;
@@ -418,88 +365,6 @@ namespace Orleans.Runtime
         public bool IsUnordered(int grainTypeCode)
         {
             return unordered.Contains(grainTypeCode);
-        }
-    }
-
-    /// <summary>
-    /// Metadata for a grain class
-    /// </summary>
-    [Serializable]
-    internal sealed class GrainClassData
-    {
-        [NonSerialized]
-        private readonly Dictionary<string, string> genericClassNames;
-
-        private readonly bool isGeneric;
-
-        internal int GrainTypeCode { get; private set; }
-        internal string GrainClass { get; private set; }
-        internal bool IsGeneric { get { return isGeneric; } }
-
-        internal GrainClassData(int grainTypeCode, string grainClass, bool isGeneric)
-        {
-            GrainTypeCode = grainTypeCode;
-            GrainClass = grainClass;
-            this.isGeneric = isGeneric;
-            genericClassNames = new Dictionary<string, string>(); // TODO: initialize only for generic classes
-        }
-
-        internal string GetClassName(string typeArguments)
-        {
-            // Knowing whether the grain implementation is generic allows for non-generic grain classes 
-            // to implement one or more generic grain interfaces.
-            // For generic grain classes, the assumption that they take the same generic arguments 
-            // as the implemented generic interface(s) still holds.
-            if (!isGeneric || String.IsNullOrWhiteSpace(typeArguments))
-            {
-                return GrainClass;
-            }
-            else
-            {
-                lock (this)
-                {
-                    if (genericClassNames.ContainsKey(typeArguments))
-                        return genericClassNames[typeArguments];
-
-                    var className = String.Format("{0}[{1}]", GrainClass, typeArguments);
-                    genericClassNames.Add(typeArguments, className);
-                    return className;
-                }
-
-            }
-        }
-
-        internal long GetTypeCode(Type interfaceType)
-        {
-            var typeInfo = interfaceType.GetTypeInfo();
-            if (typeInfo.IsGenericType && this.IsGeneric)
-            {
-                string args = TypeUtils.GetGenericTypeArgs(typeInfo.GetGenericArguments(), t => true);
-                int hash = Utils.CalculateIdHash(args);
-                return (((long)(hash & 0x00FFFFFF)) << 32) + GrainTypeCode;
-            }
-            else
-            {
-                return GrainTypeCode;
-            }
-        }
-
-        public override string ToString()
-        {
-            return String.Format("{0}:{1}", GrainClass, GrainTypeCode);
-        }
-
-        public override int GetHashCode()
-        {
-            return GrainTypeCode;
-        }
-
-        public override bool Equals(object obj)
-        {
-            if(!(obj is GrainClassData))
-                return false;
-
-            return GrainTypeCode == ((GrainClassData) obj).GrainTypeCode;
         }
     }
 }
