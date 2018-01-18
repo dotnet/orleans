@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -728,8 +728,7 @@ namespace Orleans.Runtime
             return Task.CompletedTask;
         }
 
-        public IGrainTypeResolver GrainTypeResolver => typeManager.ClusterGrainInterfaceMap;
-
+        public IGrainTypeResolver GrainTypeResolver => typeManager.GrainTypeResolver;
 
         public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)
         {

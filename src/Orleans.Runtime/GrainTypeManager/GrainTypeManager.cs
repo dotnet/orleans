@@ -35,6 +35,8 @@ namespace Orleans.Runtime
 
         public GrainInterfaceMap ClusterGrainInterfaceMap { get; private set; }
 
+        public IGrainTypeResolver GrainTypeResolver { get; private set; }
+
         public GrainTypeManager(
             ILocalSiloDetails siloDetails,
             IApplicationPartManager applicationPartManager,
@@ -51,6 +53,7 @@ namespace Orleans.Runtime
             this.multiClusterRegistrationStrategyManager = multiClusterRegistrationStrategyManager;
             grainInterfaceMap = new GrainInterfaceMap(localTestMode, this.defaultPlacementStrategy);
             ClusterGrainInterfaceMap = grainInterfaceMap;
+            GrainTypeResolver = grainInterfaceMap.GetGrainTypeResolver();
             grainInterfaceMapsBySilo = new Dictionary<SiloAddress, GrainInterfaceMap>();
 
             var grainClassFeature = applicationPartManager.CreateAndPopulateFeature<GrainClassFeature>();
@@ -306,6 +309,7 @@ namespace Orleans.Runtime
                 silos.Sort(); 
             }
             ClusterGrainInterfaceMap = newClusterGrainInterfaceMap;
+            GrainTypeResolver = ClusterGrainInterfaceMap.GetGrainTypeResolver();
             supportedSilosByTypeCode = newSupportedSilosByTypeCode;
             supportedSilosByInterface = newSupportedSilosByInterface;
         }
