@@ -14,7 +14,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
-    <ProjectReference Include="..\..\src\Orleans.Logging.Legacy\Orleans.Logging.Legacy.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Core.Legacy\Orleans.Core.Legacy.csproj" />
     <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj" />
     <ProjectReference Include="..\..\src\Orleans.EventSourcing\Orleans.EventSourcing.csproj" />
     <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj" />

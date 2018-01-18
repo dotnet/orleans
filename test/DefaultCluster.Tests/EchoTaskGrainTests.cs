@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
-using Tester;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;

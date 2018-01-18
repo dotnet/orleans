@@ -104,7 +104,7 @@ namespace ServiceBus.Tests.StreamingTests
 
         private async Task GenerateEvents(string streamNamespace, int streamCount, int eventsInStream)
         {
-            IStreamProvider streamProvider = (IStreamProvider)this.fixture.HostedCluster.StreamProviderManager.GetProvider(StreamProviderName);
+            IStreamProvider streamProvider = this.fixture.HostedCluster.ServiceProvider.GetServiceByName<IStreamProvider>(StreamProviderName);
             IAsyncStream<GeneratedEvent>[] producers =
                 Enumerable.Range(0, streamCount)
                     .Select(i => streamProvider.GetStream<GeneratedEvent>(Guid.NewGuid(), streamNamespace))

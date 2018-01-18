@@ -890,8 +890,10 @@ namespace UnitTests.Grains
             _observers = new Dictionary<string, IConsumerObserver>();
             // discuss: Note that we need to know the provider that will be used in advance. I think it would be beneficial if we specified the provider as an argument to ImplicitConsumerActivationAttribute.
 
-            var providerManager = (StreamProviderManager) Runtime.ServiceProvider.GetService(typeof(StreamProviderManager));
-            var activeStreamProviders = providerManager.GetStreamProviders().Select(x => x.Name).ToList();
+            var activeStreamProviders = Runtime.ServiceProvider
+                .GetService<IKeyedServiceCollection<string,IStreamProvider>>()
+                .GetServices(Runtime.ServiceProvider)
+                .Select(service => service.Key).ToList();
             await Task.WhenAll(activeStreamProviders.Select(stream => BecomeConsumer(this.GetPrimaryKey(), stream, "TestNamespace1")));
         }
 

@@ -1037,35 +1037,6 @@ namespace Orleans.Runtime.Configuration
         }
 
         /// <summary>
-        /// Registers a given type of <typeparamref name="T"/> where <typeparamref name="T"/> is bootstrap provider
-        /// </summary>
-        /// <typeparam name="T">Non-abstract type which implements <see cref="IBootstrapProvider"/> interface</typeparam>
-        /// <param name="providerName">Name of the bootstrap provider</param>
-        /// <param name="properties">Properties that will be passed to bootstrap provider upon initialization</param>
-        public void RegisterBootstrapProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IBootstrapProvider
-        {
-            Type providerType = typeof(T);
-            var providerTypeInfo = providerType.GetTypeInfo();
-            if (providerTypeInfo.IsAbstract ||
-                providerTypeInfo.IsGenericType ||
-                !typeof(IBootstrapProvider).IsAssignableFrom(providerType))
-                throw new ArgumentException("Expected non-generic, non-abstract type which implements IBootstrapProvider interface", "typeof(T)");
-
-            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.BOOTSTRAP_PROVIDER_CATEGORY_NAME, providerTypeInfo.FullName, providerName, properties);
-        }
-
-        /// <summary>
-        /// Registers a given bootstrap provider.
-        /// </summary>
-        /// <param name="providerTypeFullName">Full name of the bootstrap provider type</param>
-        /// <param name="providerName">Name of the bootstrap provider</param>
-        /// <param name="properties">Properties that will be passed to the bootstrap provider upon initialization </param>
-        public void RegisterBootstrapProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
-        {
-            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.BOOTSTRAP_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
-        }
-
-        /// <summary>
         /// Registers a given type of <typeparamref name="T"/> where <typeparamref name="T"/> is stream provider
         /// </summary>
         /// <typeparam name="T">Non-abstract type which implements <see cref="Orleans.Streams.IStreamProvider"/> stream</typeparam>

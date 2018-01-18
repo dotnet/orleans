@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Reflection;
 using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -19,7 +18,6 @@ using Orleans.Serialization;
 using Orleans.Streams.Core;
 using Orleans.Streams;
 using System.Runtime.ExceptionServices;
-using System.Runtime.InteropServices.ComTypes;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -79,7 +77,6 @@ namespace Orleans.Runtime
         private readonly OrleansTaskScheduler scheduler;
         private readonly ActivationDirectory activations;
         private IStreamProviderRuntime providerRuntime;
-        private IStreamProviderManager providerManager;
         private IServiceProvider serviceProvider;
         private readonly ILogger logger;
         private int collectionNumber;
@@ -113,7 +110,6 @@ namespace Orleans.Runtime
             MessageFactory messageFactory,
             SerializationManager serializationManager,
             IStreamProviderRuntime providerRuntime,
-            IStreamProviderManager providerManager,
             IServiceProvider serviceProvider,
             CachedVersionSelectorManager versionSelectorManager,
             ILoggerFactory loggerFactory,
@@ -135,7 +131,6 @@ namespace Orleans.Runtime
             this.versionSelectorManager = versionSelectorManager;
             this.providerRuntime = providerRuntime;
             this.serviceProvider = serviceProvider;
-            this.providerManager = providerManager;
             logger = loggerFactory.CreateLogger<Catalog>();
             this.config = config.Globals;
             ActivationCollector = new ActivationCollector(config, loggerFactory);
@@ -739,7 +734,7 @@ namespace Orleans.Runtime
             var invoker = InsideRuntimeClient.TryGetExtensionInvoker(this.GrainTypeManager, typeof(IStreamConsumerExtension));
             if (invoker == null)
                 throw new InvalidOperationException("Extension method invoker was not generated for an extension interface");
-            var handler = new StreamConsumerExtension(this.providerRuntime, observer, this.providerManager);
+            var handler = new StreamConsumerExtension(this.providerRuntime, observer);
             result.TryAddExtension(invoker, handler);
         }
 

@@ -17,13 +17,23 @@ namespace Orleans.Runtime
         RuntimeServices = 2000,
 
         /// <summary>
+        /// Initialize runtime storage
+        /// </summary>
+        RuntimeStorageServices = 3000,
+
+        /// <summary>
+        /// Start runtime services
+        /// </summary>
+        RuntimeGrainServices = 4000,
+
+        /// <summary>
         /// Start application layer services
         /// </summary>
-        ApplicationServices = 3000,
+        ApplicationServices = 5000,
 
         /// <summary>
         /// Silo is active and available to service requests
         /// </summary>
-        SiloActive = 4000,
+        SiloActive = 6000,
     }
 }

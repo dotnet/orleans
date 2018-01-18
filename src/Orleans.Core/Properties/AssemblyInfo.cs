@@ -40,6 +40,9 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("UnitTestGrainInterfaces")]
 [assembly: InternalsVisibleTo("UnitTestGrains")]
 [assembly: InternalsVisibleTo("UnitTests")]
-[assembly: InternalsVisibleTo("Orleans.Logging.Legacy")]
+
+// Legacy provider support
+[assembly: InternalsVisibleTo("Orleans.Core.Legacy")]
+[assembly: InternalsVisibleTo("Orleans.Runtime.Legacy")]
 
 [assembly: KnownAssembly(typeof(IGrain))]

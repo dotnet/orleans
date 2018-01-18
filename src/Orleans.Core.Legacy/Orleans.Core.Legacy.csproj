@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Core.Legacy</PackageId>
+    <Title>Microsoft Orleans Core Legacy Library</Title>
+    <Description>Legacy support for Microsoft Orleans Core library.</Description>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Orleans.Core.Legacy</AssemblyName>
+    <RootNamespace>Orleans.Core.Legacy</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" />
+  </ItemGroup>
+</Project>

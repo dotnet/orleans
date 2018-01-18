@@ -26,10 +26,8 @@ using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
 using Orleans.Providers;
 using Orleans.Runtime;
-using Orleans.Runtime.Storage;
 using Orleans.Transactions;
 using Orleans.LogConsistency;
-using Orleans.Storage;
 using Microsoft.Extensions.Logging;
 using Orleans.ApplicationParts;
 using Orleans.Runtime.Utilities;
@@ -76,32 +74,11 @@ namespace Orleans.Hosting
             services.TryAddTransient<ConsistentRingQueueBalancer>();
             services.TryAddSingleton<IStreamSubscriptionHandleFactory, StreamSubscriptionHandlerFactory>();
 
-            services.TryAddSingleton<ProviderManagerSystemTarget>();
-            services.TryAddSingleton<StatisticsProviderManager>();
-            services.AddFromExisting<IProviderManager, StatisticsProviderManager>();
+            services.TryAddSingleton<FallbackSystemTarget>();
 
-            // storage providers
-            services.TryAddSingleton<StorageProviderManager>();
-            services.AddFromExisting<IProviderManager, StorageProviderManager>();
-            services.TryAddFromExisting<IKeyedServiceCollection<string, IStorageProvider>, StorageProviderManager>(); // as named services
-            services.TryAddSingleton<IStorageProvider>(sp => sp.GetRequiredService<StorageProviderManager>().GetDefaultProvider()); // default
-
-            // log concistency providers
-            services.TryAddSingleton<LogConsistencyProviderManager>();
-            services.AddFromExisting<IProviderManager, LogConsistencyProviderManager>();
-            services.TryAddFromExisting<IKeyedServiceCollection<string, ILogConsistencyProvider>, LogConsistencyProviderManager>(); // as named services
-            services.TryAddSingleton<ILogConsistencyProvider>(sp => sp.GetRequiredService<LogConsistencyProviderManager>().GetDefaultProvider()); // default
-
-            services.TryAddSingleton<BootstrapProviderManager>();
-            services.AddFromExisting<IProviderManager, BootstrapProviderManager>();
-            services.TryAddSingleton<LoadedProviderTypeLoaders>();
             services.AddLogging();
             services.TryAddSingleton<ITimerRegistry, TimerRegistry>();
             services.TryAddSingleton<IReminderRegistry, ReminderRegistry>();
-            services.TryAddSingleton<StreamProviderManager>();
-            services.AddFromExisting<IStreamProviderManager, StreamProviderManager>();
-            services.TryAddFromExisting<IKeyedServiceCollection<string, IStreamProvider>, StreamProviderManager>(); // as named services
-            services.AddFromExisting<IProviderManager, IStreamProviderManager>();
             services.TryAddSingleton<GrainRuntime>();
             services.TryAddSingleton<IGrainRuntime, GrainRuntime>();
             services.TryAddSingleton<IGrainCancellationTokenRuntime, GrainCancellationTokenRuntime>();
@@ -128,7 +105,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<InsideRuntimeClient>();
             services.TryAddFromExisting<IRuntimeClient, InsideRuntimeClient>();
             services.TryAddFromExisting<ISiloRuntimeClient, InsideRuntimeClient>();
-            services.TryAddFromExisting<ILifecycleParticipant<ISiloLifecycle>, InsideRuntimeClient>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, InsideRuntimeClient>();
             services.TryAddSingleton<MultiClusterGossipChannelFactory>();
             services.TryAddSingleton<MultiClusterOracle>();
             services.TryAddSingleton<MultiClusterRegistrationStrategyManager>();

@@ -1,10 +1,13 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Storage;
 using Orleans.Versions;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
 using Orleans.Providers;
+using Microsoft.Extensions.DependencyInjection;
+using System.Linq;
 
 namespace Orleans.Runtime.Versions
 {
@@ -14,21 +17,13 @@ namespace Orleans.Runtime.Versions
         private readonly string clusterId;
         private IVersionStoreGrain StoreGrain => this.grainFactory.GetGrain<IVersionStoreGrain>(this.clusterId);
 
-        public bool IsEnabled { get; private set; }
+        public bool IsEnabled { get; }
 
-        public GrainVersionStore(IInternalGrainFactory grainFactory, ILocalSiloDetails siloDetails)
+        public GrainVersionStore(IInternalGrainFactory grainFactory, ILocalSiloDetails siloDetails, IServiceProvider services)
         {
             this.grainFactory = grainFactory;
             this.clusterId = siloDetails.ClusterId;
-            this.IsEnabled = false;
-        }
-
-        public void SetStorageManager(IStorageProviderManager storageProviderManager)
-        {
-            IStorageProvider unused;
-            IsEnabled = storageProviderManager.TryGetProvider(
-                ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME,
-                out unused);
+            this.IsEnabled = services.GetService<IStorageProvider>() != null;
         }
 
         public async Task SetCompatibilityStrategy(CompatibilityStrategy strategy)

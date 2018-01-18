@@ -16,7 +16,6 @@ using Orleans.Hosting;
 using Orleans.Runtime.MultiClusterNetwork;
 using Orleans.Runtime.TestHooks;
 using Orleans.Runtime.Providers;
-using Orleans.Runtime.Storage;
 
 namespace Orleans.TestingHost
 {
@@ -79,15 +78,8 @@ namespace Orleans.TestingHost
             this.host = host;
         }
 
-        internal IBootstrapProvider GetBootstrapProvider(string name)
-        {
-            var bootstrapProviderManager = this.host.Services.GetRequiredService<BootstrapProviderManager>();
-            IBootstrapProvider provider = (IBootstrapProvider)bootstrapProviderManager.GetProvider(name);
-            return CheckReturnBoundaryReference("bootstrap provider", provider);
-        }
-
         /// <summary>Find the named storage provider loaded in this silo. </summary>
-        internal IStorageProvider GetStorageProvider(string name) => CheckReturnBoundaryReference("storage provider", (IStorageProvider)this.host.Services.GetRequiredService<StorageProviderManager>().GetProvider(name));
+        internal IStorageProvider GetStorageProvider(string name) => CheckReturnBoundaryReference("storage provider", this.host.Services.GetRequiredServiceByName<IStorageProvider>(name));
 
         private static T CheckReturnBoundaryReference<T>(string what, T obj) where T : class
         {

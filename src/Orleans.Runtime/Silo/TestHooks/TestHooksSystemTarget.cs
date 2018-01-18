@@ -3,15 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans.Providers;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Storage;
-using Orleans.Streams;
 using Orleans.Hosting;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Orleans.Runtime.Counters;
-using Orleans.Runtime.Storage;
+using Orleans.Streams;
 
 namespace Orleans.Runtime.TestHooks
 {
@@ -40,62 +39,44 @@ namespace Orleans.Runtime.TestHooks
             return Task.FromResult(consistentRingProvider.ToString());
         }
 
-        public Task<bool> HasStatisticsProvider() => Task.FromResult(this.host.Services.GetService<StatisticsProviderManager>() != null);
+        public Task<bool> HasStatisticsProvider() => Task.FromResult(this.host.Services.GetServices<IStatisticsPublisher>() != null);
 
         public Task<Guid> GetServiceId() => Task.FromResult(this.host.Services.GetRequiredService<IOptions<SiloOptions>>().Value.ServiceId);
 
         public Task<bool> HasStorageProvider(string providerName)
         {
-            IStorageProvider tmp;
-            return Task.FromResult(this.host.Services.GetRequiredService<StorageProviderManager>().TryGetProvider(providerName, out tmp));
+            return Task.FromResult(this.host.Services.GetServiceByName<IStorageProvider>(providerName) != null);
         }
 
         public Task<bool> HasStreamProvider(string providerName)
         {
-            try
-            {
-                this.host.Services.GetRequiredService<IStreamProviderManager>().GetStreamProvider(providerName);
-                return Task.FromResult(true);
-            }
-            catch (KeyNotFoundException)
-            {
-                return Task.FromResult(false);
-            }
+            return Task.FromResult(this.host.Services.GetServiceByName<IStreamProvider>(providerName) != null);
         }
 
-        public Task<bool> HasBoostraperProvider(string providerName)
+        public Task<ICollection<string>> GetStorageProviderNames()
         {
-            foreach (var provider in this.host.Services.GetRequiredService<BootstrapProviderManager>().GetProviders())
-            {
-                if (String.Equals(providerName, provider.Name))
-                {
-                    return Task.FromResult(true);
-                }
-            }
-            return Task.FromResult(false);
+            var storageProviderCollection = this.host.Services.GetRequiredService<IKeyedServiceCollection<string, IStorageProvider>>();
+            return Task.FromResult<ICollection<string>>(storageProviderCollection.GetServices(this.host.Services).Select(keyedService => keyedService.Key).ToArray());
         }
 
-        public Task<ICollection<string>> GetStorageProviderNames() => Task.FromResult<ICollection<string>>(this.host.Services.GetRequiredService<StorageProviderManager>().GetProviderNames().ToList());
+        public Task<ICollection<string>> GetStreamProviderNames()
+        {
+            var streamProviderCollection = this.host.Services.GetRequiredService<IKeyedServiceCollection<string, IStreamProvider>>();
+            return Task.FromResult<ICollection<string>>(streamProviderCollection.GetServices(this.host.Services).Select(keyedService => keyedService.Key).ToArray());
+        }
 
-        public Task<ICollection<string>> GetStreamProviderNames() => Task.FromResult<ICollection<string>>(this.host.Services.GetRequiredService<IStreamProviderManager>().GetStreamProviders().Select(p => ((IProvider)p).Name).ToList());
-
-        public Task<ICollection<string>> GetAllSiloProviderNames()
+        public async Task<ICollection<string>> GetAllSiloProviderNames()
         {
             List<string> allProviders = new List<string>();
 
-            var storageProviderManager = this.host.Services.GetRequiredService<StorageProviderManager>();
-            allProviders.AddRange(storageProviderManager.GetProviderNames());
+            allProviders.AddRange(await GetStorageProviderNames());
 
-            var streamProviderManager = this.host.Services.GetRequiredService<IStreamProviderManager>();
-            allProviders.AddRange(streamProviderManager.GetStreamProviders().Select(p => p.Name));
+            allProviders.AddRange(await GetStorageProviderNames());
 
-            var statisticsProviderManager = this.host.Services.GetRequiredService<StatisticsProviderManager>();
-            allProviders.AddRange(statisticsProviderManager.GetProviders().Select(p => p.Name));
+            var statisticsPublisherCollection = this.host.Services.GetRequiredService<IKeyedServiceCollection<string, IStatisticsPublisher>>(); ;
+            allProviders.AddRange(statisticsPublisherCollection.GetServices(this.host.Services).Select(keyedService => keyedService.Key));
 
-            var booststrampProviderManager = this.host.Services.GetRequiredService<BootstrapProviderManager>();
-            allProviders.AddRange(booststrampProviderManager.GetProviders().Select(p => p.Name));
-
-            return Task.FromResult<ICollection<string>>(allProviders);
+            return allProviders;
         }
 
         public Task<int> UnregisterGrainForTesting(GrainId grain) => Task.FromResult(this.host.Services.GetRequiredService<Catalog>().UnregisterGrainForTesting(grain));

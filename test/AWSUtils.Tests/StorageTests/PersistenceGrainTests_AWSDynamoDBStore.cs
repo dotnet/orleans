@@ -47,22 +47,7 @@ namespace AWSUtils.Tests.StorageTests
                     options.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("DDBStore1", new Dictionary<string, string> { { "DataConnectionString", dataConnectionString } });
                     options.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("DDBStore2", new Dictionary<string, string> { { "DataConnectionString", dataConnectionString } });
                     options.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("DDBStore3", new Dictionary<string, string> { { "DataConnectionString", dataConnectionString } });
-                    options.ClusterConfiguration.Globals.RegisterStorageProvider<ShardedStorageProvider>("ShardedDDBStore");
 
-                    IProviderConfiguration providerConfig;
-                    if (options.ClusterConfiguration.Globals.TryGetProviderConfiguration("Orleans.Storage.ShardedStorageProvider", "ShardedDDBStore", out providerConfig))
-                    {
-                        var providerCategoriess = options.ClusterConfiguration.Globals.ProviderConfigurations;
-
-                        var providers = providerCategoriess.SelectMany(o => o.Value.Providers);
-
-                        IProviderConfiguration provider1 = GetNamedProviderConfigForShardedProvider(providers, "DDBStore1");
-                        IProviderConfiguration provider2 = GetNamedProviderConfigForShardedProvider(providers, "DDBStore2");
-                        IProviderConfiguration provider3 = GetNamedProviderConfigForShardedProvider(providers, "DDBStore3");
-                        providerConfig.AddChildConfiguration(provider1);
-                        providerConfig.AddChildConfiguration(provider2);
-                        providerConfig.AddChildConfiguration(provider3);
-                    }
                     return new TestCluster(options);
                 }
                 return null;
@@ -220,7 +205,7 @@ namespace AWSUtils.Tests.StorageTests
             Dictionary<string, string> providerCfgProps = new Dictionary<string, string>();
             var store = new DynamoDBStorageProvider();
             providerCfgProps["DataConnectionString"] = DataConnectionString;
-            var cfg = new ProviderConfiguration(providerCfgProps, null);
+            var cfg = new ProviderConfiguration(providerCfgProps);
             await store.Init(storageName, runtime, cfg);
             return store;
         }

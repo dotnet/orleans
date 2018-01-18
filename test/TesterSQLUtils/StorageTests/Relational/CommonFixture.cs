@@ -4,14 +4,10 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;
 using Orleans.Providers;
-using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Storage;
 using Orleans.Tests.SqlUtils;
 using Orleans.Storage;
-
 using TestExtensions;
-
 using UnitTests.General;
 
 namespace UnitTests.StorageTests.Relational
@@ -55,13 +51,7 @@ namespace UnitTests.StorageTests.Relational
         /// </summary>
         public CommonFixture()
         {
-            DefaultProviderRuntime = new StorageProviderManager(
-                this.GrainFactory,
-                this.Services,
-                new ClientProviderRuntime(this.InternalGrainFactory, this.Services, NullLoggerFactory.Instance),
-                new LoadedProviderTypeLoaders(new NullLogger<LoadedProviderTypeLoaders>()),
-                NullLoggerFactory.Instance);
-            ((StorageProviderManager) DefaultProviderRuntime).LoadEmptyStorageProviders().WaitWithThrow(TestConstants.InitTimeout);
+            DefaultProviderRuntime = new ClientProviderRuntime(this.InternalGrainFactory, this.Services, NullLoggerFactory.Instance);
         }
 
 
@@ -88,7 +78,7 @@ namespace UnitTests.StorageTests.Relational
                             properties["DataConnectionString"] = Storage.Storage.ConnectionString;
                             properties["AdoInvariant"] = storageInvariant;
 
-                            var config = new ProviderConfiguration(properties, null);
+                            var config = new ProviderConfiguration(properties);
                             var storageProvider = new AdoNetStorageProvider();
                             await storageProvider.Init(storageInvariant + "_StorageProvider", DefaultProviderRuntime, config);
 
