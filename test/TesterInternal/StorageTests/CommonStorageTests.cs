@@ -1,4 +1,4 @@
-﻿using Orleans;
+using Orleans;
 using Orleans.Runtime;
 using Orleans.Storage;
 using System;
@@ -77,10 +77,14 @@ namespace UnitTests.StorageTests.Relational
             {
                 // This loop writes the state consecutive times to the database to make sure its
                 // version is updated appropriately.
-                for (int k = 0; k < 10; ++k)
+                for(int k = 0; k < 10; ++k)
                 {
                     var versionBefore = grainData.Item2.ETag;
-                    await Store_WriteRead(grainTypeName, grainData.Item1, grainData.Item2).ConfigureAwait(false);
+                    await RetryHelper.RetryOnExceptionAsync(5, RetryOperation.Sigmoid, async () =>
+                    {
+                        await Store_WriteRead(grainTypeName, grainData.Item1, grainData.Item2);
+                        return Task.CompletedTask;
+                    });
 
                     var versionAfter = grainData.Item2.ETag;
                     Assert.NotEqual(versionBefore, versionAfter);

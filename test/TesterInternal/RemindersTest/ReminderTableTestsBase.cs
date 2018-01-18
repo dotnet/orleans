@@ -29,7 +29,7 @@ namespace UnitTests.RemindersTest
         protected IOptions<StorageOptions> storageOptions;
         protected IOptions<AdoNetOptions> adoNetOptions;
         protected const string testDatabaseName = "OrleansReminderTest";//for relational storage
-        
+
         protected ReminderTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture clusterFixture, LoggerFilterOptions filters)
         {
             fixture.InitializeConnectionStringAccessor(GetConnectionString);
@@ -78,7 +78,13 @@ namespace UnitTests.RemindersTest
             var upserts = await Task.WhenAll(Enumerable.Range(0, 5).Select(i =>
             {
                 var reminder = CreateReminder(MakeTestGrainReference(), i.ToString());
-                return Task.WhenAll(Enumerable.Range(1, 5).Select(j => remindersTable.UpsertRow(reminder)));
+                return Task.WhenAll(Enumerable.Range(1, 5).Select(j =>
+                {
+                    return RetryHelper.RetryOnExceptionAsync<string>(5, RetryOperation.Sigmoid, async () =>
+                    {
+                        return await remindersTable.UpsertRow(reminder);
+                    });
+                }));
             }));
             Assert.DoesNotContain(upserts, i => i.Distinct().Count() != 5);
         }
@@ -89,7 +95,7 @@ namespace UnitTests.RemindersTest
             await remindersTable.UpsertRow(reminder);
 
             var readReminder = await remindersTable.ReadRow(reminder.GrainRef, reminder.ReminderName);
-            
+
             string etagTemp = reminder.ETag = readReminder.ETag;
 
             Assert.Equal(JsonConvert.SerializeObject(readReminder), JsonConvert.SerializeObject(reminder));
@@ -113,7 +119,12 @@ namespace UnitTests.RemindersTest
             await Task.WhenAll(Enumerable.Range(1, iterations).Select(async i =>
             {
                 GrainReference grainRef = MakeTestGrainReference();
-                await remindersTable.UpsertRow(CreateReminder(grainRef, i.ToString()));
+
+                await RetryHelper.RetryOnExceptionAsync<Task>(10, RetryOperation.Sigmoid, async () =>
+                {
+                    await remindersTable.UpsertRow(CreateReminder(grainRef, i.ToString()));
+                    return Task.CompletedTask;
+                });
             }));
 
             var rows = await remindersTable.ReadRows(0, uint.MaxValue);
@@ -125,7 +136,7 @@ namespace UnitTests.RemindersTest
             Assert.Equal(rows.Reminders.Count, iterations);
 
             var remindersHashes = rows.Reminders.Select(r => r.GrainRef.GetUniformHashCode()).ToArray();
-            
+
             SafeRandom random = new SafeRandom();
 
             await Task.WhenAll(Enumerable.Range(0, iterations).Select(i =>
