@@ -65,20 +65,20 @@ namespace ServiceBus.Tests.Streaming
                 config.Globals.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName2, BuildProviderSettings(ProviderSettings2));
                 config.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
             }
+
+            public override void Dispose()
+            {
+                base.Dispose();
+                var dataManager = new AzureTableDataManager<TableEntity>(CheckpointerSettings.TableName, CheckpointerSettings.DataConnectionString, NullLoggerFactory.Instance);
+                dataManager.InitTableAsync().Wait();
+                dataManager.ClearTableAsync().Wait();
+                TestAzureTableStorageStreamFailureHandler.DeleteAll().Wait();
+            }
         }
 
         public EHProgrammaticSubscribeTest(ITestOutputHelper output, Fixture fixture)
             : base(fixture)
         {
-        }
-
-        public override void Dispose()
-        {
-            base.Dispose();
-            var dataManager = new AzureTableDataManager<TableEntity>(CheckpointerSettings.TableName, CheckpointerSettings.DataConnectionString, NullLoggerFactory.Instance);
-            dataManager.InitTableAsync().Wait();
-            dataManager.ClearTableAsync().Wait();
-            TestAzureTableStorageStreamFailureHandler.DeleteAll().Wait();
         }
     }
 }
