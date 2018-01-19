@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -15,8 +15,8 @@ namespace Orleans.Hosting
 {
     internal static class LegacyClusterConfigurationExtensions
     {
-        private const int SiloDefaultProviderInitStage = (int)SiloLifecycleStage.RuntimeStorageServices;
-        private const int SiloDefaultProviderStartStage = (int)SiloLifecycleStage.ApplicationServices;
+        private const int SiloDefaultProviderInitStage = SiloLifecycleStage.RuntimeStorageServices;
+        private const int SiloDefaultProviderStartStage = SiloLifecycleStage.ApplicationServices;
 
         public static IServiceCollection AddLegacyClusterConfigurationSupport(this IServiceCollection services, ClusterConfiguration configuration)
         {
