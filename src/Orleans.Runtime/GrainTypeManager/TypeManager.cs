@@ -75,9 +75,9 @@ namespace Orleans.Runtime
                 this.refreshClusterMapInterval);
         }
 
-        public Task<IGrainTypeResolver> GetClusterTypeCodeMap()
+        public Task<IGrainTypeResolver> GetClusterGrainTypeResolver()
         {
-            return Task.FromResult<IGrainTypeResolver>(grainTypeManager.ClusterGrainInterfaceMap);
+            return Task.FromResult<IGrainTypeResolver>(grainTypeManager.GrainTypeResolver);
         }
 
         public Task<GrainInterfaceMap> GetSiloTypeCodeMap()
