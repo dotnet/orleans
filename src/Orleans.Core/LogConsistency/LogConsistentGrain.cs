@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -57,8 +57,8 @@ namespace Orleans.LogConsistency
             lifecycle.Subscribe(GrainLifecycleStage.SetupState, OnSetupState);
             if(this is ILogConsistencyProtocolParticipant)
             {
-                lifecycle.Subscribe((int)GrainLifecycleStage.Activate - 1, PreActivate);
-                lifecycle.Subscribe((int)GrainLifecycleStage.Activate + 1, PostActivate);
+                lifecycle.Subscribe(GrainLifecycleStage.Activate - 1, PreActivate);
+                lifecycle.Subscribe(GrainLifecycleStage.Activate + 1, PostActivate);
             }
         }
 
