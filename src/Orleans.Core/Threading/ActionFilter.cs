@@ -78,7 +78,7 @@ namespace Orleans.Threading
         {
             foreach (var filter in actionFilters)
             {
-                filter.OnActionExecuting(action);
+                // filter.OnActionExecuting(action);
             }
 
             try
@@ -101,7 +101,7 @@ namespace Orleans.Threading
             {
                 foreach (var filter in reverseOrderActionFilters)
                 {
-                    filter.OnActionExecuted(action);
+                    // filter.OnActionExecuted(action);
                 }
             }
         }
