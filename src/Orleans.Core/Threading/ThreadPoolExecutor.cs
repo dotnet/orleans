@@ -59,7 +59,10 @@ namespace Orleans.Threading
 
             var workItem = new WorkItem(callback, state, options.WorkItemExecutionTimeTreshold, options.WorkItemStatusProvider);
 
-            statistic.OnEnQueueRequest(1, WorkQueueCount, workItem);
+            if (ExecutorOptions.CollectDetailedQueueStatistics)
+            {
+                statistic.OnEnQueueRequest(1, WorkQueueCount, workItem);
+            }
 
             workQueue.Add(workItem);
         }
