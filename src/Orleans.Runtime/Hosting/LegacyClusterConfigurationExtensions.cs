@@ -71,6 +71,7 @@ namespace Orleans.Hosting
 
             services.AddOptions<StatisticsOptions>()
                 .Configure<NodeConfiguration>((options, nodeConfig) => LegacyConfigurationExtensions.CopyStatisticsOptions(nodeConfig, options));
+            services.TryConfigureFormatter<StatisticsOptions, StatisticOptionsFormatter>();
 
             // Translate legacy configuration to new Options
             services.Configure<SiloMessagingOptions>(options =>
@@ -84,6 +85,7 @@ namespace Orleans.Hosting
             });
 
             services.Configure<NetworkingOptions>(options => LegacyConfigurationExtensions.CopyNetworkingOptions(configuration.Globals, options));
+            services.TryConfigureFormatter<NetworkingOptions, NetworkingOptionFormatter>();
 
             services.AddOptions<EndpointOptions>()
                 .Configure<IOptions<SiloOptions>>((options, siloOptions) =>
@@ -105,6 +107,7 @@ namespace Orleans.Hosting
                 options.SerializationProviders = configuration.Globals.SerializationProviders;
                 options.FallbackSerializationProvider = configuration.Globals.FallbackSerializationProvider;
             });
+            services.TryConfigureFormatter<SerializationProviderOptions, SerializationProviderOptionsFormatter>();
 
             services.AddOptions<GrainClassOptions>().Configure<IOptions<SiloOptions>>((options, siloOptions) =>
             {
