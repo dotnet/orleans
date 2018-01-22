@@ -150,7 +150,7 @@ From inside a grain class:
 
 From [Orleans Client](Developing-a-Client.md) code.
 
-Prior to 1.5.0:
+nPrior to 1.5.0:
 ```csharp
     IPlayerGrain player = GrainClient.GrainFactory.GetGrain<IPlayerGrain>(playerId);
 ```
@@ -203,7 +203,7 @@ await joinedTask;
 
 A grain class can optionally override `OnActivateAsync` and `OnDeactivateAsync` virtual methods that get invoked by the Orleans runtime upon activation and deactivation of each grain of the class.
 This gives the grain code a chance to perform additional initialization and cleanup operations.
-An exception throw by `OnActivateAsync` fails the activation process.
+An exception thrown by `OnActivateAsync` fails the activation process.
 While `OnActivateAsync`, if overridden, is always called as part of the grain activation process, `OnDeactivateAsync` is not guaranteed to get called in all situations, for example, in case of a server failure or other abnormal events.
 Because of that, applications should not rely on OnDeactivateAsync for performing critical operations, such as persistence of state changes, and only use it for best effort operations.
 
