@@ -132,8 +132,6 @@ namespace Orleans
 
             this.GrainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
 
-            this.ServiceProvider.GetService<TelemetryManager>()?.AddFromConfiguration(this.ServiceProvider, config.TelemetryConfiguration);
-
             var statisticsOptions = this.ServiceProvider.GetRequiredService<IOptions<StatisticsOptions>>();
             StatisticsCollector.Initialize(statisticsOptions.Value.CollectionLevel);
 
