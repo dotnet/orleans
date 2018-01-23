@@ -246,13 +246,13 @@ namespace Orleans.Statistics
             });
             IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_DOT_NET_THREADPOOL_INUSE_COMPLETIONPORTTHREADS, () =>
             {
-                int maXworkerThreads;
-                int maXcompletionPortThreads;
-                ThreadPool.GetMaxThreads(out maXworkerThreads, out maXcompletionPortThreads);
+                int maxWorkerThreads;
+                int maxCompletionPortThreads;
+                ThreadPool.GetMaxThreads(out maxWorkerThreads, out maxCompletionPortThreads);
                 int workerThreads;
                 int completionPortThreads;
                 ThreadPool.GetAvailableThreads(out workerThreads, out completionPortThreads);
-                return maXcompletionPortThreads - completionPortThreads;
+                return maxCompletionPortThreads - completionPortThreads;
             });
             return Task.CompletedTask;
         }
