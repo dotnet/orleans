@@ -1,7 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration.Options;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
@@ -15,6 +17,17 @@ namespace Orleans.Runtime
         private List<ITraceTelemetryConsumer> traceTelemetryConsumers = new List<ITraceTelemetryConsumer>();
 
         public IEnumerable<ITelemetryConsumer> TelemetryConsumers => this.consumers;
+
+        public TelemetryManager(IServiceProvider serviceProvider, IOptions<TelemetryOptions> options)
+        {
+            var newConsumers = new List<ITelemetryConsumer>(options.Value.Consumers.Count);
+            foreach (var consumerType in options.Value.Consumers)
+            {
+                var consumer = GetTelemetryConsumer(serviceProvider, consumerType, null);
+                newConsumers.Add(consumer);
+            }
+            this.AddConsumers(newConsumers);
+        }
 
         public void AddConsumers(IEnumerable<ITelemetryConsumer> newConsumers)
         {
