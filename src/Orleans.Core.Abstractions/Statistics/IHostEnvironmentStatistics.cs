@@ -1,11 +1,11 @@
-﻿namespace Orleans.Statistics
+namespace Orleans.Statistics
 {
     public interface IHostEnvironmentStatistics
     {
-        long TotalPhysicalMemory { get; }
+        long? TotalPhysicalMemory { get; }
 
-        float CpuUsage { get; }
+        float? CpuUsage { get; }
 
-        long AvailableMemory { get; }
+        long? AvailableMemory { get; }
     }
 }

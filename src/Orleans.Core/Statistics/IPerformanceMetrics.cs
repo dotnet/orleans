@@ -13,22 +13,22 @@ namespace Orleans.Runtime
         /// <summary>
         /// CPU utilization
         /// </summary>
-        float CpuUsage { get; }
+        float? CpuUsage { get; }
 
         /// <summary>
         /// Amount of memory available to processes running on the machine
         /// </summary>
-        long AvailablePhysicalMemory { get; }
+        long? AvailablePhysicalMemory { get; }
 
         /// <summary>
         /// Current memory usage
         /// </summary>
-        long MemoryUsage { get; }
+        long? MemoryUsage { get; }
 
         /// <summary>
         /// Amount of physical memory on the machine
         /// </summary>
-        long TotalPhysicalMemory { get; }
+        long? TotalPhysicalMemory { get; }
 
         /// <summary>
         /// the current size of the send queue (number of messages waiting to be sent). 
@@ -172,22 +172,22 @@ namespace Orleans.Runtime
         /// <summary>
         /// The CPU utilization.
         /// </summary>
-        public float CpuUsage { get; internal set; }
+        public float? CpuUsage { get; internal set; }
 
         /// <summary>
         /// The amount of memory available in the silo [bytes].
         /// </summary>
-        public float AvailableMemory { get; internal set; }
+        public float? AvailableMemory { get; internal set; }
 
         /// <summary>
         /// The used memory size.
         /// </summary>
-        public long MemoryUsage { get; internal set; }
+        public long? MemoryUsage { get; internal set; }
 
         /// <summary>
         /// The total physical memory available [bytes].
         /// </summary>
-        public long TotalPhysicalMemory { get; internal set; }
+        public long? TotalPhysicalMemory { get; internal set; }
 
         /// <summary>
         /// Is this silo overloaded.

@@ -1,4 +1,4 @@
-﻿#define LOG_MEMORY_PERF_COUNTERS 
+#define LOG_MEMORY_PERF_COUNTERS 
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -38,21 +38,21 @@ namespace Orleans.Runtime
 
         #region IClientPerformanceMetrics Members
 
-        public float CpuUsage
+        public float? CpuUsage
         {
             get { return hostEnvironmentStatistics.CpuUsage; }
         }
 
-        public long AvailablePhysicalMemory
+        public long? AvailablePhysicalMemory
         {
             get { return hostEnvironmentStatistics.AvailableMemory; }
         }
 
-        public long MemoryUsage
+        public long? MemoryUsage
         {
             get { return appEnvironmentStatistics.MemoryUsage; }
         }
-        public long TotalPhysicalMemory
+        public long? TotalPhysicalMemory
         {
             get { return hostEnvironmentStatistics.TotalPhysicalMemory; }
         }

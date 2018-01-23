@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.Extensions.Logging;
 using Orleans.Statistics;
 
@@ -6,11 +6,11 @@ namespace Orleans.Runtime
 {
     internal class DummyHostEnvironmentStatistics : IHostEnvironmentStatistics
     {
-        public long TotalPhysicalMemory => int.MaxValue;
+        public long? TotalPhysicalMemory => null;
 
-        public float CpuUsage => 0;
+        public float? CpuUsage => null;
 
-        public long AvailableMemory => TotalPhysicalMemory;
+        public long? AvailableMemory => null;
 
         public DummyHostEnvironmentStatistics(ILoggerFactory loggerFactory)
         {

@@ -68,22 +68,22 @@ namespace Orleans.Runtime.Counters
 
         #region ISiloPerformanceMetrics Members
 
-        public float CpuUsage 
+        public float? CpuUsage 
         { 
             get { return cpuUsageLatch.HasValue ? cpuUsageLatch.Value : hostEnvironmentStatistics.CpuUsage; } 
         }
 
-        public long AvailablePhysicalMemory
+        public long? AvailablePhysicalMemory
         {
             get { return hostEnvironmentStatistics.AvailableMemory; }
         }
 
-        public long TotalPhysicalMemory
+        public long? TotalPhysicalMemory
         {
             get { return hostEnvironmentStatistics.TotalPhysicalMemory; }
         }
 
-        public long MemoryUsage 
+        public long? MemoryUsage 
         {
             get { return appEnvironmentStatistics.MemoryUsage; } 
         }

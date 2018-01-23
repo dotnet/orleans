@@ -1,13 +1,13 @@
-﻿using Orleans.Runtime;
+using Orleans.Runtime;
 
 namespace UnitTests.SqlStatisticsPublisherTests
 {
     internal class DummyPerformanceMetrics : IClientPerformanceMetrics, ISiloPerformanceMetrics
     {
-        public float CpuUsage {get { return 1; } }
-        public long AvailablePhysicalMemory { get { return 2; } }
-        public long MemoryUsage { get { return 3; } }
-        public long TotalPhysicalMemory { get { return 4; } }
+        public float? CpuUsage {get { return 1; } }
+        public long? AvailablePhysicalMemory { get { return 2; } }
+        public long? MemoryUsage { get { return 3; } }
+        public long? TotalPhysicalMemory { get { return 4; } }
         public int SendQueueLength { get { return 5; } }
         public int ReceiveQueueLength { get { return 6; } }
         public long SentMessages { get { return 7; } }

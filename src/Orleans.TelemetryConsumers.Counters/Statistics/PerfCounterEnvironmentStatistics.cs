@@ -1,4 +1,4 @@
-﻿#define LOG_MEMORY_PERF_COUNTERS
+#define LOG_MEMORY_PERF_COUNTERS
 
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
@@ -37,14 +37,14 @@ namespace Orleans.Statistics
         ///
         /// <summary>Amount of physical memory on the machine</summary>
         ///
-        public long TotalPhysicalMemory { get; private set; }
+        public long? TotalPhysicalMemory { get; private set; }
 
         ///
         /// <summary>Amount of memory available to processes running on the machine</summary>
         ///
-        public long AvailableMemory { get { return availableMemoryCounterPF != null ? Convert.ToInt64(availableMemoryCounterPF.NextValue()) : 0; } }
+        public long? AvailableMemory { get { return availableMemoryCounterPF != null ? Convert.ToInt64(availableMemoryCounterPF.NextValue()) : (long?)null; } }
 
-        public float CpuUsage { get; private set; }
+        public float? CpuUsage { get; private set; }
 
         private static string GCGenCollectionCount
         {
@@ -196,7 +196,7 @@ namespace Orleans.Statistics
                 CpuUsage = 0;
             }
 
-            FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_CPUUSAGE, () => CpuUsage);
+            FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_CPUUSAGE, () => CpuUsage.Value);
             IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_TOTALMEMORYKB, () => (long)((MemoryUsage + KB - 1.0) / KB)); // Round up
 #if LOG_MEMORY_PERF_COUNTERS    // print GC stats in the silo log file.
             StringValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_GENCOLLECTIONCOUNT, () => GCGenCollectionCount);
