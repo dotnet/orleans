@@ -6,6 +6,7 @@ using Orleans.Metadata;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Serialization;
+using Orleans.Statistics;
 using Orleans.Streams;
 using Orleans.Streams.Core;
 
@@ -17,6 +18,8 @@ namespace Orleans
         {
             services.TryAddSingleton<TelemetryManager>();
             services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();
+            services.TryAddSingleton<IHostEnvironmentStatistics, NoOpHostEnvironmentStatistics>();
+            services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
             services.AddLogging();
             services.TryAddSingleton<ExecutorService>();
             services.TryAddSingleton<TypeMetadataCache>();

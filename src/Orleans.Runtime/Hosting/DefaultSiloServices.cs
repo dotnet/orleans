@@ -33,6 +33,7 @@ using Orleans.ApplicationParts;
 using Orleans.Runtime.Utilities;
 using System;
 using Orleans.Metadata;
+using Orleans.Statistics;
 
 namespace Orleans.Hosting
 {
@@ -65,6 +66,9 @@ namespace Orleans.Hosting
             });
             services.TryAddSingleton<TelemetryManager>();
             services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();
+
+            services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
+            services.TryAddSingleton<IHostEnvironmentStatistics, NoOpHostEnvironmentStatistics>();
 
             services.TryAddSingleton<ExecutorService>();
             // queue balancer contructing related

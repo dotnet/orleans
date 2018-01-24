@@ -20,8 +20,8 @@ namespace Orleans.AzureUtils
         public string ClientId { get; set; }
         public string HostName { get; set; }
 
-        public double CPU { get; set; }
-        public long MemoryUsage { get; set; }
+        public double? CPU { get; set; }
+        public long? MemoryUsage { get; set; }
         public int SendQueue { get; set; }
         public int ReceiveQueue { get; set; }
         public long SentMessages { get; set; }

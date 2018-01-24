@@ -1,34 +1,22 @@
-﻿using System;
+using System;
 using Microsoft.Extensions.Logging;
+using Orleans.Statistics;
 
 namespace Orleans.Runtime
 {
-    internal class RuntimeStatisticsGroup : IDisposable
+    internal class NoOpHostEnvironmentStatistics : IHostEnvironmentStatistics
     {
-        private readonly ILogger logger;
-        public long MemoryUsage => 0;
-        public long TotalPhysicalMemory => int.MaxValue;
-        public long AvailableMemory => TotalPhysicalMemory;
-        public float CpuUsage => 0;
+        public long? TotalPhysicalMemory => null;
 
-        public RuntimeStatisticsGroup(ILoggerFactory loggerFactory)
+        public float? CpuUsage => null;
+
+        public long? AvailableMemory => null;
+
+        public NoOpHostEnvironmentStatistics(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger<RuntimeStatisticsGroup>();
-        }
-
-        internal void Start()
-        {
-
+            var logger = loggerFactory.CreateLogger<NoOpHostEnvironmentStatistics>();
             logger.Warn(ErrorCode.PerfCounterNotRegistered,
-                "CPU & Memory perf counters are not available in .NET Standard. Load shedding will not work yet");
-        }
-
-        public void Stop()
-        {
-        }
-
-        public void Dispose()
-        {
+                "No implementation of IHostEnvironmentStatistics was found. Load shedding will not work yet");
         }
     }
 }

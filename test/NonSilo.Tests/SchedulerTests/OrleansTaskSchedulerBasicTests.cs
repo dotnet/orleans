@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -15,6 +15,7 @@ using Xunit;
 using Xunit.Abstractions;
 using Orleans;
 using Orleans.TestingHost.Utils;
+using Orleans.Statistics;
 
 // ReSharper disable ConvertToConstant.Local
 
@@ -45,7 +46,6 @@ namespace UnitTests.SchedulerTests
     {
         private readonly ITestOutputHelper output;
         private static readonly object lockable = new object();
-        private readonly RuntimeStatisticsGroup runtimeStatisticsGroup;
         private readonly SiloPerformanceMetrics performanceMetrics;
         private readonly UnitTestSchedulingContext rootContext;
         private readonly OrleansTaskScheduler scheduler;
@@ -55,8 +55,7 @@ namespace UnitTests.SchedulerTests
             this.output = output;
             SynchronizationContext.SetSynchronizationContext(null);
             loggerFactory = InitSchedulerLogging();
-            this.runtimeStatisticsGroup = new RuntimeStatisticsGroup(loggerFactory);
-            this.performanceMetrics = new SiloPerformanceMetrics(this.runtimeStatisticsGroup, this.loggerFactory);
+            this.performanceMetrics = new SiloPerformanceMetrics(new NoOpHostEnvironmentStatistics(loggerFactory), new AppEnvironmentStatistics(), this.loggerFactory);
             this.rootContext = new UnitTestSchedulingContext();
             this.scheduler = TestInternalHelper.InitializeSchedulerForTesting(rootContext, this.performanceMetrics, loggerFactory);
         }
@@ -65,7 +64,6 @@ namespace UnitTests.SchedulerTests
         {
             SynchronizationContext.SetSynchronizationContext(null);
             this.performanceMetrics.Dispose();
-            this.runtimeStatisticsGroup.Dispose();
             this.scheduler.Stop();
         }
 

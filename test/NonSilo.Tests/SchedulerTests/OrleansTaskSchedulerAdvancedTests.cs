@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
@@ -9,6 +9,7 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Counters;
 using Orleans.Runtime.Scheduler;
+using Orleans.Statistics;
 using UnitTests.TesterInternal;
 using Xunit;
 using Xunit.Abstractions;
@@ -18,7 +19,6 @@ namespace UnitTests.SchedulerTests
     public class OrleansTaskSchedulerAdvancedTests : MarshalByRefObject, IDisposable
     {
         private readonly ITestOutputHelper output;
-        private readonly RuntimeStatisticsGroup runtimeStatisticsGroup;
         private readonly SiloPerformanceMetrics performanceMetrics;
         private OrleansTaskScheduler orleansTaskScheduler;
 
@@ -35,8 +35,7 @@ namespace UnitTests.SchedulerTests
         {
             this.output = output;
             loggerFactory = OrleansTaskSchedulerBasicTests.InitSchedulerLogging();
-            this.runtimeStatisticsGroup = new RuntimeStatisticsGroup(loggerFactory);
-            this.performanceMetrics = new SiloPerformanceMetrics(this.runtimeStatisticsGroup, this.loggerFactory);
+            this.performanceMetrics = new SiloPerformanceMetrics(new NoOpHostEnvironmentStatistics(loggerFactory), new AppEnvironmentStatistics(), this.loggerFactory);
             
         }
 
@@ -47,7 +46,6 @@ namespace UnitTests.SchedulerTests
                 orleansTaskScheduler.Stop();
             }
             this.loggerFactory.Dispose();
-            this.runtimeStatisticsGroup.Dispose();
             this.performanceMetrics.Dispose();
         }
 
