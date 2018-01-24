@@ -118,7 +118,6 @@ namespace Orleans.Runtime.Host
 
                 orleans = host.Services.GetRequiredService<Silo>();
                 var localConfig = host.Services.GetRequiredService<NodeConfiguration>();
-                host.Services.GetService<TelemetryManager>()?.AddFromConfiguration(host.Services, localConfig.TelemetryConfiguration);
 
                 logger.Info(ErrorCode.Runtime_Error_100288, "Successfully initialized Orleans silo '{0}'.", orleans.Name);
             }

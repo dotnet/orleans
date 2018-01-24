@@ -10,6 +10,7 @@ using Orleans.Runtime.MembershipService;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Providers;
 using Orleans.Providers;
+using Orleans.Configuration.Options;
 
 namespace Orleans.Hosting
 {
@@ -104,6 +105,11 @@ namespace Orleans.Hosting
             {
                 options.SerializationProviders = configuration.Globals.SerializationProviders;
                 options.FallbackSerializationProvider = configuration.Globals.FallbackSerializationProvider;
+            });
+
+            services.Configure<TelemetryOptions>(options =>
+            {
+                LegacyConfigurationExtensions.CopyTelemetryOptions(configuration.Defaults.TelemetryConfiguration, services, options);
             });
 
             services.AddOptions<GrainClassOptions>().Configure<IOptions<SiloOptions>>((options, siloOptions) =>
