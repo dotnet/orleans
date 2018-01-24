@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -106,6 +106,30 @@ namespace Tester.CustomPlacementTests
             for (int i = 1; i < nGrains; i++)
             {
                 Assert.NotEqual(excludedSilo, tasks[i].Result);
+            }
+        }
+
+        [Fact]
+        public async Task CustomPlacement_RequestContextBased()
+        {
+            const int nGrains = 100;
+            var targetSilo = silos.Length - 1; // Always target the last one
+
+            Task<string>[] tasks = new Task<string>[nGrains];
+            for (int i = 0; i < nGrains; i++)
+            {
+                RequestContext.Set(TestPlacementStrategyFixedSiloDirector.TARGET_SILO_INDEX, targetSilo);
+                var g = this.fixture.GrainFactory.GetGrain<ICustomPlacementTestGrain>(Guid.NewGuid(),
+                    "UnitTests.Grains.CustomPlacement_RequestContextBased");
+                tasks[i] = g.GetRuntimeInstanceId();
+                RequestContext.Clear();
+            }
+
+            await Task.WhenAll(tasks);
+
+            for (int i = 1; i < nGrains; i++)
+            {
+                Assert.Equal(silos[targetSilo], tasks[i].Result);
             }
         }
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime;
@@ -8,6 +8,7 @@ namespace UnitTests.GrainInterfaces
 {
     public class TestPlacementStrategyFixedSiloDirector : IPlacementDirector<TestCustomPlacementStrategy>
     {
+        public const string TARGET_SILO_INDEX = "TARGET_SILO_INDEX";
 
         public Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
@@ -21,6 +22,10 @@ namespace UnitTests.GrainInterfaces
 
                 case CustomPlacementScenario.ExcludeOne:
                     return Task.FromResult(oddTick ? silos[0] : silos[silos.Length - 1]); // randomly return first or last silos
+
+                case CustomPlacementScenario.RequestContextBased:
+                    var index = (int)target.RequestContextData[TARGET_SILO_INDEX];
+                    return Task.FromResult(silos[index]);
 
                 default:
                     throw new InvalidOperationException(); // should never get here, only to make compiler happy
