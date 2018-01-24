@@ -30,6 +30,7 @@ namespace Orleans.Runtime.Messaging
         private readonly MessageFactory messageFactory;
         private readonly ILoggerFactory loggerFactory;
         private readonly ExecutorService executorService;
+        private readonly Action<Message>[] localMessageHandlers;
 
         internal bool IsBlockingApplicationMessages { get; private set; }
         internal ISiloPerformanceMetrics Metrics { get; private set; }
@@ -65,6 +66,8 @@ namespace Orleans.Runtime.Messaging
             {
                 Gateway = gatewayFactory(this);
             }
+
+            localMessageHandlers = new Action<Message>[Enum.GetValues(typeof(Message.Categories)).Length];
         }
 
         private void Initialize(IPEndPoint here, int generation, IOptions<SiloMessagingOptions> messagingOptions, IOptions<NetworkingOptions> networkingOptions, ISiloPerformanceMetrics metrics = null)
@@ -192,6 +195,28 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
+        public bool TrySendLocal(Message message)
+        {
+            if (!message.TargetSilo.Equals(MyAddress))
+            {
+                return false;
+            }
+
+            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Message has been looped back to this silo: {0}", message);
+            MessagingStatisticsGroup.LocalMessagesSent.Increment();
+            var localHandler = localMessageHandlers[(int) message.Category];
+            if (localHandler != null)
+            {
+                localHandler(message);
+            }
+            else
+            {
+                InboundQueue.PostMessage(message);
+            }
+
+            return true;
+        }
+
         internal void SendRejection(Message msg, Message.RejectionTypes rejectionType, string reason)
         {
             MessagingStatisticsGroup.OnRejectedMessage(msg);
@@ -204,6 +229,11 @@ namespace Orleans.Runtime.Messaging
         public Message WaitMessage(Message.Categories type, CancellationToken ct)
         {
             return InboundQueue.WaitMessage(type);
+        }
+
+        public void RegisterLocalMessageHandler(Message.Categories category, Action<Message> handler)
+        {
+            localMessageHandlers[(int) category] = handler;
         }
 
         public void Dispose()

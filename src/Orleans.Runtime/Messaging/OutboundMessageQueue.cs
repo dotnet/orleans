@@ -85,15 +85,8 @@ namespace Orleans.Runtime.Messaging
                 messageCenter.SendRejection(msg, Message.RejectionTypes.Unrecoverable, "Message to be sent does not have a target silo");
                 return;
             }
-
-            // Shortcut messages to this silo
-            if (msg.TargetSilo.Equals(messageCenter.MyAddress))
-            {
-                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Message has been looped back to this silo: {0}", msg);
-                MessagingStatisticsGroup.LocalMessagesSent.Increment();
-                messageCenter.InboundQueue.PostMessage(msg);
-            }
-            else
+            
+            if(!messageCenter.TrySendLocal(msg))
             {
                 if (stopped)
                 {

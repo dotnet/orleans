@@ -32,6 +32,7 @@ namespace Orleans.Runtime.Messaging
             this.dispatcher = dispatcher;
             this.messageFactory = messageFactory;
             OnFault = FaultBehavior.RestartOnFault;
+            messageCenter.RegisterLocalMessageHandler(cat, ReceiveMessage);
         }
 
         public override void Start()

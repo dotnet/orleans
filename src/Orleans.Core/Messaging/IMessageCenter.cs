@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 
 namespace Orleans.Runtime
@@ -15,6 +16,8 @@ namespace Orleans.Runtime
         void SendMessage(Message msg);
 
         Message WaitMessage(Message.Categories type, CancellationToken ct);
+
+        void RegisterLocalMessageHandler(Message.Categories category, Action<Message> handler);
 
         int SendQueueLength { get; }
 
