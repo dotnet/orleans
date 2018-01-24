@@ -31,7 +31,8 @@ The client configuration should look like this:
 </ClientConfiguration>
 ```
 
-Where the DataConnectionString is set to any valid SQL Server connection string. In order to use SQL Server as the store for system data, there’s now a script file [CreateOrleansTables_*](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/CreateOrleansTables_SqlServer.sql)(where asterisk denotes database vendor) in the Binaries\OrleansServer folder which establishes the necessary database objects. Make sure that all servers that will be hosting Orleans silos can reach the database and has access rights to it! We’ve tripped up a few times on this seemingly trivial concern during our testing.
+Where the DataConnectionString is set to any valid SQL Server connection string. In order to use SQL Server as the store for system data, there’s now a script file [CreateOrleansTables_*.sql](https://github.com/dotnet/orleans/tree/v1.5.3/src/OrleansSQLUtils)(where asterisk denotes database vendor) in the Binaries\OrleansServer folder which establishes the necessary database objects. Make sure that all servers that will be hosting Orleans silos can reach the database and has access rights to it! We’ve tripped up a few times on this seemingly trivial concern during our testing.
+Note that in Orleans 2.0.0 those SQL scripts have been split into per-feature pieces to match the finer grain provider model: [Clustering](https://github.com/dotnet/orleans/tree/v2.0.0-beta3/src/AdoNet/Orleans.Clustering.AdoNet), [Persistence](https://github.com/dotnet/orleans/tree/v2.0.0-beta3/src/AdoNet/Orleans.Persistence.AdoNet), [Reminders](https://github.com/dotnet/orleans/tree/v2.0.0-beta3/src/AdoNet/Orleans.Reminders.AdoNet), and [Statistics](https://github.com/dotnet/orleans/tree/v2.0.0-beta3/src/AdoNet/Orleans.Statistics.AdoNet).
 
 ### SQL Metrics and Statistics tables
 
