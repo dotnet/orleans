@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Net;
 using System.Threading;
@@ -35,7 +35,7 @@ namespace UnitTests.SchedulerTests
             this.output = output;
             loggerFactory = OrleansTaskSchedulerBasicTests.InitSchedulerLogging();
             context = new UnitTestSchedulingContext();
-            this.performanceMetrics = new SiloPerformanceMetrics(new DummyHostEnvironmentStatistics(loggerFactory), new AppEnvironmentStatistics(), this.loggerFactory);
+            this.performanceMetrics = new SiloPerformanceMetrics(new NoOpHostEnvironmentStatistics(loggerFactory), new AppEnvironmentStatistics(), this.loggerFactory);
             masterScheduler = TestInternalHelper.InitializeSchedulerForTesting(context, this.performanceMetrics, loggerFactory);
         }
         

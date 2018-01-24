@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -55,7 +55,7 @@ namespace UnitTests.SchedulerTests
             this.output = output;
             SynchronizationContext.SetSynchronizationContext(null);
             loggerFactory = InitSchedulerLogging();
-            this.performanceMetrics = new SiloPerformanceMetrics(new DummyHostEnvironmentStatistics(loggerFactory), new AppEnvironmentStatistics(), this.loggerFactory);
+            this.performanceMetrics = new SiloPerformanceMetrics(new NoOpHostEnvironmentStatistics(loggerFactory), new AppEnvironmentStatistics(), this.loggerFactory);
             this.rootContext = new UnitTestSchedulingContext();
             this.scheduler = TestInternalHelper.InitializeSchedulerForTesting(rootContext, this.performanceMetrics, loggerFactory);
         }

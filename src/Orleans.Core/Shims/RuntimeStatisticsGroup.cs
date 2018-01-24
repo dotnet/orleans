@@ -4,7 +4,7 @@ using Orleans.Statistics;
 
 namespace Orleans.Runtime
 {
-    internal class DummyHostEnvironmentStatistics : IHostEnvironmentStatistics
+    internal class NoOpHostEnvironmentStatistics : IHostEnvironmentStatistics
     {
         public long? TotalPhysicalMemory => null;
 
@@ -12,9 +12,9 @@ namespace Orleans.Runtime
 
         public long? AvailableMemory => null;
 
-        public DummyHostEnvironmentStatistics(ILoggerFactory loggerFactory)
+        public NoOpHostEnvironmentStatistics(ILoggerFactory loggerFactory)
         {
-            var logger = loggerFactory.CreateLogger<DummyHostEnvironmentStatistics>();
+            var logger = loggerFactory.CreateLogger<NoOpHostEnvironmentStatistics>();
             logger.Warn(ErrorCode.PerfCounterNotRegistered,
                 "No implementation of IHostEnvironmentStatistics was found. Load shedding will not work yet");
         }

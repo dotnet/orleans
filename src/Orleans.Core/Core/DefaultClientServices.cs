@@ -18,8 +18,7 @@ namespace Orleans
         {
             services.TryAddSingleton<TelemetryManager>();
             services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();
-            // if no IHostEnvironmentStatistics registered, use the dummy one
-            services.TryAddSingleton<IHostEnvironmentStatistics, DummyHostEnvironmentStatistics>();
+            services.TryAddSingleton<IHostEnvironmentStatistics, NoOpHostEnvironmentStatistics>();
             services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
             services.AddLogging();
             services.TryAddSingleton<ExecutorService>();
