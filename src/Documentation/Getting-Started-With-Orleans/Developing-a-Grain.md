@@ -150,7 +150,7 @@ From inside a grain class:
 
 From [Orleans Client](Developing-a-Client.md) code.
 
-nPrior to 1.5.0:
+Prior to 1.5.0:
 ```csharp
     IPlayerGrain player = GrainClient.GrainFactory.GetGrain<IPlayerGrain>(playerId);
 ```
