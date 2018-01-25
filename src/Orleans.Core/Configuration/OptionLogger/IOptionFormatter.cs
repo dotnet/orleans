@@ -8,8 +8,6 @@ namespace Orleans
     /// </summary>
     public interface IOptionFormatter
     {
-        string Category { get; }
-
         string Name { get; }
 
         //format setting values into a list of string

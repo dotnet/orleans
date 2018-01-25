@@ -40,29 +40,17 @@ namespace Orleans
         }
         public void LogOptions()
         {
-            this.logger.LogInformation("Starting with following configuration:");
             var optionFormatters = services.GetServices<IOptionFormatter>();
-            foreach (var formatterGroup in optionFormatters
-                .GroupBy(optionFormatter => optionFormatter.Category)
-                .OrderBy(group => group.Key))
+            foreach (var optionFormatter in optionFormatters)
             {
-                foreach (var optionFormatter in formatterGroup)
-                {
-                    LogOption(optionFormatter);
-                }
-
+                LogOption(optionFormatter);
             }
         }
 
         private void LogOption(IOptionFormatter formatter)
         {
             var stringBuiler = new StringBuilder();
-            if(string.IsNullOrEmpty(formatter.Category))
-                stringBuiler.AppendLine($"{formatter.Name}:");
-            else
-            {
-                stringBuiler.AppendLine($"{formatter.Category}, {formatter.Name}:");
-            }
+            stringBuiler.AppendLine($"Configuration {formatter.Name}: ");
             foreach (var setting in formatter.Format())
             {
                 stringBuiler.AppendLine($"{setting}");
