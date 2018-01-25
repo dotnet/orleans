@@ -2,11 +2,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.ApplicationParts;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Metadata;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Serialization;
+using Orleans.Statistics;
 using Orleans.Streams;
 using Orleans.Streams.Core;
 
@@ -18,10 +18,10 @@ namespace Orleans
         {
             services.TryAddSingleton<TelemetryManager>();
             services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();
+            services.TryAddSingleton<IHostEnvironmentStatistics, NoOpHostEnvironmentStatistics>();
+            services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
             services.AddLogging();
             services.TryAddSingleton<ExecutorService>();
-            services.TryAddSingleton<LoadedProviderTypeLoaders>();
-            services.TryAddSingleton<StatisticsProviderManager>();
             services.TryAddSingleton<TypeMetadataCache>();
             services.TryAddSingleton<OutsideRuntimeClient>();
             services.TryAddFromExisting<IRuntimeClient, OutsideRuntimeClient>();
@@ -34,9 +34,7 @@ namespace Orleans
             services.TryAddFromExisting<IGrainReferenceConverter, GrainFactory>();
             services.TryAddSingleton<ClientProviderRuntime>();
             services.TryAddSingleton<MessageFactory>();
-            services.TryAddSingleton<StreamProviderManager>();
             services.TryAddSingleton<ClientStatisticsManager>();
-            services.TryAddFromExisting<IStreamProviderManager, StreamProviderManager>();
             services.TryAddFromExisting<IStreamProviderRuntime, ClientProviderRuntime>();
             services.TryAddFromExisting<IProviderRuntime, ClientProviderRuntime>();
             services.TryAddSingleton<IStreamSubscriptionManagerAdmin, StreamSubscriptionManagerAdmin>();
@@ -61,6 +59,8 @@ namespace Orleans
             parts.AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainInterfaceFeature>());
             parts.AddFeatureProvider(new AssemblyAttributeFeatureProvider<SerializerFeature>());
             services.AddTransient<IConfigurationValidator, ApplicationPartValidator>();
+
+            services.TryAddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
         }
     }
 }

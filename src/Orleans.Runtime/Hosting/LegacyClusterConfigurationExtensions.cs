@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -8,11 +8,17 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
 using Orleans.Runtime.Scheduler;
+using Orleans.Runtime.Providers;
+using Orleans.Providers;
+using Orleans.Configuration.Options;
 
 namespace Orleans.Hosting
 {
     internal static class LegacyClusterConfigurationExtensions
     {
+        private const int SiloDefaultProviderInitStage = SiloLifecycleStage.RuntimeStorageServices;
+        private const int SiloDefaultProviderStartStage = SiloLifecycleStage.ApplicationServices;
+
         public static IServiceCollection AddLegacyClusterConfigurationSupport(this IServiceCollection services, ClusterConfiguration configuration)
         {
             if (configuration == null) throw new ArgumentNullException(nameof(configuration));
@@ -101,6 +107,11 @@ namespace Orleans.Hosting
                 options.FallbackSerializationProvider = configuration.Globals.FallbackSerializationProvider;
             });
 
+            services.Configure<TelemetryOptions>(options =>
+            {
+                LegacyConfigurationExtensions.CopyTelemetryOptions(configuration.Defaults.TelemetryConfiguration, services, options);
+            });
+
             services.AddOptions<GrainClassOptions>().Configure<IOptions<SiloOptions>>((options, siloOptions) =>
             {
                 var nodeConfig = configuration.GetOrCreateNodeConfigurationForSilo(siloOptions.Value.SiloName);
@@ -114,6 +125,15 @@ namespace Orleans.Hosting
                 options.AllowCallChainReentrancy = config.AllowCallChainReentrancy;
                 options.PerformDeadlockDetection = config.PerformDeadlockDetection;
             });
+
+            services.TryAddSingleton<LegacyProviderConfigurator.ScheduleTask>(sp =>
+            {
+                OrleansTaskScheduler scheduler = sp.GetRequiredService<OrleansTaskScheduler>();
+                SystemTarget fallbackSystemTarget = sp.GetRequiredService<FallbackSystemTarget>();
+                return (taskFunc) => scheduler.QueueTask(taskFunc, fallbackSystemTarget.SchedulingContext);
+            });
+            LegacyProviderConfigurator<ISiloLifecycle>.ConfigureServices(configuration.Globals.ProviderConfigurations, services, SiloDefaultProviderInitStage, SiloDefaultProviderStartStage);
+
             return services;
         }
     }

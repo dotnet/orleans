@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -26,12 +25,6 @@ namespace Orleans
         /// Gets the client configuration.
         /// </summary>
         ClientConfiguration Configuration { get; }
-
-        /// <summary>
-        /// Returns a collection of all configured <see cref="IStreamProvider"/>s.
-        /// </summary>
-        /// <returns>A collection of all configured <see cref="IStreamProvider"/>s.</returns>
-        IEnumerable<IStreamProvider> GetStreamProviders();
 
         /// <summary>
         /// Returns the <see cref="IStreamProvider"/> with the specified <paramref name="name"/>.

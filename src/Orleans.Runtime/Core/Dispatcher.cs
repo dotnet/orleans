@@ -720,11 +720,15 @@ namespace Orleans.Runtime
             // second, we check for a strategy associated with the target's interface. third, we check for a strategy associated with the activation sending the
             // message.
             var strategy = targetAddress.Grain.IsGrain ? catalog.GetGrainPlacementStrategy(targetAddress.Grain) : null;
-         
+
             var request = message.IsUsingInterfaceVersions
                 ? message.GetDeserializedBody(this.serializationManager) as InvokeMethodRequest
                 : null;
-            var target = new PlacementTarget(message.TargetGrain, request?.InterfaceId ?? 0, request?.InterfaceVersion ?? 0);
+            var target = new PlacementTarget(
+                message.TargetGrain,
+                message.RequestContextData,
+                request?.InterfaceId ?? 0,
+                request?.InterfaceVersion ?? 0);
 
             PlacementResult placementResult;
             if (placementDirectorsManager.TrySelectActivationSynchronously(

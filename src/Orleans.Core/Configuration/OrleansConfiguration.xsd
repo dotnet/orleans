@@ -309,8 +309,9 @@
       <xs:annotation>
         <xs:documentation>
           The MaxForwardCount attribute specifies the maximal number of times a message is being forwared from one silo to another.
-          Forwarding is used internally by the tuntime as a recovery mechanism when silos fail and the membership is unstable.
-          In such times the messages might not be routed correctly to destination, and runtime attempts to forward such messages a number of times before rejecting them.
+          Forwarding is used internally by the runtime as a recovery mechanism when silos fail and the membership is unstable.
+          In such times the messages might not be routed correctly to the destination, and the runtime attempts to forward such 
+	  messages the specified number of times before rejecting them.
         </xs:documentation>
       </xs:annotation>
     </xs:attribute>

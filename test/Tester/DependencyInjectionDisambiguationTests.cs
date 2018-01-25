@@ -1,8 +1,10 @@
 ﻿
 using System;
+using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using Orleans.Runtime;
+using System.Collections.Generic;
 
 namespace UnitTests.General
 {
@@ -44,6 +46,11 @@ namespace UnitTests.General
             public IValue<TValue> GetService(IServiceProvider serviceProvider, TValue name)
             {
                 return new SomeValue<TValue> { Value = name };
+            }
+
+            public IEnumerable<IKeyedService<TValue, IValue<TValue>>> GetServices(IServiceProvider services)
+            {
+                return Enumerable.Empty<IKeyedService<TValue, IValue<TValue>>>();
             }
         }
 

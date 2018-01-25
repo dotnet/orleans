@@ -1,8 +1,8 @@
-﻿#define LOG_MEMORY_PERF_COUNTERS 
+#define LOG_MEMORY_PERF_COUNTERS 
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-
+using Orleans.Statistics;
 
 namespace Orleans.Runtime
 {
@@ -13,42 +13,48 @@ namespace Orleans.Runtime
         private TimeSpan reportFrequency;
 
         private readonly IntValueStatistic connectedGatewayCount;
-        private readonly RuntimeStatisticsGroup runtimeStats;
-
+        private readonly IHostEnvironmentStatistics hostEnvironmentStatistics;
+        private readonly IAppEnvironmentStatistics appEnvironmentStatistics;
         private AsyncTaskSafeTimer reportTimer;
         private readonly ILogger logger;
         private readonly ILogger timerLogger;
-        internal ClientTableStatistics(IMessageCenter mc, IClientMetricsDataPublisher metricsDataPublisher, RuntimeStatisticsGroup runtime, ILoggerFactory loggerFactory)
+        internal ClientTableStatistics(
+            IMessageCenter mc, 
+            IClientMetricsDataPublisher metricsDataPublisher,
+            IHostEnvironmentStatistics hostEnvironmentStatistics, 
+            IAppEnvironmentStatistics appEnvironmentStatistics,
+            ILoggerFactory loggerFactory)
         {
             this.mc = mc;
             this.metricsDataPublisher = metricsDataPublisher;
             this.logger = loggerFactory.CreateLogger<ClientTableStatistics>();
             //async timer created through current class all share this logger for perf reasons
             this.timerLogger = loggerFactory.CreateLogger<AsyncTaskSafeTimer>();
-            runtimeStats = runtime;
+            this.hostEnvironmentStatistics = hostEnvironmentStatistics;
+            this.appEnvironmentStatistics = appEnvironmentStatistics;
             reportFrequency = TimeSpan.Zero;
             connectedGatewayCount = IntValueStatistic.Find(StatisticNames.CLIENT_CONNECTED_GATEWAY_COUNT);
         }
 
         #region IClientPerformanceMetrics Members
 
-        public float CpuUsage
+        public float? CpuUsage
         {
-            get { return runtimeStats.CpuUsage; }
+            get { return hostEnvironmentStatistics.CpuUsage; }
         }
 
-        public long AvailablePhysicalMemory
+        public long? AvailablePhysicalMemory
         {
-            get { return runtimeStats.AvailableMemory; }
+            get { return hostEnvironmentStatistics.AvailableMemory; }
         }
 
-        public long MemoryUsage
+        public long? MemoryUsage
         {
-            get { return runtimeStats.MemoryUsage; }
+            get { return appEnvironmentStatistics.MemoryUsage; }
         }
-        public long TotalPhysicalMemory
+        public long? TotalPhysicalMemory
         {
-            get { return runtimeStats.TotalPhysicalMemory; }
+            get { return hostEnvironmentStatistics.TotalPhysicalMemory; }
         }
 
         public int SendQueueLength

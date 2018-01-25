@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 
 namespace Orleans.Runtime
 {
@@ -17,9 +18,7 @@ namespace Orleans.Runtime
         public FileTelemetryConsumer(FileInfo file)
         {
             _logFileName = file.FullName;
-            var fileExists = File.Exists(_logFileName);
-            _logOutput = fileExists ? file.AppendText() : file.CreateText();
-            file.Refresh();
+            _logOutput = new StreamWriter(File.Open(_logFileName, FileMode.Append, FileAccess.Write, FileShare.ReadWrite), Encoding.UTF8);
         }
 
         public void TrackTrace(string message)

@@ -305,10 +305,10 @@ namespace Orleans.Messaging
             }
         }
 
-        public Task<IGrainTypeResolver> GetTypeCodeMap(IInternalGrainFactory grainFactory)
+        public Task<IGrainTypeResolver> GetGrainTypeResolver(IInternalGrainFactory grainFactory)
         {
             var silo = GetLiveGatewaySiloAddress();
-            return GetTypeManager(silo, grainFactory).GetClusterTypeCodeMap();
+            return GetTypeManager(silo, grainFactory).GetClusterGrainTypeResolver();
         }
 
         public Task<Streams.ImplicitStreamSubscriberTable> GetImplicitStreamSubscriberTable(IInternalGrainFactory grainFactory)

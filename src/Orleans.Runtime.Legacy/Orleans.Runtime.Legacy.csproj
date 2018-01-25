@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Runtime.Legacy</PackageId>
+    <Title>Microsoft Orleans Runtime Legacy Library</Title>
+    <Description>Legacy support for Microsoft Orleans Runtime library.</Description>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Orleans.Runtime.Legacy</AssemblyName>
+    <RootNamespace>Orleans.Runtime.Legacy</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Hosting\**" />
+    <EmbeddedResource Remove="Hosting\**" />
+    <None Remove="Hosting\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Orleans.Core.Legacy\Orleans.Core.Legacy.csproj" />
+    <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" />
+    <ProjectReference Include="..\Orleans.Runtime\Orleans.Runtime.csproj" />
+  </ItemGroup>
+</Project>

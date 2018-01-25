@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
+using Orleans.Statistics;
 
 namespace Orleans.Runtime.Counters
 {
@@ -19,15 +20,21 @@ namespace Orleans.Runtime.Counters
         private TimeSpan reportFrequency;
         private bool overloadLatched;
         private bool overloadValue;
-        private readonly RuntimeStatisticsGroup runtimeStats;
+        private readonly IHostEnvironmentStatistics hostEnvironmentStatistics;
+        private readonly IAppEnvironmentStatistics appEnvironmentStatistics;
         private AsyncTaskSafeTimer tableReportTimer;
         private readonly ILogger logger;
         private float? cpuUsageLatch;
 
-        internal SiloPerformanceMetrics(RuntimeStatisticsGroup runtime, ILoggerFactory loggerFactory, NodeConfiguration cfg = null)
+        internal SiloPerformanceMetrics(
+            IHostEnvironmentStatistics hostEnvironmentStatistics,
+            IAppEnvironmentStatistics appEnvironmentStatistics,
+            ILoggerFactory loggerFactory, 
+            NodeConfiguration cfg = null)
         {
             this.loggerFactory = loggerFactory;
-            runtimeStats = runtime;
+            this.hostEnvironmentStatistics = hostEnvironmentStatistics;
+            this.appEnvironmentStatistics = appEnvironmentStatistics;
             reportFrequency = TimeSpan.Zero;
             overloadLatched = false;
             overloadValue = false;
@@ -61,24 +68,24 @@ namespace Orleans.Runtime.Counters
 
         #region ISiloPerformanceMetrics Members
 
-        public float CpuUsage 
+        public float? CpuUsage 
         { 
-            get { return cpuUsageLatch.HasValue ? cpuUsageLatch.Value : runtimeStats.CpuUsage; } 
+            get { return cpuUsageLatch.HasValue ? cpuUsageLatch.Value : hostEnvironmentStatistics.CpuUsage; } 
         }
 
-        public long AvailablePhysicalMemory
+        public long? AvailablePhysicalMemory
         {
-            get { return runtimeStats.AvailableMemory; }
+            get { return hostEnvironmentStatistics.AvailableMemory; }
         }
 
-        public long TotalPhysicalMemory
+        public long? TotalPhysicalMemory
         {
-            get { return runtimeStats.TotalPhysicalMemory; }
+            get { return hostEnvironmentStatistics.TotalPhysicalMemory; }
         }
 
-        public long MemoryUsage 
+        public long? MemoryUsage 
         {
-            get { return runtimeStats.MemoryUsage; } 
+            get { return appEnvironmentStatistics.MemoryUsage; } 
         }
 
         public bool IsOverloaded

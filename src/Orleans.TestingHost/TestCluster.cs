@@ -74,11 +74,6 @@ namespace Orleans.TestingHost
         public IGrainFactory GrainFactory => this.Client;
 
         /// <summary>
-        /// The client-side <see cref="StreamProviderManager"/>.
-        /// </summary>
-        public IStreamProviderManager StreamProviderManager { get; private set; }
-
-        /// <summary>
         /// GrainFactory to use in the tests
         /// </summary>
         internal IInternalGrainFactory InternalGrainFactory => this.InternalClient;
@@ -471,7 +466,6 @@ namespace Orleans.TestingHost
             this.InternalClient = (IInternalClusterClient)this.clientBuilderFactory(clientConfig).Build();
             this.InternalClient.Connect().Wait();
             this.SerializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
-            this.StreamProviderManager = this.ServiceProvider.GetRequiredService<IRuntimeClient>().CurrentStreamProviderManager;
         }
         
         private async Task InitializeAsync(IEnumerable<string> siloNames)

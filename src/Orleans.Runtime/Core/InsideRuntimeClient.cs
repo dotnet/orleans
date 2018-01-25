@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;
@@ -20,7 +19,6 @@ using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Hosting;
-using Orleans.Configuration;
 using System.Threading;
 
 namespace Orleans.Runtime
@@ -98,8 +96,6 @@ namespace Orleans.Runtime
 
         /// <inheritdoc />
         public ClientInvokeCallback ClientInvokeCallback { get; set; }
-
-        public IStreamProviderManager CurrentStreamProviderManager { get; internal set; }
 
         public IStreamProviderRuntime CurrentStreamProviderRuntime { get; internal set; }
 
@@ -727,14 +723,12 @@ namespace Orleans.Runtime
         {
             var stopWatch = Stopwatch.StartNew();
             typeManager.Start();
-            GrainTypeResolver = typeManager.GetTypeCodeMap();
             stopWatch.Stop();
             this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Start InsideRuntimeClient took {stopWatch.ElapsedMilliseconds} Milliseconds");
             return Task.CompletedTask;
         }
 
-        public IGrainTypeResolver GrainTypeResolver { get; private set; }
-
+        public IGrainTypeResolver GrainTypeResolver => typeManager.GrainTypeResolver;
 
         public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)
         {

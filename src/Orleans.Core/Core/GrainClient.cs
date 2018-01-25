@@ -3,12 +3,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
-using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.ApplicationParts;
 using Orleans.CodeGeneration;
-using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
@@ -356,13 +353,6 @@ namespace Orleans
                 CheckInitialized();
                 RuntimeClient.ClientInvokeCallback = value;
             }
-        }
-
-        [Obsolete(DeprecationMessage)]
-        public static IEnumerable<Streams.IStreamProvider> GetStreamProviders()
-        {
-            CheckInitialized();
-            return client.GetStreamProviders();
         }
 
         internal static IStreamProviderRuntime CurrentStreamProviderRuntime

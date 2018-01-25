@@ -13,3 +13,6 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("TestInternalGrains")]
 [assembly: InternalsVisibleTo("UnitTestGrains")]
 [assembly: InternalsVisibleTo("UnitTests")]
+
+// Legacy provider support
+[assembly: InternalsVisibleTo("Orleans.Runtime.Legacy")]

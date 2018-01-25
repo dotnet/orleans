@@ -1,18 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.Runtime.Configuration;
 using Orleans.ServiceBus.Providers;
-using Orleans.ServiceBus.Providers.Testing;
 using Orleans.Storage;
 using Orleans.Streaming.EventHubs;
-using Orleans.Streams;
 using Orleans.TestingHost;
-using ServiceBus.Tests.TestStreamProviders;
 using Tester.StreamingTests;
 using Tester.TestStreamProviders;
 using TestExtensions;
@@ -71,20 +65,20 @@ namespace ServiceBus.Tests.Streaming
                 config.Globals.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName2, BuildProviderSettings(ProviderSettings2));
                 config.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
             }
+
+            public override void Dispose()
+            {
+                base.Dispose();
+                var dataManager = new AzureTableDataManager<TableEntity>(CheckpointerSettings.TableName, CheckpointerSettings.DataConnectionString, NullLoggerFactory.Instance);
+                dataManager.InitTableAsync().Wait();
+                dataManager.ClearTableAsync().Wait();
+                TestAzureTableStorageStreamFailureHandler.DeleteAll().Wait();
+            }
         }
 
         public EHProgrammaticSubscribeTest(ITestOutputHelper output, Fixture fixture)
             : base(fixture)
         {
-        }
-
-        public override void Dispose()
-        {
-            base.Dispose();
-            var dataManager = new AzureTableDataManager<TableEntity>(CheckpointerSettings.TableName, CheckpointerSettings.DataConnectionString, NullLoggerFactory.Instance);
-            dataManager.InitTableAsync().Wait();
-            dataManager.ClearTableAsync().Wait();
-            TestAzureTableStorageStreamFailureHandler.DeleteAll().Wait();
         }
     }
 }

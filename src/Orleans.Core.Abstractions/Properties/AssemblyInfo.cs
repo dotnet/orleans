@@ -11,4 +11,6 @@
 [assembly: InternalsVisibleTo("TesterInternal")]
 [assembly: InternalsVisibleTo("TestInternalGrainInterfaces")]
 [assembly: InternalsVisibleTo("TestInternalGrains")]
-[assembly: InternalsVisibleTo("Orleans.Logging.Legacy")]
+
+// Legacy provider support
+[assembly: InternalsVisibleTo("Orleans.Core.Legacy")]

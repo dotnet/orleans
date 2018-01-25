@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
@@ -313,7 +312,7 @@ namespace UnitTests.StreamingTests
             var producer = this.testCluster.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
             int eventCount = 0;
 
-            var provider = this.testCluster.StreamProviderManager.GetStreamProvider(streamProviderName);
+            var provider = this.testCluster.Client.ServiceProvider.GetServiceByName<IStreamProvider>(streamProviderName);
             var stream = provider.GetStream<int>(streamGuid, streamNamespace);
             var handle = await stream.SubscribeAsync((e,t) =>
             {

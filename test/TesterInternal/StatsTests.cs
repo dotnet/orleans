@@ -55,9 +55,6 @@ namespace UnitTests.Stats
             var clientStatisticsManager = this.HostedCluster.ServiceProvider.GetService<ClientStatisticsManager>();
             Assert.NotNull(clientStatisticsManager); // Client Statistics Manager is setup
 
-            var statisticsOptions = this.HostedCluster.ServiceProvider.GetService<IOptions<StatisticsOptions>>().Value;
-            Assert.Equal("MockStats", statisticsOptions.ProviderName);  // "Client.StatisticsProviderName"
-
             SiloHandle silo = this.HostedCluster.Primary;
             Assert.True(await this.HostedCluster.Client.GetTestHooks(silo).HasStatisticsProvider(), "Silo StatisticsProviderManager is setup");
 

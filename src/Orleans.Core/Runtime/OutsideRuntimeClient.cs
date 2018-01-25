@@ -2,9 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Net;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -41,12 +39,11 @@ namespace Orleans
         private bool disposing;
 
         private ClientProviderRuntime clientProviderRuntime;
-        private StatisticsProviderManager statisticsProviderManager;
 
         internal ClientStatisticsManager ClientStatistics;
         private GrainId clientId;
         private readonly GrainId handshakeClientId;
-        private IGrainTypeResolver grainInterfaceMap;
+        private IGrainTypeResolver grainTypeResolver;
         private ThreadTrackingStatistic incomingMessagesThreadTimeTracking;
         private readonly Func<Message, bool> tryResendMessage;
         private readonly Action<Message> unregisterCallback;
@@ -84,8 +81,6 @@ namespace Orleans
 
         internal Task<IList<Uri>> GetGateways() =>
             this.transport.GatewayManager.ListProvider.GetGateways();
-
-        public IStreamProviderManager CurrentStreamProviderManager { get; private set; }
 
         public IStreamProviderRuntime CurrentStreamProviderRuntime
         {
@@ -137,8 +132,6 @@ namespace Orleans
 
             this.GrainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
 
-            this.ServiceProvider.GetService<TelemetryManager>()?.AddFromConfiguration(this.ServiceProvider, config.TelemetryConfiguration);
-
             var statisticsOptions = this.ServiceProvider.GetRequiredService<IOptions<StatisticsOptions>>();
             StatisticsCollector.Initialize(statisticsOptions.Value.CollectionLevel);
 
@@ -149,13 +142,6 @@ namespace Orleans
                 AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
 
                 clientProviderRuntime = this.ServiceProvider.GetRequiredService<ClientProviderRuntime>();
-                statisticsProviderManager = this.ServiceProvider.GetRequiredService<StatisticsProviderManager>();
-                var statsProviderName = statisticsProviderManager.LoadProvider(config.ProviderConfigurations)
-                    .WaitForResultWithThrow(initTimeout);
-                if (statsProviderName != null)
-                {
-                    statisticsOptions.Value.ProviderName = statsProviderName;
-                }
 
                 responseTimeout = Debugger.IsAttached ? Constants.DEFAULT_RESPONSE_TIMEOUT : config.ResponseTimeout;
                 this.localAddress = ClusterConfiguration.GetLocalIPAddress(config.PreferredFamily, config.NetInterface);
@@ -195,12 +181,6 @@ namespace Orleans
         {
             var implicitSubscriberTable = await transport.GetImplicitStreamSubscriberTable(this.InternalGrainFactory);
             clientProviderRuntime.StreamingInitialize(implicitSubscriberTable);
-            var streamProviderManager = this.ServiceProvider.GetRequiredService<StreamProviderManager>();
-            await streamProviderManager
-                .LoadStreamProviders(
-                    this.config.ProviderConfigurations,
-                    clientProviderRuntime);
-            CurrentStreamProviderManager = streamProviderManager;
         }
 
         private void UnhandledException(ISchedulingContext context, Exception exception)
@@ -250,10 +230,11 @@ namespace Orleans
                     }
                 },
                 ct).Ignore();
-            grainInterfaceMap = await transport.GetTypeCodeMap(this.InternalGrainFactory);
-            
-            await ClientStatistics.Start(statisticsProviderManager, transport, clientId)
+            grainTypeResolver = await transport.GetGrainTypeResolver(this.InternalGrainFactory);
+
+            await ClientStatistics.Start(transport, clientId)
                 .WithTimeout(initTimeout);
+
             await StreamingInitialize();
         }
 
@@ -857,7 +838,7 @@ namespace Orleans
 
         public IGrainTypeResolver GrainTypeResolver
         {
-            get { return grainInterfaceMap; }
+            get { return grainTypeResolver; }
         }
 
         public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)

@@ -59,8 +59,6 @@ namespace Orleans.Runtime
 
         void DeleteObjectReference(IAddressable obj);
         
-        Streams.IStreamProviderManager CurrentStreamProviderManager { get; }
-
         Streams.IStreamProviderRuntime CurrentStreamProviderRuntime { get; }
 
         IGrainTypeResolver GrainTypeResolver { get; }
