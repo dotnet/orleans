@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Placement
 {
-    internal class StatelessWorkerDirector : IPlacementDirector<StatelessWorkerPlacement>, IActivationSelector<StatelessWorkerPlacement>
+    internal class StatelessWorkerDirector : IPlacementDirector, IActivationSelector
     {
         private static readonly SafeRandom random = new SafeRandom();
 

@@ -2,7 +2,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Counters;
 using Orleans.Runtime.GrainDirectory;
@@ -34,6 +33,7 @@ using Orleans.Runtime.Utilities;
 using System;
 using Orleans.Metadata;
 using Orleans.Statistics;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Hosting
 {
@@ -137,27 +137,48 @@ namespace Orleans.Hosting
 
             // Placement
             services.TryAddSingleton<PlacementDirectorsManager>();
-            services.TryAddSingleton<IPlacementDirector<RandomPlacement>, RandomPlacementDirector>();
-            services.TryAddSingleton<IActivationSelector<RandomPlacement>, RandomPlacementDirector>();
-            services.TryAddSingleton<IPlacementDirector<PreferLocalPlacement>, PreferLocalPlacementDirector>();
-            services.TryAddSingleton<IPlacementDirector<StatelessWorkerPlacement>, StatelessWorkerDirector>();
-            services.TryAddSingleton<IActivationSelector<StatelessWorkerPlacement>, StatelessWorkerDirector>();
-            services.TryAddSingleton<IPlacementDirector<ActivationCountBasedPlacement>, ActivationCountPlacementDirector>();
-            services.TryAddSingleton<IPlacementDirector<HashBasedPlacement>, HashBasedPlacementDirector>();
-            services.TryAddSingleton<DefaultPlacementStrategy>();
             services.TryAddSingleton<ClientObserversPlacementDirector>();
+            // Placement strategies
+            services.AddSingletonNamedService<PlacementStrategy, RandomPlacement>(nameof(RandomPlacement));
+            services.AddSingletonNamedService<PlacementStrategy, PreferLocalPlacement>(nameof(PreferLocalPlacement));
+            services.AddSingletonNamedService<PlacementStrategy, StatelessWorkerPlacement>(nameof(StatelessWorkerPlacement));
+            services.AddSingletonNamedService<PlacementStrategy, ActivationCountBasedPlacement>(nameof(ActivationCountBasedPlacement));
+            services.AddSingletonNamedService<PlacementStrategy, HashBasedPlacement>(nameof(HashBasedPlacement));
+            // Default placement stragety
+            services.TryAddSingleton<PlacementStrategy>(PlacementStrategyFactory.Create);
+            // Placement directors
+            services.AddSingletonKeyedService<Type, IPlacementDirector, RandomPlacementDirector>(typeof(RandomPlacement));
+            services.AddSingletonKeyedService<Type, IPlacementDirector, PreferLocalPlacementDirector>(typeof(PreferLocalPlacement));
+            services.AddSingletonKeyedService<Type, IPlacementDirector, StatelessWorkerDirector>(typeof(StatelessWorkerPlacement));
+            services.AddSingletonKeyedService<Type, IPlacementDirector, ActivationCountPlacementDirector>(typeof(ActivationCountBasedPlacement));
+            services.AddSingletonKeyedService<Type, IPlacementDirector, HashBasedPlacementDirector>(typeof(HashBasedPlacement));
+            // Activation selectors
+            services.AddSingletonKeyedService<Type, IActivationSelector, RandomPlacementDirector>(typeof(RandomPlacement));
+            services.AddSingletonKeyedService<Type, IActivationSelector, StatelessWorkerDirector>(typeof(StatelessWorkerPlacement));
 
-            // Versions
+            // Versioning
             services.TryAddSingleton<VersionSelectorManager>();
-            services.TryAddSingleton<IVersionSelector<MinimumVersion>, MinimumVersionSelector>();
-            services.TryAddSingleton<IVersionSelector<LatestVersion>, LatestVersionSelector>();
-            services.TryAddSingleton<IVersionSelector<AllCompatibleVersions>, AllCompatibleVersionsSelector>();
-            services.TryAddSingleton<CompatibilityDirectorManager>();
-            services.TryAddSingleton<ICompatibilityDirector<BackwardCompatible>, BackwardCompatilityDirector>();
-            services.TryAddSingleton<ICompatibilityDirector<AllVersionsCompatible>, AllVersionsCompatibilityDirector>();
-            services.TryAddSingleton<ICompatibilityDirector<StrictVersionCompatible>, StrictVersionCompatibilityDirector>();
             services.TryAddSingleton<CachedVersionSelectorManager>();
+            // Version selector strategy
             services.TryAddSingleton<IVersionStore, GrainVersionStore>();
+            services.AddSingletonNamedService<VersionSelectorStrategy, AllCompatibleVersions>(nameof(AllCompatibleVersions));
+            services.AddSingletonNamedService<VersionSelectorStrategy, LatestVersion>(nameof(LatestVersion));
+            services.AddSingletonNamedService<VersionSelectorStrategy, MinimumVersion>(nameof(MinimumVersion));
+            // Versions selectors
+            services.AddSingletonKeyedService<Type, IVersionSelector, MinimumVersionSelector>(typeof(MinimumVersion));
+            services.AddSingletonKeyedService<Type, IVersionSelector, LatestVersionSelector>(typeof(LatestVersion));
+            services.AddSingletonKeyedService<Type, IVersionSelector, AllCompatibleVersionsSelector>(typeof(AllCompatibleVersions));
+
+            // Compatibility
+            services.TryAddSingleton<CompatibilityDirectorManager>();
+            // Compatability strategy
+            services.AddSingletonNamedService<CompatibilityStrategy, AllVersionsCompatible>(nameof(AllVersionsCompatible));
+            services.AddSingletonNamedService<CompatibilityStrategy, BackwardCompatible>(nameof(BackwardCompatible));
+            services.AddSingletonNamedService<CompatibilityStrategy, StrictVersionCompatible>(nameof(StrictVersionCompatible));
+            // Compatability directors
+            services.AddSingletonKeyedService<Type, ICompatibilityDirector, BackwardCompatilityDirector>(typeof(BackwardCompatible));
+            services.AddSingletonKeyedService<Type, ICompatibilityDirector, AllVersionsCompatibilityDirector>(typeof(AllVersionsCompatible));
+            services.AddSingletonKeyedService<Type, ICompatibilityDirector, StrictVersionCompatibilityDirector>(typeof(StrictVersionCompatible));
 
             services.TryAddSingleton<Factory<IGrainRuntime>>(sp => () => sp.GetRequiredService<IGrainRuntime>());
 
@@ -172,12 +193,13 @@ namespace Orleans.Hosting
             services.TryAddSingleton<IConsistentRingProvider>(
                 sp =>
                 {
-                    var globalConfig = sp.GetRequiredService<GlobalConfiguration>();
+                    // TODO: make this not sux - jbragg
+                    var consistentRingOptions = sp.GetRequiredService<IOptions<ConsistentRingOptions>>().Value;
                     var siloDetails = sp.GetRequiredService<ILocalSiloDetails>();
                     var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
-                    if (globalConfig.UseVirtualBucketsConsistentRing)
+                    if (consistentRingOptions.UseVirtualBucketsConsistentRing)
                     {
-                        return new VirtualBucketsRingProvider(siloDetails.SiloAddress, loggerFactory, globalConfig.NumVirtualBucketsConsistentRing);
+                        return new VirtualBucketsRingProvider(siloDetails.SiloAddress, loggerFactory, consistentRingOptions.NumVirtualBucketsConsistentRing);
                     }
 
                     return new ConsistentRingProvider(siloDetails.SiloAddress, loggerFactory);

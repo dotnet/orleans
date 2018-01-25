@@ -10,7 +10,7 @@ namespace Orleans.Runtime.Placement
     /// If none exits, it prefers to place a new one in the local silo. If there are no races (only one silo at a time tries to activate this grain),
     /// the the local silo wins. In the case of concurrent activations of the first activation of this grain, only one silo wins.
     /// </summary>
-    internal class PreferLocalPlacementDirector : RandomPlacementDirector, IPlacementDirector<PreferLocalPlacement>
+    internal class PreferLocalPlacementDirector : RandomPlacementDirector, IPlacementDirector
     {
         private Task<SiloAddress> cachedLocalSilo;
 

@@ -1,4 +1,4 @@
-﻿using Orleans.LeaseProviders;
+using Orleans.LeaseProviders;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
@@ -13,6 +13,8 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Providers;
+using Orleans.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Streams
 {
@@ -71,8 +73,8 @@ namespace Orleans.Streams
     public class ClusterConfigDeploymentLeaseBasedBalancer : LeaseBasedQueueBalancer
     {
         public ClusterConfigDeploymentLeaseBasedBalancer(IServiceProvider serviceProvider, ISiloStatusOracle siloStatusOracle,
-            ClusterConfiguration clusterConfiguration, ILoggerFactory loggerFactory)
-            : base(serviceProvider, siloStatusOracle, new StaticClusterDeploymentConfiguration(clusterConfiguration), loggerFactory)
+            IOptions<StaticClusterDeploymentOptions> options, ILoggerFactory loggerFactory)
+            : base(serviceProvider, siloStatusOracle, options.Value, loggerFactory)
         { }
     }
 

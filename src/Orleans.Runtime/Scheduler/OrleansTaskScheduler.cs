@@ -6,8 +6,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Counters;
+using Microsoft.Extensions.Options;
+using Orleans.Hosting;
 
 namespace Orleans.Runtime.Scheduler
 {
@@ -24,7 +24,8 @@ namespace Orleans.Runtime.Scheduler
         internal WorkerPool Pool { get; private set; }
         internal static TimeSpan TurnWarningLengthThreshold { get; set; }
         // This is the maximum number of pending work items for a single activation before we write a warning log.
-        internal LimitValue MaxPendingItemsLimit { get; private set; }
+        internal int MaxPendingItemsSoftLimit { get; private set; }
+        internal int MaxPendingItemsHardLimit { get; private set; }
         internal TimeSpan DelayWarningThreshold { get; private set; }
         
         public int RunQueueLength { get { return RunQueue.Length; } }
@@ -36,22 +37,23 @@ namespace Orleans.Runtime.Scheduler
                 TimeSpan.FromMilliseconds(100),
                 TimeSpan.FromMilliseconds(100),
                 TimeSpan.FromMilliseconds(100),
-                NodeConfiguration.ENABLE_WORKER_THREAD_INJECTION,
-                LimitManager.GetDefaultLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS),
+                SchedulingOptions.DEFAULT_ENABLE_WORKER_THREAD_INJECTION,
+                SchedulingOptions.DEFAULT_MAX_PENDING_ITEMS_SOFT_LIMIT,
+                SchedulingOptions.DEFAULT_MAX_PENDING_ITEMS_HARD_LIMIT,
                 performanceMetrics,
                 new ExecutorService(), 
                 loggerFactory);
         }
 
-        public OrleansTaskScheduler(NodeConfiguration config, ICorePerformanceMetrics performanceMetrics, ExecutorService executorService, ILoggerFactory loggerFactory)
-            : this(config.MaxActiveThreads, config.DelayWarningThreshold, config.ActivationSchedulingQuantum,
-                    config.TurnWarningLengthThreshold, config.EnableWorkerThreadInjection, config.LimitManager.GetLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS),
-                    performanceMetrics, executorService, loggerFactory)
+        public OrleansTaskScheduler(IOptions<SchedulingOptions> options, ICorePerformanceMetrics performanceMetrics, ExecutorService executorService, ILoggerFactory loggerFactory)
+            : this(options.Value.MaxActiveThreads, options.Value.DelayWarningThreshold, options.Value.ActivationSchedulingQuantum,
+                    options.Value.TurnWarningLengthThreshold, options.Value.EnableWorkerThreadInjection, options.Value.MaxPendingWorkItemsSoftLimit,
+                    options.Value.MaxPendingWorkItemsHardLimit, performanceMetrics, executorService, loggerFactory)
         {
         }
 
         private OrleansTaskScheduler(int maxActiveThreads, TimeSpan delayWarningThreshold, TimeSpan activationSchedulingQuantum,
-            TimeSpan turnWarningLengthThreshold, bool injectMoreWorkerThreads, LimitValue maxPendingItemsLimit, 
+            TimeSpan turnWarningLengthThreshold, bool injectMoreWorkerThreads, int maxPendingItemsSoftLimit, int maxPendingItemsHardLimit,
             ICorePerformanceMetrics performanceMetrics, ExecutorService executorService, ILoggerFactory loggerFactory)
         {
             this.logger = loggerFactory.CreateLogger<OrleansTaskScheduler>();
@@ -60,7 +62,8 @@ namespace Orleans.Runtime.Scheduler
             WorkItemGroup.ActivationSchedulingQuantum = activationSchedulingQuantum;
             TurnWarningLengthThreshold = turnWarningLengthThreshold;
             applicationTurnsStopped = false;
-            MaxPendingItemsLimit = maxPendingItemsLimit;
+            this.MaxPendingItemsSoftLimit = maxPendingItemsSoftLimit;
+            this.MaxPendingItemsHardLimit = maxPendingItemsHardLimit;
             workgroupDirectory = new ConcurrentDictionary<ISchedulingContext, WorkItemGroup>();
             RunQueue = new WorkQueue();
             this.taskWorkItemLogger = loggerFactory.CreateLogger<TaskWorkItem>();

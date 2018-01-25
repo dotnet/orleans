@@ -25,7 +25,7 @@ namespace Orleans.Runtime.ReminderService
             return Task.CompletedTask;
         }
 
-        public Task Init(GlobalConfiguration config)
+        public Task Init()
         {
             return Task.CompletedTask;
         }

@@ -36,7 +36,7 @@ namespace Orleans.Runtime
             else
             {
                 // TODO: refactor this out of ClusterConfiguration
-                ipAddress = ClusterConfiguration.ResolveIPAddress(options.HostNameOrIPAddress, null, AddressFamily.InterNetwork).GetAwaiter().GetResult();
+                ipAddress = ConfigUtilities.ResolveIPAddress(options.HostNameOrIPAddress, null, AddressFamily.InterNetwork).GetAwaiter().GetResult();
             }
 
             return new IPEndPoint(ipAddress, options.Port);

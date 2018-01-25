@@ -199,7 +199,7 @@ namespace Orleans.Runtime.Scheduler
                     SchedulerStatisticsGroup.OnWorkItemEnqueue();
 #endif
                 workItems.Enqueue(task);
-                int maxPendingItemsLimit = masterScheduler.MaxPendingItemsLimit.SoftLimitThreshold;
+                int maxPendingItemsLimit = masterScheduler.MaxPendingItemsSoftLimit;
                 if (maxPendingItemsLimit > 0 && count > maxPendingItemsLimit)
                 {
                     log.Warn(ErrorCode.SchedulerTooManyPendingItems, String.Format("{0} pending work items for group {1}, exceeding the warning threshold of {2}",
