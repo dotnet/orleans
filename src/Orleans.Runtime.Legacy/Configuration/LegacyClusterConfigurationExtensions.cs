@@ -321,6 +321,12 @@ namespace Orleans.Hosting
                     options.InvariantForReminders = config.AdoInvariantForReminders;
                 });
 
+            services.AddOptions<TypeManagementOptions>()
+                .Configure<GlobalConfiguration>((options, config) =>
+                {
+                    options.TypeMapRefreshInterval = config.TypeMapRefreshInterval;
+                });
+            
             return services;
         }
     }
