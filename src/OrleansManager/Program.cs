@@ -272,7 +272,7 @@ namespace OrleansManager
         {
             int? interfaceId;
             VersionSelectorStrategy strategy;
-            if (!GetStrategyArgs(args, VersionSelectorStrategy.Parse, out strategy, out interfaceId))
+            if (!GetStrategyArgs(args, ParseVersionSelectorStrategy, out strategy, out interfaceId))
                 return;
             if (interfaceId != null)
                 systemManagement.SetSelectorStrategy(interfaceId.Value, strategy);
@@ -280,16 +280,40 @@ namespace OrleansManager
                 systemManagement.SetSelectorStrategy(strategy);
         }
 
+        private static VersionSelectorStrategy ParseVersionSelectorStrategy(string str)
+        {
+            // TODO - what about custom?
+            if (str.Equals(typeof(AllCompatibleVersions).Name))
+                return AllCompatibleVersions.Singleton;
+            if (str.Equals(typeof(LatestVersion).Name))
+                return LatestVersion.Singleton;
+            if (str.Equals(typeof(MinimumVersion).Name))
+                return MinimumVersion.Singleton;
+            return null;
+        }
+
         private static void SetCompatibilityStrategy(string[] args)
         {
             int? interfaceId;
             CompatibilityStrategy strategy;
-            if (!GetStrategyArgs(args, CompatibilityStrategy.Parse, out strategy, out interfaceId))
+            if (!GetStrategyArgs(args, ParseCompatibilityStrategy, out strategy, out interfaceId))
                 return;
             if (interfaceId != null)
                 systemManagement.SetCompatibilityStrategy(interfaceId.Value, strategy);
             else
                 systemManagement.SetCompatibilityStrategy(strategy);
+        }
+
+        private static CompatibilityStrategy ParseCompatibilityStrategy(string str)
+        {
+            // TODO - what about custom?
+            if (str.Equals(typeof(AllVersionsCompatible).Name))
+                return AllVersionsCompatible.Singleton;
+            if (str.Equals(typeof(BackwardCompatible).Name))
+                return BackwardCompatible.Singleton;
+            if (str.Equals(typeof(StrictVersionCompatible).Name))
+                return StrictVersionCompatible.Singleton;
+            return null;
         }
 
         private static bool GetStrategyArgs<T>(string[] args, Func<string, T> strategyParser, out T strategy, out int? interfaceId)

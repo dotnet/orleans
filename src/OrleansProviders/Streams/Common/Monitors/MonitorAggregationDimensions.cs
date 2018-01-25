@@ -1,49 +1,10 @@
-﻿using Orleans.Runtime.Configuration;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Orleans.Providers.Streams.Common
 {
     /// <summary>
-    /// Base class for holding monitor aggregation dimensions
-    /// </summary>
-    public class MonitorAggregationDimensions
-    {
-        /// <summary>
-        /// Data object holding Silo global configuration parameters.
-        /// </summary>
-        public GlobalConfiguration GlobalConfig { get; set; }
-
-        /// <summary>
-        /// Individual node-specific silo configuration parameters.
-        /// </summary>
-        public NodeConfiguration NodeConfig { get; set; }
-
-        /// <summary>
-        /// Constructor
-        /// </summary>
-        /// <param name="globalConfig"></param>
-        /// <param name="nodeConfig"></param>
-        public MonitorAggregationDimensions(GlobalConfiguration globalConfig, NodeConfiguration nodeConfig)
-        {
-            this.GlobalConfig = globalConfig;
-            this.NodeConfig = nodeConfig;
-        }
-
-        /// <summary>
-        /// Constructor
-        /// </summary>
-        public MonitorAggregationDimensions()
-        { }
-    }
-
-    /// <summary>
     /// Aggregation dimensions for receiver monitor
     /// </summary>
-    public class ReceiverMonitorDimensions : MonitorAggregationDimensions
+    public class ReceiverMonitorDimensions
     {
         /// <summary>
         /// Eventhub partition
@@ -53,10 +14,8 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Constructor
         /// </summary>
-        /// <param name="dimensions"></param>
         /// <param name="queueId"></param>
-        public ReceiverMonitorDimensions(MonitorAggregationDimensions dimensions, string queueId)
-            : base(dimensions.GlobalConfig, dimensions.NodeConfig)
+        public ReceiverMonitorDimensions(string queueId)
         {
             this.QueueId = queueId;
         }
@@ -79,8 +38,8 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         public string BlockPoolId { get; set; }
 
-        public CacheMonitorDimensions(MonitorAggregationDimensions dimensions, string queueId, string blockPoolId)
-            :base(dimensions, queueId)
+        public CacheMonitorDimensions(string queueId, string blockPoolId)
+            :base(queueId)
         {
             this.BlockPoolId = blockPoolId;
         }
@@ -89,15 +48,14 @@ namespace Orleans.Providers.Streams.Common
     /// <summary>
     /// Aggregation dimensions for block pool monitors
     /// </summary>
-    public class BlockPoolMonitorDimensions : MonitorAggregationDimensions
+    public class BlockPoolMonitorDimensions
     {
         /// <summary>
         /// Block pool Id
         /// </summary>
         public string BlockPoolId { get; set; }
 
-        public BlockPoolMonitorDimensions(MonitorAggregationDimensions dimensions, string blockPoolId)
-            :base(dimensions.GlobalConfig, dimensions.NodeConfig)
+        public BlockPoolMonitorDimensions(string blockPoolId)
         {
             this.BlockPoolId = blockPoolId;
         }
