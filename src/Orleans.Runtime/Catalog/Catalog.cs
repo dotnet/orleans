@@ -478,9 +478,9 @@ namespace Orleans.Runtime
 
                 if (newPlacement && !SiloStatusOracle.CurrentStatus.IsTerminating())
                 {
-                    TimeSpan ageLimit = this.collectionOptions.Value.CollectionAgeLimits.TryGetValue(grainType, out TimeSpan limit)
+                    TimeSpan ageLimit = this.collectionOptions.Value.ClassSpecificCollectionAge.TryGetValue(grainType, out TimeSpan limit)
                         ? limit
-                        : GrainCollectionOptions.DEFAULT_COLLECTION_AGE_LIMIT;
+                        : collectionOptions.Value.CollectionAge;
 
                     // create a dummy activation that will queue up messages until the real data arrives
                     // We want to do this (RegisterMessageTarget) under the same lock that we tested TryGetActivationData. They both access ActivationDirectory.

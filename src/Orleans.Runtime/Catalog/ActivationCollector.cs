@@ -32,8 +32,8 @@ namespace Orleans.Runtime
             }
 
             quantum = options.Value.CollectionQuantum;
-            shortestAgeLimit = TimeSpan.FromTicks(options.Value.CollectionAgeLimits.Values
-                .Aggregate(GrainCollectionOptions.DEFAULT_COLLECTION_AGE_LIMIT.Ticks, (a,v) => Math.Min(a,v.Ticks)));
+            shortestAgeLimit = TimeSpan.FromTicks(options.Value.ClassSpecificCollectionAge.Values
+                .Aggregate(options.Value.CollectionAge.Ticks, (a,v) => Math.Min(a,v.Ticks)));
             buckets = new ConcurrentDictionary<DateTime, Bucket>();
             nextTicket = MakeTicketFromDateTime(DateTime.UtcNow);
             nextTicketLock = new object();

@@ -61,6 +61,5 @@ namespace Orleans.Hosting
         /// </summary>
         public TimeSpan LazyDeregistrationDelay { get; set; } = DEFAULT_UNREGISTER_RACE_DELAY;
         public static readonly TimeSpan DEFAULT_UNREGISTER_RACE_DELAY = TimeSpan.FromMinutes(1);
-
     }
 }

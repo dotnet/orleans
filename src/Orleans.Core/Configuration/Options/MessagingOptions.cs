@@ -13,7 +13,8 @@ namespace Orleans.Hosting
         /// </summary>
         public TimeSpan ResponseTimeout { get; set; } = Constants.DEFAULT_RESPONSE_TIMEOUT;
 
-        /// <summaryResponseTimeout number of resends of the same message.
+        /// <summary>
+        /// The MaxResendCount attribute specifies the maximal number of resends of the same message.
         /// </summary>
         public int MaxResendCount { get; set; }
 

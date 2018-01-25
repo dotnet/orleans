@@ -209,11 +209,12 @@ namespace Orleans.Hosting
             services.AddOptions<GrainCollectionOptions>().Configure<GlobalConfiguration>((options, config) =>
             {
                 options.CollectionQuantum = config.CollectionQuantum;
-                foreach(GrainTypeConfiguration grainConfig in config.Application.ClassSpecific)
+                options.CollectionAge = config.Application.DefaultCollectionAgeLimit;
+                foreach (GrainTypeConfiguration grainConfig in config.Application.ClassSpecific)
                 {
                     if(grainConfig.CollectionAgeLimit.HasValue)
                     {
-                        options.CollectionAgeLimits.Add(grainConfig.FullTypeName, grainConfig.CollectionAgeLimit.Value);
+                        options.ClassSpecificCollectionAge.Add(grainConfig.FullTypeName, grainConfig.CollectionAgeLimit.Value);
                     }
                 };
             });
@@ -229,6 +230,7 @@ namespace Orleans.Hosting
             services.AddOptions<GrainPlacementOptions>().Configure<GlobalConfiguration>((options, config) =>
             {
                 options.DefaultPlacementStrategy = config.DefaultPlacementStrategy;
+                options.ActivationCountPlacementChooseOutOf = config.ActivationCountBasedPlacementChooseOutOf;
             });
 
             services.AddOptions<StaticClusterDeploymentOptions>().Configure<ClusterConfiguration>((options, config) =>
@@ -271,6 +273,9 @@ namespace Orleans.Hosting
                     options.ExpectedClusterSize = config.ExpectedClusterSize;
                     options.ValidateInitialConnectivity = config.ValidateInitialConnectivity;
                     options.NumMissedProbesLimit = config.NumMissedProbesLimit;
+                    options.UseLivenessGossip = config.UseLivenessGossip;
+                    options.NumProbedSilos = config.NumProbedSilos;
+                    options.NumVotesForDeathDeclaration = config.NumVotesForDeathDeclaration;
                 })
                 .Configure<ClusterConfiguration>((options, config) =>
                 {
@@ -326,7 +331,18 @@ namespace Orleans.Hosting
                 {
                     options.TypeMapRefreshInterval = config.TypeMapRefreshInterval;
                 });
-            
+
+            services.AddOptions<GrainDirectoryOptions>()
+                .Configure<GlobalConfiguration>((options, config) =>
+                {
+                    options.CachingStrategy = GlobalConfiguration.Remap(config.DirectoryCachingStrategy);
+                    options.CacheSize = config.CacheSize;
+                    options.InitialCacheTTL = config.InitialCacheTTL;
+                    options.MaximumCacheTTL = config.MaximumCacheTTL;
+                    options.CacheTTLExtensionFactor = config.CacheTTLExtensionFactor;
+                    options.LazyDeregistrationDelay = config.DirectoryLazyDeregistrationDelay;
+                });
+
             return services;
         }
     }

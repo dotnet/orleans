@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Globalization;
 using System.Reflection;
 using Orleans.Runtime;
@@ -77,7 +77,7 @@ namespace Tester
             var args = new object[] { nameof(SiloInitializationIsRetryableTest), clusterConfig};
 
             return (SiloHost)appDomain.CreateInstanceFromAndUnwrap(
-                "Orleans.Runtime.dll",
+                "Orleans.Runtime.Legacy.dll",
                 typeof(SiloHost).FullName,
                 false,
                 BindingFlags.Default,
