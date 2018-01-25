@@ -35,17 +35,6 @@ namespace Orleans
     }
 
     /// <summary>
-    /// category for options
-    /// </summary>
-    public static class OptionCategory
-    {
-        //storage provider option category
-        public const string Storage = nameof(Storage);
-        //streaming provider option category 
-        public const string Streaming = nameof(Streaming);
-    }
-
-    /// <summary>
     /// Utility class for option formatting
     /// </summary>
     public static class OptionFormattingUtilities
@@ -55,9 +44,10 @@ namespace Orleans
         /// <summary>
         /// Format key value pair usin default format
         /// </summary>
-        public static string Format(object key, object value)
+        public static string Format(object key, object value, string format = null)
         {
-            return String.Format(OptionKeyValueFormat, key, value);
+            var formatting = format ?? OptionKeyValueFormat;
+            return String.Format(formatting, key, value);
         }
     }
 }

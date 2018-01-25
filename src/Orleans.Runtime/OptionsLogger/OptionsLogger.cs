@@ -7,6 +7,7 @@ namespace Orleans.Runtime
 {
     internal class SiloOptionsLogger : OptionsLogger, ILifecycleParticipant<ISiloLifecycle>
     {
+        private int SiloOptionLoggerLifeCycleRing = int.MinValue;
         public SiloOptionsLogger(ILogger<SiloOptionsLogger> logger, IServiceProvider services)
             : base(logger, services)
         {
@@ -14,10 +15,10 @@ namespace Orleans.Runtime
 
         public void Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe(SiloLifecycleStage.RuntimeInitialize, this.OnRuntimeInitializeStart);
+            lifecycle.Subscribe(SiloOptionLoggerLifeCycleRing, this.OnStart);
         }
 
-        public Task OnRuntimeInitializeStart(CancellationToken token)
+        public Task OnStart(CancellationToken token)
         {
             this.LogOptions();
             return Task.CompletedTask;

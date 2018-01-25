@@ -99,7 +99,7 @@ namespace Orleans.Configuration
         {
             configureOptions?.Invoke(services.AddOptions<StaticGatewayListProviderOptions>());
             return services.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>()
-                .ConfigureFormatter<StaticGatewayListProviderOptions,StaticGatewayListProviderOptionsFormatter>();
+                .TryConfigureFormatter<StaticGatewayListProviderOptions,StaticGatewayListProviderOptionsFormatter>();
         }
 
         public static bool IsInCollection<T>(this IServiceCollection services)

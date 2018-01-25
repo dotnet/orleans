@@ -11,7 +11,7 @@ namespace Orleans
 { 
     internal class ClientOptionsLogger : OptionsLogger, ILifecycleParticipant<IClusterClientLifecycle>
     {
-        private int ClientOptionLoggerLifeCycleRing = 1000;
+        private int ClientOptionLoggerLifeCycleRing = int.MinValue;
         public ClientOptionsLogger(ILogger<ClientOptionsLogger> logger, IServiceProvider services)
             : base(logger, services)
         {
@@ -19,10 +19,10 @@ namespace Orleans
 
         public void Participate(IClusterClientLifecycle lifecycle)
         {
-            lifecycle.Subscribe(ClientOptionLoggerLifeCycleRing, this.OnRuntimeInitializeStart);
+            lifecycle.Subscribe(ClientOptionLoggerLifeCycleRing, this.OnStart);
         }
 
-        public Task OnRuntimeInitializeStart(CancellationToken token)
+        public Task OnStart(CancellationToken token)
         {
             this.LogOptions();
             return Task.CompletedTask;
@@ -46,39 +46,28 @@ namespace Orleans
                 .GroupBy(optionFormatter => optionFormatter.Category)
                 .OrderBy(group => group.Key))
             {
-                int spaceNum = 0;
-                //log out category if there's one
-                if (!string.IsNullOrEmpty(formatterGroup.Key))
-                {
-                    this.logger.LogInformation($"{CreateNSpace(spaceNum)}{formatterGroup.Key}:");
-                    spaceNum += 2;
-                }
-
                 foreach (var optionFormatter in formatterGroup)
                 {
-                    LogOption(optionFormatter, spaceNum);
+                    LogOption(optionFormatter);
                 }
 
             }
         }
 
-        private void LogOption(IOptionFormatter formatter, int spaces)
+        private void LogOption(IOptionFormatter formatter)
         {
-            this.logger.LogInformation($"{CreateNSpace(spaces)}{formatter.Name}:");
+            var stringBuiler = new StringBuilder();
+            if(string.IsNullOrEmpty(formatter.Category))
+                stringBuiler.AppendLine($"{formatter.Name}:");
+            else
+            {
+                stringBuiler.AppendLine($"{formatter.Category}, {formatter.Name}:");
+            }
             foreach (var setting in formatter.Format())
             {
-                this.logger.LogInformation($"{CreateNSpace(spaces + 2)}{setting}");
+                stringBuiler.AppendLine($"{setting}");
             }
-        }
-
-        private string CreateNSpace(int n)
-        {
-            var builder = new StringBuilder();
-            while (n-- > 0)
-            {
-                builder.Append(" ");
-            }
-            return builder.ToString();
+            this.logger.LogInformation(stringBuiler.ToString());
         }
     }
 }

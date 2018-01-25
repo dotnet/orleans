@@ -33,7 +33,6 @@ namespace Orleans.Configuration
                     options.ClusterId = configuration.ClusterId;
                 }
             });
-            services.TryConfigureFormatter<ClusterClientOptions, ClusterClientOptionsFormatter>();
 
             // Translate legacy configuration to new Options
             services.Configure<ClientMessagingOptions>(options =>
@@ -42,24 +41,20 @@ namespace Orleans.Configuration
 
                 options.ClientSenderBuckets = configuration.ClientSenderBuckets;
             });
-            services.TryConfigureFormatter<ClientMessagingOptions, ClientMessagingOptionFormatter>();
 
 
             services.Configure<NetworkingOptions>(options => CopyNetworkingOptions(configuration, options));
-            services.TryConfigureFormatter<NetworkingOptions, NetworkingOptionFormatter>();
 
             services.Configure<SerializationProviderOptions>(options =>
             {
                 options.SerializationProviders = configuration.SerializationProviders;
                 options.FallbackSerializationProvider = configuration.FallbackSerializationProvider;
             });
-            services.TryConfigureFormatter<SerializationProviderOptions, SerializationProviderOptionsFormatter>();
 
             services.Configure<StatisticsOptions>((options) =>
             {
                 CopyStatisticsOptions(configuration, options);
             });
-            services.TryConfigureFormatter<StatisticsOptions,StatisticOptionsFormatter>();
 
             // GatewayProvider
             LegacyGatewayListProviderConfigurator.ConfigureServices(configuration, services);

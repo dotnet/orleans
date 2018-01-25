@@ -214,8 +214,7 @@ namespace Orleans
         {
             if (configureOptions != null)
             {
-                builder.ConfigureServices(services => services.Configure<ClusterClientOptions>(configureOptions)
-                .TryConfigureFormatter<ClusterClientOptions, ClusterClientOptionsFormatter>());
+                builder.ConfigureServices(services => services.Configure<ClusterClientOptions>(configureOptions));
             }
 
             return builder;
@@ -234,7 +233,6 @@ namespace Orleans
                 builder.ConfigureServices(services =>
                 {
                     configureOptions.Invoke(services.AddOptions<ClusterClientOptions>());
-                    services.TryConfigureFormatter<ClusterClientOptions, ClusterClientOptionsFormatter>();
                 });
             }
 
