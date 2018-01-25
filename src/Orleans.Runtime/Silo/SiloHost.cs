@@ -178,12 +178,15 @@ namespace Orleans.Runtime.Host
                     if (shutdownEvent != null)
                     {
                         var shutdownThread = new Thread(o =>
-                                       {
-                                           shutdownEvent.WaitOne();
-                                           logger.Info(ErrorCode.SiloShutdownEventReceived, "Received a shutdown event. Starting graceful shutdown.");
-                                           orleans.Shutdown();
-                                       });
-                        shutdownThread.IsBackground = true;
+                        {
+                            shutdownEvent.WaitOne();
+                            logger.Info(ErrorCode.SiloShutdownEventReceived, "Received a shutdown event. Starting graceful shutdown.");
+                            orleans.Shutdown();
+                        })
+                        {
+                            IsBackground = true,
+                            Name = "SiloShutdownMonitor"
+                        };
                         shutdownThread.Start(); 
                     }
 
@@ -266,8 +269,11 @@ namespace Orleans.Runtime.Host
             var shutdownThread = new Thread(o =>
             {
                 orleans.Shutdown();
-            });
-            shutdownThread.IsBackground = true;
+            })
+            {
+                IsBackground = true,
+                Name = nameof(ShutdownOrleansSiloAsync)
+            };
             shutdownThread.Start();
 
             return WaitForOrleansSiloShutdownAsync(millisecondsTimeout, cancellationToken);
