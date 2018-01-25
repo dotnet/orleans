@@ -6,7 +6,7 @@ using Orleans.Runtime.Placement;
 
 namespace UnitTests.GrainInterfaces
 {
-    public class TestPlacementStrategyFixedSiloDirector : IPlacementDirector<TestCustomPlacementStrategy>
+    public class TestPlacementStrategyFixedSiloDirector : IPlacementDirector
     {
         public const string TARGET_SILO_INDEX = "TARGET_SILO_INDEX";
 
@@ -30,7 +30,6 @@ namespace UnitTests.GrainInterfaces
                 default:
                     throw new InvalidOperationException(); // should never get here, only to make compiler happy
             }
-
         }
     }
 }

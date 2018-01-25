@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -151,8 +151,8 @@ namespace UnitTests.Grains
     {
         public Task<PlacementStrategy> GetDefaultPlacement()
         {
-            var defaultStrategy = this.ServiceProvider.GetRequiredService<DefaultPlacementStrategy>();
-            return Task.FromResult(defaultStrategy.PlacementStrategy);
+            var defaultStrategy = this.ServiceProvider.GetRequiredService<PlacementStrategy>();
+            return Task.FromResult(defaultStrategy);
         }
     }
 

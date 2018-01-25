@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.ServiceBus.Providers.Testing;
@@ -20,8 +20,8 @@ namespace ServiceBus.Tests
     public class PluggableQueueBalancerTestsWithEHStreamProvider : PluggableQueueBalancerTestBase, IClassFixture<PluggableQueueBalancerTestsWithEHStreamProvider.Fixture>
     {
         private const string StreamProviderName = "EventHubStreamProvider";
-        private static readonly int totalQueueCount = 6;
-        private static readonly short siloCount = 2;
+        private static readonly int TotalQueueCount = 6;
+        private static readonly short SiloCount = 2;
         public static readonly EventHubGeneratorStreamProviderSettings ProviderSettings =
             new EventHubGeneratorStreamProviderSettings(StreamProviderName);
 
@@ -31,9 +31,9 @@ namespace ServiceBus.Tests
         {
             protected override TestCluster CreateTestCluster()
             {
-                var options = new TestClusterOptions(siloCount);
+                var options = new TestClusterOptions(SiloCount);
                 options.UseSiloBuilderFactory<SiloBuilderFactory>();
-                ProviderSettings.EventHubPartitionCount = totalQueueCount;
+                ProviderSettings.EventHubPartitionCount = TotalQueueCount;
                 AdjustClusterConfiguration(options.ClusterConfiguration);
                 return new TestCluster(options);
             }
@@ -60,7 +60,7 @@ namespace ServiceBus.Tests
         [Fact, TestCategory("BVT")]
         public Task PluggableQueueBalancerTest_ShouldUseInjectedQueueBalancerAndBalanceCorrectly()
         {
-            return base.ShouldUseInjectedQueueBalancerAndBalanceCorrectly(this.fixture, StreamProviderName, siloCount, totalQueueCount);
+            return base.ShouldUseInjectedQueueBalancerAndBalanceCorrectly(this.fixture, StreamProviderName, SiloCount, TotalQueueCount);
         }
     }
 }

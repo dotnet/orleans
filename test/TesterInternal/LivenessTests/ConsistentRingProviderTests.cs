@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -7,7 +7,6 @@ using Orleans.Runtime.ConsistentRing;
 using Orleans.Streams;
 using Xunit;
 using Xunit.Abstractions;
-using Microsoft.Extensions.Options;
 using Orleans.Hosting;
 using TestExtensions;
 
@@ -21,7 +20,7 @@ namespace UnitTests.LivenessTests
         {
             public Fixture()
             {
-                BufferPool.InitGlobalBufferPool(Options.Create(new SiloMessagingOptions()));
+                BufferPool.InitGlobalBufferPool(new SiloMessagingOptions());
             }
         }
 

@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
@@ -41,7 +41,7 @@ namespace UnitTests.RemindersTest
         protected override IReminderTable CreateRemindersTable()
         {
             TestUtils.CheckForAzureStorage();
-            return new AzureBasedReminderTable(this.ClusterFixture.Services.GetRequiredService<IGrainReferenceConverter>(), loggerFactory, this.siloOptions);
+            return new AzureBasedReminderTable(this.ClusterFixture.Services.GetRequiredService<IGrainReferenceConverter>(), loggerFactory, this.siloOptions, this.storageOptions);
         }
 
         protected override Task<string> GetConnectionString()

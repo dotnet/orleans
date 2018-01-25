@@ -13,6 +13,7 @@ using Xunit;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.TestingHost.Utils;
+using Orleans.Hosting;
 
 namespace UnitTests.RemindersTest
 {
@@ -25,6 +26,8 @@ namespace UnitTests.RemindersTest
         private readonly IReminderTable remindersTable;
         protected ILoggerFactory loggerFactory;
         protected IOptions<SiloOptions> siloOptions;
+        protected IOptions<StorageOptions> storageOptions;
+        protected IOptions<AdoNetOptions> adoNetOptions;
         protected const string testDatabaseName = "OrleansReminderTest";//for relational storage
         
         protected ReminderTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture clusterFixture, LoggerFilterOptions filters)
@@ -36,7 +39,9 @@ namespace UnitTests.RemindersTest
             var clusterId = "test-" + serviceId;
 
             logger.Info("ClusterId={0}", clusterId);
-            siloOptions = Options.Create(new SiloOptions { ClusterId = clusterId, ServiceId = serviceId });
+            this.siloOptions = Options.Create(new SiloOptions { ClusterId = clusterId, ServiceId = serviceId });
+            this.storageOptions = Options.Create(new StorageOptions { DataConnectionStringForReminders = fixture.ConnectionString });
+            this.adoNetOptions = Options.Create(new AdoNetOptions());
             fixture.InitializeConnectionStringAccessor(GetConnectionString);
 
             var globalConfiguration = new GlobalConfiguration
@@ -48,7 +53,7 @@ namespace UnitTests.RemindersTest
             };
 
             var rmndr = CreateRemindersTable();
-            rmndr.Init(globalConfiguration).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
+            rmndr.Init().WithTimeout(TimeSpan.FromMinutes(1)).Wait();
             remindersTable = rmndr;
         }
 

@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;
 using Orleans.Runtime.Configuration;
+using Orleans.Hosting;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions;
 using Orleans.Transactions.Development;
@@ -23,7 +24,7 @@ namespace Benchmarks.TransactionManager
         private const int ConcurrentTransactionsTransactions = TransactionsPerRun/10;
         private static readonly TimeSpan LogMaintenanceInterval = TimeSpan.FromMilliseconds(10);
         private static readonly TimeSpan TransactionTimeout = TimeSpan.FromSeconds(10);
-        List<TimeSpan> TransactionBatchTimeouts = Enumerable.Range(0, ConcurrentTransactionsTransactions)
+        List<TimeSpan> transactionBatchTimeouts = Enumerable.Range(0, ConcurrentTransactionsTransactions)
                                                     .Select(i => TransactionTimeout)
                                                     .ToList();
 
@@ -40,7 +41,7 @@ namespace Benchmarks.TransactionManager
 
         private async Task Run(Factory<Task<ITransactionLogStorage>> storageFactory)
         {
-            ITransactionManager tm = new Orleans.Transactions.TransactionManager(new TransactionLog(storageFactory), Options.Create(new TransactionsOptions()), NullLoggerFactory.Instance, NullTelemetryProducer.Instance, () => new NodeConfiguration(), LogMaintenanceInterval);
+            ITransactionManager tm = new Orleans.Transactions.TransactionManager(new TransactionLog(storageFactory), Options.Create(new TransactionsOptions()), NullLoggerFactory.Instance, NullTelemetryProducer.Instance, Options.Create<SiloStatisticsOptions>(new SiloStatisticsOptions()), LogMaintenanceInterval);
             await tm.StartAsync();
             ITransactionManagerService tms = new TransactionManagerService(tm);
             Stopwatch sw;
@@ -53,9 +54,9 @@ namespace Benchmarks.TransactionManager
             while (generatedTransactions < TransactionsPerRun)
             {
                 int generateCount = Math.Min(TransactionsPerRun - generatedTransactions, ConcurrentTransactionsTransactions - transactionsInFlight.Count);
-                StartTransactionsResponse startResponse = await tms.StartTransactions(TransactionBatchTimeouts.Take(generateCount).ToList());
+                StartTransactionsResponse startResponse = await tms.StartTransactions(this.transactionBatchTimeouts.Take(generateCount).ToList());
                 List<TransactionInfo> newTransactions = startResponse.TransactionId
-                                                                .Select(MakeTransactionInfo)
+                                                                .Select(this.MakeTransactionInfo)
                                                                 .ToList();
                 generatedTransactions += newTransactions.Count;
                 Console.WriteLine($"Generated {newTransactions.Count} Transactions.");
