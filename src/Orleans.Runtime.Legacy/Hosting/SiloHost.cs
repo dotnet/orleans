@@ -184,7 +184,8 @@ namespace Orleans.Runtime.Host
                             this.orleans.Shutdown();
                         })
                         {
-                            IsBackground = true
+                            IsBackground = true,
+                            Name = "SiloShutdownMonitor"
                         };
                         shutdownThread.Start();
                     }
@@ -270,7 +271,8 @@ namespace Orleans.Runtime.Host
                 this.orleans.Shutdown();
             })
             {
-                IsBackground = true
+                IsBackground = true,
+                Name = nameof(ShutdownOrleansSiloAsync)
             };
             shutdownThread.Start();
 
