@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
@@ -28,7 +28,11 @@ namespace Orleans.Transactions
             lockObj = new object();
 
             allocationEvent = new AutoResetEvent(true);
-            allocationThread = new Thread(AllocateTransactionId);
+            allocationThread = new Thread(AllocateTransactionId)
+            {
+                IsBackground = true,
+                Name = nameof(ActiveTransactionsTracker)
+            };
         }
 
         public void Start(long initialTransactionId)
