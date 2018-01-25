@@ -1,3 +1,4 @@
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;
@@ -25,7 +26,8 @@ namespace TestVersionGrains
 
         private void ConfigureServices(IServiceCollection services)
         {
-            services.AddSingletonNamedService<IPlacementDirector, VersionAwarePlacementDirector>(typeof(VersionAwarePlacementStrategy).FullName);
+            services.AddSingletonNamedService<PlacementStrategy, VersionAwarePlacementStrategy>(nameof(VersionAwarePlacementStrategy));
+            services.AddSingletonKeyedService<Type, IPlacementDirector, VersionAwarePlacementDirector>(typeof(VersionAwarePlacementStrategy));
         }
     }
 }
