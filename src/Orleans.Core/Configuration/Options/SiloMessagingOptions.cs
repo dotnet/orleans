@@ -1,4 +1,4 @@
-﻿using Orleans.Runtime;
+using Orleans.Runtime;
 using System;
 
 namespace Orleans.Hosting
@@ -33,5 +33,31 @@ namespace Orleans.Hosting
         ///  This is the period of time a gateway will wait before dropping a disconnected client.
         /// </summary>
         public TimeSpan ClientDropTimeout { get; set; } = Constants.DEFAULT_CLIENT_DROP_TIMEOUT;
+
+        public TimeSpan ClientRegistrationRefresh { get; set; } = DEFAULT_CLIENT_REGISTRATION_REFRESH;
+        public static readonly TimeSpan DEFAULT_CLIENT_REGISTRATION_REFRESH = TimeSpan.FromMinutes(5);
+
+        public int MaxEnqueuedRequestsSoftLimit { get; set; } = DEFAULT_MAX_ENQUEUED_REQUESTS_SOFT_LIMIT;
+        public const int DEFAULT_MAX_ENQUEUED_REQUESTS_SOFT_LIMIT = 0;
+
+        public int MaxEnqueuedRequestsHardLimit { get; set; } = DEFAULT_MAX_ENQUEUED_REQUESTS_HARD_LIMIT;
+        public const int DEFAULT_MAX_ENQUEUED_REQUESTS_HARD_LIMIT = 0;
+
+        public int MaxEnqueuedRequestsSoftLimit_StatelessWorker { get; set; } = DEFAULT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER_SOFT_LIMIT;
+        public const int DEFAULT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER_SOFT_LIMIT = 0;
+
+        public int MaxEnqueuedRequestsHardLimit_StatelessWorker { get; set; } = DEFAULT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER_HARD_LIMIT;
+        public const int DEFAULT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER_HARD_LIMIT = 0;
+
+        /// <summary>
+        /// Specifies the maximum time that a request can take before the activation is reported as "blocked"
+        /// </summary>
+        public TimeSpan MaxRequestProcessingTime { get; set; } = DEFAULT_MAX_REQUEST_PROCESSING_TIME;
+        public static readonly TimeSpan DEFAULT_MAX_REQUEST_PROCESSING_TIME = GrainCollectionOptions.DEFAULT_COLLECTION_AGE_LIMIT;
+
+        /// <summary>
+        /// For test only - Do not use in production
+        /// </summary>
+        public bool AssumeHomogenousSilosForTesting { get; set; } = false;
     }
 }

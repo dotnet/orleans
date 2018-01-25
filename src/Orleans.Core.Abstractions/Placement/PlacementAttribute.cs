@@ -16,7 +16,7 @@ namespace Orleans.Placement
         {
             if (placement == null) throw new ArgumentNullException(nameof(placement));
 
-            PlacementStrategy = placement;
+            this.PlacementStrategy = placement;
         }
     }
 

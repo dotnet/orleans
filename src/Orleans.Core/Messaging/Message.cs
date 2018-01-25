@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using Orleans.CodeGeneration;
+using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.Transactions;
@@ -349,9 +350,9 @@ namespace Orleans.Runtime
 
         // Forwardings are used by the receiver, usualy when it cannot process the message and forwars it to another silo to perform the processing
         // (got here due to outdated cache, silo is shutting down/overloaded, ...).
-        public bool MayForward(GlobalConfiguration config)
+        public bool MayForward(SiloMessagingOptions messagingOptions)
         {
-            return ForwardCount < config.MaxForwardCount;
+            return ForwardCount < messagingOptions.MaxForwardCount;
         }
 
         /// <summary>

@@ -39,7 +39,7 @@ namespace Orleans.Configuration
             services.Configure<ClientMessagingOptions>(options =>
             {
                 CopyCommonMessagingOptions(configuration, options);
-
+                options.PropagateActivityId = configuration.PropagateActivityId;
                 options.ClientSenderBuckets = configuration.ClientSenderBuckets;
             });
 

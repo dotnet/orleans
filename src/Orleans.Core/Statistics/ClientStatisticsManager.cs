@@ -30,7 +30,7 @@ namespace Orleans.Runtime
             IHostEnvironmentStatistics hostEnvironmentStatistics,
             IAppEnvironmentStatistics appEnvironmentStatistics,
             ILoggerFactory loggerFactory, 
-            IOptions<StatisticsOptions> statisticsOptions, 
+            IOptions<ClientStatisticsOptions> statisticsOptions, 
             IOptions<ClusterClientOptions> clusterClientOptions)
         {
             this.config = config;
