@@ -18,8 +18,7 @@ Orleans makes it possible to inject dependencies into application [Grains](../Ge
 However Orleans supports every container dependent injection mechanisms, one of the most commonly used method is constructor injection.
 
 Theoretically any type can be injected which was previously registered in a [`IServiceCollection`](https://docs.asp.net/projects/api/en/latest/autoapi/Microsoft/Extensions/DependencyInjection/IServiceCollection/index.html) during Silo startup.
-
-**Note**:
+*Note**:
 As Orleans is evolving, as of the current plans it will be possible to leverage dependency injection in other application classes as well, like [`StreamProviders`](../Orleans-Streams/Stream-Providers.md). 
 
 # Configuring DI
@@ -45,7 +44,7 @@ configuration.UseStartupType<MyApplication.Configuration.MyStartup>();
 
 ## Configuring via XML
 
-To register your `Startup` class with Orleans you've to add a `Startup` element to the `Defaults` section and in the `Type` attribute you've to specify the assembly qualified name for the type.
+To register your `Startup` class with Orleans you add a `Startup` element to the `Defaults` section and in the `Type` attribute you specify the assembly-qualified name for the type.
 
 ``` XML
 <?xml version="1.0" encoding="utf-8" ?>
@@ -113,9 +112,9 @@ public class InjectedService : IInjectedService
 
 # Test Framework Integration
 
-DI truly shines when coupled with a testing framework to verify the correctness of the code that build. You can read about the components for making testing in Orleans by following our [tutorials](../../Tutorials/Unit-Testing-Grains.md).
+DI truly shines when coupled with a testing framework to verify the correctness of the code that build. You can read about the components for testing in Orleans by following our [tutorials](../../Tutorials/Unit-Testing-Grains.md).
 
-You will need to do two things setup DI with tests. First you will need to implement mocks of your services. This is done in our example using [Moq](https://github.com/moq/), a popular mocking framework for .NET. Here is an example of doing mocking of a service.
+You will need to do two things to set up DI with tests. First you will need to implement mocks of your services. This is done in our example using [Moq](https://github.com/moq/), a popular mocking framework for .NET. Here is an example of mocking a service.
 
 
 ``` csharp
