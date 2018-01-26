@@ -88,7 +88,7 @@ namespace Orleans.ServiceBus.Providers
             this.telemetryProducer = telemetryProducer;
             this.statisticsOptions = statisticsOptions;
 
-            this.eventHubReceiverFactory = this.eventHubReceiverFactory == null ? EventHubAdapterReceiver.CreateReceiver : eventHubReceiverFactory;
+            this.eventHubReceiverFactory = eventHubReceiverFactory == null ? EventHubAdapterReceiver.CreateReceiver : eventHubReceiverFactory;
         }
 
         public Task Initialize(TimeSpan timeout)

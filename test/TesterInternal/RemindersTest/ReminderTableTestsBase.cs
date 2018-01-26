@@ -32,6 +32,7 @@ namespace UnitTests.RemindersTest
         
         protected ReminderTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture clusterFixture, LoggerFilterOptions filters)
         {
+            fixture.InitializeConnectionStringAccessor(GetConnectionString);
             loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType()}.log", filters);
             this.ClusterFixture = clusterFixture;
             logger = loggerFactory.CreateLogger<ReminderTableTestsBase>();
@@ -41,8 +42,7 @@ namespace UnitTests.RemindersTest
             logger.Info("ClusterId={0}", clusterId);
             this.siloOptions = Options.Create(new SiloOptions { ClusterId = clusterId, ServiceId = serviceId });
             this.storageOptions = Options.Create(new StorageOptions { DataConnectionStringForReminders = fixture.ConnectionString });
-            this.adoNetOptions = Options.Create(new AdoNetOptions());
-            fixture.InitializeConnectionStringAccessor(GetConnectionString);
+            this.adoNetOptions = Options.Create(new AdoNetOptions() { InvariantForReminders = GetAdoInvariant() });
 
             var globalConfiguration = new GlobalConfiguration
             {

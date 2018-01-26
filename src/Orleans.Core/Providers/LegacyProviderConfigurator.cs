@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Diagnostics;
@@ -111,9 +111,9 @@ namespace Orleans.Providers
             public virtual void Participate(TLifecycle lifecycle)
             {
                 this.initStage = this.config.GetIntProperty(LegacyProviderConfigurator.InitStageName, this.defaultInitStage);
-                lifecycle.Subscribe(this.initStage, Init, Close);
+                lifecycle.Subscribe(this.initStage, this.Init, this.Close);
                 this.startStage = this.config.GetIntProperty(LegacyProviderConfigurator.StartStageName, this.defaultStartStage);
-                lifecycle.Subscribe(this.startStage, Start);
+                lifecycle.Subscribe(this.startStage, this.Start);
 
             }
 
@@ -162,7 +162,7 @@ namespace Orleans.Providers
                 return Activator.CreateInstance(providerType) as TService;
             });
             services.AddSingletonNamedService<ILifecycleParticipant<TLifecycle>>(config.Name, (s, n) => new ProviderLifecycleParticipant<TService>(config, s, s.GetRequiredService<ILoggerFactory>(), defaultInitStage, defaultStartStage));
-            services.AddSingletonNamedService<IControllable>(config.Name, (s, n) => s.GetServiceByName<TService>(n) as IControllable);
+            services.AddSingletonNamedService(config.Name, (s, n) => s.GetServiceByName<TService>(n) as IControllable);
         }
     }
 }

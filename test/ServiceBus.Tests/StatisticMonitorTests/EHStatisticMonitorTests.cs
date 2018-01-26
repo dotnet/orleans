@@ -1,22 +1,16 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Microsoft.WindowsAzure.Storage.Table;
-using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.ServiceBus.Providers;
 using Orleans.ServiceBus.Providers.Testing;
 using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using ServiceBus.Tests.TestStreamProviders;
 using TestExtensions;
-using UnitTests.GrainInterfaces;
 using UnitTests.Grains.ProgrammaticSubscribe;
 using Xunit;
-using Orleans.TestingHost.Utils;
-using UnitTests.Grains;
 using ServiceBus.Tests.SlowConsumingTests;
 
 namespace ServiceBus.Tests.MonitorTests
@@ -125,7 +119,7 @@ namespace ServiceBus.Tests.MonitorTests
 
         private void AssertReceiverMonitorCallCounters(EventHubReceiverMonitorCounters totalReceiverMonitorCallCounters)
         {
-            Assert.Equal(totalReceiverMonitorCallCounters.TrackInitializationCallCounter, ehPartitionCountPerSilo);
+            Assert.Equal(ehPartitionCountPerSilo, totalReceiverMonitorCallCounters.TrackInitializationCallCounter);
             Assert.True(totalReceiverMonitorCallCounters.TrackMessagesReceivedCallCounter > 0);
             Assert.True(totalReceiverMonitorCallCounters.TrackReadCallCounter > 0);
             Assert.Equal(0, totalReceiverMonitorCallCounters.TrackShutdownCallCounter);

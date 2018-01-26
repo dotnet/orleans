@@ -51,7 +51,7 @@ namespace Orleans.Configuration
                 options.FallbackSerializationProvider = configuration.FallbackSerializationProvider;
             });
 
-            services.Configure<StatisticsOptions>((options) =>
+            services.Configure<ClientStatisticsOptions>((options) =>
             {
                 CopyStatisticsOptions(configuration, options);
             });
