@@ -43,6 +43,7 @@ namespace Orleans.Configuration
                 options.ClientSenderBuckets = configuration.ClientSenderBuckets;
             });
 
+
             services.Configure<NetworkingOptions>(options => CopyNetworkingOptions(configuration, options));
 
             services.Configure<SerializationProviderOptions>(options =>
