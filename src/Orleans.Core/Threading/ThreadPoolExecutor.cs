@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,7 +14,7 @@ namespace Orleans.Threading
     /// </summary>
     internal class ThreadPoolExecutor : IExecutor, IHealthCheckable
     {
-        private readonly BlockingCollection<WorkItem> workQueue;
+        private readonly ThreadPoolWorkQueue workQueue;
 
         private readonly ThreadPoolExecutorOptions options;
 
@@ -28,9 +28,7 @@ namespace Orleans.Threading
         {
             this.options = options ?? throw new ArgumentNullException(nameof(options));
 
-            workQueue = new BlockingCollection<WorkItem>(options.PreserveOrder
-                ? (IProducerConsumerCollection<WorkItem>) new ConcurrentQueue<WorkItem>()
-                : new ConcurrentBag<WorkItem>());
+            workQueue = new ThreadPoolWorkQueue();
 
             statistic = new ThreadPoolTrackingStatistic(options.Name, options.LoggerFactory);
 
@@ -38,12 +36,7 @@ namespace Orleans.Threading
 
             log = options.LoggerFactory.CreateLogger<ThreadPoolExecutor>();
 
-            options.CancellationTokenSource.Token.Register(() =>
-            {
-                var chanceToGracefullyExit = WorkItem.NoOp;
-                workQueue.Add(chanceToGracefullyExit);
-                workQueue.CompleteAdding();
-            });
+            options.CancellationTokenSource.Token.Register(Complete);
 
             for (var threadIndex = 0; threadIndex < options.DegreeOfParallelism; threadIndex++)
             {
@@ -51,7 +44,7 @@ namespace Orleans.Threading
             }
         }
 
-        public int WorkQueueCount => workQueue.Count;
+        public int WorkQueueCount => 0; // workQueue.Count, todo
 
         public void QueueWorkItem(WaitCallback callback, object state = null)
         {
@@ -64,7 +57,7 @@ namespace Orleans.Threading
                 statistic.OnEnQueueRequest(1, WorkQueueCount, workItem);
             }
 
-            workQueue.Add(workItem);
+            workQueue.Enqueue(workItem, forceGlobal: false);
         }
 
         public bool CheckHealth(DateTime lastCheckTime)
@@ -72,23 +65,24 @@ namespace Orleans.Threading
             return !executingWorkTracker.HasFrozenWork();
         }
 
+        public void Complete()
+        {
+            workQueue.CompleteAdding();
+        }
+
         private void ProcessWorkItems(ExecutionContext context)
         {
             statistic.OnStartExecution();
             try
             {
-                while (!workQueue.IsCompleted && (!context.CancellationTokenSource.IsCancellationRequested || options.DrainAfterCancel))
+                while (!context.CancellationTokenSource.IsCancellationRequested)
                 {
-                    try
+                    while (workQueue.TryDequeue(context.ThreadLocals, out var workItem))
                     {
-                        context.WorkItem = workQueue.Take();
-                    }
-                    catch (InvalidOperationException)
-                    {
-                        break;
+                        context.ExecuteWithFilters(workItem);
                     }
 
-                    context.ExecuteWithFilters();
+                    workQueue.WaitForWork();
                 }
             }
             catch (Exception ex)
@@ -119,6 +113,7 @@ namespace Orleans.Threading
             var context = new ExecutionContext(
                 actionFilters,
                 exceptionFilters,
+                workQueue.EnsureCurrentThreadHasQueue(),
                 options.CancellationTokenSource,
                 index);
 
@@ -234,7 +229,8 @@ namespace Orleans.Threading
             private static int GetThreadSlot(int threadIndex)
             {
                 // false sharing prevention
-                const int padding = 64;
+                const int cacheLineSize = 64;
+                const int padding = cacheLineSize;
                 return threadIndex * padding;
             }
         }
@@ -342,22 +338,28 @@ namespace Orleans.Threading
         public ExecutionContext(
             IEnumerable<ActionFilter<ExecutionContext>> actionFilters,
             IEnumerable<ExceptionFilter<ExecutionContext>> exceptionFilters,
+            ThreadPoolWorkQueueThreadLocals threadLocals,
             CancellationTokenSource cts,
             int threadIndex)
         {
             filtersApplicant = new FiltersApplicant<ExecutionContext>(actionFilters, exceptionFilters);
+            ThreadLocals = threadLocals;
             CancellationTokenSource = cts;
             ThreadIndex = threadIndex;
         }
 
+        public ThreadPoolWorkQueueThreadLocals ThreadLocals { get; }
+
         public CancellationTokenSource CancellationTokenSource { get; }
 
-        public WorkItem WorkItem { get; set; }
+        public WorkItem WorkItem { get; private set; }
 
         internal int ThreadIndex { get; }
 
-        public void ExecuteWithFilters()
+        public void ExecuteWithFilters(WorkItem workItem)
         {
+            WorkItem = workItem;
+
             try
             {
                 filtersApplicant.Apply(this);
