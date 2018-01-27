@@ -72,12 +72,13 @@ namespace Orleans.Threading
 
         private void ProcessWorkItems(ExecutionContext context)
         {
+            var threadLocals = workQueue.EnsureCurrentThreadHasQueue();
             statistic.OnStartExecution();
             try
             {
                 while (!context.CancellationTokenSource.IsCancellationRequested)
                 {
-                    while (workQueue.TryDequeue(context.ThreadLocals, out var workItem))
+                    while (workQueue.TryDequeue(threadLocals, out var workItem))
                     {
                         context.ExecuteWithFilters(workItem);
                     }
@@ -113,7 +114,6 @@ namespace Orleans.Threading
             var context = new ExecutionContext(
                 actionFilters,
                 exceptionFilters,
-                workQueue.EnsureCurrentThreadHasQueue(),
                 options.CancellationTokenSource,
                 index);
 
@@ -338,17 +338,13 @@ namespace Orleans.Threading
         public ExecutionContext(
             IEnumerable<ActionFilter<ExecutionContext>> actionFilters,
             IEnumerable<ExceptionFilter<ExecutionContext>> exceptionFilters,
-            ThreadPoolWorkQueueThreadLocals threadLocals,
             CancellationTokenSource cts,
             int threadIndex)
         {
             filtersApplicant = new FiltersApplicant<ExecutionContext>(actionFilters, exceptionFilters);
-            ThreadLocals = threadLocals;
             CancellationTokenSource = cts;
             ThreadIndex = threadIndex;
         }
-
-        public ThreadPoolWorkQueueThreadLocals ThreadLocals { get; }
 
         public CancellationTokenSource CancellationTokenSource { get; }
 
