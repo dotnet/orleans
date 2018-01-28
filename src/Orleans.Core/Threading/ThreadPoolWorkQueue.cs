@@ -13,16 +13,20 @@ namespace Orleans.Threading
     {
         internal bool loggingEnabled;
         internal readonly ConcurrentQueue<WorkItem> workItems = new ConcurrentQueue<WorkItem>();
+
+        private PaddingFor32 pad1;
+
+        internal readonly WorkStealingQueueList workStealingQueues = new WorkStealingQueueList();
         private static readonly int processorCount = Environment.ProcessorCount;
         private const int CACHE_LINE_SIZE = 64;
         private const int CompletedState = 1;
         private int isAddingCompleted;
 
-        private PaddingFor32 pad1;
+        private PaddingFor32 pad2;
 
         private volatile int numOutstandingThreadRequests = 0;
 
-        private PaddingFor32 pad2;
+        private PaddingFor32 pad3;
 
         private readonly UnfairSemaphore semaphore = new UnfairSemaphore();
 
@@ -58,7 +62,7 @@ namespace Orleans.Threading
             if (!forceGlobal)
                 tl = ThreadPoolWorkQueueThreadLocals.threadLocals;
 
-            if (null != tl)
+            if (null != tl && tl.workQueue == this)
             {
                 tl.workStealingQueue.LocalPush(callback);
             }
@@ -103,7 +107,7 @@ namespace Orleans.Threading
                 !workItems.TryDequeue(out workItem)) // then try the global queue
             {
                 // finally try to steal from another thread's local queue
-                WorkStealingQueue[] queues = WorkStealingQueueList.Queues;
+                WorkStealingQueue[] queues = tl.workQueue.workStealingQueues.Queues;
                 int c = queues.Length;
                 Debug.Assert(c > 0, "There must at least be a queue for this thread.");
                 int maxIndex = c - 1;
@@ -154,13 +158,13 @@ namespace Orleans.Threading
             }
         }
 
-        internal static class WorkStealingQueueList
+        internal class WorkStealingQueueList
         {
-            private static volatile WorkStealingQueue[] _queues = new WorkStealingQueue[0];
+            private volatile WorkStealingQueue[] _queues = new WorkStealingQueue[0];
 
-            public static WorkStealingQueue[] Queues => _queues;
+            public WorkStealingQueue[] Queues => _queues;
 
-            public static void Add(WorkStealingQueue queue)
+            public void Add(WorkStealingQueue queue)
             {
                 Debug.Assert(queue != null);
                 while (true)
@@ -178,7 +182,7 @@ namespace Orleans.Threading
                 }
             }
 
-            public static void Remove(WorkStealingQueue queue)
+            public void Remove(WorkStealingQueue queue)
             {
                 Debug.Assert(queue != null);
                 while (true)
@@ -763,7 +767,7 @@ namespace Orleans.Threading
         {
             workQueue = tpq;
             workStealingQueue = new ThreadPoolWorkQueue.WorkStealingQueue();
-            ThreadPoolWorkQueue.WorkStealingQueueList.Add(workStealingQueue);
+            workQueue.workStealingQueues.Add(workStealingQueue);
         }
 
         private void CleanUp()
@@ -778,9 +782,9 @@ namespace Orleans.Threading
                         Debug.Assert(null != cb);
                         workQueue.Enqueue(cb, forceGlobal: true);
                     }
-                }
 
-                ThreadPoolWorkQueue.WorkStealingQueueList.Remove(workStealingQueue);
+                    workQueue.workStealingQueues.Remove(workStealingQueue);
+                }
             }
         }
 
