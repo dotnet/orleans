@@ -1,5 +1,6 @@
 using System;
-
+using System.Collections.Generic;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Hosting
 {
@@ -31,5 +32,32 @@ namespace Orleans.Hosting
         /// </summary>
         public int LoadSheddingLimit { get; set; } = DEFAULT_LOAD_SHEDDING_LIMIT;
         public const int DEFAULT_LOAD_SHEDDING_LIMIT = 95;
+    }
+
+    public class SiloStatisticsOptionsFormatter : StatisticsOptionsFormatter, IOptionFormatter<SiloStatisticsOptions>
+    {
+        public string Category { get; }
+
+        public string Name => nameof(SiloStatisticsOptions);
+
+        private SiloStatisticsOptions options;
+
+        public SiloStatisticsOptionsFormatter(IOptions<SiloStatisticsOptions> options)
+            :base(options.Value)
+        {
+            this.options = options.Value;
+        }
+
+        public IEnumerable<string> Format()
+        {
+            List<string> format = base.FormatStatisticsOptions();
+            format.AddRange(new List<string>
+            {
+                OptionFormattingUtilities.Format(nameof(this.options.DeploymentLoadPublisherRefreshTime), this.options.DeploymentLoadPublisherRefreshTime),
+                OptionFormattingUtilities.Format(nameof(this.options.LoadSheddingEnabled), this.options.LoadSheddingEnabled),
+                OptionFormattingUtilities.Format(nameof(this.options.LoadSheddingLimit), this.options.LoadSheddingLimit),
+            });
+            return format;
+        }
     }
 }

@@ -1,6 +1,8 @@
+using System;
+using System.Collections.Generic;
+using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using System;
 
 namespace Orleans.Hosting
 {
@@ -42,5 +44,27 @@ namespace Orleans.Hosting
         /// </summary>
         public StatisticsLevel CollectionLevel { get; set; } = DEFAULT_COLLECTION_LEVEL;
         public static readonly StatisticsLevel DEFAULT_COLLECTION_LEVEL = StatisticsLevel.Info;
+    }
+
+    public abstract class StatisticsOptionsFormatter
+    {
+        private StatisticsOptions options;
+
+        protected StatisticsOptionsFormatter(StatisticsOptions options)
+        {
+            this.options = options;
+        }
+
+        protected List<string> FormatStatisticsOptions()
+        {
+            return new List<string>()
+            {
+                OptionFormattingUtilities.Format(nameof(this.options.MetricsTableWriteInterval), this.options.MetricsTableWriteInterval),
+                OptionFormattingUtilities.Format(nameof(this.options.PerfCountersWriteInterval), this.options.PerfCountersWriteInterval),
+                OptionFormattingUtilities.Format(nameof(this.options.LogWriteInterval), this.options.LogWriteInterval),
+                OptionFormattingUtilities.Format(nameof(this.options.WriteLogStatisticsToTable), this.options.WriteLogStatisticsToTable),
+                OptionFormattingUtilities.Format(nameof(this.options.CollectionLevel), this.options.CollectionLevel),
+            };
+        }
     }
 }

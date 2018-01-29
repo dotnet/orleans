@@ -31,6 +31,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.ApplicationParts;
 using Orleans.Runtime.Utilities;
 using System;
+using System.Collections.Generic;
 using Orleans.Metadata;
 using Orleans.Statistics;
 using Microsoft.Extensions.Options;
@@ -47,7 +48,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ILocalSiloDetails, LocalSiloDetails>();
             services.TryAddSingleton<ISiloHost, SiloWrapper>();
             services.TryAddSingleton<SiloLifecycle>();
-
+            services.TryAddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloOptionsLogger>();
             services.PostConfigure<SiloMessagingOptions>(options =>
             {
                 //
@@ -232,6 +233,12 @@ namespace Orleans.Hosting
             applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainClassFeature>());
             applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<SerializerFeature>());
             services.AddTransient<IConfigurationValidator, ApplicationPartValidator>();
+
+            //Add default option formatter if none is configured, for options which are requied to be configured 
+            services.TryConfigureFormatter<SiloMessagingOptions, SiloMessageingOptionFormatter>();
+            services.TryConfigureFormatter<SiloStatisticsOptions, SiloStatisticsOptionsFormatter>();
+            services.TryConfigureFormatter<NetworkingOptions, NetworkingOptionFormatter>();
+            services.TryConfigureFormatter<SerializationProviderOptions, SerializationProviderOptionsFormatter>();
         }
     }
 }

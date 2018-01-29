@@ -1,4 +1,6 @@
 
+using System.Xml;
+
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -6,6 +8,11 @@ namespace Orleans.Runtime
     /// </summary>
     public static class SiloLifecycleStage
     {
+        /// <summary>
+        /// First ring in silo's lifecycle
+        /// </summary>
+        public const int First = int.MinValue;
+
         /// <summary>
         /// Initialize silo runtime
         /// </summary>
