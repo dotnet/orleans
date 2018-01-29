@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -49,11 +49,11 @@ namespace Orleans.Threading
         private static readonly Action<T> NoOpFilter = _ => { };
     }
 
-    internal class ExecutionActionFilter : ActionFilter<ExecutionContext>
+    internal abstract class ExecutionActionFilter : ActionFilter<ExecutionContext>
     {
     }
 
-    internal class ExecutionExceptionFilter : ExceptionFilter<ExecutionContext>
+    internal abstract class ExecutionExceptionFilter : ExceptionFilter<ExecutionContext>
     {
     }
 

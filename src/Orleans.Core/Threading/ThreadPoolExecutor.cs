@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -44,18 +43,13 @@ namespace Orleans.Threading
             }
         }
 
-        public int WorkQueueCount => 0; // workQueue.Count, todo
-
         public void QueueWorkItem(WaitCallback callback, object state = null)
         {
             if (callback == null) throw new ArgumentNullException(nameof(callback));
 
             var workItem = new WorkItem(callback, state, options.WorkItemExecutionTimeTreshold, options.WorkItemStatusProvider);
 
-            if (ExecutorOptions.CollectDetailedQueueStatistics)
-            {
-                statistic.OnEnQueueRequest(1, WorkQueueCount, workItem);
-            }
+            statistic.OnEnQueueRequest(1, 0, workItem);
 
             workQueue.Enqueue(workItem, forceGlobal: false);
         }
