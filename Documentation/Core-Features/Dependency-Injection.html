@@ -81,8 +81,8 @@
 <p>Dependency Injection is currently supported only on the server side within Orleans.</p>
 <p>Orleans makes it possible to inject dependencies into application <a href="../Getting-Started-With-Orleans/Grains.html">Grains</a>.</p>
 <p>However Orleans supports every container dependent injection mechanisms, one of the most commonly used method is constructor injection.</p>
-<p>Theoretically any type can be injected which was previously registered in a <a href="https://docs.asp.net/projects/api/en/latest/autoapi/Microsoft/Extensions/DependencyInjection/IServiceCollection/index.html"><code>IServiceCollection</code></a> during Silo startup.</p>
-<p><strong>Note</strong>:
+<p>Theoretically any type can be injected which was previously registered in a <a href="https://docs.asp.net/projects/api/en/latest/autoapi/Microsoft/Extensions/DependencyInjection/IServiceCollection/index.html"><code>IServiceCollection</code></a> during Silo startup.
+<em>Note</em>*:
 As Orleans is evolving, as of the current plans it will be possible to leverage dependency injection in other application classes as well, like <a href="../Orleans-Streams/Stream-Providers.html"><code>StreamProviders</code></a>. </p>
 <h1 id="configuring-di">Configuring DI</h1>
 <p>The DI configuration is a global configuration value and must be configured there.</p>
@@ -96,7 +96,7 @@ Previously DI configuration was specified at the cluster node level, this was ch
 
 configuration.UseStartupType&lt;MyApplication.Configuration.MyStartup&gt;();
 </code></pre><h2 id="configuring-via-xml">Configuring via XML</h2>
-<p>To register your <code>Startup</code> class with Orleans you&#39;ve to add a <code>Startup</code> element to the <code>Defaults</code> section and in the <code>Type</code> attribute you&#39;ve to specify the assembly qualified name for the type.</p>
+<p>To register your <code>Startup</code> class with Orleans you add a <code>Startup</code> element to the <code>Defaults</code> section and in the <code>Type</code> attribute you specify the assembly-qualified name for the type.</p>
 <pre><code class="lang-XML">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot; ?&gt;
 &lt;tns:OrleansConfiguration xmlns:tns=&quot;urn:orleans&quot;&gt;
   &lt;tns:Defaults&gt;
@@ -151,8 +151,8 @@ public class InjectedService : IInjectedService
     }
 }
 </code></pre><h1 id="test-framework-integration">Test Framework Integration</h1>
-<p>DI truly shines when coupled with a testing framework to verify the correctness of the code that build. You can read about the components for making testing in Orleans by following our <a href="../../Tutorials/Unit-Testing-Grains.html">tutorials</a>.</p>
-<p>You will need to do two things setup DI with tests. First you will need to implement mocks of your services. This is done in our example using <a href="https://github.com/moq/">Moq</a>, a popular mocking framework for .NET. Here is an example of doing mocking of a service.</p>
+<p>DI truly shines when coupled with a testing framework to verify the correctness of the code that build. You can read about the components for testing in Orleans by following our <a href="../../Tutorials/Unit-Testing-Grains.html">tutorials</a>.</p>
+<p>You will need to do two things to set up DI with tests. First you will need to implement mocks of your services. This is done in our example using <a href="https://github.com/moq/">Moq</a>, a popular mocking framework for .NET. Here is an example of mocking a service.</p>
 <pre><code class="lang-csharp">public class MockServices
 {
     public IServiceProvider ConfigureServices(IServiceCollection services)
