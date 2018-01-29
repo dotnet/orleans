@@ -29,7 +29,6 @@ As a result, with no burden put on the application code, only recently used grai
 
 This period of time after which an idle grain activation becomes subject to Activation GC is called Collection Age Limit. The default Collection Age Limit is 2 hours, but it can be changed globally or for individual grain classes.
 
-
 ## Explicit Control of Activation Garbage Collection
 
 ### Delaying Activation GC
@@ -40,14 +39,13 @@ A grain activation can delay its own Activation GC, by calling `this.DelayDeacti
 protected void DelayDeactivation(TimeSpan timeSpan)
 ```
 
-This call will insure that this activations is not deactivated for at least the specified time duration. It takes priority over Activation Garbage Collection settings specified in the config, but does not cancel them.
+This call will ensure that this activation is not deactivated for at least the specified time duration. It takes priority over Activation Garbage Collection settings specified in the config, but does not cancel them.
 Therefore, this call provides an additional hook to **delay the deactivation beyond what is specified in the Activation Garbage Collection settings**. This call can not be used to expedite Activation Garbage Collection.
 
 
 A positive <c>`timeSpan`</c> value means “prevent GC of this activation for that time span”.
 
-A negative <c>`timeSpan`</c> value means “cancel the previous setting of the `DelayDeactivation` call and make this activation behave based on the regular Activation Garbage Collection settings ”.
-
+A negative <c>`timeSpan`</c> value means “cancel the previous setting of the `DelayDeactivation` call and make this activation behave based on the regular Activation Garbage Collection settings”.
 
 **Scenarios:**
 
@@ -59,8 +57,7 @@ A negative <c>`timeSpan`</c> value means “cancel the previous setting of the `
 
 4) Activation Garbage Collection settings specify age limit of 10 minutes and the grain is making a call to DelayDeactivation(20 min), and after 7 minutes there is another call on this grain, the activation will be collected after 20 min from time zero, if no extra calls were made.
 
-Note that `DelayDeactivation` does not 100% guarantee that the grain activation will not get activated before the specified period of time expires. There are certain failure cases that may cause 'premature' deactivation of grains.
-
+Note that `DelayDeactivation` does not 100% guarantee that the grain activation will not get deactivated before the specified period of time expires. There are certain failure cases that may cause 'premature' deactivation of grains.
 
 ### Expediting Activation GC
 
@@ -72,7 +69,6 @@ A grain activation can also instruct the runtime to deactivate it next time it b
 A grain activation is considered idle if it is not processing any message at the moment.
 If you call `DeactivateOnIdle` while a grain is processing a message, it will get deactivated as soon as processing of the current message is finished.
 If there are any requests queued for the grain, they will be forwarded to the next activation.
-
 
 `DeactivateOnIdle` take priority over any Activation Garbage Collection settings specified in the config or `DelayDeactivation`.
 Note that this setting only applies to the grain activation from which it has been called and it does not apply to other grain activation of this type.
