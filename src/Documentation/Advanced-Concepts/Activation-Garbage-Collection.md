@@ -9,7 +9,7 @@ As described in [Grains](../Getting-Started-With-Orleans/Grains.md), a *grain ac
 Activation Garbage Collection (Activation GC) is the process of removal from memory of unused grain activations. It is conceptually similar to how garbage collection of memory works in .NET. However, Activation GC only takes into consideration how long a particular grain activation has been idle. Memory usage is not used as a factor.
 
 ## How Activation GC Works
-The general process of Activation GC involves Orleans runtime in a silo periodically scanning for grain activations that have not been used at all for the configured period of time (Collection Age Limit). Once a grain activation has been idle for that long, it gets deactivated. The deactivation process begins by the runtime calling the grain’s `OnDeactivate()` method, and completes by removing references to the grain activation object from all data structures of the silo, so that the memory is reclaimed by the .NET GC.
+The general process of Activation GC involves Orleans runtime in a silo periodically scanning for grain activations that have not been used at all for the configured period of time (Collection Age Limit). Once a grain activation has been idle for that long, it gets deactivated. The deactivation process begins by the runtime calling the grain’s `OnDeactivateAsync()` method, and completes by removing references to the grain activation object from all data structures of the silo, so that the memory is reclaimed by the .NET GC.
 
 As a result, with no burden put on the application code, only recently used grain activations stay in memory while activations that aren't used anymore get automatically removed, and system resources used by them get reclaimed by the runtime.
 
@@ -49,15 +49,15 @@ A negative <c>`timeSpan`</c> value means “cancel the previous setting of the `
 
 **Scenarios:**
 
-1) Activation Garbage Collection settings specify age limit of 10 minutes and the grain is making a call to DelayDeactivation(20 min), it will cause this activatin to not be collected for at least 20 min.
+1) Activation Garbage Collection settings specify age limit of 10 minutes and the grain is making a call to `DelayDeactivation`(20 min), it will cause this activation to not be collected for at least 20 min.
 
-2) Activation Garbage Collection settings specify age limit of 10 minutes and the grain is making a call to DelayDeactivation(5 min), the activation will be collected after 10 min, if no extra calls were made.
+2) Activation Garbage Collection settings specify age limit of 10 minutes and the grain is making a call to `DelayDeactivation`(5 min), the activation will be collected after 10 min, if no extra calls were made.
 
-3) Activation Garbage Collection settings specify age limit of 10 minutes and the grain is making a call to DelayDeactivation(5 min), and after 7 minutes there is another call on this grain, the activation will be collected after 17 min from time zero, if no extra calls were made.
+3) Activation Garbage Collection settings specify age limit of 10 minutes and the grain is making a call to `DelayDeactivation`(5 min), and after 7 minutes there is another call on this grain, the activation will be collected after 17 min from time zero, if no extra calls were made.
 
-4) Activation Garbage Collection settings specify age limit of 10 minutes and the grain is making a call to DelayDeactivation(20 min), and after 7 minutes there is another call on this grain, the activation will be collected after 20 min from time zero, if no extra calls were made.
+4) Activation Garbage Collection settings specify age limit of 10 minutes and the grain is making a call to `DelayDeactivation`(20 min), and after 7 minutes there is another call on this grain, the activation will be collected after 20 min from time zero, if no extra calls were made.
 
-Note that `DelayDeactivation` does not 100% guarantee that the grain activation will not get deactivated before the specified period of time expires. There are certain failure cases that may cause 'premature' deactivation of grains.
+Note that `DelayDeactivation` does not 100% guarantee that the grain activation will not get deactivated before the specified period of time expires. There are certain failure cases that may cause 'premature' deactivation of grains. That means that `DelayDeactivation` **cannot not be used as a means to 'pin' a grain activation in memory forever or to a specific silo**. `DelayDeactivation` is merely an optimization mechanism that can help reduce the aggregate cost of a grain getting deactivated and reactivated over time, if that matters. In most cases there should be no need to use `DelayDeactivation` at all.
 
 ### Expediting Activation GC
 
