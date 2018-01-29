@@ -41,11 +41,16 @@ namespace Orleans.Hosting
         /// </summary>
         public string ReminderTableAssembly { get; set; }
 
+        #region TEST
         /// <summary>
         /// For TEST - Not for use in production environments.
         /// </summary>
         public bool UseMockReminderTable { get; set; } = false;
+        /// <summary>
+        /// For TEST - Not for use in production environments.
+        /// </summary>
         public TimeSpan MockReminderTableTimeout { get; set; } = DEFAULT_MOCK_REMINDER_TABLE_TIMEOUT;
         public static readonly TimeSpan DEFAULT_MOCK_REMINDER_TABLE_TIMEOUT = TimeSpan.FromMilliseconds(50);
+        #endregion TEST
     }
 }

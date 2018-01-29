@@ -30,7 +30,6 @@ using Orleans.Runtime.Versions;
 using Orleans.Versions;
 using Orleans.ApplicationParts;
 using Orleans.Serialization;
-using Orleans.Runtime.ReminderService;
 
 namespace Orleans.Runtime
 {
