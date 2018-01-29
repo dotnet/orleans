@@ -1,4 +1,4 @@
-﻿using Orleans.Providers;
+using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Storage;
 using Orleans.TestingHost;
@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using TestExtensions;
 using Xunit;
@@ -24,13 +25,15 @@ namespace Tester.StreamingTests.PlugableQueueBalancerTests
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(siloCount);
-                options.UseSiloBuilderFactory<SiloBuilderFactory>();
+                builder.Options.InitialSilosCount = siloCount;
+                builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
                 ProviderSettings.TotalQueueCount = totalQueueCount;
-                AdjustClusterConfiguration(options.ClusterConfiguration);
-                return new TestCluster(options);
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    AdjustClusterConfiguration(legacy.ClusterConfiguration);
+                });
             }
 
             private static void AdjustClusterConfiguration(ClusterConfiguration config)

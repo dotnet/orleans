@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -32,13 +32,16 @@ namespace UnitTests.ActivationsLifeCycleTests
         private void Initialize(TimeSpan collectionAgeLimit, TimeSpan quantum)
         {
             GlobalConfiguration.ENFORCE_MINIMUM_REQUIREMENT_FOR_AGE_LIMIT = false;
-            var options = new TestClusterOptions(1);
-            var config = options.ClusterConfiguration;
-            config.Globals.CollectionQuantum = quantum;
-            config.Globals.Application.SetDefaultCollectionAgeLimit(collectionAgeLimit);
-            config.Globals.Application.SetCollectionAgeLimit(typeof(IdleActivationGcTestGrain2), TimeSpan.FromSeconds(10));
-            config.Globals.Application.SetCollectionAgeLimit(typeof(BusyActivationGcTestGrain2), TimeSpan.FromSeconds(10));
-            testCluster = new TestCluster(config);
+            var builder = new TestClusterBuilder(1);
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                var config = legacy.ClusterConfiguration;
+                config.Globals.CollectionQuantum = quantum;
+                config.Globals.Application.SetDefaultCollectionAgeLimit(collectionAgeLimit);
+                config.Globals.Application.SetCollectionAgeLimit(typeof(IdleActivationGcTestGrain2), TimeSpan.FromSeconds(10));
+                config.Globals.Application.SetCollectionAgeLimit(typeof(BusyActivationGcTestGrain2), TimeSpan.FromSeconds(10));
+            });
+            testCluster = builder.Build();
             testCluster.Deploy();
             this.logger = this.testCluster.Client.ServiceProvider.GetRequiredService<ILogger<ActivationCollectorTests>>();
         }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -18,13 +18,13 @@ namespace UnitTests.General
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions();
-                options.ClusterConfiguration.Globals.PerformDeadlockDetection = true;
-                options.ClusterConfiguration.Globals.AllowCallChainReentrancy = true;
-
-                return new TestCluster(options);
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.Globals.PerformDeadlockDetection = true;
+                    legacy.ClusterConfiguration.Globals.AllowCallChainReentrancy = true;
+                });
             }
         }
 

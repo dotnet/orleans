@@ -2,8 +2,6 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.TestingHost;
-using Tester;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -16,10 +14,6 @@ namespace UnitTests.CancellationTests
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
-            {
-                return new TestCluster(new TestClusterOptions(2));
-            }
         }
 
         public GrainCancellationTokenTests(Fixture fixture)

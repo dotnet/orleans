@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -21,15 +21,14 @@ namespace Tester.AzureUtils.TimerTests
     {
         public class Fixture : BaseAzureTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 Guid serviceId = Guid.NewGuid();
-                var options = new TestClusterOptions();
-
-                options.ClusterConfiguration.Globals.ServiceId = serviceId;
-                options.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.AzureTable;
-
-                return new TestCluster(options);
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.Globals.ServiceId = serviceId;
+                    legacy.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.AzureTable;
+                });
             }
         }
 
@@ -150,7 +149,7 @@ namespace Tester.AzureUtils.TimerTests
             // start two extra silos ... although it will take it a while before they stabilize
             log.Info("Starting 2 extra silos");
 
-            this.HostedCluster.StartAdditionalSilos(2);
+            await this.HostedCluster.StartAdditionalSilos(2);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             //Block until all tasks complete.
@@ -206,7 +205,7 @@ namespace Tester.AzureUtils.TimerTests
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_2F_MultiGrain()
         {
-            List<SiloHandle> silos = this.HostedCluster.StartAdditionalSilos(2);
+            List<SiloHandle> silos = await this.HostedCluster.StartAdditionalSilos(2);
 
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g2 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -242,7 +241,7 @@ namespace Tester.AzureUtils.TimerTests
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_1F1J_MultiGrain()
         {
-            List<SiloHandle> silos = this.HostedCluster.StartAdditionalSilos(1);
+            List<SiloHandle> silos = await this.HostedCluster.StartAdditionalSilos(1);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -273,9 +272,9 @@ namespace Tester.AzureUtils.TimerTests
                 this.HostedCluster.StopSilo(siloToKill);
                 return true;
             });
-            Task<bool> t2 = Task.Factory.StartNew(() =>
+            Task<bool> t2 = this.HostedCluster.StartAdditionalSilos(1).ContinueWith(t =>
             {
-                this.HostedCluster.StartAdditionalSilos(1);
+                t.GetAwaiter().GetResult();
                 return true;
             });
             await Task.WhenAll(new[] { t1, t2 }).WithTimeout(ENDWAIT);
@@ -328,7 +327,7 @@ namespace Tester.AzureUtils.TimerTests
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_GT_1F1J_MultiGrain()
         {
-            List<SiloHandle> silos = this.HostedCluster.StartAdditionalSilos(1);
+            List<SiloHandle> silos = await this.HostedCluster.StartAdditionalSilos(1);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -356,9 +355,9 @@ namespace Tester.AzureUtils.TimerTests
                 this.HostedCluster.StopSilo(siloToKill);
                 return true;
             });
-            Task<bool> t2 = Task.Run(() =>
+            Task<bool> t2 = Task.Run(async () =>
             {
-                this.HostedCluster.StartAdditionalSilos(1);
+                await this.HostedCluster.StartAdditionalSilos(1);
                 return true;
             });
             await Task.WhenAll(new[] { t1, t2 }).WithTimeout(ENDWAIT);

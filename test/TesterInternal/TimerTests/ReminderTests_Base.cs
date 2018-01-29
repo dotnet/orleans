@@ -162,7 +162,7 @@ namespace UnitTests.TimerTests
             Thread.Sleep(period.Multiply(5));
             // start another silo ... although it will take it a while before it stabilizes
             log.Info("Starting another silo");
-            this.HostedCluster.StartAdditionalSilos(1);
+            await this.HostedCluster.StartAdditionalSilos(1);
 
             //Block until all tasks complete.
             await Task.WhenAll(tasks).WithTimeout(ENDWAIT);

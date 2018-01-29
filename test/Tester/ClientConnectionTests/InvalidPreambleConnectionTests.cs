@@ -1,5 +1,10 @@
-﻿using System;
+using System;
+using System.Linq;
 using System.Net.Sockets;
+using System.Threading.Tasks;
+using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
+using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
 
@@ -7,10 +12,15 @@ namespace Tester.ClientConnectionTests
 {
     public class InvalidPreambleConnectionTests : TestClusterPerTest
     {
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        {
+            builder.ConfigureLegacyConfiguration();
+        }
+
         [Fact, TestCategory("Functional")]
         public void ShouldCloseConnectionWhenClientSendsInvalidPreambleSize()
         {
-            var gwEndpoint = this.HostedCluster.Primary.NodeConfiguration.ProxyGatewayEndpoint;
+            var gwEndpoint = this.HostedCluster.Client.Configuration.Gateways.First();
 
             using (Socket s = new Socket(gwEndpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp))
             {

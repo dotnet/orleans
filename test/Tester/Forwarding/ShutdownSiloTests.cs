@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -19,15 +19,17 @@ namespace Tester.Forwarding
     {
         public const int NumberOfSilos = 2;
 
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             Assert.True(StorageEmulator.TryStart());
-            var options = new TestClusterOptions(NumberOfSilos);
-            options.ClusterConfiguration.AddAzureBlobStorageProvider("MemoryStore", "UseDevelopmentStorage=true");
-            options.ClusterConfiguration.Globals.DefaultPlacementStrategy = "ActivationCountBasedPlacement";
-            options.ClusterConfiguration.Globals.NumMissedProbesLimit = 1;
-            options.ClusterConfiguration.Globals.NumVotesForDeathDeclaration = 1;
-            return new TestCluster(options);
+            builder.Options.InitialSilosCount = NumberOfSilos;
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.AddAzureBlobStorageProvider("MemoryStore", "UseDevelopmentStorage=true");
+                legacy.ClusterConfiguration.Globals.DefaultPlacementStrategy = "ActivationCountBasedPlacement";
+                legacy.ClusterConfiguration.Globals.NumMissedProbesLimit = 1;
+                legacy.ClusterConfiguration.Globals.NumVotesForDeathDeclaration = 1;
+            });
         }
 
         [Fact, TestCategory("Forward")]

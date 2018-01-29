@@ -1,10 +1,8 @@
 using System;
 using System.Threading.Tasks;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
-using Tester;
 using TestExtensions;
 using Xunit;
 
@@ -16,15 +14,14 @@ namespace UnitTests.StreamingTests
         {
             public const string StreamProvider = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
 
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(2);
-
-                options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-
-                options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamProvider);
-                options.ClientConfiguration.AddSimpleMessageStreamProvider(StreamProvider);
-                return new TestCluster(options);
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+                    legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamProvider);
+                    legacy.ClientConfiguration.AddSimpleMessageStreamProvider(StreamProvider);
+                });
             }
         }
 

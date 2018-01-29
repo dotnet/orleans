@@ -1,18 +1,10 @@
-﻿using Orleans.TestingHost;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
+using Orleans.TestingHost;
 using Microsoft.Extensions.Logging;
 using Orleans.EventSourcing.CustomStorage;
 using Orleans.Hosting;
 using TestExtensions;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime;
 using Orleans.Storage;
-using Orleans.TestingHost.Utils;
 
 namespace Tester.EventSourcingTests
 {
@@ -23,39 +15,32 @@ namespace Tester.EventSourcingTests
     /// </summary>
     public class EventSourcingClusterFixture : BaseTestClusterFixture
     {
-        protected override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            var options = new TestClusterOptions();
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                // we use a slowed-down memory storage provider
+                legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
+                legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
 
-            // we use a slowed-down memory storage provider
-            options.ClusterConfiguration.AddMemoryStorageProvider("Default");
-            options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+                legacy.ClusterConfiguration.AddFaultyMemoryStorageProvider("SlowMemoryStore", 10, 15);
 
-            options.ClusterConfiguration.AddFaultyMemoryStorageProvider("SlowMemoryStore", 10, 15);
-
-            // log consistency providers are used to configure journaled grains
-            options.ClusterConfiguration.AddLogStorageBasedLogConsistencyProvider("LogStorage");
-            options.ClusterConfiguration.AddStateStorageBasedLogConsistencyProvider("StateStorage");
-            
-            options.UseSiloBuilderFactory<TestSiloBuilderFactory>();
-            return new TestCluster(options);
+                // log consistency providers are used to configure journaled grains
+                legacy.ClusterConfiguration.AddLogStorageBasedLogConsistencyProvider("LogStorage");
+                legacy.ClusterConfiguration.AddStateStorageBasedLogConsistencyProvider("StateStorage");
+            });
+            builder.AddSiloBuilderConfigurator<TestSiloConfigurator>();
         }
 
-        private class TestSiloBuilderFactory : ISiloBuilderFactory
+        private class TestSiloConfigurator : ISiloBuilderConfigurator
         {
-            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            public void Configure(ISiloHostBuilder hostBuilder)
             {
-                return new SiloHostBuilder()
-                    .ConfigureSiloName(siloName)
-                    .UseConfiguration(clusterConfiguration)
-                    .ConfigureLogging(builder => ConfigureLogging(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
-            }
-
-            private void ConfigureLogging(ILoggingBuilder builder, string filePath)
-            {
-                TestingUtils.ConfigureDefaultLoggingBuilder(builder, filePath);
-                builder.AddFilter(typeof(MemoryStorage).FullName, LogLevel.Debug);
-                builder.AddFilter(typeof(LogConsistencyProvider).Namespace, LogLevel.Debug);
+                hostBuilder.ConfigureLogging(builder =>
+                {
+                    builder.AddFilter(typeof(MemoryStorage).FullName, LogLevel.Debug);
+                    builder.AddFilter(typeof(LogConsistencyProvider).Namespace, LogLevel.Debug);
+                });
             }
         }
 

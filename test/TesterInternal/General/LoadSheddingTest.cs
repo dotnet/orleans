@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
@@ -17,10 +17,10 @@ namespace UnitTests.General
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(1);
-                return new TestCluster(options);
+                builder.Options.InitialSilosCount = 1;
+                builder.ConfigureLegacyConfiguration();
             }
         }
         public LoadSheddingTest(Fixture fixture)

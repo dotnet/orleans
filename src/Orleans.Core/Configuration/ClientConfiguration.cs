@@ -14,6 +14,7 @@ namespace Orleans.Runtime.Configuration
     /// <summary>
     /// Orleans client configuration parameters.
     /// </summary>
+    [Serializable]
     public class ClientConfiguration : MessagingConfiguration, IStatisticsConfiguration
     {
         /// <summary>

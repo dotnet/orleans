@@ -44,20 +44,11 @@ namespace Tester.StreamingTests
             }
         }
 
-        public class SiloBuilderFactory : ISiloBuilderFactory
+        public class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            public void Configure(ISiloHostBuilder hostBuilder)
             {
-                return new SiloHostBuilder()
-                    .ConfigureSiloName(siloName)
-                    .UseConfiguration(clusterConfiguration)
-                    .ConfigureServices(ConfigureServices)
-                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
-            }
-
-            private void ConfigureServices(IServiceCollection services)
-            {
-                services.AddTransient<LeaseBasedQueueBalancerForTest>();
+                hostBuilder.ConfigureServices(services => services.AddTransient<LeaseBasedQueueBalancerForTest>());
             }
         }
     }

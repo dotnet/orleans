@@ -1,60 +1,46 @@
-﻿using System;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using TestExtensions;
 using Xunit;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Tester.StorageFacet.Infrastructure;
 using Tester.StorageFacet.Implementations;
 using Orleans.Hosting;
-using Orleans.Runtime;
-using Orleans.TestingHost.Utils;
 
 namespace Tester
 {
     public class StorageFacetTests : IClassFixture<StorageFacetTests.Fixture>
     {
-        private Fixture fixture;
+        private readonly Fixture fixture;
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions();
-                options.UseSiloBuilderFactory<TestSiloBuilderFactory>();
-                return new TestCluster(options);
+                builder.AddSiloBuilderConfigurator<TestSiloBuilderConfigurator>();
             }
 
-            private class TestSiloBuilderFactory : ISiloBuilderFactory
+            private class TestSiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+                public void Configure(ISiloHostBuilder hostBuilder)
                 {
-                    var builder = new SiloHostBuilder()
-                        .ConfigureSiloName(siloName)
-                        .UseConfiguration(clusterConfiguration)
-                        .ConfigureLogging(loggingBuilder => TestingUtils.ConfigureDefaultLoggingBuilder(loggingBuilder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
-
                     // Setup storage feature infrastructure.
                     // - Setup infrastructure.
                     // - Set default feature implementation - optional
 
                     // Setup infrastructure
-                    builder.UseExampleStorage();
+                    hostBuilder.UseExampleStorage();
                     // Default storage feature factory - optional
-                    builder.UseAsDefaultExampleStorage<TableExampleStorageFactory>();
-                    
+                    hostBuilder.UseAsDefaultExampleStorage<TableExampleStorageFactory>();
+
                     // Service will need to add types they want to use to collection
                     // - Call extension functions from each implementation assembly to register it's classes.
 
                     // Blob - from blob extension assembly
-                    builder.UseBlobExampleStorage("Blob");
+                    hostBuilder.UseBlobExampleStorage("Blob");
                     // Table - from table extension assembly
-                    builder.UseTableExampleStorage("Table");
+                    hostBuilder.UseTableExampleStorage("Table");
                     // Blarg - from blarg extension assembly
                     //builder.UseBlargExampleStorage("Blarg");
-
-                    return builder;
                 }
             }
         }

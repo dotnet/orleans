@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -19,23 +19,23 @@ namespace Tester.AzureUtils.Streaming
         public const string SmsStreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
 
         private readonly SingleStreamTestRunner runner;
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             TestUtils.CheckForAzureStorage();
-            var options = new TestClusterOptions(initialSilosCount: 2);
 
-            options.ClusterConfiguration.AddMemoryStorageProvider();
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.AddMemoryStorageProvider();
 
-            options.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore", deleteOnClear : true);
-            options.ClusterConfiguration.AddAzureTableStorageProvider("PubSubStore", deleteOnClear: true, useJsonFormat: false);
+                legacy.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore", deleteOnClear: true);
+                legacy.ClusterConfiguration.AddAzureTableStorageProvider("PubSubStore", deleteOnClear: true, useJsonFormat: false);
 
-            options.ClusterConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
-            options.ClientConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
+                legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
+                legacy.ClientConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
 
-            options.ClusterConfiguration.AddAzureQueueStreamProviderV2(AzureQueueStreamProviderName);
-            options.ClientConfiguration.AddAzureQueueStreamProviderV2(AzureQueueStreamProviderName);
-
-            return new TestCluster(options);
+                legacy.ClusterConfiguration.AddAzureQueueStreamProviderV2(AzureQueueStreamProviderName);
+                legacy.ClientConfiguration.AddAzureQueueStreamProviderV2(AzureQueueStreamProviderName);
+            });
         }
 
         public AQStreamingTests()

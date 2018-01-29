@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.Remoting.Messaging;
@@ -26,12 +26,14 @@ namespace UnitTests.General
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(initialSilosCount: 1);
-                options.ClusterConfiguration.ApplyToAllNodes(n => n.PropagateActivityId = true);
-                options.ClientConfiguration.PropagateActivityId = true;
-                return new TestCluster(options);
+                builder.Options.InitialSilosCount = 1;
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.ApplyToAllNodes(n => n.PropagateActivityId = true);
+                    legacy.ClientConfiguration.PropagateActivityId = true;
+                });
             }
         }
 

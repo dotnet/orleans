@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
@@ -28,22 +28,23 @@ namespace UnitTests.HaloTests.Streaming
             public const string AzureQueueStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
             public const string SmsStreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
 
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions();
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
 
-                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
+                    legacy.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore", deleteOnClear: true);
+                    legacy.ClusterConfiguration.AddAzureTableStorageProvider("PubSubStore", deleteOnClear: true, useJsonFormat: false);
 
-                options.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore", deleteOnClear: true);
-                options.ClusterConfiguration.AddAzureTableStorageProvider("PubSubStore", deleteOnClear: true, useJsonFormat: false);
+                    legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
+                    legacy.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData",
+                        fireAndForgetDelivery: false,
+                        optimizeForImmutableData: false);
 
-                options.ClusterConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
-                options.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData", fireAndForgetDelivery: false, optimizeForImmutableData: false);
-
-                options.ClusterConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
-                options.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
-
-                return new TestCluster(options);
+                    legacy.ClusterConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
+                    legacy.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
+                });
             }
 
             public override void Dispose()

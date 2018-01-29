@@ -14,7 +14,7 @@ using Orleans.Configuration.Options;
 
 namespace Orleans.Hosting
 {
-    internal static class LegacyClusterConfigurationExtensions
+    public static class LegacyClusterConfigurationExtensions
     {
         private const int SiloDefaultProviderInitStage = SiloLifecycleStage.RuntimeStorageServices;
         private const int SiloDefaultProviderStartStage = SiloLifecycleStage.ApplicationServices;
@@ -23,7 +23,7 @@ namespace Orleans.Hosting
         {
             if (configuration == null) throw new ArgumentNullException(nameof(configuration));
 
-            if (services.Any(service => service.ServiceType == typeof(ClusterConfiguration)))
+            if (services.TryGetClusterConfiguration() != null)
             {
                 throw new InvalidOperationException("Cannot configure legacy ClusterConfiguration support twice");
             }
@@ -135,6 +135,13 @@ namespace Orleans.Hosting
             LegacyProviderConfigurator<ISiloLifecycle>.ConfigureServices(configuration.Globals.ProviderConfigurations, services, SiloDefaultProviderInitStage, SiloDefaultProviderStartStage);
 
             return services;
+        }
+
+        public static ClusterConfiguration TryGetClusterConfiguration(this IServiceCollection services)
+        {
+            return services
+                .FirstOrDefault(s => s.ServiceType == typeof(ClusterConfiguration))
+                ?.ImplementationInstance as ClusterConfiguration;
         }
     }
 }
