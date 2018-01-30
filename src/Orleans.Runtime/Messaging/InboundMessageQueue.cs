@@ -18,7 +18,9 @@ namespace Orleans.Runtime.Messaging
             {
                 int n = 0;
                 foreach (var queue in messageQueues)
+                {
                     n += queue.Count;
+                }
                 
                 return n;
             }
@@ -46,14 +48,17 @@ namespace Orleans.Runtime.Messaging
 
         public void Stop()
         {
-            if (messageQueues == null) return;
             foreach (var q in messageQueues)
+            {
                 q.CompleteAdding();
+            }
             
             if (!StatisticsCollector.CollectQueueStats) return;
 
             foreach (var q in queueTracking)
+            {
                 q.OnStopExecution();
+            }
         }
 
         public void PostMessage(Message msg)
@@ -86,6 +91,16 @@ namespace Orleans.Runtime.Messaging
             catch (InvalidOperationException)
             {
                 return null;
+            }
+        }
+
+        public void Dispose()
+        {
+            this.Stop();
+
+            foreach (var q in messageQueues)
+            {
+                q.Dispose();
             }
         }
     }

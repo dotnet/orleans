@@ -214,7 +214,8 @@ namespace Orleans.Runtime.Messaging
                 ima = null;
             }
 
-            OutboundQueue.Dispose();
+            InboundQueue?.Dispose();
+            OutboundQueue?.Dispose();
 
             GC.SuppressFinalize(this);
         }
