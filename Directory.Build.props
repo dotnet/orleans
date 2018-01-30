@@ -99,7 +99,7 @@
     <NodaTimeVersion>2.2.2</NodaTimeVersion>
 
     <!-- Tooling related packages -->
-    <SourceLinkVersion>2.5.0</SourceLinkVersion>
+    <SourceLinkVersion>2.7.6</SourceLinkVersion>
   </PropertyGroup>
 
   <!-- Versioning properties -->
