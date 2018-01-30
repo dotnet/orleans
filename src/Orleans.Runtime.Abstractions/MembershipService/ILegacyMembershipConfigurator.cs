@@ -15,6 +15,9 @@ namespace Orleans.Runtime.MembershipService
         void ConfigureServices(object configuration, IServiceCollection services);
     }
 
+    /// <summary>
+    /// Wapper for legacy config.  Should not be used for any new developent, only adapting legacy systems.
+    /// </summary>
     public class GlobalConfigurationReader
     {
         private readonly object configuration;

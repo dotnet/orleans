@@ -71,16 +71,16 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public IPEndPoint ProxyGatewayEndpoint { get; set; }
 
-        internal byte[] Subnet { get; set; } // from global
+        public byte[] Subnet { get; set; } // from global
 
         /// <summary>
         /// Whether this is a primary silo (applies for dev settings only).
         /// </summary>
-        public bool IsPrimaryNode { get; internal set; }
+        public bool IsPrimaryNode { get; set; }
         /// <summary>
         /// Whether this is one of the seed silos (applies for dev settings only).
         /// </summary>
-        public bool IsSeedNode { get; internal set; }
+        public bool IsSeedNode { get; set; }
         /// <summary>
         /// Whether this is silo is a proxying gateway silo.
         /// </summary>

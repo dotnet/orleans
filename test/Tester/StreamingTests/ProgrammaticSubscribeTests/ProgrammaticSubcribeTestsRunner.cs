@@ -1,4 +1,4 @@
-﻿using Orleans;
+using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -22,7 +22,7 @@ namespace Tester.StreamingTests
 {
     public abstract class ProgrammaticSubcribeTestsRunner 
     {
-        private BaseTestClusterFixture fixture;
+        private readonly BaseTestClusterFixture fixture;
         public const string StreamProviderName = "StreamProvider1";
         public const string StreamProviderName2 = "StreamProvider2";
         public ProgrammaticSubcribeTestsRunner(BaseTestClusterFixture fixture)

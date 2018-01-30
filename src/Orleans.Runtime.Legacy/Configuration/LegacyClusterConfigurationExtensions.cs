@@ -60,11 +60,11 @@ namespace Orleans.Hosting
             return builder.UseConfiguration(ClusterConfiguration.LocalhostPrimarySilo(siloPort, gatewayPort));
         }
 
-        private static IServiceCollection AddLegacyClusterConfigurationSupport(this IServiceCollection services, ClusterConfiguration configuration)
+        public static IServiceCollection AddLegacyClusterConfigurationSupport(this IServiceCollection services, ClusterConfiguration configuration)
         {
             if (configuration == null) throw new ArgumentNullException(nameof(configuration));
 
-            if (services.Any(service => service.ServiceType == typeof(ClusterConfiguration)))
+            if (services.TryGetClusterConfiguration() != null)
             {
                 throw new InvalidOperationException("Cannot configure legacy ClusterConfiguration support twice");
             }
@@ -344,6 +344,13 @@ namespace Orleans.Hosting
                 });
 
             return services;
+        }
+
+        public static ClusterConfiguration TryGetClusterConfiguration(this IServiceCollection services)
+        {
+            return services
+                .FirstOrDefault(s => s.ServiceType == typeof(ClusterConfiguration))
+                ?.ImplementationInstance as ClusterConfiguration;
         }
     }
 }

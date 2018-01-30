@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.WindowsAzure.Storage.Table;
@@ -41,11 +41,12 @@ namespace ServiceBus.Tests.Streaming
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(2);
-                AdjustClusterConfiguration(options.ClusterConfiguration);
-                return new TestCluster(options);
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    AdjustClusterConfiguration(legacy.ClusterConfiguration);
+                });
             }
 
             private static Dictionary<string, string> BuildProviderSettings(EventHubStreamProviderSettings providerSettings)

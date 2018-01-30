@@ -21,18 +21,18 @@ namespace UnitTests.StreamingTests
             runner = new DeactivationTestRunner(SMSStreamProviderName, this.Client);
         }
 
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            var options = new TestClusterOptions();
-            options.ClusterConfiguration.Globals.Application.SetDefaultCollectionAgeLimit(TimeSpan.FromMinutes(1));
-            options.ClusterConfiguration.Globals.Application.SetCollectionAgeLimit(typeof(MultipleSubscriptionConsumerGrain), TimeSpan.FromHours(2));
-            options.ClusterConfiguration.Globals.ResponseTimeout = TimeSpan.FromMinutes(30);
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.Globals.Application.SetDefaultCollectionAgeLimit(TimeSpan.FromMinutes(1));
+                legacy.ClusterConfiguration.Globals.Application.SetCollectionAgeLimit(typeof(MultipleSubscriptionConsumerGrain), TimeSpan.FromHours(2));
+                legacy.ClusterConfiguration.Globals.ResponseTimeout = TimeSpan.FromMinutes(30);
 
-            options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-            options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
-            options.ClientConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
-
-            return new TestCluster(options);
+                legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+                legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
+                legacy.ClientConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
+            });
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming")]

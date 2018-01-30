@@ -15,12 +15,14 @@ namespace Tester.AzureUtils.General
 
         public class Fixture : BaseAzureTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions();
-                options.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore");
-                return new TestCluster(options);
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore");
+                });
             }
+
             protected override void CheckPreconditionsOrThrow()
             {
                 base.CheckPreconditionsOrThrow();
@@ -60,11 +62,9 @@ namespace Tester.AzureUtils.General
 
         public class Fixture : BaseAzureTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions();
-                options.ClusterConfiguration.AddAzureBlobStorageProvider("AzureStore");
-                return new TestCluster(options);
+                builder.ConfigureLegacyConfiguration(legacy => legacy.ClusterConfiguration.AddAzureBlobStorageProvider("AzureStore"));
             }
 
             protected override void CheckPreconditionsOrThrow()

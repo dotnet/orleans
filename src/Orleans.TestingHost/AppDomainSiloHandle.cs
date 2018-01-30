@@ -1,11 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.Remoting;
 using System.Threading.Tasks;
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
+using Microsoft.Extensions.Configuration;
 
 namespace Orleans.TestingHost
 {
@@ -28,21 +27,23 @@ namespace Orleans.TestingHost
         /// <summary>Creates a new silo in a remote app domain and returns a handle to it.</summary>
         public static SiloHandle Create(
             string siloName,
-            Silo.SiloType type,
-            Type siloBuilderFactory,
-            ClusterConfiguration config,
-            NodeConfiguration nodeConfiguration,
-            string applicationBase = null)
+            IList<IConfigurationSource> configurationSources)
         {
+            var configBuilder = new ConfigurationBuilder();
+            foreach (var source in configurationSources) configBuilder.Add(source);
+            var configuration = configBuilder.Build();
+
+            var applicationBase = configuration[nameof(TestClusterOptions.ApplicationBaseDirectory)];
             AppDomainSetup setup = GetAppDomainSetupInfo(applicationBase);
 
             var appDomain = AppDomain.CreateDomain(siloName, null, setup);
             
             try
             {
-                var args = new object[] {siloName, siloBuilderFactory, config};
+                var serializedHostConfiguration = TestClusterHostFactory.SerializeConfigurationSources(configurationSources);
+                var args = new object[] {siloName, serializedHostConfiguration };
 
-                var siloHost = (AppDomainSiloHost) appDomain.CreateInstanceAndUnwrap(
+                var siloHost = (AppDomainSiloHost)appDomain.CreateInstanceAndUnwrap(
                     typeof(AppDomainSiloHost).Assembly.FullName,
                     typeof(AppDomainSiloHost).FullName,
                     false,
@@ -60,9 +61,8 @@ namespace Orleans.TestingHost
                 {
                     Name = siloName,
                     SiloHost = siloHost,
-                    NodeConfiguration = nodeConfiguration,
                     SiloAddress = siloHost.SiloAddress,
-                    Type = type,
+                    GatewayAddress = siloHost.GatewayAddress,
                     AppDomain = appDomain,
                     AppDomainTestHook = siloHost.AppDomainTestHook,
                 };

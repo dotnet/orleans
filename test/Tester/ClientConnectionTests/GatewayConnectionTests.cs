@@ -1,8 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
@@ -13,7 +15,6 @@ using UnitTests.GrainInterfaces;
 using Xunit;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
-using Orleans.TestingHost.Utils;
 
 namespace Tester.ClientConnectionTests
 {
@@ -45,29 +46,33 @@ namespace Tester.ClientConnectionTests
     {
         private readonly OutsideRuntimeClient runtimeClient;
 
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            var options = new TestClusterOptions(1)
+            builder.Options.UseTestClusterMembership = false;
+            builder.Options.InitialSilosCount = 1;
+            builder.ConfigureLegacyConfiguration(legacy =>
             {
-                ClientConfiguration = {GatewayListRefreshPeriod = TimeSpan.FromMilliseconds(100)}
-            };
-            return new TestCluster(options).UseClientBuilderFactory(config => CreateClientBuilder(config, options.ClusterConfiguration));
+                legacy.ClientConfiguration.GatewayListRefreshPeriod = TimeSpan.FromMilliseconds(100);
+            });
+            builder.AddClientBuilderConfigurator<ClientBuilderConfigurator>();
         }
 
-        public static IClientBuilder CreateClientBuilder(ClientConfiguration configuration, ClusterConfiguration clusterConfiguration)
+        public class ClientBuilderConfigurator : LegacyClientBuilderConfigurator
         {
-            var primaryGw = clusterConfiguration.Overrides["Primary"].ProxyGatewayEndpoint.ToGatewayUri();
-            return new ClientBuilder()
-                .UseConfiguration(configuration)
-                .ConfigureServices(services => services.AddSingleton(sp =>
+            public override void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                var primaryGw = this.ClusterConfiguration.Overrides["Primary"].ProxyGatewayEndpoint.ToGatewayUri();
+                clientBuilder.ConfigureServices(services =>
                 {
-                    var gateway = new TestGatewayManager();
-                    gateway.Gateways.Add(primaryGw);
-                    return gateway;
-                }))
-                .ConfigureServices(services => services.AddFromExisting<IGatewayListProvider, TestGatewayManager>())
-                .ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory())
-                .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(configuration.ClientName, configuration.ClusterId)));
+                    services.AddSingleton(sp =>
+                    {
+                        var gateway = new TestGatewayManager();
+                        gateway.Gateways.Add(primaryGw);
+                        return gateway;
+                    });
+                    services.AddFromExisting<IGatewayListProvider, TestGatewayManager>();
+                });
+            }
         }
 
         public GatewayConnectionTests()
@@ -85,7 +90,7 @@ namespace Tester.ClientConnectionTests
             var timeoutCount = 0;
 
             // Fake Gateway
-            var port = HostedCluster.ClusterConfiguration.PrimaryNode.Port + 2;
+            var port = this.HostedCluster.Client.Configuration.Gateways.First().Port + 2;
             var endpoint = new IPEndPoint(IPAddress.Loopback, port);
             var evt = new SocketAsyncEventArgs();
             var gatewayManager = this.runtimeClient.ServiceProvider.GetService<TestGatewayManager>();

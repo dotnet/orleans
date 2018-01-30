@@ -33,10 +33,10 @@ namespace UnitTests.StreamingTests
                 TotalQueueCount = 4,
             };
 
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(2);
                 var settings = new Dictionary<string, string>();
+
                 // get initial settings from configs
                 AdapterConfig.WriteProperties(settings);
 
@@ -47,8 +47,10 @@ namespace UnitTests.StreamingTests
                 settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
 
                 // register stream provider
-                options.ClusterConfiguration.Globals.RegisterStreamProvider<GeneratorStreamProvider>(StreamProviderName, settings);
-                return new TestCluster(options);
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.Globals.RegisterStreamProvider<GeneratorStreamProvider>(StreamProviderName, settings);
+                });
             }
         }
 

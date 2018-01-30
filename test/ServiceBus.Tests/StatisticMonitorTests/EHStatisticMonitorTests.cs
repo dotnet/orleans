@@ -31,12 +31,11 @@ namespace ServiceBus.Tests.MonitorTests
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(1);
+                builder.Options.InitialSilosCount = 1;
                 ProviderSettings.StatisticMonitorWriteInterval = monitorWriteInterval;
-                AdjustClusterConfiguration(options.ClusterConfiguration);
-                return new TestCluster(options);
+                builder.ConfigureLegacyConfiguration(legacy => AdjustClusterConfiguration(legacy.ClusterConfiguration));
             }
 
             private static void AdjustClusterConfiguration(ClusterConfiguration config)

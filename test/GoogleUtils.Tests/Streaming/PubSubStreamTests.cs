@@ -1,4 +1,4 @@
-﻿using Orleans.Providers.GCP.Streams.PubSub;
+using Orleans.Providers.GCP.Streams.PubSub;
 using Orleans.Runtime.Configuration;
 using Orleans.Storage;
 using Orleans.TestingHost;
@@ -17,32 +17,33 @@ namespace GoogleUtils.Tests.Streaming
         public static readonly string PUBSUB_STREAM_PROVIDER_NAME = "GPSProvider";
         private SingleStreamTestRunner runner;
 
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             if (!GoogleTestUtils.IsPubSubSimulatorAvailable.Value)
             {
                 throw new SkipException("Google PubSub Simulator not available");
             }
 
-            var options = new TestClusterOptions();
-            //from the config files
-            options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
-            options.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProvider", fireAndForgetDelivery: false);
-            options.ClientConfiguration.AddSimpleMessageStreamProvider("SMSProvider", fireAndForgetDelivery: false);
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                //from the config files
+                legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
+                legacy.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProvider", fireAndForgetDelivery: false);
+                legacy.ClientConfiguration.AddSimpleMessageStreamProvider("SMSProvider", fireAndForgetDelivery: false);
 
-            var providerSettings = new Dictionary<string, string>
+                var providerSettings = new Dictionary<string, string>
                 {
-                    { "ProjectId",  GoogleTestUtils.ProjectId },
-                    { "TopicId",  GoogleTestUtils.TopicId },
-                    { "DeploymentId",  GoogleTestUtils.DeploymentId.ToString()},
-                    { "Deadline",  "600" },
+                    {"ProjectId", GoogleTestUtils.ProjectId},
+                    {"TopicId", GoogleTestUtils.TopicId},
+                    {"DeploymentId", GoogleTestUtils.DeploymentId.ToString()},
+                    {"Deadline", "600"},
                     //{ "CustomEndpoint", "localhost:8085" }
                 };
 
-            options.ClientConfiguration.RegisterStreamProvider<PubSubStreamProvider>(PUBSUB_STREAM_PROVIDER_NAME, providerSettings);
-            options.ClusterConfiguration.Globals.RegisterStreamProvider<PubSubStreamProvider>(PUBSUB_STREAM_PROVIDER_NAME, providerSettings);
-            options.ClusterConfiguration.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
-            return new TestCluster(options);
+                legacy.ClientConfiguration.RegisterStreamProvider<PubSubStreamProvider>(PUBSUB_STREAM_PROVIDER_NAME, providerSettings);
+                legacy.ClusterConfiguration.Globals.RegisterStreamProvider<PubSubStreamProvider>(PUBSUB_STREAM_PROVIDER_NAME, providerSettings);
+                legacy.ClusterConfiguration.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
+            });
         }
 
         public PubSubStreamTests()

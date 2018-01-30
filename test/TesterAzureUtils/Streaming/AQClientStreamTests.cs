@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,15 +29,16 @@ namespace Tester.AzureUtils.Streaming
             runner = new ClientStreamTestRunner(this.HostedCluster);
         }
 
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             TestUtils.CheckForAzureStorage();
-            var options = new TestClusterOptions(2);
-            options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-            options.ClusterConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
-            options.ClusterConfiguration.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
-            options.ClientConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
-            return new TestCluster(options);
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+                legacy.ClusterConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
+                legacy.ClusterConfiguration.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
+                legacy.ClientConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
+            });
         }
 
         public override void Dispose()

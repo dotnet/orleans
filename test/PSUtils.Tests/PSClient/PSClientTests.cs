@@ -1,4 +1,4 @@
-﻿using Orleans;
+using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using OrleansPSUtils;
@@ -23,13 +23,14 @@ namespace PSUtils.Tests
         public Runspace Runspace { get; set; }
         public ClientConfiguration ClientConfig { get; set; }
 
-        protected override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            var options = new TestClusterOptions();
-            options.ClusterConfiguration.AddMemoryStorageProvider("Default");
-            options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-            ClientConfig = TestClusterOptions.BuildClientConfiguration(options.ClusterConfiguration);
-            return new TestCluster(options.ClusterConfiguration, null);
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
+                legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+                ClientConfig = legacy.ClientConfiguration;
+            });
         }
 
         public PowershellHostFixture()

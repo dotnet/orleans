@@ -5,7 +5,8 @@ namespace Orleans.Runtime
 {
     internal class LegacyConfigurationWrapper
     {
-        public LegacyConfigurationWrapper(IOptions<SiloOptions> siloOptions,
+        public LegacyConfigurationWrapper(
+            IOptions<SiloOptions> siloOptions,
             ClusterConfiguration config)
         {
             var siloName = siloOptions.Value.SiloName;

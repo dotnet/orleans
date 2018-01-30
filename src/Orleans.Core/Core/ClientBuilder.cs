@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -16,7 +17,6 @@ namespace Orleans
     {
         private readonly ServiceProviderBuilder serviceProviderBuilder = new ServiceProviderBuilder();
         private bool built;
-        private bool clientConfigurationRegistered;
         
         /// <inheritdoc />
         public IDictionary<object, object> Properties { get; } = new Dictionary<object, object>();
@@ -40,11 +40,7 @@ namespace Orleans
             this.built = true;
 
             // Configure default services and build the container.
-            if (!this.clientConfigurationRegistered)
-            {
-                this.UseConfiguration(ClientConfiguration.StandardLoad());
-            }
-
+            this.ConfigureServices(EnsureClientConfigurationConfigured);
             this.ConfigureDefaults();
 
             var serviceProvider = this.serviceProviderBuilder.BuildServiceProvider(new HostBuilderContext(this.Properties));
@@ -60,8 +56,6 @@ namespace Orleans
         public IClientBuilder UseConfiguration(ClientConfiguration configuration)
         {
             if (configuration == null) throw new ArgumentNullException(nameof(configuration));
-            if (this.clientConfigurationRegistered) throw new InvalidOperationException("Base configuration has already been specified and cannot be overridden.");
-            this.clientConfigurationRegistered = true;
 
             this.serviceProviderBuilder.ConfigureServices((context, services) => services.AddLegacyClientConfigurationSupport(configuration));
             return this;
@@ -95,6 +89,14 @@ namespace Orleans
             foreach (var validator in validators)
             {
                 validator.ValidateConfiguration();
+            }
+        }
+
+        private static void EnsureClientConfigurationConfigured(IServiceCollection services)
+        {
+            if (services.TryGetClientConfiguration() == null)
+            {
+                services.AddLegacyClientConfigurationSupport();
             }
         }
     }

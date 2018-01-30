@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
@@ -27,27 +27,28 @@ namespace UnitTests.StreamingTests
         private readonly ITestOutputHelper output;
         private IActivateDeactivateWatcherGrain watcher;
 
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             TestUtils.CheckForAzureStorage();
 
-            var options = new TestClusterOptions();
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
 
-            options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
+                legacy.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore", deleteOnClear: true);
+                legacy.ClusterConfiguration.AddAzureTableStorageProvider("PubSubStore", deleteOnClear: true, useJsonFormat: false);
 
-            options.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore", deleteOnClear: true);
-            options.ClusterConfiguration.AddAzureTableStorageProvider("PubSubStore", deleteOnClear: true, useJsonFormat: false);
+                legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
+                legacy.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData",
+                    fireAndForgetDelivery: false,
+                    optimizeForImmutableData: false);
 
-            options.ClusterConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
-            options.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData", fireAndForgetDelivery: false, optimizeForImmutableData: false);
+                legacy.ClusterConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
+                legacy.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
 
-            options.ClusterConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
-            options.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
-
-            options.ClientConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
-            options.ClientConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
-
-            return new TestCluster(options);
+                legacy.ClientConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
+                legacy.ClientConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
+            });
         }
 
         public StreamLifecycleTests(ITestOutputHelper output)

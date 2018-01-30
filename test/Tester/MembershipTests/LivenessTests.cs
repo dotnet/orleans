@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Net;
@@ -70,7 +70,7 @@ namespace UnitTests.MembershipTests
 
         protected async Task Do_Liveness_OracleTest_2(int silo2Kill, bool restart = true, bool startTimers = false)
         {
-            this.HostedCluster.StartAdditionalSilos(numAdditionalSilos);
+            await this.HostedCluster.StartAdditionalSilos(numAdditionalSilos);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             for (int i = 0; i < numGrains; i++)
@@ -110,7 +110,7 @@ namespace UnitTests.MembershipTests
 
         protected async Task Do_Liveness_OracleTest_3()
         {
-            var moreSilos = this.HostedCluster.StartAdditionalSilos(1);
+            var moreSilos = await this.HostedCluster.StartAdditionalSilos(1);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             await TestTraffic();
@@ -122,6 +122,7 @@ namespace UnitTests.MembershipTests
             await TestTraffic();
 
             logger.Info("\n\n\n\nAbout to re-start a first silo.\n\n\n");
+            
             this.HostedCluster.RestartStoppedSecondarySilo(siloToStop.Name);
 
             await TestTraffic();
@@ -184,11 +185,12 @@ namespace UnitTests.MembershipTests
         {
         }
 
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            var options = new TestClusterOptions(2);
-            options.ClientConfiguration.PreferedGatewayIndex = 1;
-            return new TestCluster(options);
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClientConfiguration.PreferedGatewayIndex = 1;
+            });
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Membership")]

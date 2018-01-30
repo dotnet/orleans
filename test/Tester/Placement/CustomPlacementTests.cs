@@ -6,14 +6,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Core;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Placement;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Orleans.Hosting;
-using Orleans.TestingHost.Utils;
 
 namespace Tester.CustomPlacementTests
 {
@@ -22,29 +20,27 @@ namespace Tester.CustomPlacementTests
     {
         private const short nSilos = 3;
         private readonly Fixture fixture;
-        private string[] silos;
-        private SiloAddress[] siloAddresses;
+        private readonly string[] silos;
+        private readonly SiloAddress[] siloAddresses;
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(nSilos);
-                options.UseSiloBuilderFactory<TestSiloBuilderFactory>();
-				options.ClusterConfiguration.Globals.AssumeHomogenousSilosForTesting = false;
-				options.ClusterConfiguration.Globals.TypeMapRefreshInterval = TimeSpan.FromMilliseconds(100);
-				return new TestCluster(options);
+                builder.Options.InitialSilosCount = nSilos;
+                builder.AddSiloBuilderConfigurator<TestSiloBuilderConfigurator>();
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.Globals.AssumeHomogenousSilosForTesting = false;
+                    legacy.ClusterConfiguration.Globals.TypeMapRefreshInterval = TimeSpan.FromMilliseconds(100);
+                });
             }
 
-            private class TestSiloBuilderFactory : ISiloBuilderFactory
+            private class TestSiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+                public void Configure(ISiloHostBuilder hostBuilder)
                 {
-                    return new SiloHostBuilder()
-                        .ConfigureSiloName(siloName)
-                        .UseConfiguration(clusterConfiguration)
-                        .ConfigureServices(ConfigureServices)
-                        .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
+                    hostBuilder.ConfigureServices(ConfigureServices);
                 }
             }
 

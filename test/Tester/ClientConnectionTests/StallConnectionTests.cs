@@ -1,4 +1,4 @@
-﻿using Orleans.Runtime;
+using Orleans.Runtime;
 using Orleans.TestingHost;
 using System;
 using System.Collections.Generic;
@@ -7,6 +7,7 @@ using System.Linq;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
+using Orleans.Runtime.Configuration;
 using TestExtensions;
 using Xunit;
 
@@ -16,19 +17,21 @@ namespace Tester.ClientConnectionTests
     {
         private static TimeSpan Timeout = TimeSpan.FromSeconds(10);
 
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            var options = new TestClusterOptions(1);
-            options.ClusterConfiguration.Globals.OpenConnectionTimeout = Timeout;
-            options.ClientConfiguration.ResponseTimeout = Timeout;
-            return new TestCluster(options);
+            builder.Options.InitialSilosCount = 1;
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.Globals.OpenConnectionTimeout = Timeout;
+                legacy.ClientConfiguration.ResponseTimeout = Timeout;
+            });
         }
 
         [Fact, TestCategory("Functional")]
         public async Task ConnectToGwAfterStallConnectionOpened()
         {
             Socket stalledSocket;
-            var gwEndpoint = this.HostedCluster.Primary.NodeConfiguration.ProxyGatewayEndpoint;
+            var gwEndpoint = this.HostedCluster.Primary.GatewayAddress.Endpoint;
 
             // Close current client connection
             await this.Client.Close();
@@ -54,7 +57,7 @@ namespace Tester.ClientConnectionTests
         public async Task SiloJoinAfterStallConnectionOpened()
         {
             Socket stalledSocket;
-            var siloEndpoint = this.HostedCluster.Primary.NodeConfiguration.Endpoint;
+            var siloEndpoint = this.HostedCluster.Primary.SiloAddress.Endpoint;
 
             // Stall connection to GW
             using (stalledSocket = new Socket(siloEndpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp))
@@ -74,7 +77,8 @@ namespace Tester.ClientConnectionTests
         private async Task<bool> WaitForClusterSize(int expectedSize)
         {
             var mgmtGrain = this.Client.GetGrain<IManagementGrain>(0);
-            var timeout = TestCluster.GetLivenessStabilizationTime(this.HostedCluster.ClusterConfiguration.Globals);
+            var clusterConfig = new ClusterConfiguration();
+            var timeout = TestCluster.GetLivenessStabilizationTime(clusterConfig.Globals);
             var stopWatch = Stopwatch.StartNew();
             do
             {

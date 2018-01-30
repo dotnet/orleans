@@ -29,13 +29,15 @@ namespace ServiceBus.Tests
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(SiloCount);
-                options.UseSiloBuilderFactory<SiloBuilderFactory>();
+                builder.Options.InitialSilosCount = SiloCount;
                 ProviderSettings.EventHubPartitionCount = TotalQueueCount;
-                AdjustClusterConfiguration(options.ClusterConfiguration);
-                return new TestCluster(options);
+                builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    AdjustClusterConfiguration(legacy.ClusterConfiguration);
+                });
             }
 
             private static void AdjustClusterConfiguration(ClusterConfiguration config)

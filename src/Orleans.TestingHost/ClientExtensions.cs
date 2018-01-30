@@ -14,7 +14,7 @@ namespace Orleans.TestingHost
         public static ITestHooks GetTestHooks(this IClusterClient client, SiloHandle silo)
         {
             var internalClient = (IInternalClusterClient) client;
-            return internalClient.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, silo.ProxyAddress);
+            return internalClient.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, silo.GatewayAddress);
         }
     }
 }
