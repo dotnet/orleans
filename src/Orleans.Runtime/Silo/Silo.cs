@@ -901,15 +901,22 @@ namespace Orleans.Runtime
             // NOTE: We need to minimize the amount of processing occurring on this code path -- we only have under approx 2-3 seconds before process exit will occur
             logger.Warn(ErrorCode.Runtime_Error_100220, "Process is exiting");
             
+            var cancellationSource = new CancellationTokenSource();
             lock (lockable)
             {
                 if (!this.SystemStatus.Equals(SystemStatus.Running)) return;
-                    
+
                 this.SystemStatus = SystemStatus.Stopping;
+
+                // force a non-graceful stop
+                cancellationSource.Cancel();
+                this.siloLifecycle.OnStop(cancellationSource.Token);  // don't wait for it to stop
             }
                 
             logger.Info(ErrorCode.SiloStopping, "Silo.HandleProcessExit() - starting to FastKill()");
-            Stop();
+
+            // calling stop when SystemStatus is already Stopping will wait until status Terminated
+            StopAsync(cancellationSource.Token).GetAwaiter().GetResult();
         }
 
         internal void RegisterSystemTarget(SystemTarget target)
