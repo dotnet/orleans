@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -35,24 +35,26 @@ namespace UnitTests.StreamingTests
         private string StreamNamespace;
         private readonly ITestOutputHelper output;
 
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             TestUtils.CheckForAzureStorage();
 
-            var options = new TestClusterOptions();
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
 
-            options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
+                legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
 
-            options.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore", deleteOnClear: true);
-            options.ClusterConfiguration.AddAzureTableStorageProvider("PubSubStore", deleteOnClear: true, useJsonFormat: false);
+                legacy.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore", deleteOnClear: true);
+                legacy.ClusterConfiguration.AddAzureTableStorageProvider("PubSubStore", deleteOnClear: true, useJsonFormat: false);
 
-            options.ClusterConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
-            options.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData", fireAndForgetDelivery: false, optimizeForImmutableData: false);
+                legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
+                legacy.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData",
+                    fireAndForgetDelivery: false,
+                    optimizeForImmutableData: false);
 
-            options.ClusterConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
-            options.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
-
-            return new TestCluster(options);
+                legacy.ClusterConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
+                legacy.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
+            });
         }
 
         public StreamLimitTests(ITestOutputHelper output)

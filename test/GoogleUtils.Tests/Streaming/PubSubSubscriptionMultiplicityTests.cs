@@ -1,4 +1,4 @@
-﻿using Orleans.Providers.GCP.Streams.PubSub;
+using Orleans.Providers.GCP.Streams.PubSub;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
@@ -18,7 +18,7 @@ namespace GoogleUtils.Tests.Streaming
         private const string STREAM_NAMESPACE = "PubSubSubscriptionMultiplicityTestsNamespace";
         private readonly SubscriptionMultiplicityTestRunner runner;
 
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             if (!GoogleTestUtils.IsPubSubSimulatorAvailable.Value)
             {
@@ -33,14 +33,15 @@ namespace GoogleUtils.Tests.Streaming
                     { "Deadline",  "600" },
                     //{ "CustomEndpoint", "localhost:8085" }
                 };
-            var options = new TestClusterOptions(2);
-            options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-            
-            options.ClusterConfiguration.Globals.ClusterId = GoogleTestUtils.ProjectId;
-            options.ClientConfiguration.ClusterId = GoogleTestUtils.ProjectId;
-            options.ClientConfiguration.RegisterStreamProvider<PubSubStreamProvider>(PROVIDER_NAME, providerSettings);
-            options.ClusterConfiguration.Globals.RegisterStreamProvider<PubSubStreamProvider>(PROVIDER_NAME, providerSettings);
-            return new TestCluster(options);
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+
+                legacy.ClusterConfiguration.Globals.ClusterId = GoogleTestUtils.ProjectId;
+                legacy.ClientConfiguration.ClusterId = GoogleTestUtils.ProjectId;
+                legacy.ClientConfiguration.RegisterStreamProvider<PubSubStreamProvider>(PROVIDER_NAME, providerSettings);
+                legacy.ClusterConfiguration.Globals.RegisterStreamProvider<PubSubStreamProvider>(PROVIDER_NAME, providerSettings);
+            });
         }
 
         public PubSubSubscriptionMultiplicityTests()

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
@@ -32,25 +32,25 @@ namespace UnitTests.StreamingTests
                 TotalQueueCount = 4,
             };
 
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(2);
-                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                options.ClusterConfiguration.AddMemoryStorageProvider("Default");
-                var settings = new Dictionary<string, string>();
-                // get initial settings from configs
-                AdapterConfig.WriteProperties(settings);
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
+                    var settings = new Dictionary<string, string>();
+                    // get initial settings from configs
+                    AdapterConfig.WriteProperties(settings);
 
-                // add queue balancer setting
-                settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.AssemblyQualifiedName);
+                    // add queue balancer setting
+                    settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.AssemblyQualifiedName);
 
-                // add pub/sub settting
-                settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
+                    // add pub/sub settting
+                    settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
 
-                // register stream provider
-                options.ClusterConfiguration.Globals.RegisterStreamProvider<GeneratorStreamProvider>(StreamProviderName, settings);
-
-                return new TestCluster(options);
+                    // register stream provider
+                    legacy.ClusterConfiguration.Globals.RegisterStreamProvider<GeneratorStreamProvider>(StreamProviderName, settings);
+                });
             }
         }
 

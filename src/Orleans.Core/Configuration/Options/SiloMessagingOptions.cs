@@ -1,5 +1,7 @@
-﻿using Orleans.Runtime;
+using Orleans.Runtime;
 using System;
+using System.Collections.Generic;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Hosting
 {
@@ -34,4 +36,37 @@ namespace Orleans.Hosting
         /// </summary>
         public TimeSpan ClientDropTimeout { get; set; } = Constants.DEFAULT_CLIENT_DROP_TIMEOUT;
     }
+
+    public class SiloMessageingOptionFormatter : IOptionFormatter<SiloMessagingOptions>
+    {
+        public string Category { get; }
+
+        public string Name => nameof(SiloMessagingOptions);
+
+        private SiloMessagingOptions options;
+        public SiloMessageingOptionFormatter(IOptions<SiloMessagingOptions> messageOptions)
+        {
+            options = messageOptions.Value;
+        }
+
+        public IEnumerable<string> Format()
+        {
+            return new List<string>()
+            {
+                OptionFormattingUtilities.Format(nameof(options.SiloSenderQueues), options.SiloSenderQueues),
+                OptionFormattingUtilities.Format(nameof(options.GatewaySenderQueues), options.GatewaySenderQueues),
+                OptionFormattingUtilities.Format(nameof(options.MaxForwardCount), options.MaxForwardCount),
+                OptionFormattingUtilities.Format(nameof(options.ClientDropTimeout), options.ClientDropTimeout),
+
+                OptionFormattingUtilities.Format(nameof(options.ResponseTimeout), options.ResponseTimeout),
+                OptionFormattingUtilities.Format(nameof(options.MaxResendCount), options.MaxResendCount),
+                OptionFormattingUtilities.Format(nameof(options.ResendOnTimeout), options.ResendOnTimeout),
+                OptionFormattingUtilities.Format(nameof(options.DropExpiredMessages), options.DropExpiredMessages),
+                OptionFormattingUtilities.Format(nameof(options.BufferPoolBufferSize), options.BufferPoolBufferSize),
+                OptionFormattingUtilities.Format(nameof(options.BufferPoolMaxSize), options.BufferPoolMaxSize),
+                OptionFormattingUtilities.Format(nameof(options.BufferPoolPreallocationSize), options.BufferPoolPreallocationSize)
+            };
+        }
+    }
+
 }

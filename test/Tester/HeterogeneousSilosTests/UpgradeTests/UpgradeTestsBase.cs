@@ -4,6 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration.Memory;
 using Orleans;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
@@ -11,7 +13,9 @@ using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
+using TestExtensions;
 using TestVersionGrainInterfaces;
+using TestVersionGrains;
 using Xunit;
 
 namespace Tester.HeterogeneousSilosTests.UpgradeTests
@@ -20,8 +24,8 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
     {
         private readonly TimeSpan refreshInterval = TimeSpan.FromMilliseconds(200);
         private TimeSpan waitDelay;
-        protected IClusterClient Client { get; private set; }
-        protected IManagementGrain ManagementGrain { get; private set; }
+        protected IClusterClient Client => this.cluster.Client;
+        protected IManagementGrain ManagementGrain => this.cluster.Client.GetGrain<IManagementGrain>(0);
 #if DEBUG
         private const string BuildConfiguration = "Debug";
 #else
@@ -37,10 +41,11 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         private const string VersionTestBinaryName = "TestVersionGrains.dll";
         private readonly DirectoryInfo assemblyGrainsV1Dir;
         private readonly DirectoryInfo assemblyGrainsV2Dir;
-
-        private TestClusterOptions options;
+        
         private readonly List<SiloHandle> deployedSilos = new List<SiloHandle>();
         private int siloIdx = 0;
+        private TestClusterBuilder builder;
+        private TestCluster cluster;
 
         protected abstract VersionSelectorStrategy VersionSelectorStrategy { get; }
 
@@ -195,47 +200,46 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
         private async Task<SiloHandle> StartSilo(DirectoryInfo rootDir)
         {
-            string siloName;
-            Silo.SiloType siloType;
+            SiloHandle silo;
             if (this.siloIdx == 0)
             {
-                // First silo
-                siloName = Silo.PrimarySiloName;
-                siloType = Silo.SiloType.Primary;
                 // Setup configuration
-                this.options = new TestClusterOptions(SiloCount);
-                options.ClusterConfiguration.Globals.AssumeHomogenousSilosForTesting = false;
-                options.ClusterConfiguration.Globals.TypeMapRefreshInterval = refreshInterval;
-                options.ClusterConfiguration.Globals.DefaultVersionSelectorStrategy = VersionSelectorStrategy;
-                options.ClusterConfiguration.Globals.DefaultCompatibilityStrategy = CompatibilityStrategy;
-                options.ClientConfiguration.Gateways = options.ClientConfiguration.Gateways.Take(1).ToList(); // Only use primary gw
-                options.ClusterConfiguration.AddMemoryStorageProvider("Default");
-                waitDelay = TestCluster.GetLivenessStabilizationTime(options.ClusterConfiguration.Globals, false);
+                this.builder = new TestClusterBuilder(1);
+                TestDefaultConfiguration.ConfigureTestCluster(this.builder);
+                builder.Options.ApplicationBaseDirectory = rootDir.FullName;
+                builder.AddSiloBuilderConfigurator<VersionGrainsSiloBuilderConfigurator>();
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.Globals.ExpectedClusterSize = SiloCount;
+                    legacy.ClusterConfiguration.Globals.AssumeHomogenousSilosForTesting = false;
+                    legacy.ClusterConfiguration.Globals.TypeMapRefreshInterval = refreshInterval;
+                    legacy.ClusterConfiguration.Globals.DefaultVersionSelectorStrategy = VersionSelectorStrategy;
+                    legacy.ClusterConfiguration.Globals.DefaultCompatibilityStrategy = CompatibilityStrategy;
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
+
+                    legacy.ClientConfiguration.Gateways = legacy.ClientConfiguration.Gateways.Take(1).ToList(); // Only use primary gw
+                    
+                    waitDelay = TestCluster.GetLivenessStabilizationTime(legacy.ClusterConfiguration.Globals, false);
+                });
+
+                this.cluster = builder.Build();
+                await this.cluster.DeployAsync();
+                silo = this.cluster.Primary;
             }
             else
             {
-                // Secondary Silo
-                siloName = $"Secondary_{siloIdx}";
-                siloType = Silo.SiloType.Secondary;
-            }
-            
-            var silo = AppDomainSiloHandle.Create(
-                siloName,
-                siloType,
-                typeof(TestVersionGrains.VersionGrainsSiloBuilderFactory),
-                this.options.ClusterConfiguration,
-                this.options.ClusterConfiguration.Overrides[siloName],
-                applicationBase: rootDir.FullName);
+                var configBuilder = new ConfigurationBuilder();
+                foreach (var source in cluster.ConfigurationSources) configBuilder.Add(source);
+                var testClusterOptions = new TestClusterOptions();
+                configBuilder.Build().Bind(testClusterOptions);
 
-            if (this.siloIdx == 0)
-            {
-                // If it was the first silo, setup the client
-                Client = new ClientBuilder()
-                    .ConfigureApplicationParts(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory())
-                    .UseConfiguration(options.ClientConfiguration)
-                    .Build();
-                await Client.Connect();
-                ManagementGrain = Client.GetGrain<IManagementGrain>(0);
+                // Override the root directory.
+                var sources = new IConfigurationSource[]
+                {
+                    new MemoryConfigurationSource {InitialData = new TestClusterOptions {ApplicationBaseDirectory = rootDir.FullName}.ToDictionary()}
+                };
+
+                silo = TestCluster.StartOrleansSilo(cluster, siloIdx, testClusterOptions, sources);
             }
 
             this.deployedSilos.Add(silo);

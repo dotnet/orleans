@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -22,7 +22,6 @@ namespace Tests.GeoClusterTests
     [TestCategory("GeoCluster")]
     public class GlobalSingleInstanceClusterTests : TestingClusterHost
     {
-
         public GlobalSingleInstanceClusterTests(ITestOutputHelper output) : base(output)
         {
         }
@@ -237,7 +236,11 @@ namespace Tests.GeoClusterTests
 
                 // Given a config file, create client starts a client in a new appdomain. We also create a thread on which the client will run.
                 // The thread takes a "ClientThreadArgs" as argument.
-                var thread = new Thread(ThreadFunc);
+                var thread = new Thread(ThreadFunc)
+                {
+                    IsBackground = true,
+                    Name = $"{this.GetType()}.{nameof(CreationRace)}"
+                };
                 var threadFuncArgs = new ClientThreadArgs
                 {
                     client = client,

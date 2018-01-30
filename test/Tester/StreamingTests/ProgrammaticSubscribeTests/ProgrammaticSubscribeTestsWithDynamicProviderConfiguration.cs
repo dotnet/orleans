@@ -1,11 +1,13 @@
-﻿using Orleans;
+using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams.Core;
 using Orleans.TestingHost;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
+using Orleans.Streams;
 using TestExtensions;
 using UnitTests.Grains.ProgrammaticSubscribe;
 using Xunit.Abstractions;
@@ -18,12 +20,14 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
     {
 
         private ITestOutputHelper output;
-        public override TestCluster CreateTestCluster()
+
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            var options = new TestClusterOptions(2);
-            options.ClusterConfiguration.AddMemoryStorageProvider("Default");
-            options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-            return new TestCluster(options);
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
+                legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+            });
         }
 
         public ProgrammaticSubscribeTestsWithDynamicProviderConfiguration(ITestOutputHelper output)

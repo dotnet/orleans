@@ -1,6 +1,8 @@
-﻿using Orleans.Runtime;
+using Microsoft.Extensions.Options;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using System;
+using System.Collections.Generic;
 
 namespace Orleans.Hosting
 {
@@ -37,5 +39,28 @@ namespace Orleans.Hosting
         /// The CollectionLevel property specifies the verbosity level of statistics to collect. The default is Info.
         /// </summary>
         public StatisticsLevel CollectionLevel { get; set; } = StatisticsLevel.Info;
+    }
+
+    public class StatisticOptionsFormatter : IOptionFormatter<StatisticsOptions>
+    {
+        public string Category { get; }
+
+        public string Name => nameof(StatisticsOptions);
+        private StatisticsOptions options;
+        public StatisticOptionsFormatter(IOptions<StatisticsOptions> options)
+        {
+            this.options = options.Value;
+        }
+        public IEnumerable<string> Format()
+        {
+            return new List<string>()
+            {
+                OptionFormattingUtilities.Format(nameof(options.MetricsTableWriteInterval), options.MetricsTableWriteInterval),
+                OptionFormattingUtilities.Format(nameof(options.PerfCountersWriteInterval), options.PerfCountersWriteInterval),
+                OptionFormattingUtilities.Format(nameof(options.LogWriteInterval), options.LogWriteInterval),
+                OptionFormattingUtilities.Format(nameof(options.WriteLogStatisticsToTable), options.WriteLogStatisticsToTable),
+                OptionFormattingUtilities.Format(nameof(options.CollectionLevel), options.CollectionLevel),
+            };
+        }
     }
 }

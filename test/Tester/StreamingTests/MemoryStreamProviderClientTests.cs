@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -29,12 +29,13 @@ namespace Tester.StreamingTests
 
             public static readonly MemoryAdapterConfig AdapterConfig = new MemoryAdapterConfig(StreamProviderName);
 
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(2);
-                AdjustConfig(options.ClusterConfiguration);
-                AdjustConfig(options.ClientConfiguration);
-                return new TestCluster(options);
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    AdjustConfig(legacy.ClusterConfiguration);
+                    AdjustConfig(legacy.ClientConfiguration);
+                });
             }
 
             private static void AdjustConfig(ClusterConfiguration config)

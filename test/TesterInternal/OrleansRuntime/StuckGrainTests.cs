@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
@@ -21,15 +22,24 @@ namespace UnitTests.StuckGrainTests
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 GlobalConfiguration.ENFORCE_MINIMUM_REQUIREMENT_FOR_AGE_LIMIT = false;
-                var options = new TestClusterOptions(1);
-                options.ClusterConfiguration.Globals.Application.SetDefaultCollectionAgeLimit(TimeSpan.FromSeconds(3));
-                options.ClusterConfiguration.Globals.MaxRequestProcessingTime = TimeSpan.FromSeconds(3);
-                options.ClusterConfiguration.Globals.CollectionQuantum = TimeSpan.FromSeconds(1);
+                builder.Options.InitialSilosCount = 1;
+                builder.AddSiloBuilderConfigurator<SiloHostConfigurator>();
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.Globals.Application.SetDefaultCollectionAgeLimit(TimeSpan.FromSeconds(3));
+                    legacy.ClusterConfiguration.Globals.MaxRequestProcessingTime = TimeSpan.FromSeconds(3);
+                    legacy.ClusterConfiguration.Globals.CollectionQuantum = TimeSpan.FromSeconds(1);
+                });
+            }
 
-                return new TestCluster(options);
+            private class SiloHostConfigurator : LegacySiloBuilderConfigurator {
+                public override void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    GlobalConfiguration.ENFORCE_MINIMUM_REQUIREMENT_FOR_AGE_LIMIT = false;
+                }
             }
         }
 

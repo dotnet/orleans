@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Xunit;
 using Orleans.Runtime.Configuration;
 using Orleans.Hosting;
@@ -17,26 +17,24 @@ namespace Orleans.Transactions.AzureStorage.Tests
             CheckForAzureStorage(TestDefaultConfiguration.DataConnectionString);
         }
 
-        protected override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            var options = new TestClusterOptions();
-            options.ClusterConfiguration.AddAzureTableStorageProvider(TransactionTestConstants.TransactionStore);
-            options.UseSiloBuilderFactory<SiloBuilderFactory>();
-            return new TestCluster(options);
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.AddAzureTableStorageProvider(TransactionTestConstants.TransactionStore);
+            });
+            builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         }
 
-        private class SiloBuilderFactory : ISiloBuilderFactory
+        private class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            public void Configure(ISiloHostBuilder hostBuilder)
             {
-                return new SiloHostBuilder()
-                    .ConfigureSiloName(siloName)
-                    .UseConfiguration(clusterConfiguration)
-                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)))
-                    .UseInClusterTransactionManager()
+                var id = (uint) Guid.NewGuid().GetHashCode();
+                hostBuilder.UseInClusterTransactionManager()
                     .UseAzureTransactionLog(options => {
                         // TODO: Find better way for test isolation.  Possibly different partition keys.
-                        options.TableName = $"TransactionLog{((uint)clusterConfiguration.Globals.ClusterId.GetHashCode()) % 100000}";
+                        options.TableName = $"TransactionLog{id % 100000:X}";
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     })
                     .UseTransactionalState();

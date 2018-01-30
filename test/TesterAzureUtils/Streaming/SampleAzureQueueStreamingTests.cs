@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -21,14 +21,14 @@ namespace Tester.AzureUtils.Streaming
     {
         private const string StreamProvider = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
 
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             TestUtils.CheckForAzureStorage();
-            var options = new TestClusterOptions(2);
-
-            options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-            options.ClusterConfiguration.AddAzureQueueStreamProvider(StreamProvider);
-            return new TestCluster(options);
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+                legacy.ClusterConfiguration.AddAzureQueueStreamProvider(StreamProvider);
+            });
         }
 
         public override void Dispose()

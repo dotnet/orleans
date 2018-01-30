@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Xunit.Abstractions;
@@ -22,36 +22,26 @@ namespace UnitTests.General
 
         public class Fixture : BaseTestClusterFixture
         {
-            
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions();
-                options.ClusterConfiguration.Globals.RegisterBootstrapProvider<UnitTests.General.MockBootstrapProvider>(MockBootstrapProviderName);
-                options.ClusterConfiguration.Globals.RegisterBootstrapProvider<UnitTests.General.GrainCallBootstrapper>(GrainCallBootstrapperName);
-                options.ClusterConfiguration.Globals.RegisterBootstrapProvider<UnitTests.General.LocalGrainInitBootstrapper>(LocalGrainInitBootstrapperName);
-                options.ClusterConfiguration.Globals.RegisterBootstrapProvider<UnitTests.General.ControllableBootstrapProvider>(ControllableBootstrapProviderName);
-
-                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
-                options.ClusterConfiguration.AddMemoryStorageProvider("Default", numStorageGrains: 1);
-                options.UseSiloBuilderFactory<TestSiloBuilderFactory>();
-
-                return new TestCluster(options);
-            }
-            private class TestSiloBuilderFactory : ISiloBuilderFactory
-            {
-                public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+                builder.ConfigureLegacyConfiguration(legacy =>
                 {
-                    return new SiloHostBuilder()
-                        .ConfigureSiloName(siloName)
-                        .UseConfiguration(clusterConfiguration)
-                        .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
-                }
+                    legacy.ClusterConfiguration.Globals.RegisterBootstrapProvider<MockBootstrapProvider>(MockBootstrapProviderName);
+                    legacy.ClusterConfiguration.Globals.RegisterBootstrapProvider<GrainCallBootstrapper>(GrainCallBootstrapperName);
+                    legacy.ClusterConfiguration.Globals.RegisterBootstrapProvider<LocalGrainInitBootstrapper>(LocalGrainInitBootstrapperName);
+                    legacy.ClusterConfiguration.Globals.RegisterBootstrapProvider<ControllableBootstrapProvider>(ControllableBootstrapProviderName);
+
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("Default", numStorageGrains: 1);
+                });
             }
         }
+
         const string MockBootstrapProviderName = "bootstrap1";
         const string GrainCallBootstrapperName = "bootstrap2";
         const string LocalGrainInitBootstrapperName = "bootstrap3";
         const string ControllableBootstrapProviderName = "bootstrap4";
+
         protected TestCluster HostedCluster => this.fixture.HostedCluster;
         protected IGrainFactory GrainFactory => this.fixture.GrainFactory;
 
@@ -90,7 +80,7 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("Providers"), TestCategory("Bootstrap")]
         public async Task BootstrapProvider_LocalGrainInit()
         {
-            for (int i = 0; i < 20; i++ )
+            for (int i = 0; i < 20; i++)
             {
                 ITestContentGrain grain = this.GrainFactory.GetGrain<ITestContentGrain>(i);
                 object content = await grain.FetchContentFromLocalGrain();
@@ -130,19 +120,23 @@ namespace UnitTests.General
             string args = "OneSetOfArgs";
             IManagementGrain mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
 
-            object[] replies = await mgmtGrain.SendControlCommandToProvider(controllerType, 
-               controllerName, (int)ControllableBootstrapProvider.Commands.EchoArg, args);
+            object[] replies = await mgmtGrain.SendControlCommandToProvider(controllerType,
+                controllerName,
+                (int) ControllableBootstrapProvider.Commands.EchoArg,
+                args);
 
             output.WriteLine("Got {0} replies {1}", replies.Length, Utils.EnumerableToString(replies));
-            Assert.Equal(numSilos, replies.Length);  //  "Expected to get {0} replies to command {1}", numSilos, command
+            Assert.Equal(numSilos, replies.Length); //  "Expected to get {0} replies to command {1}", numSilos, command
             Assert.True(replies.All(reply => reply.ToString().Equals(args)), $"Got args {args}");
 
             args = "DifferentSetOfArgs";
             replies = await mgmtGrain.SendControlCommandToProvider(controllerType,
-                controllerName, (int)ControllableBootstrapProvider.Commands.EchoArg, args);
+                controllerName,
+                (int) ControllableBootstrapProvider.Commands.EchoArg,
+                args);
 
             output.WriteLine("Got {0} replies {1}", replies.Length, Utils.EnumerableToString(replies));
-            Assert.Equal(numSilos, replies.Length);  //  "Expected to get {0} replies to command {1}", numSilos, command
+            Assert.Equal(numSilos, replies.Length); //  "Expected to get {0} replies to command {1}", numSilos, command
             Assert.True(replies.All(reply => reply.ToString().Equals(args)), $"Got args {args}");
         }
 
@@ -157,13 +151,17 @@ namespace UnitTests.General
         {
             var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
             // request provider InitCount on all silos in this cluster
-            object[] results = await mgmt.SendControlCommandToProvider(typeof(GrainCallBootstrapper).FullName, GrainCallBootstrapperName, (int)MockBootstrapProvider.Commands.InitCount, null);
+            object[] results = await mgmt.SendControlCommandToProvider(typeof(GrainCallBootstrapper).FullName,
+                GrainCallBootstrapperName,
+                (int) MockBootstrapProvider.Commands.InitCount,
+                null);
             foreach (var re in results)
             {
                 int initCountOnThisProviderInThisSilo = (int) re;
-                if ((int)initCountOnThisProviderInThisSilo > 0)
+                if ((int) initCountOnThisProviderInThisSilo > 0)
                     return initCountOnThisProviderInThisSilo;
             }
+
             return -1;
         }
 
@@ -171,13 +169,17 @@ namespace UnitTests.General
         {
             var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
             // request provider InitCount on all silos in this cluster
-            object[] results = await mgmt.SendControlCommandToProvider(typeof(GrainCallBootstrapper).FullName, GrainCallBootstrapperName, (int)MockBootstrapProvider.Commands.InitCount, null);
+            object[] results = await mgmt.SendControlCommandToProvider(typeof(GrainCallBootstrapper).FullName,
+                GrainCallBootstrapperName,
+                (int) MockBootstrapProvider.Commands.InitCount,
+                null);
             foreach (var re in results)
             {
-                int initCountOnThisProviderInThisSilo = (int)re;
-                if ((int)initCountOnThisProviderInThisSilo > 0)
+                int initCountOnThisProviderInThisSilo = (int) re;
+                if ((int) initCountOnThisProviderInThisSilo > 0)
                     return initCountOnThisProviderInThisSilo;
             }
+
             return -1;
         }
 
@@ -188,7 +190,7 @@ namespace UnitTests.General
         {
             var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
             // request provider InitCount on all silos in this cluster
-            object[] results = await mgmt.SendControlCommandToProvider(typeof(T).FullName, providerName, (int)MockBootstrapProvider.Commands.QueryName, null);
+            object[] results = await mgmt.SendControlCommandToProvider(typeof(T).FullName, providerName, (int) MockBootstrapProvider.Commands.QueryName, null);
             return results.Cast<string>().Count(name => name == providerName);
         }
     }

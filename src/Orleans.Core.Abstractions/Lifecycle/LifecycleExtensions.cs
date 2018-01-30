@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -43,8 +43,8 @@ namespace Orleans
                 this.onStop = onStop;
             }
 
-            public Task OnStart(CancellationToken ct) => onStart(ct);
-            public Task OnStop(CancellationToken ct) => onStop(ct);
+            public Task OnStart(CancellationToken ct) => this.onStart(ct);
+            public Task OnStop(CancellationToken ct) => this.onStop(ct);
         }
     }
 }

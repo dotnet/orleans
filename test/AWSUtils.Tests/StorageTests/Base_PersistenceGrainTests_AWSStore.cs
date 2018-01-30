@@ -1,4 +1,4 @@
-﻿using Orleans;
+using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.TestHooks;
 using Orleans.TestingHost;
@@ -8,6 +8,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using Orleans.Runtime.Configuration;
 using Tester;
 using TestExtensions;
 using UnitTests;
@@ -28,7 +29,7 @@ namespace AWSUtils.Tests.StorageTests
 
         private const int MaxReadTime = 200;
         private const int MaxWriteTime = 2000;
-        private BaseTestClusterFixture fixture;
+        private readonly BaseTestClusterFixture fixture;
 
         public Base_PersistenceGrainTests_AWSStore(ITestOutputHelper output, BaseTestClusterFixture fixture)
         {
@@ -262,10 +263,10 @@ namespace AWSUtils.Tests.StorageTests
 
         protected async Task Grain_AWSStore_SiloRestart()
         {
-            var initialServiceId = this.HostedCluster.ClusterConfiguration.Globals.ServiceId;
+            var initialServiceId = this.HostedCluster.ServiceId;
             var initialDeploymentId = this.HostedCluster.ClusterId;
-
-            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.ClusterId, this.HostedCluster.ClusterConfiguration.Globals.ServiceId);
+            var serviceId = await this.HostedCluster.Client.GetGrain<IServiceIdGrain>(Guid.Empty).GetServiceId();
+            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.ClusterId, serviceId);
 
             Guid id = Guid.NewGuid();
             IAWSStorageTestGrain grain = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain>(id);
@@ -285,8 +286,9 @@ namespace AWSUtils.Tests.StorageTests
 
             output.WriteLine("Silos restarted");
 
-            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.ClusterId, this.HostedCluster.ClusterConfiguration.Globals.ServiceId);
-            Assert.Equal(initialServiceId, this.HostedCluster.ClusterConfiguration.Globals.ServiceId);  // "ServiceId same after restart."
+            serviceId = await this.HostedCluster.Client.GetGrain<IServiceIdGrain>(Guid.Empty).GetServiceId();
+            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.ClusterId, serviceId);
+            Assert.Equal(initialServiceId, serviceId);  // "ServiceId same after restart."
             Assert.Equal(initialDeploymentId, this.HostedCluster.ClusterId);  // "ClusterId same after restart."
 
             val = await grain.GetValue();

@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.ServiceBus.Providers.Testing;
@@ -29,13 +29,15 @@ namespace ServiceBus.Tests
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(siloCount);
-                options.UseSiloBuilderFactory<SiloBuilderFactory>();
+                builder.Options.InitialSilosCount = siloCount;
                 ProviderSettings.EventHubPartitionCount = totalQueueCount;
-                AdjustClusterConfiguration(options.ClusterConfiguration);
-                return new TestCluster(options);
+                builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    AdjustClusterConfiguration(legacy.ClusterConfiguration);
+                });
             }
 
             private static void AdjustClusterConfiguration(ClusterConfiguration config)

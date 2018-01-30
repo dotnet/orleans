@@ -2,17 +2,14 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
 using Orleans.Hosting;
-using Orleans.TestingHost.Utils;
 
 namespace UnitTests.General
 {
@@ -23,28 +20,19 @@ namespace UnitTests.General
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(1);
-                options.UseSiloBuilderFactory<TestSiloBuilderFactory>();
-                return new TestCluster(options);
+                builder.Options.InitialSilosCount = 1;
+                builder.AddSiloBuilderConfigurator<TestSiloBuilderConfigurator>();
             }
 
-            private class TestSiloBuilderFactory : ISiloBuilderFactory
+            private class TestSiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+                public void Configure(ISiloHostBuilder hostBuilder)
                 {
-                    return new SiloHostBuilder()
-                        .ConfigureSiloName(siloName)
-                        .UseConfiguration(clusterConfiguration)
-                        .ConfigureServices(ConfigureServices)
-                        .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
+                    hostBuilder.ConfigureServices(services =>
+                        services.Replace(ServiceDescriptor.Singleton(typeof(IGrainActivator), typeof(HardcodedGrainActivator))));
                 }
-            }
-
-            private static void ConfigureServices(IServiceCollection services)
-            {
-                services.Replace(ServiceDescriptor.Singleton(typeof(IGrainActivator), typeof(HardcodedGrainActivator)));
             }
         }
 

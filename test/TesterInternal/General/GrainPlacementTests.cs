@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -25,16 +25,14 @@ namespace UnitTests.General
             output.WriteLine("GrainPlacementTests - constructor");
         }
 
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            var options = new TestClusterOptions();
-
-            options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-            options.ClusterConfiguration.AddMemoryStorageProvider("Default");
-
-            return new TestCluster(options);
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+                legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
+            });
         }
-
 
         [Fact, TestCategory("Placement"), TestCategory("Functional")]
         public async Task DefaultPlacementShouldBeRandom()
@@ -190,11 +188,9 @@ namespace UnitTests.General
 
             foreach (SiloHandle silo in HostedCluster.GetActiveSilos())
             {
-                NodeConfiguration siloNodeConfiguration = silo.NodeConfiguration;
-                Assert.NotNull(siloNodeConfiguration);
                 output.WriteLine(
                     "Silo {0} : Address = {1} Proxy gateway: {2}",
-                    siloNodeConfiguration.SiloName, siloNodeConfiguration.Endpoint, siloNodeConfiguration.ProxyGatewayEndpoint);
+                    silo.Name, silo.SiloAddress, silo.GatewayAddress);
             }
 
             IPEndPoint targetSilo;
@@ -245,11 +241,9 @@ namespace UnitTests.General
 
             foreach (SiloHandle silo in HostedCluster.GetActiveSilos())
             {
-                NodeConfiguration siloNodeConfiguration = silo.NodeConfiguration;
-                Assert.NotNull(siloNodeConfiguration);
                 output.WriteLine(
                     "Silo {0} : Address = {1} Proxy gateway: {2}",
-                    siloNodeConfiguration.SiloName, siloNodeConfiguration.Endpoint, siloNodeConfiguration.ProxyGatewayEndpoint);
+                    silo.Name, silo.SiloAddress, silo.GatewayAddress);
             }
 
             IPEndPoint targetSilo;

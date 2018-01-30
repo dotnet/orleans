@@ -1,4 +1,4 @@
-﻿using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using System.Threading.Tasks;
 using Orleans.Hosting;
@@ -16,30 +16,25 @@ namespace Tester.ZooKeeperUtils
         {
         }
 
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             ZookeeperTestUtils.EnsureZooKeeper();
 
-            var options = new TestClusterOptions(2);
-            options.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.ZooKeeperConnectionString;
-            options.ClusterConfiguration.PrimaryNode = null;
-            options.ClusterConfiguration.Globals.SeedNodes.Clear();
-            options.ClientConfiguration.GatewayProvider = ClientConfiguration.GatewayProviderType.ZooKeeper;
-            return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>();
+            builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.ZooKeeperConnectionString;
+                legacy.ClusterConfiguration.PrimaryNode = null;
+                legacy.ClusterConfiguration.Globals.SeedNodes.Clear();
+                legacy.ClientConfiguration.GatewayProvider = ClientConfiguration.GatewayProviderType.ZooKeeper;
+            });
         }
 
-        public class SiloBuilderFactory : ISiloBuilderFactory
+        public class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            public void Configure(ISiloHostBuilder hostBuilder)
             {
-                return new SiloHostBuilder()
-                    .ConfigureSiloName(siloName)
-                    .UseConfiguration(clusterConfiguration)
-                    .UseZooKeeperMembership(options =>
-                    {
-                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                    })
-                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
+                hostBuilder.UseZooKeeperMembership(options => { options.ConnectionString = TestDefaultConfiguration.DataConnectionString; });
             }
         }
 
