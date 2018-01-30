@@ -18,6 +18,7 @@ namespace Tester.AzureUtils
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             TestUtils.CheckForAzureStorage();
+            builder.Options.UseTestClusterMembership = false;
             builder.ConfigureLegacyConfiguration(legacy =>
             {
                 legacy.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.DataConnectionString;

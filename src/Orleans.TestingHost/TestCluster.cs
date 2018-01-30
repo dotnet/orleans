@@ -478,6 +478,7 @@ namespace Orleans.TestingHost
             var handle = cluster.LoadSiloInNewAppDomain(
                 siloSpecificOptions.SiloName,
                 configurationSources);
+            handle.InstanceNumber = (short)instanceNumber;
             Interlocked.Increment(ref cluster.startedInstances);
             return handle;
         }
