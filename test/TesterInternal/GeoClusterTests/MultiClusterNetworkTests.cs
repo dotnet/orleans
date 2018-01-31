@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -146,7 +146,7 @@ namespace Tests.GeoClusterTests
             }
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [SkippableFact(Skip = "Flaky test. SebastianBurckhardt to investigate."), TestCategory("Functional")]
         public async Task TestMultiClusterConf_3_3()
         {
             // use a random global service id for testing purposes

@@ -11,6 +11,8 @@
     <PackageReference Include="Microsoft.Orleans.OrleansCodeGenerator.Build" Version="$(OrleansPackageVersion)" PrivateAssets="All" />
     <PackageReference Include="Microsoft.Orleans.Hosting.ServiceFabric" Version="$(OrleansPackageVersion)" />
     <PackageReference Include="Microsoft.Orleans.Clustering.ServiceFabric" Version="$(OrleansPackageVersion)" />
+    <PackageReference Include="Microsoft.Orleans.Core.Legacy" Version="$(OrleansPackageVersion)" />
+    <PackageReference Include="Microsoft.Orleans.Runtime.Legacy" Version="$(OrleansPackageVersion)" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\GrainInterfaces\GrainInterfaces.csproj" />

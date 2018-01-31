@@ -69,7 +69,7 @@
     <MicrosoftAzureEventHubsVersion>1.0.3</MicrosoftAzureEventHubsVersion>
     <MicrosoftDataSQLiteVersion>2.0.0</MicrosoftDataSQLiteVersion>
     <MicrosoftPowerShell5ReferenceAssembliesVersion>1.1.0</MicrosoftPowerShell5ReferenceAssembliesVersion>
-    <MicrosoftServiceFabricServicesVersion>2.7.198</MicrosoftServiceFabricServicesVersion>
+    <MicrosoftServiceFabricServicesVersion>3.0.456</MicrosoftServiceFabricServicesVersion>
     <WindowsAzureStorageVersion>8.2.1</WindowsAzureStorageVersion>
 
     <FSharpCoreVersion>4.2.3</FSharpCoreVersion>
@@ -99,7 +99,7 @@
     <NodaTimeVersion>2.2.2</NodaTimeVersion>
 
     <!-- Tooling related packages -->
-    <SourceLinkVersion>2.5.0</SourceLinkVersion>
+    <SourceLinkVersion>2.7.6</SourceLinkVersion>
   </PropertyGroup>
 
   <!-- Versioning properties -->

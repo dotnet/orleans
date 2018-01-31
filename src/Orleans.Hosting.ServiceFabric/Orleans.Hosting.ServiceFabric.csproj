@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <TargetFramework>net461</TargetFramework>
+    <TargetFramework>netstandard2.0</TargetFramework>
     <AssemblyName>Orleans.Hosting.ServiceFabric</AssemblyName>
     <RootNamespace>Orleans.Hosting.ServiceFabric</RootNamespace>
     <PlatformTarget>x64</PlatformTarget>
