@@ -55,7 +55,6 @@ namespace Orleans.TestingHost
             {
                 config.Globals.ClusterId = this.builder.Options.ClusterId;
             }
-
             config.Globals.ExpectedClusterSize = this.builder.Options.InitialSilosCount;
             config.Globals.AssumeHomogenousSilosForTesting = this.builder.Options.AssumeHomogenousSilosForTesting;
 

@@ -227,12 +227,8 @@ namespace Orleans.TestingHost
 
         private static void TryConfigureFileLogging(IConfiguration configuration, IServiceCollection services, string name)
         {
-            bool.TryParse(configuration["UseTestClusterMemebership"], out bool configureFileLogging);
-            if (configureFileLogging)
-            {
-                var fileName = TestingUtils.CreateTraceFileName(name, configuration["ClusterId"]);
-                services.AddLogging(loggingBuilder => loggingBuilder.AddFile(fileName));
-            }
+            var fileName = TestingUtils.CreateTraceFileName(name, configuration["ClusterId"]);
+            services.AddLogging(loggingBuilder => loggingBuilder.AddFile(fileName));
         }
 
         private static void AddDefaultApplicationParts(IApplicationPartManager applicationPartsManager)

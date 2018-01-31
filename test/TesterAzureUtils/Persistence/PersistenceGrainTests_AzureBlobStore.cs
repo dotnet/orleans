@@ -25,19 +25,19 @@ namespace Tester.AzureUtils.Persistence
     [TestCategory("Persistence"), TestCategory("Azure")]
     public class PersistenceGrainTests_AzureBlobStore : Base_PersistenceGrainTests_AzureStore, IClassFixture<PersistenceGrainTests_AzureBlobStore.Fixture>
     {
+        public static Guid ServiceId = Guid.NewGuid();
         public class Fixture : BaseAzureTestClusterFixture
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                Guid serviceId = Guid.NewGuid();
+                
                 builder.Options.InitialSilosCount = 4;
                 builder.Options.UseTestClusterMembership = false;
                 builder.ConfigureLegacyConfiguration(legacy =>
                 {
                     legacy.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
 
-                    legacy.ClusterConfiguration.Globals.ServiceId = serviceId;
-
+                    legacy.ClusterConfiguration.Globals.ServiceId = ServiceId;
                     legacy.ClusterConfiguration.Globals.MaxResendCount = 0;
 
                     legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test1");
@@ -117,7 +117,7 @@ namespace Tester.AzureUtils.Persistence
         [SkippableFact, TestCategory("Functional")]
         public async Task Grain_AzureBlobStore_SiloRestart()
         {
-            await base.Grain_AzureStore_SiloRestart();
+            await base.Grain_AzureStore_SiloRestart(ServiceId);
         }
 
         [SkippableFact, TestCategory("CorePerf"), TestCategory("Performance"), TestCategory("Stress")]

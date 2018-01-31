@@ -27,7 +27,7 @@ namespace UnitTests.MembershipTests
 
         protected async Task Do_Liveness_OracleTest_1()
         {
-            output.WriteLine("ClusterId= {0}", this.HostedCluster.ClusterId);
+            output.WriteLine("ClusterId= {0}", this.HostedCluster.Options.ClusterId);
 
             SiloHandle silo3 = this.HostedCluster.StartAdditionalSilo();
 

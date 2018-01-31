@@ -101,7 +101,7 @@ namespace Orleans.TestingHost
             return testCluster;
         }
 
-        private static string CreateClusterId()
+        public static string CreateClusterId()
         {
             string prefix = "testcluster-";
             int randomSuffix = ThreadSafeRandom.Next(1000);

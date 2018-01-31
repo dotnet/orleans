@@ -28,7 +28,7 @@ namespace Tester.AzureUtils.Streaming
             public override void Dispose()
             {
                 base.Dispose();
-                var clusterId = this.HostedCluster?.ClusterId;
+                var clusterId = this.HostedCluster?.Options.ClusterId;
                 AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, StreamProviderName, clusterId, TestDefaultConfiguration.DataConnectionString).Wait();
                 AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, StreamProviderName2, clusterId, TestDefaultConfiguration.DataConnectionString).Wait();
             }

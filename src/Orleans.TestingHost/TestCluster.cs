@@ -33,6 +33,7 @@ namespace Orleans.TestingHost
         /// <summary>
         /// Primary silo handle
         /// </summary>
+        /// <remarks>This only provide valid data if your cluster are using GrainBasedMemebership</remarks>
         public SiloHandle Primary { get; private set; }
 
         /// <summary>
@@ -60,17 +61,12 @@ namespace Orleans.TestingHost
 
         private readonly StringBuilder log = new StringBuilder();
 
+        /// <summary>
+        /// Options you used to configure your test cluster
+        /// </summary>
+        /// <remarks>This is the options you configured your test cluster with, or the default one. 
+        ///If you configured your TestCluster with ClusterConfiguration, then this option may not reflect settings in that.</remarks>
         public TestClusterOptions Options => this.options;
-
-        /// <summary>
-        /// ClusterId of the cluster
-        /// </summary>
-        public string ClusterId => this.options.ClusterId;
-
-        /// <summary>
-        /// ServiceId of the cluster
-        /// </summary>
-        public Guid ServiceId => this.options.ServiceId;
 
         /// <summary>
         /// The internal client interface.

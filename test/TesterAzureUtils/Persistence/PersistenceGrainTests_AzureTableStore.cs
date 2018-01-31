@@ -35,18 +35,18 @@ namespace Tester.AzureUtils.Persistence
             {"DataConnectionString", TestDefaultConfiguration.DataConnectionString}
         };
 
+        public static Guid ServiceId = Guid.NewGuid();
         public class Fixture : BaseAzureTestClusterFixture
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                Guid serviceId = Guid.NewGuid();
                 builder.Options.InitialSilosCount = 4;
                 builder.Options.UseTestClusterMembership = false;
                 builder.ConfigureLegacyConfiguration(legacy =>
                 {
                     legacy.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
 
-                    legacy.ClusterConfiguration.Globals.ServiceId = serviceId;
+                    legacy.ClusterConfiguration.Globals.ServiceId = ServiceId;
 
                     legacy.ClusterConfiguration.Globals.MaxResendCount = 0;
 
@@ -131,7 +131,7 @@ namespace Tester.AzureUtils.Persistence
         [SkippableFact, TestCategory("Functional")]
         public async Task Grain_AzureTableStore_SiloRestart()
         {
-            await base.Grain_AzureStore_SiloRestart();
+            await base.Grain_AzureStore_SiloRestart(ServiceId);
         }
 
         [SkippableFact, TestCategory("CorePerf"), TestCategory("Performance"), TestCategory("Stress")]

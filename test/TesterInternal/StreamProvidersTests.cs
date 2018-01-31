@@ -92,7 +92,7 @@ namespace UnitTests.Streaming
 
             output.WriteLine("..... Silos restarted");
 
-            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.ClusterId, this.fixture.ClusterConfiguration.Globals.ServiceId);
+            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.Options.ClusterId, this.fixture.ClusterConfiguration.Globals.ServiceId);
 
             Assert.Equal(ServiceId, this.fixture.ClusterConfiguration.Globals.ServiceId);  // "ServiceId same after restart."
 
