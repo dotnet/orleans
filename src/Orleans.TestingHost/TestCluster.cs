@@ -42,7 +42,7 @@ namespace Orleans.TestingHost
 
         private readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
 
-        private ReadOnlyCollection<SiloHandle> Silos
+        public ReadOnlyCollection<SiloHandle> Silos
         {
             get
             {

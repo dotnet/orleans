@@ -4,6 +4,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
@@ -74,7 +75,7 @@ namespace Tester.SQLUtils
             var clientStatisticsManager = this.HostedCluster.ServiceProvider.GetService<ClientStatisticsManager>();
             Assert.NotNull(clientStatisticsManager); // Client Statistics Manager is setup
 
-            SiloHandle silo = this.HostedCluster.Primary;
+            SiloHandle silo = this.HostedCluster.Silos.First();
             Assert.True(await this.HostedCluster.Client.GetTestHooks(silo).HasStatisticsProvider(), "Silo StatisticsProviderManager is setup");
             var nodeConfig = this.fixture.ClusterConfiguration.GetOrCreateNodeConfigurationForSilo(Silo.PrimarySiloName);
             Assert.Equal(statisticProviderName, nodeConfig.StatisticsProviderName);  // "Silo.StatisticsProviderName"
