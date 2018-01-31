@@ -1,4 +1,4 @@
-﻿using Orleans;
+using Orleans;
 
 namespace UnitTests.General
 {
@@ -32,13 +32,14 @@ namespace UnitTests.General
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(2);
-                options.ClientConfiguration.SerializationProviders.Add(typeof(OneWaySerializer).GetTypeInfo());
-                options.ClusterConfiguration.Globals.SerializationProviders.Add(typeof(OneWaySerializer).GetTypeInfo());
-                options.ClusterConfiguration.Globals.TypeMapRefreshInterval = TimeSpan.FromMilliseconds(200);
-                return new TestCluster(options);
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClientConfiguration.SerializationProviders.Add(typeof(OneWaySerializer).GetTypeInfo());
+                    legacy.ClusterConfiguration.Globals.SerializationProviders.Add(typeof(OneWaySerializer).GetTypeInfo());
+                    legacy.ClusterConfiguration.Globals.TypeMapRefreshInterval = TimeSpan.FromMilliseconds(200);
+                });
             }
         }
 

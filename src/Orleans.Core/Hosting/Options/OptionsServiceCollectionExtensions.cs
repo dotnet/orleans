@@ -18,7 +18,8 @@ namespace Orleans.Hosting
         /// <typeparam name="TOptions">The options type to be configured.</typeparam>
         /// <param name="services">The <see cref="IServiceCollection"/> to add the services to.</param>
         /// <returns>The <see cref="OptionsBuilder{TOptions}"/> so that configure calls can be chained in it.</returns>
-        public static OptionsBuilder<TOptions> AddOptions<TOptions>(this IServiceCollection services) where TOptions : class
+        public static OptionsBuilder<TOptions> AddOptions<TOptions>(this IServiceCollection services)
+            where TOptions : class
             => services.AddOptions<TOptions>(Options.DefaultName);
 
         /// <summary>

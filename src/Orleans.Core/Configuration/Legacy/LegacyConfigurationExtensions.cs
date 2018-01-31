@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.IO;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -6,16 +7,33 @@ using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime;
+using Orleans.Providers;
+using Orleans.Configuration.Options;
 
 namespace Orleans.Configuration
 {
     internal static class LegacyConfigurationExtensions
     {
-        public static IServiceCollection AddLegacyClientConfigurationSupport(this IServiceCollection services, ClientConfiguration configuration)
+        private const int ClusterClientDefaultProviderInitStage = 1000;
+        private const int ClusterClientDefaultProviderStartStage = 2000;
+
+        public static IServiceCollection AddLegacyClientConfigurationSupport(this IServiceCollection services, ClientConfiguration configuration = null)
         {
-            if (services.Any(service => service.ServiceType == typeof(ClientConfiguration)))
+            if (TryGetClientConfiguration(services) != null)
             {
                 throw new InvalidOperationException("Cannot configure legacy ClientConfiguration support twice");
+            }
+
+            if (configuration == null)
+            {
+                try
+                {
+                    configuration = ClientConfiguration.StandardLoad();
+                }
+                catch (FileNotFoundException)
+                {
+                    configuration = new ClientConfiguration();
+                }
             }
 
             // these will eventually be removed once our code doesn't depend on the old ClientConfiguration
@@ -34,9 +52,10 @@ namespace Orleans.Configuration
             services.Configure<ClientMessagingOptions>(options =>
             {
                 CopyCommonMessagingOptions(configuration, options);
-
+                options.PropagateActivityId = configuration.PropagateActivityId;
                 options.ClientSenderBuckets = configuration.ClientSenderBuckets;
             });
+
 
             services.Configure<NetworkingOptions>(options => CopyNetworkingOptions(configuration, options));
 
@@ -46,15 +65,39 @@ namespace Orleans.Configuration
                 options.FallbackSerializationProvider = configuration.FallbackSerializationProvider;
             });
 
-            services.Configure<StatisticsOptions>((options) =>
+            services.Configure<ClientStatisticsOptions>((options) =>
             {
                 CopyStatisticsOptions(configuration, options);
+            });
+
+            services.Configure<TelemetryOptions>(options =>
+            {
+                CopyTelemetryOptions(configuration.TelemetryConfiguration, services, options);
             });
 
             // GatewayProvider
             LegacyGatewayListProviderConfigurator.ConfigureServices(configuration, services);
 
+            // Register providers
+            LegacyProviderConfigurator<IClusterClientLifecycle>.ConfigureServices(configuration.ProviderConfigurations, services, ClusterClientDefaultProviderInitStage, ClusterClientDefaultProviderStartStage);
+
             return services;
+        }
+
+        internal static void CopyTelemetryOptions(TelemetryConfiguration telemetryConfiguration, IServiceCollection services, TelemetryOptions options)
+        {
+            foreach (var consumer in telemetryConfiguration.Consumers)
+            {
+                services.TryAddSingleton(consumer.ConsumerType, sp => ActivatorUtilities.CreateInstance(sp, consumer.ConsumerType, consumer.Properties.Values?.ToArray() ?? new object[0]));
+                options.Consumers.Add(consumer.ConsumerType);
+            }
+        }
+        
+        public static ClientConfiguration TryGetClientConfiguration(this IServiceCollection services)
+        {
+            return services
+                .FirstOrDefault(s => s.ServiceType == typeof(ClientConfiguration))
+                ?.ImplementationInstance as ClientConfiguration;
         }
 
         internal static void CopyCommonMessagingOptions(IMessagingConfiguration configuration, MessagingOptions options)
@@ -81,7 +124,6 @@ namespace Orleans.Configuration
             options.LogWriteInterval = configuration.StatisticsLogWriteInterval;
             options.WriteLogStatisticsToTable = configuration.StatisticsWriteLogStatisticsToTable;
             options.CollectionLevel = configuration.StatisticsCollectionLevel;
-            options.ProviderName = configuration.StatisticsProviderName;
         }
     }
 }

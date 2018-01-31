@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -38,7 +38,6 @@ namespace Orleans.Runtime.GrainDirectory
             LocalGrainDirectory localDirectory,
             ILogger<GlobalSingleInstanceRegistrar> logger,
             GlobalSingleInstanceActivationMaintainer gsiActivationMaintainer,
-            GlobalConfiguration config,
             IInternalGrainFactory grainFactory,
             IMultiClusterOracle multiClusterOracle,
             ILocalSiloDetails siloDetails,
@@ -47,7 +46,7 @@ namespace Orleans.Runtime.GrainDirectory
             this.directoryPartition = localDirectory.DirectoryPartition;
             this.logger = logger;
             this.gsiActivationMaintainer = gsiActivationMaintainer;
-            this.numRetries = config.GlobalSingleInstanceNumberRetries;
+            this.numRetries = multiClusterOptions.Value.GlobalSingleInstanceNumberRetries;
             this.grainFactory = grainFactory;
             this.multiClusterOracle = multiClusterOracle;
             this.hasMultiClusterNetwork = multiClusterOptions.Value.HasMultiClusterNetwork;

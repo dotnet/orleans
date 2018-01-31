@@ -18,8 +18,8 @@ namespace Orleans.AzureUtils
         public string GatewayAddress { get; set; }
         public string HostName { get; set; }
 
-        public double CPU { get; set; }
-        public long MemoryUsage { get; set; }
+        public double? CPU { get; set; }
+        public long? MemoryUsage { get; set; }
         public int Activations { get; set; }
         public int RecentlyUsedActivations { get; set; }
         public int SendQueue { get; set; }

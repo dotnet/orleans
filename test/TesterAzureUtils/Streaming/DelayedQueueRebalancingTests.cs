@@ -23,25 +23,31 @@ namespace Tester.AzureUtils.Streaming
         private static readonly TimeSpan SILO_IMMATURE_PERIOD = TimeSpan.FromSeconds(40); // matches the config
         private static readonly TimeSpan LEEWAY = TimeSpan.FromSeconds(10);
 
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             TestUtils.CheckForAzureStorage();
 
-            // Define a cluster of 4, but deploy ony 2 to start.
-            var options = new TestClusterOptions(4);
+            // Define a cluster of 4, but 2 will be stopped.
+            builder.Options.InitialSilosCount = 4;
 
-            options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-            var persistentStreamProviderConfig = new PersistentStreamProviderConfig
+            builder.ConfigureLegacyConfiguration(legacy =>
             {
-                SiloMaturityPeriod = SILO_IMMATURE_PERIOD,
-                BalancerType = StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer,
-            };
+                legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+                var persistentStreamProviderConfig = new PersistentStreamProviderConfig
+                {
+                    SiloMaturityPeriod = SILO_IMMATURE_PERIOD,
+                    BalancerType = StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer,
+                };
 
-            options.ClusterConfiguration.AddAzureQueueStreamProvider(adapterName, persistentStreamProviderConfig: persistentStreamProviderConfig);
-            options.ClientConfiguration.Gateways = options.ClientConfiguration.Gateways.Take(1).ToList();
-            var host = new TestCluster(options);
-            host.Deploy(new[] { Silo.PrimarySiloName, "Secondary_1" });
-            return host;
+                legacy.ClusterConfiguration.AddAzureQueueStreamProvider(adapterName, persistentStreamProviderConfig: persistentStreamProviderConfig);
+                legacy.ClientConfiguration.Gateways = legacy.ClientConfiguration.Gateways.Take(1).ToList();
+            });
+        }
+
+        public DelayedQueueRebalancingTests()
+        {
+            this.HostedCluster.KillSilo(this.HostedCluster.SecondarySilos[1]);
+            this.HostedCluster.KillSilo(this.HostedCluster.SecondarySilos[2]);
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -59,8 +65,8 @@ namespace Tester.AzureUtils.Streaming
         {
             await ValidateAgentsState(2, 2, "1");
 
-            HostedCluster.RestartStoppedSecondarySilo("Secondary_2");
-            HostedCluster.RestartStoppedSecondarySilo("Secondary_3");
+            this.HostedCluster.RestartStoppedSecondarySilo("Secondary_2");
+            this.HostedCluster.RestartStoppedSecondarySilo("Secondary_3");
 
             await ValidateAgentsState(4, 2, "2");
 

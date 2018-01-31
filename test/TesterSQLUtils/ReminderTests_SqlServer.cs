@@ -1,4 +1,4 @@
-﻿//#define USE_SQL_SERVER
+//#define USE_SQL_SERVER
 
 using System;
 using System.Threading.Tasks;
@@ -24,15 +24,15 @@ namespace UnitTests.TimerTests
     {
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions();
                 string connectionString = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameSqlServer, "OrleansRemiderTestSQL")
                             .Result.CurrentConnectionString;
-                options.ClusterConfiguration.Globals.DataConnectionString = connectionString;
-                options.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.SqlServer;
-
-                return new TestCluster(options);
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.Globals.DataConnectionString = connectionString;
+                    legacy.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.SqlServer;
+                });
             }
         }
 

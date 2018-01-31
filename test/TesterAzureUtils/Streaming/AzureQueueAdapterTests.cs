@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
@@ -41,7 +41,7 @@ namespace Tester.AzureUtils.Streaming
             this.fixture = fixture;
             this.clusterId = MakeClusterId();
             this.loggerFactory = this.fixture.Services.GetService<ILoggerFactory>();
-            BufferPool.InitGlobalBufferPool(Options.Create(new SiloMessagingOptions()));
+            BufferPool.InitGlobalBufferPool(new SiloMessagingOptions());
         }
         
         public void Dispose()
@@ -109,7 +109,7 @@ namespace Tester.AzureUtils.Streaming
                                     set.Add(new StreamIdentity(message.StreamGuid, message.StreamGuid.ToString()));
                                     return set;
                                 });
-                            output.WriteLine("Queue {0} received message on stream {1}", queueId,
+                            this.output.WriteLine("Queue {0} received message on stream {1}", queueId,
                                 message.StreamGuid);
                             Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<int>().Count());  // "Half the events were ints"
                             Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<string>().Count());  // "Half the events were strings"
@@ -153,7 +153,7 @@ namespace Tester.AzureUtils.Streaming
                         Exception ex;
                         messageCount++;
                         IBatchContainer batch = cursor.GetCurrent(out ex);
-                        output.WriteLine("Token: {0}", batch.SequenceToken);
+                        this.output.WriteLine("Token: {0}", batch.SequenceToken);
                         Assert.True(batch.SequenceToken.CompareTo(lastToken) >= 0, $"order check for event {messageCount}");
                         lastToken = batch.SequenceToken;
                         if (messageCount == 10)
@@ -161,7 +161,7 @@ namespace Tester.AzureUtils.Streaming
                             tenthInCache = batch.SequenceToken;
                         }
                     }
-                    output.WriteLine("On Queue {0} we received a total of {1} message on stream {2}", kvp.Key, messageCount, streamGuid);
+                    this.output.WriteLine("On Queue {0} we received a total of {1} message on stream {2}", kvp.Key, messageCount, streamGuid);
                     Assert.Equal(NumBatches / 2, messageCount);
                     Assert.NotNull(tenthInCache);
 
@@ -172,7 +172,7 @@ namespace Tester.AzureUtils.Streaming
                     {
                         messageCount++;
                     }
-                    output.WriteLine("On Queue {0} we received a total of {1} message on stream {2}", kvp.Key, messageCount, streamGuid);
+                    this.output.WriteLine("On Queue {0} we received a total of {1} message on stream {2}", kvp.Key, messageCount, streamGuid);
                     const int expected = NumBatches / 2 - 10 + 1; // all except the first 10, including the 10th (10 + 1)
                     Assert.Equal(expected, messageCount);
                 }
@@ -195,7 +195,7 @@ namespace Tester.AzureUtils.Streaming
         {
             const string DeploymentIdFormat = "cluster-{0}";
             string now = DateTime.UtcNow.ToString("yyyy-MM-dd-hh-mm-ss-ffff");
-            return String.Format(DeploymentIdFormat, now);
+            return string.Format(DeploymentIdFormat, now);
         }
     }
 }

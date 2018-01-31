@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -8,10 +8,12 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Core;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;
 using UnitTests.GrainInterfaces;
@@ -287,6 +289,21 @@ namespace UnitTests.Grains
         {
             this.GetLogger().Info(1, "DoSomething");
             return Task.CompletedTask;
+        }
+    }
+
+    public class ServiceIdGrain : Grain, IServiceIdGrain
+    {
+        private readonly IOptions<SiloOptions> siloOptions;
+
+        public ServiceIdGrain(IOptions<SiloOptions> siloOptions)
+        {
+            this.siloOptions = siloOptions;
+        }
+
+        public Task<Guid> GetServiceId()
+        {
+            return Task.FromResult(siloOptions.Value.ServiceId);
         }
     }
 

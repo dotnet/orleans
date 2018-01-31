@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
 using Orleans.GrainDirectory;
+using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
@@ -24,7 +25,7 @@ namespace Orleans.Runtime
         private readonly OrleansTaskScheduler scheduler;
         private readonly Catalog catalog;
         private readonly ILogger logger;
-        private readonly ClusterConfiguration config;
+        private readonly SiloMessagingOptions messagingOptions;
         private readonly PlacementDirectorsManager placementDirectorsManager;
         private readonly ILocalGrainDirectory localGrainDirectory;
         private readonly MessageFactory messagefactory;
@@ -36,8 +37,8 @@ namespace Orleans.Runtime
         internal Dispatcher(
             OrleansTaskScheduler scheduler, 
             ISiloMessageCenter transport, 
-            Catalog catalog, 
-            ClusterConfiguration config,
+            Catalog catalog,
+            IOptions<SiloMessagingOptions> messagingOptions,
             PlacementDirectorsManager placementDirectorsManager,
             ILocalGrainDirectory localGrainDirectory,
             MessageFactory messagefactory,
@@ -49,7 +50,7 @@ namespace Orleans.Runtime
             this.scheduler = scheduler;
             this.catalog = catalog;
             Transport = transport;
-            this.config = config;
+            this.messagingOptions = messagingOptions.Value;
             this.invokeWorkItemLogger = loggerFactory.CreateLogger<InvokeWorkItem>();
             this.placementDirectorsManager = placementDirectorsManager;
             this.localGrainDirectory = localGrainDirectory;
@@ -586,7 +587,7 @@ namespace Orleans.Runtime
 
         internal bool TryResendMessage(Message message)
         {
-            if (!message.MayResend(this.config.Globals.MaxResendCount)) return false;
+            if (!message.MayResend(this.messagingOptions.MaxResendCount)) return false;
 
             message.ResendCount = message.ResendCount + 1;
             MessagingProcessingStatisticsGroup.OnIgcMessageResend(message);
@@ -596,7 +597,7 @@ namespace Orleans.Runtime
 
         internal bool TryForwardMessage(Message message, ActivationAddress forwardingAddress)
         {
-            if (!message.MayForward(this.config.Globals)) return false;
+            if (!message.MayForward(this.messagingOptions)) return false;
 
             message.ForwardCount = message.ForwardCount + 1;
             MessagingProcessingStatisticsGroup.OnIgcMessageForwared(message);
@@ -720,11 +721,15 @@ namespace Orleans.Runtime
             // second, we check for a strategy associated with the target's interface. third, we check for a strategy associated with the activation sending the
             // message.
             var strategy = targetAddress.Grain.IsGrain ? catalog.GetGrainPlacementStrategy(targetAddress.Grain) : null;
-         
+
             var request = message.IsUsingInterfaceVersions
                 ? message.GetDeserializedBody(this.serializationManager) as InvokeMethodRequest
                 : null;
-            var target = new PlacementTarget(message.TargetGrain, request?.InterfaceId ?? 0, request?.InterfaceVersion ?? 0);
+            var target = new PlacementTarget(
+                message.TargetGrain,
+                message.RequestContextData,
+                request?.InterfaceId ?? 0,
+                request?.InterfaceVersion ?? 0);
 
             PlacementResult placementResult;
             if (placementDirectorsManager.TrySelectActivationSynchronously(

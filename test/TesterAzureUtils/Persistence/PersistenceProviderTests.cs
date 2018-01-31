@@ -8,7 +8,6 @@ using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Storage;
 using Orleans.Storage;
 using Samples.StorageProviders;
 using TestExtensions;
@@ -23,7 +22,7 @@ namespace Tester.AzureUtils.Persistence
     [TestCategory("Persistence")]
     public class PersistenceProviderTests_Local
     {
-        private readonly StorageProviderManager storageProviderManager;
+        private readonly IProviderRuntime providerRuntime;
         private readonly Dictionary<string, string> providerCfgProps = new Dictionary<string, string>();
         private readonly ITestOutputHelper output;
         private readonly TestEnvironmentFixture fixture;
@@ -32,13 +31,7 @@ namespace Tester.AzureUtils.Persistence
         {
             this.output = output;
             this.fixture = fixture;
-            storageProviderManager = new StorageProviderManager(
-                fixture.GrainFactory,
-                fixture.Services,
-                new ClientProviderRuntime(fixture.InternalGrainFactory, fixture.Services, NullLoggerFactory.Instance),
-                new LoadedProviderTypeLoaders(new NullLogger<LoadedProviderTypeLoaders>()),
-                NullLoggerFactory.Instance);
-            storageProviderManager.LoadEmptyStorageProviders().WaitWithThrow(TestConstants.InitTimeout);
+            this.providerRuntime = new ClientProviderRuntime(fixture.InternalGrainFactory, fixture.Services, NullLoggerFactory.Instance);
             providerCfgProps.Clear();
         }
 
@@ -48,8 +41,8 @@ namespace Tester.AzureUtils.Persistence
             const string testName = nameof(PersistenceProvider_Mock_WriteRead);
 
             IStorageProvider store = new MockStorageProvider();
-            var cfg = new ProviderConfiguration(providerCfgProps, null);
-            await store.Init(testName, storageProviderManager, cfg);
+            var cfg = new ProviderConfiguration(providerCfgProps);
+            await store.Init(testName, this.providerRuntime, cfg);
 
             await Test_PersistenceProvider_WriteRead(testName, store);
         }
@@ -61,53 +54,10 @@ namespace Tester.AzureUtils.Persistence
 
             IStorageProvider store = new OrleansFileStorage();
             providerCfgProps.Add("RootDirectory", "Data");
-            var cfg = new ProviderConfiguration(providerCfgProps, null);
-            await store.Init(testName, storageProviderManager, cfg);
+            var cfg = new ProviderConfiguration(providerCfgProps);
+            await store.Init(testName, this.providerRuntime, cfg);
 
             await Test_PersistenceProvider_WriteRead(testName, store);
-        }
-
-        [Fact, TestCategory("Functional")]
-        public async Task PersistenceProvider_Sharded_WriteRead()
-        {
-            const string testName = nameof(PersistenceProvider_Sharded_WriteRead);
-
-            IStorageProvider store1 = new MockStorageProvider(2);
-            IStorageProvider store2 = new MockStorageProvider(2);
-            await storageProviderManager.AddAndInitProvider("Store1", store1);
-            await storageProviderManager.AddAndInitProvider("Store2", store2);
-            var composite = await ConfigureShardedStorageProvider(testName, storageProviderManager);
-
-            await Test_PersistenceProvider_WriteRead(testName, composite);
-        }
-
-        [Fact, TestCategory("Functional")]
-        public async Task PersistenceProvider_Sharded_9_WriteRead()
-        {
-            const string testName = nameof(PersistenceProvider_Sharded_9_WriteRead);
-
-            IStorageProvider store1 = new MockStorageProvider(2);
-            IStorageProvider store2 = new MockStorageProvider(2);
-            IStorageProvider store3 = new MockStorageProvider(2);
-            IStorageProvider store4 = new MockStorageProvider(2);
-            IStorageProvider store5 = new MockStorageProvider(2);
-            IStorageProvider store6 = new MockStorageProvider(2);
-            IStorageProvider store7 = new MockStorageProvider(2);
-            IStorageProvider store8 = new MockStorageProvider(2);
-            IStorageProvider store9 = new MockStorageProvider(2);
-            await storageProviderManager.AddAndInitProvider("Store1", store1);
-            await storageProviderManager.AddAndInitProvider("Store2", store2);
-            await storageProviderManager.AddAndInitProvider("Store3", store3);
-            await storageProviderManager.AddAndInitProvider("Store4", store4);
-            await storageProviderManager.AddAndInitProvider("Store5", store5);
-            await storageProviderManager.AddAndInitProvider("Store6", store6);
-            await storageProviderManager.AddAndInitProvider("Store7", store7);
-            await storageProviderManager.AddAndInitProvider("Store8", store8);
-            await storageProviderManager.AddAndInitProvider("Store9", store9);
-
-            ShardedStorageProvider composite = await ConfigureShardedStorageProvider(testName, storageProviderManager);
-
-            await Test_PersistenceProvider_WriteRead(testName, composite);
         }
 
         [SkippableFact, TestCategory("Functional"), TestCategory("Azure")]
@@ -118,8 +68,8 @@ namespace Tester.AzureUtils.Persistence
 
             IStorageProvider store = new AzureTableStorage();
             providerCfgProps.Add("DataConnectionString", TestDefaultConfiguration.DataConnectionString);
-            var cfg = new ProviderConfiguration(providerCfgProps, null);
-            await store.Init(testName, storageProviderManager, cfg);
+            var cfg = new ProviderConfiguration(providerCfgProps);
+            await store.Init(testName, this.providerRuntime, cfg);
 
             await Test_PersistenceProvider_Read(testName, store);
         }
@@ -259,8 +209,8 @@ namespace Tester.AzureUtils.Persistence
             IStorageProvider store = new MemoryStorageWithLatency();
             providerCfgProps.Add("Latency", expectedLatency.ToString());
             providerCfgProps.Add("MockCalls", "true");
-            var cfg = new ProviderConfiguration(providerCfgProps, null);
-            await store.Init(testName, storageProviderManager, cfg);
+            var cfg = new ProviderConfiguration(providerCfgProps);
+            await store.Init(testName, this.providerRuntime, cfg);
 
             GrainReference reference = this.fixture.InternalGrainFactory.GetGrain(GrainId.NewId());
             var state = TestStoreGrainState.NewRandomState();
@@ -326,8 +276,8 @@ namespace Tester.AzureUtils.Persistence
             var store = new AzureTableStorage();
             providerCfgProps["DataConnectionString"] = TestDefaultConfiguration.DataConnectionString;
             providerCfgProps["UseJsonFormat"] = useJson;
-            var cfg = new ProviderConfiguration(providerCfgProps, null);
-            await store.Init(testName, storageProviderManager, cfg);
+            var cfg = new ProviderConfiguration(providerCfgProps);
+            await store.Init(testName, this.providerRuntime, cfg);
             return store;
         }
 
@@ -421,19 +371,6 @@ namespace Tester.AzureUtils.Persistence
             Assert.Equal(default(long), storedGrainState.State.C);
 
             return storedGrainState;
-        }
-
-        private async Task<ShardedStorageProvider> ConfigureShardedStorageProvider(string name, StorageProviderManager storageProviderMgr)
-        {
-            var composite = new ShardedStorageProvider();
-            var provider1 = (IStorageProvider)storageProviderMgr.GetProvider("Store1");
-            var provider2 = (IStorageProvider)storageProviderMgr.GetProvider("Store2");
-            List<IProvider> providers = new List<IProvider>();
-            providers.Add(provider1);
-            providers.Add(provider2);
-            var cfg = new ProviderConfiguration(providerCfgProps, providers);
-            await composite.Init(name, storageProviderMgr, cfg);
-            return composite;
         }
 
         private static void EnsureEnvironmentSupportsState(GrainState<TestStoreGrainState> grainState)

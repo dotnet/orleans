@@ -1,4 +1,4 @@
-﻿using Orleans;
+using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,60 +19,42 @@ namespace AWSUtils.Tests.StorageTests
     [TestCategory("Persistence"), TestCategory("AWS"), TestCategory("DynamoDb")]
     public class PersistenceGrainTests_AWSDynamoDBStore : Base_PersistenceGrainTests_AWSStore, IClassFixture<PersistenceGrainTests_AWSDynamoDBStore.Fixture>
     {
-        private static string DataConnectionString = $"Service={AWSTestConstants.Service}";
+        private static readonly string DataConnectionString = $"Service={AWSTestConstants.Service}";
         public class Fixture : TestExtensions.BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 if (AWSTestConstants.IsDynamoDbAvailable)
                 {
                     Guid serviceId = Guid.NewGuid();
                     string dataConnectionString = DataConnectionString;
-                    var options = new TestClusterOptions(initialSilosCount: 4);
+                    builder.Options.InitialSilosCount = 4;
 
-
-                    options.ClusterConfiguration.Globals.ServiceId = serviceId;
-                    options.ClusterConfiguration.Globals.DataConnectionString = dataConnectionString;
-
-                    options.ClusterConfiguration.Globals.MaxResendCount = 0;
-
-
-                    options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test1");
-                    options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test2", new Dictionary<string, string> { { "Config1", "1" }, { "Config2", "2" } });
-                    options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.ErrorInjectionStorageProvider>("ErrorInjector");
-                    options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("lowercase");
-
-                    options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                    options.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("DDBStore", new Dictionary<string, string> { { "DeleteStateOnClear", "true" }, { "DataConnectionString", dataConnectionString } });
-                    options.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("DDBStore1", new Dictionary<string, string> { { "DataConnectionString", dataConnectionString } });
-                    options.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("DDBStore2", new Dictionary<string, string> { { "DataConnectionString", dataConnectionString } });
-                    options.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("DDBStore3", new Dictionary<string, string> { { "DataConnectionString", dataConnectionString } });
-                    options.ClusterConfiguration.Globals.RegisterStorageProvider<ShardedStorageProvider>("ShardedDDBStore");
-
-                    IProviderConfiguration providerConfig;
-                    if (options.ClusterConfiguration.Globals.TryGetProviderConfiguration("Orleans.Storage.ShardedStorageProvider", "ShardedDDBStore", out providerConfig))
+                    builder.ConfigureLegacyConfiguration(legacy =>
                     {
-                        var providerCategoriess = options.ClusterConfiguration.Globals.ProviderConfigurations;
+                        legacy.ClusterConfiguration.Globals.ServiceId = serviceId;
+                        legacy.ClusterConfiguration.Globals.DataConnectionString = dataConnectionString;
 
-                        var providers = providerCategoriess.SelectMany(o => o.Value.Providers);
+                        legacy.ClusterConfiguration.Globals.MaxResendCount = 0;
 
-                        IProviderConfiguration provider1 = GetNamedProviderConfigForShardedProvider(providers, "DDBStore1");
-                        IProviderConfiguration provider2 = GetNamedProviderConfigForShardedProvider(providers, "DDBStore2");
-                        IProviderConfiguration provider3 = GetNamedProviderConfigForShardedProvider(providers, "DDBStore3");
-                        providerConfig.AddChildConfiguration(provider1);
-                        providerConfig.AddChildConfiguration(provider2);
-                        providerConfig.AddChildConfiguration(provider3);
-                    }
-                    return new TestCluster(options);
+
+                        legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test1");
+                        legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test2",
+                            new Dictionary<string, string> {{"Config1", "1"}, {"Config2", "2"}});
+                        legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.ErrorInjectionStorageProvider>("ErrorInjector");
+                        legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("lowercase");
+
+                        legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+                        legacy.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("DDBStore",
+                            new Dictionary<string, string> {{"DeleteStateOnClear", "true"}, {"DataConnectionString", dataConnectionString}});
+                        legacy.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("DDBStore1",
+                            new Dictionary<string, string> {{"DataConnectionString", dataConnectionString}});
+                        legacy.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("DDBStore2",
+                            new Dictionary<string, string> {{"DataConnectionString", dataConnectionString}});
+                        legacy.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("DDBStore3",
+                            new Dictionary<string, string> {{"DataConnectionString", dataConnectionString}});
+                    });
                 }
-                return null;
-            }
-
-            private static IProviderConfiguration GetNamedProviderConfigForShardedProvider(IEnumerable<KeyValuePair<string, IProviderConfiguration>> providers, string providerName)
-            {
-                var providerConfig = providers.Where(o => o.Key.Equals(providerName)).Select(o => o.Value);
-
-                return providerConfig.First();
             }
         }
 
@@ -220,7 +202,7 @@ namespace AWSUtils.Tests.StorageTests
             Dictionary<string, string> providerCfgProps = new Dictionary<string, string>();
             var store = new DynamoDBStorageProvider();
             providerCfgProps["DataConnectionString"] = DataConnectionString;
-            var cfg = new ProviderConfiguration(providerCfgProps, null);
+            var cfg = new ProviderConfiguration(providerCfgProps);
             await store.Init(storageName, runtime, cfg);
             return store;
         }

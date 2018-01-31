@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans
 {
@@ -20,11 +19,6 @@ namespace Orleans
         Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics();
         Task<DetailedGrainReport> GetDetailedGrainReport(GrainId grainId);
 
-        Task UpdateConfiguration(string configuration);
-
-        /// <summary>Load and initialize newly added stream providers. Remove providers that are not on the list that's being passed in.</summary>
-        Task UpdateStreamProviders(IDictionary<string, ProviderCategoryConfiguration> streamProviderConfigurations);
-  
         Task<int> GetActivationCount();
 
         Task<object> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg);

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Xml;
@@ -9,7 +8,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Hosting;
 using Orleans.MultiCluster;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
 using Orleans.Runtime.MultiClusterNetwork;
 using Orleans.Versions;
@@ -175,51 +173,6 @@ namespace Orleans.Runtime.Management
             
             await Task.WhenAll(tasks);
             return tasks.Select(s => s.Result).Select(r => r.LocalActivations.Count).Sum();
-        }
-
-        public async Task UpdateConfiguration(SiloAddress[] hostIds, Dictionary<string, string> configuration, Dictionary<string, string> tracing)
-        {
-            var global = new[] { "Globals/", "/Globals/", "OrleansConfiguration/Globals/", "/OrleansConfiguration/Globals/" };
-            if (hostIds != null && configuration.Keys.Any(k => global.Any(k.StartsWith)))
-                throw new ArgumentException("Must update global configuration settings on all silos");
-
-            var silos = GetSiloAddresses(hostIds);
-            if (silos.Length == 0) return;
-
-            var document = XPathValuesToXml(configuration);
-            if (tracing != null)
-            {
-                AddXPathValue(document, new[] { "OrleansConfiguration", "Defaults", "Tracing" }, null);
-                var parent = document["OrleansConfiguration"]["Defaults"]["Tracing"];
-                foreach (var trace in tracing)
-                {
-                    var child = document.CreateElement("TraceLevelOverride");
-                    child.SetAttribute("LogPrefix", trace.Key);
-                    child.SetAttribute("TraceLevel", trace.Value);
-                    parent.AppendChild(child);
-                }
-            }
-            
-            using(var sw = new StringWriter())
-            { 
-                using(var xw = XmlWriter.Create(sw))
-                { 
-                    document.WriteTo(xw);
-                    xw.Flush();
-                    var xml = sw.ToString();
-                    // do first one, then all the rest to avoid spamming all the silos in case of a parameter error
-                    await GetSiloControlReference(silos[0]).UpdateConfiguration(xml);
-                    await Task.WhenAll(silos.Skip(1).Select(s => GetSiloControlReference(s).UpdateConfiguration(xml)));
-                }
-            }
-        }
-
-        public async Task UpdateStreamProviders(SiloAddress[] hostIds, IDictionary<string, ProviderCategoryConfiguration> streamProviderConfigurations)
-        {
-            SiloAddress[] silos = GetSiloAddresses(hostIds);
-            List<Task> actionPromises = PerformPerSiloAction(silos,
-                s => GetSiloControlReference(s).UpdateStreamProviders(streamProviderConfigurations));
-            await Task.WhenAll(actionPromises);
         }
 
         public async Task<string[]> GetActiveGrainTypes(SiloAddress[] hostsIds=null)

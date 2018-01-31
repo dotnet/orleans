@@ -18,19 +18,19 @@ namespace UnitTests.StreamingTests
     {
         private readonly Fixture fixture;
 
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(2);
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
 
-                options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-
-                options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamProvider, false);
-                options.ClientConfiguration.AddSimpleMessageStreamProvider(StreamProvider, false);
-                return new TestCluster(options);
+                    legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamProvider, false);
+                    legacy.ClientConfiguration.AddSimpleMessageStreamProvider(StreamProvider, false);
+                });
             }
         }
 
@@ -84,7 +84,7 @@ namespace UnitTests.StreamingTests
             var streamId = Guid.NewGuid();
             const int nRedEvents = 5, nBlueEvents = 3;
 
-            var provider = this.fixture.HostedCluster.StreamProviderManager.GetStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
+            var provider = this.fixture.HostedCluster.ServiceProvider.GetServiceByName<IStreamProvider>(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
             var redStream = provider.GetStream<int>(streamId, "red");
             var blueStream = provider.GetStream<int>(streamId, "blue");
 
@@ -114,7 +114,7 @@ namespace UnitTests.StreamingTests
                 StreamId = Guid.NewGuid()
             }).ToList();
 
-            var provider = fixture.HostedCluster.StreamProviderManager.GetStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
+            var provider = this.fixture.HostedCluster.ServiceProvider.GetServiceByName<IStreamProvider>(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
             foreach (var item in testData)
             {
                 var stream = provider.GetStream<int>(item.StreamId, item.Namespace);
@@ -141,7 +141,7 @@ namespace UnitTests.StreamingTests
 
             var streamId = Guid.NewGuid();
 
-            var provider = fixture.HostedCluster.StreamProviderManager.GetStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
+            var provider = this.fixture.HostedCluster.ServiceProvider.GetServiceByName<IStreamProvider>(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
             for (int i = 0; i < redEvents.Length; i++)
             {
                 var stream = provider.GetStream<int>(streamId, "red" + i);

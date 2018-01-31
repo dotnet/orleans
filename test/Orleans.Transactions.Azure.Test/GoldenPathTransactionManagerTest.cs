@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Xunit.Abstractions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -8,6 +8,7 @@ using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.Tests;
 using TestExtensions;
 using Orleans.TestingHost.Utils;
+using Orleans.Hosting;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {
@@ -25,7 +26,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
         private static ITransactionManager MakeTransactionManager()
         {
             TestFixture.CheckForAzureStorage(TestDefaultConfiguration.DataConnectionString);
-            ITransactionManager tm = new TransactionManager(new TransactionLog(StorageFactory), Options.Create<TransactionsOptions>(new TransactionsOptions()), NullLoggerFactory.Instance, NullTelemetryProducer.Instance, () => new NodeConfiguration(), LogMaintenanceInterval);
+            ITransactionManager tm = new TransactionManager(new TransactionLog(StorageFactory), Options.Create<TransactionsOptions>(new TransactionsOptions()), NullLoggerFactory.Instance, NullTelemetryProducer.Instance, Options.Create<SiloStatisticsOptions>(new SiloStatisticsOptions()), LogMaintenanceInterval);
             tm.StartAsync().GetAwaiter().GetResult();
             return tm;
         }

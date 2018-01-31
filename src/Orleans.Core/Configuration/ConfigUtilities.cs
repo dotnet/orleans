@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Runtime;
@@ -346,9 +347,126 @@ namespace Orleans.Runtime.Configuration
                 family = ParseEnum<AddressFamily>(root.GetAttribute("PreferredFamily"),
                     "Invalid preferred addressing family for " + root.LocalName + " element");
             }
-            IPAddress addr = await ClusterConfiguration.ResolveIPAddress(root.GetAttribute("Address"), subnet, family);
+            IPAddress addr = await ResolveIPAddress(root.GetAttribute("Address"), subnet, family);
             int port = ParseInt(root.GetAttribute("Port"), "Invalid Port attribute for " + root.LocalName + " element");
             return new IPEndPoint(addr, port);
+        }
+
+        internal static async Task<IPAddress> ResolveIPAddress(string addrOrHost, byte[] subnet, AddressFamily family)
+        {
+            var loopback = family == AddressFamily.InterNetwork ? IPAddress.Loopback : IPAddress.IPv6Loopback;
+
+            // IF the address is an empty string, default to the local machine
+            if (string.IsNullOrEmpty(addrOrHost))
+            {
+                addrOrHost = Dns.GetHostName();
+            }
+
+            // Fix StreamFilteringTests_SMS tests
+            if (addrOrHost.Equals("loopback", StringComparison.OrdinalIgnoreCase))
+            {
+                return loopback;
+            }
+
+            // check if addrOrHost is a valid IP address including loopback (127.0.0.0/8, ::1) and any (0.0.0.0/0, ::) addresses
+            IPAddress address;
+            if (IPAddress.TryParse(addrOrHost, out address))
+            {
+                return address;
+            }
+
+            var candidates = new List<IPAddress>();
+
+            // Get IP address from DNS. If addrOrHost is localhost will 
+            // return loopback IPv4 address (or IPv4 and IPv6 addresses if OS is supported IPv6)
+            var nodeIps = await Dns.GetHostAddressesAsync(addrOrHost);
+            foreach (var nodeIp in nodeIps.Where(x => x.AddressFamily == family))
+            {
+                // If the subnet does not match - we can't resolve this address.
+                // If subnet is not specified - pick smallest address deterministically.
+                if (subnet == null)
+                {
+                    candidates.Add(nodeIp);
+                }
+                else
+                {
+                    var ip = nodeIp;
+                    if (subnet.Select((b, i) => ip.GetAddressBytes()[i] == b).All(x => x))
+                    {
+                        candidates.Add(nodeIp);
+                    }
+                }
+            }
+            if (candidates.Count > 0)
+            {
+                return PickIPAddress(candidates);
+            }
+            var subnetStr = Utils.EnumerableToString(subnet, null, ".", false);
+            throw new ArgumentException("Hostname '" + addrOrHost + "' with subnet " + subnetStr + " and family " + family + " is not a valid IP address or DNS name");
+        }
+
+        internal static IPAddress PickIPAddress(IReadOnlyList<IPAddress> candidates)
+        {
+            IPAddress chosen = null;
+            foreach (IPAddress addr in candidates)
+            {
+                if (chosen == null)
+                {
+                    chosen = addr;
+                }
+                else
+                {
+                    if (CompareIPAddresses(addr, chosen)) // pick smallest address deterministically
+                        chosen = addr;
+                }
+            }
+            return chosen;
+        }
+
+        /// <summary>
+        /// Gets the address of the local server.
+        /// If there are multiple addresses in the correct family in the server's DNS record, the first will be returned.
+        /// </summary>
+        /// <returns>The server's IPv4 address.</returns>
+        internal static IPAddress GetLocalIPAddress(AddressFamily family = AddressFamily.InterNetwork, string interfaceName = null)
+        {
+            var loopback = (family == AddressFamily.InterNetwork) ? IPAddress.Loopback : IPAddress.IPv6Loopback;
+            // get list of all network interfaces
+            NetworkInterface[] netInterfaces = NetworkInterface.GetAllNetworkInterfaces();
+
+            var candidates = new List<IPAddress>();
+            // loop through interfaces
+            for (int i = 0; i < netInterfaces.Length; i++)
+            {
+                NetworkInterface netInterface = netInterfaces[i];
+
+                if (netInterface.OperationalStatus != OperationalStatus.Up)
+                {
+                    // Skip network interfaces that are not operational
+                    continue;
+                }
+                if (!string.IsNullOrWhiteSpace(interfaceName) &&
+                    !netInterface.Name.StartsWith(interfaceName, StringComparison.Ordinal)) continue;
+
+                bool isLoopbackInterface = (netInterface.NetworkInterfaceType == NetworkInterfaceType.Loopback);
+                // get list of all unicast IPs from current interface
+                UnicastIPAddressInformationCollection ipAddresses = netInterface.GetIPProperties().UnicastAddresses;
+
+                // loop through IP address collection
+                foreach (UnicastIPAddressInformation ip in ipAddresses)
+                {
+                    if (ip.Address.AddressFamily == family) // Picking the first address of the requested family for now. Will need to revisit later
+                    {
+                        //don't pick loopback address, unless we were asked for a loopback interface
+                        if (!(isLoopbackInterface && ip.Address.Equals(loopback)))
+                        {
+                            candidates.Add(ip.Address); // collect all candidates.
+                        }
+                    }
+                }
+            }
+            if (candidates.Count > 0) return PickIPAddress(candidates);
+            throw new OrleansException("Failed to get a local IP address.");
         }
 
         internal static string IStatisticsConfigurationToString(IStatisticsConfiguration config)
@@ -470,6 +588,27 @@ namespace Orleans.Runtime.Configuration
                               Enum.GetName(typeof(GCLatencyMode), GCSettings.LatencyMode))
                 .AppendLine();
             return sb.ToString();
+        }
+
+        // returns true if lhs is "less" (in some repeatable sense) than rhs
+        private static bool CompareIPAddresses(IPAddress lhs, IPAddress rhs)
+        {
+            byte[] lbytes = lhs.GetAddressBytes();
+            byte[] rbytes = rhs.GetAddressBytes();
+
+            if (lbytes.Length != rbytes.Length) return lbytes.Length < rbytes.Length;
+
+            // compare starting from most significant octet.
+            // 10.68.20.21 < 10.98.05.04
+            for (int i = 0; i < lbytes.Length; i++)
+            {
+                if (lbytes[i] != rbytes[i])
+                {
+                    return lbytes[i] < rbytes[i];
+                }
+            }
+            // They're equal
+            return false;
         }
     }
 }

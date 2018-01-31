@@ -12,7 +12,7 @@ namespace Orleans.Runtime
         /// Acquires grain interface map for all grain types supported across the entire cluster
         /// </summary>
         /// <returns></returns>
-        Task<IGrainTypeResolver> GetClusterTypeCodeMap();
+        Task<IGrainTypeResolver> GetClusterGrainTypeResolver();
 
         Task<Streams.ImplicitStreamSubscriberTable> GetImplicitStreamSubscriberTable(SiloAddress silo);
     }

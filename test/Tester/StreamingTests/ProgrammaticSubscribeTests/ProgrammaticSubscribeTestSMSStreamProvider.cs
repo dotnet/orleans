@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -17,16 +17,21 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
     {
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(2);
-                options.ClusterConfiguration.AddMemoryStorageProvider("Default");
-                options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-                options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamProviderName, false, true,
-                    StreamPubSubType.ExplicitGrainBasedAndImplicit);
-                options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamProviderName2, false, true,
-                    StreamPubSubType.ExplicitGrainBasedOnly);
-                return new TestCluster(options);
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+                    legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamProviderName,
+                        false,
+                        true,
+                        StreamPubSubType.ExplicitGrainBasedAndImplicit);
+                    legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamProviderName2,
+                        false,
+                        true,
+                        StreamPubSubType.ExplicitGrainBasedOnly);
+                });
             }
         }
 

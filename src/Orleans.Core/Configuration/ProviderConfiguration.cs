@@ -15,20 +15,9 @@ namespace Orleans.Runtime.Configuration
     public class ProviderConfiguration : IProviderConfiguration
     {
         private IDictionary<string, string> properties;
-        private readonly IList<ProviderConfiguration> childConfigurations = new List<ProviderConfiguration>();
-        [NonSerialized]
-        private IList<IProvider> childProviders;
-        [NonSerialized]
-        private IProviderManager providerManager;
 
         public string Type { get; private set; }
         public string Name { get; private set; }
-        public IProviderManager ProviderManager {get { return providerManager; } }
-
-        public void AddChildConfiguration(IProviderConfiguration config)
-        {
-            childConfigurations.Add(config as ProviderConfiguration);
-        }
 
         private ReadOnlyDictionary<string, string> readonlyCopyOfProperties;
         /// <summary>
@@ -59,10 +48,9 @@ namespace Orleans.Runtime.Configuration
         }
 
         // for testing purposes
-        internal ProviderConfiguration(IDictionary<string, string> properties, IList<IProvider> childProviders)
+        internal ProviderConfiguration(IDictionary<string, string> properties)
         {
             this.properties = properties ?? new Dictionary<string, string>(1);
-            this.childProviders = childProviders;
         }
 
         // Load from an element with the format <Provider Type="..." Name="...">...</Provider>
@@ -115,7 +103,7 @@ namespace Orleans.Runtime.Configuration
                 }
             }
 
-            LoadProviderConfigurations(child, nsManager, alreadyLoaded, c => childConfigurations.Add(c));
+            LoadProviderConfigurations(child, nsManager, alreadyLoaded, c => { });
         }
 
         internal static void LoadProviderConfigurations(XmlElement root, XmlNamespaceManager nsManager,
@@ -131,13 +119,6 @@ namespace Orleans.Runtime.Configuration
                 config.Load(subElement, alreadyLoaded, nsManager);
                 add(config);
             }
-        }
-
-        internal void SetProviderManager(IProviderManager manager)
-        {
-            this.providerManager = manager;
-            foreach (var child in childConfigurations)
-                child.SetProviderManager(manager);
         }
 
         public void SetProperty(string key, string val)
@@ -167,29 +148,6 @@ namespace Orleans.Runtime.Configuration
             var propsStr = properties == null ? "Null" : Utils.EnumerableToString(properties.Keys);
             return string.Format("Name={0}, Type={1}, Properties={2}", Name, Type, propsStr);
         }
-
-        /// <summary>
-        /// Children providers of this provider. Used by hierarchical providers.
-        /// </summary>
-        public IList<IProvider> Children
-        {
-            get
-            {
-                if (childProviders != null)
-                    return new List<IProvider>(childProviders); //clone
-
-                var list = new List<IProvider>();
-
-                if (childConfigurations.Count == 0)
-                    return list; // empty list
-
-                foreach (var config in childConfigurations)
-                    list.Add(providerManager.GetProvider(config.Name));
-
-                childProviders = list;
-                return new List<IProvider>(childProviders); // clone
-            }
-        }
     }
 
     /// <summary>
@@ -198,7 +156,6 @@ namespace Orleans.Runtime.Configuration
     [Serializable]
     public class ProviderCategoryConfiguration
     {
-        public const string BOOTSTRAP_PROVIDER_CATEGORY_NAME = "Bootstrap";
         public const string STORAGE_PROVIDER_CATEGORY_NAME = "Storage";
         public const string STREAM_PROVIDER_CATEGORY_NAME = "Stream";
         public const string LOG_CONSISTENCY_PROVIDER_CATEGORY_NAME = "LogConsistency";

@@ -12,7 +12,7 @@ namespace Orleans.Runtime
         SiloAddress SiloAddress { get; }
         DateTime TimeCreated { get; }
         GrainDirectoryEntryStatus RegistrationStatus { get; set; }
-        bool OkToRemove(UnregistrationCause cause, GlobalConfiguration config);
+        bool OkToRemove(UnregistrationCause cause, TimeSpan lazyDeregistrationDelay);
     }
 
     internal interface IGrainInfo
@@ -22,7 +22,7 @@ namespace Orleans.Runtime
         bool SingleInstance { get; }
         bool AddActivation(ActivationId act, SiloAddress silo);
         ActivationAddress AddSingleActivation(GrainId grain, ActivationId act, SiloAddress silo, GrainDirectoryEntryStatus registrationStatus);
-        bool RemoveActivation(ActivationId act, UnregistrationCause cause, GlobalConfiguration config, out IActivationInfo entry, out bool wasRemoved);
+        bool RemoveActivation(ActivationId act, UnregistrationCause cause, TimeSpan lazyDeregistrationDelay, out IActivationInfo entry, out bool wasRemoved);
 
         /// <summary>
         /// Merges two grain directory infos, returning a map of activations which must be deactivated, grouped by silo.

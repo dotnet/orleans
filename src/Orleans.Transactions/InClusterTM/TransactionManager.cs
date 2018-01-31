@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 using Orleans.Runtime.Configuration;
+using Orleans.Hosting;
 
 namespace Orleans.Transactions
 { 
@@ -47,7 +48,7 @@ namespace Orleans.Transactions
         private Task transactionLogMaintenanceTask;
         private TransactionManagerMetrics metrics;
         public TransactionManager(TransactionLog transactionLog, IOptions<TransactionsOptions> configOption, ILoggerFactory loggerFactory, ITelemetryProducer telemetryProducer,
-            Factory<NodeConfiguration> getNodeConfig, TimeSpan? logMaintenanceInterval = null)
+            IOptions<SiloStatisticsOptions> statisticsOptions, TimeSpan? logMaintenanceInterval = null)
         {
             this.transactionLog = transactionLog;
             this.options = configOption.Value;
@@ -68,7 +69,7 @@ namespace Orleans.Transactions
             this.resources = new Dictionary<ITransactionalResource, long>();
             this.transactions = new List<Transaction>();
             this.metrics =
-                new TransactionManagerMetrics(telemetryProducer, getNodeConfig().StatisticsMetricsTableWriteInterval);
+                new TransactionManagerMetrics(telemetryProducer, statisticsOptions.Value.MetricsTableWriteInterval);
             this.checkpointedLSN = 0;
             this.IsRunning = false;
         }

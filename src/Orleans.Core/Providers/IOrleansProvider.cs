@@ -11,7 +11,6 @@ namespace Orleans.Providers
     /// <summary>
     /// Base interface for all type-specific provider interfaces in Orleans
     /// </summary>
-    /// <seealso cref="Orleans.Providers.IBootstrapProvider"/>
     /// <seealso cref="Orleans.Storage.IStorageProvider"/>
     /// <seealso cref="Orleans.LogConsistency.ILogConsistencyProvider"/>
 
@@ -36,19 +35,6 @@ namespace Orleans.Providers
     #pragma warning restore 1574
 
     /// <summary>
-    /// Internal provider management interface for instantiating dependent providers in a hierarchical tree of dependencies
-    /// </summary>
-    public interface IProviderManager
-    {
-        /// <summary>
-        /// Call into Provider Manager for instantiating dependent providers in a hierarchical tree of dependencies
-        /// </summary>
-        /// <param name="name">Name of the provider to be found</param>
-        /// <returns>Provider instance with the given name</returns>
-        IProvider GetProvider(string name);
-    }
-
-    /// <summary>
     /// Configuration information that a provider receives
     /// </summary>
     public interface IProviderConfiguration
@@ -63,16 +49,10 @@ namespace Orleans.Providers
         /// </summary>
         string Name { get; }
 
-        void AddChildConfiguration(IProviderConfiguration config);
         /// <summary>
         /// Configuration properties for this provider instance, as name-value pairs.
         /// </summary>
         ReadOnlyDictionary<string, string> Properties { get; }
-
-        /// <summary>
-        /// Nested providers in case of a hierarchical tree of dependencies
-        /// </summary>
-        IList<IProvider> Children { get; }
 
         /// <summary>
         /// Set a property in this provider configuration.

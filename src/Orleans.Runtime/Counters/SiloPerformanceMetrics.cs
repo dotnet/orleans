@@ -1,8 +1,10 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime.Configuration;
+using Microsoft.Extensions.Options;
+using Orleans.Hosting;
 using Orleans.Runtime.Scheduler;
+using Orleans.Statistics;
 
 namespace Orleans.Runtime.Counters
 {
@@ -13,26 +15,32 @@ namespace Orleans.Runtime.Counters
         internal ActivationCollector ActivationCollector { get; set; }
         internal IMessageCenter MessageCenter { get; set; }
         internal ISiloMetricsDataPublisher MetricsDataPublisher { get; set; }
-        internal NodeConfiguration NodeConfig { get; set; }
+        internal SiloStatisticsOptions statisticsOptions { get; set; }
 
         private readonly ILoggerFactory loggerFactory;
         private TimeSpan reportFrequency;
         private bool overloadLatched;
         private bool overloadValue;
-        private readonly RuntimeStatisticsGroup runtimeStats;
+        private readonly IHostEnvironmentStatistics hostEnvironmentStatistics;
+        private readonly IAppEnvironmentStatistics appEnvironmentStatistics;
         private AsyncTaskSafeTimer tableReportTimer;
         private readonly ILogger logger;
         private float? cpuUsageLatch;
 
-        internal SiloPerformanceMetrics(RuntimeStatisticsGroup runtime, ILoggerFactory loggerFactory, NodeConfiguration cfg = null)
+        internal SiloPerformanceMetrics(
+            IHostEnvironmentStatistics hostEnvironmentStatistics,
+            IAppEnvironmentStatistics appEnvironmentStatistics,
+            ILoggerFactory loggerFactory,
+            IOptions<SiloStatisticsOptions> statisticsOptions)
         {
             this.loggerFactory = loggerFactory;
-            runtimeStats = runtime;
+            this.hostEnvironmentStatistics = hostEnvironmentStatistics;
+            this.appEnvironmentStatistics = appEnvironmentStatistics;
             reportFrequency = TimeSpan.Zero;
             overloadLatched = false;
             overloadValue = false;
             this.logger = loggerFactory.CreateLogger<SiloPerformanceMetrics>();
-            NodeConfig = cfg ?? new NodeConfiguration();
+            this.statisticsOptions = statisticsOptions.Value;
             StringValueStatistic.FindOrCreate(StatisticNames.RUNTIME_IS_OVERLOADED, () => IsOverloaded.ToString());
         }
 
@@ -61,29 +69,29 @@ namespace Orleans.Runtime.Counters
 
         #region ISiloPerformanceMetrics Members
 
-        public float CpuUsage 
+        public float? CpuUsage 
         { 
-            get { return cpuUsageLatch.HasValue ? cpuUsageLatch.Value : runtimeStats.CpuUsage; } 
+            get { return cpuUsageLatch.HasValue ? cpuUsageLatch.Value : hostEnvironmentStatistics.CpuUsage; } 
         }
 
-        public long AvailablePhysicalMemory
+        public long? AvailablePhysicalMemory
         {
-            get { return runtimeStats.AvailableMemory; }
+            get { return hostEnvironmentStatistics.AvailableMemory; }
         }
 
-        public long TotalPhysicalMemory
+        public long? TotalPhysicalMemory
         {
-            get { return runtimeStats.TotalPhysicalMemory; }
+            get { return hostEnvironmentStatistics.TotalPhysicalMemory; }
         }
 
-        public long MemoryUsage 
+        public long? MemoryUsage 
         {
-            get { return runtimeStats.MemoryUsage; } 
+            get { return appEnvironmentStatistics.MemoryUsage; } 
         }
 
         public bool IsOverloaded
         {
-            get { return overloadLatched ? overloadValue : (NodeConfig.LoadSheddingEnabled && (CpuUsage > NodeConfig.LoadSheddingLimit)); }
+            get { return this.overloadLatched ? overloadValue : (this.statisticsOptions.LoadSheddingEnabled && (CpuUsage > this.statisticsOptions.LoadSheddingLimit)); }
         }
 
         public long RequestQueueLength

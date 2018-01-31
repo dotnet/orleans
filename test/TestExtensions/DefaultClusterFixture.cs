@@ -1,29 +1,24 @@
-﻿using Orleans.Hosting;
+using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
-using Orleans.TestingHost.Utils;
 
 namespace TestExtensions
 {
     public class DefaultClusterFixture : BaseTestClusterFixture
     {
-        protected override TestCluster CreateTestCluster()
-        {
-            var options = new TestClusterOptions();
-            options.ClusterConfiguration.AddMemoryStorageProvider("Default");
-            options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-            return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>();
-        }
+        public ClusterConfiguration ClusterConfiguration { get; private set; }
 
-        public class SiloBuilderFactory : ISiloBuilderFactory
+        public ClientConfiguration ClientConfiguration { get; private set; }
+
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            builder.ConfigureLegacyConfiguration(legacy =>
             {
-                return new SiloHostBuilder()
-                    .ConfigureSiloName(siloName)
-                    .UseConfiguration(clusterConfiguration)
-                    .ConfigureLogging(loggingBuilder => TestingUtils.ConfigureDefaultLoggingBuilder(loggingBuilder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
-            }
+                legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
+                legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+                this.ClusterConfiguration = legacy.ClusterConfiguration;
+                this.ClientConfiguration = legacy.ClientConfiguration;
+            });
         }
     }
 }

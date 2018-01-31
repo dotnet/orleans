@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
@@ -15,25 +15,26 @@ namespace UnitTests.StreamingTests
     {
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(initialSilosCount: 4);
+                builder.Options.InitialSilosCount = 4;
 
-                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.ErrorInjectionStorageProvider>(PubSubStoreProviderName);
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
+                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.ErrorInjectionStorageProvider>(PubSubStoreProviderName);
 
-                options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
+                    legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
 
-                options.ClusterConfiguration.Globals.MaxResendCount = 0;
-                options.ClusterConfiguration.Globals.ResponseTimeout = TimeSpan.FromSeconds(30);
+                    legacy.ClusterConfiguration.Globals.MaxResendCount = 0;
+                    legacy.ClusterConfiguration.Globals.ResponseTimeout = TimeSpan.FromSeconds(30);
 
-                options.ClientConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
+                    legacy.ClientConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
 
-                options.ClientConfiguration.ClientSenderBuckets = 8192;
-                options.ClientConfiguration.ResponseTimeout = TimeSpan.FromSeconds(30);
-                options.ClientConfiguration.MaxResendCount = 0;
-
-                return new TestCluster(options);
+                    legacy.ClientConfiguration.ClientSenderBuckets = 8192;
+                    legacy.ClientConfiguration.ResponseTimeout = TimeSpan.FromSeconds(30);
+                    legacy.ClientConfiguration.MaxResendCount = 0;
+                });
             }
         }
 

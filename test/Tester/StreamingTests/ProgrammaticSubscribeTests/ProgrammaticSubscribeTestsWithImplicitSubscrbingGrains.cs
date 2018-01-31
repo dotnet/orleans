@@ -1,18 +1,10 @@
-﻿using Orleans;
-using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using TestExtensions;
-using UnitTests.StreamingTests;
 using Xunit;
-using UnitTests.GrainInterfaces;
-using Orleans.TestingHost.Utils;
-using UnitTests.Grains;
 using UnitTests.Grains.ProgrammaticSubscribe;
 
 namespace Tester.StreamingTests.ProgrammaticSubscribeTests
@@ -24,16 +16,21 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(2);
-                options.ClusterConfiguration.AddMemoryStorageProvider("Default");
-                options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-                options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamProviderName, false, true,
-                    StreamPubSubType.ImplicitOnly);
-                options.ClientConfiguration.AddSimpleMessageStreamProvider(StreamProviderName, false, true,
-                    StreamPubSubType.ImplicitOnly);
-                return new TestCluster(options);
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+                    legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamProviderName,
+                        false,
+                        true,
+                        StreamPubSubType.ImplicitOnly);
+                    legacy.ClientConfiguration.AddSimpleMessageStreamProvider(StreamProviderName,
+                        false,
+                        true,
+                        StreamPubSubType.ImplicitOnly);
+                });
             }
         }
 

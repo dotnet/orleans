@@ -1,4 +1,4 @@
-﻿using Orleans;
+using Orleans;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -9,6 +9,7 @@ using Amazon.DynamoDBv2;
 using Microsoft.Extensions.Logging;
 using Orleans.Reminders.DynamoDB;
 using Microsoft.Extensions.Options;
+using Orleans.Hosting;
 
 namespace OrleansAWSUtils.Reminders
 {
@@ -33,6 +34,7 @@ namespace OrleansAWSUtils.Reminders
         private const string TABLE_NAME_DEFAULT_VALUE = "OrleansReminders";
         private ILogger logger;
         private readonly ILoggerFactory loggerFactory;
+        private readonly StorageOptions storageOptions;
         private DynamoDBStorage storage;
         private readonly Guid serviceId;
 
@@ -41,12 +43,13 @@ namespace OrleansAWSUtils.Reminders
         /// </summary>
         /// <param name="grainReferenceConverter">The grain factory.</param>
         /// <param name="loggerFactory">logger factory to use</param>
-        public DynamoDBReminderTable(IGrainReferenceConverter grainReferenceConverter, ILoggerFactory loggerFactory, IOptions<SiloOptions> siloOptions)
+        public DynamoDBReminderTable(IGrainReferenceConverter grainReferenceConverter, ILoggerFactory loggerFactory, IOptions<SiloOptions> siloOptions, IOptions<StorageOptions> storageOptions)
         {
             this.grainReferenceConverter = grainReferenceConverter;
             this.logger = loggerFactory.CreateLogger<DynamoDBReminderTable>();
             this.loggerFactory = loggerFactory;
             this.serviceId = siloOptions.Value.ServiceId;
+            this.storageOptions = storageOptions.Value;
         }
 
         /// <summary>
@@ -54,10 +57,10 @@ namespace OrleansAWSUtils.Reminders
         /// </summary>
         /// <param name="config"> Global configuration to initialize with </param>
         /// <returns></returns>
-        public Task Init(GlobalConfiguration config)
+        public Task Init()
         {
-            storage = new DynamoDBStorage(config.DataConnectionStringForReminders, loggerFactory);
-            logger.Info(ErrorCode.ReminderServiceBase, "Initializing AWS DynamoDB Reminders Table");
+            this.storage = new DynamoDBStorage(this.storageOptions.DataConnectionStringForReminders, this.loggerFactory);
+            this.logger.Info(ErrorCode.ReminderServiceBase, "Initializing AWS DynamoDB Reminders Table");
 
             var secondaryIndex = new GlobalSecondaryIndex
             {
@@ -70,7 +73,7 @@ namespace OrleansAWSUtils.Reminders
                 }
             };
 
-            return storage.InitializeTable(TABLE_NAME_DEFAULT_VALUE,
+            return this.storage.InitializeTable(TABLE_NAME_DEFAULT_VALUE,
                 new List<KeySchemaElement>
                 {
                     new KeySchemaElement { AttributeName = REMINDER_ID_PROPERTY_NAME, KeyType = KeyType.HASH },
@@ -94,7 +97,7 @@ namespace OrleansAWSUtils.Reminders
         /// <returns> Return the RemiderTableData if the rows were read successfully </returns>
         public async Task<ReminderEntry> ReadRow(GrainReference grainRef, string reminderName)
         {
-            var reminderId = ConstructReminderId(serviceId, grainRef, reminderName);
+            var reminderId = ConstructReminderId(this.serviceId, grainRef, reminderName);
 
             var keys = new Dictionary<string, AttributeValue>
                 {
@@ -104,11 +107,11 @@ namespace OrleansAWSUtils.Reminders
 
             try
             {
-                return await storage.ReadSingleEntryAsync(TABLE_NAME_DEFAULT_VALUE, keys, Resolve).ConfigureAwait(false);
+                return await this.storage.ReadSingleEntryAsync(TABLE_NAME_DEFAULT_VALUE, keys, this.Resolve).ConfigureAwait(false);
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.ReminderServiceBase,
+                this.logger.Warn(ErrorCode.ReminderServiceBase,
                     $"Intermediate error reading reminder entry {Utils.DictionaryToString(keys)} from table {TABLE_NAME_DEFAULT_VALUE}.", exc);
                 throw;
             }
@@ -123,20 +126,20 @@ namespace OrleansAWSUtils.Reminders
         {
             var expressionValues = new Dictionary<string, AttributeValue>
                 {
-                    { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(serviceId.ToString()) },
+                    { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(this.serviceId.ToString()) },
                     { $":{GRAIN_REFERENCE_PROPERTY_NAME}", new AttributeValue(grainRef.ToKeyString()) }
                 };
 
             try
             {
                 var expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME} AND {GRAIN_REFERENCE_PROPERTY_NAME} = :{GRAIN_REFERENCE_PROPERTY_NAME}";
-                var records = await storage.ScanAsync(TABLE_NAME_DEFAULT_VALUE, expressionValues, expression, Resolve).ConfigureAwait(false);
+                var records = await this.storage.ScanAsync(TABLE_NAME_DEFAULT_VALUE, expressionValues, expression, this.Resolve).ConfigureAwait(false);
 
                 return new ReminderTableData(records);
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.ReminderServiceBase,
+                this.logger.Warn(ErrorCode.ReminderServiceBase,
                     $"Intermediate error reading reminder entry {Utils.DictionaryToString(expressionValues)} from table {TABLE_NAME_DEFAULT_VALUE}.", exc);
                 throw;
             }
@@ -152,7 +155,7 @@ namespace OrleansAWSUtils.Reminders
         {
             var expressionValues = new Dictionary<string, AttributeValue>
                 {
-                    { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(serviceId.ToString()) },
+                    { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(this.serviceId.ToString()) },
                     { $":Begin{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = beginHash.ToString() } },
                     { $":End{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = endHash.ToString() } }
                 };
@@ -169,13 +172,13 @@ namespace OrleansAWSUtils.Reminders
                     expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME} AND ({GRAIN_HASH_PROPERTY_NAME} > :Begin{GRAIN_HASH_PROPERTY_NAME} OR {GRAIN_HASH_PROPERTY_NAME} <= :End{GRAIN_HASH_PROPERTY_NAME})";
                 }
 
-                var records = await storage.ScanAsync(TABLE_NAME_DEFAULT_VALUE, expressionValues, expression, Resolve).ConfigureAwait(false);
+                var records = await this.storage.ScanAsync(TABLE_NAME_DEFAULT_VALUE, expressionValues, expression, this.Resolve).ConfigureAwait(false);
 
                 return new ReminderTableData(records);
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.ReminderServiceBase,
+                this.logger.Warn(ErrorCode.ReminderServiceBase,
                     $"Intermediate error reading reminder entry {Utils.DictionaryToString(expressionValues)} from table {TABLE_NAME_DEFAULT_VALUE}.", exc);
                 throw;
             }
@@ -202,7 +205,7 @@ namespace OrleansAWSUtils.Reminders
         /// <returns> Return true if the row was removed </returns>
         public async Task<bool> RemoveRow(GrainReference grainRef, string reminderName, string eTag)
         {
-            var reminderId = ConstructReminderId(serviceId, grainRef, reminderName);
+            var reminderId = ConstructReminderId(this.serviceId, grainRef, reminderName);
 
             var keys = new Dictionary<string, AttributeValue>
                 {
@@ -215,7 +218,7 @@ namespace OrleansAWSUtils.Reminders
                 var conditionalValues = new Dictionary<string, AttributeValue> { { CURRENT_ETAG_ALIAS, new AttributeValue { N = eTag } } };
                 var expression = $"{ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}";
 
-                await storage.DeleteEntryAsync(TABLE_NAME_DEFAULT_VALUE, keys, expression, conditionalValues).ConfigureAwait(false);
+                await this.storage.DeleteEntryAsync(TABLE_NAME_DEFAULT_VALUE, keys, expression, conditionalValues).ConfigureAwait(false);
                 return true;
             }
             catch (ConditionalCheckFailedException)
@@ -232,13 +235,13 @@ namespace OrleansAWSUtils.Reminders
         {
             var expressionValues = new Dictionary<string, AttributeValue>
                 {
-                    { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(serviceId.ToString()) }
+                    { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(this.serviceId.ToString()) }
                 };
 
             try
             {
                 var expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME}";
-                var records = await storage.ScanAsync(TABLE_NAME_DEFAULT_VALUE, expressionValues, expression,
+                var records = await this.storage.ScanAsync(TABLE_NAME_DEFAULT_VALUE, expressionValues, expression,
                     item => new Dictionary<string, AttributeValue>
                     {
                         { REMINDER_ID_PROPERTY_NAME, item[REMINDER_ID_PROPERTY_NAME] },
@@ -247,21 +250,21 @@ namespace OrleansAWSUtils.Reminders
 
                 if (records.Count <= 25)
                 {
-                    await storage.DeleteEntriesAsync(TABLE_NAME_DEFAULT_VALUE, records);
+                    await this.storage.DeleteEntriesAsync(TABLE_NAME_DEFAULT_VALUE, records);
                 }
                 else
                 {
                     List<Task> tasks = new List<Task>();
                     foreach (var batch in records.BatchIEnumerable(25))
                     {
-                        tasks.Add(storage.DeleteEntriesAsync(TABLE_NAME_DEFAULT_VALUE, batch));
+                        tasks.Add(this.storage.DeleteEntriesAsync(TABLE_NAME_DEFAULT_VALUE, batch));
                     }
                     await Task.WhenAll(tasks);
                 }
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.ReminderServiceBase,
+                this.logger.Warn(ErrorCode.ReminderServiceBase,
                     $"Intermediate error removing reminder entries {Utils.DictionaryToString(expressionValues)} from table {TABLE_NAME_DEFAULT_VALUE}.", exc);
                 throw;
             }
@@ -274,32 +277,32 @@ namespace OrleansAWSUtils.Reminders
         /// <returns> Return the entry ETag if entry was upsert successfully </returns>
         public async Task<string> UpsertRow(ReminderEntry entry)
         {
-            var reminderId = ConstructReminderId(serviceId, entry.GrainRef, entry.ReminderName);
+            var reminderId = ConstructReminderId(this.serviceId, entry.GrainRef, entry.ReminderName);
 
             var fields = new Dictionary<string, AttributeValue>
                 {
                     { REMINDER_ID_PROPERTY_NAME, new AttributeValue(reminderId) },
                     { GRAIN_HASH_PROPERTY_NAME, new AttributeValue { N = entry.GrainRef.GetUniformHashCode().ToString() } },
-                    { SERVICE_ID_PROPERTY_NAME, new AttributeValue(serviceId.ToString()) },
+                    { SERVICE_ID_PROPERTY_NAME, new AttributeValue(this.serviceId.ToString()) },
                     { GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue( entry.GrainRef.ToKeyString()) },
                     { PERIOD_PROPERTY_NAME, new AttributeValue(entry.Period.ToString()) },
                     { START_TIME_PROPERTY_NAME, new AttributeValue(entry.StartAt.ToString()) },
                     { REMINDER_NAME_PROPERTY_NAME, new AttributeValue(entry.ReminderName) },
-                    { ETAG_PROPERTY_NAME, new AttributeValue { N = random.Next(int.MaxValue).ToString() } }
+                    { ETAG_PROPERTY_NAME, new AttributeValue { N = this.random.Next(int.MaxValue).ToString() } }
                 };
 
             try
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("UpsertRow entry = {0}, etag = {1}", entry.ToString(), entry.ETag);
+                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("UpsertRow entry = {0}, etag = {1}", entry.ToString(), entry.ETag);
 
-                await storage.PutEntryAsync(TABLE_NAME_DEFAULT_VALUE, fields);
+                await this.storage.PutEntryAsync(TABLE_NAME_DEFAULT_VALUE, fields);
                 
                 entry.ETag = fields[ETAG_PROPERTY_NAME].N;
                 return entry.ETag;
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.ReminderServiceBase,
+                this.logger.Warn(ErrorCode.ReminderServiceBase,
                     $"Intermediate error updating entry {entry.ToString()} to the table {TABLE_NAME_DEFAULT_VALUE}.", exc);
                 throw;
             }

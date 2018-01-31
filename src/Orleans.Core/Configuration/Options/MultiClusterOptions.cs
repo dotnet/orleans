@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace Orleans.Hosting
@@ -8,6 +8,15 @@ namespace Orleans.Hosting
     /// </summary>
     public class MultiClusterOptions
     {
+        public static class BuiltIn
+        {
+            /// <summary>Default value to allow discrimination of override values.</summary>
+            public const string NotSpecified = "NotSpecified";
+
+            /// <summary>An Azure Table serving as a channel. </summary>
+            public const string AzureTable = "AzureTable";
+        }
+
         /// <summary>
         /// Whether this cluster is configured to be part of a multi-cluster network
         /// </summary>
@@ -42,6 +51,9 @@ namespace Orleans.Hosting
         /// <summary>
         /// The time between the slow retries for DOUBTFUL activations.
         /// </summary>
-        public TimeSpan GlobalSingleInstanceRetryInterval { get; set; } = TimeSpan.FromSeconds(30);
+        public TimeSpan GlobalSingleInstanceRetryInterval { get; set; } = DEFAULT_GLOBAL_SINGLE_INSTANCE_RETRY_INTERVAL;
+        public static readonly TimeSpan DEFAULT_GLOBAL_SINGLE_INSTANCE_RETRY_INTERVAL = TimeSpan.FromSeconds(30);
+
+        public Dictionary<string, string> GossipChannels { get; set; } = new Dictionary<string, string>();
     }
 }

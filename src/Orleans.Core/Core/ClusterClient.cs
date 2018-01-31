@@ -1,10 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
+using System.Linq;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
-using Microsoft.Extensions.Logging;
 
 namespace Orleans
 {
@@ -14,6 +17,7 @@ namespace Orleans
     internal class ClusterClient : IInternalClusterClient
     {
         private readonly OutsideRuntimeClient runtimeClient;
+        private readonly ClusterClientLifecycle clusterClientLifecycle;
         private readonly AsyncLock initLock = new AsyncLock();
         private LifecycleState state = LifecycleState.Created;
 
@@ -37,8 +41,26 @@ namespace Orleans
         {
             this.Configuration = configuration;
             this.runtimeClient = runtimeClient;
+            this.clusterClientLifecycle = new ClusterClientLifecycle(loggerFactory);
+
             //set PropagateActivityId flag from node cofnig
             RequestContext.PropagateActivityId = configuration.PropagateActivityId;
+
+            // register all lifecycle participants
+            IEnumerable<ILifecycleParticipant<IClusterClientLifecycle>> lifecycleParticipants = this.ServiceProvider.GetServices<ILifecycleParticipant<IClusterClientLifecycle>>();
+            foreach (ILifecycleParticipant<IClusterClientLifecycle> participant in lifecycleParticipants)
+            {
+                participant?.Participate(clusterClientLifecycle);
+            }
+
+            // register all named lifecycle participants
+            IKeyedServiceCollection<string, ILifecycleParticipant<IClusterClientLifecycle>> namedLifecycleParticipantCollections = this.ServiceProvider.GetService<IKeyedServiceCollection<string, ILifecycleParticipant<IClusterClientLifecycle>>>();
+            foreach (ILifecycleParticipant<IClusterClientLifecycle> participant in namedLifecycleParticipantCollections
+                ?.GetServices(this.ServiceProvider)
+                ?.Select(s => s?.GetService(this.ServiceProvider)))
+            {
+                participant?.Participate(clusterClientLifecycle);
+            }
         }
 
         /// <inheritdoc />
@@ -73,13 +95,6 @@ namespace Orleans
                                     this.state == LifecycleState.Disposing;
 
         /// <inheritdoc />
-        public IEnumerable<IStreamProvider> GetStreamProviders()
-        {
-            this.ThrowIfDisposedOrNotInitialized();
-            return this.runtimeClient.CurrentStreamProviderManager.GetStreamProviders();
-        }
-
-        /// <inheritdoc />
         public IStreamProvider GetStreamProvider(string name)
         {
             this.ThrowIfDisposedOrNotInitialized();
@@ -88,9 +103,9 @@ namespace Orleans
                 throw new ArgumentNullException(nameof(name));
             }
 
-            return this.runtimeClient.CurrentStreamProviderManager.GetProvider(name) as IStreamProvider;
+            return this.runtimeClient.ServiceProvider.GetRequiredServiceByName<IStreamProvider>(name);
         }
-        
+
         /// <inheritdoc />
         public async Task Connect()
         {
@@ -105,6 +120,7 @@ namespace Orleans
                 
                 this.state = LifecycleState.Starting;
                 await this.runtimeClient.Start().ConfigureAwait(false);
+                await this.clusterClientLifecycle.OnStart();
                 this.state = LifecycleState.Started;
             }
         }
@@ -127,6 +143,14 @@ namespace Orleans
                 try
                 {
                     this.state = LifecycleState.Disposing;
+                    CancellationToken canceled = CancellationToken.None;
+                    if (!gracefully)
+                    {
+                        var cts = new CancellationTokenSource();
+                        cts.Cancel();
+                        canceled = cts.Token;
+                    }
+                    await this.clusterClientLifecycle.OnStop(canceled);
                     if (gracefully)
                     {
                         Utils.SafeExecute(() => this.runtimeClient.Disconnect());
@@ -252,7 +276,7 @@ namespace Orleans
         private void ThrowIfDisposedOrNotInitialized()
         {
             this.ThrowIfDisposed();
-            if (!this.IsInitialized) throw new InvalidOperationException("Client is not initialized.");
+            if (!this.IsInitialized) throw new InvalidOperationException($"Client is not initialized. Current client state is {this.state}.");
         }
 
         private void ThrowIfDisposedOrAlreadyInitialized()

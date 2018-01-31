@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
@@ -20,6 +20,11 @@ namespace UnitTests.Grains
 
     [TestPlacementStrategy(CustomPlacementScenario.ExcludeOne)]
     public class CustomPlacement_ExcludeOneGrain : CustomPlacementBaseGrain
+    {
+    }
+
+    [TestPlacementStrategy(CustomPlacementScenario.RequestContextBased)]
+    public class CustomPlacement_RequestContextBased : CustomPlacementBaseGrain
     {
     }
 }

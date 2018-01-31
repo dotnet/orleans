@@ -3,9 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;
 using Orleans.Providers;
-using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Storage;
 using Orleans.Storage;
 using TestExtensions;
 using UnitTests.StorageTests.Relational;
@@ -26,17 +24,11 @@ namespace AWSUtils.Tests.StorageTests
             if (!AWSTestConstants.IsDynamoDbAvailable)
                 throw new SkipException("Unable to connect to DynamoDB simulator");
 
-            DefaultProviderRuntime = new StorageProviderManager(
-                fixture.GrainFactory,
-                fixture.Services,
-                new ClientProviderRuntime(fixture.InternalGrainFactory, fixture.Services, NullLoggerFactory.Instance),
-                new LoadedProviderTypeLoaders(new NullLogger<LoadedProviderTypeLoaders>()),
-                NullLoggerFactory.Instance);
-            ((StorageProviderManager) DefaultProviderRuntime).LoadEmptyStorageProviders().WaitWithThrow(TestConstants.InitTimeout);
+            DefaultProviderRuntime = new ClientProviderRuntime(fixture.InternalGrainFactory, fixture.Services, NullLoggerFactory.Instance);
 
             var properties = new Dictionary<string, string>();
             properties["DataConnectionString"] = $"Service={AWSTestConstants.Service}";
-            var config = new ProviderConfiguration(properties, null);
+            var config = new ProviderConfiguration(properties);
             var provider = new DynamoDBStorageProvider();
             provider.Init("DynamoDBStorageProviderTests", DefaultProviderRuntime, config).Wait();
             PersistenceStorageTests = new CommonStorageTests(fixture.InternalGrainFactory, provider);

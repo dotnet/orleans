@@ -1,32 +1,44 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Providers;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.Hosting;
 using Microsoft.Extensions.Options;
+using Orleans.Statistics;
 
 namespace Orleans.Runtime
 {
     internal class ClientStatisticsManager : IDisposable
     {
         private readonly ClientConfiguration config;
-        private readonly StatisticsOptions statisticsOptions;
+        private readonly ClientStatisticsOptions statisticsOptions;
         private readonly IServiceProvider serviceProvider;
+        private readonly IHostEnvironmentStatistics hostEnvironmentStatistics;
+        private readonly IAppEnvironmentStatistics appEnvironmentStatistics;
         private readonly ClusterClientOptions clusterClientOptions;
         private ClientTableStatistics tableStatistics;
         private LogStatistics logStatistics;
-        private RuntimeStatisticsGroup runtimeStats;
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
-        public ClientStatisticsManager(ClientConfiguration config, SerializationManager serializationManager, IServiceProvider serviceProvider, ILoggerFactory loggerFactory, IOptions<StatisticsOptions> statisticsOptions, IOptions<ClusterClientOptions> clusterClientOptions)
+
+        public ClientStatisticsManager(
+            ClientConfiguration config, 
+            SerializationManager serializationManager, 
+            IServiceProvider serviceProvider,
+            IHostEnvironmentStatistics hostEnvironmentStatistics,
+            IAppEnvironmentStatistics appEnvironmentStatistics,
+            ILoggerFactory loggerFactory, 
+            IOptions<ClientStatisticsOptions> statisticsOptions, 
+            IOptions<ClusterClientOptions> clusterClientOptions)
         {
             this.config = config;
             this.statisticsOptions = statisticsOptions.Value;
             this.serviceProvider = serviceProvider;
+            this.hostEnvironmentStatistics = hostEnvironmentStatistics;
+            this.appEnvironmentStatistics = appEnvironmentStatistics;
             this.clusterClientOptions = clusterClientOptions.Value;
-            runtimeStats = new RuntimeStatisticsGroup(loggerFactory);
             logStatistics = new LogStatistics(this.statisticsOptions.LogWriteInterval, false, serializationManager, loggerFactory);
             logger = loggerFactory.CreateLogger<ClientStatisticsManager>();
             this.loggerFactory = loggerFactory;
@@ -35,30 +47,18 @@ namespace Orleans.Runtime
             ApplicationRequestsStatisticsGroup.Init(config.ResponseTimeout);
         }
 
-        internal async Task Start(StatisticsProviderManager statsManager, IMessageCenter transport, GrainId clientId)
+        internal async Task Start(IMessageCenter transport, GrainId clientId)
         {
-            runtimeStats.Start();
-
-            // Configure Metrics
-            IProvider statsProvider = null;
-            if (!string.IsNullOrEmpty(statisticsOptions.ProviderName))
+            IClientMetricsDataPublisher metricsDataPublisher = this.serviceProvider.GetService<IClientMetricsDataPublisher>();
+            if (metricsDataPublisher != null)
             {
-                var extType = statisticsOptions.ProviderName;
-                statsProvider = statsManager.GetProvider(extType);
-                var metricsDataPublisher = statsProvider as IClientMetricsDataPublisher;
-                if (metricsDataPublisher == null)
-                {
-                    var msg = String.Format("Trying to create {0} as a metrics publisher, but the provider is not configured."
-                        , extType);
-                    throw new ArgumentException(msg, "ProviderType (configuration)");
-                }
                 var configurableMetricsDataPublisher = metricsDataPublisher as IConfigurableClientMetricsDataPublisher;
                 if (configurableMetricsDataPublisher != null)
                 {
                     configurableMetricsDataPublisher.AddConfiguration(
                         this.clusterClientOptions.ClusterId, config.DNSHostName, clientId.ToString(), transport.MyAddress.Endpoint.Address);
                 }
-                tableStatistics = new ClientTableStatistics(transport, metricsDataPublisher, runtimeStats, this.loggerFactory)
+                tableStatistics = new ClientTableStatistics(transport, metricsDataPublisher, this.hostEnvironmentStatistics, this.appEnvironmentStatistics, this.loggerFactory)
                 {
                     MetricsTableWriteInterval = statisticsOptions.MetricsTableWriteInterval
                 };
@@ -68,7 +68,7 @@ namespace Orleans.Runtime
                 // Hook up to publish client metrics to Azure storage table
                 var publisher = AssemblyLoader.LoadAndCreateInstance<IClientMetricsDataPublisher>(Constants.ORLEANS_STATISTICS_AZURESTORAGE, logger, this.serviceProvider);
                 await publisher.Init(config, transport.MyAddress.Endpoint.Address, clientId.ToParsableString());
-                tableStatistics = new ClientTableStatistics(transport, publisher, runtimeStats, this.loggerFactory)
+                tableStatistics = new ClientTableStatistics(transport, publisher, this.hostEnvironmentStatistics, this.appEnvironmentStatistics, this.loggerFactory)
                 {
                     MetricsTableWriteInterval = statisticsOptions.MetricsTableWriteInterval
                 };
@@ -77,9 +77,10 @@ namespace Orleans.Runtime
             // Configure Statistics
             if (statisticsOptions.WriteLogStatisticsToTable)
             {
+                IStatisticsPublisher statsProvider = this.serviceProvider.GetService<IStatisticsPublisher>();
                 if (statsProvider != null)
                 {
-                    logStatistics.StatsTablePublisher = statsProvider as IStatisticsPublisher;
+                    logStatistics.StatsTablePublisher = statsProvider;
                     // Note: Provider has already been Init-ialized above.
                 }
                 else if (config.UseAzureSystemStore)
@@ -95,9 +96,6 @@ namespace Orleans.Runtime
 
         internal void Stop()
         {
-            runtimeStats?.Stop();
-            runtimeStats = null;
-
             if (logStatistics != null)
             {
                 logStatistics.Stop();
@@ -112,9 +110,6 @@ namespace Orleans.Runtime
 
         public void Dispose()
         {
-            if (runtimeStats != null)
-                runtimeStats.Dispose();
-            runtimeStats = null;
             if (logStatistics != null)
                 logStatistics.Dispose();
             logStatistics = null;

@@ -1,5 +1,7 @@
-﻿using Orleans.Runtime;
+using Orleans.Runtime;
 using System;
+using System.Collections.Generic;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Hosting
 {
@@ -33,5 +35,64 @@ namespace Orleans.Hosting
         ///  This is the period of time a gateway will wait before dropping a disconnected client.
         /// </summary>
         public TimeSpan ClientDropTimeout { get; set; } = Constants.DEFAULT_CLIENT_DROP_TIMEOUT;
+
+        public TimeSpan ClientRegistrationRefresh { get; set; } = DEFAULT_CLIENT_REGISTRATION_REFRESH;
+        public static readonly TimeSpan DEFAULT_CLIENT_REGISTRATION_REFRESH = TimeSpan.FromMinutes(5);
+
+        public int MaxEnqueuedRequestsSoftLimit { get; set; } = DEFAULT_MAX_ENQUEUED_REQUESTS_SOFT_LIMIT;
+        public const int DEFAULT_MAX_ENQUEUED_REQUESTS_SOFT_LIMIT = 0;
+
+        public int MaxEnqueuedRequestsHardLimit { get; set; } = DEFAULT_MAX_ENQUEUED_REQUESTS_HARD_LIMIT;
+        public const int DEFAULT_MAX_ENQUEUED_REQUESTS_HARD_LIMIT = 0;
+
+        public int MaxEnqueuedRequestsSoftLimit_StatelessWorker { get; set; } = DEFAULT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER_SOFT_LIMIT;
+        public const int DEFAULT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER_SOFT_LIMIT = 0;
+
+        public int MaxEnqueuedRequestsHardLimit_StatelessWorker { get; set; } = DEFAULT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER_HARD_LIMIT;
+        public const int DEFAULT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER_HARD_LIMIT = 0;
+
+        /// <summary>
+        /// Specifies the maximum time that a request can take before the activation is reported as "blocked"
+        /// </summary>
+        public TimeSpan MaxRequestProcessingTime { get; set; } = DEFAULT_MAX_REQUEST_PROCESSING_TIME;
+        public static readonly TimeSpan DEFAULT_MAX_REQUEST_PROCESSING_TIME = GrainCollectionOptions.DEFAULT_COLLECTION_AGE_LIMIT;
+
+        /// <summary>
+        /// For test only - Do not use in production
+        /// </summary>
+        public bool AssumeHomogenousSilosForTesting { get; set; } = false;
     }
+
+    public class SiloMessageingOptionFormatter : IOptionFormatter<SiloMessagingOptions>
+    {
+        public string Category { get; }
+
+        public string Name => nameof(SiloMessagingOptions);
+
+        private SiloMessagingOptions options;
+        public SiloMessageingOptionFormatter(IOptions<SiloMessagingOptions> messageOptions)
+        {
+            options = messageOptions.Value;
+        }
+
+        public IEnumerable<string> Format()
+        {
+            return new List<string>()
+            {
+                OptionFormattingUtilities.Format(nameof(options.SiloSenderQueues), options.SiloSenderQueues),
+                OptionFormattingUtilities.Format(nameof(options.GatewaySenderQueues), options.GatewaySenderQueues),
+                OptionFormattingUtilities.Format(nameof(options.MaxForwardCount), options.MaxForwardCount),
+                OptionFormattingUtilities.Format(nameof(options.ClientDropTimeout), options.ClientDropTimeout),
+
+                OptionFormattingUtilities.Format(nameof(options.ResponseTimeout), options.ResponseTimeout),
+                OptionFormattingUtilities.Format(nameof(options.MaxResendCount), options.MaxResendCount),
+                OptionFormattingUtilities.Format(nameof(options.ResendOnTimeout), options.ResendOnTimeout),
+                OptionFormattingUtilities.Format(nameof(options.DropExpiredMessages), options.DropExpiredMessages),
+                OptionFormattingUtilities.Format(nameof(options.BufferPoolBufferSize), options.BufferPoolBufferSize),
+                OptionFormattingUtilities.Format(nameof(options.BufferPoolMaxSize), options.BufferPoolMaxSize),
+                OptionFormattingUtilities.Format(nameof(options.BufferPoolPreallocationSize), options.BufferPoolPreallocationSize)
+            };
+        }
+    }
+
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;
@@ -20,7 +19,6 @@ using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Hosting;
-using Orleans.Configuration;
 using System.Threading;
 
 namespace Orleans.Runtime
@@ -57,7 +55,6 @@ namespace Orleans.Runtime
 
         public InsideRuntimeClient(
             ILocalSiloDetails siloDetails,
-            ClusterConfiguration config,
             GrainTypeManager typeManager,
             TypeMetadataCache typeMetadataCache,
             OrleansTaskScheduler scheduler,
@@ -75,8 +72,8 @@ namespace Orleans.Runtime
             MySilo = siloDetails.SiloAddress;
             disposables = new List<IDisposable>();
             callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
-            Config = config;
-            config.OnConfigChange("Globals/Message", () => ResponseTimeout = Config.Globals.ResponseTimeout);
+            this.ResponseTimeout = messagingOptions.Value.ResponseTimeout;
+//            config.OnConfigChange("Globals/Message", () => ResponseTimeout = Config.Globals.ResponseTimeout);
             this.typeManager = typeManager;
             this.messageFactory = messageFactory;
             this.transactionAgent = new Lazy<ITransactionAgent>(() => transactionAgent());
@@ -99,8 +96,6 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public ClientInvokeCallback ClientInvokeCallback { get; set; }
 
-        public IStreamProviderManager CurrentStreamProviderManager { get; internal set; }
-
         public IStreamProviderRuntime CurrentStreamProviderRuntime { get; internal set; }
 
         public OrleansTaskScheduler Scheduler { get; }
@@ -108,8 +103,6 @@ namespace Orleans.Runtime
         public IInternalGrainFactory InternalGrainFactory => this.ConcreteGrainFactory;
 
         private SiloAddress MySilo { get; }
-
-        private ClusterConfiguration Config { get; }
 
         public GrainFactory ConcreteGrainFactory { get; }
 
@@ -211,7 +204,7 @@ namespace Orleans.Runtime
             if (context == null && !oneWay)
                 logger.Warn(ErrorCode.IGC_SendRequest_NullContext, "Null context {0}: {1}", message, Utils.GetStackTrace());
 
-            if (message.IsExpirableMessage(Config.Globals.DropExpiredMessages))
+            if (message.IsExpirableMessage(this.messagingOptions.DropExpiredMessages))
                 message.TimeToLive = ResponseTimeout;
 
             if (!oneWay)
@@ -732,8 +725,7 @@ namespace Orleans.Runtime
             return Task.CompletedTask;
         }
 
-        public IGrainTypeResolver GrainTypeResolver => typeManager.ClusterGrainInterfaceMap;
-
+        public IGrainTypeResolver GrainTypeResolver => typeManager.GrainTypeResolver;
 
         public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)
         {

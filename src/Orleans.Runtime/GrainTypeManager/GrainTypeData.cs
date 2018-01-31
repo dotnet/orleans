@@ -90,14 +90,6 @@ namespace Orleans.Runtime
         {
             PlacementStrategy placement;
 
-            if (GetPlacementStrategy<StatelessWorkerAttribute>(
-                grainClass,
-                attr => new StatelessWorkerPlacement(attr.MaxLocalWorkers),
-                out placement))
-            {
-                return placement;
-            }
-
             if (GetPlacementStrategy<PlacementAttribute>(
                 grainClass,
                 a => a.PlacementStrategy,

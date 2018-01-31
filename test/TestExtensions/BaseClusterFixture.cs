@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -10,8 +10,8 @@ namespace TestExtensions
 {
     public abstract class BaseTestClusterFixture : IDisposable
     {
-        private ExceptionDispatchInfo preconditionsException;
-        private ILogger appLogger;
+        private readonly ExceptionDispatchInfo preconditionsException;
+
         static BaseTestClusterFixture()
         {
             TestDefaultConfiguration.InitializeDefaults();
@@ -25,28 +25,34 @@ namespace TestExtensions
             }
             catch (Exception ex)
             {
-                preconditionsException = ExceptionDispatchInfo.Capture(ex);
+                this.preconditionsException = ExceptionDispatchInfo.Capture(ex);
                 return;
             }
 
-            var testCluster = CreateTestCluster();
+            var builder = new TestClusterBuilder();
+            TestDefaultConfiguration.ConfigureTestCluster(builder);
+            builder.ConfigureLegacyConfiguration();
+            ConfigureTestCluster(builder);
+
+            var testCluster = builder.Build();
             if (testCluster?.Primary == null)
             {
                 testCluster?.Deploy();
             }
             this.HostedCluster = testCluster;
-            this.appLogger = this.Client?.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
+            this.Logger = this.Client?.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
         }
 
         public void EnsurePreconditionsMet()
         {
-            preconditionsException?.Throw();
+            this.preconditionsException?.Throw();
         }
 
         protected virtual void CheckPreconditionsOrThrow() { }
 
-
-        protected abstract TestCluster CreateTestCluster();
+        protected virtual void ConfigureTestCluster(TestClusterBuilder builder)
+        {
+        }
 
         public TestCluster HostedCluster { get; }
 
@@ -54,9 +60,8 @@ namespace TestExtensions
 
         public IClusterClient Client => this.HostedCluster?.Client;
 
-        public ILogger Logger => this.appLogger;
-           
-
+        public ILogger Logger { get; }
+        
         public virtual void Dispose()
         {
             this.HostedCluster?.StopAllSilos();

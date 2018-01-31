@@ -1,29 +1,46 @@
-﻿
+
+using System.Xml;
+
 namespace Orleans.Runtime
 {
     /// <summary>
     /// Stages of a silo's lifecycle.
     /// </summary>
-    public enum SiloLifecycleStage
+    public static class SiloLifecycleStage
     {
+        /// <summary>
+        /// First ring in silo's lifecycle
+        /// </summary>
+        public const int First = int.MinValue;
+
         /// <summary>
         /// Initialize silo runtime
         /// </summary>
-        RuntimeInitialize = 1000,
+        public const int RuntimeInitialize = 1000;
 
         /// <summary>
         /// Start runtime services
         /// </summary>
-        RuntimeServices = 2000,
+        public const int RuntimeServices = 2000;
+
+        /// <summary>
+        /// Initialize runtime storage
+        /// </summary>
+        public const int RuntimeStorageServices = 3000;
+
+        /// <summary>
+        /// Start runtime services
+        /// </summary>
+        public const int RuntimeGrainServices = 4000;
 
         /// <summary>
         /// Start application layer services
         /// </summary>
-        ApplicationServices = 3000,
+        public const int ApplicationServices = 5000;
 
         /// <summary>
         /// Silo is active and available to service requests
         /// </summary>
-        SiloActive = 4000,
+        public const int SiloActive = 6000;
     }
 }

@@ -1,4 +1,4 @@
-﻿namespace Orleans.Runtime
+namespace Orleans.Runtime
 {
     /// <summary>
     /// Marker interface for all Telemetry Consumers

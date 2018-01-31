@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using System;
@@ -98,8 +98,15 @@ namespace Orleans.Configuration
             Action<OptionsBuilder<StaticGatewayListProviderOptions>> configureOptions)
         {
             configureOptions?.Invoke(services.AddOptions<StaticGatewayListProviderOptions>());
-            return services.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>();
+            return services.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>()
+                .TryConfigureFormatter<StaticGatewayListProviderOptions,StaticGatewayListProviderOptionsFormatter>();
         }
+
+        public static bool IsInCollection<T>(this IServiceCollection services)
+        {
+            return services.Any(s => s.ServiceType == typeof(T));
+        }
+
 
         private class GrainCallFilterWrapper : IGrainCallFilter
         {

@@ -12,17 +12,18 @@ namespace UnitTests.MembershipTests
 {
     public class SilosStopTests : TestClusterPerTest
     {
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            var options = new TestClusterOptions(2);
-            options.ClusterConfiguration.Globals.DefaultPlacementStrategy = "ActivationCountBasedPlacement";
-            options.ClusterConfiguration.Globals.NumMissedProbesLimit = 1;
-            options.ClusterConfiguration.Globals.NumVotesForDeathDeclaration = 1;
-            options.ClusterConfiguration.Globals.TypeMapRefreshInterval = TimeSpan.FromMilliseconds(100);
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.Globals.DefaultPlacementStrategy = "ActivationCountBasedPlacement";
+                legacy.ClusterConfiguration.Globals.NumMissedProbesLimit = 1;
+                legacy.ClusterConfiguration.Globals.NumVotesForDeathDeclaration = 1;
+                legacy.ClusterConfiguration.Globals.TypeMapRefreshInterval = TimeSpan.FromMilliseconds(100);
 
-            // use only Primary as the gateway
-            options.ClientConfiguration.Gateways = options.ClientConfiguration.Gateways.Take(1).ToList();
-            return new TestCluster(options);
+                // use only Primary as the gateway
+                legacy.ClientConfiguration.Gateways = legacy.ClientConfiguration.Gateways.Take(1).ToList();
+            });
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Liveness")]

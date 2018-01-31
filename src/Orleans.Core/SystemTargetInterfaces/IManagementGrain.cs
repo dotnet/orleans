@@ -102,47 +102,6 @@ namespace Orleans.Runtime
         Task<object[]> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg = null);
 
         /// <summary>
-        /// Update the configuration information dynamically. Only a subset of configuration information
-        /// can be updated - will throw an error (and make no config changes) if you specify attributes
-        /// or elements that cannot be changed. The configuration format is XML, in the same format
-        /// as the OrleansConfiguration.xml file. The allowed elements and attributes are:
-        /// <pre>
-        /// &lt;OrleansConfiguration&gt;
-        ///     &lt;Globals&gt;
-        ///         &lt;Messaging ResponseTimeout=&quot;?&quot;/&gt;
-        ///         &lt;Caching CacheSize=&quot;?&quot;/&gt;
-        ///         &lt;Activation CollectionInterval=&quot;?&quot; CollectionAmount=&quot;?&quot; CollectionTotalMemoryLimit=&quot;?&quot; CollectionActivationLimit=&quot;?&quot;/&gt;
-        ///         &lt;Liveness ProbeTimeout=&quot;?&quot; TableRefreshTimeout=&quot;?&quot; NumMissedProbesLimit=&quot;?&quot;/&gt;
-        ///     &lt;/Globals&gt;
-        ///     &lt;Defaults&gt;
-        ///         &lt;LoadShedding Enabled=&quot;?&quot; LoadLimit=&quot;?&quot;/&gt;
-        ///         &lt;Tracing DefaultTraceLevel=&quot;?&quot; PropagateActivityId=&quot;?&quot;&gt;
-        ///             &lt;TraceLevelOverride LogPrefix=&quot;?&quot; TraceLevel=&quot;?&quot;/&gt;
-        ///         &lt;/Tracing&gt;
-        ///     &lt;/Defaults&gt;
-        /// &lt;/OrleansConfiguration&gt;
-        /// </pre>
-        /// </summary>
-        /// <param name="hostIds">Silos to update, or null for all silos</param>
-        /// <param name="configuration">XML elements and attributes to update</param>
-        /// <param name="tracing">Tracing level settings</param>
-        /// <returns></returns>
-        Task UpdateConfiguration(SiloAddress[] hostIds, Dictionary<string, string> configuration, Dictionary<string, string> tracing);
-
-        /// <summary>
-        /// Update the stream providers dynamically. The stream providers in the listed silos will be 
-        /// updated based on the differences between its loaded stream providers and the list of providers 
-        /// in the streamProviderConfigurations: If a provider in the configuration object already exists 
-        /// in the silo, it will be kept as is; if a provider in the configuration object does not exist 
-        /// in the silo, it will be loaded and started; if a provider that exists in silo but is not in 
-        /// the configuration object, it will be stopped and removed from the silo. 
-        /// </summary>
-        /// <param name="hostIds">Silos to update, or null for all silos</param>
-        /// <param name="streamProviderConfigurations">stream provider configurations that carries target stream providers</param>
-        /// <returns></returns>
-        Task UpdateStreamProviders(SiloAddress[] hostIds, IDictionary<string, ProviderCategoryConfiguration> streamProviderConfigurations);
-
-        /// <summary>
         /// Returns an array of all the active grain types in the system
         /// </summary>
         /// <param name="hostsIds">List of silos this command is to be sent to.</param>

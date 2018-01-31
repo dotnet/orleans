@@ -19,14 +19,15 @@ namespace Tester.AzureUtils.Streaming
         private const string AQStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private const string StreamNamespace = "AQSubscriptionMultiplicityTestsNamespace";
         private readonly SubscriptionMultiplicityTestRunner runner;
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             TestUtils.CheckForAzureStorage();
-            var options = new TestClusterOptions(2);
-            options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-            options.ClusterConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
-            options.ClientConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
-            return new TestCluster(options);
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+                legacy.ClusterConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
+                legacy.ClientConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
+            });
         }
 
         public AQSubscriptionMultiplicityTests()

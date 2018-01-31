@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -25,13 +25,15 @@ namespace UnitTests.ActivationsLifeCycleTests
             this.output = output;
         }
 
-        private void Initialize(TestClusterOptions options = null)
+        private void Initialize(TestClusterBuilder builder = null)
         {
-            if (options == null)
+            if (builder == null)
             {
-                options = new TestClusterOptions(1);
+                builder = new TestClusterBuilder(1);
             }
-            testCluster = new TestCluster(options);
+
+            builder.ConfigureLegacyConfiguration();
+            testCluster = builder.Build();
             testCluster.Deploy();
         }
         
@@ -183,11 +185,14 @@ namespace UnitTests.ActivationsLifeCycleTests
 
         private async Task DeactivateOnIdle_NonExistentActivation_Runner(int forwardCount)
         {
-            var options = new TestClusterOptions(2);
-            options.ClusterConfiguration.Globals.MaxForwardCount = forwardCount;
-            // For this test we only want to talk to the primary
-            options.ClientConfiguration.Gateways.RemoveAt(1);
-            Initialize(options);
+            var builder = new TestClusterBuilder(2);
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.Globals.MaxForwardCount = forwardCount;
+                // For this test we only want to talk to the primary
+                legacy.ClientConfiguration.Gateways.RemoveAt(1);
+            });
+            Initialize(builder);
 
             ICollectionTestGrain grain = await PickGrainInNonPrimary();
 
@@ -251,11 +256,14 @@ namespace UnitTests.ActivationsLifeCycleTests
         public async Task MissingActivation_WithoutDirectoryLazyDeregistration_MultiSilo()
         {
             var directoryLazyDeregistrationDelay = TimeSpan.FromMilliseconds(-1);
-            var options = new TestClusterOptions(2);
-            // Disable retries in this case, to make test more predictable.
-            options.ClusterConfiguration.Globals.MaxForwardCount = 0;
-            options.ClientConfiguration.Gateways.RemoveAt(1);
-            Initialize(options);
+            var builder = new TestClusterBuilder(2);
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                // Disable retries in this case, to make test more predictable.
+                legacy.ClusterConfiguration.Globals.MaxForwardCount = 0;
+                legacy.ClientConfiguration.Gateways.RemoveAt(1);
+            });
+            Initialize(builder);
             for (int i = 0; i < 10; i++)
             {
                 await MissingActivation_Runner(i, directoryLazyDeregistrationDelay);
@@ -267,11 +275,15 @@ namespace UnitTests.ActivationsLifeCycleTests
         {
             var directoryLazyDeregistrationDelay = TimeSpan.FromMilliseconds(5000);
             var lazyDeregistrationDelay = TimeSpan.FromMilliseconds(5000);
-            var options = new TestClusterOptions(1);
-            options.ClusterConfiguration.Globals.DirectoryLazyDeregistrationDelay = directoryLazyDeregistrationDelay;
-            // Disable retries in this case, to make test more predictable.
-            options.ClusterConfiguration.Globals.MaxForwardCount = 0;
-            Initialize(options);
+            var builder = new TestClusterBuilder(1);
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.Globals.DirectoryLazyDeregistrationDelay = directoryLazyDeregistrationDelay;
+                // Disable retries in this case, to make test more predictable.
+                legacy.ClusterConfiguration.Globals.MaxForwardCount = 0;
+            });
+
+            Initialize(builder);
 
             for (int i = 0; i < 10; i++)
             {
@@ -283,11 +295,15 @@ namespace UnitTests.ActivationsLifeCycleTests
         public async Task MissingActivation_WithoutDirectoryLazyDeregistration_MultiSilo_SecondaryFirst()
         {
             var lazyDeregistrationDelay = TimeSpan.FromMilliseconds(-1);
-            var options = new TestClusterOptions(2);
-            // Disable retries in this case, to make test more predictable.
-            options.ClusterConfiguration.Globals.MaxForwardCount = 0;
-            options.ClientConfiguration.Gateways.RemoveAt(1);
-            Initialize(options);
+            var builder = new TestClusterBuilder(2);
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                // Disable retries in this case, to make test more predictable.
+                legacy.ClusterConfiguration.Globals.MaxForwardCount = 0;
+                legacy.ClientConfiguration.Gateways.RemoveAt(1);
+            });
+
+            Initialize(builder);
 
             await MissingActivation_Runner(1, lazyDeregistrationDelay, true);
         }

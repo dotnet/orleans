@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -8,6 +8,8 @@ using Orleans.Runtime;
 using Orleans.Concurrency;
 using Orleans.Runtime.Configuration;
 using DateTime = System.DateTime;
+using Orleans.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Transactions
 {
@@ -117,7 +119,7 @@ namespace Orleans.Transactions
 
         //metrics related
         private TransactionAgentMetrics metrics;
-        public TransactionAgent(ILocalSiloDetails siloDetails, ITransactionManagerService tmService, ILoggerFactory loggerFactory, ITelemetryProducer telemetryProducer, Factory<NodeConfiguration> getNodeConfig)
+        public TransactionAgent(ILocalSiloDetails siloDetails, ITransactionManagerService tmService, ILoggerFactory loggerFactory, ITelemetryProducer telemetryProducer, IOptions<SiloStatisticsOptions> statisticsOptions)
             : base(Constants.TransactionAgentSystemTargetId, siloDetails.SiloAddress, loggerFactory)
         {
             logger = loggerFactory.CreateLogger<TransactionAgent>();
@@ -132,7 +134,7 @@ namespace Orleans.Transactions
             transactionCommitQueue = new ConcurrentQueue<TransactionInfo>();
             commitCompletions = new ConcurrentDictionary<long, TaskCompletionSource<bool>>();
             outstandingCommits = new HashSet<long>();
-            this.metrics = new TransactionAgentMetrics(telemetryProducer, getNodeConfig().StatisticsMetricsTableWriteInterval);
+            this.metrics = new TransactionAgentMetrics(telemetryProducer, statisticsOptions.Value.MetricsTableWriteInterval);
         }
 
         #region ITransactionAgent

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
@@ -42,8 +42,10 @@ namespace Tester.AzureUtils.Deployment
 
         private async Task ValidateConfigurationAtStartup(string connectionString)
         {
-            var serviceRuntime = new TestServiceRuntimeWrapper();
-            serviceRuntime.DeploymentId = "foo";
+            var serviceRuntime = new TestServiceRuntimeWrapper
+            {
+                DeploymentId = "foo"
+            };
             serviceRuntime.Settings["DataConnectionString"] = connectionString;
             serviceRuntime.InstanceName = "name";
 
@@ -59,8 +61,10 @@ namespace Tester.AzureUtils.Deployment
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task ValidateConfiguration_InvalidConnectionString()
         {
-            var serviceRuntime = new TestServiceRuntimeWrapper();
-            serviceRuntime.DeploymentId = "bar";
+            var serviceRuntime = new TestServiceRuntimeWrapper
+            {
+                DeploymentId = "bar"
+            };
             serviceRuntime.Settings["DataConnectionString"] = "InvalidConnectionString";
             serviceRuntime.InstanceName = "name";
 
@@ -76,8 +80,10 @@ namespace Tester.AzureUtils.Deployment
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task ValidateConfiguration_IncorrectKey()
         {
-            var serviceRuntime = new TestServiceRuntimeWrapper();
-            serviceRuntime.DeploymentId = "bar";
+            var serviceRuntime = new TestServiceRuntimeWrapper
+            {
+                DeploymentId = "bar"
+            };
             serviceRuntime.Settings["DataConnectionString"] = "DefaultEndpointsProtocol=https;AccountName=orleanstest;AccountKey=IncorrectKey";
             serviceRuntime.InstanceName = "name";
 
@@ -104,7 +110,7 @@ namespace Tester.AzureUtils.Deployment
 
         public string GetConfigurationSettingValue(string configurationSettingName)
         {
-            return Settings[configurationSettingName];
+            return this.Settings[configurationSettingName];
         }
 
         public IPEndPoint GetIPEndpoint(string endpointName)

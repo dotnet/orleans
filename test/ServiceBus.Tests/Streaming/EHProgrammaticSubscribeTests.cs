@@ -1,18 +1,12 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.Runtime.Configuration;
 using Orleans.ServiceBus.Providers;
-using Orleans.ServiceBus.Providers.Testing;
 using Orleans.Storage;
 using Orleans.Streaming.EventHubs;
-using Orleans.Streams;
 using Orleans.TestingHost;
-using ServiceBus.Tests.TestStreamProviders;
 using Tester.StreamingTests;
 using Tester.TestStreamProviders;
 using TestExtensions;
@@ -47,11 +41,12 @@ namespace ServiceBus.Tests.Streaming
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(2);
-                AdjustClusterConfiguration(options.ClusterConfiguration);
-                return new TestCluster(options);
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    AdjustClusterConfiguration(legacy.ClusterConfiguration);
+                });
             }
 
             private static Dictionary<string, string> BuildProviderSettings(EventHubStreamProviderSettings providerSettings)

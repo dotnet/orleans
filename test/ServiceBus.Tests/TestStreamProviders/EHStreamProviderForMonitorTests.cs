@@ -1,4 +1,4 @@
-﻿using Orleans.Providers;
+using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.ServiceBus.Providers;
@@ -35,19 +35,17 @@ namespace ServiceBus.Tests.TestStreamProviders
 
             private void ChangeCachePressure()
             {
-                cachePressureInjectionMonitor.isUnderPressure = !cachePressureInjectionMonitor.isUnderPressure;
+                this.cachePressureInjectionMonitor.UnderPressure = !this.cachePressureInjectionMonitor.UnderPressure;
             }
 
             protected override IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamProviderSettings providerSettings)
             {
-                var globalConfig = this.serviceProvider.GetRequiredService<GlobalConfiguration>();
-                var nodeConfig = this.serviceProvider.GetRequiredService<NodeConfiguration>();
-                var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
-                var eventHubPath = hubSettings.Path;
-                var sharedDimensions = new EventHubMonitorAggregationDimensions(globalConfig, nodeConfig, eventHubPath);
+                var loggerFactory = this.serviceProvider.GetRequiredService<ILoggerFactory>();
+                var eventHubPath = this.hubSettings.Path;
+                var sharedDimensions = new EventHubMonitorAggregationDimensions(eventHubPath);
                 Func<EventHubCacheMonitorDimensions, ILoggerFactory, ITelemetryProducer, ICacheMonitor> cacheMonitorFactory = (dimensions, logger, telemetryProducer) => CacheMonitorForTesting.Instance;
                 Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, ITelemetryProducer, IBlockPoolMonitor> blockPoolMonitorFactory = (dimensions, logger, telemetryProducer) =>BlockPoolMonitorForTesting.Instance;
-                return new CacheFactoryForMonitorTesting(this.cachePressureInjectionMonitor, providerSettings, SerializationManager,
+                return new CacheFactoryForMonitorTesting(this.cachePressureInjectionMonitor, providerSettings, this.SerializationManager,
                     sharedDimensions, loggerFactory, cacheMonitorFactory, blockPoolMonitorFactory);
             }
 
@@ -105,13 +103,13 @@ namespace ServiceBus.Tests.TestStreamProviders
 
     public class CachePressureInjectionMonitor : ICachePressureMonitor
     {
-        public bool isUnderPressure { get; set; }
+        public bool UnderPressure { get; set; }
         private bool wasUnderPressur;
         public ICacheMonitor CacheMonitor { set; private get; }
         public CachePressureInjectionMonitor()
         {
-            this.isUnderPressure = false;
-            this.wasUnderPressur = this.isUnderPressure;
+            this.UnderPressure = false;
+            this.wasUnderPressur = this.UnderPressure;
         }
 
         public void RecordCachePressureContribution(double cachePressureContribution)
@@ -121,12 +119,12 @@ namespace ServiceBus.Tests.TestStreamProviders
 
         public bool IsUnderPressure(DateTime utcNow)
         {
-            if (this.wasUnderPressur != this.isUnderPressure)
+            if (this.wasUnderPressur != this.UnderPressure)
             {
-                this.CacheMonitor?.TrackCachePressureMonitorStatusChange(this.GetType().Name, this.isUnderPressure, null, null, null);
-                this.wasUnderPressur = this.isUnderPressure;
+                this.CacheMonitor?.TrackCachePressureMonitorStatusChange(this.GetType().Name, this.UnderPressure, null, null, null);
+                this.wasUnderPressur = this.UnderPressure;
             }
-            return this.isUnderPressure;
+            return this.UnderPressure;
         }
     }
 }

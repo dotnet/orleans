@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System;
 using Orleans.Placement;
 using Orleans.Runtime;
 
@@ -21,18 +17,5 @@ namespace UnitTests.GrainInterfaces
     public class VersionAwarePlacementStrategy : PlacementStrategy
     {
         internal static VersionAwarePlacementStrategy Singleton { get; } = new VersionAwarePlacementStrategy();
-
-        private VersionAwarePlacementStrategy()
-        { }
-
-        public override bool Equals(object obj)
-        {
-            return obj is VersionAwarePlacementStrategy;
-        }
-
-        public override int GetHashCode()
-        {
-            return GetType().GetHashCode();
-        }
     }
 }

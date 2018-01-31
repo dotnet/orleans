@@ -1,5 +1,5 @@
 using System;
-using Newtonsoft.Json;
+using System.Runtime.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -7,7 +7,7 @@ namespace Orleans.Runtime
     internal abstract class UniqueIdentifier : IEquatable<UniqueIdentifier>, IComparable<UniqueIdentifier>
     {
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
-        [JsonProperty]
+        [DataMember]
         protected readonly internal UniqueKey Key;
 
         protected UniqueIdentifier()

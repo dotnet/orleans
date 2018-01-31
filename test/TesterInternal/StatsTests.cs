@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
@@ -21,21 +21,21 @@ namespace UnitTests.Stats
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(initialSilosCount: 1);
+                builder.Options.InitialSilosCount = 1;
 
-                options.ClusterConfiguration.Globals.RegisterStatisticsProvider<UnitTests.Stats.MockStatsSiloCollector>("MockStats");
-                options.ClusterConfiguration.ApplyToAllNodes(nc => nc.StatisticsMetricsTableWriteInterval = TimeSpan.FromSeconds(1));
-                options.ClusterConfiguration.ApplyToAllNodes(nc => nc.StatisticsLogWriteInterval = TimeSpan.FromSeconds(1));
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.Globals.RegisterStatisticsProvider<UnitTests.Stats.MockStatsSiloCollector>("MockStats");
+                    legacy.ClusterConfiguration.ApplyToAllNodes(nc => nc.StatisticsMetricsTableWriteInterval = TimeSpan.FromSeconds(1));
+                    legacy.ClusterConfiguration.ApplyToAllNodes(nc => nc.StatisticsLogWriteInterval = TimeSpan.FromSeconds(1));
 
-                options.ClientConfiguration.RegisterStatisticsProvider<UnitTests.Stats.MockStatsClientCollector>("MockStats");
-                options.ClientConfiguration.StatisticsMetricsTableWriteInterval = TimeSpan.FromSeconds(1);
-                options.ClientConfiguration.StatisticsLogWriteInterval = TimeSpan.FromSeconds(1);
-
-                return new TestCluster(options);
+                    legacy.ClientConfiguration.RegisterStatisticsProvider<UnitTests.Stats.MockStatsClientCollector>("MockStats");
+                    legacy.ClientConfiguration.StatisticsMetricsTableWriteInterval = TimeSpan.FromSeconds(1);
+                    legacy.ClientConfiguration.StatisticsLogWriteInterval = TimeSpan.FromSeconds(1);
+                });
             }
-
         }
 
         protected TestCluster HostedCluster { get; private set; }
@@ -50,13 +50,8 @@ namespace UnitTests.Stats
         [Fact, TestCategory("Functional"), TestCategory("Client"), TestCategory("Stats")]
         public async Task Stats_Init_Mock()
         {
-            ClientConfiguration config = this.HostedCluster.ClientConfiguration;
-
             var clientStatisticsManager = this.HostedCluster.ServiceProvider.GetService<ClientStatisticsManager>();
             Assert.NotNull(clientStatisticsManager); // Client Statistics Manager is setup
-
-            var statisticsOptions = this.HostedCluster.ServiceProvider.GetService<IOptions<StatisticsOptions>>().Value;
-            Assert.Equal("MockStats", statisticsOptions.ProviderName);  // "Client.StatisticsProviderName"
 
             SiloHandle silo = this.HostedCluster.Primary;
             Assert.True(await this.HostedCluster.Client.GetTestHooks(silo).HasStatisticsProvider(), "Silo StatisticsProviderManager is setup");

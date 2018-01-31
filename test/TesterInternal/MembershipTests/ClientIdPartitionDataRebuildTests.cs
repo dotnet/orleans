@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -129,16 +129,19 @@ namespace UnitTests.MembershipTests
 
         private void CreateAndDeployTestCluster()
         {
-            var options = new TestClusterOptions(3);
+            var builder = new TestClusterBuilder(3);
 
-            options.ClusterConfiguration.Globals.NumMissedProbesLimit = 1;
-            options.ClusterConfiguration.Globals.ProbeTimeout = TimeSpan.FromMilliseconds(500);
-            options.ClusterConfiguration.Globals.NumVotesForDeathDeclaration = 1;
-            options.ClusterConfiguration.Globals.CacheSize = 0;
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.Globals.NumMissedProbesLimit = 1;
+                legacy.ClusterConfiguration.Globals.ProbeTimeout = TimeSpan.FromMilliseconds(500);
+                legacy.ClusterConfiguration.Globals.NumVotesForDeathDeclaration = 1;
+                legacy.ClusterConfiguration.Globals.CacheSize = 0;
 
-            // use only Primary as the gateway
-            options.ClientConfiguration.Gateways = options.ClientConfiguration.Gateways.Take(1).ToList();
-            this.hostedCluster = new TestCluster(options);
+                // use only Primary as the gateway
+                legacy.ClientConfiguration.Gateways = legacy.ClientConfiguration.Gateways.Take(1).ToList();
+            });
+            this.hostedCluster = builder.Build();
             this.hostedCluster.Deploy();
         }
 

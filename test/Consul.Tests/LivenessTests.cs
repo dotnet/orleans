@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.TestingHost.Utils;
@@ -18,39 +19,38 @@ namespace Consul.Tests
         {
         }
 
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             ConsulTestUtils.EnsureConsul();
-
-            var options = new TestClusterOptions(2);
-            options.ClusterConfiguration.Globals.DataConnectionString = ConsulTestUtils.CONSUL_ENDPOINT;
-            options.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
-            options.ClusterConfiguration.PrimaryNode = null;
-            options.ClusterConfiguration.Globals.SeedNodes.Clear();
-            return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>()
-                .UseClientBuilderFactory(clientBuilderFactory);
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.Globals.DataConnectionString = ConsulTestUtils.CONSUL_ENDPOINT;
+                legacy.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
+                legacy.ClusterConfiguration.PrimaryNode = null;
+                legacy.ClusterConfiguration.Globals.SeedNodes.Clear();
+            });
+            builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+            builder.AddClientBuilderConfigurator<ClientBuilderConfigurator>();
         }
 
-        private Func<ClientConfiguration, IClientBuilder> clientBuilderFactory = config => new ClientBuilder()
-            .UseConfiguration(config).UseConsulGatewayListProvider(gatewayOptions =>
-            {
-                gatewayOptions.Address = new Uri(ConsulTestUtils.CONSUL_ENDPOINT);;
-            })
-            .ConfigureApplicationParts(parts => parts.AddFromAppDomain())
-            .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(config.ClientName, config.ClusterId)));
-
-        public class SiloBuilderFactory : ISiloBuilderFactory
+        public class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            public void Configure(ISiloHostBuilder hostBuilder)
             {
-                return new SiloHostBuilder()
-                    .ConfigureSiloName(siloName)
-                    .UseConfiguration(clusterConfiguration)
-                    .UseConsulMembership(options =>
+                hostBuilder.UseConsulMembership(options => { options.Address = new Uri(ConsulTestUtils.CONSUL_ENDPOINT); });
+            }
+        }
+
+        public class ClientBuilderConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder
+                    .UseConsulGatewayListProvider(gatewayOptions =>
                     {
-                        options.Address = new Uri(ConsulTestUtils.CONSUL_ENDPOINT);
-                    })
-                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
+                        gatewayOptions.Address = new Uri(ConsulTestUtils.CONSUL_ENDPOINT);
+                        ;
+                    });
             }
         }
 

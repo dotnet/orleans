@@ -1,26 +1,28 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using System.Linq;
 using Orleans.Runtime.Configuration;
 using Orleans.Hosting;
 using Orleans.Hosting.Development;
 using Orleans.TestingHost;
-using Orleans.TestingHost.Utils;
 using BenchmarkGrainInterfaces.Transaction;
 
 namespace Benchmarks.Transactions
 {
     public class TransactionBenchmark
     {
-        private TestCluster _host;
+        private TestCluster host;
 
         public void Setup()
         {
-            var options = new TestClusterOptions();
-            options.ClusterConfiguration.AddMemoryStorageProvider();
-            options.UseSiloBuilderFactory<SiloBuilderFactory>();
-            _host = new TestCluster(options);
-            _host.Deploy();
+            var builder = new TestClusterBuilder();
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.AddMemoryStorageProvider();
+            });
+            builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+            this.host = builder.Build();
+            this.host.Deploy();
         }
 
         public async Task RunAsync()
@@ -53,7 +55,7 @@ namespace Benchmarks.Transactions
 
         public async Task<Report> RunAsync(int run, int transactiosPerRun, int concurrentPerRun)
         {
-            ILoadGrain load = this._host.Client.GetGrain<ILoadGrain>(Guid.NewGuid());
+            ILoadGrain load = this.host.Client.GetGrain<ILoadGrain>(Guid.NewGuid());
             await load.Generate(run, transactiosPerRun, concurrentPerRun);
             Report report = null;
             while (report == null)
@@ -66,16 +68,14 @@ namespace Benchmarks.Transactions
 
         public void Teardown()
         {
-            _host.StopAllSilos();
+            host.StopAllSilos();
         }
 
-        public sealed class SiloBuilderFactory : ISiloBuilderFactory
+        public sealed class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            public void Configure(ISiloHostBuilder hostBuilder)
             {
-                return new SiloHostBuilder().ConfigureSiloName(siloName)
-                    .UseConfiguration(clusterConfiguration)
-                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)))
+                hostBuilder
                     .UseInClusterTransactionManager()
                     .UseInMemoryTransactionLog()
                     .UseTransactionalState();

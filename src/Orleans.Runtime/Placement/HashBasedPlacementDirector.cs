@@ -1,9 +1,9 @@
-﻿using System.Linq;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Placement
 {
-    internal class HashBasedPlacementDirector : IPlacementDirector<HashBasedPlacement>
+    internal class HashBasedPlacementDirector : IPlacementDirector
     {
         public virtual Task<SiloAddress> OnAddActivation(
             PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)

@@ -6,7 +6,6 @@ using System.Runtime.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Providers;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
@@ -14,9 +13,6 @@ using Orleans.Storage;
 using Orleans.MultiCluster;
 using Orleans.Hosting;
 using Orleans.Runtime.MultiClusterNetwork;
-using Orleans.Runtime.TestHooks;
-using Orleans.Runtime.Providers;
-using Orleans.Runtime.Storage;
 
 namespace Orleans.TestingHost
 {
@@ -26,24 +22,21 @@ namespace Orleans.TestingHost
         private readonly ISiloHost host;
 
         /// <summary>Creates and initializes a silo in the current app domain.</summary>
-        /// <param name="name">Name of this silo.</param>
-        /// <param name="siloBuilderFactoryType">Type of silo host builder factory.</param>
-        /// <param name="config">Silo config data to be used for this silo.</param>
-        public AppDomainSiloHost(string name, Type siloBuilderFactoryType, ClusterConfiguration config)
+        /// <param name="appDomainName">Name of this silo.</param>
+        /// <param name="serializedConfigurationSources">Silo config data to be used for this silo.</param>
+        public AppDomainSiloHost(string appDomainName, string serializedConfigurationSources)
         {
-            var builderFactory = (ISiloBuilderFactory)Activator.CreateInstance(siloBuilderFactoryType);
-            ISiloHostBuilder builder = builderFactory
-                .CreateSiloBuilder(name, config)
-                .ConfigureServices(services => services.AddSingleton<TestHooksSystemTarget>())
-                .ConfigureApplicationParts(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory());
-            this.host = builder.Build();
-            InitializeTestHooksSystemTarget();
+            var deserializedSources = TestClusterHostFactory.DeserializeConfigurationSources(serializedConfigurationSources);
+            this.host = TestClusterHostFactory.CreateSiloHost(appDomainName, deserializedSources);
             this.AppDomainTestHook = new AppDomainTestHooks(this.host);
         }
 
         /// <summary> SiloAddress for this silo. </summary>
         public SiloAddress SiloAddress => this.host.Services.GetRequiredService<ILocalSiloDetails>().SiloAddress;
-        
+
+        /// <summary> Gateway address for this silo. </summary>
+        public SiloAddress GatewayAddress => this.host.Services.GetRequiredService<ILocalSiloDetails>().GatewayAddress;
+
         internal AppDomainTestHooks AppDomainTestHook { get; }
         
         /// <summary>Starts the silo</summary>
@@ -56,13 +49,6 @@ namespace Orleans.TestingHost
         public void Shutdown()
         {
             this.host.StopAsync().GetAwaiter().GetResult();
-        }
-
-        private void InitializeTestHooksSystemTarget()
-        {
-            var testHook = this.host.Services.GetRequiredService<TestHooksSystemTarget>();
-            var providerRuntime = this.host.Services.GetRequiredService<SiloProviderRuntime>();
-            providerRuntime.RegisterSystemTarget(testHook);
         }
     }
 
@@ -79,15 +65,8 @@ namespace Orleans.TestingHost
             this.host = host;
         }
 
-        internal IBootstrapProvider GetBootstrapProvider(string name)
-        {
-            var bootstrapProviderManager = this.host.Services.GetRequiredService<BootstrapProviderManager>();
-            IBootstrapProvider provider = (IBootstrapProvider)bootstrapProviderManager.GetProvider(name);
-            return CheckReturnBoundaryReference("bootstrap provider", provider);
-        }
-
         /// <summary>Find the named storage provider loaded in this silo. </summary>
-        internal IStorageProvider GetStorageProvider(string name) => CheckReturnBoundaryReference("storage provider", (IStorageProvider)this.host.Services.GetRequiredService<StorageProviderManager>().GetProvider(name));
+        internal IStorageProvider GetStorageProvider(string name) => CheckReturnBoundaryReference("storage provider", this.host.Services.GetRequiredServiceByName<IStorageProvider>(name));
 
         private static T CheckReturnBoundaryReference<T>(string what, T obj) where T : class
         {
