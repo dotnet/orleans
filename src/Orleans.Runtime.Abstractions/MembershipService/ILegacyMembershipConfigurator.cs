@@ -32,7 +32,7 @@ namespace Orleans.Runtime.MembershipService
 
         public T GetPropertyValue<T>(string propertyName)
         {
-            MethodInfo getMethod = this.type.GetProperty("propertyName").GetGetMethod();
+            MethodInfo getMethod = this.type.GetProperty(propertyName).GetGetMethod();
             return (T)getMethod.Invoke(this.configuration, null);
         }
     }
