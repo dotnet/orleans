@@ -3,10 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime.ReminderService
 {
@@ -26,22 +24,19 @@ namespace Orleans.Runtime.ReminderService
         private readonly ILoggerFactory loggerFactory;
         private readonly AverageTimeSpanStatistic tardinessStat;
         private readonly CounterStatistic ticksDeliveredStat;
-        private readonly GlobalConfiguration config;
         private readonly TimeSpan initTimeout;
 
         internal LocalReminderService(
             Silo silo,
             GrainId id,
             IReminderTable reminderTable,
-            GlobalConfiguration config,
             TimeSpan initTimeout,
             ILoggerFactory loggerFactory)
-            : base(id, silo, null, loggerFactory)
+            : base(id, silo, loggerFactory)
         {
             this.timerLogger = loggerFactory.CreateLogger<GrainTimer>();
             localReminders = new Dictionary<ReminderIdentity, LocalReminderData>();
             this.reminderTable = reminderTable;
-            this.config = config;
             this.initTimeout = initTimeout;
             localTableSequence = 0;
             this.loggerFactory = loggerFactory;
@@ -61,10 +56,11 @@ namespace Orleans.Runtime.ReminderService
         public override async Task Start()
         {
             // confirm that it can access the underlying store, as after this the ReminderService will load in the background, without the opportunity to prevent the Silo from starting
-            await reminderTable.Init(config).WithTimeout(initTimeout);
+            await reminderTable.Init().WithTimeout(initTimeout);
 
             await base.Start();
         }
+
 
         public async override Task Stop()
         {

@@ -5,11 +5,12 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime.Configuration;
+using Microsoft.Extensions.Options;
+using Orleans.Hosting;
 
 namespace Orleans.Runtime.Placement
 {
-    internal class ActivationCountPlacementDirector : RandomPlacementDirector, ISiloStatisticsChangeListener, IPlacementDirector<ActivationCountBasedPlacement>
+    internal class ActivationCountPlacementDirector : RandomPlacementDirector, ISiloStatisticsChangeListener, IPlacementDirector
     {
         private class CachedLocalStat
         {
@@ -43,16 +44,16 @@ namespace Orleans.Runtime.Placement
         private readonly SafeRandom random = new SafeRandom();
         private int chooseHowMany = 2;
 
-        public ActivationCountPlacementDirector(DeploymentLoadPublisher deploymentLoadPublisher, GlobalConfiguration globalConfig, ILogger<ActivationCountPlacementDirector> logger)
+        public ActivationCountPlacementDirector(DeploymentLoadPublisher deploymentLoadPublisher, IOptions<GrainPlacementOptions> options, ILogger<ActivationCountPlacementDirector> logger)
         {
             this.logger = logger;
 
             SelectSilo = SelectSiloPowerOfK;
-            if (globalConfig.ActivationCountBasedPlacementChooseOutOf <= 0)
+            if (options.Value.ActivationCountPlacementChooseOutOf <= 0)
                 throw new ArgumentException(
-                    "GlobalConfig.ActivationCountBasedPlacementChooseOutOf is " + globalConfig.ActivationCountBasedPlacementChooseOutOf);
+                    "GlobalConfig.ActivationCountBasedPlacementChooseOutOf is " + options.Value.ActivationCountPlacementChooseOutOf);
 
-            chooseHowMany = globalConfig.ActivationCountBasedPlacementChooseOutOf;
+            chooseHowMany = options.Value.ActivationCountPlacementChooseOutOf;
             deploymentLoadPublisher?.SubscribeToStatisticsChangeEvents(this);
         }
 

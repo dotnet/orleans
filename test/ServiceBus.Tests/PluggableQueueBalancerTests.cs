@@ -20,8 +20,8 @@ namespace ServiceBus.Tests
     public class PluggableQueueBalancerTestsWithEHStreamProvider : PluggableQueueBalancerTestBase, IClassFixture<PluggableQueueBalancerTestsWithEHStreamProvider.Fixture>
     {
         private const string StreamProviderName = "EventHubStreamProvider";
-        private static readonly int totalQueueCount = 6;
-        private static readonly short siloCount = 2;
+        private static readonly int TotalQueueCount = 6;
+        private static readonly short SiloCount = 2;
         public static readonly EventHubGeneratorStreamProviderSettings ProviderSettings =
             new EventHubGeneratorStreamProviderSettings(StreamProviderName);
 
@@ -31,8 +31,8 @@ namespace ServiceBus.Tests
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.Options.InitialSilosCount = siloCount;
-                ProviderSettings.EventHubPartitionCount = totalQueueCount;
+                builder.Options.InitialSilosCount = SiloCount;
+                ProviderSettings.EventHubPartitionCount = TotalQueueCount;
                 builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
                 builder.ConfigureLegacyConfiguration(legacy =>
                 {
@@ -62,7 +62,7 @@ namespace ServiceBus.Tests
         [Fact, TestCategory("BVT")]
         public Task PluggableQueueBalancerTest_ShouldUseInjectedQueueBalancerAndBalanceCorrectly()
         {
-            return base.ShouldUseInjectedQueueBalancerAndBalanceCorrectly(this.fixture, StreamProviderName, siloCount, totalQueueCount);
+            return base.ShouldUseInjectedQueueBalancerAndBalanceCorrectly(this.fixture, StreamProviderName, SiloCount, TotalQueueCount);
         }
     }
 }

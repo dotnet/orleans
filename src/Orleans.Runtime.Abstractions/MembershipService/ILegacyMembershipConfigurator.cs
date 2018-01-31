@@ -1,11 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Hosting;
-using Orleans.Messaging;
-using Orleans.Runtime.Configuration;
-using LivenessProviderType = Orleans.Runtime.Configuration.GlobalConfiguration.LivenessProviderType;
+using System;
+using System.Reflection;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -17,6 +12,28 @@ namespace Orleans.Runtime.MembershipService
         /// <summary>
         /// Configure the membership table in the legacy way 
         /// </summary>
-        void ConfigureServices(GlobalConfiguration configuration, IServiceCollection services);
+        void ConfigureServices(object configuration, IServiceCollection services);
+    }
+
+    /// <summary>
+    /// Wapper for legacy config.  Should not be used for any new developent, only adapting legacy systems.
+    /// </summary>
+    public class GlobalConfigurationReader
+    {
+        private readonly object configuration;
+        private readonly Type type;
+        
+        public GlobalConfigurationReader(object configuration)
+        {
+            this.configuration = configuration;
+            this.type = configuration.GetType();
+            if(this.type.Name != "GlobalConfiguration") throw new ArgumentException($"GlobalConfiguration expected", nameof(configuration));
+        }
+
+        public T GetPropertyValue<T>(string propertyName)
+        {
+            MethodInfo getMethod = this.type.GetProperty(propertyName).GetGetMethod();
+            return (T)getMethod.Invoke(this.configuration, null);
+        }
     }
 }

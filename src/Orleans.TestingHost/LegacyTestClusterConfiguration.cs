@@ -71,7 +71,7 @@ namespace Orleans.TestingHost
                 var nodeConfig = config.GetOrCreateNodeConfigurationForSilo(siloConfig.SiloName);
                 nodeConfig.Port = siloConfig.SiloPort;
                 nodeConfig.SiloName = siloConfig.SiloName;
-                var address = ClusterConfiguration.ResolveIPAddress(nodeConfig.HostNameOrIPAddress, nodeConfig.Subnet, nodeConfig.AddressType).GetAwaiter().GetResult();
+                var address = ConfigUtilities.ResolveIPAddress(nodeConfig.HostNameOrIPAddress, nodeConfig.Subnet, nodeConfig.AddressType).GetAwaiter().GetResult();
                 nodeConfig.ProxyGatewayEndpoint = new IPEndPoint(address, siloConfig.GatewayPort);
                 nodeConfig.IsPrimaryNode = i == 0;
             }
@@ -154,7 +154,7 @@ namespace Orleans.TestingHost
 
         internal static string Serialize(SerializationManager serializationManager, object config)
         {
-            BufferPool.InitGlobalBufferPool(Options.Create(new MessagingOptions()));
+            BufferPool.InitGlobalBufferPool(new SiloMessagingOptions());
             var writer = new BinaryTokenStreamWriter();
             serializationManager.Serialize(config, writer);
             string serialized = Convert.ToBase64String(writer.ToByteArray());

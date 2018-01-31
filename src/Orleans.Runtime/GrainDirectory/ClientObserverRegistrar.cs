@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
@@ -19,7 +21,7 @@ namespace Orleans.Runtime
         private readonly ILocalGrainDirectory grainDirectory;
         private readonly SiloAddress myAddress;
         private readonly OrleansTaskScheduler scheduler;
-        private readonly ClusterConfiguration orleansConfig;
+        private readonly SiloMessagingOptions messagingOptions;
         private readonly ILogger logger;
         private Gateway gateway;
         private IDisposable refreshTimer;
@@ -29,14 +31,14 @@ namespace Orleans.Runtime
             ILocalSiloDetails siloDetails,
             ILocalGrainDirectory dir,
             OrleansTaskScheduler scheduler,
-            ClusterConfiguration config,
+            IOptions<SiloMessagingOptions> messagingOptions,
             ILoggerFactory loggerFactory)
             : base(Constants.ClientObserverRegistrarId, siloDetails.SiloAddress, loggerFactory)
         {
             grainDirectory = dir;
             myAddress = siloDetails.SiloAddress;
             this.scheduler = scheduler;
-            orleansConfig = config;
+            this.messagingOptions = messagingOptions.Value;
             logger = loggerFactory.CreateLogger<ClientObserverRegistrar>();
         }
 
@@ -51,12 +53,12 @@ namespace Orleans.Runtime
         private void Start()
         {
             var random = new SafeRandom();
-            var randomOffset = random.NextTimeSpan(orleansConfig.Globals.ClientRegistrationRefresh);
+            var randomOffset = random.NextTimeSpan(this.messagingOptions.ClientRegistrationRefresh);
             this.refreshTimer = this.RegisterTimer(
                 this.OnClientRefreshTimer,
                 null,
                 randomOffset,
-                orleansConfig.Globals.ClientRegistrationRefresh,
+                this.messagingOptions.ClientRegistrationRefresh,
                 "ClientObserverRegistrar.ClientRefreshTimer");
             if (logger.IsEnabled(LogLevel.Debug)) { logger.Debug("Client registrar service started successfully."); }
         }
@@ -97,7 +99,7 @@ namespace Orleans.Runtime
                     },
                     AsyncExecutorWithRetries.INFINITE_RETRIES, // Do not limit the number of on-error retries, control it via "maxExecutionTime"
                     (exc, i) => true, // Retry on all errors.         
-                    orleansConfig.Globals.ClientRegistrationRefresh, // "maxExecutionTime"
+                    this.messagingOptions.ClientRegistrationRefresh, // "maxExecutionTime"
                     new ExponentialBackoff(EXP_BACKOFF_ERROR_MIN, EXP_BACKOFF_ERROR_MAX, EXP_BACKOFF_STEP)); // how long to wait between error retries
             }
             catch (Exception exc)

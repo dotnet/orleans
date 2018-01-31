@@ -4,7 +4,7 @@ using System.Reflection;
 using System.Text;
 using System.Xml;
 using Microsoft.Extensions.Logging;
-
+using Orleans.Hosting;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -23,15 +23,15 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public TimeSpan DefaultCollectionAgeLimit
         {
-            get { return defaults.CollectionAgeLimit.HasValue ? defaults.CollectionAgeLimit.Value : GlobalConfiguration.DEFAULT_COLLECTION_AGE_LIMIT; }
+            get { return this.defaults.CollectionAgeLimit ?? GrainCollectionOptions.DEFAULT_COLLECTION_AGE_LIMIT; }
         }
 
         internal TimeSpan ShortestCollectionAgeLimit
         {
             get
             {
-                TimeSpan shortest = DefaultCollectionAgeLimit;
-                foreach (var typeConfig in ClassSpecific)
+                TimeSpan shortest = this.DefaultCollectionAgeLimit;
+                foreach (var typeConfig in this.ClassSpecific)
                 {
                     TimeSpan curr = typeConfig.CollectionAgeLimit.Value;
                     if (curr < shortest)
@@ -49,14 +49,14 @@ namespace Orleans.Runtime.Configuration
         /// <param name="defaultCollectionAgeLimit">The default time period used to collect in-active activations.</param>
         public ApplicationConfiguration(TimeSpan? defaultCollectionAgeLimit = null)
         {
-            classSpecific = new Dictionary<string, GrainTypeConfiguration>();
-            defaults = new GrainTypeConfiguration(null, defaultCollectionAgeLimit);
+            this.classSpecific = new Dictionary<string, GrainTypeConfiguration>();
+            this.defaults = new GrainTypeConfiguration(null, defaultCollectionAgeLimit);
         }
 
         /// <summary>
         /// IEnumerable of all configurations for different grain types.
         /// </summary>
-        public IEnumerable<GrainTypeConfiguration> ClassSpecific { get { return classSpecific.Values; } }
+        public IEnumerable<GrainTypeConfiguration> ClassSpecific { get { return this.classSpecific.Values; } }
 
         /// <summary>
         /// Load this configuratin from xml element.
@@ -73,15 +73,15 @@ namespace Orleans.Runtime.Configuration
 
                 if (config.AreDefaults)
                 {
-                    defaults = config;
+                    this.defaults = config;
                 }
                 else
                 {
-                    if (classSpecific.ContainsKey(config.FullTypeName))
+                    if (this.classSpecific.ContainsKey(config.FullTypeName))
                     {
                         throw new InvalidOperationException(string.Format("duplicate type {0} in configuration", config.FullTypeName));
                     }
-                    classSpecific.Add(config.FullTypeName, config);
+                    this.classSpecific.Add(config.FullTypeName, config);
                 }
             }
 
@@ -112,13 +112,13 @@ namespace Orleans.Runtime.Configuration
         /// <returns></returns>
         public TimeSpan GetCollectionAgeLimit(string grainTypeFullName)
         {
-            if (String.IsNullOrEmpty(grainTypeFullName))
+            if (string.IsNullOrEmpty(grainTypeFullName))
             {
                 throw new ArgumentNullException("grainTypeFullName");
             }
             GrainTypeConfiguration config;
-            return classSpecific.TryGetValue(grainTypeFullName, out config) && config.CollectionAgeLimit.HasValue ? 
-                config.CollectionAgeLimit.Value : DefaultCollectionAgeLimit;
+            return this.classSpecific.TryGetValue(grainTypeFullName, out config) && config.CollectionAgeLimit.HasValue ? 
+                config.CollectionAgeLimit.Value : this.DefaultCollectionAgeLimit;
         }
 
 
@@ -143,17 +143,17 @@ namespace Orleans.Runtime.Configuration
         /// <param name="ageLimit">The age limit to use.</param>
         public void SetCollectionAgeLimit(string grainTypeFullName, TimeSpan ageLimit)
         {
-            if (String.IsNullOrEmpty(grainTypeFullName))
+            if (string.IsNullOrEmpty(grainTypeFullName))
             {
                 throw new ArgumentNullException("grainTypeFullName");
             }
             ThrowIfLessThanZero(ageLimit, "ageLimit");
 
             GrainTypeConfiguration config;
-            if (!classSpecific.TryGetValue(grainTypeFullName, out config))
+            if (!this.classSpecific.TryGetValue(grainTypeFullName, out config))
             {
                 config = new GrainTypeConfiguration(grainTypeFullName);
-                classSpecific[grainTypeFullName] = config;
+                this.classSpecific[grainTypeFullName] = config;
             }
 
             config.SetCollectionAgeLimit(ageLimit);
@@ -178,12 +178,12 @@ namespace Orleans.Runtime.Configuration
         /// <param name="grainTypeFullName">Grain type full name.</param>
         public void ResetCollectionAgeLimitToDefault(string grainTypeFullName)
         {
-            if (String.IsNullOrEmpty(grainTypeFullName))
+            if (string.IsNullOrEmpty(grainTypeFullName))
             {
                 throw new ArgumentNullException(nameof(grainTypeFullName));
             }
             GrainTypeConfiguration config;
-            if (!classSpecific.TryGetValue(grainTypeFullName, out config)) return;
+            if (!this.classSpecific.TryGetValue(grainTypeFullName, out config)) return;
 
             config.SetCollectionAgeLimit(null);
         }
@@ -195,7 +195,7 @@ namespace Orleans.Runtime.Configuration
         public void SetDefaultCollectionAgeLimit(TimeSpan ageLimit)
         {
             ThrowIfLessThanZero(ageLimit, "ageLimit");
-            defaults.SetCollectionAgeLimit(ageLimit);
+            this.defaults.SetCollectionAgeLimit(ageLimit);
         }
 
         private static void ThrowIfLessThanZero(TimeSpan timeSpan, string paramName)
@@ -205,7 +205,7 @@ namespace Orleans.Runtime.Configuration
 
         internal void ValidateConfiguration(ILogger logger)
         {
-            foreach (GrainTypeConfiguration config in classSpecific.Values)
+            foreach (GrainTypeConfiguration config in this.classSpecific.Values)
             {
                 config.ValidateConfiguration(logger);
             }
@@ -220,10 +220,10 @@ namespace Orleans.Runtime.Configuration
             var result = new StringBuilder();
             result.AppendFormat("   Application:").AppendLine();
             result.AppendFormat("      Defaults:").AppendLine();
-            result.AppendFormat("         Deactivate if idle for: {0}", DefaultCollectionAgeLimit)
+            result.AppendFormat("         Deactivate if idle for: {0}", this.DefaultCollectionAgeLimit)
                 .AppendLine();
 
-            foreach (GrainTypeConfiguration config in classSpecific.Values)
+            foreach (GrainTypeConfiguration config in this.classSpecific.Values)
             {
                 if (!config.CollectionAgeLimit.HasValue) continue;
 
@@ -250,12 +250,12 @@ namespace Orleans.Runtime.Configuration
         /// <summary>
         /// Whether this is a defualt configuration that applies to all grain types.
         /// </summary>
-        public bool AreDefaults { get { return FullTypeName == null; } }
+        public bool AreDefaults { get { return this.FullTypeName == null; } }
 
         /// <summary>
         /// The time period used to collect in-active activations of this type.
         /// </summary>
-        public TimeSpan? CollectionAgeLimit { get { return collectionAgeLimit; } }
+        public TimeSpan? CollectionAgeLimit { get { return this.collectionAgeLimit; } }
 
         private TimeSpan? collectionAgeLimit;
 
@@ -265,7 +265,7 @@ namespace Orleans.Runtime.Configuration
         /// <param name="type">Grain type of this configuration.</param>
         public GrainTypeConfiguration(string type)
         {
-            FullTypeName = type;
+            this.FullTypeName = type;
         }
 
         /// <summary>
@@ -275,7 +275,7 @@ namespace Orleans.Runtime.Configuration
         /// <param name="ageLimit">Age limit for this type.</param>
         public GrainTypeConfiguration(string type, TimeSpan? ageLimit)
         {
-            FullTypeName = type;
+            this.FullTypeName = type;
             SetCollectionAgeLimit(ageLimit);
         }
 
@@ -285,10 +285,10 @@ namespace Orleans.Runtime.Configuration
         {
             if (ageLimit == null)
             {
-                collectionAgeLimit = null;
+                this.collectionAgeLimit = null;
             }
 
-            TimeSpan minAgeLimit = GlobalConfiguration.DEFAULT_COLLECTION_QUANTUM;
+            TimeSpan minAgeLimit = GrainCollectionOptions.DEFAULT_COLLECTION_QUANTUM;
             if (ageLimit < minAgeLimit)
             {
                 if (GlobalConfiguration.ENFORCE_MINIMUM_REQUIREMENT_FOR_AGE_LIMIT)
@@ -296,7 +296,7 @@ namespace Orleans.Runtime.Configuration
                     throw new ArgumentOutOfRangeException($"The AgeLimit attribute is required to be at least {minAgeLimit}.");
                 }
             }
-            collectionAgeLimit = ageLimit;
+            this.collectionAgeLimit = ageLimit;
         }
 
         /// <summary>
@@ -340,28 +340,28 @@ namespace Orleans.Runtime.Configuration
 
             if (found) return new GrainTypeConfiguration(fullTypeName, collectionAgeLimit);
 
-            throw new InvalidOperationException(string.Format("empty GrainTypeConfiguration for {0}", fullTypeName == null ? "defaults" : fullTypeName));
+            throw new InvalidOperationException(string.Format("empty GrainTypeConfiguration for {0}", fullTypeName ?? "defaults"));
         }
 
         internal void ValidateConfiguration(ILogger logger)
         {
-            if (AreDefaults) return;
+            if (this.AreDefaults) return;
 
             Type type = null;               
             try
             {
-                type = new CachedTypeResolver().ResolveType(FullTypeName);
+                type = new CachedTypeResolver().ResolveType(this.FullTypeName);
             }
             catch (Exception exception)
             {
-                string errStr = String.Format("Unable to find grain class type {0} specified in configuration; Failing silo startup.", FullTypeName);
+                string errStr = string.Format("Unable to find grain class type {0} specified in configuration; Failing silo startup.", this.FullTypeName);
                 logger.Error(ErrorCode.Loader_TypeLoadError, errStr, exception);
                 throw new OrleansException(errStr, exception);
             }
 
             if (type == null)
             {
-                string errStr = String.Format("Unable to find grain class type {0} specified in configuration; Failing silo startup.", FullTypeName);
+                string errStr = string.Format("Unable to find grain class type {0} specified in configuration; Failing silo startup.", this.FullTypeName);
                 logger.Error(ErrorCode.Loader_TypeLoadError_2, errStr);
                 throw new OrleansException(errStr);
             }
@@ -369,7 +369,7 @@ namespace Orleans.Runtime.Configuration
             // postcondition: returned type must implement IGrain.
             if (!typeof(IGrain).IsAssignableFrom(type))
             {
-                string errStr = String.Format("Type {0} must implement IGrain to be used Application configuration context.",type.FullName);
+                string errStr = string.Format("Type {0} must implement IGrain to be used Application configuration context.",type.FullName);
                 logger.Error(ErrorCode.Loader_TypeLoadError_3, errStr);
                 throw new OrleansException(errStr);
             }
@@ -377,7 +377,7 @@ namespace Orleans.Runtime.Configuration
             
             if (!typeInfo.IsInterface && !typeInfo.IsClass)
             {
-                string errStr = String.Format("Type {0} must either be an interface or class used Application configuration context.",type.FullName);
+                string errStr = string.Format("Type {0} must either be an interface or class used Application configuration context.",type.FullName);
                 logger.Error(ErrorCode.Loader_TypeLoadError_4, errStr);
                 throw new OrleansException(errStr);
             }

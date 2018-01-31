@@ -11,7 +11,7 @@ namespace Orleans.Runtime.Configuration
 
         public GrainServiceConfigurations()
         {
-            GrainServices = new Dictionary<string, IGrainServiceConfiguration>();
+            this.GrainServices = new Dictionary<string, IGrainServiceConfiguration>();
         }
 
         internal static GrainServiceConfigurations Load(XmlElement child)
@@ -64,9 +64,9 @@ namespace Orleans.Runtime.Configuration
 
         public GrainServiceConfiguration(IDictionary<string, string> properties, string serviceName, string serviceType)
         {
-            Properties = properties;
-            Name = serviceName;
-            ServiceType = serviceType;
+            this.Properties = properties;
+            this.Name = serviceName;
+            this.ServiceType = serviceType;
         }
 
         internal void Load(XmlElement child, IDictionary<string, IGrainServiceConfiguration> alreadyLoaded, XmlNamespaceManager nsManager)
@@ -79,36 +79,36 @@ namespace Orleans.Runtime.Configuration
 
             if (child.HasAttribute("Name"))
             {
-                Name = child.GetAttribute("Name");
+                this.Name = child.GetAttribute("Name");
             }
 
-            if (alreadyLoaded != null && alreadyLoaded.ContainsKey(Name))
+            if (alreadyLoaded != null && alreadyLoaded.ContainsKey(this.Name))
             {
                 return;
             }
 
             if (child.HasAttribute("ServiceType"))
             {
-                ServiceType = child.GetAttribute("ServiceType");
+                this.ServiceType = child.GetAttribute("ServiceType");
             }
             else
             {
                 throw new FormatException("Missing 'ServiceType' attribute on 'GrainService' element");
             }
 
-            if (String.IsNullOrEmpty(Name))
+            if (string.IsNullOrEmpty(this.Name))
             {
-                Name = ServiceType;
+                this.Name = this.ServiceType;
             }
 
-            Properties = new Dictionary<string, string>();
+            this.Properties = new Dictionary<string, string>();
             for (int i = 0; i < child.Attributes.Count; i++)
             {
                 var key = child.Attributes[i].LocalName;
                 var val = child.Attributes[i].Value;
                 if ((key != "Type") && (key != "Name"))
                 {
-                    Properties[key] = val;
+                    this.Properties[key] = val;
                 }
             }
         }

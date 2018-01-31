@@ -8,7 +8,7 @@ namespace Orleans.Hosting
     /// <summary>
     /// Specifies global messaging options that are common to client and silo.
     /// </summary>
-    public class MessagingOptions
+    public abstract class MessagingOptions
     {
         /// <summary>
         /// The ResponseTimeout attribute specifies the default timeout before a request is assumed to have failed.
@@ -47,5 +47,11 @@ namespace Orleans.Hosting
         /// The initial size of the messaging buffer pool that is pre-allocated.
         /// </summary>
         public int BufferPoolPreallocationSize { get; set; } = 250;
+
+        /// <summary>
+        ///  Whether Trace.CorrelationManager.ActivityId settings should be propagated into grain calls.
+        /// </summary>
+        public bool PropagateActivityId { get; set; } = DEFAULT_PROPAGATE_ACTIVITY_ID;
+        public const bool DEFAULT_PROPAGATE_ACTIVITY_ID = Constants.DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
     }
 }

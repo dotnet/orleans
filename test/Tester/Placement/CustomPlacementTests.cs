@@ -40,9 +40,14 @@ namespace Tester.CustomPlacementTests
             {
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
-                    hostBuilder.ConfigureServices(services =>
-                        services.AddSingleton<IPlacementDirector<TestCustomPlacementStrategy>, TestPlacementStrategyFixedSiloDirector>());
+                    hostBuilder.ConfigureServices(ConfigureServices);
                 }
+            }
+
+            private static void ConfigureServices(IServiceCollection services)
+            {
+                services.AddSingletonNamedService<PlacementStrategy, TestCustomPlacementStrategy>(nameof(TestCustomPlacementStrategy));
+                services.AddSingletonKeyedService<Type, IPlacementDirector, TestPlacementStrategyFixedSiloDirector>(typeof(TestCustomPlacementStrategy));
             }
         }
 

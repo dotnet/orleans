@@ -13,6 +13,7 @@ using Orleans.Streams;
 using Orleans.LogConsistency;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
+using Orleans.Hosting;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -25,8 +26,8 @@ namespace Orleans.Runtime.Configuration
 
         public ConfigValue(T val, bool isDefaultValue)
         {
-            Value = val;
-            IsDefaultValue = isDefaultValue;
+            this.Value = val;
+            this.IsDefaultValue = isDefaultValue;
         }
     }
 
@@ -85,6 +86,28 @@ namespace Orleans.Runtime.Configuration
             Custom
         }
 
+        public static string Remap(ReminderServiceProviderType type)
+        {
+            switch(type)
+            {
+                case ReminderServiceProviderType.NotSpecified:
+                    return ReminderOptions.BuiltIn.NotSpecified;
+                case ReminderServiceProviderType.ReminderTableGrain:
+                    return ReminderOptions.BuiltIn.ReminderTableGrain;
+                case ReminderServiceProviderType.AzureTable:
+                    return ReminderOptions.BuiltIn.AzureTable;
+                case ReminderServiceProviderType.SqlServer:
+                    return ReminderOptions.BuiltIn.SqlServer;
+                case ReminderServiceProviderType.MockTable:
+                    return ReminderOptions.BuiltIn.MockTable;
+                case ReminderServiceProviderType.Disabled:
+                    return ReminderOptions.BuiltIn.Disabled;
+                case ReminderServiceProviderType.Custom:
+                    return ReminderOptions.BuiltIn.Custom;
+            }
+            throw new NotSupportedException($"ReminderServiceProviderType {type} is not supported");
+        }
+
         /// <summary>
         /// Configuration for Gossip Channels
         /// </summary>
@@ -95,6 +118,19 @@ namespace Orleans.Runtime.Configuration
 
             /// <summary>An Azure Table serving as a channel. </summary>
             AzureTable,
+        }
+
+        public static string Remap(GossipChannelType type)
+        {
+            switch (type)
+            {
+                case GossipChannelType.NotSpecified:
+                    return MultiClusterOptions.BuiltIn.NotSpecified;
+                case GossipChannelType.AzureTable:
+                    return MultiClusterOptions.BuiltIn.AzureTable;
+                default:
+                    throw new NotSupportedException($"GossipChannelType {type} is not supported");
+            }
         }
 
         /// <summary>
@@ -123,6 +159,35 @@ namespace Orleans.Runtime.Configuration
             Adaptive
         }
 
+        private static DirectoryCachingStrategyType Remap(GrainDirectoryOptions.CachingStrategyType type)
+        {
+            switch(type)
+            {
+                case GrainDirectoryOptions.CachingStrategyType.None:
+                    return DirectoryCachingStrategyType.None;
+                case GrainDirectoryOptions.CachingStrategyType.LRU:
+                    return DirectoryCachingStrategyType.LRU;
+                case GrainDirectoryOptions.CachingStrategyType.Adaptive:
+                    return DirectoryCachingStrategyType.Adaptive;
+                default:
+                    throw new NotSupportedException($"CachingStrategyType {type} is not supported");
+            }
+        }
+        public static GrainDirectoryOptions.CachingStrategyType Remap(DirectoryCachingStrategyType type)
+        {
+            switch (type)
+            {
+                case DirectoryCachingStrategyType.None:
+                    return GrainDirectoryOptions.CachingStrategyType.None;
+                case DirectoryCachingStrategyType.LRU:
+                    return GrainDirectoryOptions.CachingStrategyType.LRU;
+                case DirectoryCachingStrategyType.Adaptive:
+                    return GrainDirectoryOptions.CachingStrategyType.Adaptive;
+                default:
+                    throw new NotSupportedException($"DirectoryCachingStrategyType {type} is not supported");
+            }
+        }
+
         public ApplicationConfiguration Application { get; private set; }
 
         /// <summary>
@@ -143,7 +208,7 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public bool PrimaryNodeIsRequired
         {
-            get { return LivenessType == LivenessProviderType.MembershipTableGrain; }
+            get { return this.LivenessType == LivenessProviderType.MembershipTableGrain; }
         }
 
         /// <summary>
@@ -183,7 +248,7 @@ namespace Orleans.Runtime.Configuration
         /// <summary>
         /// The expected size of a cluster. Need not be very accurate, can be an overestimate.
         /// </summary>
-        public int ExpectedClusterSize { get { return ExpectedClusterSizeConfigValue.Value; } set { ExpectedClusterSizeConfigValue = new ConfigValue<int>(value, false); } }
+        public int ExpectedClusterSize { get { return this.ExpectedClusterSizeConfigValue.Value; } set { this.ExpectedClusterSizeConfigValue = new ConfigValue<int>(value, false); } }
         /// <summary>
         /// The number of missed "I am alive" heartbeat messages from a silo or number of un-replied probes that lead to suspecting this silo as dead.
         /// </summary>
@@ -298,9 +363,9 @@ namespace Orleans.Runtime.Configuration
         {
             get
             {
-                return string.IsNullOrWhiteSpace(dataConnectionStringForReminders) ? DataConnectionString : dataConnectionStringForReminders;
+                return string.IsNullOrWhiteSpace(this.dataConnectionStringForReminders) ? this.DataConnectionString : this.dataConnectionStringForReminders;
             }
-            set { dataConnectionStringForReminders = value; }
+            set { this.dataConnectionStringForReminders = value; }
         }
 
         /// <summary>
@@ -310,12 +375,12 @@ namespace Orleans.Runtime.Configuration
         {
             get
             {
-                return string.IsNullOrWhiteSpace(adoInvariantForReminders) ? AdoInvariant : adoInvariantForReminders;
+                return string.IsNullOrWhiteSpace(this.adoInvariantForReminders) ? this.AdoInvariant : this.adoInvariantForReminders;
             }
-            set { adoInvariantForReminders = value; }
+            set { this.adoInvariantForReminders = value; }
         }
 
-        internal TimeSpan CollectionQuantum { get; set; }
+        public TimeSpan CollectionQuantum { get; set; }
 
         /// <summary>
         /// Specifies the maximum time that a request can take before the activation is reported as "blocked"
@@ -363,14 +428,14 @@ namespace Orleans.Runtime.Configuration
         {
             get
             {
-                return livenessServiceType;
+                return this.livenessServiceType;
             }
             set
             {
                 if (value == LivenessProviderType.NotSpecified)
                     throw new ArgumentException("Cannot set LivenessType to " + LivenessProviderType.NotSpecified, "LivenessType");
 
-                livenessServiceType = value;
+                this.livenessServiceType = value;
             }
         }
 
@@ -392,7 +457,7 @@ namespace Orleans.Runtime.Configuration
         {
             get
             {
-                return reminderServiceType;
+                return this.reminderServiceType;
             }
             set
             {
@@ -407,7 +472,7 @@ namespace Orleans.Runtime.Configuration
             if (reminderType == ReminderServiceProviderType.NotSpecified)
                 throw new ArgumentException("Cannot set ReminderServiceType to " + ReminderServiceProviderType.NotSpecified, "ReminderServiceType");
 
-            reminderServiceType = reminderType;
+            this.reminderServiceType = reminderType;
         }
 
         public TimeSpan MockReminderTableTimeout { get; set; }
@@ -434,7 +499,7 @@ namespace Orleans.Runtime.Configuration
 
         public TimeSpan ClientRegistrationRefresh { get; set; }
 
-        internal bool PerformDeadlockDetection { get; set; }
+        public bool PerformDeadlockDetection { get; set; }
         
         public bool AllowCallChainReentrancy { get; set; }
         
@@ -456,13 +521,13 @@ namespace Orleans.Runtime.Configuration
         /// Determines if ADO should be used for storage of Membership and Reminders info.
         /// True if either or both of LivenessType and ReminderServiceType are set to SqlServer, false otherwise.
         /// </summary>
-        internal bool UseSqlSystemStore
+        public bool UseSqlSystemStore
         {
             get
             {
-                return !String.IsNullOrWhiteSpace(DataConnectionString) && (
-                    (LivenessEnabled && LivenessType == LivenessProviderType.SqlServer)
-                    || ReminderServiceType == ReminderServiceProviderType.SqlServer);
+                return !string.IsNullOrWhiteSpace(this.DataConnectionString) && (
+                    (this.LivenessEnabled && this.LivenessType == LivenessProviderType.SqlServer)
+                    || this.ReminderServiceType == ReminderServiceProviderType.SqlServer);
             }
         }
 
@@ -474,8 +539,8 @@ namespace Orleans.Runtime.Configuration
         {
             get
             {
-                return !String.IsNullOrWhiteSpace(DataConnectionString) && (
-                    (LivenessEnabled && LivenessType == LivenessProviderType.ZooKeeper));
+                return !string.IsNullOrWhiteSpace(this.DataConnectionString) && (
+                    (this.LivenessEnabled && this.LivenessType == LivenessProviderType.ZooKeeper));
             }
         }
 
@@ -483,131 +548,103 @@ namespace Orleans.Runtime.Configuration
         /// Determines if Azure Storage should be used for storage of Membership and Reminders info.
         /// True if either or both of LivenessType and ReminderServiceType are set to AzureTable, false otherwise.
         /// </summary>
-        internal bool UseAzureSystemStore
+        public bool UseAzureSystemStore
         {
             get
             {
-                return !String.IsNullOrWhiteSpace(DataConnectionString)
-                       && !UseSqlSystemStore && !UseZooKeeperSystemStore;
+                return !string.IsNullOrWhiteSpace(this.DataConnectionString)
+                       && !this.UseSqlSystemStore && !this.UseZooKeeperSystemStore;
             }
         }
 
-        internal bool RunsInAzure { get { return UseAzureSystemStore && !String.IsNullOrWhiteSpace(this.ClusterId); } }
+        internal bool RunsInAzure { get { return this.UseAzureSystemStore && !string.IsNullOrWhiteSpace(this.ClusterId); } }
 
-        private static readonly TimeSpan DEFAULT_LIVENESS_PROBE_TIMEOUT = TimeSpan.FromSeconds(10);
-        private static readonly TimeSpan DEFAULT_LIVENESS_TABLE_REFRESH_TIMEOUT = TimeSpan.FromSeconds(60);
-        private static readonly TimeSpan DEFAULT_LIVENESS_DEATH_VOTE_EXPIRATION_TIMEOUT = TimeSpan.FromSeconds(120);
-        private static readonly TimeSpan DEFAULT_LIVENESS_I_AM_ALIVE_TABLE_PUBLISH_TIMEOUT = TimeSpan.FromMinutes(5);
-        private static readonly TimeSpan DEFAULT_LIVENESS_MAX_JOIN_ATTEMPT_TIME = TimeSpan.FromMinutes(5); // 5 min
-        private static readonly TimeSpan DEFAULT_REFRESH_CLUSTER_INTERFACEMAP_TIME = TimeSpan.FromMinutes(1);
-        private const int DEFAULT_LIVENESS_NUM_MISSED_PROBES_LIMIT = 3;
-        private const int DEFAULT_LIVENESS_NUM_PROBED_SILOS = 3;
-        private const int DEFAULT_LIVENESS_NUM_VOTES_FOR_DEATH_DECLARATION = 2;
-        private const int DEFAULT_LIVENESS_NUM_TABLE_I_AM_ALIVE_LIMIT = 2;
-        private const bool DEFAULT_LIVENESS_USE_LIVENESS_GOSSIP = true;
-        private const bool DEFAULT_VALIDATE_INITIAL_CONNECTIVITY = true;
         private const int DEFAULT_MAX_MULTICLUSTER_GATEWAYS = 10;
         private const bool DEFAULT_USE_GLOBAL_SINGLE_INSTANCE = true;
         private static readonly TimeSpan DEFAULT_BACKGROUND_GOSSIP_INTERVAL = TimeSpan.FromSeconds(30);
-        private static readonly TimeSpan DEFAULT_GLOBAL_SINGLE_INSTANCE_RETRY_INTERVAL = TimeSpan.FromSeconds(30);
         private const int DEFAULT_GLOBAL_SINGLE_INSTANCE_NUMBER_RETRIES = 10;
         private const int DEFAULT_LIVENESS_EXPECTED_CLUSTER_SIZE = 20;
-        private const int DEFAULT_CACHE_SIZE = 1000000;
-        private static readonly TimeSpan DEFAULT_INITIAL_CACHE_TTL = TimeSpan.FromSeconds(30);
-        private static readonly TimeSpan DEFAULT_MAXIMUM_CACHE_TTL = TimeSpan.FromSeconds(240);
-        private const double DEFAULT_TTL_EXTENSION_FACTOR = 2.0;
-        private const DirectoryCachingStrategyType DEFAULT_DIRECTORY_CACHING_STRATEGY = DirectoryCachingStrategyType.Adaptive;
-        internal static readonly TimeSpan DEFAULT_COLLECTION_QUANTUM = TimeSpan.FromMinutes(1);
-        internal static readonly TimeSpan DEFAULT_COLLECTION_AGE_LIMIT = TimeSpan.FromHours(2);
         public static bool ENFORCE_MINIMUM_REQUIREMENT_FOR_AGE_LIMIT = true;
-        private static readonly TimeSpan DEFAULT_UNREGISTER_RACE_DELAY = TimeSpan.FromMinutes(1);
-        private static readonly TimeSpan DEFAULT_CLIENT_REGISTRATION_REFRESH = TimeSpan.FromMinutes(5);
         public const bool DEFAULT_PERFORM_DEADLOCK_DETECTION = false;
         public const bool DEFAULT_ALLOW_CALL_CHAIN_REENTRANCY = false;
-        public static readonly string DEFAULT_PLACEMENT_STRATEGY = typeof(RandomPlacement).Name;
         public static readonly string DEFAULT_MULTICLUSTER_REGISTRATION_STRATEGY = typeof(GlobalSingleInstanceRegistration).Name;
-        private static readonly TimeSpan DEFAULT_DEPLOYMENT_LOAD_PUBLISHER_REFRESH_TIME = TimeSpan.FromSeconds(1);
-        private const int DEFAULT_ACTIVATION_COUNT_BASED_PLACEMENT_CHOOSE_OUT_OF = 2;
 
-        private const bool DEFAULT_USE_VIRTUAL_RING_BUCKETS = true;
-        private const int DEFAULT_NUM_VIRTUAL_RING_BUCKETS = 30;
-        private static readonly TimeSpan DEFAULT_MOCK_REMINDER_TABLE_TIMEOUT = TimeSpan.FromMilliseconds(50);
         private string dataConnectionStringForReminders;
         private string adoInvariantForReminders;
 
-        internal GlobalConfiguration()
+        public GlobalConfiguration()
             : base(true)
         {
-            Application = new ApplicationConfiguration();
-            SeedNodes = new List<IPEndPoint>();
-            livenessServiceType = LivenessProviderType.NotSpecified;
-            LivenessEnabled = true;
-            ProbeTimeout = DEFAULT_LIVENESS_PROBE_TIMEOUT;
-            TableRefreshTimeout = DEFAULT_LIVENESS_TABLE_REFRESH_TIMEOUT;
-            DeathVoteExpirationTimeout = DEFAULT_LIVENESS_DEATH_VOTE_EXPIRATION_TIMEOUT;
-            IAmAliveTablePublishTimeout = DEFAULT_LIVENESS_I_AM_ALIVE_TABLE_PUBLISH_TIMEOUT;
-            NumMissedProbesLimit = DEFAULT_LIVENESS_NUM_MISSED_PROBES_LIMIT;
-            NumProbedSilos = DEFAULT_LIVENESS_NUM_PROBED_SILOS;
-            NumVotesForDeathDeclaration = DEFAULT_LIVENESS_NUM_VOTES_FOR_DEATH_DECLARATION;
-            NumMissedTableIAmAliveLimit = DEFAULT_LIVENESS_NUM_TABLE_I_AM_ALIVE_LIMIT;
-            UseLivenessGossip = DEFAULT_LIVENESS_USE_LIVENESS_GOSSIP;
-            ValidateInitialConnectivity = DEFAULT_VALIDATE_INITIAL_CONNECTIVITY;
-            MaxJoinAttemptTime = DEFAULT_LIVENESS_MAX_JOIN_ATTEMPT_TIME;
-            TypeMapRefreshInterval = DEFAULT_REFRESH_CLUSTER_INTERFACEMAP_TIME;
-            MaxMultiClusterGateways = DEFAULT_MAX_MULTICLUSTER_GATEWAYS;
-            BackgroundGossipInterval = DEFAULT_BACKGROUND_GOSSIP_INTERVAL;
-            UseGlobalSingleInstanceByDefault = DEFAULT_USE_GLOBAL_SINGLE_INSTANCE;
-            GlobalSingleInstanceRetryInterval = DEFAULT_GLOBAL_SINGLE_INSTANCE_RETRY_INTERVAL;
-            GlobalSingleInstanceNumberRetries = DEFAULT_GLOBAL_SINGLE_INSTANCE_NUMBER_RETRIES;
-            ExpectedClusterSizeConfigValue = new ConfigValue<int>(DEFAULT_LIVENESS_EXPECTED_CLUSTER_SIZE, true);
-            ServiceId = Guid.Empty;
+            this.Application = new ApplicationConfiguration();
+            this.SeedNodes = new List<IPEndPoint>();
+            this.livenessServiceType = LivenessProviderType.NotSpecified;
+            this.LivenessEnabled = MembershipOptions.DEFAULT_LIVENESS_ENABLED;
+            this.ProbeTimeout = MembershipOptions.DEFAULT_LIVENESS_PROBE_TIMEOUT;
+            this.TableRefreshTimeout = MembershipOptions.DEFAULT_LIVENESS_TABLE_REFRESH_TIMEOUT;
+            this.DeathVoteExpirationTimeout = MembershipOptions.DEFAULT_LIVENESS_DEATH_VOTE_EXPIRATION_TIMEOUT;
+            this.IAmAliveTablePublishTimeout = MembershipOptions.DEFAULT_LIVENESS_I_AM_ALIVE_TABLE_PUBLISH_TIMEOUT;
+            this.NumMissedProbesLimit = MembershipOptions.DEFAULT_LIVENESS_NUM_MISSED_PROBES_LIMIT;
+            this.NumProbedSilos = MembershipOptions.DEFAULT_LIVENESS_NUM_PROBED_SILOS;
+            this.NumVotesForDeathDeclaration = MembershipOptions.DEFAULT_LIVENESS_NUM_VOTES_FOR_DEATH_DECLARATION;
+            this.NumMissedTableIAmAliveLimit = MembershipOptions.DEFAULT_LIVENESS_NUM_TABLE_I_AM_ALIVE_LIMIT;
+            this.UseLivenessGossip = MembershipOptions.DEFAULT_LIVENESS_USE_LIVENESS_GOSSIP;
+            this.ValidateInitialConnectivity = MembershipOptions.DEFAULT_VALIDATE_INITIAL_CONNECTIVITY;
+            this.MaxJoinAttemptTime = MembershipOptions.DEFAULT_LIVENESS_MAX_JOIN_ATTEMPT_TIME;
+            this.TypeMapRefreshInterval = TypeManagementOptions.DEFAULT_REFRESH_CLUSTER_INTERFACEMAP_TIME;
+            this.MaxMultiClusterGateways = DEFAULT_MAX_MULTICLUSTER_GATEWAYS;
+            this.BackgroundGossipInterval = DEFAULT_BACKGROUND_GOSSIP_INTERVAL;
+            this.UseGlobalSingleInstanceByDefault = DEFAULT_USE_GLOBAL_SINGLE_INSTANCE;
+            this.GlobalSingleInstanceRetryInterval = MultiClusterOptions.DEFAULT_GLOBAL_SINGLE_INSTANCE_RETRY_INTERVAL;
+            this.GlobalSingleInstanceNumberRetries = DEFAULT_GLOBAL_SINGLE_INSTANCE_NUMBER_RETRIES;
+            this.ExpectedClusterSizeConfigValue = new ConfigValue<int>(DEFAULT_LIVENESS_EXPECTED_CLUSTER_SIZE, true);
+            this.ServiceId = Guid.Empty;
             this.ClusterId = "";
-            DataConnectionString = "";
+            this.DataConnectionString = "";
 
             // Assume the ado invariant is for sql server storage if not explicitly specified
-            AdoInvariant = Constants.INVARIANT_NAME_SQL_SERVER;
+            this.AdoInvariant = Constants.INVARIANT_NAME_SQL_SERVER;
 
-            MaxRequestProcessingTime = DEFAULT_COLLECTION_AGE_LIMIT;
-            CollectionQuantum = DEFAULT_COLLECTION_QUANTUM;
+            this.MaxRequestProcessingTime = SiloMessagingOptions.DEFAULT_MAX_REQUEST_PROCESSING_TIME;
+            this.CollectionQuantum = GrainCollectionOptions.DEFAULT_COLLECTION_QUANTUM;
 
-            CacheSize = DEFAULT_CACHE_SIZE;
-            InitialCacheTTL = DEFAULT_INITIAL_CACHE_TTL;
-            MaximumCacheTTL = DEFAULT_MAXIMUM_CACHE_TTL;
-            CacheTTLExtensionFactor = DEFAULT_TTL_EXTENSION_FACTOR;
-            DirectoryCachingStrategy = DEFAULT_DIRECTORY_CACHING_STRATEGY;
-            DirectoryLazyDeregistrationDelay = DEFAULT_UNREGISTER_RACE_DELAY;
-            ClientRegistrationRefresh = DEFAULT_CLIENT_REGISTRATION_REFRESH;
+            this.CacheSize = GrainDirectoryOptions.DEFAULT_CACHE_SIZE;
+            this.InitialCacheTTL = GrainDirectoryOptions.DEFAULT_INITIAL_CACHE_TTL;
+            this.MaximumCacheTTL = GrainDirectoryOptions.DEFAULT_MAXIMUM_CACHE_TTL;
+            this.CacheTTLExtensionFactor = GrainDirectoryOptions.DEFAULT_TTL_EXTENSION_FACTOR;
+            this.DirectoryCachingStrategy = Remap(GrainDirectoryOptions.DEFAULT_CACHING_STRATEGY);
+            this.DirectoryLazyDeregistrationDelay = GrainDirectoryOptions.DEFAULT_UNREGISTER_RACE_DELAY;
+            this.ClientRegistrationRefresh = SiloMessagingOptions.DEFAULT_CLIENT_REGISTRATION_REFRESH;
 
-            PerformDeadlockDetection = DEFAULT_PERFORM_DEADLOCK_DETECTION;
-            AllowCallChainReentrancy = DEFAULT_ALLOW_CALL_CHAIN_REENTRANCY;
-            reminderServiceType = ReminderServiceProviderType.NotSpecified;
-            DefaultPlacementStrategy = DEFAULT_PLACEMENT_STRATEGY;
-            DeploymentLoadPublisherRefreshTime = DEFAULT_DEPLOYMENT_LOAD_PUBLISHER_REFRESH_TIME;
-            ActivationCountBasedPlacementChooseOutOf = DEFAULT_ACTIVATION_COUNT_BASED_PLACEMENT_CHOOSE_OUT_OF;
-            UseVirtualBucketsConsistentRing = DEFAULT_USE_VIRTUAL_RING_BUCKETS;
-            NumVirtualBucketsConsistentRing = DEFAULT_NUM_VIRTUAL_RING_BUCKETS;
-            UseMockReminderTable = false;
-            MockReminderTableTimeout = DEFAULT_MOCK_REMINDER_TABLE_TIMEOUT;
-            AssumeHomogenousSilosForTesting = false;
+            this.PerformDeadlockDetection = DEFAULT_PERFORM_DEADLOCK_DETECTION;
+            this.AllowCallChainReentrancy = DEFAULT_ALLOW_CALL_CHAIN_REENTRANCY;
+            this.reminderServiceType = ReminderServiceProviderType.NotSpecified;
+            this.DefaultPlacementStrategy = GrainPlacementOptions.DEFAULT_PLACEMENT_STRATEGY;
+            this.DeploymentLoadPublisherRefreshTime = SiloStatisticsOptions.DEFAULT_DEPLOYMENT_LOAD_PUBLISHER_REFRESH_TIME;
+            this.ActivationCountBasedPlacementChooseOutOf = GrainPlacementOptions.DEFAULT_ACTIVATION_COUNT_PLACEMENT_CHOOSE_OUT_OF;
+            this.UseVirtualBucketsConsistentRing = ConsistentRingOptions.DEFAULT_USE_VIRTUAL_RING_BUCKETS;
+            this.NumVirtualBucketsConsistentRing = ConsistentRingOptions.DEFAULT_NUM_VIRTUAL_RING_BUCKETS;
+            this.UseMockReminderTable = false;
+            this.MockReminderTableTimeout = ReminderOptions.DEFAULT_MOCK_REMINDER_TABLE_TIMEOUT;
+            this.AssumeHomogenousSilosForTesting = false;
 
-            ProviderConfigurations = new Dictionary<string, ProviderCategoryConfiguration>();
-            GrainServiceConfigurations = new GrainServiceConfigurations();
-            DefaultCompatibilityStrategy = BackwardCompatible.Singleton;
-            DefaultVersionSelectorStrategy = AllCompatibleVersions.Singleton;
+            this.ProviderConfigurations = new Dictionary<string, ProviderCategoryConfiguration>();
+            this.GrainServiceConfigurations = new GrainServiceConfigurations();
+            this.DefaultCompatibilityStrategy = BackwardCompatible.Singleton;
+            this.DefaultVersionSelectorStrategy = AllCompatibleVersions.Singleton;
 
-            FastKillOnCancelKeyPress = true;
+            this.FastKillOnCancelKeyPress = true;
         }
 
         public override string ToString()
         {
             var sb = new StringBuilder();
             sb.AppendFormat("   System Ids:").AppendLine();
-            sb.AppendFormat("      ServiceId: {0}", ServiceId).AppendLine();
+            sb.AppendFormat("      ServiceId: {0}", this.ServiceId).AppendLine();
             sb.AppendFormat("      ClusterId: {0}", this.ClusterId).AppendLine();
-            sb.Append("   Subnet: ").Append(Subnet == null ? "" : Subnet.ToStrings(x => x.ToString(CultureInfo.InvariantCulture), ".")).AppendLine();
+            sb.Append("   Subnet: ").Append(this.Subnet == null ? "" : this.Subnet.ToStrings(x => x.ToString(CultureInfo.InvariantCulture), ".")).AppendLine();
             sb.Append("   Seed nodes: ");
             bool first = true;
-            foreach (IPEndPoint node in SeedNodes)
+            foreach (IPEndPoint node in this.SeedNodes)
             {
                 if (!first)
                 {
@@ -619,32 +656,32 @@ namespace Orleans.Runtime.Configuration
             sb.AppendLine();
             sb.AppendFormat(base.ToString());
             sb.AppendFormat("   Liveness:").AppendLine();
-            sb.AppendFormat("      LivenessEnabled: {0}", LivenessEnabled).AppendLine();
-            sb.AppendFormat("      LivenessType: {0}", LivenessType).AppendLine();
-            sb.AppendFormat("      ProbeTimeout: {0}", ProbeTimeout).AppendLine();
-            sb.AppendFormat("      TableRefreshTimeout: {0}", TableRefreshTimeout).AppendLine();
-            sb.AppendFormat("      DeathVoteExpirationTimeout: {0}", DeathVoteExpirationTimeout).AppendLine();
-            sb.AppendFormat("      NumMissedProbesLimit: {0}", NumMissedProbesLimit).AppendLine();
-            sb.AppendFormat("      NumProbedSilos: {0}", NumProbedSilos).AppendLine();
-            sb.AppendFormat("      NumVotesForDeathDeclaration: {0}", NumVotesForDeathDeclaration).AppendLine();
-            sb.AppendFormat("      UseLivenessGossip: {0}", UseLivenessGossip).AppendLine();
-            sb.AppendFormat("      ValidateInitialConnectivity: {0}", ValidateInitialConnectivity).AppendLine();
-            sb.AppendFormat("      IAmAliveTablePublishTimeout: {0}", IAmAliveTablePublishTimeout).AppendLine();
-            sb.AppendFormat("      NumMissedTableIAmAliveLimit: {0}", NumMissedTableIAmAliveLimit).AppendLine();
-            sb.AppendFormat("      MaxJoinAttemptTime: {0}", MaxJoinAttemptTime).AppendLine();
-            sb.AppendFormat("      ExpectedClusterSize: {0}", ExpectedClusterSize).AppendLine();
+            sb.AppendFormat("      LivenessEnabled: {0}", this.LivenessEnabled).AppendLine();
+            sb.AppendFormat("      LivenessType: {0}", this.LivenessType).AppendLine();
+            sb.AppendFormat("      ProbeTimeout: {0}", this.ProbeTimeout).AppendLine();
+            sb.AppendFormat("      TableRefreshTimeout: {0}", this.TableRefreshTimeout).AppendLine();
+            sb.AppendFormat("      DeathVoteExpirationTimeout: {0}", this.DeathVoteExpirationTimeout).AppendLine();
+            sb.AppendFormat("      NumMissedProbesLimit: {0}", this.NumMissedProbesLimit).AppendLine();
+            sb.AppendFormat("      NumProbedSilos: {0}", this.NumProbedSilos).AppendLine();
+            sb.AppendFormat("      NumVotesForDeathDeclaration: {0}", this.NumVotesForDeathDeclaration).AppendLine();
+            sb.AppendFormat("      UseLivenessGossip: {0}", this.UseLivenessGossip).AppendLine();
+            sb.AppendFormat("      ValidateInitialConnectivity: {0}", this.ValidateInitialConnectivity).AppendLine();
+            sb.AppendFormat("      IAmAliveTablePublishTimeout: {0}", this.IAmAliveTablePublishTimeout).AppendLine();
+            sb.AppendFormat("      NumMissedTableIAmAliveLimit: {0}", this.NumMissedTableIAmAliveLimit).AppendLine();
+            sb.AppendFormat("      MaxJoinAttemptTime: {0}", this.MaxJoinAttemptTime).AppendLine();
+            sb.AppendFormat("      ExpectedClusterSize: {0}", this.ExpectedClusterSize).AppendLine();
 
-            if (HasMultiClusterNetwork)
+            if (this.HasMultiClusterNetwork)
             {
                 sb.AppendLine("   MultiClusterNetwork:");
-                sb.AppendFormat("      ClusterId: {0}", ClusterId ?? "").AppendLine();
-                sb.AppendFormat("      DefaultMultiCluster: {0}", DefaultMultiCluster != null ? string.Join(",", DefaultMultiCluster) : "null").AppendLine();
-                sb.AppendFormat("      MaxMultiClusterGateways: {0}", MaxMultiClusterGateways).AppendLine();
-                sb.AppendFormat("      BackgroundGossipInterval: {0}", BackgroundGossipInterval).AppendLine();
-                sb.AppendFormat("      UseGlobalSingleInstanceByDefault: {0}", UseGlobalSingleInstanceByDefault).AppendLine();
-                sb.AppendFormat("      GlobalSingleInstanceRetryInterval: {0}", GlobalSingleInstanceRetryInterval).AppendLine();
-                sb.AppendFormat("      GlobalSingleInstanceNumberRetries: {0}", GlobalSingleInstanceNumberRetries).AppendLine();
-                sb.AppendFormat("      GossipChannels: {0}", string.Join(",", GossipChannels.Select(conf => conf.ChannelType.ToString() + ":" + conf.ConnectionString))).AppendLine();
+                sb.AppendFormat("      ClusterId: {0}", this.ClusterId ?? "").AppendLine();
+                sb.AppendFormat("      DefaultMultiCluster: {0}", this.DefaultMultiCluster != null ? string.Join(",", this.DefaultMultiCluster) : "null").AppendLine();
+                sb.AppendFormat("      MaxMultiClusterGateways: {0}", this.MaxMultiClusterGateways).AppendLine();
+                sb.AppendFormat("      BackgroundGossipInterval: {0}", this.BackgroundGossipInterval).AppendLine();
+                sb.AppendFormat("      UseGlobalSingleInstanceByDefault: {0}", this.UseGlobalSingleInstanceByDefault).AppendLine();
+                sb.AppendFormat("      GlobalSingleInstanceRetryInterval: {0}", this.GlobalSingleInstanceRetryInterval).AppendLine();
+                sb.AppendFormat("      GlobalSingleInstanceNumberRetries: {0}", this.GlobalSingleInstanceNumberRetries).AppendLine();
+                sb.AppendFormat("      GossipChannels: {0}", string.Join(",", this.GossipChannels.Select(conf => conf.ChannelType.ToString() + ":" + conf.ConnectionString))).AppendLine();
             }
             else
             {
@@ -653,42 +690,42 @@ namespace Orleans.Runtime.Configuration
 
             sb.AppendFormat("   SystemStore:").AppendLine();
             // Don't print connection credentials in log files, so pass it through redactment filter
-            string connectionStringForLog = ConfigUtilities.RedactConnectionStringInfo(DataConnectionString);
+            string connectionStringForLog = ConfigUtilities.RedactConnectionStringInfo(this.DataConnectionString);
             sb.AppendFormat("      SystemStore ConnectionString: {0}", connectionStringForLog).AppendLine();
-            string remindersConnectionStringForLog = ConfigUtilities.RedactConnectionStringInfo(DataConnectionStringForReminders);
+            string remindersConnectionStringForLog = ConfigUtilities.RedactConnectionStringInfo(this.DataConnectionStringForReminders);
             sb.AppendFormat("      Reminders ConnectionString: {0}", remindersConnectionStringForLog).AppendLine();
-            sb.Append(Application.ToString()).AppendLine();
+            sb.Append(this.Application.ToString()).AppendLine();
             sb.Append("   PlacementStrategy: ").AppendLine();
-            sb.Append("      ").Append("   Default Placement Strategy: ").Append(DefaultPlacementStrategy).AppendLine();
-            sb.Append("      ").Append("   Deployment Load Publisher Refresh Time: ").Append(DeploymentLoadPublisherRefreshTime).AppendLine();
-            sb.Append("      ").Append("   Activation CountBased Placement Choose Out Of: ").Append(ActivationCountBasedPlacementChooseOutOf).AppendLine();
+            sb.Append("      ").Append("   Default Placement Strategy: ").Append(this.DefaultPlacementStrategy).AppendLine();
+            sb.Append("      ").Append("   Deployment Load Publisher Refresh Time: ").Append(this.DeploymentLoadPublisherRefreshTime).AppendLine();
+            sb.Append("      ").Append("   Activation CountBased Placement Choose Out Of: ").Append(this.ActivationCountBasedPlacementChooseOutOf).AppendLine();
             sb.AppendFormat("   Grain directory cache:").AppendLine();
-            sb.AppendFormat("      Maximum size: {0} grains", CacheSize).AppendLine();
-            sb.AppendFormat("      Initial TTL: {0}", InitialCacheTTL).AppendLine();
-            sb.AppendFormat("      Maximum TTL: {0}", MaximumCacheTTL).AppendLine();
-            sb.AppendFormat("      TTL extension factor: {0:F2}", CacheTTLExtensionFactor).AppendLine();
-            sb.AppendFormat("      Directory Caching Strategy: {0}", DirectoryCachingStrategy).AppendLine();
+            sb.AppendFormat("      Maximum size: {0} grains", this.CacheSize).AppendLine();
+            sb.AppendFormat("      Initial TTL: {0}", this.InitialCacheTTL).AppendLine();
+            sb.AppendFormat("      Maximum TTL: {0}", this.MaximumCacheTTL).AppendLine();
+            sb.AppendFormat("      TTL extension factor: {0:F2}", this.CacheTTLExtensionFactor).AppendLine();
+            sb.AppendFormat("      Directory Caching Strategy: {0}", this.DirectoryCachingStrategy).AppendLine();
             sb.AppendFormat("   Grain directory:").AppendLine();
-            sb.AppendFormat("      Lazy deregistration delay: {0}", DirectoryLazyDeregistrationDelay).AppendLine();
-            sb.AppendFormat("      Client registration refresh: {0}", ClientRegistrationRefresh).AppendLine();
+            sb.AppendFormat("      Lazy deregistration delay: {0}", this.DirectoryLazyDeregistrationDelay).AppendLine();
+            sb.AppendFormat("      Client registration refresh: {0}", this.ClientRegistrationRefresh).AppendLine();
             sb.AppendFormat("   Reminder Service:").AppendLine();
-            sb.AppendFormat("       ReminderServiceType: {0}", ReminderServiceType).AppendLine();
-            if (ReminderServiceType == ReminderServiceProviderType.MockTable)
+            sb.AppendFormat("       ReminderServiceType: {0}", this.ReminderServiceType).AppendLine();
+            if (this.ReminderServiceType == ReminderServiceProviderType.MockTable)
             {
-                sb.AppendFormat("       MockReminderTableTimeout: {0}ms", MockReminderTableTimeout.TotalMilliseconds).AppendLine();
+                sb.AppendFormat("       MockReminderTableTimeout: {0}ms", this.MockReminderTableTimeout.TotalMilliseconds).AppendLine();
             }
             sb.AppendFormat("   Consistent Ring:").AppendLine();
-            sb.AppendFormat("       Use Virtual Buckets Consistent Ring: {0}", UseVirtualBucketsConsistentRing).AppendLine();
-            sb.AppendFormat("       Num Virtual Buckets Consistent Ring: {0}", NumVirtualBucketsConsistentRing).AppendLine();
+            sb.AppendFormat("       Use Virtual Buckets Consistent Ring: {0}", this.UseVirtualBucketsConsistentRing).AppendLine();
+            sb.AppendFormat("       Num Virtual Buckets Consistent Ring: {0}", this.NumVirtualBucketsConsistentRing).AppendLine();
             sb.AppendFormat("   Providers:").AppendLine();
-            sb.Append(ProviderConfigurationUtility.PrintProviderConfigurations(ProviderConfigurations));
+            sb.Append(ProviderConfigurationUtility.PrintProviderConfigurations(this.ProviderConfigurations));
 
             return sb.ToString();
         }
 
         internal override void Load(XmlElement root)
         {
-            SeedNodes = new List<IPEndPoint>();
+            this.SeedNodes = new List<IPEndPoint>();
 
             XmlElement child;
             foreach (XmlNode c in root.ChildNodes)
@@ -696,7 +733,7 @@ namespace Orleans.Runtime.Configuration
                 child = c as XmlElement;
                 if (child != null && child.LocalName == "Networking")
                 {
-                    Subnet = child.HasAttribute("Subnet")
+                    this.Subnet = child.HasAttribute("Subnet")
                         ? ConfigUtilities.ParseSubnet(child.GetAttribute("Subnet"), "Invalid Subnet")
                         : null;
                 }
@@ -711,69 +748,69 @@ namespace Orleans.Runtime.Configuration
                     case "Liveness":
                         if (child.HasAttribute("LivenessEnabled"))
                         {
-                            LivenessEnabled = ConfigUtilities.ParseBool(child.GetAttribute("LivenessEnabled"),
+                            this.LivenessEnabled = ConfigUtilities.ParseBool(child.GetAttribute("LivenessEnabled"),
                                 "Invalid boolean value for the LivenessEnabled attribute on the Liveness element");
                         }
                         if (child.HasAttribute("ProbeTimeout"))
                         {
-                            ProbeTimeout = ConfigUtilities.ParseTimeSpan(child.GetAttribute("ProbeTimeout"),
+                            this.ProbeTimeout = ConfigUtilities.ParseTimeSpan(child.GetAttribute("ProbeTimeout"),
                                 "Invalid time value for the ProbeTimeout attribute on the Liveness element");
                         }
                         if (child.HasAttribute("TableRefreshTimeout"))
                         {
-                            TableRefreshTimeout = ConfigUtilities.ParseTimeSpan(child.GetAttribute("TableRefreshTimeout"),
+                            this.TableRefreshTimeout = ConfigUtilities.ParseTimeSpan(child.GetAttribute("TableRefreshTimeout"),
                                 "Invalid time value for the TableRefreshTimeout attribute on the Liveness element");
                         }
                         if (child.HasAttribute("DeathVoteExpirationTimeout"))
                         {
-                            DeathVoteExpirationTimeout = ConfigUtilities.ParseTimeSpan(child.GetAttribute("DeathVoteExpirationTimeout"),
+                            this.DeathVoteExpirationTimeout = ConfigUtilities.ParseTimeSpan(child.GetAttribute("DeathVoteExpirationTimeout"),
                                 "Invalid time value for the DeathVoteExpirationTimeout attribute on the Liveness element");
                         }
                         if (child.HasAttribute("NumMissedProbesLimit"))
                         {
-                            NumMissedProbesLimit = ConfigUtilities.ParseInt(child.GetAttribute("NumMissedProbesLimit"),
+                            this.NumMissedProbesLimit = ConfigUtilities.ParseInt(child.GetAttribute("NumMissedProbesLimit"),
                                 "Invalid integer value for the NumMissedIAmAlive attribute on the Liveness element");
                         }
                         if (child.HasAttribute("NumProbedSilos"))
                         {
-                            NumProbedSilos = ConfigUtilities.ParseInt(child.GetAttribute("NumProbedSilos"),
+                            this.NumProbedSilos = ConfigUtilities.ParseInt(child.GetAttribute("NumProbedSilos"),
                                 "Invalid integer value for the NumProbedSilos attribute on the Liveness element");
                         }
                         if (child.HasAttribute("NumVotesForDeathDeclaration"))
                         {
-                            NumVotesForDeathDeclaration = ConfigUtilities.ParseInt(child.GetAttribute("NumVotesForDeathDeclaration"),
+                            this.NumVotesForDeathDeclaration = ConfigUtilities.ParseInt(child.GetAttribute("NumVotesForDeathDeclaration"),
                                 "Invalid integer value for the NumVotesForDeathDeclaration attribute on the Liveness element");
                         }
                         if (child.HasAttribute("UseLivenessGossip"))
                         {
-                            UseLivenessGossip = ConfigUtilities.ParseBool(child.GetAttribute("UseLivenessGossip"),
+                            this.UseLivenessGossip = ConfigUtilities.ParseBool(child.GetAttribute("UseLivenessGossip"),
                                 "Invalid boolean value for the UseLivenessGossip attribute on the Liveness element");
                         }
                         if (child.HasAttribute("ValidateInitialConnectivity"))
                         {
-                            ValidateInitialConnectivity = ConfigUtilities.ParseBool(child.GetAttribute("ValidateInitialConnectivity"),
+                            this.ValidateInitialConnectivity = ConfigUtilities.ParseBool(child.GetAttribute("ValidateInitialConnectivity"),
                                 "Invalid boolean value for the ValidateInitialConnectivity attribute on the Liveness element");
                         }
                         if (child.HasAttribute("IAmAliveTablePublishTimeout"))
                         {
-                            IAmAliveTablePublishTimeout = ConfigUtilities.ParseTimeSpan(child.GetAttribute("IAmAliveTablePublishTimeout"),
+                            this.IAmAliveTablePublishTimeout = ConfigUtilities.ParseTimeSpan(child.GetAttribute("IAmAliveTablePublishTimeout"),
                                 "Invalid time value for the IAmAliveTablePublishTimeout attribute on the Liveness element");
                         }
                         if (child.HasAttribute("NumMissedTableIAmAliveLimit"))
                         {
-                            NumMissedTableIAmAliveLimit = ConfigUtilities.ParseInt(child.GetAttribute("NumMissedTableIAmAliveLimit"),
+                            this.NumMissedTableIAmAliveLimit = ConfigUtilities.ParseInt(child.GetAttribute("NumMissedTableIAmAliveLimit"),
                                 "Invalid integer value for the NumMissedTableIAmAliveLimit attribute on the Liveness element");
                         }
                         if (child.HasAttribute("MaxJoinAttemptTime"))
                         {
-                            MaxJoinAttemptTime = ConfigUtilities.ParseTimeSpan(child.GetAttribute("MaxJoinAttemptTime"),
+                            this.MaxJoinAttemptTime = ConfigUtilities.ParseTimeSpan(child.GetAttribute("MaxJoinAttemptTime"),
                                 "Invalid time value for the MaxJoinAttemptTime attribute on the Liveness element");
                         }
                         if (child.HasAttribute("ExpectedClusterSize"))
                         {
                             int expectedClusterSize = ConfigUtilities.ParseInt(child.GetAttribute("ExpectedClusterSize"),
                                 "Invalid integer value for the ExpectedClusterSize attribute on the Liveness element");
-                            ExpectedClusterSizeConfigValue = new ConfigValue<int>(expectedClusterSize, false);
+                            this.ExpectedClusterSizeConfigValue = new ConfigValue<int>(expectedClusterSize, false);
                         }
                         break;
 
@@ -785,9 +822,9 @@ namespace Orleans.Runtime.Configuration
                             var sst = child.GetAttribute("SystemStoreType");
                             if (!"None".Equals(sst, StringComparison.OrdinalIgnoreCase))
                             {
-                                LivenessType = (LivenessProviderType)Enum.Parse(typeof(LivenessProviderType), sst);
+                                this.LivenessType = (LivenessProviderType)Enum.Parse(typeof(LivenessProviderType), sst);
                                 ReminderServiceProviderType reminderServiceProviderType;
-                                if (LivenessType == LivenessProviderType.MembershipTableGrain)
+                                if (this.LivenessType == LivenessProviderType.MembershipTableGrain)
                                 {
                                     // Special case for MembershipTableGrain -> ReminderTableGrain since we use the same setting
                                     // for LivenessType and ReminderServiceType even if the enum are not 100% compatible
@@ -805,30 +842,30 @@ namespace Orleans.Runtime.Configuration
                         }
                         if (child.HasAttribute("MembershipTableAssembly"))
                         {
-                            MembershipTableAssembly = child.GetAttribute("MembershipTableAssembly");
-                            if (LivenessType != LivenessProviderType.Custom)
+                            this.MembershipTableAssembly = child.GetAttribute("MembershipTableAssembly");
+                            if (this.LivenessType != LivenessProviderType.Custom)
                                 throw new FormatException("SystemStoreType should be \"Custom\" when MembershipTableAssembly is specified");
-                            if (MembershipTableAssembly.EndsWith(".dll"))
+                            if (this.MembershipTableAssembly.EndsWith(".dll"))
                                 throw new FormatException("Use fully qualified assembly name for \"MembershipTableAssembly\"");
                         }
                         if (child.HasAttribute("ReminderTableAssembly"))
                         {
-                            ReminderTableAssembly = child.GetAttribute("ReminderTableAssembly");
-                            if (ReminderServiceType != ReminderServiceProviderType.Custom)
+                            this.ReminderTableAssembly = child.GetAttribute("ReminderTableAssembly");
+                            if (this.ReminderServiceType != ReminderServiceProviderType.Custom)
                                 throw new FormatException("ReminderServiceType should be \"Custom\" when ReminderTableAssembly is specified");
-                            if (ReminderTableAssembly.EndsWith(".dll"))
+                            if (this.ReminderTableAssembly.EndsWith(".dll"))
                                 throw new FormatException("Use fully qualified assembly name for \"ReminderTableAssembly\"");
                         }
-                        if (LivenessType == LivenessProviderType.Custom && string.IsNullOrEmpty(MembershipTableAssembly))
+                        if (this.LivenessType == LivenessProviderType.Custom && string.IsNullOrEmpty(this.MembershipTableAssembly))
                             throw new FormatException("MembershipTableAssembly should be set when SystemStoreType is \"Custom\"");
-                        if (ReminderServiceType == ReminderServiceProviderType.Custom && String.IsNullOrEmpty(ReminderTableAssembly))
+                        if (this.ReminderServiceType == ReminderServiceProviderType.Custom && string.IsNullOrEmpty(this.ReminderTableAssembly))
                         { 
                             SetReminderServiceType(ReminderServiceProviderType.Disabled);
                         }
 
                         if (child.HasAttribute("ServiceId"))
                         {
-                            ServiceId = ConfigUtilities.ParseGuid(child.GetAttribute("ServiceId"),
+                            this.ServiceId = ConfigUtilities.ParseGuid(child.GetAttribute("ServiceId"),
                                 "Invalid Guid value for the ServiceId attribute on the Azure element");
                         }
                         if (child.HasAttribute("DeploymentId"))
@@ -837,16 +874,16 @@ namespace Orleans.Runtime.Configuration
                         }
                         if (child.HasAttribute(Constants.DATA_CONNECTION_STRING_NAME))
                         {
-                            DataConnectionString = child.GetAttribute(Constants.DATA_CONNECTION_STRING_NAME);
-                            if (String.IsNullOrWhiteSpace(DataConnectionString))
+                            this.DataConnectionString = child.GetAttribute(Constants.DATA_CONNECTION_STRING_NAME);
+                            if (string.IsNullOrWhiteSpace(this.DataConnectionString))
                             {
                                 throw new FormatException("SystemStore.DataConnectionString cannot be blank");
                             }
                         }
                         if (child.HasAttribute(Constants.DATA_CONNECTION_FOR_REMINDERS_STRING_NAME))
                         {
-                            DataConnectionStringForReminders = child.GetAttribute(Constants.DATA_CONNECTION_FOR_REMINDERS_STRING_NAME);
-                            if (String.IsNullOrWhiteSpace(DataConnectionStringForReminders))
+                            this.DataConnectionStringForReminders = child.GetAttribute(Constants.DATA_CONNECTION_FOR_REMINDERS_STRING_NAME);
+                            if (string.IsNullOrWhiteSpace(this.DataConnectionStringForReminders))
                             {
                                 throw new FormatException("SystemStore.DataConnectionStringForReminders cannot be blank");
                             }
@@ -854,83 +891,83 @@ namespace Orleans.Runtime.Configuration
                         if (child.HasAttribute(Constants.ADO_INVARIANT_NAME))
                         {
                             var adoInvariant = child.GetAttribute(Constants.ADO_INVARIANT_NAME);
-                            if (String.IsNullOrWhiteSpace(adoInvariant))
+                            if (string.IsNullOrWhiteSpace(adoInvariant))
                             {
                                 throw new FormatException("SystemStore.AdoInvariant cannot be blank");
                             }
-                            AdoInvariant = adoInvariant;
+                            this.AdoInvariant = adoInvariant;
                         }
                         if (child.HasAttribute(Constants.ADO_INVARIANT_FOR_REMINDERS_NAME))
                         {
                             var adoInvariantForReminders = child.GetAttribute(Constants.ADO_INVARIANT_FOR_REMINDERS_NAME);
-                            if (String.IsNullOrWhiteSpace(adoInvariantForReminders))
+                            if (string.IsNullOrWhiteSpace(adoInvariantForReminders))
                             {
                                 throw new FormatException("SystemStore.adoInvariantForReminders cannot be blank");
                             }
-                            AdoInvariantForReminders = adoInvariantForReminders;
+                            this.AdoInvariantForReminders = adoInvariantForReminders;
                         }
                         if (child.HasAttribute("MaxStorageBusyRetries"))
                         {
-                            MaxStorageBusyRetries = ConfigUtilities.ParseInt(child.GetAttribute("MaxStorageBusyRetries"),
+                            this.MaxStorageBusyRetries = ConfigUtilities.ParseInt(child.GetAttribute("MaxStorageBusyRetries"),
                                 "Invalid integer value for the MaxStorageBusyRetries attribute on the SystemStore element");
                         }
                         if (child.HasAttribute("UseMockReminderTable"))
                         {
-                            MockReminderTableTimeout = ConfigUtilities.ParseTimeSpan(child.GetAttribute("UseMockReminderTable"), "Invalid timeout value");
-                            UseMockReminderTable = true;
+                            this.MockReminderTableTimeout = ConfigUtilities.ParseTimeSpan(child.GetAttribute("UseMockReminderTable"), "Invalid timeout value");
+                            this.UseMockReminderTable = true;
                         }
                         break;
                     case "MultiClusterNetwork":
-                        HasMultiClusterNetwork = true;
-                        ClusterId = child.GetAttribute("ClusterId");
+                        this.HasMultiClusterNetwork = true;
+                        this.ClusterId = child.GetAttribute("ClusterId");
 
                         // we always trim cluster ids to avoid surprises when parsing comma-separated lists
-                        if (ClusterId != null) 
-                            ClusterId = ClusterId.Trim(); 
+                        if (this.ClusterId != null)
+                            this.ClusterId = this.ClusterId.Trim(); 
 
-                        if (string.IsNullOrEmpty(ClusterId))
+                        if (string.IsNullOrEmpty(this.ClusterId))
                             throw new FormatException("MultiClusterNetwork.ClusterId cannot be blank");
-                        if (ClusterId.Contains(","))
-                            throw new FormatException("MultiClusterNetwork.ClusterId cannot contain commas: " + ClusterId);
+                        if (this.ClusterId.Contains(","))
+                            throw new FormatException("MultiClusterNetwork.ClusterId cannot contain commas: " + this.ClusterId);
 
                         if (child.HasAttribute("DefaultMultiCluster"))
                         {
                             var toparse = child.GetAttribute("DefaultMultiCluster").Trim();
                             if (string.IsNullOrEmpty(toparse))
                             {
-                                DefaultMultiCluster = new List<string>(); // empty cluster
+                                this.DefaultMultiCluster = new List<string>(); // empty cluster
                             }
                             else
                             {
-                                DefaultMultiCluster = toparse.Split(',').Select(id => id.Trim()).ToList();
-                                foreach (var id in DefaultMultiCluster)
+                                this.DefaultMultiCluster = toparse.Split(',').Select(id => id.Trim()).ToList();
+                                foreach (var id in this.DefaultMultiCluster)
                                     if (string.IsNullOrEmpty(id))
                                         throw new FormatException("MultiClusterNetwork.DefaultMultiCluster cannot contain blank cluster ids: " + toparse);
                             }
                         }
                         if (child.HasAttribute("BackgroundGossipInterval"))
                         {
-                            BackgroundGossipInterval = ConfigUtilities.ParseTimeSpan(child.GetAttribute("BackgroundGossipInterval"),
+                            this.BackgroundGossipInterval = ConfigUtilities.ParseTimeSpan(child.GetAttribute("BackgroundGossipInterval"),
                                 "Invalid time value for the BackgroundGossipInterval attribute on the MultiClusterNetwork element");
                         }
                         if (child.HasAttribute("UseGlobalSingleInstanceByDefault"))
                         {
-                            UseGlobalSingleInstanceByDefault = ConfigUtilities.ParseBool(child.GetAttribute("UseGlobalSingleInstanceByDefault"),
+                            this.UseGlobalSingleInstanceByDefault = ConfigUtilities.ParseBool(child.GetAttribute("UseGlobalSingleInstanceByDefault"),
                                 "Invalid boolean for the UseGlobalSingleInstanceByDefault attribute on the MultiClusterNetwork element");
                         }
                         if (child.HasAttribute("GlobalSingleInstanceRetryInterval"))
                         {
-                            GlobalSingleInstanceRetryInterval = ConfigUtilities.ParseTimeSpan(child.GetAttribute("GlobalSingleInstanceRetryInterval"),
+                            this.GlobalSingleInstanceRetryInterval = ConfigUtilities.ParseTimeSpan(child.GetAttribute("GlobalSingleInstanceRetryInterval"),
                                 "Invalid time value for the GlobalSingleInstanceRetryInterval attribute on the MultiClusterNetwork element");
                         }
                         if (child.HasAttribute("GlobalSingleInstanceNumberRetries"))
                         {
-                            GlobalSingleInstanceNumberRetries = ConfigUtilities.ParseInt(child.GetAttribute("GlobalSingleInstanceNumberRetries"),
+                            this.GlobalSingleInstanceNumberRetries = ConfigUtilities.ParseInt(child.GetAttribute("GlobalSingleInstanceNumberRetries"),
                                 "Invalid value for the GlobalSingleInstanceRetryInterval attribute on the MultiClusterNetwork element");
                         }
                         if (child.HasAttribute("MaxMultiClusterGateways"))
                         {
-                            MaxMultiClusterGateways = ConfigUtilities.ParseInt(child.GetAttribute("MaxMultiClusterGateways"),
+                            this.MaxMultiClusterGateways = ConfigUtilities.ParseInt(child.GetAttribute("MaxMultiClusterGateways"),
                                 "Invalid value for the MaxMultiClusterGateways attribute on the MultiClusterNetwork element");
                         }
                         var channels = new List<GossipChannelConfiguration>();
@@ -946,10 +983,10 @@ namespace Orleans.Runtime.Configuration
                                 ConnectionString = channelspec.GetAttribute("ConnectionString")
                             });
                         }
-                        GossipChannels = channels;
+                        this.GossipChannels = channels;
                         break;
                     case "SeedNode":
-                        SeedNodes.Add(ConfigUtilities.ParseIPEndPoint(child, Subnet).GetResult());
+                        this.SeedNodes.Add(ConfigUtilities.ParseIPEndPoint(child, this.Subnet).GetResult());
                         break;
 
                     case "Messaging":
@@ -957,43 +994,43 @@ namespace Orleans.Runtime.Configuration
                         break;
 
                     case "Application":
-                        Application.Load(child);
+                        this.Application.Load(child);
                         break;
 
                     case "PlacementStrategy":
                         if (child.HasAttribute("DefaultPlacementStrategy"))
-                            DefaultPlacementStrategy = child.GetAttribute("DefaultPlacementStrategy");
+                            this.DefaultPlacementStrategy = child.GetAttribute("DefaultPlacementStrategy");
                         if (child.HasAttribute("DeploymentLoadPublisherRefreshTime"))
-                            DeploymentLoadPublisherRefreshTime = ConfigUtilities.ParseTimeSpan(child.GetAttribute("DeploymentLoadPublisherRefreshTime"),
+                            this.DeploymentLoadPublisherRefreshTime = ConfigUtilities.ParseTimeSpan(child.GetAttribute("DeploymentLoadPublisherRefreshTime"),
                                 "Invalid time span value for PlacementStrategy.DeploymentLoadPublisherRefreshTime");
                         if (child.HasAttribute("ActivationCountBasedPlacementChooseOutOf"))
-                            ActivationCountBasedPlacementChooseOutOf = ConfigUtilities.ParseInt(child.GetAttribute("ActivationCountBasedPlacementChooseOutOf"),
+                            this.ActivationCountBasedPlacementChooseOutOf = ConfigUtilities.ParseInt(child.GetAttribute("ActivationCountBasedPlacementChooseOutOf"),
                                 "Invalid ActivationCountBasedPlacementChooseOutOf setting");
                         break;
 
                     case "Caching":
                         if (child.HasAttribute("CacheSize"))
-                            CacheSize = ConfigUtilities.ParseInt(child.GetAttribute("CacheSize"),
+                            this.CacheSize = ConfigUtilities.ParseInt(child.GetAttribute("CacheSize"),
                                 "Invalid integer value for Caching.CacheSize");
 
                         if (child.HasAttribute("InitialTTL"))
-                            InitialCacheTTL = ConfigUtilities.ParseTimeSpan(child.GetAttribute("InitialTTL"),
+                            this.InitialCacheTTL = ConfigUtilities.ParseTimeSpan(child.GetAttribute("InitialTTL"),
                                 "Invalid time value for Caching.InitialTTL");
 
                         if (child.HasAttribute("MaximumTTL"))
-                            MaximumCacheTTL = ConfigUtilities.ParseTimeSpan(child.GetAttribute("MaximumTTL"),
+                            this.MaximumCacheTTL = ConfigUtilities.ParseTimeSpan(child.GetAttribute("MaximumTTL"),
                                 "Invalid time value for Caching.MaximumTTL");
 
                         if (child.HasAttribute("TTLExtensionFactor"))
-                            CacheTTLExtensionFactor = ConfigUtilities.ParseDouble(child.GetAttribute("TTLExtensionFactor"),
+                            this.CacheTTLExtensionFactor = ConfigUtilities.ParseDouble(child.GetAttribute("TTLExtensionFactor"),
                                 "Invalid double value for Caching.TTLExtensionFactor");
-                        if (CacheTTLExtensionFactor <= 1.0)
+                        if (this.CacheTTLExtensionFactor <= 1.0)
                         {
                             throw new FormatException("Caching.TTLExtensionFactor must be greater than 1.0");
                         }
 
                         if (child.HasAttribute("DirectoryCachingStrategy"))
-                            DirectoryCachingStrategy = ConfigUtilities.ParseEnum<DirectoryCachingStrategyType>(child.GetAttribute("DirectoryCachingStrategy"),
+                            this.DirectoryCachingStrategy = ConfigUtilities.ParseEnum<DirectoryCachingStrategyType>(child.GetAttribute("DirectoryCachingStrategy"),
                                 "Invalid value for Caching.Strategy");
 
                         break;
@@ -1001,12 +1038,12 @@ namespace Orleans.Runtime.Configuration
                     case "Directory":
                         if (child.HasAttribute("DirectoryLazyDeregistrationDelay"))
                         {
-                            DirectoryLazyDeregistrationDelay = ConfigUtilities.ParseTimeSpan(child.GetAttribute("DirectoryLazyDeregistrationDelay"),
+                            this.DirectoryLazyDeregistrationDelay = ConfigUtilities.ParseTimeSpan(child.GetAttribute("DirectoryLazyDeregistrationDelay"),
                                 "Invalid time span value for Directory.DirectoryLazyDeregistrationDelay");
                         }
                         if (child.HasAttribute("ClientRegistrationRefresh"))
                         {
-                            ClientRegistrationRefresh = ConfigUtilities.ParseTimeSpan(child.GetAttribute("ClientRegistrationRefresh"),
+                            this.ClientRegistrationRefresh = ConfigUtilities.ParseTimeSpan(child.GetAttribute("ClientRegistrationRefresh"),
                                 "Invalid time span value for Directory.ClientRegistrationRefresh");
                         }
                         break;
@@ -1014,21 +1051,21 @@ namespace Orleans.Runtime.Configuration
                     default:
                         if (child.LocalName.Equals("GrainServices", StringComparison.Ordinal))
                         {
-                            GrainServiceConfigurations = GrainServiceConfigurations.Load(child);
+                            this.GrainServiceConfigurations = GrainServiceConfigurations.Load(child);
                         }
 
                         if (child.LocalName.EndsWith("Providers", StringComparison.Ordinal))
                         {
                             var providerCategory = ProviderCategoryConfiguration.Load(child);
 
-                            if (ProviderConfigurations.ContainsKey(providerCategory.Name))
+                            if (this.ProviderConfigurations.ContainsKey(providerCategory.Name))
                             {
-                                var existingCategory = ProviderConfigurations[providerCategory.Name];
+                                var existingCategory = this.ProviderConfigurations[providerCategory.Name];
                                 existingCategory.Merge(providerCategory);
                             }
                             else
                             {
-                                ProviderConfigurations.Add(providerCategory.Name, providerCategory);
+                                this.ProviderConfigurations.Add(providerCategory.Name, providerCategory);
                             }
                         }
                         break;
@@ -1051,7 +1088,7 @@ namespace Orleans.Runtime.Configuration
                 !typeof(Orleans.Streams.IStreamProvider).IsAssignableFrom(providerType))
                 throw new ArgumentException("Expected non-generic, non-abstract type which implements IStreamProvider interface", "typeof(T)");
 
-            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
+            ProviderConfigurationUtility.RegisterProvider(this.ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
         }
 
         /// <summary>
@@ -1062,7 +1099,7 @@ namespace Orleans.Runtime.Configuration
         /// <param name="properties">Properties that will be passed to the stream provider upon initialization </param>
         public void RegisterStreamProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
         {
-            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
+            ProviderConfigurationUtility.RegisterProvider(this.ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
         }
 
         /// <summary>
@@ -1080,7 +1117,7 @@ namespace Orleans.Runtime.Configuration
                 !typeof(IStorageProvider).IsAssignableFrom(providerType))
                 throw new ArgumentException("Expected non-generic, non-abstract type which implements IStorageProvider interface", "typeof(T)");
 
-            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME, providerTypeInfo.FullName, providerName, properties);
+            ProviderConfigurationUtility.RegisterProvider(this.ProviderConfigurations, ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME, providerTypeInfo.FullName, providerName, properties);
         }
 
         /// <summary>
@@ -1091,7 +1128,7 @@ namespace Orleans.Runtime.Configuration
         /// <param name="properties">Properties that will be passed to the storage provider upon initialization </param>
         public void RegisterStorageProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
         {
-            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
+            ProviderConfigurationUtility.RegisterProvider(this.ProviderConfigurations, ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
         }
 
         public void RegisterStatisticsProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IStatisticsPublisher, ISiloMetricsDataPublisher
@@ -1106,12 +1143,12 @@ namespace Orleans.Runtime.Configuration
                 ))
                 throw new ArgumentException("Expected non-generic, non-abstract type which implements IStatisticsPublisher, ISiloMetricsDataPublisher interface", "typeof(T)");
 
-            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STATISTICS_PROVIDER_CATEGORY_NAME, providerTypeInfo.FullName, providerName, properties);
+            ProviderConfigurationUtility.RegisterProvider(this.ProviderConfigurations, ProviderCategoryConfiguration.STATISTICS_PROVIDER_CATEGORY_NAME, providerTypeInfo.FullName, providerName, properties);
         }
 
         public void RegisterStatisticsProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
         {
-            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STATISTICS_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
+            ProviderConfigurationUtility.RegisterProvider(this.ProviderConfigurations, ProviderCategoryConfiguration.STATISTICS_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
         }
 
         /// <summary>
@@ -1122,7 +1159,7 @@ namespace Orleans.Runtime.Configuration
         /// <param name="properties">Properties that will be passed to the log-consistency provider upon initialization </param>
         public void RegisterLogConsistencyProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
         {
-            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.LOG_CONSISTENCY_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
+            ProviderConfigurationUtility.RegisterProvider(this.ProviderConfigurations, ProviderCategoryConfiguration.LOG_CONSISTENCY_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
         }
 
 
@@ -1141,7 +1178,7 @@ namespace Orleans.Runtime.Configuration
                 !typeof(ILogConsistencyProvider).IsAssignableFrom(providerType))
                 throw new ArgumentException("Expected non-generic, non-abstract type which implements ILogConsistencyProvider interface", "typeof(T)");
 
-            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.LOG_CONSISTENCY_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
+            ProviderConfigurationUtility.RegisterProvider(this.ProviderConfigurations, ProviderCategoryConfiguration.LOG_CONSISTENCY_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
         } 
         
 
@@ -1154,7 +1191,7 @@ namespace Orleans.Runtime.Configuration
         /// <returns>True if a configuration for this provider already exists, false otherwise.</returns>
         public bool TryGetProviderConfiguration(string providerTypeFullName, string providerName, out IProviderConfiguration config)
         {
-            return ProviderConfigurationUtility.TryGetProviderConfiguration(ProviderConfigurations, providerTypeFullName, providerName, out config);
+            return ProviderConfigurationUtility.TryGetProviderConfiguration(this.ProviderConfigurations, providerTypeFullName, providerName, out config);
         }
 
         /// <summary>
@@ -1163,12 +1200,12 @@ namespace Orleans.Runtime.Configuration
         /// <returns>An enumeration of all currently configured provider configurations.</returns>
         public IEnumerable<IProviderConfiguration> GetAllProviderConfigurations()
         {
-            return ProviderConfigurationUtility.GetAllProviderConfigurations(ProviderConfigurations);
+            return ProviderConfigurationUtility.GetAllProviderConfigurations(this.ProviderConfigurations);
         }
 
         public void RegisterGrainService(string serviceName, string serviceType, IDictionary<string, string> properties = null)
         {
-            GrainServiceConfigurationsUtility.RegisterGrainService(GrainServiceConfigurations, serviceName, serviceType, properties);
+            GrainServiceConfigurationsUtility.RegisterGrainService(this.GrainServiceConfigurations, serviceName, serviceType, properties);
         }
     }
 }

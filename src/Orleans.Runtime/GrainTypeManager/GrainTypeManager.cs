@@ -40,7 +40,7 @@ namespace Orleans.Runtime
         public GrainTypeManager(
             ILocalSiloDetails siloDetails,
             IApplicationPartManager applicationPartManager,
-            DefaultPlacementStrategy defaultPlacementStrategy,
+            PlacementStrategy defaultPlacementStrategy,
             SerializationManager serializationManager,
             MultiClusterRegistrationStrategyManager multiClusterRegistrationStrategyManager,
             ILogger<GrainTypeManager> logger,
@@ -48,7 +48,7 @@ namespace Orleans.Runtime
         {
             var localTestMode = siloDetails.SiloAddress.Endpoint.Address.Equals(IPAddress.Loopback);
             this.logger = logger;
-            this.defaultPlacementStrategy = defaultPlacementStrategy.PlacementStrategy;
+            this.defaultPlacementStrategy = defaultPlacementStrategy;
             this.serializationManager = serializationManager;
             this.multiClusterRegistrationStrategyManager = multiClusterRegistrationStrategyManager;
             grainInterfaceMap = new GrainInterfaceMap(localTestMode, this.defaultPlacementStrategy);

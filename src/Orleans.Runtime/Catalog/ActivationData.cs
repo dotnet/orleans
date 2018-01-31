@@ -5,14 +5,16 @@ using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
 using Orleans.Core;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
 using Orleans.Storage;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
+using Orleans.Hosting;
 
 namespace Orleans.Runtime
 {
@@ -164,14 +166,11 @@ namespace Orleans.Runtime
         // This is the maximum amount of time we expect a request to continue processing
         private readonly TimeSpan maxRequestProcessingTime;
         private readonly TimeSpan maxWarningRequestProcessingTime;
-        private readonly NodeConfiguration nodeConfiguration;
+        private readonly SiloMessagingOptions messagingOptions;
         public readonly TimeSpan CollectionAgeLimit;
         private readonly ILogger logger;
         private IGrainMethodInvoker lastInvoker;
         private IServiceScope serviceScope;
-
-        // This is the maximum number of enqueued request messages for a single activation before we write a warning log or reject new requests.
-        private LimitValue maxEnqueuedRequestsLimit;
         private HashSet<IGrainTimer> timers;
         
         public ActivationData(
@@ -181,7 +180,7 @@ namespace Orleans.Runtime
             IMultiClusterRegistrationStrategy registrationStrategy,
             IActivationCollector collector,
             TimeSpan ageLimit,
-            NodeConfiguration nodeConfiguration,
+            IOptions<SiloMessagingOptions> messagingOptions,
             TimeSpan maxWarningRequestProcessingTime,
 			TimeSpan maxRequestProcessingTime,
             IRuntimeClient runtimeClient,
@@ -195,7 +194,7 @@ namespace Orleans.Runtime
             this.lifecycle = new GrainLifecycle(loggerFactory);
             this.maxRequestProcessingTime = maxRequestProcessingTime;
             this.maxWarningRequestProcessingTime = maxWarningRequestProcessingTime;
-            this.nodeConfiguration = nodeConfiguration;
+            this.messagingOptions = messagingOptions.Value;
             ResetKeepAliveRequest();
             Address = addr;
             State = ActivationState.Create;
@@ -617,10 +616,15 @@ namespace Orleans.Runtime
         /// <returns>Returns LimitExceededException if overloaded, otherwise <c>null</c>c></returns>
         public LimitExceededException CheckOverloaded(ILogger log)
         {
-            LimitValue limitValue = GetMaxEnqueuedRequestLimit();
-
-            int maxRequestsHardLimit = limitValue.HardLimitThreshold;
-            int maxRequestsSoftLimit = limitValue.SoftLimitThreshold;
+            string limitName = LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS;
+            int maxRequestsHardLimit = this.messagingOptions.MaxEnqueuedRequestsHardLimit;
+            int maxRequestsSoftLimit = this.messagingOptions.MaxEnqueuedRequestsSoftLimit;
+            if (GrainInstanceType != null && CodeGeneration.GrainInterfaceUtils.IsStatelessWorker(GrainInstanceType.GetTypeInfo()))
+            {
+                limitName = LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER;
+                maxRequestsHardLimit = this.messagingOptions.MaxEnqueuedRequestsHardLimit_StatelessWorker;
+                maxRequestsSoftLimit = this.messagingOptions.MaxEnqueuedRequestsSoftLimit_StatelessWorker;
+            }
 
             if (maxRequestsHardLimit <= 0 && maxRequestsSoftLimit <= 0) return null; // No limits are set
 
@@ -632,7 +636,7 @@ namespace Orleans.Runtime
                     String.Format("Overload - {0} enqueued requests for activation {1}, exceeding hard limit rejection threshold of {2}",
                         count, this, maxRequestsHardLimit));
 
-                return new LimitExceededException(limitValue.Name, count, maxRequestsHardLimit, this.ToString());
+                return new LimitExceededException(limitName, count, maxRequestsHardLimit, this.ToString());
             }
             if (maxRequestsSoftLimit > 0 && count > maxRequestsSoftLimit) // Soft limit
             {
@@ -654,21 +658,6 @@ namespace Orleans.Runtime
                 long numWaiting = WaitingCount;
                 return (int)(numInDispatcher + numActive + numWaiting);
             }
-        }
-
-        private LimitValue GetMaxEnqueuedRequestLimit()
-        {
-            if (maxEnqueuedRequestsLimit != null) return maxEnqueuedRequestsLimit;
-            if (GrainInstanceType != null)
-            {
-                string limitName = CodeGeneration.GrainInterfaceUtils.IsStatelessWorker(GrainInstanceType.GetTypeInfo())
-                    ? LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER
-                    : LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS;
-                maxEnqueuedRequestsLimit = nodeConfiguration.LimitManager.GetLimit(limitName); // Cache for next time
-                return maxEnqueuedRequestsLimit;
-            }
-
-            return nodeConfiguration.LimitManager.GetLimit(LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS);
         }
 
         public Message PeekNextWaitingMessage()

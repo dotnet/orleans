@@ -1,8 +1,5 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Configuration
 { 
@@ -23,7 +20,7 @@ namespace Orleans.Runtime.Configuration
         {
             if (string.IsNullOrWhiteSpace(providerName)) throw new ArgumentNullException(nameof(providerName));
 
-            config.Globals.RegisterLogConsistencyProvider<EventSourcing.LogStorage.LogConsistencyProvider>(providerName);
+            config.Globals.RegisterLogConsistencyProvider("Orleans.EventSourcing.LogStorage.LogConsistencyProvider", providerName);
         }
 
         /// <summary>
@@ -37,7 +34,7 @@ namespace Orleans.Runtime.Configuration
         {
             if (string.IsNullOrWhiteSpace(providerName)) throw new ArgumentNullException(nameof(providerName));
 
-            config.Globals.RegisterLogConsistencyProvider<EventSourcing.StateStorage.LogConsistencyProvider>(providerName);
+            config.Globals.RegisterLogConsistencyProvider("Orleans.EventSourcing.StateStorage.LogConsistencyProvider", providerName);
         }
 
         /// <summary>
@@ -58,7 +55,7 @@ namespace Orleans.Runtime.Configuration
             if (primaryCluster != null)
                 properties.Add("PrimaryCluster", primaryCluster);
 
-            config.Globals.RegisterLogConsistencyProvider<EventSourcing.CustomStorage.LogConsistencyProvider>(providerName, properties);
+            config.Globals.RegisterLogConsistencyProvider("Orleans.EventSourcing.CustomStorage.LogConsistencyProvider", providerName, properties);
         }
     }
 }

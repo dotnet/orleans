@@ -32,7 +32,7 @@ namespace Orleans.Runtime
             var typeCode = GrainInterfaceUtils.GetGrainClassTypeCode(typeof(IReminderService));
             var grainId = GrainId.GetGrainServiceGrainId(0, typeCode);
 
-            return new LocalReminderService(silo, grainId, this.reminderTable, silo.GlobalConfig, iniTimeSpan, this.loggerFactory);
+            return new LocalReminderService(silo, grainId, this.reminderTable, iniTimeSpan, this.loggerFactory);
         }
     }
 }

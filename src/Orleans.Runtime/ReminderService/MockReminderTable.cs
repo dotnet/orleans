@@ -1,7 +1,5 @@
 using System;
 using System.Threading.Tasks;
-using Orleans.Runtime.Configuration;
-using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.ReminderService
 {
@@ -14,8 +12,7 @@ namespace Orleans.Runtime.ReminderService
         {
             this.delay = delay;
         }
-
-        public Task Init(GlobalConfiguration config)
+        public Task Init()
         {
             return Task.CompletedTask;
         }

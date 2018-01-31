@@ -4,6 +4,8 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
@@ -22,15 +24,16 @@ namespace Orleans.Runtime
         private static readonly List<ActivationData> nothing = new List<ActivationData> { Capacity = 0 };
         private readonly ILogger logger;
 
-        public ActivationCollector(ClusterConfiguration config, ILoggerFactory loggerFactory)
+        public ActivationCollector(IOptions<GrainCollectionOptions> options, ILoggerFactory loggerFactory)
         {
-            if (TimeSpan.Zero == config.Globals.CollectionQuantum)
+            if (TimeSpan.Zero == options.Value.CollectionQuantum)
             {
                 throw new ArgumentException("Globals.CollectionQuantum cannot be zero.", "config");
             }
 
-            quantum = config.Globals.CollectionQuantum;
-            shortestAgeLimit = config.Globals.Application.ShortestCollectionAgeLimit;
+            quantum = options.Value.CollectionQuantum;
+            shortestAgeLimit = TimeSpan.FromTicks(options.Value.ClassSpecificCollectionAge.Values
+                .Aggregate(options.Value.CollectionAge.Ticks, (a,v) => Math.Min(a,v.Ticks)));
             buckets = new ConcurrentDictionary<DateTime, Bucket>();
             nextTicket = MakeTicketFromDateTime(DateTime.UtcNow);
             nextTicketLock = new object();

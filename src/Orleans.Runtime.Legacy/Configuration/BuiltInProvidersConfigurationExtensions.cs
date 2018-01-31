@@ -1,6 +1,5 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using Orleans.Storage;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -18,16 +17,16 @@ namespace Orleans.Runtime.Configuration
         public static void AddMemoryStorageProvider(
             this ClusterConfiguration config,
             string providerName = "MemoryStore",
-            int numStorageGrains = MemoryStorage.NumStorageGrainsDefaultValue)
+            int numStorageGrains = 10)
         {
             if (string.IsNullOrWhiteSpace(providerName)) throw new ArgumentNullException(nameof(providerName));
 
             var properties = new Dictionary<string, string>
             {
-                { MemoryStorage.NumStorageGrainsPropertyName, numStorageGrains.ToString() },
+                { "NumStorageGrains", numStorageGrains.ToString() },
             };
 
-            config.Globals.RegisterStorageProvider<MemoryStorage>(providerName, properties);
+            config.Globals.RegisterStorageProvider("Orleans.Storage.MemoryStorage", providerName, properties);
         }
     }
 }

@@ -55,7 +55,6 @@ namespace Orleans.Runtime
 
         public InsideRuntimeClient(
             ILocalSiloDetails siloDetails,
-            ClusterConfiguration config,
             GrainTypeManager typeManager,
             TypeMetadataCache typeMetadataCache,
             OrleansTaskScheduler scheduler,
@@ -73,8 +72,8 @@ namespace Orleans.Runtime
             MySilo = siloDetails.SiloAddress;
             disposables = new List<IDisposable>();
             callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
-            Config = config;
-            config.OnConfigChange("Globals/Message", () => ResponseTimeout = Config.Globals.ResponseTimeout);
+            this.ResponseTimeout = messagingOptions.Value.ResponseTimeout;
+//            config.OnConfigChange("Globals/Message", () => ResponseTimeout = Config.Globals.ResponseTimeout);
             this.typeManager = typeManager;
             this.messageFactory = messageFactory;
             this.transactionAgent = new Lazy<ITransactionAgent>(() => transactionAgent());
@@ -104,8 +103,6 @@ namespace Orleans.Runtime
         public IInternalGrainFactory InternalGrainFactory => this.ConcreteGrainFactory;
 
         private SiloAddress MySilo { get; }
-
-        private ClusterConfiguration Config { get; }
 
         public GrainFactory ConcreteGrainFactory { get; }
 
@@ -207,7 +204,7 @@ namespace Orleans.Runtime
             if (context == null && !oneWay)
                 logger.Warn(ErrorCode.IGC_SendRequest_NullContext, "Null context {0}: {1}", message, Utils.GetStackTrace());
 
-            if (message.IsExpirableMessage(Config.Globals.DropExpiredMessages))
+            if (message.IsExpirableMessage(this.messagingOptions.DropExpiredMessages))
                 message.TimeToLive = ResponseTimeout;
 
             if (!oneWay)

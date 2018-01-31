@@ -1,7 +1,8 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime.Configuration;
+using Microsoft.Extensions.Options;
+using Orleans.Hosting;
 using Orleans.Runtime.Scheduler;
 using Orleans.Statistics;
 
@@ -14,7 +15,7 @@ namespace Orleans.Runtime.Counters
         internal ActivationCollector ActivationCollector { get; set; }
         internal IMessageCenter MessageCenter { get; set; }
         internal ISiloMetricsDataPublisher MetricsDataPublisher { get; set; }
-        internal NodeConfiguration NodeConfig { get; set; }
+        internal SiloStatisticsOptions statisticsOptions { get; set; }
 
         private readonly ILoggerFactory loggerFactory;
         private TimeSpan reportFrequency;
@@ -29,8 +30,8 @@ namespace Orleans.Runtime.Counters
         internal SiloPerformanceMetrics(
             IHostEnvironmentStatistics hostEnvironmentStatistics,
             IAppEnvironmentStatistics appEnvironmentStatistics,
-            ILoggerFactory loggerFactory, 
-            NodeConfiguration cfg = null)
+            ILoggerFactory loggerFactory,
+            IOptions<SiloStatisticsOptions> statisticsOptions)
         {
             this.loggerFactory = loggerFactory;
             this.hostEnvironmentStatistics = hostEnvironmentStatistics;
@@ -39,7 +40,7 @@ namespace Orleans.Runtime.Counters
             overloadLatched = false;
             overloadValue = false;
             this.logger = loggerFactory.CreateLogger<SiloPerformanceMetrics>();
-            NodeConfig = cfg ?? new NodeConfiguration();
+            this.statisticsOptions = statisticsOptions.Value;
             StringValueStatistic.FindOrCreate(StatisticNames.RUNTIME_IS_OVERLOADED, () => IsOverloaded.ToString());
         }
 
@@ -90,7 +91,7 @@ namespace Orleans.Runtime.Counters
 
         public bool IsOverloaded
         {
-            get { return overloadLatched ? overloadValue : (NodeConfig.LoadSheddingEnabled && (CpuUsage > NodeConfig.LoadSheddingLimit)); }
+            get { return this.overloadLatched ? overloadValue : (this.statisticsOptions.LoadSheddingEnabled && (CpuUsage > this.statisticsOptions.LoadSheddingLimit)); }
         }
 
         public long RequestQueueLength

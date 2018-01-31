@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
@@ -43,19 +43,24 @@ namespace Tester
 
     public class CustomGrainService : GrainService, ICustomGrainService
     {
-        public CustomGrainService(IGrainIdentity id, Silo silo, IGrainServiceConfiguration config, ILoggerFactory loggerFactory) : base(id, silo, config, loggerFactory)
+        private readonly IGrainIdentity id;
+        private IGrainServiceConfiguration config;
+
+        public CustomGrainService(IGrainIdentity id, Silo silo, ILoggerFactory loggerFactory) : base(id, silo, loggerFactory)
         {
-            
+            this.id = id;
         }
 
         private bool started = false;
         private bool startedInBackground = false;
         private bool init = false;
 
-        public override Task Init(IServiceProvider serviceProvider)
+        public async override Task Init(IServiceProvider serviceProvider)
         {
+            await base.Init(serviceProvider);
+            long configKey = this.id.GetPrimaryKeyLong(out string ignore);
+            this.config = serviceProvider.GetRequiredServiceByKey<long,IGrainServiceConfiguration>(configKey);
             init = true;
-            return base.Init(serviceProvider);
         }
 
         public override Task Start()
@@ -71,7 +76,7 @@ namespace Tester
 
         public Task<string> GetServiceConfigProperty(string propertyName)
         {
-            return Task.FromResult(base.Config.Properties[propertyName]);
+            return Task.FromResult(this.config.Properties[propertyName]);
         }
 
         protected override Task StartInBackground()

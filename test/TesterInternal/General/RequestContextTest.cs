@@ -335,50 +335,6 @@ namespace UnitTests.General
             RequestContext.Clear();
         }
 
-        [Fact(Skip = "Silo setting update of PropagateActivityId is not correctly implemented")]
-        [TestCategory("Functional"), TestCategory("RequestContext")]
-        public async Task RequestContext_ActivityId_CM_DynamicChange_Server()
-        {
-            Guid activityId = Guid.NewGuid();
-            Guid activityId2 = Guid.NewGuid();
-
-            const string PropagateActivityIdConfigKey = @"/OrleansConfiguration/Defaults/Tracing/@PropagateActivityId";
-            var changeConfig = new Dictionary<string, string>();
-
-            IManagementGrain mgmtGrain = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
-
-            IRequestContextTestGrain grain = this.fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
-
-            RequestContextTestUtils.SetActivityId(activityId);
-            Guid result = await grain.E2EActivityId();
-            Assert.Equal(activityId,  result);  // "E2E ActivityId #1 not propagated correctly"
-            RequestContext.Clear();
-
-            changeConfig[PropagateActivityIdConfigKey] = Boolean.FalseString;
-            output.WriteLine("Set {0}={1}", PropagateActivityIdConfigKey, changeConfig[PropagateActivityIdConfigKey]);
-            await mgmtGrain.UpdateConfiguration(null, changeConfig, null);
-
-            RequestContextTestUtils.SetActivityId(activityId2);
-            result = await grain.E2EActivityId();
-            Assert.NotEqual(activityId2, result);  // "E2E ActivityId #2 should not have been propagated"
-            Assert.Equal(Guid.Empty,  result);  // "E2E ActivityId #2 should not have been propagated"
-            RequestContext.Clear();
-
-            changeConfig[PropagateActivityIdConfigKey] = Boolean.TrueString;
-            output.WriteLine("Set {0}={1}", PropagateActivityIdConfigKey, changeConfig[PropagateActivityIdConfigKey]);
-            await mgmtGrain.UpdateConfiguration(null, changeConfig, null);
-
-            RequestContextTestUtils.SetActivityId(activityId2);
-            result = await grain.E2EActivityId();
-            Assert.Equal(activityId2,  result);  // "E2E ActivityId #2 should have been propagated"
-            RequestContext.Clear();
-
-            RequestContextTestUtils.SetActivityId(activityId);
-            result = await grain.E2EActivityId();
-            Assert.Equal(activityId,  result);  // "E2E ActivityId #1 not propagated correctly after #2"
-            RequestContext.Clear();
-        }
-
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task ClientInvokeCallback_CountCallbacks()
         {

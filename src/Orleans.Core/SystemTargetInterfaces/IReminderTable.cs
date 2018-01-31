@@ -14,7 +14,7 @@ namespace Orleans
     /// </summary>  
     public interface IReminderTable
     {
-        Task Init(GlobalConfiguration config);
+        Task Init();
 
         Task<ReminderTableData> ReadRows(GrainReference key);
 

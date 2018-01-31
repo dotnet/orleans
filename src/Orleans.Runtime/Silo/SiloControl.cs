@@ -19,8 +19,6 @@ namespace Orleans.Runtime
     {
         private readonly ILogger logger;
         private readonly ILocalSiloDetails localSiloDetails;
-        private readonly Factory<NodeConfiguration> localConfiguration;
-        private readonly ClusterConfiguration clusterConfiguration;
 
         private readonly DeploymentLoadPublisher deploymentLoadPublisher;
         private readonly Catalog catalog;
@@ -33,8 +31,6 @@ namespace Orleans.Runtime
 
         public SiloControl(
             ILocalSiloDetails localSiloDetails,
-            Factory<NodeConfiguration> localConfiguration,
-            ClusterConfiguration clusterConfiguration,
             DeploymentLoadPublisher deploymentLoadPublisher,
             Catalog catalog,
             GrainTypeManager grainTypeManager,
@@ -47,8 +43,6 @@ namespace Orleans.Runtime
             : base(Constants.SiloControlId, localSiloDetails.SiloAddress, loggerFactory)
         {
             this.localSiloDetails = localSiloDetails;
-            this.localConfiguration = localConfiguration;
-            this.clusterConfiguration = clusterConfiguration;
 
             this.logger = loggerFactory.CreateLogger<SiloControl>();
             this.deploymentLoadPublisher = deploymentLoadPublisher;
@@ -128,14 +122,6 @@ namespace Orleans.Runtime
         {
             logger.Info("DetailedGrainReport for grain id {0}", grainId);
             return Task.FromResult( this.catalog.GetDetailedGrainReport(grainId));
-        }
-
-        public Task UpdateConfiguration(string configuration)
-        {
-            logger.Info("UpdateConfiguration with {0}", configuration);
-            this.clusterConfiguration.Update(configuration);
-            logger.Info(ErrorCode.Runtime_Error_100318, "UpdateConfiguration - new config is now {0}", this.clusterConfiguration.ToString(this.localSiloDetails.Name));
-            return Task.CompletedTask;
         }
 
         public Task<int> GetActivationCount()

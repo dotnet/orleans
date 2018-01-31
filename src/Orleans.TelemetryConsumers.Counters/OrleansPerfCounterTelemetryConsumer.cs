@@ -1,4 +1,4 @@
-﻿using Orleans;
+using Orleans;
 using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
@@ -31,9 +31,9 @@ namespace OrleansTelemetryConsumers.Counters
         {
             this.logger = loggerFactory.CreateLogger<OrleansPerfCounterTelemetryConsumer>();
             this.isInitialized = new Lazy<bool>(this.Initialize, true);
-            if (!AreWindowsPerfCountersAvailable(logger))
+            if (!AreWindowsPerfCountersAvailable(this.logger))
             {
-                logger.Warn(ErrorCode.PerfCounterNotFound, "Windows perf counters not found -- defaulting to in-memory counters. " + ExplainHowToCreateOrleansPerfCounters);
+                this.logger.Warn(ErrorCode.PerfCounterNotFound, "Windows perf counters not found -- defaulting to in-memory counters. " + ExplainHowToCreateOrleansPerfCounters);
             }
         }
 
@@ -65,7 +65,7 @@ namespace OrleansTelemetryConsumers.Counters
 
         private PerformanceCounter CreatePerfCounter(string perfCounterName)
         {
-            logger.Debug(ErrorCode.PerfCounterRegistering, "Creating perf counter {0}", perfCounterName);
+            this.logger.Debug(ErrorCode.PerfCounterRegistering, "Creating perf counter {0}", perfCounterName);
             return new PerformanceCounter(CATEGORY_NAME, perfCounterName, false);
         }
 
@@ -83,17 +83,17 @@ namespace OrleansTelemetryConsumers.Counters
             if (PerformanceCounterCategory.Exists(CATEGORY_NAME))
                 DeleteCounters();
 
-            isInstalling = true;
-            if (!isInitialized.Value)
+            this.isInstalling = true;
+            if (!this.isInitialized.Value)
             {
                 var msg = "Unable to install Windows Performance counters";
-                logger.Warn(ErrorCode.PerfCounterNotFound, msg);
+                this.logger.Warn(ErrorCode.PerfCounterNotFound, msg);
                 throw new InvalidOperationException(msg);
             }
 
             var collection = new CounterCreationDataCollection();
 
-            foreach (PerfCounterConfigData cd in perfCounterData)
+            foreach (PerfCounterConfigData cd in this.perfCounterData)
             {
                 var perfCounterName = GetPerfCounterName(cd);
                 var description = cd.Name.Name;
@@ -122,7 +122,7 @@ namespace OrleansTelemetryConsumers.Counters
 
         private PerfCounterConfigData GetCounter(string counterName)
         {
-            return perfCounterData.Where(pcd => GetPerfCounterName(pcd) == counterName).SingleOrDefault();
+            return this.perfCounterData.Where(pcd => GetPerfCounterName(pcd) == counterName).SingleOrDefault();
         }
 
         #endregion
@@ -226,7 +226,7 @@ namespace OrleansTelemetryConsumers.Counters
 
         private void WriteMetric(string name, UpdateMode mode = UpdateMode.Increment, double? value = null)
         {
-            if (!isInitialized.Value)
+            if (!this.isInitialized.Value)
                 return;
 
             // Attempt to initialize grain-specific counters if they haven't been initialized yet.
@@ -245,7 +245,7 @@ namespace OrleansTelemetryConsumers.Counters
             try
             {
 
-                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.PerfCounterWriting, "Writing perf counter {0}", perfCounterName);
+                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace(ErrorCode.PerfCounterWriting, "Writing perf counter {0}", perfCounterName);
 
                 switch (mode)
                 {
@@ -276,7 +276,7 @@ namespace OrleansTelemetryConsumers.Counters
             }
             catch (Exception ex)
             {
-                logger.Error(ErrorCode.PerfCounterUnableToWrite, string.Format("Unable to write to Windows perf counter '{0}'", statsName), ex);
+                this.logger.Error(ErrorCode.PerfCounterUnableToWrite, string.Format("Unable to write to Windows perf counter '{0}'", statsName), ex);
             }
         }
 

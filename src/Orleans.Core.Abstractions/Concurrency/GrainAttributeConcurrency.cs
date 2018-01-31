@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Orleans.Placement;
+using Orleans.Runtime;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -43,21 +45,16 @@ namespace Orleans.Concurrency
     /// of preservation of grain state between requests and where multiple activations of the same grain are allowed to be created by the runtime.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class)]
-    public sealed class StatelessWorkerAttribute : Attribute
+    public sealed class StatelessWorkerAttribute : PlacementAttribute
     {
-        /// <summary>
-        /// Maximal number of local StatelessWorkers in a single silo.
-        /// </summary>
-        public int MaxLocalWorkers { get; private set; }
-
         public StatelessWorkerAttribute(int maxLocalWorkers)
+            : base(new StatelessWorkerPlacement(maxLocalWorkers))
         {
-            MaxLocalWorkers = maxLocalWorkers;
         }
 
         public StatelessWorkerAttribute()
+            : base(new StatelessWorkerPlacement())
         {
-            MaxLocalWorkers = -1;
         }
     }
 
@@ -91,7 +88,7 @@ namespace Orleans.Concurrency
 
         public MayInterleaveAttribute(string callbackMethodName)
         {
-            CallbackMethodName = callbackMethodName;
+            this.CallbackMethodName = callbackMethodName;
         }
     }
 
