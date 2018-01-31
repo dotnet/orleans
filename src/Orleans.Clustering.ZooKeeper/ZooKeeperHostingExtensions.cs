@@ -46,7 +46,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure DI container with ZooKeeper based Memebership
+        /// Configure DI container with ZooKeeper based Membership
         /// </summary>
         public static IServiceCollection UseZooKeeperMembership(this IServiceCollection services,
             Action<ZooKeeperMembershipOptions> configureOptions)
@@ -55,7 +55,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure DI container with ZooKeeper based Memebership
+        /// Configure DI container with ZooKeeper based Membership
         /// </summary>
         public static IServiceCollection UseZooKeeperMembership(this IServiceCollection services,
             Action<OptionsBuilder<ZooKeeperMembershipOptions>> configureOptions)
