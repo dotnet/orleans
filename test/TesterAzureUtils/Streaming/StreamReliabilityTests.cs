@@ -706,8 +706,7 @@ namespace UnitTests.Streaming.Reliability
             output.WriteLine("Consumer grain is located on silo {0} ; Producer on same silo = {1}", siloAddress, sameSilo);
 
             // Kill the silo containing the consumer grain
-            bool isPrimary = siloAddress.Equals(this.HostedCluster.Primary.SiloAddress);
-            SiloHandle siloToKill = isPrimary ? this.HostedCluster.Primary : this.HostedCluster.SecondarySilos.First();
+            SiloHandle siloToKill = this.HostedCluster.Silos.First(s => s.SiloAddress.Equals(siloAddress));
             StopSilo(siloToKill, true, false);
             // Note: Don't restart failed silo for this test case
             // Note: Don't reinitialize client
@@ -745,8 +744,7 @@ namespace UnitTests.Streaming.Reliability
             output.WriteLine("Producer grain is located on silo {0} ; Consumer on same silo = {1}", siloAddress, sameSilo);
 
             // Kill the silo containing the producer grain
-            bool isPrimary = siloAddress.Equals(this.HostedCluster.Primary.SiloAddress);
-            SiloHandle siloToKill = isPrimary ? this.HostedCluster.Primary : this.HostedCluster.SecondarySilos.First();
+            SiloHandle siloToKill = this.HostedCluster.Silos.First(s => s.SiloAddress.Equals(siloAddress));
             StopSilo(siloToKill, true, false);
             // Note: Don't restart failed silo for this test case
             // Note: Don't reinitialize client
@@ -786,8 +784,7 @@ namespace UnitTests.Streaming.Reliability
             output.WriteLine("Consumer grain is located on silo {0} ; Producer on same silo = {1}", siloAddress, sameSilo);
 
             // Restart the silo containing the consumer grain
-            bool isPrimary = siloAddress.Equals(this.HostedCluster.Primary.SiloAddress);
-            SiloHandle siloToKill = isPrimary ? this.HostedCluster.Primary : this.HostedCluster.SecondarySilos.First();
+            SiloHandle siloToKill = this.HostedCluster.Silos.First(s => s.SiloAddress.Equals(siloAddress));
             StopSilo(siloToKill, true, true);
             // Note: Don't reinitialize client
 
@@ -825,8 +822,7 @@ namespace UnitTests.Streaming.Reliability
             output.WriteLine("Producer grain is located on silo {0} ; Consumer on same silo = {1}", siloAddress, sameSilo);
 
             // Restart the silo containing the consumer grain
-            bool isPrimary = siloAddress.Equals(this.HostedCluster.Primary.SiloAddress);
-            SiloHandle siloToKill = isPrimary ? this.HostedCluster.Primary : this.HostedCluster.SecondarySilos.First();
+            SiloHandle siloToKill = this.HostedCluster.Silos.First(s => s.SiloAddress.Equals(siloAddress));
             StopSilo(siloToKill, true, true);
             // Note: Don't reinitialize client
 
@@ -942,7 +938,7 @@ namespace UnitTests.Streaming.Reliability
         private void StopSilo(SiloHandle silo, bool kill, bool restart)
         {
             SiloAddress oldSilo = silo.SiloAddress;
-            bool isPrimary = oldSilo.Equals(this.HostedCluster.Primary.SiloAddress);
+            bool isPrimary = oldSilo.Equals(this.HostedCluster.Primary?.SiloAddress);
             string siloType = isPrimary ? "Primary" : "Secondary";
             string action;
             if (restart)    action = kill ? "Kill+Restart" : "Stop+Restart";
