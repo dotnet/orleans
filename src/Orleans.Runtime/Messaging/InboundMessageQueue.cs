@@ -8,8 +8,12 @@ namespace Orleans.Runtime.Messaging
     internal class InboundMessageQueue : IInboundMessageQueue
     {
         private readonly BlockingCollection<Message>[] messageQueues;
+
         private readonly ILogger log;
+
         private readonly QueueTrackingStatistic[] queueTracking;
+
+        private bool disposed;
 
         /// <inheritdoc />
         public int Count
@@ -108,11 +112,19 @@ namespace Orleans.Runtime.Messaging
         /// <inheritdoc />
         public void Dispose()
         {
-            this.Stop();
-
-            foreach (var q in this.messageQueues)
+            if (this.disposed) return;
+            lock (this.messageQueues)
             {
-                q.Dispose();
+                if (this.disposed) return;
+
+                this.Stop();
+
+                foreach (var q in this.messageQueues)
+                {
+                    q.Dispose();
+                }
+
+                this.disposed = true;
             }
         }
     }
