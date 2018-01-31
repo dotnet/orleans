@@ -30,7 +30,7 @@ namespace Orleans.TestingHost
             }
             var configuration = configBuilder.Build();
 
-            string siloName = configuration["SiloName"] ?? hostName;
+            string siloName = configuration[nameof(TestSiloSpecificOptions.SiloName)] ?? hostName;
 
             ISiloHostBuilder hostBuilder = new SiloHostBuilder()
                 .ConfigureOrleans(ob => ob.Bind(configuration).Configure(options => options.SiloName = options.SiloName ?? siloName))
@@ -119,8 +119,8 @@ namespace Orleans.TestingHost
 
         private static void ConfigureListeningPorts(HostBuilderContext context, IServiceCollection services)
         {
-            int siloPort = int.Parse(context.Configuration["SiloPort"]);
-            int gatewayPort = int.Parse(context.Configuration["GatewayPort"]);
+            int siloPort = int.Parse(context.Configuration[nameof(TestSiloSpecificOptions.SiloPort)]);
+            int gatewayPort = int.Parse(context.Configuration[nameof(TestSiloSpecificOptions.GatewayPort)]);
 
             services.Configure<EndpointOptions>(options =>
             {
@@ -201,7 +201,7 @@ namespace Orleans.TestingHost
             // If the test involves a custom membership oracle and no membership table, special care will be required
             if (useTestClusterMembership && services.All(svc => svc.ServiceType != typeof(IMembershipTable)))
             {
-                var primarySiloEndPoint = new IPEndPoint(IPAddress.Loopback, int.Parse(context.Configuration["PrimarySiloPort"]));
+                var primarySiloEndPoint = new IPEndPoint(IPAddress.Loopback, int.Parse(context.Configuration[nameof(TestSiloSpecificOptions.PrimarySiloPort)]));
 
                 services.UseDevelopmentMembership(options => options.PrimarySiloEndpoint = primarySiloEndPoint);
             }
@@ -214,8 +214,8 @@ namespace Orleans.TestingHost
             {
                 services.UseStaticGatewayListProvider(options =>
                 {
-                    int baseGatewayPort = int.Parse(configuration["BaseGatewayPort"]);
-                    int initialSilosCount = int.Parse(configuration["InitialSilosCount"]);
+                    int baseGatewayPort = int.Parse(configuration[nameof(TestClusterOptions.BaseGatewayPort)]);
+                    int initialSilosCount = int.Parse(configuration[nameof(TestClusterOptions.InitialSilosCount)]);
 
                     options.Gateways = Enumerable.Range(baseGatewayPort, initialSilosCount)
                         .Select(port => new IPEndPoint(IPAddress.Loopback, port).ToGatewayUri())
@@ -227,7 +227,7 @@ namespace Orleans.TestingHost
 
         private static void TryConfigureFileLogging(IConfiguration configuration, IServiceCollection services, string name)
         {
-            var fileName = TestingUtils.CreateTraceFileName(name, configuration["ClusterId"]);
+            var fileName = TestingUtils.CreateTraceFileName(name, configuration[nameof(TestClusterOptions.ClusterId)]);
             services.AddLogging(loggingBuilder => loggingBuilder.AddFile(fileName));
         }
 
