@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Options;
 
@@ -19,7 +18,7 @@ namespace Orleans.Hosting
         public int ClientSenderBuckets { get; set; } = 8192;
     }
 
-    public class ClientMessagingOptionFormatter : IOptionFormatter<ClientMessagingOptions>
+    public class ClientMessagingOptionFormatter : MessagingOptionsFormatter, IOptionFormatter<ClientMessagingOptions>
     {
         public string Category { get; }
 
@@ -27,24 +26,19 @@ namespace Orleans.Hosting
 
         private ClientMessagingOptions options;
         public ClientMessagingOptionFormatter(IOptions<ClientMessagingOptions> messageOptions)
+            : base(messageOptions.Value)
         {
             options = messageOptions.Value;
         }
 
         public IEnumerable<string> Format()
         {
-            return new List<string>()
+            List<string> format = base.FormatStatisticsOptions();
+            format.AddRange(new List<string>
             {
                 OptionFormattingUtilities.Format(nameof(options.ClientSenderBuckets), options.ClientSenderBuckets),
-
-                OptionFormattingUtilities.Format(nameof(options.ResponseTimeout), options.ResponseTimeout),
-                OptionFormattingUtilities.Format(nameof(options.MaxResendCount), options.MaxResendCount),
-                OptionFormattingUtilities.Format(nameof(options.ResendOnTimeout), options.ResendOnTimeout),
-                OptionFormattingUtilities.Format(nameof(options.DropExpiredMessages), options.DropExpiredMessages),
-                OptionFormattingUtilities.Format(nameof(options.BufferPoolBufferSize), options.BufferPoolBufferSize),
-                OptionFormattingUtilities.Format(nameof(options.BufferPoolMaxSize), options.BufferPoolMaxSize),
-                OptionFormattingUtilities.Format(nameof(options.BufferPoolPreallocationSize), options.BufferPoolPreallocationSize)
-            };
+            });
+            return format;
         }
     }
 }
