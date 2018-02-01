@@ -1,6 +1,8 @@
-﻿namespace Orleans.Runtime.Messaging
+using System;
+
+namespace Orleans.Runtime.Messaging
 {
-    internal interface IInboundMessageQueue
+    internal interface IInboundMessageQueue : IDisposable
     {
         int Count { get; }
 
