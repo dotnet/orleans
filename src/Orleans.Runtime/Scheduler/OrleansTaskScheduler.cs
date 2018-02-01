@@ -33,8 +33,7 @@ namespace Orleans.Runtime.Scheduler
         // This is the maximum number of pending work items for a single activation before we write a warning log.
         internal int MaxPendingItemsSoftLimit { get; private set; }
         internal int MaxPendingItemsHardLimit { get; private set; }
-        internal TimeSpan DelayWarningThreshold { get; private set; }
-        
+
         public int RunQueueLength => systemAgent.Count + mainAgent.Count;
 
         public static OrleansTaskScheduler CreateTestInstance(int maxActiveThreads, ICorePerformanceMetrics performanceMetrics, ILoggerFactory loggerFactory)
