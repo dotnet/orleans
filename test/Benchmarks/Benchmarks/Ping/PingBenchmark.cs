@@ -4,18 +4,22 @@ using System.Linq;
 using Orleans.TestingHost;
 using BenchmarkGrainInterfaces.Ping;
 using Microsoft.Extensions.Configuration;
+using TestExtensions;
 
 namespace Benchmarks.Ping
 {
     public class PingBenchmark
     {
-        private TestCluster _host;
+        private TestCluster host;
 
         public void Setup()
         {
-            var options = new TestClusterOptions();
-            _host = new TestCluster(options, new IConfigurationSource[0]);
-            _host.Deploy();
+            var builder = new TestClusterBuilder();
+            TestDefaultConfiguration.ConfigureTestCluster(builder);
+            builder.ConfigureLegacyConfiguration();
+
+            this.host = builder.Build();
+            this.host.Deploy();
         }
 
         public async Task RunAsync()
@@ -43,7 +47,7 @@ namespace Benchmarks.Ping
 
         public async Task<Report> RunAsync(int run, int concurrentPerRun, TimeSpan duration)
         {
-            ILoadGrain load = this._host.Client.GetGrain<ILoadGrain>(Guid.NewGuid());
+            ILoadGrain load = this.host.Client.GetGrain<ILoadGrain>(Guid.NewGuid());
             await load.Generate(run, concurrentPerRun, duration);
             Report report = null;
             while (report == null)
@@ -56,7 +60,7 @@ namespace Benchmarks.Ping
 
         public void Teardown()
         {
-            _host.StopAllSilos();
+            this.host.StopAllSilos();
         }
     }
 }
