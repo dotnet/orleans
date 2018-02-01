@@ -97,13 +97,6 @@ namespace Orleans.CodeGeneration
                 || IsStatelessWorker(methodInfo);
         }
 
-        public static bool IsStatelessWorker(TypeInfo grainTypeInfo)
-        {
-            return grainTypeInfo.GetCustomAttributes(typeof(StatelessWorkerAttribute), true).Any() ||
-                grainTypeInfo.GetInterfaces()
-                    .Any(i => i.GetTypeInfo().GetCustomAttributes(typeof(StatelessWorkerAttribute), true).Any());
-        }
-
         public static bool IsStatelessWorker(MethodInfo methodInfo)
         {
             var declaringTypeInfo = methodInfo.DeclaringType.GetTypeInfo();
