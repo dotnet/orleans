@@ -28,21 +28,26 @@ namespace Orleans.TestingHost
     /// </remarks>
     public class TestCluster
     {
+        private readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
+        private readonly TestClusterOptions options;
+        private readonly StringBuilder log = new StringBuilder();
+
         private int startedInstances;
 
         /// <summary>
-        /// Primary silo handle
+        /// Primary silo handle, if applicable.
         /// </summary>
-        /// <remarks>This only provide valid data if your cluster are using GrainBasedMemebership</remarks>
+        /// <remarks>This handle is valid only when using Grain-based membership.</remarks>
         public SiloHandle Primary { get; private set; }
 
         /// <summary>
-        /// List of handles to the secondary silos
+        /// List of handles to the secondary silos.
         /// </summary>
         public IReadOnlyList<SiloHandle> SecondarySilos => this.additionalSilos;
 
-        private readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
-
+        /// <summary>
+        /// Collection of all known silos.
+        /// </summary>
         public ReadOnlyCollection<SiloHandle> Silos
         {
             get
@@ -59,13 +64,12 @@ namespace Orleans.TestingHost
             }
         }
 
-        private readonly StringBuilder log = new StringBuilder();
-
         /// <summary>
-        /// Options you used to configure your test cluster
+        /// Options used to configure the test cluster.
         /// </summary>
         /// <remarks>This is the options you configured your test cluster with, or the default one. 
-        ///If you configured your TestCluster with ClusterConfiguration, then this option may not reflect settings in that.</remarks>
+        /// If the cluster is being configured via ClusterConfiguration, then this object may not reflect the true settings.
+        /// </remarks>
         public TestClusterOptions Options => this.options;
 
         /// <summary>
@@ -97,8 +101,6 @@ namespace Orleans.TestingHost
         /// SerializationManager to use in the tests
         /// </summary>
         public SerializationManager SerializationManager { get; private set; }
-
-        private readonly TestClusterOptions options;
         
         /// <summary>
         /// Configures the test cluster plus client in-process.
