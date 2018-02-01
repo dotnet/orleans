@@ -7,6 +7,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.StreamingTests;
 using Xunit;
@@ -20,7 +21,7 @@ namespace Tester.AzureUtils.Streaming
 #pragma warning disable 618
         private readonly string adapterType = typeof(AzureQueueStreamProvider).FullName;
 #pragma warning restore 618
-        private static readonly TimeSpan SILO_IMMATURE_PERIOD = TimeSpan.FromSeconds(40); // matches the config
+        private static readonly TimeSpan SILO_IMMATURE_PERIOD = TimeSpan.FromSeconds(80); // matches the config
         private static readonly TimeSpan LEEWAY = TimeSpan.FromSeconds(10);
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -43,11 +44,11 @@ namespace Tester.AzureUtils.Streaming
                 legacy.ClientConfiguration.Gateways = legacy.ClientConfiguration.Gateways.Take(1).ToList();
             });
         }
-
+        
         public DelayedQueueRebalancingTests()
         {
-            this.HostedCluster.KillSilo(this.HostedCluster.SecondarySilos[1]);
-            this.HostedCluster.KillSilo(this.HostedCluster.SecondarySilos[2]);
+            this.HostedCluster.StopSilo(this.HostedCluster.Silos.ElementAt(1));
+            this.HostedCluster.StopSilo(this.HostedCluster.Silos.ElementAt(2));
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -65,8 +66,7 @@ namespace Tester.AzureUtils.Streaming
         {
             await ValidateAgentsState(2, 2, "1");
 
-            this.HostedCluster.RestartStoppedSecondarySilo("Secondary_2");
-            this.HostedCluster.RestartStoppedSecondarySilo("Secondary_3");
+            await this.HostedCluster.StartAdditionalSilos(2);
 
             await ValidateAgentsState(4, 2, "2");
 
