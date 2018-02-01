@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+using System;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
@@ -43,7 +42,14 @@ namespace Orleans.Runtime.MembershipService
         }
         private class LegacyGrainBasedMembershipConfigurator : ILegacyMembershipConfigurator
         {
-            public void ConfigureServices(GlobalConfiguration configuration, IServiceCollection services)
+            public void ConfigureServices(object configuration, IServiceCollection services)
+            {
+                GlobalConfiguration config = configuration as GlobalConfiguration;
+                if (config == null) throw new ArgumentException($"{nameof(GlobalConfiguration)} expected", nameof(configuration));
+                ConfigureServices(config, services);
+            }
+
+            private void ConfigureServices(GlobalConfiguration configuration, IServiceCollection services)
             {
                 services.UseDevelopmentMembership(options => CopyGlobalGrainBasedMembershipOptions(configuration, options));
             }

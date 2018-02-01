@@ -1,16 +1,12 @@
-﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Orleans.Hosting;
-using Orleans.Runtime;
-using Orleans.TestingHost.Utils;
 
 namespace Tester
 {
@@ -18,32 +14,25 @@ namespace Tester
     {
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(1);
-                options.UseSiloBuilderFactory<GrainSiloBuilderFactory>();
-                options.ClusterConfiguration.Globals.RegisterGrainService("CustomGrainService", "Tester.CustomGrainService, Tester",
-                    new Dictionary<string, string> { { "test-property", "xyz" } });
-
-                return new TestCluster(options);
-            }
-
-            private class GrainSiloBuilderFactory : ISiloBuilderFactory
-            {
-                public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+                builder.Options.InitialSilosCount = 1;
+                builder.AddSiloBuilderConfigurator<GrainSiloBuilderConfigurator>();
+                builder.ConfigureLegacyConfiguration(legacy =>
                 {
-                    return new SiloHostBuilder()
-                        .ConfigureSiloName(siloName)
-                        .UseConfiguration(clusterConfiguration)
-                        .ConfigureServices(ConfigureServices)
-                        .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
-                }
-
+                    legacy.ClusterConfiguration.Globals.RegisterGrainService("CustomGrainService",
+                        "Tester.CustomGrainService, Tester",
+                        new Dictionary<string, string> {{"test-property", "xyz"}});
+                });
             }
 
-            private static void ConfigureServices(IServiceCollection services)
+            private class GrainSiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                services.AddSingleton<ICustomGrainServiceClient, CustomGrainServiceClient>();
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder.ConfigureServices(services =>
+                        services.AddSingleton<ICustomGrainServiceClient, CustomGrainServiceClient>());
+                }
             }
         }
 

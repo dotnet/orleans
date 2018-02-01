@@ -6,8 +6,6 @@ using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using BenchmarkGrainInterfaces.MapReduce;
 using BenchmarkGrains.MapReduce;
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 
 namespace Benchmarks.MapReduce
@@ -23,8 +21,8 @@ namespace Benchmarks.MapReduce
         [GlobalSetup]
         public void BenchmarkSetup()
         {
-            var options = new TestClusterOptions(1);
-            _host = new TestCluster(options);
+            var builder = new TestClusterBuilder(1);
+            _host = builder.Build();
             _host.Deploy();
         }
 

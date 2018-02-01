@@ -1,4 +1,4 @@
-﻿//#define REREAD_STATE_AFTER_WRITE_FAILED
+//#define REREAD_STATE_AFTER_WRITE_FAILED
 
 
 using System;
@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.AzureUtils;
@@ -44,31 +45,25 @@ namespace Tester.AzureUtils.Persistence
 
         private const int MaxReadTime = 200;
         private const int MaxWriteTime = 2000;
-
-        public class SiloBuilderFactory : ISiloBuilderFactory
+        public class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            public void Configure(ISiloHostBuilder hostBuilder)
             {
-                return new SiloHostBuilder()
-                    .ConfigureSiloName(siloName)
-                    .UseConfiguration(clusterConfiguration)
-                    .UseAzureTableMembership(options =>
-                    {
-                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        options.MaxStorageBusyRetries = 3;
-                    })
-                    .ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory().AddFromAppDomain().WithReferences())
-                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
+                hostBuilder.UseAzureTableMembership(options =>
+                {
+                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    options.MaxStorageBusyRetries = 3;
+                });
             }
         }
 
-        public static Func<ClientConfiguration, IClientBuilder> ClientBuilderFactory = config => new ClientBuilder()
-            .UseConfiguration(config).UseAzureTableGatewayListProvider(gatewayOptions =>
+        public class ClientBuilderConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
-                gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-            })
-            .ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory().AddFromAppDomain().WithReferences())
-            .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(config.ClientName, config.ClusterId)));
+                clientBuilder.UseAzureTableGatewayListProvider(gatewayOptions => { gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString; });
+            }
+        }
 
         public static IProviderConfiguration GetNamedProviderConfigForShardedProvider(IEnumerable<KeyValuePair<string, IProviderConfiguration>> providers, string providerName)
         {
@@ -307,11 +302,11 @@ namespace Tester.AzureUtils.Persistence
             Assert.Equal(expected3,  val3);  // "Value after Re-Read - 3"
         }
 
-        protected async Task Grain_AzureStore_SiloRestart()
+        protected async Task Grain_AzureStore_SiloRestart(Guid serviceID)
         {
-            var initialServiceId = this.HostedCluster.ClusterConfiguration.Globals.ServiceId;
+            var initialServiceId = serviceID;
 
-            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.ClusterId, this.HostedCluster.ClusterConfiguration.Globals.ServiceId);
+            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.Options.ClusterId, serviceID);
 
             Guid id = Guid.NewGuid();
             IAzureStorageTestGrain grain = this.GrainFactory.GetGrain<IAzureStorageTestGrain>(id);
@@ -331,8 +326,9 @@ namespace Tester.AzureUtils.Persistence
 
             output.WriteLine("Silos restarted");
 
-            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.ClusterId, this.HostedCluster.ClusterConfiguration.Globals.ServiceId);
-            Assert.Equal(initialServiceId,  this.HostedCluster.ClusterConfiguration.Globals.ServiceId);  // "ServiceId same after restart."
+            var serviceId = await this.GrainFactory.GetGrain<IServiceIdGrain>(Guid.Empty).GetServiceId();
+            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.Options.ClusterId, serviceId);
+            Assert.Equal(initialServiceId, serviceId);  // "ServiceId same after restart."
             
             val = await grain.GetValue();
             Assert.Equal(1,  val);  // "Value after Write-1"

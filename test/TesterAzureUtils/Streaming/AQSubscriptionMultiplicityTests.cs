@@ -19,14 +19,15 @@ namespace Tester.AzureUtils.Streaming
         private const string AQStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private const string StreamNamespace = "AQSubscriptionMultiplicityTestsNamespace";
         private readonly SubscriptionMultiplicityTestRunner runner;
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             TestUtils.CheckForAzureStorage();
-            var options = new TestClusterOptions(2);
-            options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-            options.ClusterConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
-            options.ClientConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
-            return new TestCluster(options);
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+                legacy.ClusterConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
+                legacy.ClientConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
+            });
         }
 
         public AQSubscriptionMultiplicityTests()
@@ -36,7 +37,7 @@ namespace Tester.AzureUtils.Streaming
 
         public override void Dispose()
         {
-            var clusterId = HostedCluster.ClusterId;
+            var clusterId = HostedCluster.Options.ClusterId;
             base.Dispose();
             AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, AQStreamProviderName, clusterId, TestDefaultConfiguration.DataConnectionString).Wait();
         }

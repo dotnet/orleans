@@ -58,19 +58,19 @@ namespace Orleans.Runtime.Host
         private EventWaitHandle startupEvent;
         private EventWaitHandle shutdownEvent;
         private bool disposed;
-        private const string dateFormat = "yyyy-MM-dd-HH.mm.ss.fffZ";
+        private const string DateFormat = "yyyy-MM-dd-HH.mm.ss.fffZ";
         /// <summary>
         /// Constructor
         /// </summary>
         /// <param name="siloName">Name of this silo.</param>
         public SiloHost(string siloName)
         {
-            Name = siloName;
+            this.Name = siloName;
             this.loggerProvider =
-                new FileLoggerProvider($"SiloHost-{siloName}-{DateTime.UtcNow.ToString(dateFormat)}.log");
+                new FileLoggerProvider($"SiloHost-{siloName}-{DateTime.UtcNow.ToString(DateFormat)}.log");
             this.logger = this.loggerProvider.CreateLogger(this.GetType().FullName);
-            Type = Silo.SiloType.Secondary; // Default
-            IsStarted = false;
+            this.Type = Silo.SiloType.Secondary; // Default
+            this.IsStarted = false;
         }
 
         /// <summary> Constructor </summary>
@@ -87,9 +87,9 @@ namespace Orleans.Runtime.Host
         public SiloHost(string siloName, FileInfo configFile)
             : this(siloName)
         {
-            ConfigFileName = configFile.FullName;
+            this.ConfigFileName = configFile.FullName;
             var config = new ClusterConfiguration();
-            config.LoadFromFile(ConfigFileName);
+            config.LoadFromFile(this.ConfigFileName);
             SetSiloConfig(config);
         }
 
@@ -100,31 +100,31 @@ namespace Orleans.Runtime.Host
         {
             try
             {
-                if (!ConfigLoaded) LoadOrleansConfig();
+                if (!this.ConfigLoaded) LoadOrleansConfig();
                 var builder = new SiloHostBuilder()
-                    .ConfigureSiloName(Name)
-                    .UseConfiguration(Config)
+                    .ConfigureSiloName(this.Name)
+                    .UseConfiguration(this.Config)
                     .ConfigureApplicationParts(parts => parts
                         .AddFromAppDomain()
                         .AddFromApplicationBaseDirectory());
 
-                if (!string.IsNullOrWhiteSpace(Config.Defaults.StartupTypeName))
+                if (!string.IsNullOrWhiteSpace(this.Config.Defaults.StartupTypeName))
                 {
                     builder.UseServiceProviderFactory(services =>
-                        StartupBuilder.ConfigureStartup(Config.Defaults.StartupTypeName, services));
+                        StartupBuilder.ConfigureStartup(this.Config.Defaults.StartupTypeName, services));
                 }
 
                 var host = builder.Build();
 
-                orleans = host.Services.GetRequiredService<Silo>();
+                this.orleans = host.Services.GetRequiredService<Silo>();
                 var localConfig = host.Services.GetRequiredService<NodeConfiguration>();
 
-                logger.Info(ErrorCode.Runtime_Error_100288, "Successfully initialized Orleans silo '{0}'.", orleans.Name);
+                this.logger.Info(ErrorCode.Runtime_Error_100288, "Successfully initialized Orleans silo '{0}'.", this.orleans.Name);
             }
             catch (Exception exc)
             {
                 ReportStartupError(exc);
-                orleans = null;
+                this.orleans = null;
             }
         }
 
@@ -147,69 +147,72 @@ namespace Orleans.Runtime.Host
                 if (string.IsNullOrEmpty(Thread.CurrentThread.Name))
                     Thread.CurrentThread.Name = this.GetType().Name;
 
-                if (orleans != null)
+                if (this.orleans != null)
                 {
-                    var shutdownEventName = Config.Defaults.SiloShutdownEventName ?? Name + "-Shutdown";                    
+                    var shutdownEventName = this.Config.Defaults.SiloShutdownEventName ?? this.Name + "-Shutdown";
 
                     bool createdNew;
                     try
                     {
-                        logger.Info(ErrorCode.SiloShutdownEventName, "Silo shutdown event name: {0}", shutdownEventName);
-                        shutdownEvent = new EventWaitHandle(false, EventResetMode.ManualReset, shutdownEventName, out createdNew);
+                        this.logger.Info(ErrorCode.SiloShutdownEventName, "Silo shutdown event name: {0}", shutdownEventName);
+                        this.shutdownEvent = new EventWaitHandle(false, EventResetMode.ManualReset, shutdownEventName, out createdNew);
                         if (!createdNew)
                         {
-                            logger.Info(ErrorCode.SiloShutdownEventOpened, "Opened existing shutdown event. Setting the event {0}", shutdownEventName);
+                            this.logger.Info(ErrorCode.SiloShutdownEventOpened, "Opened existing shutdown event. Setting the event {0}", shutdownEventName);
                         }
                         else
                         {
-                            logger.Info(ErrorCode.SiloShutdownEventCreated, "Created and set shutdown event {0}", shutdownEventName);
+                            this.logger.Info(ErrorCode.SiloShutdownEventCreated, "Created and set shutdown event {0}", shutdownEventName);
                         }
                     }
                     catch (PlatformNotSupportedException exc)
                     {
-                        logger.Info(ErrorCode.SiloShutdownEventFailure, "Unable to create SiloShutdownEvent: {0}", exc.ToString());
+                        this.logger.Info(ErrorCode.SiloShutdownEventFailure, "Unable to create SiloShutdownEvent: {0}", exc.ToString());
                     }
 
                     // Start silo
-                    orleans.Start();
+                    this.orleans.Start();
 
                     // Wait for the shutdown event, and trigger a graceful shutdown if we receive it.
 
-                    if (shutdownEvent != null)
+                    if (this.shutdownEvent != null)
                     {
                         var shutdownThread = new Thread(o =>
-                                       {
-                                           shutdownEvent.WaitOne();
-                                           logger.Info(ErrorCode.SiloShutdownEventReceived, "Received a shutdown event. Starting graceful shutdown.");
-                                           orleans.Shutdown();
-                                       });
-                        shutdownThread.IsBackground = true;
-                        shutdownThread.Start(); 
+                        {
+                            this.shutdownEvent.WaitOne();
+                            this.logger.Info(ErrorCode.SiloShutdownEventReceived, "Received a shutdown event. Starting graceful shutdown.");
+                            this.orleans.Shutdown();
+                        })
+                        {
+                            IsBackground = true,
+                            Name = "SiloShutdownMonitor"
+                        };
+                        shutdownThread.Start();
                     }
 
                     try
                     {
-                        var startupEventName = Name;
-                        logger.Info(ErrorCode.SiloStartupEventName, "Silo startup event name: {0}", startupEventName);
+                        var startupEventName = this.Name;
+                        this.logger.Info(ErrorCode.SiloStartupEventName, "Silo startup event name: {0}", startupEventName);
 
-                        startupEvent = new EventWaitHandle(true, EventResetMode.ManualReset, startupEventName, out createdNew);
+                        this.startupEvent = new EventWaitHandle(true, EventResetMode.ManualReset, startupEventName, out createdNew);
                         if (!createdNew)
                         {
-                            logger.Info(ErrorCode.SiloStartupEventOpened, "Opened existing startup event. Setting the event {0}", startupEventName);
-                            startupEvent.Set();
+                            this.logger.Info(ErrorCode.SiloStartupEventOpened, "Opened existing startup event. Setting the event {0}", startupEventName);
+                            this.startupEvent.Set();
                         }
                         else
                         {
-                            logger.Info(ErrorCode.SiloStartupEventCreated, "Created and set startup event {0}", startupEventName);
+                            this.logger.Info(ErrorCode.SiloStartupEventCreated, "Created and set startup event {0}", startupEventName);
                         }
                     }
                     catch (PlatformNotSupportedException exc)
                     {
-                        logger.Info(ErrorCode.SiloStartupEventFailure, "Unable to create SiloStartupEvent: {0}", exc.ToString());
+                        this.logger.Info(ErrorCode.SiloStartupEventFailure, "Unable to create SiloStartupEvent: {0}", exc.ToString());
                     }
 
-                    logger.Info(ErrorCode.SiloStarted, "Silo {0} started successfully", Name);
-                    IsStarted = true;
+                    this.logger.Info(ErrorCode.SiloStarted, "Silo {0} started successfully", this.Name);
+                    this.IsStarted = true;
                 }
                 else
                 {
@@ -221,8 +224,8 @@ namespace Orleans.Runtime.Host
                 if (catchExceptions)
                 {
                     ReportStartupError(exc);
-                    orleans = null;
-                    IsStarted = false;
+                    this.orleans = null;
+                    this.IsStarted = false;
                     return false;
                 }
                 else
@@ -237,8 +240,8 @@ namespace Orleans.Runtime.Host
         /// </summary>
         public void StopOrleansSilo()
         {
-            IsStarted = false;
-            if (orleans != null) orleans.Stop();
+            this.IsStarted = false;
+            if (this.orleans != null) this.orleans.Stop();
         }
 
         /// <summary>
@@ -246,8 +249,8 @@ namespace Orleans.Runtime.Host
         /// </summary>
         public void ShutdownOrleansSilo()
         {
-            IsStarted = false;
-            if (orleans != null) orleans.Shutdown();
+            this.IsStarted = false;
+            if (this.orleans != null) this.orleans.Shutdown();
         }
 
         /// <summary>
@@ -258,16 +261,19 @@ namespace Orleans.Runtime.Host
         /// <returns></returns>
         public Task ShutdownOrleansSiloAsync(int millisecondsTimeout, CancellationToken cancellationToken)
         {
-            if (orleans == null || !IsStarted)
+            if (this.orleans == null || !this.IsStarted)
                 return Task.CompletedTask;
 
-            IsStarted = false;
+            this.IsStarted = false;
 
             var shutdownThread = new Thread(o =>
             {
-                orleans.Shutdown();
-            });
-            shutdownThread.IsBackground = true;
+                this.orleans.Shutdown();
+            })
+            {
+                IsBackground = true,
+                Name = nameof(ShutdownOrleansSiloAsync)
+            };
             shutdownThread.Start();
 
             return WaitForOrleansSiloShutdownAsync(millisecondsTimeout, cancellationToken);
@@ -325,7 +331,7 @@ namespace Orleans.Runtime.Host
             {
                 var tcs = new TaskCompletionSource<bool>();
                 registeredHandle = ThreadPool.RegisterWaitForSingleObject(
-                    orleans.SiloTerminatedEvent,
+                    this.orleans.SiloTerminatedEvent,
                     (state, timedOut) => ((TaskCompletionSource<bool>)state).TrySetResult(!timedOut),
                     tcs,
                     millisecondsTimeout,
@@ -352,11 +358,11 @@ namespace Orleans.Runtime.Host
         /// <param name="connectionString">Azure connection string to use the silo system data.</param>
         public void SetDeploymentId(string clusterId, string connectionString)
         {
-            logger.Info(ErrorCode.SiloSetDeploymentId, "Setting Deployment Id to {0} and data connection string to {1}",
+            this.logger.Info(ErrorCode.SiloSetDeploymentId, "Setting Deployment Id to {0} and data connection string to {1}",
                 clusterId, ConfigUtilities.RedactConnectionStringInfo(connectionString));
 
-            Config.Globals.ClusterId = clusterId;
-            Config.Globals.DataConnectionString = connectionString;
+            this.Config.Globals.ClusterId = clusterId;
+            this.Config.Globals.DataConnectionString = connectionString;
         }
 
         /// <summary>
@@ -368,10 +374,10 @@ namespace Orleans.Runtime.Host
         /// <param name="generation">Generation number for this silo.</param>
         public void SetSiloEndpoint(IPEndPoint endpoint, int generation)
         {
-            logger.Info(ErrorCode.SiloSetSiloEndpoint, "Setting silo endpoint address to {0}:{1}", endpoint, generation);
-            NodeConfig.HostNameOrIPAddress = endpoint.Address.ToString();
-            NodeConfig.Port = endpoint.Port;
-            NodeConfig.Generation = generation;
+            this.logger.Info(ErrorCode.SiloSetSiloEndpoint, "Setting silo endpoint address to {0}:{1}", endpoint, generation);
+            this.NodeConfig.HostNameOrIPAddress = endpoint.Address.ToString();
+            this.NodeConfig.Port = endpoint.Port;
+            this.NodeConfig.Generation = generation;
         }
 
         /// <summary>
@@ -380,8 +386,8 @@ namespace Orleans.Runtime.Host
         /// <param name="endpoint">IP address of the gateway socket connection.</param>
         public void SetProxyEndpoint(IPEndPoint endpoint)
         {
-            logger.Info(ErrorCode.SiloSetProxyEndpoint, "Setting silo proxy endpoint address to {0}", endpoint);
-            NodeConfig.ProxyGatewayEndpoint = endpoint;
+            this.logger.Info(ErrorCode.SiloSetProxyEndpoint, "Setting silo proxy endpoint address to {0}", endpoint);
+            this.NodeConfig.ProxyGatewayEndpoint = endpoint;
         }
 
         /// <summary>
@@ -390,9 +396,9 @@ namespace Orleans.Runtime.Host
         /// <param name="endpoint">IP address of the inter-silo connection socket on the seed node silo.</param>
         public void SetSeedNodeEndpoint(IPEndPoint endpoint)
         {
-            logger.Info(ErrorCode.SiloSetSeedNode, "Adding seed node address={0} port={1}", endpoint.Address, endpoint.Port);
-            Config.Globals.SeedNodes.Clear();
-            Config.Globals.SeedNodes.Add(endpoint);
+            this.logger.Info(ErrorCode.SiloSetSeedNode, "Adding seed node address={0} port={1}", endpoint.Address, endpoint.Port);
+            this.Config.Globals.SeedNodes.Clear();
+            this.Config.Globals.SeedNodes.Add(endpoint);
         }
 
         /// <summary>
@@ -402,11 +408,11 @@ namespace Orleans.Runtime.Host
         public void SetSeedNodeEndpoints(IPEndPoint[] endpoints)
         {
             // Add all silos as seed nodes
-            Config.Globals.SeedNodes.Clear();
+            this.Config.Globals.SeedNodes.Clear();
             foreach (IPEndPoint endpoint in endpoints)
             {
-                logger.Info(ErrorCode.SiloAddSeedNode, "Adding seed node address={0} port={1}", endpoint.Address, endpoint.Port);
-                Config.Globals.SeedNodes.Add(endpoint);
+                this.logger.Info(ErrorCode.SiloAddSeedNode, "Adding seed node address={0} port={1}", endpoint.Address, endpoint.Port);
+                this.Config.Globals.SeedNodes.Add(endpoint);
             }
         }
 
@@ -418,8 +424,8 @@ namespace Orleans.Runtime.Host
         /// <param name="endpoint">The IP address for the inter-silo connection socket on the Primary silo.</param>
         public void SetPrimaryNodeEndpoint(IPEndPoint endpoint)
         {
-            logger.Info(ErrorCode.SiloSetPrimaryNode, "Setting primary node address={0} port={1}", endpoint.Address, endpoint.Port);
-            Config.PrimaryNode = endpoint;
+            this.logger.Info(ErrorCode.SiloSetPrimaryNode, "Setting primary node address={0} port={1}", endpoint.Address, endpoint.Port);
+            this.Config.PrimaryNode = endpoint;
         }
 
         /// <summary>
@@ -428,8 +434,8 @@ namespace Orleans.Runtime.Host
         /// <param name="siloType">Type of this silo.</param>
         public void SetSiloType(Silo.SiloType siloType)
         {
-            logger.Info(ErrorCode.SiloSetSiloType, "Setting silo type {0}", siloType);
-            Type = siloType;
+            this.logger.Info(ErrorCode.SiloSetSiloType, "Setting silo type {0}", siloType);
+            this.Type = siloType;
         }
 
         /// <summary>
@@ -438,8 +444,8 @@ namespace Orleans.Runtime.Host
         /// <param name="livenessType">Liveness type for this silo</param>
         public void SetSiloLivenessType(GlobalConfiguration.LivenessProviderType livenessType)
         {
-            logger.Info(ErrorCode.SetSiloLivenessType, "Setting silo Liveness Provider Type={0}", livenessType);
-            Config.Globals.LivenessType = livenessType;
+            this.logger.Info(ErrorCode.SetSiloLivenessType, "Setting silo Liveness Provider Type={0}", livenessType);
+            this.Config.Globals.LivenessType = livenessType;
         }
 
         /// <summary>
@@ -448,8 +454,8 @@ namespace Orleans.Runtime.Host
         /// <param name="reminderType">Reminder service type for this silo</param>
         public void SetReminderServiceType(GlobalConfiguration.ReminderServiceProviderType reminderType)
         {
-            logger.Info(ErrorCode.SetSiloLivenessType, "Setting silo Reminder Service Provider Type={0}", reminderType);
-            Config.Globals.SetReminderServiceType(reminderType);
+            this.logger.Info(ErrorCode.SetSiloLivenessType, "Setting silo Reminder Service Provider Type={0}", reminderType);
+            this.Config.Globals.SetReminderServiceType(reminderType);
         }
 
         /// <summary>
@@ -458,8 +464,8 @@ namespace Orleans.Runtime.Host
         /// <param name="size">The expected deployment size.</param>
         public void SetExpectedClusterSize(int size)
         {
-            logger.Info(ErrorCode.SetSiloLivenessType, "Setting Expected Cluster Size to={0}", size);
-            Config.Globals.ExpectedClusterSize = size;
+            this.logger.Info(ErrorCode.SetSiloLivenessType, "Setting Expected Cluster Size to={0}", size);
+            this.Config.Globals.ExpectedClusterSize = size;
         }
 
         /// <summary>
@@ -473,17 +479,17 @@ namespace Orleans.Runtime.Host
         /// <param name="exc">Exception which caused the silo startup issue.</param>
         public void ReportStartupError(Exception exc)
         {
-            if (string.IsNullOrWhiteSpace(Name))
-                Name = "Silo";
+            if (string.IsNullOrWhiteSpace(this.Name))
+                this.Name = "Silo";
 
-            var errMsg = "ERROR starting Orleans silo name=" + Name + " Exception=" + LogFormatter.PrintException(exc);
-            if (logger != null) logger.Error(ErrorCode.Runtime_Error_100105, errMsg, exc);
+            var errMsg = "ERROR starting Orleans silo name=" + this.Name + " Exception=" + LogFormatter.PrintException(exc);
+            if (this.logger != null) this.logger.Error(ErrorCode.Runtime_Error_100105, errMsg, exc);
 
             // Dump Startup error to a log file
             var now = DateTime.UtcNow;
-           
-            var dateString = now.ToString(dateFormat, CultureInfo.InvariantCulture);
-            var startupLog = Name + "-StartupError-" + dateString + ".txt";
+
+            var dateString = now.ToString(DateFormat, CultureInfo.InvariantCulture);
+            var startupLog = this.Name + "-StartupError-" + dateString + ".txt";
 
             try
             {
@@ -491,7 +497,7 @@ namespace Orleans.Runtime.Host
             }
             catch (Exception exc2)
             {
-                if (logger != null) logger.Error(ErrorCode.Runtime_Error_100106, "Error writing log file " + startupLog, exc2);
+                if (this.logger != null) this.logger.Error(ErrorCode.Runtime_Error_100106, "Error writing log file " + startupLog, exc2);
             }
         }
 
@@ -500,16 +506,16 @@ namespace Orleans.Runtime.Host
         /// </summary>
         public void LoadOrleansConfig()
         {
-            if (ConfigLoaded) return;
+            if (this.ConfigLoaded) return;
 
-            var config = Config ?? new ClusterConfiguration();
+            var config = this.Config ?? new ClusterConfiguration();
 
             try
             {
-                if (ConfigFileName == null)
+                if (this.ConfigFileName == null)
                     config.StandardLoad();
                 else
-                    config.LoadFromFile(ConfigFileName);
+                    config.LoadFromFile(this.ConfigFileName);
             }
             catch (Exception ex)
             {
@@ -525,18 +531,18 @@ namespace Orleans.Runtime.Host
         /// <param name="config">Configuration data for this silo and cluster.</param>
         private void SetSiloConfig(ClusterConfiguration config)
         {
-            Config = config;
+            this.Config = config;
 
-            if (!String.IsNullOrEmpty(DeploymentId))
-                Config.Globals.ClusterId = DeploymentId;
+            if (!string.IsNullOrEmpty(this.DeploymentId))
+                this.Config.Globals.ClusterId = this.DeploymentId;
 
-            if (string.IsNullOrWhiteSpace(Name))
+            if (string.IsNullOrWhiteSpace(this.Name))
                 throw new ArgumentException("SiloName not defined - cannot initialize config");
 
-            NodeConfig = Config.GetOrCreateNodeConfigurationForSilo(Name);
-            Type = NodeConfig.IsPrimaryNode ? Silo.SiloType.Primary : Silo.SiloType.Secondary;
+            this.NodeConfig = this.Config.GetOrCreateNodeConfigurationForSilo(this.Name);
+            this.Type = this.NodeConfig.IsPrimaryNode ? Silo.SiloType.Primary : Silo.SiloType.Secondary;
 
-            ConfigLoaded = true;
+            this.ConfigLoaded = true;
         }
 
         /// <summary>
@@ -550,19 +556,19 @@ namespace Orleans.Runtime.Host
         /// </remarks>
         private void WaitForOrleansSiloShutdownImpl(CancellationToken? cancellationToken = null)
         {
-            if (!IsStarted)
+            if (!this.IsStarted)
                 throw new InvalidOperationException("Cannot wait for silo " + this.Name + " since it was not started successfully previously.");
 
-            if (startupEvent != null)
-                startupEvent.Reset();
-            
-            if (orleans != null)
+            if (this.startupEvent != null)
+                this.startupEvent.Reset();
+
+            if (this.orleans != null)
             {
                 // Intercept cancellation to initiate silo stop
                 if (cancellationToken.HasValue)
-                    cancellationToken.Value.Register(HandleExternalCancellation);
+                    cancellationToken.Value.Register(this.HandleExternalCancellation);
 
-                orleans.SiloTerminatedEvent.WaitOne();
+                this.orleans.SiloTerminatedEvent.WaitOne();
             }
             else
                 throw new InvalidOperationException("Cannot wait for silo " + this.Name + " due to prior initialization error");
@@ -574,7 +580,7 @@ namespace Orleans.Runtime.Host
         private void HandleExternalCancellation()
         {
             // Try to perform gracefull shutdown of Silo when we a cancellation request has been made
-            logger.Info(ErrorCode.SiloStopping, "External cancellation triggered, starting to shutdown silo.");
+            this.logger.Info(ErrorCode.SiloStopping, "External cancellation triggered, starting to shutdown silo.");
             ShutdownOrleansSilo();
         }
 
@@ -591,21 +597,21 @@ namespace Orleans.Runtime.Host
         /// <param name="disposing"></param>
         protected virtual void Dispose(bool disposing)
         {
-            if (!disposed)
+            if (!this.disposed)
             {
                 if (disposing)
                 {
                     this.loggerProvider?.Dispose();
                     this.loggerProvider = null;
-                    if (startupEvent != null)
+                    if (this.startupEvent != null)
                     {
-                        startupEvent.Dispose();
-                        startupEvent = null;
+                        this.startupEvent.Dispose();
+                        this.startupEvent = null;
                     }
                     this.IsStarted = false;
                 }
             }
-            disposed = true;
+            this.disposed = true;
         }
     }
 }

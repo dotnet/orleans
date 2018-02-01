@@ -1,3 +1,4 @@
+using Orleans.Hosting;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -24,10 +25,10 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public string SiloName
         {
-            get { return siloName; }
+            get { return this.siloName; }
             set
             {
-                siloName = value;
+                this.siloName = value;
             }
         }
 
@@ -42,7 +43,7 @@ namespace Orleans.Runtime.Configuration
         /// This is a configurable IP address or Hostname.
         /// </summary>
         public string HostNameOrIPAddress { get; set; }
-        private IPAddress Address { get { return ClusterConfiguration.ResolveIPAddress(HostNameOrIPAddress, Subnet, AddressType).GetResult(); } }
+        private IPAddress Address { get { return ConfigUtilities.ResolveIPAddress(this.HostNameOrIPAddress, this.Subnet, this.AddressType).GetResult(); } }
 
         /// <summary>
         /// The port this silo uses for silo-to-silo communication.
@@ -59,7 +60,7 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public IPEndPoint Endpoint
         {
-            get { return new IPEndPoint(Address, Port); }
+            get { return new IPEndPoint(this.Address, this.Port); }
         }
         /// <summary>
         /// The AddressFamilyof the IP address of this silo.
@@ -70,20 +71,20 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public IPEndPoint ProxyGatewayEndpoint { get; set; }
 
-        internal byte[] Subnet { get; set; } // from global
+        public byte[] Subnet { get; set; } // from global
 
         /// <summary>
         /// Whether this is a primary silo (applies for dev settings only).
         /// </summary>
-        public bool IsPrimaryNode { get; internal set; }
+        public bool IsPrimaryNode { get; set; }
         /// <summary>
         /// Whether this is one of the seed silos (applies for dev settings only).
         /// </summary>
-        public bool IsSeedNode { get; internal set; }
+        public bool IsSeedNode { get; set; }
         /// <summary>
         /// Whether this is silo is a proxying gateway silo.
         /// </summary>
-        public bool IsGatewayNode { get { return ProxyGatewayEndpoint != null; } }
+        public bool IsGatewayNode { get { return this.ProxyGatewayEndpoint != null; } }
 
         /// <summary>
         /// The MaxActiveThreads attribute specifies the maximum number of simultaneous active threads the scheduler will allow.
@@ -190,131 +191,122 @@ namespace Orleans.Runtime.Configuration
         public string SiloShutdownEventName { get; set; }
 
         internal const string DEFAULT_NODE_NAME = "default";
-        private static readonly TimeSpan DEFAULT_STATS_METRICS_TABLE_WRITE_PERIOD = TimeSpan.FromSeconds(30);
-        private static readonly TimeSpan DEFAULT_STATS_PERF_COUNTERS_WRITE_PERIOD = TimeSpan.FromSeconds(30);
-        private static readonly TimeSpan DEFAULT_STATS_LOG_WRITE_PERIOD = TimeSpan.FromMinutes(5);
-        internal static readonly StatisticsLevel DEFAULT_STATS_COLLECTION_LEVEL = StatisticsLevel.Info;
-        private static readonly int DEFAULT_MAX_ACTIVE_THREADS = Math.Max(4, System.Environment.ProcessorCount);
-        private const int DEFAULT_MIN_DOT_NET_THREAD_POOL_SIZE = 200;
-        private static readonly int DEFAULT_MIN_DOT_NET_CONNECTION_LIMIT = DEFAULT_MIN_DOT_NET_THREAD_POOL_SIZE;
-        private static readonly TimeSpan DEFAULT_ACTIVATION_SCHEDULING_QUANTUM = TimeSpan.FromMilliseconds(100);
-        internal const bool ENABLE_WORKER_THREAD_INJECTION = false;
 
         public NodeConfiguration()
         {
-            creationTimestamp = DateTime.UtcNow;
+            this.creationTimestamp = DateTime.UtcNow;
 
-            SiloName = "";
-            HostNameOrIPAddress = "";
-            DNSHostName = Dns.GetHostName();
-            Port = 0;
-            Generation = 0;
-            AddressType = AddressFamily.InterNetwork;
-            ProxyGatewayEndpoint = null;
+            this.SiloName = "";
+            this.HostNameOrIPAddress = "";
+            this.DNSHostName = Dns.GetHostName();
+            this.Port = 0;
+            this.Generation = 0;
+            this.AddressType = AddressFamily.InterNetwork;
+            this.ProxyGatewayEndpoint = null;
 
-            MaxActiveThreads = DEFAULT_MAX_ACTIVE_THREADS;
-            DelayWarningThreshold = TimeSpan.FromMilliseconds(10000); // 10,000 milliseconds
-            ActivationSchedulingQuantum = DEFAULT_ACTIVATION_SCHEDULING_QUANTUM;
-            TurnWarningLengthThreshold = TimeSpan.FromMilliseconds(200);
-            EnableWorkerThreadInjection = ENABLE_WORKER_THREAD_INJECTION;
+            this.MaxActiveThreads = SchedulingOptions.DEFAULT_MAX_ACTIVE_THREADS;
+            this.DelayWarningThreshold = SchedulingOptions.DEFAULT_DELAY_WARNING_THRESHOLD;
+            this.ActivationSchedulingQuantum = SchedulingOptions.DEFAULT_ACTIVATION_SCHEDULING_QUANTUM;
+            this.TurnWarningLengthThreshold = SchedulingOptions.DEFAULT_DELAY_WARNING_THRESHOLD;
+            this.EnableWorkerThreadInjection = SchedulingOptions.DEFAULT_ENABLE_WORKER_THREAD_INJECTION;
 
-            LoadSheddingEnabled = false;
-            LoadSheddingLimit = 95;
-            
-            PropagateActivityId = Constants.DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
+            this.LoadSheddingEnabled = false;
+            this.LoadSheddingLimit = SiloStatisticsOptions.DEFAULT_LOAD_SHEDDING_LIMIT;
 
-            StatisticsMetricsTableWriteInterval = DEFAULT_STATS_METRICS_TABLE_WRITE_PERIOD;
-            StatisticsPerfCountersWriteInterval = DEFAULT_STATS_PERF_COUNTERS_WRITE_PERIOD;
-            StatisticsLogWriteInterval = DEFAULT_STATS_LOG_WRITE_PERIOD;
-            StatisticsWriteLogStatisticsToTable = true;
-            StatisticsCollectionLevel = DEFAULT_STATS_COLLECTION_LEVEL;
+            this.PropagateActivityId = SiloMessagingOptions.DEFAULT_PROPAGATE_ACTIVITY_ID;
 
-            LimitManager = new LimitManager();
+            this.StatisticsMetricsTableWriteInterval = SiloStatisticsOptions.DEFAULT_METRICS_TABLE_WRITE_PERIOD;
+            this.StatisticsPerfCountersWriteInterval = SiloStatisticsOptions.SILO_DEFAULT_PERF_COUNTERS_WRITE_PERIOD;
+            this.StatisticsLogWriteInterval = SiloStatisticsOptions.DEFAULT_LOG_WRITE_PERIOD;
+            this.StatisticsWriteLogStatisticsToTable = SiloStatisticsOptions.DEFAULT_LOG_TO_TABLE;
+            this.StatisticsCollectionLevel = SiloStatisticsOptions.DEFAULT_COLLECTION_LEVEL;
 
-            MinDotNetThreadPoolSize = DEFAULT_MIN_DOT_NET_THREAD_POOL_SIZE;
+            this.LimitManager = new LimitManager();
+
+            this.MinDotNetThreadPoolSize = ThreadPoolOptions.DEFAULT_MIN_DOT_NET_THREAD_POOL_SIZE;
 
             // .NET ServicePointManager settings / optimizations
-            Expect100Continue = false;
-            DefaultConnectionLimit = DEFAULT_MIN_DOT_NET_CONNECTION_LIMIT;
-            UseNagleAlgorithm = false;
+            this.Expect100Continue = false;
+            this.DefaultConnectionLimit = ServicePointOptions.DEFAULT_MIN_DOT_NET_CONNECTION_LIMIT;
+            this.UseNagleAlgorithm = false;
 
-            AdditionalAssemblyDirectories = new Dictionary<string, SearchOption>();
-            ExcludedGrainTypes = new List<string>();
+            this.AdditionalAssemblyDirectories = new Dictionary<string, SearchOption>();
+            this.ExcludedGrainTypes = new List<string>();
         }
 
         public NodeConfiguration(NodeConfiguration other)
         {
-            creationTimestamp = other.creationTimestamp;
+            this.creationTimestamp = other.creationTimestamp;
 
-            SiloName = other.SiloName;
-            HostNameOrIPAddress = other.HostNameOrIPAddress;
-            DNSHostName = other.DNSHostName;
-            Port = other.Port;
-            Generation = other.Generation;
-            AddressType = other.AddressType;
-            ProxyGatewayEndpoint = other.ProxyGatewayEndpoint;
+            this.SiloName = other.SiloName;
+            this.HostNameOrIPAddress = other.HostNameOrIPAddress;
+            this.DNSHostName = other.DNSHostName;
+            this.Port = other.Port;
+            this.Generation = other.Generation;
+            this.AddressType = other.AddressType;
+            this.ProxyGatewayEndpoint = other.ProxyGatewayEndpoint;
 
-            MaxActiveThreads = other.MaxActiveThreads;
-            DelayWarningThreshold = other.DelayWarningThreshold;
-            ActivationSchedulingQuantum = other.ActivationSchedulingQuantum;
-            TurnWarningLengthThreshold = other.TurnWarningLengthThreshold;
-            EnableWorkerThreadInjection = other.EnableWorkerThreadInjection;
+            this.MaxActiveThreads = other.MaxActiveThreads;
+            this.DelayWarningThreshold = other.DelayWarningThreshold;
+            this.ActivationSchedulingQuantum = other.ActivationSchedulingQuantum;
+            this.TurnWarningLengthThreshold = other.TurnWarningLengthThreshold;
+            this.EnableWorkerThreadInjection = other.EnableWorkerThreadInjection;
 
-            LoadSheddingEnabled = other.LoadSheddingEnabled;
-            LoadSheddingLimit = other.LoadSheddingLimit;
-            
-            PropagateActivityId = other.PropagateActivityId;
+            this.LoadSheddingEnabled = other.LoadSheddingEnabled;
+            this.LoadSheddingLimit = other.LoadSheddingLimit;
 
-            StatisticsProviderName = other.StatisticsProviderName;
-            StatisticsMetricsTableWriteInterval = other.StatisticsMetricsTableWriteInterval;
-            StatisticsPerfCountersWriteInterval = other.StatisticsPerfCountersWriteInterval;
-            StatisticsLogWriteInterval = other.StatisticsLogWriteInterval;
-            StatisticsWriteLogStatisticsToTable = other.StatisticsWriteLogStatisticsToTable;
-            StatisticsCollectionLevel = other.StatisticsCollectionLevel;
+            this.PropagateActivityId = other.PropagateActivityId;
 
-            LimitManager = new LimitManager(other.LimitManager); // Shallow copy
+            this.StatisticsProviderName = other.StatisticsProviderName;
+            this.StatisticsMetricsTableWriteInterval = other.StatisticsMetricsTableWriteInterval;
+            this.StatisticsPerfCountersWriteInterval = other.StatisticsPerfCountersWriteInterval;
+            this.StatisticsLogWriteInterval = other.StatisticsLogWriteInterval;
+            this.StatisticsWriteLogStatisticsToTable = other.StatisticsWriteLogStatisticsToTable;
+            this.StatisticsCollectionLevel = other.StatisticsCollectionLevel;
 
-            Subnet = other.Subnet;
+            this.LimitManager = new LimitManager(other.LimitManager); // Shallow copy
 
-            MinDotNetThreadPoolSize = other.MinDotNetThreadPoolSize;
-            Expect100Continue = other.Expect100Continue;
-            DefaultConnectionLimit = other.DefaultConnectionLimit;
-            UseNagleAlgorithm = other.UseNagleAlgorithm;
+            this.Subnet = other.Subnet;
 
-            StartupTypeName = other.StartupTypeName;
-            AdditionalAssemblyDirectories = new Dictionary<string, SearchOption>(other.AdditionalAssemblyDirectories);
-            ExcludedGrainTypes = other.ExcludedGrainTypes.ToList();
-            TelemetryConfiguration = other.TelemetryConfiguration.Clone();
+            this.MinDotNetThreadPoolSize = other.MinDotNetThreadPoolSize;
+            this.Expect100Continue = other.Expect100Continue;
+            this.DefaultConnectionLimit = other.DefaultConnectionLimit;
+            this.UseNagleAlgorithm = other.UseNagleAlgorithm;
+
+            this.StartupTypeName = other.StartupTypeName;
+            this.AdditionalAssemblyDirectories = new Dictionary<string, SearchOption>(other.AdditionalAssemblyDirectories);
+            this.ExcludedGrainTypes = other.ExcludedGrainTypes.ToList();
+            this.TelemetryConfiguration = other.TelemetryConfiguration.Clone();
         }
 
         public override string ToString()
         {
             var sb = new StringBuilder();
 
-            sb.Append("   Silo Name: ").AppendLine(SiloName);
-            sb.Append("   Generation: ").Append(Generation).AppendLine();
-            sb.Append("   Host Name or IP Address: ").AppendLine(HostNameOrIPAddress);
-            sb.Append("   DNS Host Name: ").AppendLine(DNSHostName);
-            sb.Append("   Port: ").Append(Port).AppendLine();
-            sb.Append("   Subnet: ").Append(Subnet == null ? "" : Subnet.ToStrings(x => x.ToString(), ".")).AppendLine();
-            sb.Append("   Preferred Address Family: ").Append(AddressType).AppendLine();
-            if (IsGatewayNode)
+            sb.Append("   Silo Name: ").AppendLine(this.SiloName);
+            sb.Append("   Generation: ").Append(this.Generation).AppendLine();
+            sb.Append("   Host Name or IP Address: ").AppendLine(this.HostNameOrIPAddress);
+            sb.Append("   DNS Host Name: ").AppendLine(this.DNSHostName);
+            sb.Append("   Port: ").Append(this.Port).AppendLine();
+            sb.Append("   Subnet: ").Append(this.Subnet == null ? "" : this.Subnet.ToStrings(x => x.ToString(), ".")).AppendLine();
+            sb.Append("   Preferred Address Family: ").Append(this.AddressType).AppendLine();
+            if (this.IsGatewayNode)
             {
-                sb.Append("   Proxy Gateway: ").Append(ProxyGatewayEndpoint.ToString()).AppendLine();
+                sb.Append("   Proxy Gateway: ").Append(this.ProxyGatewayEndpoint.ToString()).AppendLine();
             }
             else
             {
-                sb.Append("   IsGatewayNode: ").Append(IsGatewayNode).AppendLine();
+                sb.Append("   IsGatewayNode: ").Append(this.IsGatewayNode).AppendLine();
             }
-            sb.Append("   IsPrimaryNode: ").Append(IsPrimaryNode).AppendLine();
+            sb.Append("   IsPrimaryNode: ").Append(this.IsPrimaryNode).AppendLine();
             sb.Append("   Scheduler: ").AppendLine();
-            sb.Append("      ").Append("   Max Active Threads: ").Append(MaxActiveThreads).AppendLine();
+            sb.Append("      ").Append("   Max Active Threads: ").Append(this.MaxActiveThreads).AppendLine();
             sb.Append("      ").Append("   Processor Count: ").Append(System.Environment.ProcessorCount).AppendLine();
-            sb.Append("      ").Append("   Delay Warning Threshold: ").Append(DelayWarningThreshold).AppendLine();
-            sb.Append("      ").Append("   Activation Scheduling Quantum: ").Append(ActivationSchedulingQuantum).AppendLine();
-            sb.Append("      ").Append("   Turn Warning Length Threshold: ").Append(TurnWarningLengthThreshold).AppendLine();
-            sb.Append("      ").Append("   Inject More Worker Threads: ").Append(EnableWorkerThreadInjection).AppendLine();
-            sb.Append("      ").Append("   MinDotNetThreadPoolSize: ").Append(MinDotNetThreadPoolSize).AppendLine();
+            sb.Append("      ").Append("   Delay Warning Threshold: ").Append(this.DelayWarningThreshold).AppendLine();
+            sb.Append("      ").Append("   Activation Scheduling Quantum: ").Append(this.ActivationSchedulingQuantum).AppendLine();
+            sb.Append("      ").Append("   Turn Warning Length Threshold: ").Append(this.TurnWarningLengthThreshold).AppendLine();
+            sb.Append("      ").Append("   Inject More Worker Threads: ").Append(this.EnableWorkerThreadInjection).AppendLine();
+            sb.Append("      ").Append("   MinDotNetThreadPoolSize: ").Append(this.MinDotNetThreadPoolSize).AppendLine();
 
             int workerThreads;
             int completionPortThreads;
@@ -323,13 +315,13 @@ namespace Orleans.Runtime.Configuration
             ThreadPool.GetMaxThreads(out workerThreads, out completionPortThreads);
             sb.Append("      ").AppendFormat("   .NET thread pool sizes - Max: Worker Threads={0} Completion Port Threads={1}", workerThreads, completionPortThreads).AppendLine();
 
-            sb.Append("      ").AppendFormat("   .NET ServicePointManager - DefaultConnectionLimit={0} Expect100Continue={1} UseNagleAlgorithm={2}", DefaultConnectionLimit, Expect100Continue, UseNagleAlgorithm).AppendLine();
-            sb.Append("   Load Shedding Enabled: ").Append(LoadSheddingEnabled).AppendLine();
-            sb.Append("   Load Shedding Limit: ").Append(LoadSheddingLimit).AppendLine();
-            sb.Append("   SiloShutdownEventName: ").Append(SiloShutdownEventName).AppendLine();
+            sb.Append("      ").AppendFormat("   .NET ServicePointManager - DefaultConnectionLimit={0} Expect100Continue={1} UseNagleAlgorithm={2}", this.DefaultConnectionLimit, this.Expect100Continue, this.UseNagleAlgorithm).AppendLine();
+            sb.Append("   Load Shedding Enabled: ").Append(this.LoadSheddingEnabled).AppendLine();
+            sb.Append("   Load Shedding Limit: ").Append(this.LoadSheddingLimit).AppendLine();
+            sb.Append("   SiloShutdownEventName: ").Append(this.SiloShutdownEventName).AppendLine();
             sb.Append("   Debug: ").AppendLine();
             sb.Append(ConfigUtilities.IStatisticsConfigurationToString(this));
-            sb.Append(LimitManager);
+            sb.Append(this.LimitManager);
             return sb.ToString();
         }
 
@@ -341,7 +333,7 @@ namespace Orleans.Runtime.Configuration
 
         internal void Load(XmlElement root)
         {
-            SiloName = root.LocalName.Equals("Override") ? root.GetAttribute("Node") : DEFAULT_NODE_NAME;
+            this.SiloName = root.LocalName.Equals("Override") ? root.GetAttribute("Node") : DEFAULT_NODE_NAME;
 
             foreach (XmlNode c in root.ChildNodes)
             {
@@ -354,109 +346,109 @@ namespace Orleans.Runtime.Configuration
                     case "Networking":
                         if (child.HasAttribute("Address"))
                         {
-                            HostNameOrIPAddress = child.GetAttribute("Address");
+                            this.HostNameOrIPAddress = child.GetAttribute("Address");
                         }
                         if (child.HasAttribute("Port"))
                         {
-                            Port = ConfigUtilities.ParseInt(child.GetAttribute("Port"),
-                                "Non-numeric Port attribute value on Networking element for " + SiloName);
+                            this.Port = ConfigUtilities.ParseInt(child.GetAttribute("Port"),
+                                "Non-numeric Port attribute value on Networking element for " + this.SiloName);
                         }
                         if (child.HasAttribute("PreferredFamily"))
                         {
-                            AddressType = ConfigUtilities.ParseEnum<AddressFamily>(child.GetAttribute("PreferredFamily"),
+                            this.AddressType = ConfigUtilities.ParseEnum<AddressFamily>(child.GetAttribute("PreferredFamily"),
                                 "Invalid preferred address family on Networking node. Valid choices are 'InterNetwork' and 'InterNetworkV6'");
                         }
                         break;
                     case "ProxyingGateway":
-                        ProxyGatewayEndpoint = ConfigUtilities.ParseIPEndPoint(child, Subnet).GetResult();
+                        this.ProxyGatewayEndpoint = ConfigUtilities.ParseIPEndPoint(child, this.Subnet).GetResult();
                         break;
                     case "Scheduler":
                         if (child.HasAttribute("MaxActiveThreads"))
                         {
-                            MaxActiveThreads = ConfigUtilities.ParseInt(child.GetAttribute("MaxActiveThreads"),
-                                "Non-numeric MaxActiveThreads attribute value on Scheduler element for " + SiloName);
-                            if (MaxActiveThreads < 1)
+                            this.MaxActiveThreads = ConfigUtilities.ParseInt(child.GetAttribute("MaxActiveThreads"),
+                                "Non-numeric MaxActiveThreads attribute value on Scheduler element for " + this.SiloName);
+                            if (this.MaxActiveThreads < 1)
                             {
-                                MaxActiveThreads = DEFAULT_MAX_ACTIVE_THREADS;
+                                this.MaxActiveThreads = SchedulingOptions.DEFAULT_MAX_ACTIVE_THREADS;
                             }
                         }
                         if (child.HasAttribute("DelayWarningThreshold"))
                         {
-                            DelayWarningThreshold = ConfigUtilities.ParseTimeSpan(child.GetAttribute("DelayWarningThreshold"),
-                                "Non-numeric DelayWarningThreshold attribute value on Scheduler element for " + SiloName);
+                            this.DelayWarningThreshold = ConfigUtilities.ParseTimeSpan(child.GetAttribute("DelayWarningThreshold"),
+                                "Non-numeric DelayWarningThreshold attribute value on Scheduler element for " + this.SiloName);
                         }
                         if (child.HasAttribute("ActivationSchedulingQuantum"))
                         {
-                            ActivationSchedulingQuantum = ConfigUtilities.ParseTimeSpan(child.GetAttribute("ActivationSchedulingQuantum"),
-                                "Non-numeric ActivationSchedulingQuantum attribute value on Scheduler element for " + SiloName);
+                            this.ActivationSchedulingQuantum = ConfigUtilities.ParseTimeSpan(child.GetAttribute("ActivationSchedulingQuantum"),
+                                "Non-numeric ActivationSchedulingQuantum attribute value on Scheduler element for " + this.SiloName);
                         }
                         if (child.HasAttribute("TurnWarningLengthThreshold"))
                         {
-                            TurnWarningLengthThreshold = ConfigUtilities.ParseTimeSpan(child.GetAttribute("TurnWarningLengthThreshold"),
-                                "Non-numeric TurnWarningLengthThreshold attribute value on Scheduler element for " + SiloName);
+                            this.TurnWarningLengthThreshold = ConfigUtilities.ParseTimeSpan(child.GetAttribute("TurnWarningLengthThreshold"),
+                                "Non-numeric TurnWarningLengthThreshold attribute value on Scheduler element for " + this.SiloName);
                         }
                         if (child.HasAttribute("MinDotNetThreadPoolSize"))
                         {
-                            MinDotNetThreadPoolSize = ConfigUtilities.ParseInt(child.GetAttribute("MinDotNetThreadPoolSize"),
-                                "Invalid ParseInt MinDotNetThreadPoolSize value on Scheduler element for " + SiloName);
+                            this.MinDotNetThreadPoolSize = ConfigUtilities.ParseInt(child.GetAttribute("MinDotNetThreadPoolSize"),
+                                "Invalid ParseInt MinDotNetThreadPoolSize value on Scheduler element for " + this.SiloName);
                         }
                         if (child.HasAttribute("Expect100Continue"))
                         {
-                            Expect100Continue = ConfigUtilities.ParseBool(child.GetAttribute("Expect100Continue"),
-                                "Invalid ParseBool Expect100Continue value on Scheduler element for " + SiloName);
+                            this.Expect100Continue = ConfigUtilities.ParseBool(child.GetAttribute("Expect100Continue"),
+                                "Invalid ParseBool Expect100Continue value on Scheduler element for " + this.SiloName);
                         }
                         if (child.HasAttribute("DefaultConnectionLimit"))
                         {
-                            DefaultConnectionLimit = ConfigUtilities.ParseInt(child.GetAttribute("DefaultConnectionLimit"),
-                                "Invalid ParseInt DefaultConnectionLimit value on Scheduler element for " + SiloName);
+                            this.DefaultConnectionLimit = ConfigUtilities.ParseInt(child.GetAttribute("DefaultConnectionLimit"),
+                                "Invalid ParseInt DefaultConnectionLimit value on Scheduler element for " + this.SiloName);
                         }
                         if (child.HasAttribute("UseNagleAlgorithm "))
                         {
-                            UseNagleAlgorithm = ConfigUtilities.ParseBool(child.GetAttribute("UseNagleAlgorithm "),
-                                "Invalid ParseBool UseNagleAlgorithm value on Scheduler element for " + SiloName);
+                            this.UseNagleAlgorithm = ConfigUtilities.ParseBool(child.GetAttribute("UseNagleAlgorithm "),
+                                "Invalid ParseBool UseNagleAlgorithm value on Scheduler element for " + this.SiloName);
                         }
                         break;
                     case "LoadShedding":
                         if (child.HasAttribute("Enabled"))
                         {
-                            LoadSheddingEnabled = ConfigUtilities.ParseBool(child.GetAttribute("Enabled"),
-                                "Invalid boolean value for Enabled attribute on LoadShedding attribute for " + SiloName);
+                            this.LoadSheddingEnabled = ConfigUtilities.ParseBool(child.GetAttribute("Enabled"),
+                                "Invalid boolean value for Enabled attribute on LoadShedding attribute for " + this.SiloName);
                         }
                         if (child.HasAttribute("LoadLimit"))
                         {
-                            LoadSheddingLimit = ConfigUtilities.ParseInt(child.GetAttribute("LoadLimit"),
-                                "Invalid integer value for LoadLimit attribute on LoadShedding attribute for " + SiloName);
-                            if (LoadSheddingLimit < 0)
+                            this.LoadSheddingLimit = ConfigUtilities.ParseInt(child.GetAttribute("LoadLimit"),
+                                "Invalid integer value for LoadLimit attribute on LoadShedding attribute for " + this.SiloName);
+                            if (this.LoadSheddingLimit < 0)
                             {
-                                LoadSheddingLimit = 0;
+                                this.LoadSheddingLimit = 0;
                             }
-                            if (LoadSheddingLimit > 100)
+                            if (this.LoadSheddingLimit > 100)
                             {
-                                LoadSheddingLimit = 100;
+                                this.LoadSheddingLimit = 100;
                             }
                         }
                         break;
                     case "Tracing":
-                        if (ConfigUtilities.TryParsePropagateActivityId(child, siloName, out var propagateActivityId))
+                        if (ConfigUtilities.TryParsePropagateActivityId(child, this.siloName, out var propagateActivityId))
                             this.PropagateActivityId = propagateActivityId;
                         break;
                     case "Statistics":
-                        ConfigUtilities.ParseStatistics(this, child, SiloName);
+                        ConfigUtilities.ParseStatistics(this, child, this.SiloName);
                         break;
                     case "Limits":
-                        ConfigUtilities.ParseLimitValues(LimitManager, child, SiloName);
+                        ConfigUtilities.ParseLimitValues(this.LimitManager, child, this.SiloName);
                         break;
                     case "Startup":
                         if (child.HasAttribute("Type"))
                         {
-                            StartupTypeName = child.GetAttribute("Type");
+                            this.StartupTypeName = child.GetAttribute("Type");
                         }
                         break;
                     case "Telemetry":
                         ConfigUtilities.ParseTelemetry(child, this.TelemetryConfiguration);
                         break;
                     case "AdditionalAssemblyDirectories":
-                        ConfigUtilities.ParseAdditionalAssemblyDirectories(AdditionalAssemblyDirectories, child);
+                        ConfigUtilities.ParseAdditionalAssemblyDirectories(this.AdditionalAssemblyDirectories, child);
                         break;
                 }
             }

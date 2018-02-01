@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.ApplicationParts;
 using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Metadata;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -16,6 +17,7 @@ namespace Orleans
     {
         public static void AddDefaultServices(IClientBuilder builder, IServiceCollection services)
         {
+            services.TryAddSingleton<ILifecycleParticipant<IClusterClientLifecycle>, ClientOptionsLogger>();
             services.TryAddSingleton<TelemetryManager>();
             services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();
             services.TryAddSingleton<IHostEnvironmentStatistics, NoOpHostEnvironmentStatistics>();
@@ -61,6 +63,12 @@ namespace Orleans
             services.AddTransient<IConfigurationValidator, ApplicationPartValidator>();
 
             services.TryAddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
+
+            //Add default option formatter if none is configured, for options which are requied to be configured 
+            services.TryConfigureFormatter<ClusterClientOptions, ClusterClientOptionsFormatter>();
+            services.TryConfigureFormatter<ClientMessagingOptions, ClientMessagingOptionFormatter>();
+            services.TryConfigureFormatter<NetworkingOptions, NetworkingOptionFormatter>();
+            services.TryConfigureFormatter<ClientStatisticsOptions, ClientStatisticsOptionsFormatter>();
         }
     }
 }

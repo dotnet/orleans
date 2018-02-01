@@ -7,13 +7,14 @@ namespace Orleans.Runtime.MembershipService
     /// <inheritdoc />
     public class LegacyAzureTableMembershipConfigurator : ILegacyMembershipConfigurator
     {
-        public void ConfigureServices(GlobalConfiguration configuration, IServiceCollection services)
+        public void ConfigureServices(object configuration, IServiceCollection services)
         {
             services.UseAzureTableMembership(
                 options =>
                 {
-                    options.MaxStorageBusyRetries = configuration.MaxStorageBusyRetries;
-                    options.ConnectionString = configuration.DataConnectionString;
+                    var reader = new GlobalConfigurationReader(configuration);
+                    options.MaxStorageBusyRetries = reader.GetPropertyValue<int>("MaxStorageBusyRetries");
+                    options.ConnectionString = reader.GetPropertyValue<string>("DataConnectionString");
                 });
         }
     }

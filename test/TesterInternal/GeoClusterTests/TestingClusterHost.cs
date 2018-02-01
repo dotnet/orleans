@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -164,22 +164,16 @@ namespace Tests.GeoClusterTests
         }
 
 
-        private class TestSiloBuilderFactory : ISiloBuilderFactory
+        private class TestSiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            public void Configure(ISiloHostBuilder hostBuilder)
             {
-                return new SiloHostBuilder()
-                    .ConfigureSiloName(siloName)
-                    .UseConfiguration(clusterConfiguration)
-                    .ConfigureLogging(builder => ConfigureLogging(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
-            }
-
-            private void ConfigureLogging(ILoggingBuilder builder, string filePath)
-            {
-                    TestingUtils.ConfigureDefaultLoggingBuilder(builder, filePath);
+                hostBuilder.ConfigureLogging(builder =>
+                {
                     builder.AddFilter("Runtime.Catalog", LogLevel.Debug);
                     builder.AddFilter("Runtime.Dispatcher", LogLevel.Trace);
                     builder.AddFilter("Orleans.GrainDirectory.LocalGrainDirectory", LogLevel.Trace);
+                });
             }
         }
 
@@ -192,16 +186,25 @@ namespace Tests.GeoClusterTests
 
                 WriteLog("Starting Cluster {0}  ({1})...", myCount, clusterId);
 
-                var options = new TestClusterOptions(initialSilosCount: numSilos)
+                var builder = new TestClusterBuilder(initialSilosCount: numSilos)
                 {
-                    BaseSiloPort = GetPortBase(myCount),
-                    BaseGatewayPort = GetProxyBase(myCount)
+                    Options =
+                    {
+                        ClusterId = clusterId,
+                        BaseSiloPort = GetPortBase(myCount),
+                        BaseGatewayPort = GetProxyBase(myCount)
+                    }
                 };
-                options.ClusterConfiguration.AddMemoryStorageProvider("Default");
-                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                options.UseSiloBuilderFactory<TestSiloBuilderFactory>();
-                customizer?.Invoke(options.ClusterConfiguration);
-                testCluster = new TestCluster(options.ClusterConfiguration, null);
+                builder.AddSiloBuilderConfigurator<TestSiloBuilderConfigurator>();
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+                    customizer?.Invoke(legacy.ClusterConfiguration);
+                    if (myCount == 0)
+                        gossipStabilizationTime = GetGossipStabilizationTime(legacy.ClusterConfiguration.Globals);
+                });
+                testCluster = builder.Build();
                 testCluster.Deploy();
 
                 Clusters[clusterId] = new ClusterInfo
@@ -209,10 +212,7 @@ namespace Tests.GeoClusterTests
                     Cluster = testCluster,
                     SequenceNumber = myCount
                 };
-
-                if (myCount == 0)
-                    gossipStabilizationTime = GetGossipStabilizationTime(options.ClusterConfiguration.Globals);
-
+                
                 WriteLog("Cluster {0} started. [{1}]", clusterId, string.Join(" ", testCluster.GetActiveSilos().Select(s => s.ToString())));
             }
         }
@@ -332,7 +332,7 @@ namespace Tests.GeoClusterTests
             var name = string.Format("Client-{0}-{1}", clusterId, clientNumber);
 
             // clients are assigned to silos round-robin
-            var gatewayport = ci.Silos.ElementAt(clientNumber).ProxyAddress.Endpoint.Port;
+            var gatewayport = ci.Silos.ElementAt(clientNumber).GatewayAddress.Endpoint.Port;
 
             WriteLog("Starting {0} connected to {1}", name, gatewayport);
             

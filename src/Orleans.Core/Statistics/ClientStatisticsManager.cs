@@ -13,7 +13,7 @@ namespace Orleans.Runtime
     internal class ClientStatisticsManager : IDisposable
     {
         private readonly ClientConfiguration config;
-        private readonly StatisticsOptions statisticsOptions;
+        private readonly ClientStatisticsOptions statisticsOptions;
         private readonly IServiceProvider serviceProvider;
         private readonly IHostEnvironmentStatistics hostEnvironmentStatistics;
         private readonly IAppEnvironmentStatistics appEnvironmentStatistics;
@@ -30,7 +30,7 @@ namespace Orleans.Runtime
             IHostEnvironmentStatistics hostEnvironmentStatistics,
             IAppEnvironmentStatistics appEnvironmentStatistics,
             ILoggerFactory loggerFactory, 
-            IOptions<StatisticsOptions> statisticsOptions, 
+            IOptions<ClientStatisticsOptions> statisticsOptions, 
             IOptions<ClusterClientOptions> clusterClientOptions)
         {
             this.config = config;

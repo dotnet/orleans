@@ -1,4 +1,4 @@
-﻿//#define REREAD_STATE_AFTER_WRITE_FAILED
+//#define REREAD_STATE_AFTER_WRITE_FAILED
 
 
 using System;
@@ -12,6 +12,7 @@ using Xunit;
 using Xunit.Abstractions;
 using Orleans.Runtime.Configuration;
 using System.Collections.Generic;
+using System.Linq;
 using Orleans.Providers;
 using Microsoft.Extensions.DependencyInjection;
 using TestExtensions;
@@ -33,31 +34,40 @@ namespace Tester.AzureUtils.Persistence
         {
             {"DataConnectionString", TestDefaultConfiguration.DataConnectionString}
         };
+
+        public static Guid ServiceId = Guid.NewGuid();
         public class Fixture : BaseAzureTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                Guid serviceId = Guid.NewGuid();
-                var options = new TestClusterOptions(initialSilosCount: 4);
-                options.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                builder.Options.InitialSilosCount = 4;
+                builder.Options.UseTestClusterMembership = false;
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
 
-                options.ClusterConfiguration.Globals.ServiceId = serviceId;
+                    legacy.ClusterConfiguration.Globals.ServiceId = ServiceId;
 
-                options.ClusterConfiguration.Globals.MaxResendCount = 0;
+                    legacy.ClusterConfiguration.Globals.MaxResendCount = 0;
 
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test1");
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test2", new Dictionary<string, string> { { "Config1", "1" }, { "Config2", "2" } });
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.ErrorInjectionStorageProvider>("ErrorInjector");
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("lowercase");
+                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test1");
+                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test2",
+                        new Dictionary<string, string> {{"Config1", "1"}, {"Config2", "2"}});
+                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.ErrorInjectionStorageProvider>("ErrorInjector");
+                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("lowercase");
 
-                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<AzureTableStorage>("AzureStore", new Dictionary<string, string> { { "DeleteStateOnClear", "true" }, { "DataConnectionString", options.ClusterConfiguration.Globals.DataConnectionString } });
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<AzureTableStorage>("AzureStore1", new Dictionary<string, string> { { "DataConnectionString", options.ClusterConfiguration.Globals.DataConnectionString } });
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<AzureTableStorage>("AzureStore2", new Dictionary<string, string> { { "DataConnectionString", options.ClusterConfiguration.Globals.DataConnectionString } });
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<AzureTableStorage>("AzureStore3", new Dictionary<string, string> { { "DataConnectionString", options.ClusterConfiguration.Globals.DataConnectionString } });
-
-                return new TestCluster(options).UseSiloBuilderFactory<SiloBuilderFactory>()
-                    .UseClientBuilderFactory(ClientBuilderFactory);
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.AzureTableStorage>("AzureStore",
+                        new Dictionary<string, string> {{"DeleteStateOnClear", "true"}, {"DataConnectionString", legacy.ClusterConfiguration.Globals.DataConnectionString}});
+                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.AzureTableStorage>("AzureStore1",
+                        new Dictionary<string, string> {{"DataConnectionString", legacy.ClusterConfiguration.Globals.DataConnectionString}});
+                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.AzureTableStorage>("AzureStore2",
+                        new Dictionary<string, string> {{"DataConnectionString", legacy.ClusterConfiguration.Globals.DataConnectionString}});
+                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.AzureTableStorage>("AzureStore3",
+                        new Dictionary<string, string> {{"DataConnectionString", legacy.ClusterConfiguration.Globals.DataConnectionString}});
+                });
+                builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+                builder.AddClientBuilderConfigurator<ClientBuilderConfigurator>();
             }
         }
 
@@ -121,7 +131,7 @@ namespace Tester.AzureUtils.Persistence
         [SkippableFact, TestCategory("Functional")]
         public async Task Grain_AzureTableStore_SiloRestart()
         {
-            await base.Grain_AzureStore_SiloRestart();
+            await base.Grain_AzureStore_SiloRestart(ServiceId);
         }
 
         [SkippableFact, TestCategory("CorePerf"), TestCategory("Performance"), TestCategory("Stress")]
@@ -162,7 +172,7 @@ namespace Tester.AzureUtils.Persistence
             var initialState = new GrainStateContainingGrainReferences { Grain = grain };
             var entity = new DynamicTableEntity();
             var storage = new AzureTableStorage();
-            await storage.Init("AzStore", this.HostedCluster.ServiceProvider.GetRequiredService<ClientProviderRuntime>(), new ProviderConfiguration(providerProperties));
+            await storage.Init("AzStore", this.HostedCluster.ServiceProvider.GetRequiredService<ClientProviderRuntime>(), new ProviderConfiguration(this.providerProperties));
             storage.ConvertToStorageFormat(initialState, entity);
             var convertedState = new GrainStateContainingGrainReferences();
             convertedState = (GrainStateContainingGrainReferences)storage.ConvertFromStorageFormat(entity);
@@ -188,7 +198,7 @@ namespace Tester.AzureUtils.Persistence
             }
             var entity = new DynamicTableEntity();
             var storage = new AzureTableStorage();
-            await storage.Init("AzStore", this.HostedCluster.ServiceProvider.GetRequiredService<ClientProviderRuntime>(), new ProviderConfiguration(providerProperties));
+            await storage.Init("AzStore", this.HostedCluster.ServiceProvider.GetRequiredService<ClientProviderRuntime>(), new ProviderConfiguration(this.providerProperties));
             storage.ConvertToStorageFormat(initialState, entity);
             var convertedState = (GrainStateContainingGrainReferences)storage.ConvertFromStorageFormat(entity);
             Assert.NotNull(convertedState);

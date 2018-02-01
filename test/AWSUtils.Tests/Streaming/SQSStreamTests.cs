@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -21,49 +21,49 @@ namespace AWSUtils.Tests.Streaming
 
         private SingleStreamTestRunner runner;
 
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             if (!AWSTestConstants.IsSqsAvailable)
             {
                 throw new SkipException("Empty connection string");
             }
 
-            var options = new TestClusterOptions();
-            //from the config files
-            options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
+            builder.ConfigureLegacyConfiguration(options =>
+            {
+                //from the config files
+                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
 
-            options.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProvider", fireAndForgetDelivery: false);
+                options.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProvider", fireAndForgetDelivery: false);
 
-            options.ClientConfiguration.AddSimpleMessageStreamProvider("SMSProvider", fireAndForgetDelivery: false);
+                options.ClientConfiguration.AddSimpleMessageStreamProvider("SMSProvider", fireAndForgetDelivery: false);
 
-            //previous silo creation
-            options.ClusterConfiguration.Globals.DataConnectionString = AWSTestConstants.DefaultSQSConnectionString;
-            options.ClientConfiguration.DataConnectionString = AWSTestConstants.DefaultSQSConnectionString;
-            var streamConnectionString = new Dictionary<string, string>
+                //previous silo creation
+                options.ClusterConfiguration.Globals.DataConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+                options.ClientConfiguration.DataConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+                var streamConnectionString = new Dictionary<string, string>
                 {
-                    { "DataConnectionString",  AWSTestConstants.DefaultSQSConnectionString}
+                    {"DataConnectionString", AWSTestConstants.DefaultSQSConnectionString}
                 };
 
-            options.ClientConfiguration.RegisterStreamProvider<SQSStreamProvider>("SQSProvider", streamConnectionString);
+                options.ClientConfiguration.RegisterStreamProvider<SQSStreamProvider>("SQSProvider", streamConnectionString);
 
-            options.ClusterConfiguration.Globals.RegisterStreamProvider<SQSStreamProvider>("SQSProvider", streamConnectionString);
-            options.ClusterConfiguration.Globals.RegisterStreamProvider<SQSStreamProvider>("SQSProvider2", streamConnectionString);
+                options.ClusterConfiguration.Globals.RegisterStreamProvider<SQSStreamProvider>("SQSProvider", streamConnectionString);
+                options.ClusterConfiguration.Globals.RegisterStreamProvider<SQSStreamProvider>("SQSProvider2", streamConnectionString);
 
-            var storageConnectionString = new Dictionary<string, string>
+                var storageConnectionString = new Dictionary<string, string>
                 {
-                    { "DataConnectionString",  $"Service={AWSTestConstants.Service}"},
-                    { "DeleteStateOnClear",  "true"}
+                    {"DataConnectionString", $"Service={AWSTestConstants.Service}"},
+                    {"DeleteStateOnClear", "true"}
                 };
-            options.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("DynamoDBStore", storageConnectionString);
-            var storageConnectionString2 = new Dictionary<string, string>
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("DynamoDBStore", storageConnectionString);
+                var storageConnectionString2 = new Dictionary<string, string>
                 {
-                    { "DataConnectionString",  $"Service={AWSTestConstants.Service}"},
-                    { "DeleteStateOnClear",  "true"},
-                    { "UseJsonFormat",  "true"}
+                    {"DataConnectionString", $"Service={AWSTestConstants.Service}"},
+                    {"DeleteStateOnClear", "true"},
+                    {"UseJsonFormat", "true"}
                 };
-            options.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("PubSubStore", storageConnectionString2);
-
-            return new TestCluster(options);
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("PubSubStore", storageConnectionString2);
+            });
         }
 
 
@@ -74,7 +74,7 @@ namespace AWSUtils.Tests.Streaming
 
         public override void Dispose()
         {
-            var clusterId = HostedCluster.ClusterId;
+            var clusterId = HostedCluster.Options.ClusterId;
             base.Dispose();
             SQSStreamProviderUtils.DeleteAllUsedQueues(SQS_STREAM_PROVIDER_NAME, clusterId, AWSTestConstants.DefaultSQSConnectionString, NullLoggerFactory.Instance).Wait();
         }

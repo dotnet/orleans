@@ -123,6 +123,7 @@ namespace Orleans.Statistics
             {
                 logger.Warn(ErrorCode.PerfCounterConnectError,
                     "Error initializing CPU & Memory perf counters - you need to repair Windows perf counter config on this machine with 'lodctr /r' command");
+                throw;
             }
         }
 
@@ -164,11 +165,11 @@ namespace Orleans.Statistics
 
         public Task OnStart(CancellationToken ct)
         {
-            if (!countersAvailable)
-            {
-                logger.Warn(ErrorCode.PerfCounterNotRegistered,
-                    "CPU & Memory perf counters did not initialize correctly - try repairing Windows perf counter config on this machine with 'lodctr /r' command");
-            }
+            //if (!countersAvailable)
+            //{
+            //    logger.Warn(ErrorCode.PerfCounterNotRegistered,
+            //        "CPU & Memory perf counters did not initialize correctly - try repairing Windows perf counter config on this machine with 'lodctr /r' command");
+            //}
 
             if (cpuCounterPF != null)
             {

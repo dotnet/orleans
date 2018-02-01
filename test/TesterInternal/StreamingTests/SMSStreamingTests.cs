@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Orleans.Providers;
 using Orleans.Providers.Streams.SimpleMessageStream;
@@ -13,29 +13,36 @@ namespace UnitTests.StreamingTests
     {
         public class Fixture : BaseTestClusterFixture
         {
-            private readonly static Guid serviceId = Guid.NewGuid();
+            private static readonly Guid ServiceId = Guid.NewGuid();
             public const string AzureQueueStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
             public const string SmsStreamProviderName = "SMSProvider";
 
-            protected override TestCluster CreateTestCluster()
+            public ClusterConfiguration ClusterConfiguration { get; set; }
+
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(initialSilosCount: 4);
+                builder.Options.InitialSilosCount = 4;
 
-                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
-                options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
 
-                options.ClusterConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
-                options.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData", fireAndForgetDelivery: false, optimizeForImmutableData: false);
+                    legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
+                    legacy.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData",
+                        fireAndForgetDelivery: false,
+                        optimizeForImmutableData: false);
 
-                options.ClientConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
+                    legacy.ClientConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
 
-                options.ClusterConfiguration.Globals.ServiceId = serviceId;
-                return new TestCluster(options);
+                    legacy.ClusterConfiguration.Globals.ServiceId = ServiceId;
+                    this.ClusterConfiguration = legacy.ClusterConfiguration;
+                });
             }
         }
 
-        private SingleStreamTestRunner runner;
-        private bool fireAndForgetDeliveryProperty;
+        private readonly SingleStreamTestRunner runner;
+        private readonly bool fireAndForgetDeliveryProperty;
         
         public SMSStreamingTests(Fixture fixture)
         {
@@ -140,7 +147,7 @@ namespace UnitTests.StreamingTests
         private bool ExtractFireAndForgetDeliveryProperty(Fixture fixture)
         {
             ProviderCategoryConfiguration providerConfigs;
-            if (fixture.HostedCluster.ClusterConfiguration.Globals.ProviderConfigurations.TryGetValue(ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, 
+            if (fixture.ClusterConfiguration.Globals.ProviderConfigurations.TryGetValue(ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, 
                 out providerConfigs))
             {
                 IProviderConfiguration provider;

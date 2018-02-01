@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Xml;
+using Orleans.Hosting;
 using Orleans.Providers;
 
 namespace Orleans.Runtime.Configuration
@@ -14,6 +15,7 @@ namespace Orleans.Runtime.Configuration
     /// <summary>
     /// Orleans client configuration parameters.
     /// </summary>
+    [Serializable]
     public class ClientConfiguration : MessagingConfiguration, IStatisticsConfiguration
     {
         /// <summary>
@@ -137,9 +139,7 @@ namespace Orleans.Runtime.Configuration
         public LimitManager LimitManager { get; private set; }
 
         private static readonly TimeSpan DEFAULT_GATEWAY_LIST_REFRESH_PERIOD = TimeSpan.FromMinutes(1);
-        private static readonly TimeSpan DEFAULT_STATS_METRICS_TABLE_WRITE_PERIOD = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan DEFAULT_STATS_PERF_COUNTERS_WRITE_PERIOD = Constants.INFINITE_TIMESPAN;
-        private static readonly TimeSpan DEFAULT_STATS_LOG_WRITE_PERIOD = TimeSpan.FromMinutes(5);
 
         /// <summary>
         /// </summary>
@@ -190,11 +190,11 @@ namespace Orleans.Runtime.Configuration
 
             GatewayListRefreshPeriod = DEFAULT_GATEWAY_LIST_REFRESH_PERIOD;
             StatisticsProviderName = null;
-            StatisticsMetricsTableWriteInterval = DEFAULT_STATS_METRICS_TABLE_WRITE_PERIOD;
+            StatisticsMetricsTableWriteInterval = StatisticsOptions.DEFAULT_METRICS_TABLE_WRITE_PERIOD;
             StatisticsPerfCountersWriteInterval = DEFAULT_STATS_PERF_COUNTERS_WRITE_PERIOD;
-            StatisticsLogWriteInterval = DEFAULT_STATS_LOG_WRITE_PERIOD;
-            StatisticsWriteLogStatisticsToTable = true;
-            StatisticsCollectionLevel = NodeConfiguration.DEFAULT_STATS_COLLECTION_LEVEL;
+            StatisticsLogWriteInterval = StatisticsOptions.DEFAULT_LOG_WRITE_PERIOD;
+            StatisticsWriteLogStatisticsToTable = StatisticsOptions.DEFAULT_LOG_TO_TABLE;
+            StatisticsCollectionLevel = StatisticsOptions.DEFAULT_COLLECTION_LEVEL;
             LimitManager = new LimitManager();
             ProviderConfigurations = new Dictionary<string, ProviderCategoryConfiguration>();
         }

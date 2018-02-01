@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
-using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -27,7 +26,6 @@ namespace Orleans.Providers
         private ConcurrentDictionary<QueueId, IMemoryStreamQueueGrain> queueGrains;
         private IObjectPool<FixedSizeBuffer> bufferPool;
         private BlockPoolMonitorDimensions blockPoolMonitorDimensions;
-        private MonitorAggregationDimensions sharedDimensions;
         private IStreamFailureHandler streamFailureHandler;
         private IServiceProvider serviceProvider;
         private MemoryAdapterConfig adapterConfig;
@@ -103,7 +101,6 @@ namespace Orleans.Providers
             adapterConfig.PopulateFromProviderConfig(providerConfig);
             streamQueueMapper = new HashRingBasedStreamQueueMapper(adapterConfig.TotalQueueCount, adapterConfig.StreamProviderName);
 
-            this.sharedDimensions = new MonitorAggregationDimensions(serviceProvider.GetService<GlobalConfiguration>(), serviceProvider.GetService<NodeConfiguration>());
             this.serializer = MemoryMessageBodySerializerFactory<TSerializer>.GetOrCreateSerializer(svcProvider);
         }
 
@@ -112,7 +109,7 @@ namespace Orleans.Providers
             if (this.bufferPool == null)
             {
                 // 1 meg block size pool
-                this.blockPoolMonitorDimensions = new BlockPoolMonitorDimensions(this.sharedDimensions, $"BlockPool-{Guid.NewGuid()}");
+                this.blockPoolMonitorDimensions = new BlockPoolMonitorDimensions($"BlockPool-{Guid.NewGuid()}");
                 var oneMb = 1 << 20;
                 var objectPoolMonitor = new ObjectPoolMonitorBridge(this.BlockPoolMonitorFactory(blockPoolMonitorDimensions, this.telemetryProducer), oneMb);
                 this.bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(oneMb), objectPoolMonitor, this.adapterConfig.StatisticMonitorWriteInterval);
@@ -153,7 +150,7 @@ namespace Orleans.Providers
         /// <returns></returns>
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
-            var dimensions = new ReceiverMonitorDimensions(this.sharedDimensions, queueId.ToString());
+            var dimensions = new ReceiverMonitorDimensions(queueId.ToString());
             var receiverLogger = this.loggerFactory.CreateLogger($"{typeof(MemoryAdapterReceiver<TSerializer>).FullName}.{this.providerName}.{queueId}");
             var receiverMonitor = this.ReceiverMonitorFactory(dimensions, this.telemetryProducer);
             IQueueAdapterReceiver receiver = new MemoryAdapterReceiver<TSerializer>(GetQueueGrain(queueId), receiverLogger, this.serializer, receiverMonitor);
@@ -196,7 +193,7 @@ namespace Orleans.Providers
             //move block pool creation from init method to here, to avoid unnecessary block pool creation when stream provider is initialized in client side. 
             CreateBufferPoolIfNotCreatedYet();
             var logger = this.loggerFactory.CreateLogger($"{typeof(MemoryPooledCache<TSerializer>).FullName}.{this.providerName}.{queueId}");
-            var monitor = this.CacheMonitorFactory(new CacheMonitorDimensions(this.sharedDimensions, queueId.ToString(), this.blockPoolMonitorDimensions.BlockPoolId), this.telemetryProducer);
+            var monitor = this.CacheMonitorFactory(new CacheMonitorDimensions(queueId.ToString(), this.blockPoolMonitorDimensions.BlockPoolId), this.telemetryProducer);
             return new MemoryPooledCache<TSerializer>(bufferPool, purgePredicate, logger, this.serializer, monitor, this.adapterConfig.StatisticMonitorWriteInterval);
         }
 

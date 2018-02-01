@@ -7,6 +7,8 @@ using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Providers;
+using Orleans.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Streams
 {
@@ -14,8 +16,8 @@ namespace Orleans.Streams
     {
         public StaticClusterConfigDeploymentBalancer(
             ISiloStatusOracle siloStatusOracle,
-            ClusterConfiguration clusterConfiguration)
-            : base(siloStatusOracle, new StaticClusterDeploymentConfiguration(clusterConfiguration), true)
+            IOptions<StaticClusterDeploymentOptions> options)
+            : base(siloStatusOracle, options.Value, true)
         { }
     }
 
@@ -23,8 +25,8 @@ namespace Orleans.Streams
     {
         public DynamicClusterConfigDeploymentBalancer(
             ISiloStatusOracle siloStatusOracle,
-            ClusterConfiguration clusterConfiguration)
-            : base(siloStatusOracle, new StaticClusterDeploymentConfiguration(clusterConfiguration), false)
+            IOptions<StaticClusterDeploymentOptions> options)
+            : base(siloStatusOracle, options.Value, false)
         { }
     }
 

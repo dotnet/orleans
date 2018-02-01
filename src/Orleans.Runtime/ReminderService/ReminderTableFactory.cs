@@ -1,23 +1,24 @@
 using System;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime.Configuration;
+using Microsoft.Extensions.Options;
+using Orleans.Hosting;
 
 namespace Orleans.Runtime.ReminderService
 {
     internal class ReminderTableFactory
     {
-        private readonly GlobalConfiguration globalConfiguration;
+        private readonly ReminderOptions options;
         private readonly IGrainFactory grainFactory;
         private readonly IServiceProvider serviceProvider;
         private readonly ILogger logger;
 
         public ReminderTableFactory(
-            GlobalConfiguration globalConfiguration,
+            IOptions<ReminderOptions> options,
             IGrainFactory grainFactory,
             IServiceProvider serviceProvider,
             ILogger<ReminderTableFactory> logger)
         {
-            this.globalConfiguration = globalConfiguration;
+            this.options = options.Value;
             this.grainFactory = grainFactory;
             this.logger = logger;
             this.serviceProvider = serviceProvider;
@@ -25,33 +26,33 @@ namespace Orleans.Runtime.ReminderService
 
         public IReminderTable Create()
         {
-            var config = this.globalConfiguration;
-            var serviceType = config.ReminderServiceType;
+            var serviceType = this.options.ReminderService;
 
             switch (serviceType)
             {
-                default:
-                    throw new NotSupportedException(
-                              $"The reminder table does not currently support service provider {serviceType}.");
-                case GlobalConfiguration.ReminderServiceProviderType.SqlServer:
+                case ReminderOptions.BuiltIn.SqlServer:
                     return AssemblyLoader.LoadAndCreateInstance<IReminderTable>(
                         Constants.ORLEANS_REMINDERS_ADONET,
                         logger,
                         this.serviceProvider);
-                case GlobalConfiguration.ReminderServiceProviderType.AzureTable:
+                case ReminderOptions.BuiltIn.AzureTable:
                     return AssemblyLoader.LoadAndCreateInstance<IReminderTable>(
                         Constants.ORLEANS_REMINDERS_AZURESTORAGE,
                         logger,
                         this.serviceProvider);
-                case GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain:
+                case ReminderOptions.BuiltIn.ReminderTableGrain:
                     return this.grainFactory.GetGrain<IReminderTableGrain>(Constants.ReminderTableGrainId);
-                case GlobalConfiguration.ReminderServiceProviderType.MockTable:
-                    return new MockReminderTable(config.MockReminderTableTimeout);
-                case GlobalConfiguration.ReminderServiceProviderType.Custom:
+                case ReminderOptions.BuiltIn.MockTable:
+                    return new MockReminderTable(this.options.MockReminderTableTimeout);
+                case ReminderOptions.BuiltIn.Custom:
                     return AssemblyLoader.LoadAndCreateInstance<IReminderTable>(
-                        config.ReminderTableAssembly,
+                        this.options.ReminderTableAssembly,
                         logger,
                         this.serviceProvider);
+                default:
+                    throw new NotSupportedException(
+                              $"The reminder table does not currently support service provider {serviceType}.");
+
             }
         }
     }

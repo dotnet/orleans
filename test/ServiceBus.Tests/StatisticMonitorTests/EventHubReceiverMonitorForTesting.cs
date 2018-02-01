@@ -1,15 +1,6 @@
-﻿using Orleans;
 using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
-using Orleans.ServiceBus.Providers;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
-using UnitTests.GrainInterfaces;
-using UnitTests.Grains;
 
 namespace ServiceBus.Tests.MonitorTests
 {
@@ -23,12 +14,12 @@ namespace ServiceBus.Tests.MonitorTests
         }
         public void TrackInitialization(bool success, TimeSpan callTime, Exception exception)
         {
-            Interlocked.Increment(ref this.CallCounters.TrackInitializationCallCounter);
+            if(success) Interlocked.Increment(ref this.CallCounters.TrackInitializationCallCounter);
         }
 
         public void TrackRead(bool success, TimeSpan callTime, Exception exception)
         {
-            Interlocked.Increment(ref this.CallCounters.TrackReadCallCounter);
+            if (success) Interlocked.Increment(ref this.CallCounters.TrackReadCallCounter);
         }
 
         public void TrackMessagesReceived(long count, DateTime? oldestEnqueueTime, DateTime? newestEnqueueTime)

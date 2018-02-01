@@ -1,10 +1,3 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Orleans.Runtime.Configuration;
-using Orleans.Providers.Streams.Common;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -12,7 +5,7 @@ namespace Orleans.ServiceBus.Providers
     /// Base class for monitor aggregation dimensions, whcih is a information bag for the monitoring target. 
     /// Monitors can use this information bag to build its aggregation dimensions.
     /// </summary>
-    public class EventHubMonitorAggregationDimensions : MonitorAggregationDimensions
+    public class EventHubMonitorAggregationDimensions
     {
         /// <summary>
         /// Eventhub path
@@ -22,11 +15,8 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Constructor
         /// </summary>
-        /// <param name="globalConfig"></param>
-        /// <param name="nodeConfig"></param>
         /// <param name="ehHubPath"></param>
-        public EventHubMonitorAggregationDimensions(GlobalConfiguration globalConfig, NodeConfiguration nodeConfig, string ehHubPath)
-            :base(globalConfig, nodeConfig)
+        public EventHubMonitorAggregationDimensions(string ehHubPath)
         {
             this.EventHubPath = ehHubPath;
         }
@@ -36,7 +26,6 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         /// <param name="dimensions"></param>
         public EventHubMonitorAggregationDimensions(EventHubMonitorAggregationDimensions dimensions)
-            :base(dimensions.GlobalConfig, dimensions.NodeConfig)
         {
             this.EventHubPath = dimensions.EventHubPath;
         }

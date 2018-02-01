@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.ApplicationParts;
@@ -22,33 +23,34 @@ namespace UnitTests
         private readonly Fixture fixture;
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions();
-                ILoggerFactory codeGenLoggerFactory = new LoggerFactory();
-                codeGenLoggerFactory.AddProvider(new FileLoggerProvider("ClientCodeGeneration.log"));
-                options.UseSiloBuilderFactory<SiloBuilder>();
-                options.ClientBuilderFactory = cfg => ClientBuilder
-                    .CreateDefault()
-                    .UseConfiguration(cfg)
-                    .ConfigureApplicationParts(
-                        parts => parts.AddApplicationPart(typeof(IRuntimeCodeGenGrain).Assembly).WithCodeGeneration(codeGenLoggerFactory.CreateLogger("RuntimeCodeGen")));
-
-                return new TestCluster(options);
+                builder.Options.InitialSilosCount = 1;
+                builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+                builder.AddClientBuilderConfigurator<ClientBuilderConfigurator>();
             }
         }
 
-        public class SiloBuilder : ISiloBuilderFactory
-        {
-            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+        public class ClientBuilderConfigurator : IClientBuilderConfigurator {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 ILoggerFactory codeGenLoggerFactory = new LoggerFactory();
+                codeGenLoggerFactory.AddProvider(new FileLoggerProvider("ClientCodeGeneration.log"));
+                clientBuilder.ConfigureApplicationParts(
+                    parts => parts.AddApplicationPart(typeof(IRuntimeCodeGenGrain).Assembly).WithCodeGeneration(codeGenLoggerFactory.CreateLogger("RuntimeCodeGen")));
+            }
+        }
+
+        public class SiloBuilderConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                ILoggerFactory codeGenLoggerFactory = new LoggerFactory();
+                var siloName = hostBuilder.GetConfigurationValue("SiloName") ?? nameof(RuntimeCodeGenTests);
                 codeGenLoggerFactory.AddProvider(new FileLoggerProvider($"{siloName}-CodeGeneration.log"));
-                return SiloHostBuilder
-                    .CreateDefault()
-                    .UseConfiguration(clusterConfiguration)
-                    .ConfigureSiloName(siloName)
-                    .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IRuntimeCodeGenGrain).Assembly).WithCodeGeneration(codeGenLoggerFactory.CreateLogger("RuntimeCodeGen")));
+                hostBuilder
+                    .ConfigureApplicationParts(parts =>
+                        parts.AddApplicationPart(typeof(IRuntimeCodeGenGrain).Assembly).WithCodeGeneration(codeGenLoggerFactory.CreateLogger("RuntimeCodeGen")));
             }
         }
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -44,12 +44,13 @@ namespace ServiceBus.Tests.StreamingTests
         private static readonly EventHubStreamProviderSettings ProviderSettings =
             new EventHubStreamProviderSettings(StreamProviderName);
 
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            var options = new TestClusterOptions(2);
-            AdjustConfig(options.ClusterConfiguration);
-            AdjustConfig(options.ClientConfiguration);
-            return new TestCluster(options);
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                AdjustConfig(legacy.ClusterConfiguration);
+                AdjustConfig(legacy.ClientConfiguration);
+            });
         }
 
         [Fact]

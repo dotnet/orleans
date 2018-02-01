@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
@@ -25,16 +25,14 @@ namespace ServiceBus.Tests.TestStreamProviders
 
             public AdapterFactory()
             {
-                createdCaches = new ConcurrentBag<QueueCacheForTesting>();
+                this.createdCaches = new ConcurrentBag<QueueCacheForTesting>();
             }
 
             protected override IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamProviderSettings providerSettings)
             {
-                var globalConfig = this.serviceProvider.GetRequiredService<GlobalConfiguration>();
-                var nodeConfig = this.serviceProvider.GetRequiredService<NodeConfiguration>();
-                var eventHubPath = hubSettings.Path;
-                var sharedDimensions = new EventHubMonitorAggregationDimensions(globalConfig, nodeConfig, eventHubPath);
-                return new CacheFactoryForTesting(providerSettings, SerializationManager, this.createdCaches, sharedDimensions, serviceProvider.GetRequiredService<ILoggerFactory>());
+                var eventHubPath = this.hubSettings.Path;
+                var sharedDimensions = new EventHubMonitorAggregationDimensions(eventHubPath);
+                return new CacheFactoryForTesting(providerSettings, this.SerializationManager, this.createdCaches, sharedDimensions, this.serviceProvider.GetRequiredService<ILoggerFactory>());
             }
 
             private class CacheFactoryForTesting : EventHubQueueCacheFactory
@@ -51,7 +49,7 @@ namespace ServiceBus.Tests.TestStreamProviders
                     this.caches = caches;
                 }
 
-                private const int defaultMaxAddCount = 10;
+                private const int DefaultMaxAddCount = 10;
                 protected override IEventHubQueueCache CreateCache(string partition, EventHubStreamProviderSettings providerSettings, IStreamQueueCheckpointer<string> checkpointer,
                     ILoggerFactory loggerFactory, IObjectPool<FixedSizeBuffer> bufferPool, string blockPoolId,  TimePurgePredicate timePurge,
                     SerializationManager serializationManager, EventHubMonitorAggregationDimensions sharedDimensions, ITelemetryProducer telemetryProducer)
@@ -60,7 +58,7 @@ namespace ServiceBus.Tests.TestStreamProviders
                     var cacheMonitor = this.CacheMonitorFactory(cacheMonitorDimensions, loggerFactory, telemetryProducer);
                     var cacheLogger = loggerFactory.CreateLogger($"{typeof(EventHubQueueCache).FullName}.{providerSettings.StreamProviderName}.{partition}");
                     //set defaultMaxAddCount to 10 so TryCalculateCachePressureContribution will start to calculate real contribution shortly
-                    var cache = new QueueCacheForTesting(defaultMaxAddCount, checkpointer, new EventHubDataAdapter(serializationManager, bufferPool),
+                    var cache = new QueueCacheForTesting(DefaultMaxAddCount, checkpointer, new EventHubDataAdapter(serializationManager, bufferPool),
                         EventHubDataComparer.Instance, cacheLogger, new EventHubCacheEvictionStrategy(cacheLogger, timePurge, cacheMonitor, providerSettings.StatisticMonitorWriteInterval),
                         cacheMonitor, providerSettings.StatisticMonitorWriteInterval);
                     this.caches.Add(cache);
@@ -101,7 +99,7 @@ namespace ServiceBus.Tests.TestStreamProviders
                 switch (command)
                 {
                     case IsCacheBackPressureTriggeredCommand:
-                        return Task.FromResult<object>(createdCaches.Any(cache => cache.IsUnderPressure));
+                        return Task.FromResult<object>(this.createdCaches.Any(cache => cache.IsUnderPressure));
                     default: return base.ExecuteCommand(command, arg);
                 }
             }

@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.LeaseProviders;
 using Orleans.Providers;
@@ -37,37 +37,35 @@ namespace Tester.AzureUtils.Lease
 
         //since lease length is 1 min, so set time out to be two minutes to fulfill some test scenario
         public static readonly TimeSpan TimeOut = TimeSpan.FromMinutes(2);
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             TestUtils.CheckForAzureStorage();
-            var options = new TestClusterOptions(siloCount);
-            options.UseSiloBuilderFactory<TestSiloBuilderFactory>();
+            builder.Options.InitialSilosCount = siloCount;
+            builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
             ProviderSettings.TotalQueueCount = totalQueueCount;
-            AdjustClusterConfiguration(options.ClusterConfiguration);
-            return new TestCluster(options);
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                AdjustClusterConfiguration(legacy.ClusterConfiguration);
+            });
         }
 
-        private class TestSiloBuilderFactory : ISiloBuilderFactory
+        public class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            private static void ConfigureServices(IServiceCollection services)
             {
-                return new SiloHostBuilder()
-                    .ConfigureSiloName(siloName)
-                    .UseConfiguration(clusterConfiguration)
-                    .ConfigureServices(ConfigureServices)
-                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
+                var leaseProviderConfig = new AzureBlobLeaseProviderConfig()
+                {
+                    DataConnectionString = TestDefaultConfiguration.DataConnectionString,
+                    BlobContainerName = "test-container-leasebasedqueuebalancer"
+                };
+                services.AddSingleton<AzureBlobLeaseProviderConfig>(leaseProviderConfig);
+                services.AddTransient<AzureBlobLeaseProvider>();
             }
-        }
 
-        private static void ConfigureServices(IServiceCollection services)
-        {
-            var leaseProviderConfig = new AzureBlobLeaseProviderConfig()
+            public void Configure(ISiloHostBuilder hostBuilder)
             {
-                DataConnectionString = TestDefaultConfiguration.DataConnectionString,
-                BlobContainerName = "test-container-leasebasedqueuebalancer"
-            };
-            services.AddSingleton<AzureBlobLeaseProviderConfig>(leaseProviderConfig);
-            services.AddTransient<AzureBlobLeaseProvider>();
+                hostBuilder.ConfigureServices(ConfigureServices);
+            }
         }
 
         private static void AdjustClusterConfiguration(ClusterConfiguration config)

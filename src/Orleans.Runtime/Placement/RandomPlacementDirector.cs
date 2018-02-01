@@ -5,7 +5,7 @@ using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime.Placement
 {
-    internal class RandomPlacementDirector : IPlacementDirector<RandomPlacement>, IActivationSelector<RandomPlacement>
+    internal class RandomPlacementDirector : IPlacementDirector, IActivationSelector
     {
         private readonly SafeRandom random = new SafeRandom();
 

@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.ServiceBus.Providers.Testing;
@@ -20,8 +20,8 @@ namespace ServiceBus.Tests
     public class PluggableQueueBalancerTestsWithEHStreamProvider : PluggableQueueBalancerTestBase, IClassFixture<PluggableQueueBalancerTestsWithEHStreamProvider.Fixture>
     {
         private const string StreamProviderName = "EventHubStreamProvider";
-        private static readonly int totalQueueCount = 6;
-        private static readonly short siloCount = 2;
+        private static readonly int TotalQueueCount = 6;
+        private static readonly short SiloCount = 2;
         public static readonly EventHubGeneratorStreamProviderSettings ProviderSettings =
             new EventHubGeneratorStreamProviderSettings(StreamProviderName);
 
@@ -29,13 +29,15 @@ namespace ServiceBus.Tests
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(siloCount);
-                options.UseSiloBuilderFactory<SiloBuilderFactory>();
-                ProviderSettings.EventHubPartitionCount = totalQueueCount;
-                AdjustClusterConfiguration(options.ClusterConfiguration);
-                return new TestCluster(options);
+                builder.Options.InitialSilosCount = SiloCount;
+                ProviderSettings.EventHubPartitionCount = TotalQueueCount;
+                builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    AdjustClusterConfiguration(legacy.ClusterConfiguration);
+                });
             }
 
             private static void AdjustClusterConfiguration(ClusterConfiguration config)
@@ -60,7 +62,7 @@ namespace ServiceBus.Tests
         [Fact, TestCategory("BVT")]
         public Task PluggableQueueBalancerTest_ShouldUseInjectedQueueBalancerAndBalanceCorrectly()
         {
-            return base.ShouldUseInjectedQueueBalancerAndBalanceCorrectly(this.fixture, StreamProviderName, siloCount, totalQueueCount);
+            return base.ShouldUseInjectedQueueBalancerAndBalanceCorrectly(this.fixture, StreamProviderName, SiloCount, TotalQueueCount);
         }
     }
 }

@@ -160,7 +160,8 @@ namespace Orleans.Runtime
         /// <returns></returns>
         public static Uri ToGatewayUri(this System.Net.IPEndPoint ep)
         {
-            return new Uri(string.Format("gwy.tcp://{0}:{1}/0", ep.Address, ep.Port));
+            var builder = new UriBuilder("gwy.tcp", ep.Address.ToString(), ep.Port, "0");
+            return builder.Uri;
         }
 
         /// <summary>
@@ -170,7 +171,8 @@ namespace Orleans.Runtime
         /// <returns></returns>
         public static Uri ToGatewayUri(this SiloAddress address)
         {
-            return new Uri(string.Format("gwy.tcp://{0}:{1}/{2}", address.Endpoint.Address, address.Endpoint.Port, address.Generation));
+            var builder = new UriBuilder("gwy.tcp", address.Endpoint.Address.ToString(), address.Endpoint.Port, address.Generation.ToString());
+            return builder.Uri;
         }
 
         

@@ -21,5 +21,8 @@ namespace Orleans.Runtime
         /// Gets or sets a unique identifier for this service, which should survive deployment and redeployment, where as <see cref="ClusterId"/> might not.
         /// </summary>
         public Guid ServiceId { get; set; }
+
+        public bool FastKillOnCancelKeyPress { get; set; } = DEFAULT_FAST_KILL_ON_CANCEL;
+        public const bool DEFAULT_FAST_KILL_ON_CANCEL = true;
     }
 }

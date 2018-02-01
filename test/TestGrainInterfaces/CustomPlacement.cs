@@ -39,16 +39,6 @@ namespace UnitTests.GrainInterfaces
         {
             Scenario = scenario;
         }
-
-        public override bool Equals(object obj)
-        {
-            return obj is TestCustomPlacementStrategy && Scenario == ((TestCustomPlacementStrategy)obj).Scenario;
-        }
-
-        public override int GetHashCode()
-        {
-            return GetType().GetHashCode() ^ Scenario.GetHashCode();
-        }
     }
 
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]

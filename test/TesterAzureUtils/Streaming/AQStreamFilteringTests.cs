@@ -20,19 +20,20 @@ namespace Tester.AzureUtils.Streaming
         public class Fixture : BaseAzureTestClusterFixture
         {
             public const string StreamProvider = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(2);
-                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
 
-                options.ClusterConfiguration.AddAzureQueueStreamProvider(StreamProvider);
-                return new TestCluster(options);
+                    legacy.ClusterConfiguration.AddAzureQueueStreamProvider(StreamProvider);
+                });
             }
 
             public override void Dispose()
             {
-                var clusterId = this.HostedCluster?.ClusterId;
+                var clusterId = this.HostedCluster?.Options.ClusterId;
                 base.Dispose();
                 AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, StreamProvider, clusterId, TestDefaultConfiguration.DataConnectionString)
                     .Wait();
@@ -42,7 +43,7 @@ namespace Tester.AzureUtils.Streaming
         public StreamFilteringTests_AQ(Fixture fixture) : base(fixture)
         {
             fixture.EnsurePreconditionsMet();
-            this.clusterId = fixture.HostedCluster.ClusterId;
+            this.clusterId = fixture.HostedCluster.Options.ClusterId;
             streamProviderName = Fixture.StreamProvider;
         }
 

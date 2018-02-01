@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -33,7 +33,6 @@ namespace Orleans.Runtime.GrainDirectory
         public GlobalSingleInstanceActivationMaintainer(
             LocalGrainDirectory router,
             ILogger logger,
-            GlobalConfiguration config,
             IInternalGrainFactory grainFactory,
             IMultiClusterOracle multiClusterOracle,
             ExecutorService executorService,
@@ -48,7 +47,7 @@ namespace Orleans.Runtime.GrainDirectory
             this.multiClusterOracle = multiClusterOracle;
             this.siloDetails = siloDetails;
             this.multiClusterOptions = multiClusterOptions.Value;
-            this.period = config.GlobalSingleInstanceRetryInterval;
+            this.period = multiClusterOptions.Value.GlobalSingleInstanceRetryInterval;
             logger.Debug("GSIP:M GlobalSingleInstanceActivationMaintainer Started, Period = {0}", period);
         }
 

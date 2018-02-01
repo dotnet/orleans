@@ -1,30 +1,28 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using System;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
+using Orleans.Runtime;
 using Orleans.Runtime.Placement;
 using UnitTests.GrainInterfaces;
 using Orleans.Hosting;
 using Orleans.TestingHost;
-using Orleans.Runtime.Configuration;
-using Orleans.TestingHost.Utils;
 using UnitTests.Grains;
 
 namespace TestVersionGrains
 {
-    public class VersionGrainsSiloBuilderFactory : ISiloBuilderFactory
+    public class VersionGrainsSiloBuilderConfigurator : ISiloBuilderConfigurator
     {
-        public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+        public void Configure(ISiloHostBuilder hostBuilder)
         {
-            return new SiloHostBuilder()
-                .ConfigureSiloName(siloName)
-                .UseConfiguration(clusterConfiguration)
+            hostBuilder
                 .ConfigureServices(this.ConfigureServices)
-                .ConfigureApplicationParts(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory())
-                .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
+                .ConfigureApplicationParts(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory());
         }
 
         private void ConfigureServices(IServiceCollection services)
         {
-            services.AddSingleton<IPlacementDirector<VersionAwarePlacementStrategy>, VersionAwarePlacementDirector>();
+            services.AddSingletonNamedService<PlacementStrategy, VersionAwarePlacementStrategy>(nameof(VersionAwarePlacementStrategy));
+            services.AddSingletonKeyedService<Type, IPlacementDirector, VersionAwarePlacementDirector>(typeof(VersionAwarePlacementStrategy));
         }
     }
 }

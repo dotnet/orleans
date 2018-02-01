@@ -20,16 +20,18 @@ namespace UnitTests.StreamingTests
             public const string StreamProviderName = "ControllableTestStreamProvider";
             public readonly string StreamProviderTypeName = typeof(ControllableTestStreamProvider).FullName;
 
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(2);
                 var settings = new Dictionary<string, string>
                     {
                         {PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.AssemblyQualifiedName},
                         {PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString()}
                     };
-                options.ClusterConfiguration.Globals.RegisterStreamProvider<ControllableTestStreamProvider>(StreamProviderName, settings);
-                return new TestCluster(options);
+
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.Globals.RegisterStreamProvider<ControllableTestStreamProvider>(StreamProviderName, settings);
+                });
             }
         }
 

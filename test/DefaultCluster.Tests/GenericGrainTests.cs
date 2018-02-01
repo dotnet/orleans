@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
@@ -618,9 +619,11 @@ namespace DefaultCluster.Tests.General
         public async Task Generic_PingSelf()
         {
             var id = Guid.NewGuid();
+            Thread.Sleep(TimeSpan.FromSeconds(15));
             var grain =  this.GrainFactory.GetGrain<IGenericPingSelf<string>>(id);
             var s1 = Guid.NewGuid().ToString();
             var s2 = await grain.PingSelf(s1);
+            Thread.Sleep(TimeSpan.FromSeconds(15));
             Assert.Equal(s1, s2);
         }
 
@@ -644,8 +647,11 @@ namespace DefaultCluster.Tests.General
             var grain =  this.GrainFactory.GetGrain<IGenericPingSelf<string>>(id);
             var target =  this.GrainFactory.GetGrain<IGenericPingSelf<string>>(targetId);
             var s1 = Guid.NewGuid().ToString();
-            var s2 = await grain.PingSelfThroughOther(target, s1);
-            Assert.Equal(s1, s2);
+	        for (var i = 0; i < 50000; i++)
+	        {
+		        var s2 = await grain.PingSelfThroughOther(target, s1);
+		        Assert.Equal(s1, s2);
+			}
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics"), TestCategory("ActivateDeactivate")]

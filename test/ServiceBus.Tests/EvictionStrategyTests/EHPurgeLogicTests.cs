@@ -1,4 +1,4 @@
-﻿using Orleans;
+using Orleans;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -18,6 +18,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using TestExtensions;
 using Xunit;
 using Orleans.ServiceBus.Providers.Testing;
+using Orleans.Hosting;
 
 namespace ServiceBus.Tests.EvictionStrategyTests
 {
@@ -39,9 +40,11 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         public EHPurgeLogicTests()
         {
             //an mock eh settings
-            this.ehSettings = new EventHubPartitionSettings();
-            ehSettings.Hub = new EventHubSettings();
-            ehSettings.Partition = "MockPartition";
+            this.ehSettings = new EventHubPartitionSettings
+            {
+                Hub = new EventHubSettings(),
+                Partition = "MockPartition"
+            };
 
             //set up cache pressure monitor and purge predicate
             this.cachePressureInjectionMonitor = new CachePressureInjectionMonitor();
@@ -198,16 +201,16 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         {
             this.cacheList = new ConcurrentBag<EventHubQueueCacheForTesting>();
             this.evictionStrategyList = new List<EHEvictionStrategyForTesting>();
-            var monitorDimensions = new EventHubReceiverMonitorDimensions();
-            monitorDimensions.EventHubPartition = ehSettings.Partition;
-            monitorDimensions.EventHubPath = ehSettings.Hub.Path;
-            monitorDimensions.GlobalConfig = null;
-            monitorDimensions.NodeConfig = null;
+            var monitorDimensions = new EventHubReceiverMonitorDimensions
+            {
+                EventHubPartition = this.ehSettings.Partition,
+                EventHubPath = this.ehSettings.Hub.Path,
+            };
 
-            this.receiver1 = new EventHubAdapterReceiver(ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance, 
-                new DefaultEventHubReceiverMonitor(monitorDimensions, this.telemetryProducer), this.GetNodeConfiguration, this.telemetryProducer);
-            this.receiver2 = new EventHubAdapterReceiver(ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance,
-                new DefaultEventHubReceiverMonitor(monitorDimensions, this.telemetryProducer), this.GetNodeConfiguration, this.telemetryProducer);
+            this.receiver1 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance, 
+                new DefaultEventHubReceiverMonitor(monitorDimensions, this.telemetryProducer), new SiloStatisticsOptions(), this.telemetryProducer);
+            this.receiver2 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance,
+                new DefaultEventHubReceiverMonitor(monitorDimensions, this.telemetryProducer), new SiloStatisticsOptions(), this.telemetryProducer);
             this.receiver1.Initialize(this.timeOut);
             this.receiver2.Initialize(this.timeOut);
         }

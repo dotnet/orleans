@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Clustering.DynamoDB</PackageId>
     <Title>Microsoft Orleans clustering provider for AWS DynamoDB</Title>
@@ -22,6 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Orleans.Core.Legacy\Orleans.Core.Legacy.csproj" />
     <ProjectReference Include="..\..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
     <ProjectReference Include="..\..\OrleansProviders\OrleansProviders.csproj" />
   </ItemGroup>

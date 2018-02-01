@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.GrainDirectory;
+using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.GrainDirectory
@@ -30,7 +32,7 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
 
-        public bool OkToRemove(UnregistrationCause cause, GlobalConfiguration config)
+        public bool OkToRemove(UnregistrationCause cause, TimeSpan lazyDeregistrationDelay)
         {
             switch (cause)
             {
@@ -45,7 +47,7 @@ namespace Orleans.Runtime.GrainDirectory
                         if (RegistrationStatus == GrainDirectoryEntryStatus.Cached)
                             return true; // cache entries are always removed
 
-                        var delayparameter = config.DirectoryLazyDeregistrationDelay;
+                        var delayparameter = lazyDeregistrationDelay;
                         if (delayparameter <= TimeSpan.Zero)
                             return false; // no lazy deregistration
                         else
@@ -122,11 +124,11 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        public bool RemoveActivation(ActivationId act, UnregistrationCause cause, GlobalConfiguration config, out IActivationInfo info, out bool wasRemoved)
+        public bool RemoveActivation(ActivationId act, UnregistrationCause cause, TimeSpan lazyDeregistrationDelay, out IActivationInfo info, out bool wasRemoved)
         {
             info = null;
             wasRemoved = false;
-            if (Instances.TryGetValue(act, out info) && info.OkToRemove(cause, config))
+            if (Instances.TryGetValue(act, out info) && info.OkToRemove(cause, lazyDeregistrationDelay))
             {
                 Instances.Remove(act);
                 wasRemoved = true;
@@ -216,8 +218,8 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly ILogger log;
         private readonly ILoggerFactory loggerFactory;
         private readonly ISiloStatusOracle siloStatusOracle;
-        private readonly GlobalConfiguration globalConfig;
         private readonly IInternalGrainFactory grainFactory;
+        private readonly IOptions<GrainDirectoryOptions> grainDirectoryOptions;
 
         [ThreadStatic]
         private static ActivationId[] activationIdsHolder;
@@ -227,13 +229,13 @@ namespace Orleans.Runtime.GrainDirectory
 
         internal int Count { get { return partitionData.Count; } }
 
-        public GrainDirectoryPartition(ISiloStatusOracle siloStatusOracle, GlobalConfiguration globalConfig, IInternalGrainFactory grainFactory, ILoggerFactory loggerFactory)
+        public GrainDirectoryPartition(ISiloStatusOracle siloStatusOracle, IOptions<GrainDirectoryOptions> grainDirectoryOptions, IInternalGrainFactory grainFactory, ILoggerFactory loggerFactory)
         {
             partitionData = new Dictionary<GrainId, IGrainInfo>();
             lockable = new object();
             log = loggerFactory.CreateLogger<GrainDirectoryPartition>();
             this.siloStatusOracle = siloStatusOracle;
-            this.globalConfig = globalConfig;
+            this.grainDirectoryOptions = grainDirectoryOptions;
             this.grainFactory = grainFactory;
             this.loggerFactory = loggerFactory;
         }
@@ -353,7 +355,7 @@ namespace Orleans.Runtime.GrainDirectory
             entry = null;
             lock (lockable)
             {
-                if (partitionData.ContainsKey(grain) && partitionData[grain].RemoveActivation(activation, cause, globalConfig, out entry, out wasRemoved))
+                if (partitionData.ContainsKey(grain) && partitionData[grain].RemoveActivation(activation, cause, this.grainDirectoryOptions.Value.LazyDeregistrationDelay, out entry, out wasRemoved))
                     // if the last activation for the grain was removed, we remove the entire grain info 
                     partitionData.Remove(grain);
 
@@ -530,7 +532,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// <returns>new grain directory partition containing entries satisfying the given predicate</returns>
         internal GrainDirectoryPartition Split(Predicate<GrainId> predicate, bool modifyOrigin)
         {
-            var newDirectory = new GrainDirectoryPartition(this.siloStatusOracle, this.globalConfig, this.grainFactory, this.loggerFactory);
+            var newDirectory = new GrainDirectoryPartition(this.siloStatusOracle, this.grainDirectoryOptions, this.grainFactory, this.loggerFactory);
 
             if (modifyOrigin)
             {

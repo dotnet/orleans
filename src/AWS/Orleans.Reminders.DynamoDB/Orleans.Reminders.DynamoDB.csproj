@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Reminders.DynamoDB</PackageId>
     <Title>Microsoft Orleans Reminders DynamoDB</Title>
@@ -26,6 +26,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Orleans.Core.Legacy\Orleans.Core.Legacy.csproj" />
     <ProjectReference Include="..\..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
   </ItemGroup>
 </Project>

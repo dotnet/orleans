@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Threading.Tasks;
 using System.Collections.Generic;
@@ -26,46 +26,26 @@ namespace Tests.GeoClusterTests
 
         public class Fixture : BaseAzureTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(1);
+                builder.Options.InitialSilosCount = 1;
 
-                options.ClusterConfiguration.AddMemoryStorageProvider("Default");
-                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                options.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore");
-
-                options.ClusterConfiguration.AddAzureTableStorageProvider();
-                options.ClusterConfiguration.AddStateStorageBasedLogConsistencyProvider();
-                options.ClusterConfiguration.AddLogStorageBasedLogConsistencyProvider();
-                options.ClusterConfiguration.AddCustomStorageInterfaceBasedLogConsistencyProvider("CustomStorage");
-
-                options.ClusterConfiguration.AddCustomStorageInterfaceBasedLogConsistencyProvider("CustomStoragePrimaryCluster", "A");
-
-                options.UseSiloBuilderFactory<TestSiloBuilderFactory>();
-
-                return new TestCluster(options);
-            }
-
-            private class TestSiloBuilderFactory : ISiloBuilderFactory
-            {
-                public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+                builder.ConfigureLegacyConfiguration(legacy =>
                 {
-                    return new SiloHostBuilder()
-                        .ConfigureSiloName(siloName)
-                        .UseConfiguration(clusterConfiguration)
-                        .ConfigureServices(services => ConfigureLogging(services, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
-                }
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+                    legacy.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore");
 
-                private void ConfigureLogging(IServiceCollection services, string filePath)
-                {
-                    services.AddLogging(builder =>
-                    {
-                        TestingUtils.ConfigureDefaultLoggingBuilder(builder, filePath);
-                        builder.AddFilter(typeof(LogConsistencyProvider).Namespace, LogLevel.Trace);
-                    });
-                }
+                    legacy.ClusterConfiguration.AddAzureTableStorageProvider();
+                    legacy.ClusterConfiguration.AddStateStorageBasedLogConsistencyProvider();
+                    legacy.ClusterConfiguration.AddLogStorageBasedLogConsistencyProvider();
+                    legacy.ClusterConfiguration.AddCustomStorageInterfaceBasedLogConsistencyProvider("CustomStorage");
+
+                    legacy.ClusterConfiguration.AddCustomStorageInterfaceBasedLogConsistencyProvider("CustomStoragePrimaryCluster", "A");
+                });
             }
         }
+
         public BasicLogTestGrainTests(Fixture fixture)
         {
             this.fixture = fixture;

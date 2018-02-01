@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
@@ -12,23 +12,23 @@ namespace Tester.AzureUtils.Streaming
     [TestCategory("BVT"), TestCategory("Streaming"), TestCategory("Functional"), TestCategory("AQStreaming")]
     public class AQProgrammaticSubscribeTest : ProgrammaticSubcribeTestsRunner, IClassFixture<AQProgrammaticSubscribeTest.Fixture>
     {
-        private Fixture fixture;
         public class Fixture : BaseAzureTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(2);
-                options.ClusterConfiguration.AddMemoryStorageProvider("Default");
-                options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-                options.ClusterConfiguration.AddAzureQueueStreamProviderV2(StreamProviderName);
-                options.ClusterConfiguration.AddAzureQueueStreamProviderV2(StreamProviderName2);
-                return new TestCluster(options);
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+                    legacy.ClusterConfiguration.AddAzureQueueStreamProviderV2(StreamProviderName);
+                    legacy.ClusterConfiguration.AddAzureQueueStreamProviderV2(StreamProviderName2);
+                });
             }
 
             public override void Dispose()
             {
                 base.Dispose();
-                var clusterId = this.HostedCluster.ClusterId;
+                var clusterId = this.HostedCluster?.Options.ClusterId;
                 AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, StreamProviderName, clusterId, TestDefaultConfiguration.DataConnectionString).Wait();
                 AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, StreamProviderName2, clusterId, TestDefaultConfiguration.DataConnectionString).Wait();
             }
@@ -38,7 +38,6 @@ namespace Tester.AzureUtils.Streaming
             : base(fixture)
         {
             fixture.EnsurePreconditionsMet();
-            this.fixture = fixture;
         }
     }
 

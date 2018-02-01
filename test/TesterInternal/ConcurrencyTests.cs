@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime.Configuration;
@@ -19,12 +19,12 @@ namespace UnitTests.ConcurrencyTests
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions();
-                options.ClusterConfiguration.ApplyToAllNodes(n => n.MaxActiveThreads = 2);
-
-                return new TestCluster(options);
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.ApplyToAllNodes(n => n.MaxActiveThreads = 2);
+                });
             }
         }
 

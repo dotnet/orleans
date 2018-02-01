@@ -49,7 +49,7 @@ namespace Orleans.Threading
 
             var workItem = new WorkItem(callback, state, options.WorkItemExecutionTimeTreshold, options.WorkItemStatusProvider);
 
-            statistic.OnEnQueueRequest(1, 0, workItem);
+            statistic.OnEnQueueRequest(workItem);
 
             workQueue.Enqueue(workItem, forceGlobal: false);
         }
@@ -406,11 +406,11 @@ namespace Orleans.Threading
             }
         }
 
-        public void OnEnQueueRequest(int i, int workQueueCount, WorkItem workItem)
+        public void OnEnQueueRequest(WorkItem workItem)
         {
             if (ExecutorOptions.CollectDetailedQueueStatistics)
             {
-                queueTracking.OnEnQueueRequest(i, workQueueCount, workItem.ExecutionTime);
+                queueTracking.OnEnQueueRequest(1, 0, workItem.ExecutionTime);
             }
         }
 

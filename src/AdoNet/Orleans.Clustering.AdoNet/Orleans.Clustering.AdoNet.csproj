@@ -34,7 +34,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Orleans.Core.Legacy\Orleans.Core.Legacy.csproj" />
     <ProjectReference Include="..\..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
+    <ProjectReference Include="..\..\Orleans.Runtime.Legacy\Orleans.Runtime.Legacy.csproj" />
     <ProjectReference Include="..\..\OrleansProviders\OrleansProviders.csproj" />
   </ItemGroup>
 

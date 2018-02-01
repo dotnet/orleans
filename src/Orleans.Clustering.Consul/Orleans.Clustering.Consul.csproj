@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.OrleansConsulUtils</PackageId>
     <Title>Microsoft Orleans Membership Consul</Title>
@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Orleans.Core.Legacy\Orleans.Core.Legacy.csproj" />
     <ProjectReference Include="..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
   </ItemGroup>
 </Project>

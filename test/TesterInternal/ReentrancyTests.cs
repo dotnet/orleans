@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
@@ -25,15 +25,16 @@ namespace UnitTests
     {
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions();
-                options.ClusterConfiguration.Globals.RegisterStreamProvider<SimpleMessageStreamProvider>("sms");
-                options.ClusterConfiguration.AddMemoryStorageProvider("Default");
-                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-                options.ClusterConfiguration.Globals.AllowCallChainReentrancy = true;
-                return new TestCluster(options);
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.Globals.RegisterStreamProvider<SimpleMessageStreamProvider>("sms");
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+                    legacy.ClusterConfiguration.Globals.AllowCallChainReentrancy = true;
+                });
             }
         }
 
@@ -363,15 +364,19 @@ namespace UnitTests
     {
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            public ClusterConfiguration ClusterConfiguration { get; private set; }
+
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions();
-                options.ClusterConfiguration.Globals.RegisterStreamProvider<SimpleMessageStreamProvider>("sms");
-                options.ClusterConfiguration.Globals.AllowCallChainReentrancy = false;
-                options.ClusterConfiguration.AddMemoryStorageProvider("Default");
-                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-                return new TestCluster(options);
+                builder.ConfigureLegacyConfiguration(legacy =>
+                {
+                    legacy.ClusterConfiguration.Globals.RegisterStreamProvider<SimpleMessageStreamProvider>("sms");
+                    legacy.ClusterConfiguration.Globals.AllowCallChainReentrancy = false;
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+                    legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+                    this.ClusterConfiguration = legacy.ClusterConfiguration;
+                });
             }
         }
 
@@ -410,7 +415,7 @@ namespace UnitTests
                     Assert.True(false, string.Format("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace));
                 }
             }
-            if (this.hostedCluster.ClusterConfiguration.Globals.PerformDeadlockDetection)
+            if (this.fixture.ClusterConfiguration.Globals.PerformDeadlockDetection)
             {
                 Assert.True(deadlock, "Non-reentrant grain should deadlock on stream item delivery to itself when CanInterleave predicate returns false");
             }
@@ -444,7 +449,7 @@ namespace UnitTests
                     Assert.True(false, string.Format("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace));
                 }
             }
-            if (this.hostedCluster.ClusterConfiguration.Globals.PerformDeadlockDetection)
+            if (this.fixture.ClusterConfiguration.Globals.PerformDeadlockDetection)
             {
                 Assert.True(deadlock, "Non-reentrant grain should deadlock");
             }
@@ -478,7 +483,7 @@ namespace UnitTests
                     Assert.True(false, string.Format("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace));
                 }
             }
-            if (this.hostedCluster.ClusterConfiguration.Globals.PerformDeadlockDetection)
+            if (this.fixture.ClusterConfiguration.Globals.PerformDeadlockDetection)
             {
                 Assert.True(deadlock, "Non-reentrant grain should deadlock when MayInterleave predicate returns false");
             }
@@ -512,7 +517,7 @@ namespace UnitTests
                     Assert.True(false, $"Unexpected exception {exc.Message}: {exc.StackTrace}");
                 }
             }
-            if (this.hostedCluster.ClusterConfiguration.Globals.PerformDeadlockDetection)
+            if (this.fixture.ClusterConfiguration.Globals.PerformDeadlockDetection)
             {
                 Assert.True(deadlock, "Non-reentrant grain should deadlock");
             }

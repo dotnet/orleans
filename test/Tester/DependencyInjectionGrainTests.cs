@@ -22,37 +22,30 @@ namespace UnitTests.General
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(1);
-                options.UseSiloBuilderFactory<TestSiloBuilderFactory>();
-                return new TestCluster(options);
+                builder.Options.InitialSilosCount = 1;
+                builder.AddSiloBuilderConfigurator<TestSiloBuilderConfigurator>();
             }
 
-            private class TestSiloBuilderFactory : ISiloBuilderFactory
+            private class TestSiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+                public void Configure(ISiloHostBuilder hostBuilder)
                 {
-                    return new SiloHostBuilder()
-                        .ConfigureSiloName(siloName)
-                        .UseConfiguration(clusterConfiguration)
-                        .ConfigureServices(ConfigureServices)
-                        .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)));
+                    hostBuilder.ConfigureServices(services =>
+                    {
+                        services.AddSingleton<IInjectedService, InjectedService>();
+                        services.AddScoped<IInjectedScopedService, InjectedScopedService>();
+
+                        // explicitly register a grain class to assert that it will NOT use the registration, 
+                        // as by design this is not supported.
+                        services.AddTransient<ExplicitlyRegisteredSimpleDIGrain>(
+                            sp => new ExplicitlyRegisteredSimpleDIGrain(
+                                sp.GetRequiredService<IInjectedService>(),
+                                "some value",
+                                5));
+                    });
                 }
-            }
-
-            private static void ConfigureServices(IServiceCollection services)
-            {
-                services.AddSingleton<IInjectedService, InjectedService>();
-                services.AddScoped<IInjectedScopedService, InjectedScopedService>();
-
-                // explicitly register a grain class to assert that it will NOT use the registration, 
-                // as by design this is not supported.
-                services.AddTransient<ExplicitlyRegisteredSimpleDIGrain>(
-                    sp => new ExplicitlyRegisteredSimpleDIGrain(
-                        sp.GetRequiredService<IInjectedService>(),
-                        "some value",
-                        5));
             }
         }
 

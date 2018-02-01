@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Globalization;
 using System.Reflection;
 using Orleans.Runtime;
@@ -26,7 +26,7 @@ namespace Tester
 
             try
             {
-                var config = new TestClusterOptions(1).ClusterConfiguration;
+                var config = ClusterConfiguration.LocalhostPrimarySilo();
                 var originalLivenessType = config.Globals.LivenessType;
                 var originalMembershipAssembly = config.Globals.MembershipTableAssembly;
 
@@ -77,7 +77,7 @@ namespace Tester
             var args = new object[] { nameof(SiloInitializationIsRetryableTest), clusterConfig};
 
             return (SiloHost)appDomain.CreateInstanceFromAndUnwrap(
-                "Orleans.Runtime.dll",
+                "Orleans.Runtime.Legacy.dll",
                 typeof(SiloHost).FullName,
                 false,
                 BindingFlags.Default,

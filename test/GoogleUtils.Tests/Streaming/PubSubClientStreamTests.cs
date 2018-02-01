@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
@@ -27,7 +27,7 @@ namespace GoogleUtils.Tests.Streaming
             runner = new ClientStreamTestRunner(HostedCluster);
         }
 
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             if (!GoogleTestUtils.IsPubSubSimulatorAvailable.Value)
             {
@@ -35,22 +35,23 @@ namespace GoogleUtils.Tests.Streaming
             }
 
             var providerSettings = new Dictionary<string, string>
-                {
-                    { "ProjectId",  GoogleTestUtils.ProjectId },
-                    { "TopicId",  GoogleTestUtils.TopicId },
-                    { "DeploymentId",  GoogleTestUtils.DeploymentId.ToString()},
-                    { "Deadline",  "600" },
-                    //{ "CustomEndpoint", "localhost:8085" }
-                };
-
-            var options = new TestClusterOptions(2);
-            options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-            options.ClusterConfiguration.Globals.RegisterStreamProvider<PubSubStreamProvider>(PROVIDER_NAME, providerSettings);
-            options.ClusterConfiguration.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
-            options.ClientConfiguration.RegisterStreamProvider<PubSubStreamProvider>(PROVIDER_NAME, providerSettings);
-            return new TestCluster(options);
+            {
+                {"ProjectId", GoogleTestUtils.ProjectId},
+                {"TopicId", GoogleTestUtils.TopicId},
+                {"DeploymentId", GoogleTestUtils.DeploymentId.ToString()},
+                {"Deadline", "600"},
+                //{ "CustomEndpoint", "localhost:8085" }
+            };
+            
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+                legacy.ClusterConfiguration.Globals.RegisterStreamProvider<PubSubStreamProvider>(PROVIDER_NAME, providerSettings);
+                legacy.ClusterConfiguration.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
+                legacy.ClientConfiguration.RegisterStreamProvider<PubSubStreamProvider>(PROVIDER_NAME, providerSettings);
+            });
         }
-        
+
         [SkippableFact]
         public async Task GPS_StreamProducerOnDroppedClientTest()
         {

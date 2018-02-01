@@ -276,7 +276,7 @@ namespace Orleans
         private void ThrowIfDisposedOrNotInitialized()
         {
             this.ThrowIfDisposed();
-            if (!this.IsInitialized) throw new InvalidOperationException("Client is not initialized.");
+            if (!this.IsInitialized) throw new InvalidOperationException($"Client is not initialized. Current client state is {this.state}.");
         }
 
         private void ThrowIfDisposedOrAlreadyInitialized()

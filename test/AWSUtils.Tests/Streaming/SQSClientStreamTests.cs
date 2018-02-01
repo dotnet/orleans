@@ -1,4 +1,4 @@
-﻿using AWSUtils.Tests.StorageTests;
+using AWSUtils.Tests.StorageTests;
 using Orleans.Providers.Streams;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -29,8 +29,8 @@ namespace AWSUtils.Tests.Streaming
             this.output = output;
             runner = new ClientStreamTestRunner(this.HostedCluster);
         }
-        
-        public override TestCluster CreateTestCluster()
+
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             if (!AWSTestConstants.IsSqsAvailable)
             {
@@ -39,26 +39,27 @@ namespace AWSUtils.Tests.Streaming
 
             var clusterId = Guid.NewGuid().ToString();
             var streamConnectionString = new Dictionary<string, string>
-                {
-                    { "DataConnectionString",  StorageConnectionString},
-                    { "DeploymentId",  clusterId}
-                };
-            var options = new TestClusterOptions(2);
-            options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+            {
+                {"DataConnectionString", StorageConnectionString},
+                {"DeploymentId", clusterId}
+            };
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
 
-            options.ClusterConfiguration.Globals.ClusterId = clusterId;
-            options.ClientConfiguration.ClusterId = clusterId;
-            options.ClusterConfiguration.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
-            options.ClientConfiguration.DataConnectionString = StorageConnectionString;
-            options.ClusterConfiguration.Globals.DataConnectionString = StorageConnectionString;
-            options.ClusterConfiguration.Globals.RegisterStreamProvider<SQSStreamProvider>(SQSStreamProviderName, streamConnectionString);
-            options.ClientConfiguration.RegisterStreamProvider<SQSStreamProvider>(SQSStreamProviderName, streamConnectionString);
-            return new TestCluster(options);
+                legacy.ClusterConfiguration.Globals.ClusterId = clusterId;
+                legacy.ClientConfiguration.ClusterId = clusterId;
+                legacy.ClusterConfiguration.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
+                legacy.ClientConfiguration.DataConnectionString = StorageConnectionString;
+                legacy.ClusterConfiguration.Globals.DataConnectionString = StorageConnectionString;
+                legacy.ClusterConfiguration.Globals.RegisterStreamProvider<SQSStreamProvider>(SQSStreamProviderName, streamConnectionString);
+                legacy.ClientConfiguration.RegisterStreamProvider<SQSStreamProvider>(SQSStreamProviderName, streamConnectionString);
+            });
         }
 
         public override void Dispose()
         {
-            var clusterId = HostedCluster.ClusterId;
+            var clusterId = HostedCluster.Options.ClusterId;
             base.Dispose();
             SQSStreamProviderUtils.DeleteAllUsedQueues(SQSStreamProviderName, clusterId, StorageConnectionString, NullLoggerFactory.Instance).Wait();
         }

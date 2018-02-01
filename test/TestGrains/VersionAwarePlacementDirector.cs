@@ -1,15 +1,12 @@
-﻿using Orleans.Runtime;
+using Orleans.Runtime;
 using Orleans.Runtime.Placement;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    public class VersionAwarePlacementDirector : IPlacementDirector<VersionAwarePlacementStrategy>
+    public class VersionAwarePlacementDirector : IPlacementDirector
     {
         private readonly Random random = new Random();
 

@@ -45,7 +45,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure DI container with SqlMemebership
+        /// Configure DI container with SqlMembership
         /// </summary>
         public static IServiceCollection UseSqlMembership(this IServiceCollection services,
             Action<SqlMembershipOptions> configureOptions)
@@ -54,7 +54,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure DI container with SqlMemebership
+        /// Configure DI container with SqlMembership
         /// </summary>
         public static IServiceCollection UseSqlMembership(this IServiceCollection services,
             Action<OptionsBuilder<SqlMembershipOptions>> configureOptions)

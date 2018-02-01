@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage.Table;
@@ -36,14 +36,12 @@ namespace ServiceBus.Tests.SlowConsumingTests
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(2);
                 ProviderSettings.SlowConsumingMonitorPressureWindowSize = monitorPressureWindowSize;
                 ProviderSettings.SlowConsumingMonitorFlowControlThreshold = flowControlThredhold;
                 ProviderSettings.AveragingCachePressureMonitorFlowControlThreshold = null;
-                AdjustClusterConfiguration(options.ClusterConfiguration);
-                return new TestCluster(options);
+                builder.ConfigureLegacyConfiguration(legacy => AdjustClusterConfiguration(legacy.ClusterConfiguration));
             }
 
             private static void AdjustClusterConfiguration(ClusterConfiguration config)

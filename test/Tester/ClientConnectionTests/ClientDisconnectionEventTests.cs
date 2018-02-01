@@ -3,7 +3,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
-using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -13,12 +12,7 @@ namespace Tester.ClientConnectionTests
     public class ClientDisconnectionEventTests : TestClusterPerTest
     {
         private readonly OutsideRuntimeClient runtimeClient;
-
-        public override TestCluster CreateTestCluster()
-        {
-            return new TestCluster(new TestClusterOptions(2));
-        }
-
+        
         public ClientDisconnectionEventTests()
         {
             this.runtimeClient = this.HostedCluster.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();

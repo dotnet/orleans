@@ -132,10 +132,10 @@ namespace Orleans
 
             this.GrainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
 
-            var statisticsOptions = this.ServiceProvider.GetRequiredService<IOptions<StatisticsOptions>>();
-            StatisticsCollector.Initialize(statisticsOptions.Value.CollectionLevel);
+            var statisticsOptions = this.ServiceProvider.GetRequiredService<IOptions<ClientStatisticsOptions>>().Value;
+            StatisticsCollector.Initialize(statisticsOptions.CollectionLevel);
 
-            BufferPool.InitGlobalBufferPool(resolvedClientMessagingOptions);
+            BufferPool.InitGlobalBufferPool(resolvedClientMessagingOptions.Value);
 
             try
             {
@@ -144,7 +144,7 @@ namespace Orleans
                 clientProviderRuntime = this.ServiceProvider.GetRequiredService<ClientProviderRuntime>();
 
                 responseTimeout = Debugger.IsAttached ? Constants.DEFAULT_RESPONSE_TIMEOUT : config.ResponseTimeout;
-                this.localAddress = ClusterConfiguration.GetLocalIPAddress(config.PreferredFamily, config.NetInterface);
+                this.localAddress = ConfigUtilities.GetLocalIPAddress(config.PreferredFamily, config.NetInterface);
 
                 // Client init / sign-on message
                 logger.Info(ErrorCode.ClientInitializing, string.Format(
