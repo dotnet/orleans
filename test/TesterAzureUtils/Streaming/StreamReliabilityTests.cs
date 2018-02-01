@@ -111,7 +111,7 @@ namespace UnitTests.Streaming.Reliability
             }
             Task.WhenAll(promises).Wait();
 #endif
-            var clusterId = HostedCluster.ClusterId;
+            var clusterId = HostedCluster.Options.ClusterId;
             base.Dispose();
             if (_streamProviderName != null && _streamProviderName.Equals(AZURE_QUEUE_STREAM_PROVIDER_NAME))
             {
@@ -136,15 +136,12 @@ namespace UnitTests.Streaming.Reliability
             StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             CheckSilosRunning("Before Restart", numExpectedSilos);
-            SiloHandle prim1 = this.HostedCluster.Primary;
-            SiloHandle sec1 = this.HostedCluster.SecondarySilos.First();
-
+            var silos = this.HostedCluster.Silos;
             RestartAllSilos();
 
             CheckSilosRunning("After Restart", numExpectedSilos);
-
-            Assert.NotEqual(prim1, this.HostedCluster.Primary); // Should be different Primary silos after restart
-            Assert.NotEqual(sec1, this.HostedCluster.SecondarySilos.First()); // Should be different Secondary silos after restart
+            
+            Assert.NotEqual(silos, this.HostedCluster.Silos); // Should be different silos after restart
 
             StreamTestUtils.LogEndTest(testName, logger);
         }

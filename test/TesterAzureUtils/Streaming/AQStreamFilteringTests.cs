@@ -33,7 +33,7 @@ namespace Tester.AzureUtils.Streaming
 
             public override void Dispose()
             {
-                var clusterId = this.HostedCluster?.ClusterId;
+                var clusterId = this.HostedCluster?.Options.ClusterId;
                 base.Dispose();
                 AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, StreamProvider, clusterId, TestDefaultConfiguration.DataConnectionString)
                     .Wait();
@@ -43,7 +43,7 @@ namespace Tester.AzureUtils.Streaming
         public StreamFilteringTests_AQ(Fixture fixture) : base(fixture)
         {
             fixture.EnsurePreconditionsMet();
-            this.clusterId = fixture.HostedCluster.ClusterId;
+            this.clusterId = fixture.HostedCluster.Options.ClusterId;
             streamProviderName = Fixture.StreamProvider;
         }
 

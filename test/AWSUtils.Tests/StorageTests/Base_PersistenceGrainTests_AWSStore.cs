@@ -263,10 +263,10 @@ namespace AWSUtils.Tests.StorageTests
 
         protected async Task Grain_AWSStore_SiloRestart()
         {
-            var initialServiceId = this.HostedCluster.ServiceId;
-            var initialDeploymentId = this.HostedCluster.ClusterId;
+            var initialServiceId = this.HostedCluster.Options.ServiceId;
+            var initialDeploymentId = this.HostedCluster.Options.ClusterId;
             var serviceId = await this.HostedCluster.Client.GetGrain<IServiceIdGrain>(Guid.Empty).GetServiceId();
-            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.ClusterId, serviceId);
+            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.Options.ClusterId, serviceId);
 
             Guid id = Guid.NewGuid();
             IAWSStorageTestGrain grain = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain>(id);
@@ -287,9 +287,9 @@ namespace AWSUtils.Tests.StorageTests
             output.WriteLine("Silos restarted");
 
             serviceId = await this.HostedCluster.Client.GetGrain<IServiceIdGrain>(Guid.Empty).GetServiceId();
-            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.ClusterId, serviceId);
+            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.Options.ClusterId, serviceId);
             Assert.Equal(initialServiceId, serviceId);  // "ServiceId same after restart."
-            Assert.Equal(initialDeploymentId, this.HostedCluster.ClusterId);  // "ClusterId same after restart."
+            Assert.Equal(initialDeploymentId, this.HostedCluster.Options.ClusterId);  // "ClusterId same after restart."
 
             val = await grain.GetValue();
             Assert.Equal(1, val);  // "Value after Write-1"

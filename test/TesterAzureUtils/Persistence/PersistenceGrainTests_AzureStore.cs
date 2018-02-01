@@ -45,7 +45,6 @@ namespace Tester.AzureUtils.Persistence
 
         private const int MaxReadTime = 200;
         private const int MaxWriteTime = 2000;
-
         public class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
             public void Configure(ISiloHostBuilder hostBuilder)
@@ -303,11 +302,11 @@ namespace Tester.AzureUtils.Persistence
             Assert.Equal(expected3,  val3);  // "Value after Re-Read - 3"
         }
 
-        protected async Task Grain_AzureStore_SiloRestart()
+        protected async Task Grain_AzureStore_SiloRestart(Guid serviceID)
         {
-            var initialServiceId = this.HostedCluster.ServiceId;
+            var initialServiceId = serviceID;
 
-            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.ClusterId, this.HostedCluster.ServiceId);
+            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.Options.ClusterId, serviceID);
 
             Guid id = Guid.NewGuid();
             IAzureStorageTestGrain grain = this.GrainFactory.GetGrain<IAzureStorageTestGrain>(id);
@@ -328,7 +327,7 @@ namespace Tester.AzureUtils.Persistence
             output.WriteLine("Silos restarted");
 
             var serviceId = await this.GrainFactory.GetGrain<IServiceIdGrain>(Guid.Empty).GetServiceId();
-            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.ClusterId, serviceId);
+            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.Options.ClusterId, serviceId);
             Assert.Equal(initialServiceId, serviceId);  // "ServiceId same after restart."
             
             val = await grain.GetValue();
