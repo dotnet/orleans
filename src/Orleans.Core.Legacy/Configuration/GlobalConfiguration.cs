@@ -619,8 +619,8 @@ namespace Orleans.Runtime.Configuration
             this.DefaultPlacementStrategy = GrainPlacementOptions.DEFAULT_PLACEMENT_STRATEGY;
             this.DeploymentLoadPublisherRefreshTime = TimeSpan.FromSeconds(1);
             this.ActivationCountBasedPlacementChooseOutOf = GrainPlacementOptions.DEFAULT_ACTIVATION_COUNT_PLACEMENT_CHOOSE_OUT_OF;
-            this.UseVirtualBucketsConsistentRing = ConsistentRingOptions.DEFAULT_USE_VIRTUAL_RING_BUCKETS;
-            this.NumVirtualBucketsConsistentRing = ConsistentRingOptions.DEFAULT_NUM_VIRTUAL_RING_BUCKETS;
+            this.UseVirtualBucketsConsistentRing = true;
+            this.NumVirtualBucketsConsistentRing = 30;
             this.UseMockReminderTable = false;
             this.MockReminderTableTimeout = ReminderOptions.DEFAULT_MOCK_REMINDER_TABLE_TIMEOUT;
             this.AssumeHomogenousSilosForTesting = false;
