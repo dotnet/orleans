@@ -46,7 +46,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure DI container with Consul based Memebership
+        /// Configure DI container with Consul based Membership
         /// </summary>
         public static IServiceCollection UseConsulMembership(this IServiceCollection services,
             Action<ConsulMembershipOptions> configureOptions)
@@ -55,7 +55,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure DI container with Consul based Memebership
+        /// Configure DI container with Consul based Membership
         /// </summary>
         public static IServiceCollection UseConsulMembership(this IServiceCollection services,
             Action<OptionsBuilder<ConsulMembershipOptions>> configureOptions)

@@ -14,7 +14,7 @@ namespace Orleans.TestingHost
         public bool InitializeClientOnDeploy { get; set; }
         public short InitialSilosCount { get; set; }
         public string ApplicationBaseDirectory { get; set; }
-        public bool ConfigureFileLogging { get; set; }
+        public bool ConfigureFileLogging { get; set; } = true;
         public bool AssumeHomogenousSilosForTesting { get; set; }
         public List<string> SiloBuilderConfiguratorTypes { get; } = new List<string>();
         public List<string> ClientBuilderConfiguratorTypes { get; } = new List<string>();

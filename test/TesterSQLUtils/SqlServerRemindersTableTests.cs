@@ -52,7 +52,7 @@ namespace UnitTests.RemindersTest
         [SkippableFact, TestCategory("Functional")]
         public async Task RemindersTable_SqlServer_RemindersRange()
         {
-            await RemindersRange();
+            await RemindersRange(iterations: 30);
         }
 
         [SkippableFact, TestCategory("Functional")]

@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Diagnostics;
 
@@ -13,7 +13,9 @@ namespace Orleans.Runtime
         /// Writes a log entry at the Debug severity level.
         /// </summary>
         /// <param name="logger">The logger</param>
-        /// <param name="format">A standard format string, suitable for String.Format.</param>
+        /// <param name="format">Format string of the log message with named parameters
+        /// <remarks>Not always suitable for <c>String.Format</c>. See Microsoft.Extensions.Logging MessageTemplate section for more information. Suggest to use their pattern over this extension method</remarks>
+        /// </param>
         /// <param name="args">Any arguments to the format string.</param>
         public static void Debug(this ILogger logger, string format, params object[] args)
         {
@@ -36,7 +38,9 @@ namespace Orleans.Runtime
         /// Writes a log entry at the Trace logLevel.
         /// </summary>
         /// <param name="logger">The logger</param>
-        /// <param name="format">A standard format string, suitable for String.Format.</param>
+        /// <param name="format">Format string of the log message with named parameters
+        /// <remarks>Not always suitable for <c>String.Format</c>. See Microsoft.Extensions.Logging MessageTemplate section for more information. Suggest to use their pattern over this extension method</remarks>
+        /// </param>
         /// <param name="args">Any arguments to the format string.</param>
         public static void Trace(this ILogger logger, string format, params object[] args)
         {
@@ -58,7 +62,9 @@ namespace Orleans.Runtime
         /// Writes a log entry at the Information Level
         /// </summary>
         /// <param name="logger">Target logger.</param>
-        /// <param name="format">A standard format string, suitable for String.Format.</param>
+        /// <param name="format">Format string of the log message with named parameters
+        /// <remarks>Not always suitable for <c>String.Format</c>. See Microsoft.Extensions.Logging MessageTemplate section for more information. Suggest to use their pattern over this extension method</remarks>
+        /// </param>
         /// <param name="args">Any arguments to the format string.</param>
         public static void Info(this ILogger logger, string format, params object[] args)
         {
@@ -80,7 +86,9 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="logger">The logger</param>
         /// <param name="logCode">The log code associated with this message.</param>
-        /// <param name="format">A standard format string, suitable for String.Format.</param>
+        /// <param name="format">Format string of the log message with named parameters
+        /// <remarks>Not always suitable for <c>String.Format</c>. See Microsoft.Extensions.Logging MessageTemplate section for more information. Suggest to use their pattern over this extension method</remarks>
+        /// </param>
         /// <param name="args">Any arguments to the format string.</param>
         public static void Debug(this ILogger logger, int logCode, string format, params object[] args)
         {
@@ -113,7 +121,9 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="logger">The logger</param>
         /// <param name="logCode">The log code associated with this message.</param>
-        /// <param name="format">A standard format string, suitable for String.Format.</param>
+        /// <param name="format">Format string of the log message with named parameters
+        /// <remarks>Not always suitable for <c>String.Format</c>. See Microsoft.Extensions.Logging MessageTemplate section for more information. Suggest to use their pattern over this extension method</remarks>
+        /// </param>
         /// <param name="args">Any arguments to the format string.</param>
         public static void Trace(this ILogger logger, int logCode, string format, params object[] args)
         {
@@ -146,7 +156,9 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="logger">The logger</param>
         /// <param name="logCode">The log code associated with this message.</param>
-        /// <param name="format">A standard format string, suitable for String.Format.</param>
+        /// <param name="format">Format string of the log message with named parameters
+        /// <remarks>Not always suitable for <c>String.Format</c>. See Microsoft.Extensions.Logging MessageTemplate section for more information. Suggest to use their pattern over this extension method</remarks>
+        /// </param>
         /// <param name="args">Any arguments to the format string.</param>
         public static void Info(this ILogger logger, int logCode, string format, params object[] args)
         {
@@ -179,7 +191,9 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="logger">The logger</param>
         /// <param name="logCode">The log code associated with this message.</param>
-        /// <param name="format">A standard format string, suitable for String.Format.</param>
+        /// <param name="format">Format string of the log message with named parameters
+        /// <remarks>Not always suitable for <c>String.Format</c>. See Microsoft.Extensions.Logging MessageTemplate section for more information. Suggest to use their pattern over this extension method</remarks>
+        /// </param>
         /// <param name="args">Any arguments to the format string.</param>
         public static void Warn(this ILogger logger, int logCode, string format, params object[] args)
         {
