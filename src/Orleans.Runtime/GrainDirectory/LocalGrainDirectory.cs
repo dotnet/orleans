@@ -8,7 +8,6 @@ using Microsoft.Extensions.Options;
 using Orleans.GrainDirectory;
 using Orleans.Hosting;
 using Orleans.Runtime.Scheduler;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MultiClusterNetwork;
 
 namespace Orleans.Runtime.GrainDirectory
@@ -118,10 +117,7 @@ namespace Orleans.Runtime.GrainDirectory
             membershipCache = new HashSet<SiloAddress>();
             ClusterId = clusterId;
 
-            lock (membershipCache)
-            {
-                DirectoryCache = GrainDirectoryCacheFactory<IReadOnlyList<Tuple<SiloAddress, ActivationId>>>.CreateGrainDirectoryCache(grainDirectoryOptions.Value);
-            }
+            DirectoryCache = GrainDirectoryCacheFactory<IReadOnlyList<Tuple<SiloAddress, ActivationId>>>.CreateGrainDirectoryCache(grainDirectoryOptions.Value);
             /* TODO - investigate dynamic config changes using IOptions - jbragg
                         clusterConfig.OnConfigChange("Globals/Caching", () =>
                         {
