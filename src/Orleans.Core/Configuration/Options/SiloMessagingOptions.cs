@@ -78,7 +78,7 @@ namespace Orleans.Hosting
 
         public IEnumerable<string> Format()
         {
-            List<string> format = base.FormatStatisticsOptions();
+            List<string> format = base.FormatSharedOptions();
             format.AddRange(new List<string>
             {
                 OptionFormattingUtilities.Format(nameof(options.SiloSenderQueues), options.SiloSenderQueues),
