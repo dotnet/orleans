@@ -629,7 +629,7 @@ namespace Orleans.Runtime
             }
         }
 
-        // Forwardings are used by the receiver, usualy when it cannot process the message and forwars it to another silo to perform the processing
+        // Forwarding is used by the receiver, usually when it cannot process the message and forwards it to another silo to perform the processing
         // (got here due to outdated cache, silo is shutting down/overloaded, ...).
         private static bool MayForward(Message message, SiloMessagingOptions messagingOptions)
         {

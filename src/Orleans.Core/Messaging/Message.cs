@@ -347,7 +347,6 @@ namespace Orleans.Runtime
         {
             return ResendCount < maxResendCount;
         }
-
         
         /// <summary>
         /// Set by sender's placement logic when NewPlacementRequested is true
