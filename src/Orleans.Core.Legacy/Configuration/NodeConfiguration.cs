@@ -213,7 +213,7 @@ namespace Orleans.Runtime.Configuration
             this.LoadSheddingEnabled = false;
             this.LoadSheddingLimit = SiloStatisticsOptions.DEFAULT_LOAD_SHEDDING_LIMIT;
 
-            this.PropagateActivityId = SiloMessagingOptions.DEFAULT_PROPAGATE_ACTIVITY_ID;
+            this.PropagateActivityId = Constants.DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
 
             this.StatisticsMetricsTableWriteInterval = SiloStatisticsOptions.DEFAULT_METRICS_TABLE_WRITE_PERIOD;
             this.StatisticsPerfCountersWriteInterval = SiloStatisticsOptions.SILO_DEFAULT_PERF_COUNTERS_WRITE_PERIOD;

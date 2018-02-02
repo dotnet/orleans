@@ -604,7 +604,7 @@ namespace Orleans.Runtime.Configuration
             // Assume the ado invariant is for sql server storage if not explicitly specified
             this.AdoInvariant = Constants.INVARIANT_NAME_SQL_SERVER;
 
-            this.MaxRequestProcessingTime = SiloMessagingOptions.DEFAULT_MAX_REQUEST_PROCESSING_TIME;
+            this.MaxRequestProcessingTime = GrainCollectionOptions.DEFAULT_COLLECTION_AGE_LIMIT;
             this.CollectionQuantum = GrainCollectionOptions.DEFAULT_COLLECTION_QUANTUM;
 
             this.CacheSize = GrainDirectoryOptions.DEFAULT_CACHE_SIZE;
@@ -613,7 +613,7 @@ namespace Orleans.Runtime.Configuration
             this.CacheTTLExtensionFactor = GrainDirectoryOptions.DEFAULT_TTL_EXTENSION_FACTOR;
             this.DirectoryCachingStrategy = Remap(GrainDirectoryOptions.DEFAULT_CACHING_STRATEGY);
             this.DirectoryLazyDeregistrationDelay = GrainDirectoryOptions.DEFAULT_UNREGISTER_RACE_DELAY;
-            this.ClientRegistrationRefresh = SiloMessagingOptions.DEFAULT_CLIENT_REGISTRATION_REFRESH;
+            this.ClientRegistrationRefresh = TimeSpan.FromMinutes(5);
 
             this.PerformDeadlockDetection = DEFAULT_PERFORM_DEADLOCK_DETECTION;
             this.AllowCallChainReentrancy = DEFAULT_ALLOW_CALL_CHAIN_REENTRANCY;

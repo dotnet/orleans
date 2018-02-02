@@ -348,13 +348,7 @@ namespace Orleans.Runtime
             return ResendCount < maxResendCount;
         }
 
-        // Forwardings are used by the receiver, usualy when it cannot process the message and forwars it to another silo to perform the processing
-        // (got here due to outdated cache, silo is shutting down/overloaded, ...).
-        public bool MayForward(SiloMessagingOptions messagingOptions)
-        {
-            return ForwardCount < messagingOptions.MaxForwardCount;
-        }
-
+        
         /// <summary>
         /// Set by sender's placement logic when NewPlacementRequested is true
         /// so that receiver knows desired grain type
