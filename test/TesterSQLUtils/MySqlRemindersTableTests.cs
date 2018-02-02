@@ -53,7 +53,7 @@ namespace UnitTests.RemindersTest
         [SkippableFact]
         public async Task RemindersTable_MySql_RemindersRange()
         {
-            await RemindersRange();
+            await RemindersRange(iterations: 50);
         }
 
         [SkippableFact]

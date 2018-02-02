@@ -150,7 +150,7 @@ namespace Orleans.Statistics.AdoNet.Storage
         ///}).ConfigureAwait(continueOnCapturedContext: false);                
         /// </code>
         /// </example>
-        public Task<IEnumerable<TResult>> ReadAsync<TResult>(string query, Action<IDbCommand> parameterProvider, Func<IDataRecord, int, CancellationToken, Task<TResult>> selector, CancellationToken cancellationToken = default(CancellationToken), CommandBehavior commandBehavior = CommandBehavior.Default)
+        public async Task<IEnumerable<TResult>> ReadAsync<TResult>(string query, Action<IDbCommand> parameterProvider, Func<IDataRecord, int, CancellationToken, Task<TResult>> selector, CancellationToken cancellationToken = default(CancellationToken), CommandBehavior commandBehavior = CommandBehavior.Default)
         {
             //If the query is something else that is not acceptable (e.g. an empty string), there will an appropriate database exception.
             if(query == null)
@@ -163,11 +163,7 @@ namespace Orleans.Statistics.AdoNet.Storage
                 throw new ArgumentNullException("selector");
             }
 
-            //It is certain the result is already ready here and can be collected straight away. Having a truly asynchronous result collection
-            //IAsyncEnumerable<TResult> or equivalent method ought to be used. Taking the result here without async-await saves for generating
-            //the async state machine.
-            var ret = ExecuteAsync(query, parameterProvider, ExecuteReaderAsync, selector, cancellationToken, commandBehavior).GetAwaiter().GetResult().Item1;
-            return Task.FromResult(ret);
+            return (await ExecuteAsync(query, parameterProvider, ExecuteReaderAsync, selector, cancellationToken, commandBehavior).ConfigureAwait(false)).Item1;
         }
 
 
@@ -192,7 +188,7 @@ namespace Orleans.Statistics.AdoNet.Storage
         /// }).ConfigureAwait(continueOnCapturedContext: false);                
         /// </code>
         /// </example>
-        public Task<int> ExecuteAsync(string query, Action<IDbCommand> parameterProvider, CancellationToken cancellationToken = default(CancellationToken), CommandBehavior commandBehavior = CommandBehavior.Default)
+        public async Task<int> ExecuteAsync(string query, Action<IDbCommand> parameterProvider, CancellationToken cancellationToken = default(CancellationToken), CommandBehavior commandBehavior = CommandBehavior.Default)
         {
             //If the query is something else that is not acceptable (e.g. an empty string), there will an appropriate database exception.
             if(query == null)
@@ -200,11 +196,7 @@ namespace Orleans.Statistics.AdoNet.Storage
                 throw new ArgumentNullException("query");
             }
 
-            //It is certain the result is already ready here and can be collected straight away. Having a truly asynchronous result collection
-            //IAsyncEnumerable<TResult> or equivalent method ought to be used. Taking the result here without async-await saves for generating
-            //the async state machine.
-            var ret = ExecuteAsync(query, parameterProvider, ExecuteReaderAsync, (unit, id, c) => Task.FromResult(unit), cancellationToken, commandBehavior).GetAwaiter().GetResult().Item2;
-            return Task.FromResult(ret);
+            return (await ExecuteAsync(query, parameterProvider, ExecuteReaderAsync, (unit, id, c) => Task.FromResult(unit), cancellationToken, commandBehavior).ConfigureAwait(false)).Item2;
         }
 
         /// <summary>
@@ -233,7 +225,7 @@ namespace Orleans.Statistics.AdoNet.Storage
                     results.Add(obj);
                 }
 
-                await reader.NextResultAsync(cancellationToken);
+                await reader.NextResultAsync(cancellationToken).ConfigureAwait(false);
                 ++resultSetCount;
             }
 
