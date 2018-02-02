@@ -619,7 +619,7 @@ namespace Orleans.Runtime
             string limitName = LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS;
             int maxRequestsHardLimit = this.messagingOptions.MaxEnqueuedRequestsHardLimit;
             int maxRequestsSoftLimit = this.messagingOptions.MaxEnqueuedRequestsSoftLimit;
-            if (GrainInstanceType != null && CodeGeneration.GrainInterfaceUtils.IsStatelessWorker(GrainInstanceType.GetTypeInfo()))
+            if (IsStatelessWorker)
             {
                 limitName = LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER;
                 maxRequestsHardLimit = this.messagingOptions.MaxEnqueuedRequestsHardLimit_StatelessWorker;
