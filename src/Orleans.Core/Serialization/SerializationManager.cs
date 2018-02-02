@@ -107,7 +107,7 @@ namespace Orleans.Serialization
 
         public SerializationManager(
             IServiceProvider serviceProvider,
-            IOptions<SerializationProviderOptions> serializatonProviderOptions,
+            IOptions<SerializationProviderOptions> serializationProviderOptions,
             ILoggerFactory loggerFactory,
             ITypeResolver typeResolver)
         {
@@ -128,9 +128,9 @@ namespace Orleans.Serialization
             deserializers = new Dictionary<RuntimeTypeHandle, Deserializer>();
             grainRefConstructorDictionary = new ConcurrentDictionary<Type, Func<GrainReference, GrainReference>>();
 
-            var serializatonProviderOptionsValue = serializatonProviderOptions.Value;
+            var options = serializationProviderOptions.Value;
 
-            fallbackSerializer = GetFallbackSerializer(serviceProvider, serializatonProviderOptionsValue.FallbackSerializationProvider);
+            fallbackSerializer = GetFallbackSerializer(serviceProvider, options.FallbackSerializationProvider);
 
             if (StatisticsCollector.CollectSerializationStats)
             {
@@ -167,7 +167,7 @@ namespace Orleans.Serialization
                 FallbackCopiesTimeStatistic = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_FALLBACK_DEEPCOPY_MILLIS, storeFallback).AddValueConverter(Utils.TicksToMilliSeconds);
             }
 
-            RegisterSerializationProviders(serializatonProviderOptionsValue.SerializationProviders);
+            RegisterSerializationProviders(options.SerializationProviders);
         }
 
         public void RegisterSerializers(IApplicationPartManager applicationPartManager)

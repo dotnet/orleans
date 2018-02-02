@@ -43,6 +43,7 @@ namespace Orleans.Runtime
         private Catalog catalog;
         private Dispatcher dispatcher;
         private List<IGrainCallFilter> grainCallFilters;
+        private SerializationManager serializationManager;
 
         private readonly InterfaceToImplementationMappingCache interfaceToImplementationMapping = new InterfaceToImplementationMappingCache();
         public TimeSpan ResponseTimeout { get; private set; }
@@ -59,7 +60,6 @@ namespace Orleans.Runtime
             TypeMetadataCache typeMetadataCache,
             OrleansTaskScheduler scheduler,
             IServiceProvider serviceProvider,
-            SerializationManager serializationManager,
             MessageFactory messageFactory,
             Factory<ITransactionAgent> transactionAgent,
             ILoggerFactory loggerFactory,
@@ -68,21 +68,19 @@ namespace Orleans.Runtime
             IOptions<SchedulingOptions> schedulerOptions)
         {
             this.ServiceProvider = serviceProvider;
-            this.SerializationManager = serializationManager;
-            MySilo = siloDetails.SiloAddress;
-            disposables = new List<IDisposable>();
-            callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
+            this.MySilo = siloDetails.SiloAddress;
+            this.disposables = new List<IDisposable>();
+            this.callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
             this.ResponseTimeout = messagingOptions.Value.ResponseTimeout;
-//            config.OnConfigChange("Globals/Message", () => ResponseTimeout = Config.Globals.ResponseTimeout);
             this.typeManager = typeManager;
             this.messageFactory = messageFactory;
             this.transactionAgent = new Lazy<ITransactionAgent>(() => transactionAgent());
             this.Scheduler = scheduler;
             this.ConcreteGrainFactory = new GrainFactory(this, typeMetadataCache);
-            tryResendMessage = msg => this.Dispatcher.TryResendMessage(msg);
-            unregisterCallback = msg => UnRegisterCallback(msg.Id);
+            this.tryResendMessage = msg => this.Dispatcher.TryResendMessage(msg);
+            this.unregisterCallback = msg => this.UnRegisterCallback(msg.Id);
             this.logger = loggerFactory.CreateLogger<InsideRuntimeClient>();
-            this.invokeExceptionLogger =loggerFactory.CreateLogger($"{typeof(Grain).FullName}.InvokeException");
+            this.invokeExceptionLogger = loggerFactory.CreateLogger($"{typeof(Grain).FullName}.InvokeException");
             this.loggerFactory = loggerFactory;
             this.messagingOptions = messagingOptions.Value;
             this.callbackDataLogger = loggerFactory.CreateLogger<CallbackData>();
@@ -105,9 +103,7 @@ namespace Orleans.Runtime
         private SiloAddress MySilo { get; }
 
         public GrainFactory ConcreteGrainFactory { get; }
-
-        public SerializationManager SerializationManager { get; }
-
+        
         private Catalog Catalog => this.catalog ?? (this.catalog = this.ServiceProvider.GetRequiredService<Catalog>());
 
         private ILocalGrainDirectory Directory
@@ -336,7 +332,7 @@ namespace Orleans.Runtime
                 object resultObject;
                 try
                 {
-                    var request = (InvokeMethodRequest) message.GetDeserializedBody(this.SerializationManager);
+                    var request = (InvokeMethodRequest) message.GetDeserializedBody(this.serializationManager);
                     if (request.Arguments != null)
                     {
                         CancellationSourcesExtension.RegisterCancellationTokens(target, request, this.loggerFactory, logger, this, this.cancellationTokenRuntime);
@@ -482,7 +478,7 @@ namespace Orleans.Runtime
         {
             try
             {
-                SendResponse(message, new Response(SerializationManager.DeepCopy(resultObject)));
+                SendResponse(message, new Response(this.serializationManager.DeepCopy(resultObject)));
             }
             catch (Exception exc)
             {
@@ -534,7 +530,7 @@ namespace Orleans.Runtime
         {
             try
             {
-                var copiedException = PrepareForRemoting((Exception)SerializationManager.DeepCopy(ex));
+                var copiedException = PrepareForRemoting((Exception)this.serializationManager.DeepCopy(ex));
                 SendResponse(message, Response.ExceptionResponse(copiedException));
             }
             catch (Exception exc1)
@@ -719,6 +715,7 @@ namespace Orleans.Runtime
         private Task OnRuntimeInitializeStart(CancellationToken tc)
         {
             var stopWatch = Stopwatch.StartNew();
+            this.serializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
             typeManager.Start();
             stopWatch.Stop();
             this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Start InsideRuntimeClient took {stopWatch.ElapsedMilliseconds} Milliseconds");
