@@ -385,7 +385,7 @@ namespace Orleans.Runtime
             // Hook up to receive notification of process exit / Ctrl-C events
             AppDomain.CurrentDomain.ProcessExit += HandleProcessExit;
             if (this.siloOptions.FastKillOnCancelKeyPress)
-                Console.CancelKeyPress += HandleProcessExit;
+                Console.CancelKeyPress += HandleConsoleCancelKeyPress;
             //TODO: setup thead pool directly to lifecycle
             StartTaskWithPerfAnalysis("ConfigureThreadPoolAndServicePointSettings",
                 this.ConfigureThreadPoolAndServicePointSettings, Stopwatch.StartNew());
@@ -809,24 +809,14 @@ namespace Orleans.Runtime
         private void HandleProcessExit(object sender, EventArgs e)
         {
             // NOTE: We need to minimize the amount of processing occurring on this code path -- we only have under approx 2-3 seconds before process exit will occur
-            logger.Warn(ErrorCode.Runtime_Error_100220, "Process is exiting");
-            
-            var cancellationSource = new CancellationTokenSource();
-            lock (lockable)
-            {
-                if (!this.SystemStatus.Equals(SystemStatus.Running)) return;
+            this.logger.Warn(ErrorCode.Runtime_Error_100220, "Process is exiting");
+            this.Stop();
+        }
 
-                this.SystemStatus = SystemStatus.Stopping;
-
-                // force a non-graceful stop
-                cancellationSource.Cancel();
-                this.siloLifecycle.OnStop(cancellationSource.Token);  // don't wait for it to stop
-            }
-                
-            logger.Info(ErrorCode.SiloStopping, "Silo.HandleProcessExit() - starting to FastKill()");
-
-            // calling stop when SystemStatus is already Stopping will wait until status Terminated
-            StopAsync(cancellationSource.Token).GetAwaiter().GetResult();
+        private void HandleConsoleCancelKeyPress(object sender, EventArgs e)
+        {
+            // Gracefully terminate the silo.
+            this.Shutdown();
         }
 
         internal void RegisterSystemTarget(SystemTarget target)
