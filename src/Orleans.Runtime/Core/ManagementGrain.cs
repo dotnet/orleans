@@ -38,7 +38,8 @@ namespace Orleans.Runtime.Management
             ISiloStatusOracle siloStatusOracle,
             MembershipTableFactory membershipTableFactory, 
             GrainTypeManager grainTypeManager, 
-            IVersionStore versionStore)
+            IVersionStore versionStore,
+            ILogger<ManagementGrain> logger)
         {
             this.multiClusterOptions = multiClusterOptions.Value;
             this.multiClusterOracle = multiClusterOracle;
@@ -47,12 +48,7 @@ namespace Orleans.Runtime.Management
             this.membershipTableFactory = membershipTableFactory;
             this.grainTypeManager = grainTypeManager;
             this.versionStore = versionStore;
-        }
-
-        public override Task OnActivateAsync()
-        {
-            logger = this.ServiceProvider.GetRequiredService<ILogger<ManagementGrain>>();
-            return Task.CompletedTask;
+            this.logger = logger;
         }
 
         public async Task<Dictionary<SiloAddress, SiloStatus>> GetHosts(bool onlyActive = false)
@@ -287,7 +283,7 @@ namespace Orleans.Runtime.Management
         private Task<IMembershipTable> GetMembershipTable()
         {
             if (!(this.siloStatusOracle is MembershipOracle)) throw new InvalidOperationException("The current membership oracle does not support detailed silo status reporting.");
-            return this.membershipTableFactory.GetMembershipTable();
+            return Task.FromResult(this.membershipTableFactory.GetMembershipTable());
         }
 
         private SiloAddress[] GetSiloAddresses(SiloAddress[] silos)

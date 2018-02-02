@@ -66,8 +66,9 @@ namespace Orleans.Runtime.MembershipService
             {
                 logger.Info(ErrorCode.MembershipStarting, "MembershipOracle starting on host = " + membershipOracleData.MyHostname + " address = " + MyAddress.ToLongString() + " at " + LogFormatter.PrintDate(membershipOracleData.SiloStartTime) + ", backOffMax = " + EXP_BACKOFF_CONTENTION_MAX);
 
-                // Create the membership table.
-                this.membershipTableProvider = await this.membershipTableFactory.GetMembershipTable();
+                // Init the membership table.
+                this.membershipTableProvider = this.membershipTableFactory.GetMembershipTable();
+                await this.membershipTableProvider.InitializeMembershipTable(true);
 
                 // randomly delay the startup, so not all silos write to the table at once.
                 // Use random time not larger than MaxJoinAttemptTime, one minute and 0.5sec*ExpectedClusterSize;
