@@ -159,35 +159,6 @@ namespace Orleans.Runtime.Configuration
             Adaptive
         }
 
-        private static DirectoryCachingStrategyType Remap(GrainDirectoryOptions.CachingStrategyType type)
-        {
-            switch(type)
-            {
-                case GrainDirectoryOptions.CachingStrategyType.None:
-                    return DirectoryCachingStrategyType.None;
-                case GrainDirectoryOptions.CachingStrategyType.LRU:
-                    return DirectoryCachingStrategyType.LRU;
-                case GrainDirectoryOptions.CachingStrategyType.Adaptive:
-                    return DirectoryCachingStrategyType.Adaptive;
-                default:
-                    throw new NotSupportedException($"CachingStrategyType {type} is not supported");
-            }
-        }
-        public static GrainDirectoryOptions.CachingStrategyType Remap(DirectoryCachingStrategyType type)
-        {
-            switch (type)
-            {
-                case DirectoryCachingStrategyType.None:
-                    return GrainDirectoryOptions.CachingStrategyType.None;
-                case DirectoryCachingStrategyType.LRU:
-                    return GrainDirectoryOptions.CachingStrategyType.LRU;
-                case DirectoryCachingStrategyType.Adaptive:
-                    return GrainDirectoryOptions.CachingStrategyType.Adaptive;
-                default:
-                    throw new NotSupportedException($"DirectoryCachingStrategyType {type} is not supported");
-            }
-        }
-
         public ApplicationConfiguration Application { get; private set; }
 
         /// <summary>
@@ -602,23 +573,23 @@ namespace Orleans.Runtime.Configuration
             // Assume the ado invariant is for sql server storage if not explicitly specified
             this.AdoInvariant = Constants.INVARIANT_NAME_SQL_SERVER;
 
-            this.MaxRequestProcessingTime = GrainCollectionOptions.DEFAULT_COLLECTION_AGE_LIMIT;
-            this.CollectionQuantum = GrainCollectionOptions.DEFAULT_COLLECTION_QUANTUM;
+            this.MaxRequestProcessingTime = TimeSpan.FromHours(2);
+            this.CollectionQuantum = TimeSpan.FromMinutes(1);
 
-            this.CacheSize = GrainDirectoryOptions.DEFAULT_CACHE_SIZE;
-            this.InitialCacheTTL = GrainDirectoryOptions.DEFAULT_INITIAL_CACHE_TTL;
-            this.MaximumCacheTTL = GrainDirectoryOptions.DEFAULT_MAXIMUM_CACHE_TTL;
-            this.CacheTTLExtensionFactor = GrainDirectoryOptions.DEFAULT_TTL_EXTENSION_FACTOR;
-            this.DirectoryCachingStrategy = Remap(GrainDirectoryOptions.DEFAULT_CACHING_STRATEGY);
-            this.DirectoryLazyDeregistrationDelay = GrainDirectoryOptions.DEFAULT_UNREGISTER_RACE_DELAY;
+            this.CacheSize = 1000000;
+            this.InitialCacheTTL = TimeSpan.FromSeconds(30);
+            this.MaximumCacheTTL = TimeSpan.FromSeconds(240);
+            this.CacheTTLExtensionFactor = 2.0;
+            this.DirectoryCachingStrategy = DirectoryCachingStrategyType.Adaptive;
+            this.DirectoryLazyDeregistrationDelay = TimeSpan.FromMinutes(1);
             this.ClientRegistrationRefresh = TimeSpan.FromMinutes(5);
 
             this.PerformDeadlockDetection = SchedulingOptions.DEFAULT_PERFORM_DEADLOCK_DETECTION;
             this.AllowCallChainReentrancy = SchedulingOptions.DEFAULT_ALLOW_CALL_CHAIN_REENTRANCY;
             this.reminderServiceType = ReminderServiceProviderType.NotSpecified;
-            this.DefaultPlacementStrategy = GrainPlacementOptions.DEFAULT_PLACEMENT_STRATEGY;
+            this.DefaultPlacementStrategy = nameof(RandomPlacement);
             this.DeploymentLoadPublisherRefreshTime = TimeSpan.FromSeconds(1);
-            this.ActivationCountBasedPlacementChooseOutOf = GrainPlacementOptions.DEFAULT_ACTIVATION_COUNT_PLACEMENT_CHOOSE_OUT_OF;
+            this.ActivationCountBasedPlacementChooseOutOf = 2;
             this.UseVirtualBucketsConsistentRing = true;
             this.NumVirtualBucketsConsistentRing = 30;
             this.UseMockReminderTable = false;

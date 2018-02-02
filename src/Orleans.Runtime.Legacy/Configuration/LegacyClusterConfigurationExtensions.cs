@@ -335,7 +335,7 @@ namespace Orleans.Hosting
             services.AddOptions<GrainDirectoryOptions>()
                 .Configure<GlobalConfiguration>((options, config) =>
                 {
-                    options.CachingStrategy = GlobalConfiguration.Remap(config.DirectoryCachingStrategy);
+                    options.CachingStrategy = Remap(config.DirectoryCachingStrategy);
                     options.CacheSize = config.CacheSize;
                     options.InitialCacheTTL = config.InitialCacheTTL;
                     options.MaximumCacheTTL = config.MaximumCacheTTL;
@@ -351,6 +351,21 @@ namespace Orleans.Hosting
             return services
                 .FirstOrDefault(s => s.ServiceType == typeof(ClusterConfiguration))
                 ?.ImplementationInstance as ClusterConfiguration;
+        }
+
+        private static GrainDirectoryOptions.CachingStrategyType Remap(GlobalConfiguration.DirectoryCachingStrategyType type)
+        {
+            switch (type)
+            {
+                case GlobalConfiguration.DirectoryCachingStrategyType.None:
+                    return GrainDirectoryOptions.CachingStrategyType.None;
+                case GlobalConfiguration.DirectoryCachingStrategyType.LRU:
+                    return GrainDirectoryOptions.CachingStrategyType.LRU;
+                case GlobalConfiguration.DirectoryCachingStrategyType.Adaptive:
+                    return GrainDirectoryOptions.CachingStrategyType.Adaptive;
+                default:
+                    throw new NotSupportedException($"DirectoryCachingStrategyType {type} is not supported");
+            }
         }
     }
 }
