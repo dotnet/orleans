@@ -211,15 +211,15 @@ namespace Orleans.Runtime.Configuration
             this.EnableWorkerThreadInjection = SchedulingOptions.DEFAULT_ENABLE_WORKER_THREAD_INJECTION;
 
             this.LoadSheddingEnabled = false;
-            this.LoadSheddingLimit = SiloStatisticsOptions.DEFAULT_LOAD_SHEDDING_LIMIT;
+            this.LoadSheddingLimit = 95;
 
             this.PropagateActivityId = Constants.DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
 
-            this.StatisticsMetricsTableWriteInterval = SiloStatisticsOptions.DEFAULT_METRICS_TABLE_WRITE_PERIOD;
-            this.StatisticsPerfCountersWriteInterval = SiloStatisticsOptions.SILO_DEFAULT_PERF_COUNTERS_WRITE_PERIOD;
-            this.StatisticsLogWriteInterval = SiloStatisticsOptions.DEFAULT_LOG_WRITE_PERIOD;
-            this.StatisticsWriteLogStatisticsToTable = SiloStatisticsOptions.DEFAULT_LOG_TO_TABLE;
-            this.StatisticsCollectionLevel = SiloStatisticsOptions.DEFAULT_COLLECTION_LEVEL;
+            this.StatisticsMetricsTableWriteInterval = TimeSpan.FromSeconds(30);
+            this.StatisticsPerfCountersWriteInterval = TimeSpan.FromSeconds(30);
+            this.StatisticsLogWriteInterval = TimeSpan.FromMinutes(5);
+            this.StatisticsWriteLogStatisticsToTable = true;
+            this.StatisticsCollectionLevel = StatisticsLevel.Info;
 
             this.LimitManager = new LimitManager();
 

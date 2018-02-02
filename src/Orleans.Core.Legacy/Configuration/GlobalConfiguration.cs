@@ -619,7 +619,7 @@ namespace Orleans.Runtime.Configuration
             this.AllowCallChainReentrancy = DEFAULT_ALLOW_CALL_CHAIN_REENTRANCY;
             this.reminderServiceType = ReminderServiceProviderType.NotSpecified;
             this.DefaultPlacementStrategy = GrainPlacementOptions.DEFAULT_PLACEMENT_STRATEGY;
-            this.DeploymentLoadPublisherRefreshTime = SiloStatisticsOptions.DEFAULT_DEPLOYMENT_LOAD_PUBLISHER_REFRESH_TIME;
+            this.DeploymentLoadPublisherRefreshTime = TimeSpan.FromSeconds(1);
             this.ActivationCountBasedPlacementChooseOutOf = GrainPlacementOptions.DEFAULT_ACTIVATION_COUNT_PLACEMENT_CHOOSE_OUT_OF;
             this.UseVirtualBucketsConsistentRing = ConsistentRingOptions.DEFAULT_USE_VIRTUAL_RING_BUCKETS;
             this.NumVirtualBucketsConsistentRing = ConsistentRingOptions.DEFAULT_NUM_VIRTUAL_RING_BUCKETS;
