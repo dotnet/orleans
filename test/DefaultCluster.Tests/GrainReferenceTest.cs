@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
@@ -14,6 +14,8 @@ using Xunit;
 
 namespace DefaultCluster.Tests.General
 {
+    using Microsoft.Extensions.DependencyInjection;
+
     /// <summary>
     /// Summary description for GrainReferenceTest
     /// </summary>
@@ -105,7 +107,8 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("Serialization"), TestCategory("JSON")]
         public async Task GrainReference_Json_Serialization_Nested()
         {
-            var settings = OrleansJsonSerializer.GetDefaultSerializerSettings(HostedCluster.SerializationManager, HostedCluster.GrainFactory);
+            var typeResolver = this.HostedCluster.Client.ServiceProvider.GetRequiredService<ITypeResolver>();
+            var settings = OrleansJsonSerializer.GetDefaultSerializerSettings(typeResolver, HostedCluster.GrainFactory);
             
             var grain = HostedCluster.GrainFactory.GetGrain<ISimpleGrain>(GetRandomGrainId());
             await grain.SetA(56820);
@@ -238,7 +241,8 @@ namespace DefaultCluster.Tests.General
 
         private T NewtonsoftJsonSerializeRoundtrip<T>(T obj)
         {
-            var settings = OrleansJsonSerializer.GetDefaultSerializerSettings(this.HostedCluster.SerializationManager, this.GrainFactory);
+            var typeResolver = this.HostedCluster.Client.ServiceProvider.GetRequiredService<ITypeResolver>();
+            var settings = OrleansJsonSerializer.GetDefaultSerializerSettings(typeResolver, this.GrainFactory);
             // http://james.newtonking.com/json/help/index.html?topic=html/T_Newtonsoft_Json_JsonConvert.htm
             string json = JsonConvert.SerializeObject(obj, settings);
             object other = JsonConvert.DeserializeObject(json, typeof(T), settings);

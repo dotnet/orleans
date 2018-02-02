@@ -62,7 +62,7 @@ namespace UnitTests.Serialization
             this.environment.SerializationManager.RoundTripSerializationForTesting(data);
             Assert.True(FakeSerializer.SerializeCalled);
             Assert.True(FakeSerializer.DeserializeCalled);
-    }
+        }
 
         private class FakeSerializedWithNoCodegenSerializers : FakeSerialized
         {
