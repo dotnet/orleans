@@ -55,7 +55,7 @@ namespace Orleans.Hosting
             this.options = options;
         }
 
-        protected List<string> FormatStatisticsOptions()
+        protected List<string> FormatSharedOptions()
         {
             return new List<string>()
             {

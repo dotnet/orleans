@@ -235,10 +235,17 @@ namespace Orleans.Hosting
             services.AddTransient<IConfigurationValidator, ApplicationPartValidator>();
 
             //Add default option formatter if none is configured, for options which are requied to be configured 
-            services.TryConfigureFormatter<SiloMessagingOptions, SiloMessageingOptionFormatter>();
-            services.TryConfigureFormatter<SiloStatisticsOptions, SiloStatisticsOptionsFormatter>();
-            services.TryConfigureFormatter<NetworkingOptions, NetworkingOptionFormatter>();
+            services.TryConfigureFormatter<SiloOptions, SiloOptionsFormatter>();
+            services.TryConfigureFormatter<SchedulingOptions, SchedulingOptionsFormatter>();
+            services.TryConfigureFormatter<ThreadPoolOptions, ThreadPoolOptionsFormatter>();
             services.TryConfigureFormatter<SerializationProviderOptions, SerializationProviderOptionsFormatter>();
+            services.TryConfigureFormatter<NetworkingOptions, NetworkingOptionFormatter>();
+            services.TryConfigureFormatter<SiloMessagingOptions, SiloMessagingOptionFormatter>();
+            services.TryConfigureFormatter<TypeManagementOptions, TypeManagementOptionsFormatter>();
+            services.TryConfigureFormatter<GrainDirectoryOptions, GrainDirectoryOptionsFormatter>();
+            services.TryConfigureFormatter<GrainPlacementOptions, GrainPlacementOptionsFormatter>();
+            services.TryConfigureFormatter<VersioningOptions, VersioningOptionsFormatter>();
+            services.TryConfigureFormatter<SiloStatisticsOptions, SiloStatisticsOptionsFormatter>();
         }
     }
 }

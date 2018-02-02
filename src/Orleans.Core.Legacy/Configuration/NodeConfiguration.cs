@@ -207,7 +207,7 @@ namespace Orleans.Runtime.Configuration
             this.MaxActiveThreads = SchedulingOptions.DEFAULT_MAX_ACTIVE_THREADS;
             this.DelayWarningThreshold = SchedulingOptions.DEFAULT_DELAY_WARNING_THRESHOLD;
             this.ActivationSchedulingQuantum = SchedulingOptions.DEFAULT_ACTIVATION_SCHEDULING_QUANTUM;
-            this.TurnWarningLengthThreshold = SchedulingOptions.DEFAULT_DELAY_WARNING_THRESHOLD;
+            this.TurnWarningLengthThreshold = SchedulingOptions.DEFAULT_TURN_WARNING_THRESHOLD;
             this.EnableWorkerThreadInjection = SchedulingOptions.DEFAULT_ENABLE_WORKER_THREAD_INJECTION;
 
             this.LoadSheddingEnabled = false;

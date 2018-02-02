@@ -1,7 +1,6 @@
 using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
-using Microsoft.Extensions.Options;
 
 namespace Orleans.Hosting
 {
@@ -54,4 +53,30 @@ namespace Orleans.Hosting
         public bool PropagateActivityId { get; set; } = DEFAULT_PROPAGATE_ACTIVITY_ID;
         public const bool DEFAULT_PROPAGATE_ACTIVITY_ID = Constants.DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
     }
+
+    public abstract class MessagingOptionsFormatter
+    {
+        private MessagingOptions options;
+
+        protected MessagingOptionsFormatter(MessagingOptions options)
+        {
+            this.options = options;
+        }
+
+        protected List<string> FormatSharedOptions()
+        {
+            return new List<string>()
+            {
+                OptionFormattingUtilities.Format(nameof(this.options.ResponseTimeout), this.options.ResponseTimeout),
+                OptionFormattingUtilities.Format(nameof(this.options.MaxResendCount), this.options.MaxResendCount),
+                OptionFormattingUtilities.Format(nameof(this.options.ResendOnTimeout), this.options.ResendOnTimeout),
+                OptionFormattingUtilities.Format(nameof(this.options.DropExpiredMessages), this.options.DropExpiredMessages),
+                OptionFormattingUtilities.Format(nameof(this.options.BufferPoolBufferSize), this.options.BufferPoolBufferSize),
+                OptionFormattingUtilities.Format(nameof(this.options.BufferPoolMaxSize), this.options.BufferPoolMaxSize),
+                OptionFormattingUtilities.Format(nameof(this.options.BufferPoolPreallocationSize), this.options.BufferPoolPreallocationSize),
+                OptionFormattingUtilities.Format(nameof(this.options.PropagateActivityId), this.options.PropagateActivityId),
+            };
+        }
+    }
+
 }
