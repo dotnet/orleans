@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.WindowsAzure.Storage.Table;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Statistics.AzureStorage;
@@ -66,21 +67,22 @@ namespace Orleans.AzureUtils
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
-
-        public ClientMetricsTableDataManager(ILoggerFactory loggerFactory, IOptions<ClusterClientOptions> clusterClientOptions)
+        private StorageOptions storageOptions;
+        public ClientMetricsTableDataManager(ILoggerFactory loggerFactory, IOptions<ClusterClientOptions> clusterClientOptions, IOptions<StorageOptions> storageOptions)
         {
             logger = loggerFactory.CreateLogger<ClientMetricsTableDataManager>();
             this.loggerFactory = loggerFactory;
             this.deploymentId = clusterClientOptions.Value.ClusterId;
+            this.storageOptions = storageOptions.Value;
         }
 
-        async Task IClientMetricsDataPublisher.Init(ClientConfiguration config, IPAddress address, string clientId)
+        async Task IClientMetricsDataPublisher.Init(IPAddress address, string clientId)
         {
             this.clientId = clientId;
             this.address = address;
-            myHostName = config.DNSHostName;
+            myHostName = Dns.GetHostName();
             storage = new AzureTableDataManager<ClientMetricsData>(
-                INSTANCE_TABLE_NAME, config.DataConnectionString, this.loggerFactory);
+                INSTANCE_TABLE_NAME, storageOptions.DataConnectionString, this.loggerFactory);
 
             await storage.InitTableAsync().WithTimeout(initTimeout);
         }

@@ -149,7 +149,7 @@ namespace Orleans
                 // Client init / sign-on message
                 logger.Info(ErrorCode.ClientInitializing, string.Format(
                     "{0} Initializing OutsideRuntimeClient on {1} at {2} Client Id = {3} {0}",
-                    BARS, config.DNSHostName, localAddress, handshakeClientId));
+                    BARS, Dns.GetHostName(), localAddress, handshakeClientId));
                 string startMsg = string.Format("{0} Starting OutsideRuntimeClient with runtime Version='{1}' in AppDomain={2}",
                     BARS, RuntimeVersion.Current, PrintAppDomainDetails());
                 startMsg = string.Format("{0} Config= " + Environment.NewLine + " {1}", startMsg, config);
