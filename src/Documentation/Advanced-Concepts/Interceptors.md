@@ -291,6 +291,34 @@ GrainClient.ClientInvokeCallback = (request, grain) =>
 
 This way the client tells the server that it wants to use exception conversion.
 
+### Calling Grains from Interceptors
+
+It is possible to make grain calls from an interceptor through the injection of `IGrainFactory` into our interceptor class:
+``` csharp
+private readonly IGrainFactory grainFactory;
+
+public CustomCallFilter(IGrainFactory grainFactory)
+{
+  this.grainFactory = grainFactory;
+}
+
+public async Task Invoke(IGrainCallContext context)
+{
+  // Hook calls to any grain other than ICustomFilterGrain implementations.
+  // This avoids potential infinite recursion when calling OnReceivedCall() below.
+  if (!(context.Grain is ICustomFilterGrain))
+  {
+    var filterGrain = this.grainFactory.GetGrain<ICustomFilterGrain>(context.Grain.GetPrimaryKeyLong());
+
+    // Perform some grain call here.
+    await filterGrain.OnReceivedCall();
+  }
+
+  // Continue invoking the call on the target grain.
+  await context.Invoke();
+}
+```
+
 # Obsolete Interceptor Features
 The following sections describe functionality which has been superseded by the above features and may be removed in a future release.
 
