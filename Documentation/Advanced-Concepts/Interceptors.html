@@ -309,7 +309,31 @@ public class MyAccessControlledGrain : Grain, IMyFilteredGrain, IGrainCallFilter
 <pre><code class="lang-csharp">GrainClient.ClientInvokeCallback = (request, grain) =&gt;
     { RequestContext.Set(&quot;IsExceptionConversionEnabled&quot;, true); };
 </code></pre><p>This way the client tells the server that it wants to use exception conversion.</p>
-<h1 id="obsolete-interceptor-features">Obsolete Interceptor Features</h1>
+<h3 id="calling-grains-from-interceptors">Calling Grains from Interceptors</h3>
+<p>It is possible to make grain calls from an interceptor through the injection of <code>IGrainFactory</code> into our interceptor class:</p>
+<pre><code class="lang-csharp">private readonly IGrainFactory grainFactory;
+
+public CustomCallFilter(IGrainFactory grainFactory)
+{
+  this.grainFactory = grainFactory;
+}
+
+public async Task Invoke(IGrainCallContext context)
+{
+  // Hook calls to any grain other than ICustomFilterGrain implementations.
+  // This avoids potential infinite recursion when calling OnReceivedCall() below.
+  if (!(context.Grain is ICustomFilterGrain))
+  {
+    var filterGrain = this.grainFactory.GetGrain&lt;ICustomFilterGrain&gt;(context.Grain.GetPrimaryKeyLong());
+
+    // Perform some grain call here.
+    await filterGrain.OnReceivedCall();
+  }
+
+  // Continue invoking the call on the target grain.
+  await context.Invoke();
+}
+</code></pre><h1 id="obsolete-interceptor-features">Obsolete Interceptor Features</h1>
 <p>The following sections describe functionality which has been superseded by the above features and may be removed in a future release.</p>
 <h2 id="silo-level-interceptors">Silo-level Interceptors</h2>
 <p>Silo-level interceptors are called for all grain calls within a silo. They can be installed using <code>IProviderRuntime.SetInvokeInterceptor(interceptor)</code>, typically from within a <a href="Application-Bootstrap-within-a-Silo.html">Bootstrap Provider</a>&#39;s <code>Init</code> method, like so:</p>
