@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
@@ -496,6 +497,10 @@ namespace UnitTests.Serialization
             var source4 = new byte[] { 1, 3, 5 };
             deserialized = OrleansSerializationLoop(environment.SerializationManager, source4);
             ValidateArray<byte>(source4, deserialized, "byte");
+
+            var source5 = Enumerable.Repeat(3, (environment.SerializationManager.LargeObjectSizeThreshold / sizeof(int)) + 1).ToArray();
+            deserialized = OrleansSerializationLoop(environment.SerializationManager, source5);
+            ValidateArray<int>(source5, deserialized, "int");
         }
 
         [Theory, TestCategory("Functional")]
