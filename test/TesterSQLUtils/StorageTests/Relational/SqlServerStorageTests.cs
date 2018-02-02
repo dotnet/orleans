@@ -1,4 +1,4 @@
-﻿using Orleans;
+using Orleans;
 using Orleans.Runtime;
 using Orleans.Tests.SqlUtils;
 using System;
@@ -9,7 +9,7 @@ using Xunit;
 namespace UnitTests.StorageTests.Relational
 {
     public struct WriteReadTestResult { public long Count { get; set; } }
-    
+
     /// <summary>
     /// Persistence tests for SQL Server.
     /// </summary>
@@ -23,7 +23,7 @@ namespace UnitTests.StorageTests.Relational
         /// The storage invariant, storage ID, or ADO.NET invariant for this test set.
         /// </summary>
         private const string AdoNetInvariant = AdoNetInvariants.InvariantNameSqlServer;
-        
+
         public SqlServerStorageTests(CommonFixture commonFixture) : base(AdoNetInvariant, commonFixture)
         {
             //XUnit.NET will automatically call this constructor before every test method run.
@@ -137,7 +137,8 @@ namespace UnitTests.StorageTests.Relational
         [TestCategory("Functional")]
         internal async Task StorageDataSetGeneric_Json_WriteRead(string grainType, Func<IInternalGrainFactory, GrainReference> getGrainReference, GrainState<TestStateGeneric1<string>> grainState)
         {
-            await this.Relational_Json_WriteRead(grainType, getGrainReference(this.Fixture.InternalGrainFactory), grainState);
+            var grainReference = getGrainReference(this.Fixture.InternalGrainFactory);
+            await this.Relational_Json_WriteRead(grainType, grainReference, grainState);
         }
 
 

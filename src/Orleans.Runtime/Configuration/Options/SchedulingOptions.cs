@@ -19,7 +19,7 @@ namespace Orleans.Hosting
         /// Whether or not to allow reentrancy for calls within the same call chain.
         /// </summary>
         public bool AllowCallChainReentrancy { get; set; } = DEFAULT_ALLOW_CALL_CHAIN_REENTRANCY;
-        public const bool DEFAULT_ALLOW_CALL_CHAIN_REENTRANCY = false;
+        public const bool DEFAULT_ALLOW_CALL_CHAIN_REENTRANCY = true;
 
         /// <summary>
         /// The MaxActiveThreads attribute specifies the maximum number of simultaneous active threads the scheduler will allow.

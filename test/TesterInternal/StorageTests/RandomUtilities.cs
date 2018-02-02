@@ -25,7 +25,7 @@ namespace UnitTests.StorageTests.Relational
         public const long NormalGrainTypeCode = 3L;
 
         /// <summary>
-        /// This type code is consistent with Orleans.Runtime.Category.Grain = 3, used also like
+        /// This type code is consistent with Orleans.Runtime.Category.Grain = 6, used also like
         /// "public Category IdCategory { get { return GetCategory(TypeCodeData); } }".
         /// Note that 0L would likely do also.
         /// </summary>
@@ -82,16 +82,11 @@ namespace UnitTests.StorageTests.Relational
             }
         };
 
-
-        /// <summary>
-        /// The seed the pseudo-random generator uses. This is used to get the same random results across test runs.
-        /// </summary>
-        private const int PseudoRandomSeed = 0;
-
+                
         /// <summary>
         /// Pseudo-random number generator wrapped to protect from multi-threaded access.
         /// </summary>
-        private static ThreadLocal<Random> SafePseudoRandom { get; } = new ThreadLocal<Random>(() => new Random(PseudoRandomSeed));
+        private static SafeRandom SafePseudoRandom { get; } = new SafeRandom();
 
         /// <summary>
         /// A list of random generators being used. This list is read-only after construction.
@@ -100,11 +95,11 @@ namespace UnitTests.StorageTests.Relational
         private static Dictionary<Type, object> RandomGenerators { get; } = new Dictionary<Type, object>
         {
             [typeof(Guid)] = new Func<object, Guid>(state => { return Guid.NewGuid(); }),
-            [typeof(int)] = new Func<object, int>(state => { return SafePseudoRandom.Value.Next(); }),
+            [typeof(int)] = new Func<object, int>(state => { return SafePseudoRandom.Next(); }),
             [typeof(long)] = new Func<object, long>(state =>
             {
                 var bufferInt64 = new byte[sizeof(long)];
-                SafePseudoRandom.Value.NextBytes(bufferInt64);
+                SafePseudoRandom.NextBytes(bufferInt64);
                 return BitConverter.ToInt64(bufferInt64, 0);
             }),
             [typeof(string)] = new Func<object, string>(symbolSet =>
@@ -114,8 +109,8 @@ namespace UnitTests.StorageTests.Relational
                 var builder = new StringBuilder();
                 for(long i = 0; i < count; ++i)
                 {
-                    var symbolRange = symbols.SetRanges[SafePseudoRandom.Value.Next(symbols.SetRanges.Count)];
-                    builder.Append((char)SafePseudoRandom.Value.Next(symbolRange.Start, symbolRange.End));
+                    var symbolRange = symbols.SetRanges[SafePseudoRandom.Next(symbols.SetRanges.Count)];
+                    builder.Append((char)SafePseudoRandom.Next(symbolRange.Start, symbolRange.End));
                 }
 
                 return builder.ToString();
