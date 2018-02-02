@@ -204,11 +204,11 @@ namespace Orleans.Runtime.Configuration
             this.AddressType = AddressFamily.InterNetwork;
             this.ProxyGatewayEndpoint = null;
 
-            this.MaxActiveThreads = SchedulingOptions.DEFAULT_MAX_ACTIVE_THREADS;
-            this.DelayWarningThreshold = SchedulingOptions.DEFAULT_DELAY_WARNING_THRESHOLD;
-            this.ActivationSchedulingQuantum = SchedulingOptions.DEFAULT_ACTIVATION_SCHEDULING_QUANTUM;
-            this.TurnWarningLengthThreshold = SchedulingOptions.DEFAULT_TURN_WARNING_THRESHOLD;
-            this.EnableWorkerThreadInjection = SchedulingOptions.DEFAULT_ENABLE_WORKER_THREAD_INJECTION;
+            this.MaxActiveThreads = Math.Max(4, Environment.ProcessorCount);
+            this.DelayWarningThreshold = TimeSpan.FromMilliseconds(10000);
+            this.ActivationSchedulingQuantum = TimeSpan.FromMilliseconds(100);
+            this.TurnWarningLengthThreshold = TimeSpan.FromMilliseconds(200);
+            this.EnableWorkerThreadInjection = false;
 
             this.LoadSheddingEnabled = false;
             this.LoadSheddingLimit = 95;
@@ -369,7 +369,7 @@ namespace Orleans.Runtime.Configuration
                                 "Non-numeric MaxActiveThreads attribute value on Scheduler element for " + this.SiloName);
                             if (this.MaxActiveThreads < 1)
                             {
-                                this.MaxActiveThreads = SchedulingOptions.DEFAULT_MAX_ACTIVE_THREADS;
+                                this.MaxActiveThreads = Math.Max(4, System.Environment.ProcessorCount);
                             }
                         }
                         if (child.HasAttribute("DelayWarningThreshold"))

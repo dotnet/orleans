@@ -86,28 +86,6 @@ namespace Orleans.Runtime.Configuration
             Custom
         }
 
-        public static string Remap(ReminderServiceProviderType type)
-        {
-            switch(type)
-            {
-                case ReminderServiceProviderType.NotSpecified:
-                    return ReminderOptions.BuiltIn.NotSpecified;
-                case ReminderServiceProviderType.ReminderTableGrain:
-                    return ReminderOptions.BuiltIn.ReminderTableGrain;
-                case ReminderServiceProviderType.AzureTable:
-                    return ReminderOptions.BuiltIn.AzureTable;
-                case ReminderServiceProviderType.SqlServer:
-                    return ReminderOptions.BuiltIn.SqlServer;
-                case ReminderServiceProviderType.MockTable:
-                    return ReminderOptions.BuiltIn.MockTable;
-                case ReminderServiceProviderType.Disabled:
-                    return ReminderOptions.BuiltIn.Disabled;
-                case ReminderServiceProviderType.Custom:
-                    return ReminderOptions.BuiltIn.Custom;
-            }
-            throw new NotSupportedException($"ReminderServiceProviderType {type} is not supported");
-        }
-
         /// <summary>
         /// Configuration for Gossip Channels
         /// </summary>
@@ -584,8 +562,8 @@ namespace Orleans.Runtime.Configuration
             this.DirectoryLazyDeregistrationDelay = TimeSpan.FromMinutes(1);
             this.ClientRegistrationRefresh = TimeSpan.FromMinutes(5);
 
-            this.PerformDeadlockDetection = SchedulingOptions.DEFAULT_PERFORM_DEADLOCK_DETECTION;
-            this.AllowCallChainReentrancy = SchedulingOptions.DEFAULT_ALLOW_CALL_CHAIN_REENTRANCY;
+            this.PerformDeadlockDetection = false;
+            this.AllowCallChainReentrancy = false;
             this.reminderServiceType = ReminderServiceProviderType.NotSpecified;
             this.DefaultPlacementStrategy = nameof(RandomPlacement);
             this.DeploymentLoadPublisherRefreshTime = TimeSpan.FromSeconds(1);
@@ -593,7 +571,7 @@ namespace Orleans.Runtime.Configuration
             this.UseVirtualBucketsConsistentRing = true;
             this.NumVirtualBucketsConsistentRing = 30;
             this.UseMockReminderTable = false;
-            this.MockReminderTableTimeout = ReminderOptions.DEFAULT_MOCK_REMINDER_TABLE_TIMEOUT;
+            this.MockReminderTableTimeout = TimeSpan.FromMilliseconds(50);
             this.AssumeHomogenousSilosForTesting = false;
 
             this.ProviderConfigurations = new Dictionary<string, ProviderCategoryConfiguration>();
