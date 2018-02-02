@@ -565,8 +565,6 @@ namespace Orleans.Runtime.Configuration
         private const int DEFAULT_GLOBAL_SINGLE_INSTANCE_NUMBER_RETRIES = 10;
         private const int DEFAULT_LIVENESS_EXPECTED_CLUSTER_SIZE = 20;
         public static bool ENFORCE_MINIMUM_REQUIREMENT_FOR_AGE_LIMIT = true;
-        public const bool DEFAULT_PERFORM_DEADLOCK_DETECTION = false;
-        public const bool DEFAULT_ALLOW_CALL_CHAIN_REENTRANCY = false;
         public static readonly string DEFAULT_MULTICLUSTER_REGISTRATION_STRATEGY = typeof(GlobalSingleInstanceRegistration).Name;
 
         private string dataConnectionStringForReminders;
@@ -615,8 +613,8 @@ namespace Orleans.Runtime.Configuration
             this.DirectoryLazyDeregistrationDelay = GrainDirectoryOptions.DEFAULT_UNREGISTER_RACE_DELAY;
             this.ClientRegistrationRefresh = TimeSpan.FromMinutes(5);
 
-            this.PerformDeadlockDetection = DEFAULT_PERFORM_DEADLOCK_DETECTION;
-            this.AllowCallChainReentrancy = DEFAULT_ALLOW_CALL_CHAIN_REENTRANCY;
+            this.PerformDeadlockDetection = SchedulingOptions.DEFAULT_PERFORM_DEADLOCK_DETECTION;
+            this.AllowCallChainReentrancy = SchedulingOptions.DEFAULT_ALLOW_CALL_CHAIN_REENTRANCY;
             this.reminderServiceType = ReminderServiceProviderType.NotSpecified;
             this.DefaultPlacementStrategy = GrainPlacementOptions.DEFAULT_PLACEMENT_STRATEGY;
             this.DeploymentLoadPublisherRefreshTime = TimeSpan.FromSeconds(1);
