@@ -70,7 +70,7 @@ namespace Orleans.Runtime
             {
                 // Hook up to publish client metrics to Azure storage table
                 var publisher = AssemblyLoader.LoadAndCreateInstance<IClientMetricsDataPublisher>(Constants.ORLEANS_STATISTICS_AZURESTORAGE, logger, this.serviceProvider);
-                await publisher.Init(config, transport.MyAddress.Endpoint.Address, clientId.ToParsableString());
+                await publisher.Init(transport.MyAddress.Endpoint.Address, clientId.ToParsableString());
                 tableStatistics = new ClientTableStatistics(transport, publisher, this.hostEnvironmentStatistics, this.appEnvironmentStatistics, this.loggerFactory)
                 {
                     MetricsTableWriteInterval = statisticsOptions.MetricsTableWriteInterval

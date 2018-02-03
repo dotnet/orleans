@@ -31,14 +31,6 @@ namespace Orleans
         IClientBuilder ConfigureServices(Action<IServiceCollection> configureServices);
 
         /// <summary>
-        /// Specified the configuration to use for this client.
-        /// </summary>
-        /// <param name="configuration">The configuration.</param>
-        /// <remarks>This method may only be called once per builder instance.</remarks>
-        /// <returns>The builder.</returns>
-        IClientBuilder UseConfiguration(ClientConfiguration configuration);
-
-        /// <summary>
         /// Specifies how the <see cref="IServiceProvider"/> for this client is configured. 
         /// </summary>
         /// <param name="factory">The service provider factory.</param>

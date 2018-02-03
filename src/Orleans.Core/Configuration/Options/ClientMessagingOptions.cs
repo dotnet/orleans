@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Net.Sockets;
 using Microsoft.Extensions.Options;
 
 namespace Orleans.Hosting
@@ -16,6 +17,14 @@ namespace Orleans.Hosting
         ///  If this attribute is not specified, then Math.Pow(2, 13) is used.
         /// </summary>
         public int ClientSenderBuckets { get; set; } = 8192;
+
+        /// <summary>
+        /// </summary>
+        public AddressFamily PreferredFamily { get; set; } = AddressFamily.InterNetwork;
+        /// <summary>
+        /// The Interface attribute specifies the name of the network interface to use to work out an IP address for this machine.
+        /// </summary>
+        public string NetInterface { get; set; }
     }
 
     public class ClientMessagingOptionFormatter : MessagingOptionsFormatter, IOptionFormatter<ClientMessagingOptions>
@@ -37,6 +46,8 @@ namespace Orleans.Hosting
             format.AddRange(new List<string>
             {
                 OptionFormattingUtilities.Format(nameof(this.options.ClientSenderBuckets), this.options.ClientSenderBuckets),
+                OptionFormattingUtilities.Format(nameof(options.PreferredFamily), options.PreferredFamily),
+                OptionFormattingUtilities.Format(nameof(options.NetInterface), options.NetInterface),
             });
             return format;
         }

@@ -12,7 +12,8 @@ using Orleans.Configuration.Options;
 
 namespace Orleans.Configuration
 {
-    internal static class LegacyClientConfigurationExtensions
+
+    public static class LegacyConfigurationExtensions
     {
         private const int ClusterClientDefaultProviderInitStage = 1000;
         private const int ClusterClientDefaultProviderStartStage = 2000;
@@ -54,6 +55,8 @@ namespace Orleans.Configuration
                 CopyCommonMessagingOptions(configuration, options);
                 options.PropagateActivityId = configuration.PropagateActivityId;
                 options.ClientSenderBuckets = configuration.ClientSenderBuckets;
+                options.PreferredFamily = configuration.PreferredFamily;
+                options.NetInterface = configuration.NetInterface;
             });
 
 
@@ -75,6 +78,11 @@ namespace Orleans.Configuration
                 CopyTelemetryOptions(configuration.TelemetryConfiguration, services, options);
             });
 
+            services.Configure<GatewayOptions>(options =>
+            {
+                options.GatewayListRefreshPeriod = configuration.GatewayListRefreshPeriod;
+                options.PreferedGatewayIndex = configuration.PreferedGatewayIndex;
+            });
             // GatewayProvider
             LegacyGatewayListProviderConfigurator.ConfigureServices(configuration, services);
 

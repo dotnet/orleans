@@ -22,11 +22,6 @@ namespace Orleans
         IServiceProvider ServiceProvider { get; }
 
         /// <summary>
-        /// Gets the client configuration.
-        /// </summary>
-        ClientConfiguration Configuration { get; }
-
-        /// <summary>
         /// Returns the <see cref="IStreamProvider"/> with the specified <paramref name="name"/>.
         /// </summary>
         /// <param name="name">The name of the stream provider.</param>
