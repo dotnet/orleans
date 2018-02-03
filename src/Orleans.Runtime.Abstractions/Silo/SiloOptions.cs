@@ -1,4 +1,6 @@
+using Microsoft.Extensions.Options;
 using System;
+using System.Collections.Generic;
 
 namespace Orleans.Runtime
 {
@@ -24,5 +26,29 @@ namespace Orleans.Runtime
 
         public bool FastKillOnCancelKeyPress { get; set; } = DEFAULT_FAST_KILL_ON_CANCEL;
         public const bool DEFAULT_FAST_KILL_ON_CANCEL = true;
+    }
+
+    public class SiloOptionsFormatter : IOptionFormatter<SiloOptions>
+    {
+        public string Category { get; }
+
+        public string Name => nameof(SiloOptions);
+
+        private SiloOptions options;
+        public SiloOptionsFormatter(IOptions<SiloOptions> options)
+        {
+            this.options = options.Value;
+        }
+
+        public IEnumerable<string> Format()
+        {
+            return new List<string>()
+            {
+                OptionFormattingUtilities.Format(nameof(options.SiloName),options.SiloName),
+                OptionFormattingUtilities.Format(nameof(options.ClusterId), options.ClusterId),
+                OptionFormattingUtilities.Format(nameof(options.ServiceId), options.ServiceId),
+                OptionFormattingUtilities.Format(nameof(options.FastKillOnCancelKeyPress), options.FastKillOnCancelKeyPress)
+            };
+        }
     }
 }

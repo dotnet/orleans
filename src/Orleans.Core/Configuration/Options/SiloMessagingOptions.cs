@@ -63,36 +63,37 @@ namespace Orleans.Hosting
         public bool AssumeHomogenousSilosForTesting { get; set; } = false;
     }
 
-    public class SiloMessageingOptionFormatter : IOptionFormatter<SiloMessagingOptions>
+    public class SiloMessagingOptionFormatter : MessagingOptionsFormatter, IOptionFormatter<SiloMessagingOptions>
     {
         public string Category { get; }
 
         public string Name => nameof(SiloMessagingOptions);
 
         private SiloMessagingOptions options;
-        public SiloMessageingOptionFormatter(IOptions<SiloMessagingOptions> messageOptions)
+        public SiloMessagingOptionFormatter(IOptions<SiloMessagingOptions> messageOptions)
+            : base(messageOptions.Value)
         {
             options = messageOptions.Value;
         }
 
         public IEnumerable<string> Format()
         {
-            return new List<string>()
+            List<string> format = base.FormatSharedOptions();
+            format.AddRange(new List<string>
             {
                 OptionFormattingUtilities.Format(nameof(options.SiloSenderQueues), options.SiloSenderQueues),
                 OptionFormattingUtilities.Format(nameof(options.GatewaySenderQueues), options.GatewaySenderQueues),
                 OptionFormattingUtilities.Format(nameof(options.MaxForwardCount), options.MaxForwardCount),
                 OptionFormattingUtilities.Format(nameof(options.ClientDropTimeout), options.ClientDropTimeout),
-
-                OptionFormattingUtilities.Format(nameof(options.ResponseTimeout), options.ResponseTimeout),
-                OptionFormattingUtilities.Format(nameof(options.MaxResendCount), options.MaxResendCount),
-                OptionFormattingUtilities.Format(nameof(options.ResendOnTimeout), options.ResendOnTimeout),
-                OptionFormattingUtilities.Format(nameof(options.DropExpiredMessages), options.DropExpiredMessages),
-                OptionFormattingUtilities.Format(nameof(options.BufferPoolBufferSize), options.BufferPoolBufferSize),
-                OptionFormattingUtilities.Format(nameof(options.BufferPoolMaxSize), options.BufferPoolMaxSize),
-                OptionFormattingUtilities.Format(nameof(options.BufferPoolPreallocationSize), options.BufferPoolPreallocationSize)
-            };
+                OptionFormattingUtilities.Format(nameof(options.ClientRegistrationRefresh), options.ClientRegistrationRefresh),
+                OptionFormattingUtilities.Format(nameof(options.MaxEnqueuedRequestsSoftLimit), options.MaxEnqueuedRequestsSoftLimit),
+                OptionFormattingUtilities.Format(nameof(options.MaxEnqueuedRequestsHardLimit), options.MaxEnqueuedRequestsHardLimit),
+                OptionFormattingUtilities.Format(nameof(options.MaxEnqueuedRequestsSoftLimit_StatelessWorker), options.MaxEnqueuedRequestsSoftLimit_StatelessWorker),
+                OptionFormattingUtilities.Format(nameof(options.MaxEnqueuedRequestsHardLimit_StatelessWorker), options.MaxEnqueuedRequestsHardLimit_StatelessWorker),
+                OptionFormattingUtilities.Format(nameof(options.MaxRequestProcessingTime), options.MaxRequestProcessingTime),
+                OptionFormattingUtilities.Format(nameof(options.AssumeHomogenousSilosForTesting), options.AssumeHomogenousSilosForTesting)
+            });
+            return format;
         }
     }
-
 }

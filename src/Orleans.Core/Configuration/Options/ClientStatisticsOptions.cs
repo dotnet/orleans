@@ -24,7 +24,7 @@ namespace Orleans.Hosting
 
         public IEnumerable<string> Format()
         {
-            return base.FormatStatisticsOptions();
+            return base.FormatSharedOptions();
         }
     }
 

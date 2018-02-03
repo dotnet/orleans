@@ -403,8 +403,7 @@ namespace Orleans.Serialization
                 var msg = $"No serialization methods found on type {serializerType.GetParseableName(TypeFormattingOptions.LogFormat)}.";
                 logger.Warn(
                     ErrorCode.SerMgr_SerializationMethodsMissing,
-                    msg,
-                    serializerType.GetParseableName(TypeFormattingOptions.LogFormat));
+                    msg);
                 throw new ArgumentException(msg);
             }
 
@@ -745,9 +744,9 @@ namespace Orleans.Serialization
                     if (etInfo.IsPrimitive && Buffer.ByteLength(originalArray) > this.LargeObjectSizeThreshold)
                     {
                         logger.Info(ErrorCode.Ser_LargeObjectAllocated,
-                            "Large {0} array of total byte size {1} is being copied. This will result in an allocation on the large object heap. " +
+                            $"Large {t.OrleansTypeName()} array of total byte size {Buffer.ByteLength(originalArray)} is being copied. This will result in an allocation on the large object heap. " +
                             "Frequent allocations to the large object heap can result in frequent gen2 garbage collections and poor system performance. " +
-                            "Please consider using Immutable<{0}> instead.", t.OrleansTypeName(), Buffer.ByteLength(originalArray));
+                            $"Please consider using Immutable<{t.OrleansTypeName()}> instead.");
                     }
                     return originalArray.Clone();
                 }

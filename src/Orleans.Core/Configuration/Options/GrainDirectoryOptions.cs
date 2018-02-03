@@ -1,5 +1,7 @@
 
+using Microsoft.Extensions.Options;
 using System;
+using System.Collections.Generic;
 
 namespace Orleans.Hosting
 {
@@ -61,5 +63,31 @@ namespace Orleans.Hosting
         /// </summary>
         public TimeSpan LazyDeregistrationDelay { get; set; } = DEFAULT_UNREGISTER_RACE_DELAY;
         public static readonly TimeSpan DEFAULT_UNREGISTER_RACE_DELAY = TimeSpan.FromMinutes(1);
+    }
+
+    public class GrainDirectoryOptionsFormatter : IOptionFormatter<GrainDirectoryOptions>
+    {
+        public string Category { get; }
+
+        public string Name => nameof(GrainDirectoryOptions);
+
+        private GrainDirectoryOptions options;
+        public GrainDirectoryOptionsFormatter(IOptions<GrainDirectoryOptions> options)
+        {
+            this.options = options.Value;
+        }
+
+        public IEnumerable<string> Format()
+        {
+            return new List<string>()
+            {
+                OptionFormattingUtilities.Format(nameof(options.CachingStrategy),options.CachingStrategy),
+                OptionFormattingUtilities.Format(nameof(options.CacheSize),options.CacheSize),
+                OptionFormattingUtilities.Format(nameof(options.InitialCacheTTL),options.InitialCacheTTL),
+                OptionFormattingUtilities.Format(nameof(options.MaximumCacheTTL),options.MaximumCacheTTL),
+                OptionFormattingUtilities.Format(nameof(options.CacheTTLExtensionFactor),options.CacheTTLExtensionFactor),
+                OptionFormattingUtilities.Format(nameof(options.LazyDeregistrationDelay),options.LazyDeregistrationDelay),
+            };
+        }
     }
 }

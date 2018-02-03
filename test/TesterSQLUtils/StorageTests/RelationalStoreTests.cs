@@ -196,15 +196,18 @@ namespace UnitTests.StorageTests.SQLAdapter
                 {
                     //There can be a DbException due to the operation being forcefully cancelled...
                     //... Unless this is a test for a provider which does not support for cancellation.
+                    //The exception is wrapped into an AggregrateException due to the test arrangement of hard synchronous
+                    //wait to force for actual cancellation check and remove "natural timeout" causes.
+                    var innerException = ex?.InnerException;
                     if(sut.Storage.SupportsCommandCancellation())
                     {
                         //If the operation is cancelled already before database calls, a OperationCancelledException
                         //will be thrown in any case.
-                        Assert.True(ex is DbException || ex is OperationCanceledException, $"Unexcepted exception: {ex}");
+                        Assert.True(innerException is DbException || innerException is OperationCanceledException, $"Unexcepted exception: {ex}");
                     }
                     else
                     {
-                        Assert.True(ex is OperationCanceledException, $"Unexcepted exception: {ex}");
+                        Assert.True(innerException is OperationCanceledException, $"Unexcepted exception: {ex}");
                     }
                 }
             }

@@ -1,4 +1,6 @@
+using Microsoft.Extensions.Options;
 using System;
+using System.Collections.Generic;
 
 namespace Orleans.Hosting
 {
@@ -10,12 +12,14 @@ namespace Orleans.Hosting
         /// <summary>
         /// Whether or not to perform deadlock detection.
         /// </summary>
-        public bool PerformDeadlockDetection { get; set; }
+        public bool PerformDeadlockDetection { get; set; } = DEFAULT_PERFORM_DEADLOCK_DETECTION;
+        public const bool DEFAULT_PERFORM_DEADLOCK_DETECTION = false;
 
         /// <summary>
         /// Whether or not to allow reentrancy for calls within the same call chain.
         /// </summary>
-        public bool AllowCallChainReentrancy { get; set; }
+        public bool AllowCallChainReentrancy { get; set; } = DEFAULT_ALLOW_CALL_CHAIN_REENTRANCY;
+        public const bool DEFAULT_ALLOW_CALL_CHAIN_REENTRANCY = true;
 
         /// <summary>
         /// The MaxActiveThreads attribute specifies the maximum number of simultaneous active threads the scheduler will allow.
@@ -56,5 +60,33 @@ namespace Orleans.Hosting
         /// </summary>
         public bool EnableWorkerThreadInjection { get; set; } = DEFAULT_ENABLE_WORKER_THREAD_INJECTION;
         public const bool DEFAULT_ENABLE_WORKER_THREAD_INJECTION = false;
+    }
+
+    public class SchedulingOptionsFormatter : IOptionFormatter<SchedulingOptions>
+    {
+        public string Category { get; }
+
+        public string Name => nameof(SchedulingOptions);
+
+        private SchedulingOptions options;
+        public SchedulingOptionsFormatter(IOptions<SchedulingOptions> options)
+        {
+            this.options = options.Value;
+        }
+
+        public IEnumerable<string> Format()
+        {
+            return new List<string>()
+            {
+                OptionFormattingUtilities.Format(nameof(options.PerformDeadlockDetection),options.PerformDeadlockDetection),
+                OptionFormattingUtilities.Format(nameof(options.AllowCallChainReentrancy), options.AllowCallChainReentrancy),
+                OptionFormattingUtilities.Format(nameof(options.DelayWarningThreshold), options.DelayWarningThreshold),
+                OptionFormattingUtilities.Format(nameof(options.ActivationSchedulingQuantum), options.ActivationSchedulingQuantum),
+                OptionFormattingUtilities.Format(nameof(options.TurnWarningLengthThreshold), options.TurnWarningLengthThreshold),
+                OptionFormattingUtilities.Format(nameof(options.MaxPendingWorkItemsSoftLimit), options.MaxPendingWorkItemsSoftLimit),
+                OptionFormattingUtilities.Format(nameof(options.MaxPendingWorkItemsHardLimit), options.MaxPendingWorkItemsHardLimit),
+                OptionFormattingUtilities.Format(nameof(options.EnableWorkerThreadInjection), options.EnableWorkerThreadInjection),
+            };
+        }
     }
 }
