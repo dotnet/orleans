@@ -31,7 +31,7 @@ namespace Tester.CustomPlacementTests
                 builder.AddSiloBuilderConfigurator<TestSiloBuilderConfigurator>();
                 builder.ConfigureLegacyConfiguration(legacy =>
                 {
-                    legacy.ClusterConfiguration.Globals.AssumeHomogenousSilosForTesting = false;
+                    legacy.ClusterConfiguration.Globals.AssumeHomogenousSilosForTesting = true;
                     legacy.ClusterConfiguration.Globals.TypeMapRefreshInterval = TimeSpan.FromMilliseconds(100);
                 });
             }

@@ -8,11 +8,10 @@ namespace Orleans.Runtime.Placement
         public virtual Task<SiloAddress> OnAddActivation(
             PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
-            var allSilos = context.GetCompatibleSilos(target);
-
+            var allSilos = context.GetCompatibleSilos(target).OrderBy(s => s).ToArray();
             int hash = (int) (target.GrainIdentity.GetUniformHashCode() & 0x7fffffff); // reset highest order bit to avoid negative ints
 
-            return Task.FromResult(allSilos[hash % allSilos.Count]);
+            return Task.FromResult(allSilos[hash % allSilos.Length]);
         }
     }
 }
