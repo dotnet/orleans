@@ -215,6 +215,9 @@ namespace Orleans.Runtime.MembershipService
         internal void UpdateMyFaultAndUpdateZone(MembershipEntry entry)
         {
             this.myFaultAndUpdateZones = new UpdateFaultCombo(entry.UpdateZone, entry.FaultZone);
+
+            if (this.multiClusterActive)
+                localMultiClusterGatewaysCopy = DetermineMultiClusterGateways();
         }
 
         internal bool TryUpdateStatusAndNotify(MembershipEntry entry)
