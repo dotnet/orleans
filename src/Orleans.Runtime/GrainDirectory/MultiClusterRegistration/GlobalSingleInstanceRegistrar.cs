@@ -85,6 +85,9 @@ namespace Orleans.Runtime.GrainDirectory
 
             if (config == null || !config.Clusters.Contains(this.clusterId))
             {
+                if (logger.IsEnabled(LogLevel.Debug))
+                    logger.Debug($"GSIP: Skip {address.Grain} Act={address} mcConf={config}");
+
                 // we are not joined to the cluster yet/anymore. Go to doubtful state directly.
                 gsiActivationMaintainer.TrackDoubtfulGrain(address.Grain);
                 return directoryPartition.AddSingleActivation(address.Grain, address.Activation, address.Silo, GrainDirectoryEntryStatus.Doubtful);
@@ -118,7 +121,6 @@ namespace Orleans.Runtime.GrainDirectory
                 switch (outcome.State)
                 {
                     case OutcomeState.RemoteOwner:
-                    case OutcomeState.RemoteOwnerLikely:
                         {
                             directoryPartition.CacheOrUpdateRemoteClusterRegistration(address.Grain, address.Activation, outcome.RemoteOwnerAddress.Address);
                             return outcome.RemoteOwnerAddress;
@@ -132,6 +134,13 @@ namespace Orleans.Runtime.GrainDirectory
                         }
                     case OutcomeState.Inconclusive:
                         {
+                            break;
+                        }
+                    case OutcomeState.RemoteOwnerLikely:
+                        {
+                            // give prospective owner time to finish
+                            await Task.Delay(5); 
+
                             break;
                         }
                 }

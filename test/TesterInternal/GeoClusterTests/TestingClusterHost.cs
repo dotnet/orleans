@@ -176,9 +176,12 @@ namespace Tests.GeoClusterTests
             {
                 hostBuilder.ConfigureLogging(builder =>
                 {
-                    builder.AddFilter("Runtime.Catalog", LogLevel.Debug);
-                    builder.AddFilter("Runtime.Dispatcher", LogLevel.Trace);
-                    builder.AddFilter("Orleans.GrainDirectory.LocalGrainDirectory", LogLevel.Trace);
+                    builder.AddFilter("Orleans.Runtime.Catalog", LogLevel.Debug);
+                    builder.AddFilter("Orleans.Runtime.Dispatcher", LogLevel.Trace);
+                    builder.AddFilter("Orleans.Runtime.GrainDirectory.LocalGrainDirectory", LogLevel.Trace);
+                    builder.AddFilter("Orleans.Runtime.GrainDirectory.GlobalSingleInstanceRegistrar", LogLevel.Trace);
+                    builder.AddFilter("Orleans.Runtime.LogConsistency.ProtocolServices", LogLevel.Trace);
+                    builder.AddFilter("Orleans.Storage.MemoryStorageGrain", LogLevel.Debug);
                 });
                 hostBuilder.AddAzureBlobGrainStorage("PubSubStore", (AzureBlobStorageOptions options) =>
                 {

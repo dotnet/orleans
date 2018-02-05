@@ -33,7 +33,7 @@ namespace UnitTests.GeoClusterTests
         {
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [SkippableFact]
         public async Task TwoClusterBattery()
         {
 
@@ -52,7 +52,7 @@ namespace UnitTests.GeoClusterTests
                 await t;
         }
 
-        [SkippableFact]
+        [SkippableFact, TestCategory("Functional")]
         public async Task ThreeClusterBattery()
         {
 
@@ -446,7 +446,7 @@ namespace UnitTests.GeoClusterTests
                 AssertEqual(1, p.Result, gref);
         }
 
-        [SkippableFact]
+        [SkippableFact, TestCategory("Functional")]
         public async Task BlockedDeact()
         {
             await RunWithTimeout("Start Clusters and Clients", 180 * 1000, () =>

@@ -257,6 +257,10 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 maintainer.Stop();
             }
+            if (GsiActivationMaintainer != null)
+            {
+                GsiActivationMaintainer.Stop();
+            }
             DirectoryCache.Clear();
         }
 
@@ -598,6 +602,8 @@ namespace Orleans.Runtime.GrainDirectory
 
                 // we are the owner     
                 var registrar = this.registrarManager.GetRegistrarForGrain(address.Grain);
+
+                if (log.IsEnabled(LogLevel.Trace)) log.Trace($"use registrar {registrar.GetType().Name} for activation {address}");
 
                 return registrar.IsSynchronous ? registrar.Register(address, singleActivation)
                     : await registrar.RegisterAsync(address, singleActivation);
