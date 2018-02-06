@@ -246,7 +246,7 @@ namespace Orleans.Hosting
             services.TryConfigureFormatter<GrainDirectoryOptions, GrainDirectoryOptionsFormatter>();
             services.TryConfigureFormatter<GrainPlacementOptions, GrainPlacementOptionsFormatter>();
             services.TryConfigureFormatter<GrainCollectionOptions, GrainCollectionOptionsFormatter>();
-            services.TryConfigureFormatter<VersioningOptions, VersioningOptionsFormatter>();
+            services.TryConfigureFormatter<GrainVersioningOptions, GrainVersioningOptionsFormatter>();
             services.TryConfigureFormatter<ConsistentRingOptions, ConsistentRingOptionsFormatter>();
             services.TryConfigureFormatter<MultiClusterOptions, MultiClusterOptionsFormatter>();
             services.TryConfigureFormatter<SiloStatisticsOptions, SiloStatisticsOptionsFormatter>();

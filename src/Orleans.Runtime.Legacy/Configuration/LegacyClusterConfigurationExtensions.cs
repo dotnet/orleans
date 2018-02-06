@@ -291,11 +291,11 @@ namespace Orleans.Hosting
                     options.MockReminderTableTimeout = config.MockReminderTableTimeout;
                 });
 
-            services.AddOptions<VersioningOptions>()
+            services.AddOptions<GrainVersioningOptions>()
                 .Configure<GlobalConfiguration>((options, config) =>
                 {
-                    options.DefaultCompatibilityStrategy = config.DefaultCompatibilityStrategy?.GetType().Name ?? VersioningOptions.DEFAULT_COMPATABILITY_STRATEGY;
-                    options.DefaultVersionSelectorStrategy = config.DefaultVersionSelectorStrategy?.GetType().Name ?? VersioningOptions.DEFAULT_VERSION_SELECTOR_STRATEGY;
+                    options.DefaultCompatibilityStrategy = config.DefaultCompatibilityStrategy?.GetType().Name ?? GrainVersioningOptions.DEFAULT_COMPATABILITY_STRATEGY;
+                    options.DefaultVersionSelectorStrategy = config.DefaultVersionSelectorStrategy?.GetType().Name ?? GrainVersioningOptions.DEFAULT_VERSION_SELECTOR_STRATEGY;
                 });
 
             services.AddOptions<ThreadPoolOptions>()

@@ -9,7 +9,7 @@ namespace Orleans.Hosting
     /// <summary>
     /// Versioning options govern grain implementation selection in heterogeneous deployments.
     /// </summary>
-    public class VersioningOptions
+    public class GrainVersioningOptions
     {
         /// <summary>
         /// Strategy used to determine grain compatibility in heterogeneous deployments.
@@ -24,14 +24,14 @@ namespace Orleans.Hosting
         public const string DEFAULT_VERSION_SELECTOR_STRATEGY = nameof(AllCompatibleVersions);
     }
 
-    public class VersioningOptionsFormatter : IOptionFormatter<VersioningOptions>
+    public class GrainVersioningOptionsFormatter : IOptionFormatter<GrainVersioningOptions>
     {
         public string Category { get; }
 
-        public string Name => nameof(VersioningOptions);
+        public string Name => nameof(GrainVersioningOptions);
 
-        private VersioningOptions options;
-        public VersioningOptionsFormatter(IOptions<VersioningOptions> options)
+        private GrainVersioningOptions options;
+        public GrainVersioningOptionsFormatter(IOptions<GrainVersioningOptions> options)
         {
             this.options = options.Value;
         }

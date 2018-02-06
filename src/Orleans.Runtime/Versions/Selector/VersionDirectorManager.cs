@@ -16,7 +16,7 @@ namespace Orleans.Runtime.Versions.Selector
 
         public IVersionSelector Default { get; set; }
 
-        public VersionSelectorManager(IServiceProvider serviceProvider, IOptions<VersioningOptions> options)
+        public VersionSelectorManager(IServiceProvider serviceProvider, IOptions<GrainVersioningOptions> options)
         {
             this.serviceProvider = serviceProvider;
             this.strategyFromConfig = serviceProvider.GetRequiredServiceByName<VersionSelectorStrategy>(options.Value.DefaultVersionSelectorStrategy);
