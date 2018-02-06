@@ -498,7 +498,7 @@ namespace Orleans.Runtime
             var versionStore = Services.GetService<IVersionStore>();
             await StartAsyncTaskWithPerfAnalysis("Init type manager", () => scheduler
                 .QueueTask(() => this.typeManager.Initialize(versionStore), this.typeManager.SchedulingContext)
-                .WithTimeout(this.initTimeout, $"TypeManager Initializing failed due to timeout{initTimeout}"), stopWatch);
+                .WithTimeout(this.initTimeout, $"TypeManager Initializing failed due to timeout {initTimeout}"), stopWatch);
 
             //if running in multi cluster scenario, start the MultiClusterNetwork Oracle
             if (this.multiClusterOracle != null)
