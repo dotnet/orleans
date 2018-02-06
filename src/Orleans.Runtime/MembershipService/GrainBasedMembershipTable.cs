@@ -62,7 +62,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 try
                 {
-                    await membershipTableGrain.ReadAll().WithTimeout(timespan, $"MembershipGrain.ReadAll failed due to timeout {timespan}");
+                    await membershipTableGrain.ReadAll().WithTimeout(timespan, $"MembershipGrain trying to read all content of the membership table, failed due to timeout {timespan}");
                     logger.Info(ErrorCode.MembershipTableGrainInit2, "-Connected to membership table provider.");
                     return;
                 }

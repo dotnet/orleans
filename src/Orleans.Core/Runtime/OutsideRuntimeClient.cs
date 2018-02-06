@@ -233,7 +233,7 @@ namespace Orleans
             grainTypeResolver = await transport.GetGrainTypeResolver(this.InternalGrainFactory);
 
             await ClientStatistics.Start(transport, clientId)
-                .WithTimeout(initTimeout, $"clientStatistics.Start failed due to timeout {initTimeout}");
+                .WithTimeout(initTimeout, $"Starting ClientStatistics failed due to timeout {initTimeout}");
 
             await StreamingInitialize();
         }
