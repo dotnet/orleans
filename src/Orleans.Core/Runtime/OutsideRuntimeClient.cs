@@ -139,7 +139,7 @@ namespace Orleans
                 clientProviderRuntime = this.ServiceProvider.GetRequiredService<ClientProviderRuntime>();
 
                 responseTimeout = Debugger.IsAttached ? Constants.DEFAULT_RESPONSE_TIMEOUT : this.clientMessagingOptions.ResponseTimeout;
-                this.localAddress = ConfigUtilities.GetLocalIPAddress(this.clientMessagingOptions.PreferredFamily, this.clientMessagingOptions.NetInterface);
+                this.localAddress = ConfigUtilities.GetLocalIPAddress(this.clientMessagingOptions.PreferredFamily, this.clientMessagingOptions.NetworkInterfaceName);
 
                 // Client init / sign-on message
                 logger.Info(ErrorCode.ClientInitializing, string.Format(

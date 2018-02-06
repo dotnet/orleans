@@ -24,7 +24,7 @@ namespace Orleans.Hosting
         /// <summary>
         /// The Interface attribute specifies the name of the network interface to use to work out an IP address for this machine.
         /// </summary>
-        public string NetInterface { get; set; }
+        public string NetworkInterfaceName { get; set; }
     }
 
     public class ClientMessagingOptionFormatter : MessagingOptionsFormatter, IOptionFormatter<ClientMessagingOptions>
@@ -47,7 +47,7 @@ namespace Orleans.Hosting
             {
                 OptionFormattingUtilities.Format(nameof(this.options.ClientSenderBuckets), this.options.ClientSenderBuckets),
                 OptionFormattingUtilities.Format(nameof(options.PreferredFamily), options.PreferredFamily),
-                OptionFormattingUtilities.Format(nameof(options.NetInterface), options.NetInterface),
+                OptionFormattingUtilities.Format(nameof(options.NetworkInterfaceName), options.NetworkInterfaceName),
             });
             return format;
         }

@@ -60,7 +60,7 @@ namespace Orleans.Configuration
                 options.PropagateActivityId = configuration.PropagateActivityId;
                 options.ClientSenderBuckets = configuration.ClientSenderBuckets;
                 options.PreferredFamily = configuration.PreferredFamily;
-                options.NetInterface = configuration.NetInterface;
+                options.NetworkInterfaceName = configuration.NetInterface;
             });
 
 

@@ -84,7 +84,7 @@ namespace Orleans.Runtime
                 if (statsProvider != null)
                 {
                     logStatistics.StatsTablePublisher = statsProvider;
-                    // Note: Provider has already been Init-ialized above.
+                    // Note: Provider has already been initialized as a IProvider in the lifecycle
                 }
                 else if (CanUseAzureTable())
                 {
