@@ -118,14 +118,16 @@ namespace Orleans.Hosting
 
             services.AddOptions<SiloStatisticsOptions>()
                 .Configure<NodeConfiguration>((options, nodeConfig) => LegacyConfigurationExtensions.CopyStatisticsOptions(nodeConfig, options))
+                .Configure<GlobalConfiguration>((options, config) =>
+                {
+                    options.DeploymentLoadPublisherRefreshTime = config.DeploymentLoadPublisherRefreshTime;
+                });
+
+            services.AddOptions<LoadSheddingOptions>()
                 .Configure<NodeConfiguration>((options, nodeConfig) =>
                 {
                     options.LoadSheddingEnabled = nodeConfig.LoadSheddingEnabled;
                     options.LoadSheddingLimit = nodeConfig.LoadSheddingLimit;
-                })
-                .Configure<GlobalConfiguration>((options, config) =>
-                {
-                    options.DeploymentLoadPublisherRefreshTime = config.DeploymentLoadPublisherRefreshTime;
                 });
 
             // Translate legacy configuration to new Options

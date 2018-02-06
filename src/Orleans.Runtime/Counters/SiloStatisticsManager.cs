@@ -20,6 +20,7 @@ namespace Orleans.Runtime.Counters
 
         public SiloStatisticsManager(
             IOptions<SiloStatisticsOptions> statisticsOptions,
+            IOptions<LoadSheddingOptions> loadSheddingOptions,
             IOptions<StorageOptions> azureStorageOptions,
             ILocalSiloDetails siloDetails, 
             SerializationManager serializationManager, 
@@ -41,7 +42,7 @@ namespace Orleans.Runtime.Counters
             this.logger = loggerFactory.CreateLogger<SiloStatisticsManager>();
             this.hostEnvironmentStatistics = hostEnvironmentStatistics;
             this.logStatistics = new LogStatistics(statisticsOptions.Value.LogWriteInterval, true, serializationManager, loggerFactory);
-            this.MetricsTable = new SiloPerformanceMetrics(this.hostEnvironmentStatistics, appEnvironmentStatistics, loggerFactory, statisticsOptions);
+            this.MetricsTable = new SiloPerformanceMetrics(this.hostEnvironmentStatistics, appEnvironmentStatistics, loggerFactory, loadSheddingOptions);
             this.countersPublisher = new CountersStatistics(statisticsOptions.Value.PerfCountersWriteInterval, telemetryProducer, loggerFactory);
         }
 

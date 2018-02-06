@@ -211,7 +211,7 @@ namespace Orleans.Runtime.Configuration
             this.EnableWorkerThreadInjection = SchedulingOptions.DEFAULT_ENABLE_WORKER_THREAD_INJECTION;
 
             this.LoadSheddingEnabled = false;
-            this.LoadSheddingLimit = SiloStatisticsOptions.DEFAULT_LOAD_SHEDDING_LIMIT;
+            this.LoadSheddingLimit = LoadSheddingOptions.DEFAULT_LOAD_SHEDDING_LIMIT;
 
             this.PropagateActivityId = SiloMessagingOptions.DEFAULT_PROPAGATE_ACTIVITY_ID;
 
