@@ -57,7 +57,7 @@ namespace Tester.CustomPlacementTests
 
             // sort silo IDs into an array
             this.silos = fixture.HostedCluster.GetActiveSilos().Select(h => h.SiloAddress.ToString()).OrderBy(s => s).ToArray();
-            this.siloAddresses = fixture.HostedCluster.GetActiveSilos().Select(h => h.SiloAddress).OrderBy(s => s.ToString()).ToArray();
+            this.siloAddresses = fixture.HostedCluster.GetActiveSilos().Select(h => h.SiloAddress).OrderBy(s => s).ToArray();
         }
 
         [Fact]
