@@ -13,7 +13,6 @@ namespace Orleans.Runtime.MembershipService
 {
     internal class MembershipOracle : SystemTarget, IMembershipOracle, IMembershipService
     {
-        private readonly MembershipTableFactory membershipTableFactory;
         private readonly IInternalGrainFactory grainFactory;
         private IMembershipTable membershipTableProvider;
         private readonly MembershipOracleData membershipOracleData;
@@ -41,11 +40,11 @@ namespace Orleans.Runtime.MembershipService
         private TimeSpan AllowedIAmAliveMissPeriod { get { return this.membershipOptions.IAmAliveTablePublishTimeout.Multiply(this.membershipOptions.NumMissedTableIAmAliveLimit); } }
         private readonly ILoggerFactory loggerFactory;
 
-        public MembershipOracle(ILocalSiloDetails siloDetails, IOptions<MembershipOptions> membershipOptions, MembershipTableFactory membershipTableFactory, IInternalGrainFactory grainFactory, IOptions<MultiClusterOptions> multiClusterOptions, ILoggerFactory loggerFactory)
+        public MembershipOracle(ILocalSiloDetails siloDetails, IOptions<MembershipOptions> membershipOptions, IMembershipTable membershipTable, IInternalGrainFactory grainFactory, IOptions<MultiClusterOptions> multiClusterOptions, ILoggerFactory loggerFactory)
             : base(Constants.MembershipOracleId, siloDetails.SiloAddress, loggerFactory)
         {
             this.loggerFactory = loggerFactory;
-            this.membershipTableFactory = membershipTableFactory;
+            this.membershipTableProvider = membershipTable;
             this.grainFactory = grainFactory;
             logger = loggerFactory.CreateLogger<MembershipOracleData>();
             membershipOracleData = new MembershipOracleData(siloDetails, logger, multiClusterOptions.Value);
@@ -67,7 +66,6 @@ namespace Orleans.Runtime.MembershipService
                 logger.Info(ErrorCode.MembershipStarting, "MembershipOracle starting on host = " + membershipOracleData.MyHostname + " address = " + MyAddress.ToLongString() + " at " + LogFormatter.PrintDate(membershipOracleData.SiloStartTime) + ", backOffMax = " + EXP_BACKOFF_CONTENTION_MAX);
 
                 // Init the membership table.
-                this.membershipTableProvider = this.membershipTableFactory.GetMembershipTable();
                 await this.membershipTableProvider.InitializeMembershipTable(true);
 
                 // randomly delay the startup, so not all silos write to the table at once.

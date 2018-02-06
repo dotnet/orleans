@@ -119,7 +119,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<MembershipOracle>();
             services.TryAddFromExisting<IMembershipOracle, MembershipOracle>();
             services.TryAddFromExisting<ISiloStatusOracle, MembershipOracle>();
-            services.TryAddSingleton<MembershipTableFactory>();
             services.TryAddSingleton<ReminderTableFactory>();
             services.TryAddSingleton<IReminderTable>(sp => sp.GetRequiredService<ReminderTableFactory>().Create());
             services.TryAddSingleton<LocalReminderServiceFactory>();
