@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
 using Microsoft.Extensions.Options;
 
 namespace Orleans.Configuration.Options
@@ -31,7 +30,7 @@ namespace Orleans.Configuration.Options
         public IEnumerable<string> Format()
         {
             return new List<string>()
-                {OptionFormattingUtilities.Format(nameof(options.Gateways), string.Join(",", options.Gateways))};
+                {OptionFormattingUtilities.Format(nameof(this.options.Gateways), string.Join(",", this.options.Gateways))};
         }
     }
 }

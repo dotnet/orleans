@@ -1,14 +1,24 @@
+using System.Collections.Generic;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
-using System.Collections.Generic;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Settings which regulate the placement of grains across a cluster.
+    /// </summary>
     public class GrainPlacementOptions
     {
+        /// <summary>
+        /// Default strategy used for placeing grains across a cluster.
+        /// </summary>
         public string DefaultPlacementStrategy { get; set; } = DEFAULT_PLACEMENT_STRATEGY;
         public static readonly string DEFAULT_PLACEMENT_STRATEGY = nameof(RandomPlacement);
 
+        /// <summary>
+        /// Number of silos randomly selected for consideration when using activation count placement policy.
+        /// Only used with Activation Count placement policy.
+        /// </summary>
         public int ActivationCountPlacementChooseOutOf { get; set; } = DEFAULT_ACTIVATION_COUNT_PLACEMENT_CHOOSE_OUT_OF;
         public const int DEFAULT_ACTIVATION_COUNT_PLACEMENT_CHOOSE_OUT_OF = 2;
     }
@@ -29,8 +39,8 @@ namespace Orleans.Hosting
         {
             return new List<string>()
             {
-                OptionFormattingUtilities.Format(nameof(options.DefaultPlacementStrategy),options.DefaultPlacementStrategy),
-                OptionFormattingUtilities.Format(nameof(options.ActivationCountPlacementChooseOutOf), options.ActivationCountPlacementChooseOutOf),
+                OptionFormattingUtilities.Format(nameof(this.options.DefaultPlacementStrategy),this.options.DefaultPlacementStrategy),
+                OptionFormattingUtilities.Format(nameof(this.options.ActivationCountPlacementChooseOutOf), this.options.ActivationCountPlacementChooseOutOf),
             };
         }
     }
