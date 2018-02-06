@@ -36,7 +36,7 @@ namespace Orleans.Hosting
             List<string> format = base.FormatSharedOptions();
             format.AddRange(new List<string>
             {
-                OptionFormattingUtilities.Format(nameof(options.ClientSenderBuckets), options.ClientSenderBuckets),
+                OptionFormattingUtilities.Format(nameof(this.options.ClientSenderBuckets), this.options.ClientSenderBuckets),
             });
             return format;
         }

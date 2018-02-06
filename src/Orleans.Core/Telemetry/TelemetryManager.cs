@@ -3,8 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Orleans.Configuration.Options;
-using Orleans.Runtime.Configuration;
+using Orleans.Hosting;
 
 namespace Orleans.Runtime
 {

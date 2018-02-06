@@ -1,12 +1,19 @@
-using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.Options;
+using Orleans.Runtime;
 
-namespace Orleans.Configuration.Options
+namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Telemetry consumer settings
+    /// </summary>
     public class TelemetryOptions
     {
-        internal IList<Type> Consumers { get; set; } = new List<Type>();
+        /// <summary>
+        /// Configured telemetry consumers
+        /// </summary>
+        public IList<Type> Consumers { get; set; } = new List<Type>();
     }
 
     public static class TelemetryOptionsExtensions
@@ -15,6 +22,25 @@ namespace Orleans.Configuration.Options
         {
             options.Consumers.Add(typeof(T));
             return options;
+        }
+    }
+
+    public class TelemetryOptionsFormatter : IOptionFormatter<TelemetryOptions>
+    {
+        public string Category { get; }
+
+        public string Name => nameof(TelemetryOptions);
+
+        private TelemetryOptions options;
+        public TelemetryOptionsFormatter(IOptions<TelemetryOptions> options)
+        {
+            this.options = options.Value;
+        }
+
+        public IEnumerable<string> Format()
+        {
+            return new List<string>()
+                {OptionFormattingUtilities.Format(nameof(this.options.Consumers), string.Join(";", this.options.Consumers))};
         }
     }
 }

@@ -239,13 +239,22 @@ namespace Orleans.Hosting
             services.TryConfigureFormatter<SchedulingOptions, SchedulingOptionsFormatter>();
             services.TryConfigureFormatter<ThreadPoolOptions, ThreadPoolOptionsFormatter>();
             services.TryConfigureFormatter<SerializationProviderOptions, SerializationProviderOptionsFormatter>();
-            services.TryConfigureFormatter<NetworkingOptions, NetworkingOptionFormatter>();
+            services.TryConfigureFormatter<NetworkingOptions, NetworkingOptionsFormatter>();
             services.TryConfigureFormatter<SiloMessagingOptions, SiloMessagingOptionFormatter>();
             services.TryConfigureFormatter<TypeManagementOptions, TypeManagementOptionsFormatter>();
+            services.TryConfigureFormatter<MembershipOptions, MembershipOptionsFormatter>();
             services.TryConfigureFormatter<GrainDirectoryOptions, GrainDirectoryOptionsFormatter>();
             services.TryConfigureFormatter<GrainPlacementOptions, GrainPlacementOptionsFormatter>();
-            services.TryConfigureFormatter<VersioningOptions, VersioningOptionsFormatter>();
+            services.TryConfigureFormatter<GrainCollectionOptions, GrainCollectionOptionsFormatter>();
+            services.TryConfigureFormatter<GrainVersioningOptions, GrainVersioningOptionsFormatter>();
+            services.TryConfigureFormatter<ConsistentRingOptions, ConsistentRingOptionsFormatter>();
+            services.TryConfigureFormatter<MultiClusterOptions, MultiClusterOptionsFormatter>();
             services.TryConfigureFormatter<SiloStatisticsOptions, SiloStatisticsOptionsFormatter>();
+            services.TryConfigureFormatter<AdoNetOptions, AdoNetOptionsFormatter>();
+            services.TryConfigureFormatter<GrainServiceOptions, GrainServiceOptionsFormatter>();
+            services.TryConfigureFormatter<ReminderOptions, ReminderOptionsFormatter>();
+            services.TryConfigureFormatter<ServicePointOptions, ServicePointOptionsFormatter>();
+            services.TryConfigureFormatter<TelemetryOptions, TelemetryOptionsFormatter>();
         }
     }
 }

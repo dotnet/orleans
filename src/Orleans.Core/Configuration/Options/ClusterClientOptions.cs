@@ -29,7 +29,7 @@ namespace Orleans.Runtime
         {
             return new List<string>()
             {
-                OptionFormattingUtilities.Format(nameof(options.ClusterId), options.ClusterId)
+                OptionFormattingUtilities.Format(nameof(this.options.ClusterId), this.options.ClusterId)
             };
         }
     }

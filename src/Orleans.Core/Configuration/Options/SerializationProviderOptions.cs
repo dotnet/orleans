@@ -9,7 +9,14 @@ namespace Orleans.Hosting
     /// </summary>
     public class SerializationProviderOptions
     {
+        /// <summary>
+        /// Externally registered serializers
+        /// </summary>
         public List<TypeInfo> SerializationProviders { get; set; } = new List<TypeInfo>();
+
+        /// <summary>
+        /// Serializer used if no serializer is found for a type.
+        /// </summary>
         public TypeInfo FallbackSerializationProvider { get; set; }
     }
 
@@ -28,8 +35,8 @@ namespace Orleans.Hosting
         {
             return new List<string>()
             {
-                OptionFormattingUtilities.Format(nameof(options.SerializationProviders), string.Join(",", options.SerializationProviders)),
-                OptionFormattingUtilities.Format(nameof(options.FallbackSerializationProvider), options.FallbackSerializationProvider)
+                OptionFormattingUtilities.Format(nameof(this.options.SerializationProviders), string.Join(",", this.options.SerializationProviders)),
+                OptionFormattingUtilities.Format(nameof(this.options.FallbackSerializationProvider), this.options.FallbackSerializationProvider)
             };
         }
     }
