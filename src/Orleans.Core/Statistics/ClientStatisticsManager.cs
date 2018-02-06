@@ -23,10 +23,10 @@ namespace Orleans.Runtime
         private LogStatistics logStatistics;
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
-        private StorageOptions storageOptions;
+        private MonitoringStorageOptions storageOptions;
         private string dnsHostName;
         public ClientStatisticsManager(
-            IOptions<StorageOptions> storageOptions,
+            IOptions<MonitoringStorageOptions> storageOptions,
             SerializationManager serializationManager, 
             IServiceProvider serviceProvider,
             IHostEnvironmentStatistics hostEnvironmentStatistics,

@@ -48,6 +48,10 @@ namespace Orleans.Configuration
                     options.ClusterId = configuration.ClusterId;
                 }
             });
+            services.Configure<MonitoringStorageOptions>(options =>
+            {
+                options.DataConnectionString = configuration.DataConnectionString;
+            });
 
             // Translate legacy configuration to new Options
             services.Configure<ClientMessagingOptions>(options =>

@@ -67,8 +67,8 @@ namespace Orleans.AzureUtils
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
-        private StorageOptions storageOptions;
-        public ClientMetricsTableDataManager(ILoggerFactory loggerFactory, IOptions<ClusterClientOptions> clusterClientOptions, IOptions<StorageOptions> storageOptions)
+        private MonitoringStorageOptions storageOptions;
+        public ClientMetricsTableDataManager(ILoggerFactory loggerFactory, IOptions<ClusterClientOptions> clusterClientOptions, IOptions<MonitoringStorageOptions> storageOptions)
         {
             logger = loggerFactory.CreateLogger<ClientMetricsTableDataManager>();
             this.loggerFactory = loggerFactory;

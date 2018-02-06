@@ -16,12 +16,12 @@ namespace Orleans.Runtime.Counters
         internal SiloPerformanceMetrics MetricsTable;
         private readonly ILogger logger;
         private readonly ILocalSiloDetails siloDetails;
-        private readonly StorageOptions storageOptions;
+        private readonly MonitoringStorageOptions storageOptions;
 
         public SiloStatisticsManager(
             IOptions<SiloStatisticsOptions> statisticsOptions,
             IOptions<LoadSheddingOptions> loadSheddingOptions,
-            IOptions<StorageOptions> azureStorageOptions,
+            IOptions<MonitoringStorageOptions> azureStorageOptions,
             ILocalSiloDetails siloDetails, 
             SerializationManager serializationManager, 
             ITelemetryProducer telemetryProducer,
