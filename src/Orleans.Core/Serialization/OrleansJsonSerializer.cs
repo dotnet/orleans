@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net;
 using System.Reflection;
 using System.Runtime.Serialization;
@@ -18,18 +18,17 @@ namespace Orleans.Serialization
         public const string TypeNameHandlingProperty = "TypeNameHandling";
         private readonly JsonSerializerSettings settings;
 
-        public OrleansJsonSerializer(SerializationManager serializationManager, IGrainFactory grainFactory)
+        public OrleansJsonSerializer(ITypeResolver typeResolver, IGrainFactory grainFactory)
         {
-            this.settings = GetDefaultSerializerSettings(serializationManager, grainFactory);
+            this.settings = GetDefaultSerializerSettings(typeResolver, grainFactory);
         }
 
         /// <summary>
         /// Returns the default serializer settings.
         /// </summary>
         /// <returns>The default serializer settings.</returns>
-        public static JsonSerializerSettings GetDefaultSerializerSettings(SerializationManager serializationManager, IGrainFactory grainFactory)
+        public static JsonSerializerSettings GetDefaultSerializerSettings(ITypeResolver typeResolver, IGrainFactory grainFactory)
         {
-            var typeResolver = serializationManager.ServiceProvider.GetRequiredService<ITypeResolver>();
             var serializationBinder = new OrleansJsonSerializationBinder(typeResolver);
             var settings = new JsonSerializerSettings
             {
@@ -41,9 +40,6 @@ namespace Orleans.Serialization
                 NullValueHandling = NullValueHandling.Ignore,
                 ConstructorHandling = ConstructorHandling.AllowNonPublicDefaultConstructor,
                 TypeNameAssemblyFormatHandling = TypeNameAssemblyFormatHandling.Simple,
-
-                // Types such as GrainReference need context during deserialization, so provide that context now.
-                Context = new StreamingContext(StreamingContextStates.All, new SerializationContext(serializationManager)),
                 Formatting = Formatting.None,
                 SerializationBinder = serializationBinder
             };

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
@@ -87,7 +87,8 @@ namespace Orleans.Storage
                 useJsonFormat = "true".Equals(config.Properties[USE_JSON_FORMAT_PROPERTY_NAME], StringComparison.OrdinalIgnoreCase);
 
             var grainFactory = providerRuntime.ServiceProvider.GetRequiredService<IGrainFactory>();
-            this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(this.serializationManager, grainFactory), config);
+            var typeResolver = providerRuntime.ServiceProvider.GetRequiredService<ITypeResolver>();
+            this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(typeResolver, grainFactory), config);
 
             initMsg = string.Format("{0} UseJsonFormat={1}", initMsg, useJsonFormat);
 

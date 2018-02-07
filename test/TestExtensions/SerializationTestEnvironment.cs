@@ -67,7 +67,7 @@ namespace TestExtensions
 
         internal IServiceProvider Services => this.RuntimeClient.ServiceProvider;
 
-        public SerializationManager SerializationManager => this.RuntimeClient.SerializationManager;
+        public SerializationManager SerializationManager => this.RuntimeClient.ServiceProvider.GetRequiredService<SerializationManager>();
         
         public void Dispose()
         {

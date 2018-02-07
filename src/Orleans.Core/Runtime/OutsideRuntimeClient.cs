@@ -66,7 +66,8 @@ namespace Orleans
         private IPAddress localAddress;
         private IGatewayListProvider gatewayListProvider;
         private readonly ILoggerFactory loggerFactory;
-        public SerializationManager SerializationManager { get; set; }
+
+        private SerializationManager serializationManager;
 
         public ActivationAddress CurrentActivationAddress
         {
@@ -122,7 +123,7 @@ namespace Orleans
 
             this.InternalGrainFactory = this.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
             this.ClientStatistics = this.ServiceProvider.GetRequiredService<ClientStatisticsManager>();
-            this.SerializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
+            this.serializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
             this.messageFactory = this.ServiceProvider.GetService<MessageFactory>();
 
             this.config = this.ServiceProvider.GetRequiredService<ClientConfiguration>();
@@ -401,7 +402,7 @@ namespace Orleans
                         continue;
 
                     RequestContextExtensions.Import(message.RequestContextData);
-                    var request = (InvokeMethodRequest)message.GetDeserializedBody(this.SerializationManager);
+                    var request = (InvokeMethodRequest)message.GetDeserializedBody(this.serializationManager);
                     var targetOb = (IAddressable)objectData.LocalObject.Target;
                     object resultObject = null;
                     Exception caught = null;
@@ -455,7 +456,7 @@ namespace Orleans
             try
             {
                 // we're expected to notify the caller if the deep copy failed.
-                deepCopy = this.SerializationManager.DeepCopy(resultObject);
+                deepCopy = this.serializationManager.DeepCopy(resultObject);
             }
             catch (Exception exc2)
             {
@@ -474,7 +475,7 @@ namespace Orleans
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         private void ReportException(Message message, Exception exception)
         {
-            var request = (InvokeMethodRequest)message.GetDeserializedBody(this.SerializationManager);
+            var request = (InvokeMethodRequest)message.GetDeserializedBody(this.serializationManager);
             switch (message.Direction)
             {
                 default:
@@ -496,7 +497,7 @@ namespace Orleans
                         try
                         {
                             // we're expected to notify the caller if the deep copy failed.
-                            deepCopy = (Exception)this.SerializationManager.DeepCopy(exception);
+                            deepCopy = (Exception)this.serializationManager.DeepCopy(exception);
                         }
                         catch (Exception ex2)
                         {
