@@ -42,7 +42,6 @@ namespace Orleans.Hosting
             List<string> format = base.FormatSharedOptions();
             format.AddRange(new List<string>
             {
-                OptionFormattingUtilities.Format(nameof(this.options.DeploymentLoadPublisherRefreshTime), this.options.DeploymentLoadPublisherRefreshTime),
                 OptionFormattingUtilities.Format(nameof(this.options.DeploymentLoadPublisherRefreshTime), this.options.DeploymentLoadPublisherRefreshTime)
             });
             return format;
