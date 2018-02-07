@@ -56,7 +56,7 @@ namespace Orleans.Runtime.ReminderService
         public override async Task Start()
         {
             // confirm that it can access the underlying store, as after this the ReminderService will load in the background, without the opportunity to prevent the Silo from starting
-            await reminderTable.Init().WithTimeout(initTimeout);
+            await reminderTable.Init().WithTimeout(initTimeout, $"ReminderTable Initialization failed due to timeout {initTimeout}");
 
             await base.Start();
         }
