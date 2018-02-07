@@ -12,6 +12,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="Configuration\OrleansConfiguration.xsd">
+      <Pack>true</Pack>
+      <PackagePath>tools\</PackagePath>
+      <Visible>false</Visible>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
     <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" />
   </ItemGroup>

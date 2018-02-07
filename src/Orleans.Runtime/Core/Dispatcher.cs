@@ -597,7 +597,7 @@ namespace Orleans.Runtime
 
         internal bool TryForwardMessage(Message message, ActivationAddress forwardingAddress)
         {
-            if (!message.MayForward(this.messagingOptions)) return false;
+            if (!MayForward(message, this.messagingOptions)) return false;
 
             message.ForwardCount = message.ForwardCount + 1;
             MessagingProcessingStatisticsGroup.OnIgcMessageForwared(message);
@@ -627,6 +627,13 @@ namespace Orleans.Runtime
                 message.ClearTargetAddress();
                 this.SendMessage(message);
             }
+        }
+
+        // Forwarding is used by the receiver, usually when it cannot process the message and forwards it to another silo to perform the processing
+        // (got here due to outdated cache, silo is shutting down/overloaded, ...).
+        private static bool MayForward(Message message, SiloMessagingOptions messagingOptions)
+        {
+            return message.ForwardCount < messagingOptions.MaxForwardCount;
         }
 
         #endregion

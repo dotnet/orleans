@@ -287,7 +287,7 @@ namespace Orleans.Hosting
             services.AddOptions<ReminderOptions>()
                 .Configure<GlobalConfiguration>((options, config) =>
                 {
-                    options.ReminderService = GlobalConfiguration.Remap(config.ReminderServiceType);
+                    options.ReminderService = Remap(config.ReminderServiceType);
                     options.ReminderTableAssembly = config.ReminderTableAssembly;
                     options.UseMockReminderTable = config.UseMockReminderTable;
                     options.MockReminderTableTimeout = config.MockReminderTableTimeout;
@@ -337,7 +337,7 @@ namespace Orleans.Hosting
             services.AddOptions<GrainDirectoryOptions>()
                 .Configure<GlobalConfiguration>((options, config) =>
                 {
-                    options.CachingStrategy = GlobalConfiguration.Remap(config.DirectoryCachingStrategy);
+                    options.CachingStrategy = Remap(config.DirectoryCachingStrategy);
                     options.CacheSize = config.CacheSize;
                     options.InitialCacheTTL = config.InitialCacheTTL;
                     options.MaximumCacheTTL = config.MaximumCacheTTL;
@@ -354,5 +354,44 @@ namespace Orleans.Hosting
                 .FirstOrDefault(s => s.ServiceType == typeof(ClusterConfiguration))
                 ?.ImplementationInstance as ClusterConfiguration;
         }
+
+        private static GrainDirectoryOptions.CachingStrategyType Remap(GlobalConfiguration.DirectoryCachingStrategyType type)
+        {
+            switch (type)
+            {
+                case GlobalConfiguration.DirectoryCachingStrategyType.None:
+                    return GrainDirectoryOptions.CachingStrategyType.None;
+                case GlobalConfiguration.DirectoryCachingStrategyType.LRU:
+                    return GrainDirectoryOptions.CachingStrategyType.LRU;
+                case GlobalConfiguration.DirectoryCachingStrategyType.Adaptive:
+                    return GrainDirectoryOptions.CachingStrategyType.Adaptive;
+                default:
+                    throw new NotSupportedException($"DirectoryCachingStrategyType {type} is not supported");
+            }
+        }
+
+        private static string Remap(GlobalConfiguration.ReminderServiceProviderType type)
+        {
+            switch (type)
+            {
+                case GlobalConfiguration.ReminderServiceProviderType.NotSpecified:
+                    return ReminderOptions.BuiltIn.NotSpecified;
+                case GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain:
+                    return ReminderOptions.BuiltIn.ReminderTableGrain;
+                case GlobalConfiguration.ReminderServiceProviderType.AzureTable:
+                    return ReminderOptions.BuiltIn.AzureTable;
+                case GlobalConfiguration.ReminderServiceProviderType.SqlServer:
+                    return ReminderOptions.BuiltIn.SqlServer;
+                case GlobalConfiguration.ReminderServiceProviderType.MockTable:
+                    return ReminderOptions.BuiltIn.MockTable;
+                case GlobalConfiguration.ReminderServiceProviderType.Disabled:
+                    return ReminderOptions.BuiltIn.Disabled;
+                case GlobalConfiguration.ReminderServiceProviderType.Custom:
+                    return ReminderOptions.BuiltIn.Custom;
+            }
+            throw new NotSupportedException($"ReminderServiceProviderType {type} is not supported");
+        }
+
+
     }
 }
