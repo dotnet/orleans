@@ -34,7 +34,7 @@ namespace Orleans.LogConsistency
             ILogViewAdaptorHost<TLogView, TLogEntry> hostgrain,
             TLogView initialstate,
             string graintypename,
-            IStorageProvider storageProvider,
+            IGrainStorage grainStorage,
             ILogConsistencyProtocolServices services)
 
             where TLogView : class, new()

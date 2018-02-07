@@ -11,6 +11,7 @@ using Orleans.Streams;
 using System.Collections.Generic;
 using System.Linq;
 using Orleans.Runtime;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Orleans.Providers
 {
@@ -49,10 +50,10 @@ namespace Orleans.Providers
                 }
                 else if (providerGroup.Key == ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME)
                 {
-                    services.AddSingleton<IStorageProvider>(sp => sp.GetServiceByName<IStorageProvider>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
+                    services.TryAddSingleton<IGrainStorage>(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
                     foreach (IProviderConfiguration providerConfig in providerGroup.SelectMany(kvp => kvp.Value.Providers.Values))
                     {
-                        RegisterProvider<IStorageProvider>(providerConfig, services, defaultInitStage, defaultStartStage);
+                        RegisterProvider<IGrainStorage>(providerConfig, services, defaultInitStage, defaultStartStage);
                     }
                 }
                 else if (providerGroup.Key == ProviderCategoryConfiguration.LOG_CONSISTENCY_PROVIDER_CATEGORY_NAME)
@@ -97,6 +98,7 @@ namespace Orleans.Providers
             private int initStage;
             private readonly int defaultStartStage;
             private int startStage;
+            private Lazy<IProvider> provider;
 
             public ProviderLifecycleParticipant(IProviderConfiguration config, IServiceProvider services, ILoggerFactory loggerFactory, int defaultInitStage, int defaultStartStage)
             {
@@ -106,31 +108,43 @@ namespace Orleans.Providers
                 this.defaultInitStage = defaultInitStage;
                 this.defaultStartStage = defaultStartStage;
                 this.schedule = services.GetService<LegacyProviderConfigurator.ScheduleTask>();
+                this.provider = new Lazy<IProvider>(() => services.GetServiceByName<TService>(this.config.Name) as IProvider);
             }
 
             public virtual void Participate(TLifecycle lifecycle)
             {
                 this.initStage = this.config.GetIntProperty(LegacyProviderConfigurator.InitStageName, this.defaultInitStage);
-                lifecycle.Subscribe(this.initStage, this.Init, this.Close);
+                lifecycle.Subscribe(this.initStage, this.Init, this.ProviderClose);
                 this.startStage = this.config.GetIntProperty(LegacyProviderConfigurator.StartStageName, this.defaultStartStage);
-                lifecycle.Subscribe(this.startStage, this.Start);
+                lifecycle.Subscribe(this.startStage, this.Start, this.StreamProviderClose);
 
             }
 
             private async Task Init(CancellationToken ct)
             {
                 var stopWatch = Stopwatch.StartNew();
-                IProvider provider = this.services.GetServiceByName<TService>(this.config.Name) as IProvider;
+                IProvider provider = this.provider.Value;
                 IProviderRuntime runtime = this.services.GetRequiredService<IProviderRuntime>();
                 await Schedule(() => provider.Init(this.config.Name, runtime, this.config));
                 stopWatch.Stop();
                 this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Initializing provider {this.config.Name} of type {this.config.Type} in stage {this.initStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");
             }
 
-            private async Task Close(CancellationToken ct)
+            private async Task ProviderClose(CancellationToken ct)
             {
                 var stopWatch = Stopwatch.StartNew();
-                IProvider provider = this.services.GetServiceByName<TService>(this.config.Name) as IProvider;
+                IProvider provider = this.provider.Value;
+                if (provider is IStreamProvider) return; // stream providers are closed in StreamProviderClose
+                await Schedule(() => provider.Close());
+                stopWatch.Stop();
+                this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Closing provider {this.config.Name} of type {this.config.Type} in stage {this.initStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");
+            }
+
+            private async Task StreamProviderClose(CancellationToken ct)
+            {
+                var stopWatch = Stopwatch.StartNew();
+                IProvider provider = this.provider.Value;
+                if (!(provider is IStreamProvider)) return; // only stream providers are closed here
                 await Schedule(() => provider.Close());
                 stopWatch.Stop();
                 this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Closing provider {this.config.Name} of type {this.config.Type} in stage {this.initStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");
@@ -139,7 +153,7 @@ namespace Orleans.Providers
             private async Task Start(CancellationToken ct)
             {
                 var stopWatch = Stopwatch.StartNew();
-                IStreamProviderImpl provider = this.services.GetServiceByName<TService>(this.config.Name) as IStreamProviderImpl;
+                IStreamProviderImpl provider = this.provider.Value as IStreamProviderImpl;
                 if (provider == null) return;
                 await Schedule(() => provider.Start());
                 stopWatch.Stop();

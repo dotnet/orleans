@@ -1,29 +1,28 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Transactions.Abstractions;
 using Orleans.Core;
 using Orleans.Runtime;
 using Orleans.Storage;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Transactions
 {
     internal class TransactionalStateStorageProviderWrapper<TState> : ITransactionalStateStorage<TState>
         where TState : class, new()
     {
-        private readonly IStorageProvider storageProvider;
+        private readonly IGrainStorage grainStorage;
         private readonly IGrainActivationContext context;
+        private readonly ILoggerFactory loggerFactory;
         private readonly ConcurrentDictionary<string, IStorage<TransactionalStateRecord<TState>>> stateStorages;
-        private readonly ILogger storageLogger;
-        public TransactionalStateStorageProviderWrapper(IStorageProvider storageProvider, IGrainActivationContext context)
+        public TransactionalStateStorageProviderWrapper(IGrainStorage grainStorage, IGrainActivationContext context, ILoggerFactory loggerFactory)
         {
-            this.storageProvider = storageProvider;
+            this.grainStorage = grainStorage;
             this.context = context;
-            this.storageLogger = context.ActivationServices.GetRequiredService<ILoggerFactory>().CreateLogger(storageProvider.GetType().FullName);
+            this.loggerFactory = loggerFactory;
             this.stateStorages = new ConcurrentDictionary<string, IStorage<TransactionalStateRecord<TState>>>();
         }
 
@@ -67,7 +66,7 @@ namespace Orleans.Transactions
 
         private IStorage<TransactionalStateRecord<TState>> GetStateStorage(string stateName)
         {
-            return this.stateStorages.GetOrAdd(stateName, name => new StateStorageBridge<TransactionalStateRecord<TState>>(name, this.context.GrainInstance.GrainReference, storageProvider, this.storageLogger));
+            return this.stateStorages.GetOrAdd(stateName, name => new StateStorageBridge<TransactionalStateRecord<TState>>(name, this.context.GrainInstance.GrainReference, grainStorage, this.loggerFactory));
         }
     }
 

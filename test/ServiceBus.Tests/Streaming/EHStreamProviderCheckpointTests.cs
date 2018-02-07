@@ -172,7 +172,7 @@ namespace ServiceBus.Tests.StreamingTests
         {
             // register stream provider
             config.Globals.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
-            config.AddAzureTableStorageProvider(ImplicitSubscription_RecoverableStream_CollectorGrain.StorageProviderName);
+            config.AddAzureBlobStorageProvider(ImplicitSubscription_RecoverableStream_CollectorGrain.StorageProviderName);
         }
 
         private static void AdjustConfig(ClientConfiguration config)

@@ -22,6 +22,7 @@ using UnitTests.StreamingTests;
 using Xunit;
 using Xunit.Abstractions;
 using Tester;
+using Microsoft.Extensions.Options;
 
 // ReSharper disable ConvertToConstant.Local
 // ReSharper disable CheckNamespace
@@ -52,9 +53,6 @@ namespace UnitTests.Streaming.Reliability
             builder.ConfigureLegacyConfiguration(legacy =>
             {
                 legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
-
-                legacy.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore", deleteOnClear: true);
-                legacy.ClusterConfiguration.AddAzureTableStorageProvider("PubSubStore", deleteOnClear: true, useJsonFormat: false);
 
                 legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
 
@@ -88,7 +86,19 @@ namespace UnitTests.Streaming.Reliability
                 {
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     options.MaxStorageBusyRetries = 3;
-                });
+                })
+                .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                    {
+                        options.ServiceId = silo.Value.ServiceId.ToString();
+                        options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.DeleteStateOnClear = true;
+                    }))
+                .AddAzureTableGrainStorage("PubSubStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                {
+                    options.ServiceId = silo.Value.ServiceId.ToString();
+                    options.DeleteStateOnClear = true;
+                    options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                }));
             }
         }
 
