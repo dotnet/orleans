@@ -1,6 +1,6 @@
-using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Hosting
 {
@@ -49,9 +49,17 @@ namespace Orleans.Hosting
         public TimeSpan TurnWarningLengthThreshold { get; set; } = DEFAULT_TURN_WARNING_THRESHOLD;
         public static readonly TimeSpan DEFAULT_TURN_WARNING_THRESHOLD = TimeSpan.FromMilliseconds(200);
 
+        /// <summary>
+        /// Per work group limit of how many items can be queued up before warnings are generated.
+        /// </summary>
         public int MaxPendingWorkItemsSoftLimit { get; set; } = DEFAULT_MAX_PENDING_ITEMS_SOFT_LIMIT;
         public const int DEFAULT_MAX_PENDING_ITEMS_SOFT_LIMIT = 0;
 
+        /// <summary>
+        /// Per work group limit of how many items can be queued up before work is rejected.
+        /// NOTE: This setting is not in effect.
+        /// TODO: Remove this setting - jbragg
+        /// </summary>
         public int MaxPendingWorkItemsHardLimit { get; set; } = DEFAULT_MAX_PENDING_ITEMS_HARD_LIMIT;
         public const int DEFAULT_MAX_PENDING_ITEMS_HARD_LIMIT = 0;
 
@@ -78,14 +86,14 @@ namespace Orleans.Hosting
         {
             return new List<string>()
             {
-                OptionFormattingUtilities.Format(nameof(options.PerformDeadlockDetection),options.PerformDeadlockDetection),
-                OptionFormattingUtilities.Format(nameof(options.AllowCallChainReentrancy), options.AllowCallChainReentrancy),
-                OptionFormattingUtilities.Format(nameof(options.DelayWarningThreshold), options.DelayWarningThreshold),
-                OptionFormattingUtilities.Format(nameof(options.ActivationSchedulingQuantum), options.ActivationSchedulingQuantum),
-                OptionFormattingUtilities.Format(nameof(options.TurnWarningLengthThreshold), options.TurnWarningLengthThreshold),
-                OptionFormattingUtilities.Format(nameof(options.MaxPendingWorkItemsSoftLimit), options.MaxPendingWorkItemsSoftLimit),
-                OptionFormattingUtilities.Format(nameof(options.MaxPendingWorkItemsHardLimit), options.MaxPendingWorkItemsHardLimit),
-                OptionFormattingUtilities.Format(nameof(options.EnableWorkerThreadInjection), options.EnableWorkerThreadInjection),
+                OptionFormattingUtilities.Format(nameof(this.options.PerformDeadlockDetection), this.options.PerformDeadlockDetection),
+                OptionFormattingUtilities.Format(nameof(this.options.AllowCallChainReentrancy), this.options.AllowCallChainReentrancy),
+                OptionFormattingUtilities.Format(nameof(this.options.DelayWarningThreshold), this.options.DelayWarningThreshold),
+                OptionFormattingUtilities.Format(nameof(this.options.ActivationSchedulingQuantum), this.options.ActivationSchedulingQuantum),
+                OptionFormattingUtilities.Format(nameof(this.options.TurnWarningLengthThreshold), this.options.TurnWarningLengthThreshold),
+                OptionFormattingUtilities.Format(nameof(this.options.MaxPendingWorkItemsSoftLimit), this.options.MaxPendingWorkItemsSoftLimit),
+                OptionFormattingUtilities.Format(nameof(this.options.MaxPendingWorkItemsHardLimit), this.options.MaxPendingWorkItemsHardLimit),
+                OptionFormattingUtilities.Format(nameof(this.options.EnableWorkerThreadInjection), this.options.EnableWorkerThreadInjection),
             };
         }
     }

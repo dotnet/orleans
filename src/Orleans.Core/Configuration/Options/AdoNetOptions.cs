@@ -1,6 +1,12 @@
 
+using System.Collections.Generic;
+using Microsoft.Extensions.Options;
+
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// AdoNet settings
+    /// </summary>
     public class AdoNetOptions
     {
         /// <summary>
@@ -15,5 +21,26 @@ namespace Orleans.Hosting
         /// Set this property to override <see cref="AdoInvariant"/> for reminders.
         /// </summary>
         public string InvariantForReminders { get; set; }
+    }
+
+    public class AdoNetOptionsFormatter : IOptionFormatter<AdoNetOptions>
+    {
+        public string Category { get; }
+
+        public string Name => nameof(AdoNetOptions);
+        private AdoNetOptions options;
+        public AdoNetOptionsFormatter(IOptions<AdoNetOptions> options)
+        {
+            this.options = options.Value;
+        }
+
+        public IEnumerable<string> Format()
+        {
+            return new List<string>()
+            {
+                OptionFormattingUtilities.Format(nameof(this.options.Invariant), this.options.Invariant),
+                OptionFormattingUtilities.Format(nameof(this.options.InvariantForReminders), this.options.InvariantForReminders),
+            };
+        }
     }
 }

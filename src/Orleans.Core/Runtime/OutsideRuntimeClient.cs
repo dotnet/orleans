@@ -202,7 +202,7 @@ namespace Orleans
         private async Task StartInternal()
         {
             await this.gatewayListProvider.InitializeGatewayListProvider()
-                               .WithTimeout(initTimeout);
+                               .WithTimeout(initTimeout, $"gatewayListProvider.InitializeGatewayListProvider failed due to timeout {initTimeout}");
 
             var generation = -SiloAddress.AllocateNewGeneration(); // Client generations are negative
             transport = ActivatorUtilities.CreateInstance<ProxiedMessageCenter>(this.ServiceProvider, localAddress, generation, handshakeClientId);
@@ -233,7 +233,7 @@ namespace Orleans
             grainTypeResolver = await transport.GetGrainTypeResolver(this.InternalGrainFactory);
 
             await ClientStatistics.Start(transport, clientId)
-                .WithTimeout(initTimeout);
+                .WithTimeout(initTimeout, $"Starting ClientStatistics failed due to timeout {initTimeout}");
 
             await StreamingInitialize();
         }

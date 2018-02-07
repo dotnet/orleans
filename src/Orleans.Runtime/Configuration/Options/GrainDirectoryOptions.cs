@@ -1,7 +1,7 @@
 
-using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Hosting
 {
@@ -81,12 +81,13 @@ namespace Orleans.Hosting
         {
             return new List<string>()
             {
-                OptionFormattingUtilities.Format(nameof(options.CachingStrategy),options.CachingStrategy),
-                OptionFormattingUtilities.Format(nameof(options.CacheSize),options.CacheSize),
-                OptionFormattingUtilities.Format(nameof(options.InitialCacheTTL),options.InitialCacheTTL),
-                OptionFormattingUtilities.Format(nameof(options.MaximumCacheTTL),options.MaximumCacheTTL),
-                OptionFormattingUtilities.Format(nameof(options.CacheTTLExtensionFactor),options.CacheTTLExtensionFactor),
-                OptionFormattingUtilities.Format(nameof(options.LazyDeregistrationDelay),options.LazyDeregistrationDelay),
+                OptionFormattingUtilities.Format(nameof(this.options.CachingStrategy),this.options.CachingStrategy),
+                OptionFormattingUtilities.Format(nameof(this.options.CacheSize),this.options.CacheSize),
+
+                OptionFormattingUtilities.Format(nameof(this.options.InitialCacheTTL),this.options.InitialCacheTTL),
+                OptionFormattingUtilities.Format(nameof(this.options.MaximumCacheTTL),this.options.MaximumCacheTTL),
+                OptionFormattingUtilities.Format(nameof(this.options.CacheTTLExtensionFactor),this.options.CacheTTLExtensionFactor),
+                OptionFormattingUtilities.Format(nameof(this.options.LazyDeregistrationDelay),this.options.LazyDeregistrationDelay),
             };
         }
     }

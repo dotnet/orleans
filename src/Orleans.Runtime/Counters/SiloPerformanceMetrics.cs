@@ -15,7 +15,7 @@ namespace Orleans.Runtime.Counters
         internal ActivationCollector ActivationCollector { get; set; }
         internal IMessageCenter MessageCenter { get; set; }
         internal ISiloMetricsDataPublisher MetricsDataPublisher { get; set; }
-        internal SiloStatisticsOptions statisticsOptions { get; set; }
+        internal LoadSheddingOptions loadSheddingOptions { get; set; }
 
         private readonly ILoggerFactory loggerFactory;
         private TimeSpan reportFrequency;
@@ -31,7 +31,7 @@ namespace Orleans.Runtime.Counters
             IHostEnvironmentStatistics hostEnvironmentStatistics,
             IAppEnvironmentStatistics appEnvironmentStatistics,
             ILoggerFactory loggerFactory,
-            IOptions<SiloStatisticsOptions> statisticsOptions)
+            IOptions<LoadSheddingOptions> loadSheddingOptions)
         {
             this.loggerFactory = loggerFactory;
             this.hostEnvironmentStatistics = hostEnvironmentStatistics;
@@ -40,7 +40,7 @@ namespace Orleans.Runtime.Counters
             overloadLatched = false;
             overloadValue = false;
             this.logger = loggerFactory.CreateLogger<SiloPerformanceMetrics>();
-            this.statisticsOptions = statisticsOptions.Value;
+            this.loadSheddingOptions = loadSheddingOptions.Value;
             StringValueStatistic.FindOrCreate(StatisticNames.RUNTIME_IS_OVERLOADED, () => IsOverloaded.ToString());
         }
 
@@ -91,7 +91,7 @@ namespace Orleans.Runtime.Counters
 
         public bool IsOverloaded
         {
-            get { return this.overloadLatched ? overloadValue : (this.statisticsOptions.LoadSheddingEnabled && (CpuUsage > this.statisticsOptions.LoadSheddingLimit)); }
+            get { return this.overloadLatched ? overloadValue : (this.loadSheddingOptions.LoadSheddingEnabled && (CpuUsage > this.loadSheddingOptions.LoadSheddingLimit)); }
         }
 
         public long RequestQueueLength

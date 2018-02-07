@@ -198,7 +198,7 @@ namespace Orleans
         /// <param name="timeout">Amount of time to wait before timing out</param>
         /// <exception cref="TimeoutException">If we time out we will get this exception</exception>
         /// <returns>The completed task</returns>
-        internal static async Task WithTimeout(this Task taskToComplete, TimeSpan timeout)
+        public static async Task WithTimeout(this Task taskToComplete, TimeSpan timeout, string exceptionMessage = null)
         {
             if (taskToComplete.IsCompleted)
             {
@@ -220,7 +220,8 @@ namespace Orleans
 
             // We did not complete before the timeout, we fire and forget to ensure we observe any exceptions that may occur
             taskToComplete.Ignore();
-            throw new TimeoutException(String.Format("WithTimeout has timed out after {0}.", timeout));
+            var errorMessage = exceptionMessage ?? $"WithTimeout has timed out after {timeout}";
+            throw new TimeoutException(errorMessage);
         }
 
         /// <summary>
@@ -230,7 +231,7 @@ namespace Orleans
         /// <param name="timeSpan">Amount of time to wait before timing out</param>
         /// <exception cref="TimeoutException">If we time out we will get this exception</exception>
         /// <returns>The value of the completed task</returns>
-        public static async Task<T> WithTimeout<T>(this Task<T> taskToComplete, TimeSpan timeSpan)
+        public static async Task<T> WithTimeout<T>(this Task<T> taskToComplete, TimeSpan timeSpan, string exceptionMessage = null)
         {
             if (taskToComplete.IsCompleted)
             {
@@ -250,7 +251,8 @@ namespace Orleans
 
             // We did not complete before the timeout, we fire and forget to ensure we observe any exceptions that may occur
             taskToComplete.Ignore();
-            throw new TimeoutException(String.Format("WithTimeout has timed out after {0}.", timeSpan));
+            var errorMessage = exceptionMessage ?? $"WithTimeout has timed out after {timeSpan}";
+            throw new TimeoutException(errorMessage);
         }
 
         internal static Task WrapInTask(Action action)

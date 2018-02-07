@@ -116,20 +116,17 @@ namespace Orleans.Runtime.ReminderService
             // assuming the calling grain executes one call at a time, so no need to lock
             if (!reminderTable.TryGetValue(grainRef, out data))
             {
-                logger.Info("1");
                 return false;
             }
 
             data.TryGetValue(reminderName, out e); // check if eTag matches
             if (e == null || !e.ETag.Equals(eTag))
             {
-                logger.Info("2");
                 return false;
             }
 
             if (!data.Remove(reminderName))
             {
-                logger.Info("3");
                 return false;
             }
 
@@ -137,7 +134,6 @@ namespace Orleans.Runtime.ReminderService
             {
                 reminderTable.Remove(grainRef);
             }
-            logger.Info("4");
             return true;
         }
 

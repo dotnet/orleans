@@ -1,8 +1,13 @@
 
 using System;
+using System.Collections.Generic;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Settings for cluster membership.
+    /// </summary>
     public class MembershipOptions
     {
         /// <summary>
@@ -91,5 +96,38 @@ namespace Orleans.Hosting
         /// TEST ONLY - Do not modify in production environments
         /// </summary>
         public bool IsRunningAsUnitTest { get; set; } = false;
+    }
+
+    public class MembershipOptionsFormatter : IOptionFormatter<MembershipOptions>
+    {
+        public string Category { get; }
+
+        public string Name => nameof(MembershipOptions);
+        private MembershipOptions options;
+        public MembershipOptionsFormatter(IOptions<MembershipOptions> options)
+        {
+            this.options = options.Value;
+        }
+
+        public IEnumerable<string> Format()
+        {
+            return new List<string>()
+            {
+                OptionFormattingUtilities.Format(nameof(this.options.NumMissedTableIAmAliveLimit), this.options.NumMissedTableIAmAliveLimit),
+                OptionFormattingUtilities.Format(nameof(this.options.LivenessEnabled), this.options.LivenessEnabled),
+                OptionFormattingUtilities.Format(nameof(this.options.ProbeTimeout), this.options.ProbeTimeout),
+                OptionFormattingUtilities.Format(nameof(this.options.TableRefreshTimeout), this.options.TableRefreshTimeout),
+                OptionFormattingUtilities.Format(nameof(this.options.DeathVoteExpirationTimeout), this.options.DeathVoteExpirationTimeout),
+                OptionFormattingUtilities.Format(nameof(this.options.IAmAliveTablePublishTimeout), this.options.IAmAliveTablePublishTimeout),
+                OptionFormattingUtilities.Format(nameof(this.options.MaxJoinAttemptTime), this.options.MaxJoinAttemptTime),
+                OptionFormattingUtilities.Format(nameof(this.options.ExpectedClusterSize), this.options.ExpectedClusterSize),
+                OptionFormattingUtilities.Format(nameof(this.options.ValidateInitialConnectivity), this.options.ValidateInitialConnectivity),
+                OptionFormattingUtilities.Format(nameof(this.options.UseLivenessGossip), this.options.UseLivenessGossip),
+                OptionFormattingUtilities.Format(nameof(this.options.NumProbedSilos), this.options.NumProbedSilos),
+                OptionFormattingUtilities.Format(nameof(this.options.NumMissedProbesLimit), this.options.NumMissedProbesLimit),
+                OptionFormattingUtilities.Format(nameof(this.options.NumVotesForDeathDeclaration), this.options.NumVotesForDeathDeclaration),
+                OptionFormattingUtilities.Format(nameof(this.options.IsRunningAsUnitTest), this.options.IsRunningAsUnitTest),
+            };
+        }
     }
 }

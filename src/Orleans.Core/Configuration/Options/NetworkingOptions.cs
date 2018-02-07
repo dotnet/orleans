@@ -1,7 +1,7 @@
-using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Options;
+using Orleans.Runtime;
 
 namespace Orleans.Hosting
 {
@@ -22,14 +22,14 @@ namespace Orleans.Hosting
         public TimeSpan MaxSocketAge { get; set; } = TimeSpan.MaxValue;
     }
 
-    public class NetworkingOptionFormatter : IOptionFormatter<NetworkingOptions>
+    public class NetworkingOptionsFormatter : IOptionFormatter<NetworkingOptions>
     {
         public string Category { get; }
 
         public string Name => nameof(NetworkingOptions);
 
         private NetworkingOptions options;
-        public NetworkingOptionFormatter(IOptions<NetworkingOptions> options)
+        public NetworkingOptionsFormatter(IOptions<NetworkingOptions> options)
         {
             this.options = options.Value;
         }
@@ -38,8 +38,8 @@ namespace Orleans.Hosting
         {
             return new List<string>()
             {
-                OptionFormattingUtilities.Format(nameof(options.OpenConnectionTimeout),options.OpenConnectionTimeout),
-                OptionFormattingUtilities.Format(nameof(options.MaxSocketAge), options.MaxSocketAge)
+                OptionFormattingUtilities.Format(nameof(this.options.OpenConnectionTimeout),this.options.OpenConnectionTimeout),
+                OptionFormattingUtilities.Format(nameof(this.options.MaxSocketAge), this.options.MaxSocketAge)
             };
         }
     }

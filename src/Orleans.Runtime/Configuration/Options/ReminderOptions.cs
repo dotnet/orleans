@@ -1,8 +1,13 @@
 
 using System;
+using System.Collections.Generic;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Settings for reminder service.
+    /// </summary>
     public class ReminderOptions
     {
         public static class BuiltIn
@@ -52,5 +57,29 @@ namespace Orleans.Hosting
         public TimeSpan MockReminderTableTimeout { get; set; } = DEFAULT_MOCK_REMINDER_TABLE_TIMEOUT;
         public static readonly TimeSpan DEFAULT_MOCK_REMINDER_TABLE_TIMEOUT = TimeSpan.FromMilliseconds(50);
         #endregion TEST
+    }
+
+    public class ReminderOptionsFormatter : IOptionFormatter<ReminderOptions>
+    {
+        public string Category { get; }
+
+        public string Name => nameof(ReminderOptions);
+
+        private ReminderOptions options;
+        public ReminderOptionsFormatter(IOptions<ReminderOptions> options)
+        {
+            this.options = options.Value;
+        }
+
+        public IEnumerable<string> Format()
+        {
+            return new List<string>()
+            {
+                OptionFormattingUtilities.Format(nameof(this.options.ReminderService),this.options.ReminderService),
+                OptionFormattingUtilities.Format(nameof(this.options.ReminderTableAssembly), this.options.ReminderTableAssembly),
+                OptionFormattingUtilities.Format(nameof(this.options.UseMockReminderTable), this.options.UseMockReminderTable),
+                OptionFormattingUtilities.Format(nameof(this.options.MockReminderTableTimeout), this.options.MockReminderTableTimeout),
+            };
+        }
     }
 }

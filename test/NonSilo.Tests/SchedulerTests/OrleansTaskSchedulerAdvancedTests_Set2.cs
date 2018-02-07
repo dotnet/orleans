@@ -36,7 +36,7 @@ namespace UnitTests.SchedulerTests
             this.output = output;
             this.loggerFactory = OrleansTaskSchedulerBasicTests.InitSchedulerLogging();
             this.context = new UnitTestSchedulingContext();
-            this.performanceMetrics = new SiloPerformanceMetrics(new NoOpHostEnvironmentStatistics(this.loggerFactory), new AppEnvironmentStatistics(), this.loggerFactory, Options.Create<SiloStatisticsOptions>(new SiloStatisticsOptions()));
+            this.performanceMetrics = new SiloPerformanceMetrics(new NoOpHostEnvironmentStatistics(this.loggerFactory), new AppEnvironmentStatistics(), this.loggerFactory, Options.Create<LoadSheddingOptions>(new LoadSheddingOptions()));
             this.masterScheduler = TestInternalHelper.InitializeSchedulerForTesting(this.context, this.performanceMetrics, this.loggerFactory);
         }
         

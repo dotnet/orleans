@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Hosting
 {
@@ -54,6 +55,40 @@ namespace Orleans.Hosting
         public TimeSpan GlobalSingleInstanceRetryInterval { get; set; } = DEFAULT_GLOBAL_SINGLE_INSTANCE_RETRY_INTERVAL;
         public static readonly TimeSpan DEFAULT_GLOBAL_SINGLE_INSTANCE_RETRY_INTERVAL = TimeSpan.FromSeconds(30);
 
+        /// <summary>
+        /// Inter-cluster gossip channels.
+        /// </summary>
         public Dictionary<string, string> GossipChannels { get; set; } = new Dictionary<string, string>();
+    }
+
+    public class MultiClusterOptionsFormatter : IOptionFormatter<MultiClusterOptions>
+    {
+        public string Category { get; }
+
+        public string Name => nameof(MultiClusterOptions);
+        private MultiClusterOptions options;
+        public MultiClusterOptionsFormatter(IOptions<MultiClusterOptions> options)
+        {
+            this.options = options.Value;
+        }
+
+        public IEnumerable<string> Format()
+        {
+            var formated = new List<string>()
+            {
+                OptionFormattingUtilities.Format(nameof(this.options.HasMultiClusterNetwork), this.options.HasMultiClusterNetwork),
+                OptionFormattingUtilities.Format(nameof(this.options.DefaultMultiCluster), string.Join(";", this.options.DefaultMultiCluster)),
+                OptionFormattingUtilities.Format(nameof(this.options.MaxMultiClusterGateways), this.options.MaxMultiClusterGateways),
+                OptionFormattingUtilities.Format(nameof(this.options.BackgroundGossipInterval), this.options.BackgroundGossipInterval),
+                OptionFormattingUtilities.Format(nameof(this.options.UseGlobalSingleInstanceByDefault), this.options.UseGlobalSingleInstanceByDefault),
+                OptionFormattingUtilities.Format(nameof(this.options.GlobalSingleInstanceNumberRetries), this.options.GlobalSingleInstanceNumberRetries),
+                OptionFormattingUtilities.Format(nameof(this.options.GlobalSingleInstanceRetryInterval), this.options.GlobalSingleInstanceRetryInterval),
+            };
+            foreach (KeyValuePair<string, string> channel in this.options.GossipChannels)
+            {
+                formated.Add(OptionFormattingUtilities.Format($"{nameof(this.options.GossipChannels)}.{channel.Key}", channel.Value));
+            }
+            return formated;
+        }
     }
 }

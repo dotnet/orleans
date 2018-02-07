@@ -1,7 +1,7 @@
-using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Options;
+using Orleans.Runtime;
 
 namespace Orleans.Hosting
 {
@@ -36,18 +36,33 @@ namespace Orleans.Hosting
         /// </summary>
         public TimeSpan ClientDropTimeout { get; set; } = Constants.DEFAULT_CLIENT_DROP_TIMEOUT;
 
+        /// <summary>
+        /// Interval in which the list of connected clients is refreshed.
+        /// </summary>
         public TimeSpan ClientRegistrationRefresh { get; set; } = DEFAULT_CLIENT_REGISTRATION_REFRESH;
         public static readonly TimeSpan DEFAULT_CLIENT_REGISTRATION_REFRESH = TimeSpan.FromMinutes(5);
 
+        /// <summary>
+        /// Per grain threshold for pending requests.  Generated warning when exceeded.
+        /// </summary>
         public int MaxEnqueuedRequestsSoftLimit { get; set; } = DEFAULT_MAX_ENQUEUED_REQUESTS_SOFT_LIMIT;
         public const int DEFAULT_MAX_ENQUEUED_REQUESTS_SOFT_LIMIT = 0;
 
+        /// <summary>
+        /// Per grain threshold for pending requests.  Requests are rejected when exceeded.
+        /// </summary>
         public int MaxEnqueuedRequestsHardLimit { get; set; } = DEFAULT_MAX_ENQUEUED_REQUESTS_HARD_LIMIT;
         public const int DEFAULT_MAX_ENQUEUED_REQUESTS_HARD_LIMIT = 0;
 
+        /// <summary>
+        /// Per grain threshold for pending requests for stateless workers.  Generated warning when exceeded.
+        /// </summary>
         public int MaxEnqueuedRequestsSoftLimit_StatelessWorker { get; set; } = DEFAULT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER_SOFT_LIMIT;
         public const int DEFAULT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER_SOFT_LIMIT = 0;
 
+        /// <summary>
+        /// Per grain threshold for pending requests for stateless workers.  Requests are rejected when exceeded.
+        /// </summary>
         public int MaxEnqueuedRequestsHardLimit_StatelessWorker { get; set; } = DEFAULT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER_HARD_LIMIT;
         public const int DEFAULT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER_HARD_LIMIT = 0;
 
@@ -81,17 +96,17 @@ namespace Orleans.Hosting
             List<string> format = base.FormatSharedOptions();
             format.AddRange(new List<string>
             {
-                OptionFormattingUtilities.Format(nameof(options.SiloSenderQueues), options.SiloSenderQueues),
-                OptionFormattingUtilities.Format(nameof(options.GatewaySenderQueues), options.GatewaySenderQueues),
-                OptionFormattingUtilities.Format(nameof(options.MaxForwardCount), options.MaxForwardCount),
-                OptionFormattingUtilities.Format(nameof(options.ClientDropTimeout), options.ClientDropTimeout),
-                OptionFormattingUtilities.Format(nameof(options.ClientRegistrationRefresh), options.ClientRegistrationRefresh),
-                OptionFormattingUtilities.Format(nameof(options.MaxEnqueuedRequestsSoftLimit), options.MaxEnqueuedRequestsSoftLimit),
-                OptionFormattingUtilities.Format(nameof(options.MaxEnqueuedRequestsHardLimit), options.MaxEnqueuedRequestsHardLimit),
-                OptionFormattingUtilities.Format(nameof(options.MaxEnqueuedRequestsSoftLimit_StatelessWorker), options.MaxEnqueuedRequestsSoftLimit_StatelessWorker),
-                OptionFormattingUtilities.Format(nameof(options.MaxEnqueuedRequestsHardLimit_StatelessWorker), options.MaxEnqueuedRequestsHardLimit_StatelessWorker),
-                OptionFormattingUtilities.Format(nameof(options.MaxRequestProcessingTime), options.MaxRequestProcessingTime),
-                OptionFormattingUtilities.Format(nameof(options.AssumeHomogenousSilosForTesting), options.AssumeHomogenousSilosForTesting)
+                OptionFormattingUtilities.Format(nameof(this.options.SiloSenderQueues), this.options.SiloSenderQueues),
+                OptionFormattingUtilities.Format(nameof(this.options.GatewaySenderQueues), this.options.GatewaySenderQueues),
+                OptionFormattingUtilities.Format(nameof(this.options.MaxForwardCount), this.options.MaxForwardCount),
+                OptionFormattingUtilities.Format(nameof(this.options.ClientDropTimeout), this.options.ClientDropTimeout),
+                OptionFormattingUtilities.Format(nameof(this.options.ClientRegistrationRefresh), this.options.ClientRegistrationRefresh),
+                OptionFormattingUtilities.Format(nameof(this.options.MaxEnqueuedRequestsSoftLimit), this.options.MaxEnqueuedRequestsSoftLimit),
+                OptionFormattingUtilities.Format(nameof(this.options.MaxEnqueuedRequestsHardLimit), this.options.MaxEnqueuedRequestsHardLimit),
+                OptionFormattingUtilities.Format(nameof(this.options.MaxEnqueuedRequestsSoftLimit_StatelessWorker), this.options.MaxEnqueuedRequestsSoftLimit_StatelessWorker),
+                OptionFormattingUtilities.Format(nameof(this.options.MaxEnqueuedRequestsHardLimit_StatelessWorker), this.options.MaxEnqueuedRequestsHardLimit_StatelessWorker),
+                OptionFormattingUtilities.Format(nameof(this.options.MaxRequestProcessingTime), this.options.MaxRequestProcessingTime),
+                OptionFormattingUtilities.Format(nameof(this.options.AssumeHomogenousSilosForTesting), this.options.AssumeHomogenousSilosForTesting)
             });
             return format;
         }

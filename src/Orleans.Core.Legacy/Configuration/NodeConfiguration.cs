@@ -191,6 +191,18 @@ namespace Orleans.Runtime.Configuration
         public string SiloShutdownEventName { get; set; }
 
         internal const string DEFAULT_NODE_NAME = "default";
+		
+		private static int DEFAULT_MAX_ACTIVE_THREADS = Math.Max(4, Environment.ProcessorCount);
+		private static TimeSpan DEFAULT_DELAY_WARNING_THRESHOLD = TimeSpan.FromMilliseconds(10000);
+		private static TimeSpan DEFAULT_ACTIVATION_SCHEDULING_QUANTUM = TimeSpan.FromMilliseconds(100);
+		private static TimeSpan DEFAULT_TURN_WARNING_THRESHOLD = TimeSpan.FromMilliseconds(200);
+		private static TimeSpan DEFAULT_METRICS_TABLE_WRITE_PERIOD = TimeSpan.FromSeconds(30);
+		private static TimeSpan SILO_DEFAULT_PERF_COUNTERS_WRITE_PERIOD = TimeSpan.FromSeconds(30);
+		private static TimeSpan DEFAULT_LOG_WRITE_PERIOD = TimeSpan.FromMinutes(5);
+
+        private const bool DEFAULT_ENABLE_WORKER_THREAD_INJECTION = false;
+		private const bool DEFAULT_LOG_TO_TABLE = true;
+		private const StatisticsLevel DEFAULT_COLLECTION_LEVEL = StatisticsLevel.Info;
 
         public NodeConfiguration()
         {
@@ -204,22 +216,22 @@ namespace Orleans.Runtime.Configuration
             this.AddressType = AddressFamily.InterNetwork;
             this.ProxyGatewayEndpoint = null;
 
-            this.MaxActiveThreads = Math.Max(4, Environment.ProcessorCount);
-            this.DelayWarningThreshold = TimeSpan.FromMilliseconds(10000);
-            this.ActivationSchedulingQuantum = TimeSpan.FromMilliseconds(100);
-            this.TurnWarningLengthThreshold = TimeSpan.FromMilliseconds(200);
-            this.EnableWorkerThreadInjection = false;
+            this.MaxActiveThreads = DEFAULT_MAX_ACTIVE_THREADS;
+            this.DelayWarningThreshold = DEFAULT_DELAY_WARNING_THRESHOLD;
+            this.ActivationSchedulingQuantum = DEFAULT_ACTIVATION_SCHEDULING_QUANTUM;
+            this.TurnWarningLengthThreshold = DEFAULT_TURN_WARNING_THRESHOLD;
+            this.EnableWorkerThreadInjection = DEFAULT_ENABLE_WORKER_THREAD_INJECTION;
 
             this.LoadSheddingEnabled = false;
-            this.LoadSheddingLimit = 95;
+            this.LoadSheddingLimit = LoadSheddingOptions.DEFAULT_LOAD_SHEDDING_LIMIT;
 
             this.PropagateActivityId = Constants.DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
 
-            this.StatisticsMetricsTableWriteInterval = TimeSpan.FromSeconds(30);
-            this.StatisticsPerfCountersWriteInterval = TimeSpan.FromSeconds(30);
-            this.StatisticsLogWriteInterval = TimeSpan.FromMinutes(5);
-            this.StatisticsWriteLogStatisticsToTable = true;
-            this.StatisticsCollectionLevel = StatisticsLevel.Info;
+            this.StatisticsMetricsTableWriteInterval = DEFAULT_METRICS_TABLE_WRITE_PERIOD;
+            this.StatisticsPerfCountersWriteInterval = SILO_DEFAULT_PERF_COUNTERS_WRITE_PERIOD;
+            this.StatisticsLogWriteInterval = DEFAULT_LOG_WRITE_PERIOD;
+            this.StatisticsWriteLogStatisticsToTable = DEFAULT_LOG_TO_TABLE;
+            this.StatisticsCollectionLevel = DEFAULT_COLLECTION_LEVEL;
 
             this.LimitManager = new LimitManager();
 
