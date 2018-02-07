@@ -1279,7 +1279,9 @@ namespace Orleans.Serialization
         public object Deserialize(Type t, IBinaryTokenStreamReader stream)
         {
             var context = this.deserializationContext.Value;
+            var genericGrainType = context.GenericGrainType;
             context.Reset();
+            context.GenericGrainType = genericGrainType;
             context.StreamReader = stream;
             Stopwatch timer = null;
             if (StatisticsCollector.CollectSerializationStats)
