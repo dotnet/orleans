@@ -96,6 +96,8 @@ namespace Orleans.Serialization
         private readonly ITypeResolver typeResolver;
         private IRuntimeClient runtimeClient;
 
+        internal DeserializationContext DeserializationContext => deserializationContext.Value;
+
         internal IRuntimeClient RuntimeClient
             => this.runtimeClient ?? (this.runtimeClient = this.serviceProvider.GetService<IRuntimeClient>());
 

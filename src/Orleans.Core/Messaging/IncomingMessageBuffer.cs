@@ -179,7 +179,7 @@ namespace Orleans.Runtime
             if (msg.HasDirection && msg.Direction != Message.Directions.Response)
             {
                 msg.ExpectedBodyType = typeof(CodeGeneration.InvokeMethodRequest<>);
-                this.deserializationContext.GenericGrainType = string.IsNullOrEmpty(msg.GenericGrainType) ? null : msg.GenericGrainType;
+                this.serializationManager.DeserializationContext.GenericGrainType = string.IsNullOrEmpty(msg.GenericGrainType) ? null : msg.GenericGrainType;
             }
             try
             {
