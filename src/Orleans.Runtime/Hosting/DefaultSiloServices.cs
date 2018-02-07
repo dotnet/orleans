@@ -255,6 +255,7 @@ namespace Orleans.Hosting
             services.TryConfigureFormatter<ReminderOptions, ReminderOptionsFormatter>();
             services.TryConfigureFormatter<ServicePointOptions, ServicePointOptionsFormatter>();
             services.TryConfigureFormatter<TelemetryOptions, TelemetryOptionsFormatter>();
+            services.TryConfigureFormatter<LoadSheddingOptions, LoadSheddingOptionsFormatter>();
         }
     }
 }
