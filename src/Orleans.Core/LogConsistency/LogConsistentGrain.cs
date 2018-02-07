@@ -110,7 +110,7 @@ namespace Orleans.LogConsistency
                 var errMsg = attr != null
                     ? $"Cannot find consistency provider with Name={attr.ProviderName} for grain type {this.GetType().FullName}"
                     : $"No consistency provider manager found loading grain type {this.GetType().FullName}";
-                throw new BadStorageConfigException(errMsg);
+                throw new BadGrainStorageConfigException(errMsg);
             }
 
             // use default if none found
@@ -118,7 +118,7 @@ namespace Orleans.LogConsistency
             if (defaultFactory == null)
             {
                 var errMsg = $"No log consistency provider found loading grain type {this.GetType().FullName}";
-                throw new BadStorageConfigException(errMsg);
+                throw new BadGrainStorageConfigException(errMsg);
             };
 
             return defaultFactory;

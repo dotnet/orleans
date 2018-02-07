@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.Serialization;
 using Orleans.Providers;
+using Orleans.Runtime;
 
 namespace Orleans.Storage
 {
@@ -15,7 +16,7 @@ namespace Orleans.Storage
     /// Exception thrown whenever a grain call is attempted with a bad / missing storage provider configuration settings for that grain.
     /// </summary>
     [Serializable]
-    public class BadProviderConfigException : BadStorageConfigException
+    public class BadProviderConfigException : OrleansException
     {
         public BadProviderConfigException()
         { }

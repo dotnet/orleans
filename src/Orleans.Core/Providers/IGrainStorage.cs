@@ -54,18 +54,18 @@ namespace Orleans.Storage
     /// Exception thrown whenever a grain call is attempted with a bad / missing storage configuration settings for that grain.
     /// </summary>
     [Serializable]
-    public class BadStorageConfigException : OrleansException
+    public class BadGrainStorageConfigException : BadProviderConfigException
     {
-        public BadStorageConfigException()
+        public BadGrainStorageConfigException()
         { }
-        public BadStorageConfigException(string msg)
+        public BadGrainStorageConfigException(string msg)
             : base(msg)
         { }
-        public BadStorageConfigException(string msg, Exception exc)
+        public BadGrainStorageConfigException(string msg, Exception exc)
             : base(msg, exc)
         { }
 
-        protected BadStorageConfigException(SerializationInfo info, StreamingContext context)
+        protected BadGrainStorageConfigException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         { }
     }

@@ -40,7 +40,7 @@ namespace Orleans.Storage
                 errMsg = $"No storage provider named \"{name}\" found loading grain type {grainTypeName}.";
             }
 
-            throw new BadProviderConfigException(errMsg);
+            throw new BadGrainStorageConfigException(errMsg);
         }
     }
 }

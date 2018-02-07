@@ -61,15 +61,13 @@ namespace Orleans.Hosting
 
         private class AzureTableStorageOptionsFormatter : IOptionFormatter<AzureTableStorageOptions>
         {
-            public string Category { get; } = nameof(AzureTableStorageOptions);
-
             public string Name { get; }
 
             private AzureTableStorageOptions options;
             public AzureTableStorageOptionsFormatter(string name,  AzureTableStorageOptions options)
             {
                 this.options = options;
-                this.Name = $"{nameof(AzureTableStorageOptions)}.{name}";
+                this.Name = OptionFormattingUtilities.Name<AzureTableStorageOptions>(name);
             }
 
             public IEnumerable<string> Format()
