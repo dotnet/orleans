@@ -156,6 +156,12 @@ namespace Orleans.Hosting
 
             services.Configure<NetworkingOptions>(options => LegacyConfigurationExtensions.CopyNetworkingOptions(configuration.Globals, options));
 
+            //configure data connection string for metric table and statistic table
+            services.Configure<MonitoringStorageOptions>(options =>
+            {
+                options.DataConnectionString = configuration.Globals.DataConnectionString;
+            });
+
             services.AddOptions<EndpointOptions>()
                 .Configure<IOptions<SiloOptions>>((options, siloOptions) =>
                 {

@@ -4,6 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
@@ -28,12 +30,12 @@ namespace Orleans.Messaging
         private readonly ILoggerFactory loggerFactory;
         private readonly object lockable;
 
-        private readonly ClientConfiguration config;
+        private readonly GatewayOptions gatewayOptions;
         private bool gatewayRefreshCallInitiated;
 
-        public GatewayManager(ClientConfiguration cfg, IGatewayListProvider gatewayListProvider, ILoggerFactory loggerFactory)
+        public GatewayManager(GatewayOptions gatewayOptions, IGatewayListProvider gatewayListProvider, ILoggerFactory loggerFactory)
         {
-            config = cfg;
+            this.gatewayOptions = gatewayOptions;
             knownDead = new Dictionary<Uri, DateTime>();
             rand = new SafeRandom();
             logger = loggerFactory.CreateLogger<GatewayManager>();
@@ -60,14 +62,14 @@ namespace Orleans.Messaging
                 ((IGatewayListObservable)ListProvider).SubscribeToGatewayNotificationEvents(this);
             }
 
-            roundRobinCounter = cfg.PreferedGatewayIndex >= 0 ? cfg.PreferedGatewayIndex : rand.Next(knownGateways.Count);
+            roundRobinCounter = this.gatewayOptions.PreferedGatewayIndex >= 0 ? this.gatewayOptions.PreferedGatewayIndex : rand.Next(knownGateways.Count);
 
             cachedLiveGateways = knownGateways;
 
             lastRefreshTime = DateTime.UtcNow;
             if (ListProvider.IsUpdatable)
             {
-                gatewayRefreshTimer = new SafeTimer(this.loggerFactory.CreateLogger<SafeTimer>(), RefreshSnapshotLiveGateways_TimerCallback, null, config.GatewayListRefreshPeriod, config.GatewayListRefreshPeriod);
+                gatewayRefreshTimer = new SafeTimer(this.loggerFactory.CreateLogger<SafeTimer>(), RefreshSnapshotLiveGateways_TimerCallback, null, this.gatewayOptions.GatewayListRefreshPeriod, this.gatewayOptions.GatewayListRefreshPeriod);
             }
         }
 

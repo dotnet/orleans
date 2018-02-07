@@ -5,6 +5,8 @@ using System.Threading.Tasks;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
@@ -37,14 +39,13 @@ namespace Orleans
         /// <param name="runtimeClient">The runtime client.</param>
         /// <param name="configuration">The client configuration.</param>
         /// <param name="loggerFactory">Logger factory used to create loggers</param>
-        public ClusterClient(OutsideRuntimeClient runtimeClient, ClientConfiguration configuration, ILoggerFactory loggerFactory)
+        public ClusterClient(OutsideRuntimeClient runtimeClient, ILoggerFactory loggerFactory, IOptions<ClientMessagingOptions> clientMessagingOptions)
         {
-            this.Configuration = configuration;
             this.runtimeClient = runtimeClient;
             this.clusterClientLifecycle = new ClusterClientLifecycle(loggerFactory);
 
             //set PropagateActivityId flag from node cofnig
-            RequestContext.PropagateActivityId = configuration.PropagateActivityId;
+            RequestContext.PropagateActivityId = clientMessagingOptions.Value.PropagateActivityId;
 
             // register all lifecycle participants
             IEnumerable<ILifecycleParticipant<IClusterClientLifecycle>> lifecycleParticipants = this.ServiceProvider.GetServices<ILifecycleParticipant<IClusterClientLifecycle>>();
@@ -71,9 +72,6 @@ namespace Orleans
 
         /// <inheritdoc />
         public IServiceProvider ServiceProvider => this.runtimeClient.ServiceProvider;
-        
-        /// <inheritdoc />
-        public ClientConfiguration Configuration { get; }
 
         /// <inheritdoc />
         IStreamProviderRuntime IInternalClusterClient.StreamProviderRuntime => this.runtimeClient.CurrentStreamProviderRuntime;

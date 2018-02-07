@@ -26,7 +26,6 @@ namespace Orleans
         private ILogger logger;
         private ILogger callBackDataLogger;
         private ILogger timerLogger;
-        private ClientConfiguration config;
         private ClientMessagingOptions clientMessagingOptions;
 
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
@@ -92,7 +91,7 @@ namespace Orleans
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
-        public OutsideRuntimeClient(ILoggerFactory loggerFactory)
+        public OutsideRuntimeClient(ILoggerFactory loggerFactory, IOptions<ClientMessagingOptions> clientMessagingOptions)
         {
             this.loggerFactory = loggerFactory;
             this.logger = loggerFactory.CreateLogger<OutsideRuntimeClient>();
@@ -103,6 +102,7 @@ namespace Orleans
             localObjects = new ConcurrentDictionary<GuidId, LocalObjectData>();
             this.callBackDataLogger = loggerFactory.CreateLogger<CallbackData>();
             this.timerLogger = loggerFactory.CreateLogger<SafeTimer>();
+            this.clientMessagingOptions = clientMessagingOptions.Value;
         }
 
         internal void ConsumeServices(IServiceProvider services)
@@ -126,17 +126,12 @@ namespace Orleans
             this.serializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
             this.messageFactory = this.ServiceProvider.GetService<MessageFactory>();
 
-            this.config = this.ServiceProvider.GetRequiredService<ClientConfiguration>();
-
-            var resolvedClientMessagingOptions = this.ServiceProvider.GetRequiredService<IOptions<ClientMessagingOptions>>();
-            this.clientMessagingOptions = resolvedClientMessagingOptions.Value;
-
             this.GrainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
 
             var statisticsOptions = this.ServiceProvider.GetRequiredService<IOptions<ClientStatisticsOptions>>().Value;
             StatisticsCollector.Initialize(statisticsOptions.CollectionLevel);
 
-            BufferPool.InitGlobalBufferPool(resolvedClientMessagingOptions.Value);
+            BufferPool.InitGlobalBufferPool(this.clientMessagingOptions);
 
             try
             {
@@ -144,16 +139,15 @@ namespace Orleans
 
                 clientProviderRuntime = this.ServiceProvider.GetRequiredService<ClientProviderRuntime>();
 
-                responseTimeout = Debugger.IsAttached ? Constants.DEFAULT_RESPONSE_TIMEOUT : config.ResponseTimeout;
-                this.localAddress = ConfigUtilities.GetLocalIPAddress(config.PreferredFamily, config.NetInterface);
+                responseTimeout = Debugger.IsAttached ? Constants.DEFAULT_RESPONSE_TIMEOUT : this.clientMessagingOptions.ResponseTimeout;
+                this.localAddress = ConfigUtilities.GetLocalIPAddress(this.clientMessagingOptions.PreferredFamily, this.clientMessagingOptions.NetworkInterfaceName);
 
                 // Client init / sign-on message
                 logger.Info(ErrorCode.ClientInitializing, string.Format(
                     "{0} Initializing OutsideRuntimeClient on {1} at {2} Client Id = {3} {0}",
-                    BARS, config.DNSHostName, localAddress, handshakeClientId));
+                    BARS, Dns.GetHostName(), localAddress, handshakeClientId));
                 string startMsg = string.Format("{0} Starting OutsideRuntimeClient with runtime Version='{1}' in AppDomain={2}",
                     BARS, RuntimeVersion.Current, PrintAppDomainDetails());
-                startMsg = string.Format("{0} Config= " + Environment.NewLine + " {1}", startMsg, config);
                 logger.Info(ErrorCode.ClientStarting, startMsg);
 
                 if (TestOnlyThrowExceptionDuringInit)
@@ -578,7 +572,7 @@ namespace Orleans
             {
                 message.DebugContext = debugContext;
             }
-            if (message.IsExpirableMessage(config.DropExpiredMessages))
+            if (message.IsExpirableMessage(this.clientMessagingOptions.DropExpiredMessages))
             {
                 // don't set expiration for system target messages.
                 message.TimeToLive = responseTimeout;
@@ -605,7 +599,7 @@ namespace Orleans
 
         private bool TryResendMessage(Message message)
         {
-            if (!message.MayResend(config.MaxResendCount))
+            if (!message.MayResend(this.clientMessagingOptions.MaxResendCount))
             {
                 return false;
             }

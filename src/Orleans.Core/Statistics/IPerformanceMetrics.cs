@@ -118,7 +118,7 @@ namespace Orleans.Runtime
 
     public interface IClientMetricsDataPublisher
     {
-        Task Init(ClientConfiguration config, IPAddress address, string clientId);
+        Task Init(IPAddress address, string clientId);
         Task ReportMetrics(IClientPerformanceMetrics metricsData);
     }
 

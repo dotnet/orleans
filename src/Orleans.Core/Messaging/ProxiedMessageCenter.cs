@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -95,7 +96,8 @@ namespace Orleans.Messaging
         private readonly ExecutorService executorService;
 
         public ProxiedMessageCenter(
-            ClientConfiguration config,
+            IOptions<GatewayOptions> gatewayOptions,
+            IOptions<ClientMessagingOptions> clientMessagingOptions,
             IPAddress localAddress,
             int gen,
             GrainId clientId,
@@ -119,11 +121,11 @@ namespace Orleans.Messaging
             this.messageFactory = messageFactory;
             this.connectionStatusListener = connectionStatusListener;
             Running = false;
-            GatewayManager = new GatewayManager(config, gatewayListProvider, loggerFactory);
+            GatewayManager = new GatewayManager(gatewayOptions.Value, gatewayListProvider, loggerFactory);
             PendingInboundMessages = new BlockingCollection<Message>();
             gatewayConnections = new Dictionary<Uri, GatewayConnection>();
             numMessages = 0;
-            grainBuckets = new WeakReference[config.ClientSenderBuckets];
+            grainBuckets = new WeakReference[clientMessagingOptions.Value.ClientSenderBuckets];
             logger = loggerFactory.CreateLogger<ProxiedMessageCenter>();
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Proxy grain client constructed");
             IntValueStatistic.FindOrCreate(
