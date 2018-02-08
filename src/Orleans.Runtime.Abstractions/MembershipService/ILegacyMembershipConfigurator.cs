@@ -34,7 +34,7 @@ namespace Orleans.Runtime.MembershipService
     }
 
     /// <summary>
-    /// Wapper for legacy config.  Should not be used for any new developent, only adapting legacy systems.
+    /// Wrapper for legacy config.  Should not be used for any new developent, only adapting legacy systems.
     /// </summary>
     public class GlobalConfigurationReader
     {

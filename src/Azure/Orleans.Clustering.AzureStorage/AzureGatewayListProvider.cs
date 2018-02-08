@@ -2,11 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Messaging;
-using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.AzureUtils.Options;
 using Orleans.Runtime;
+using Orleans.Hosting;
 
 namespace Orleans.AzureUtils
 {
@@ -18,11 +18,11 @@ namespace Orleans.AzureUtils
         private readonly ILoggerFactory loggerFactory;
         private readonly TimeSpan maxStaleness;
 
-        public AzureGatewayListProvider(ILoggerFactory loggerFactory, IOptions<AzureTableGatewayListProviderOptions> options, IOptions<ClusterClientOptions> clusterClientOptions, ClientConfiguration clientConfiguration)
+        public AzureGatewayListProvider(ILoggerFactory loggerFactory, IOptions<AzureTableGatewayListProviderOptions> options, IOptions<ClusterClientOptions> clusterClientOptions, IOptions<GatewayOptions> gatewayOptions)
         {
             this.loggerFactory = loggerFactory;
             this.clusterId = clusterClientOptions.Value.ClusterId;
-            this.maxStaleness = clientConfiguration.GatewayListRefreshPeriod;
+            this.maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
             this.options = options.Value;
         }
 

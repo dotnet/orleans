@@ -11,11 +11,12 @@ namespace OrleansAWSUtils.Membership
     public class LegacyDynamoDBGatewayListProviderConfigurator : ILegacyGatewayListProviderConfigurator
     {
         /// <inheritdoc/>
-        public void ConfigureServices(ClientConfiguration configuration, IServiceCollection services)
+        public void ConfigureServices(object configuration, IServiceCollection services)
         {
             services.UseDynamoDBGatewayListProvider(options =>
             {
-               ParseDataConnectionString(configuration.DataConnectionString, options);
+                var reader = new ClientConfigurationReader(configuration);
+                ParseDataConnectionString(reader.GetPropertyValue<string>("DataConnectionString"), options);
             });
         }
 
