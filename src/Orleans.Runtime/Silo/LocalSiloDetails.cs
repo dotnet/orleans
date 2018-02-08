@@ -23,7 +23,7 @@ namespace Orleans.Runtime
 
             var endpointOptions = siloEndpointOptions.Value;
             this.siloAddressLazy = new Lazy<SiloAddress>(() => SiloAddress.New(ResolveEndpoint(endpointOptions), SiloAddress.AllocateNewGeneration()));
-            this.gatewayAddressLazy = new Lazy<SiloAddress>(() => endpointOptions.ProxyPort != 0 ? SiloAddress.New(new IPEndPoint(this.SiloAddress.Endpoint.Address, endpointOptions.ProxyPort), 0) : null);
+            this.gatewayAddressLazy = new Lazy<SiloAddress>(() => endpointOptions.ProxyPort != 0 ? SiloAddress.New(new IPEndPoint(endpointOptions.ProxyIPAddress, endpointOptions.ProxyPort), 0) : null);                        
         }
 
         private static IPEndPoint ResolveEndpoint(EndpointOptions options)
