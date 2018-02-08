@@ -27,6 +27,11 @@ namespace Orleans.Hosting
         /// </summary>
         public int ProxyPort { get; set; }
 
+        /// <summary>
+        /// The IP address used for proxy.
+        /// </summary>
+        public IPAddress ProxyIPAddress { get; set; }
+
         //public bool BindToAny { get; set; }
     }
 }
