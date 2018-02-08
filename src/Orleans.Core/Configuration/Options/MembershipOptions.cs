@@ -100,8 +100,6 @@ namespace Orleans.Hosting
 
     public class MembershipOptionsFormatter : IOptionFormatter<MembershipOptions>
     {
-        public string Category { get; }
-
         public string Name => nameof(MembershipOptions);
         private MembershipOptions options;
         public MembershipOptionsFormatter(IOptions<MembershipOptions> options)

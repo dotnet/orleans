@@ -19,8 +19,6 @@ namespace Orleans.Hosting
 
     public class ThreadPoolOptionsFormatter : IOptionFormatter<ThreadPoolOptions>
     {
-        public string Category { get; }
-
         public string Name => nameof(ThreadPoolOptions);
 
         private ThreadPoolOptions options;

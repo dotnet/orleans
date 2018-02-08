@@ -18,8 +18,6 @@ namespace Orleans.Hosting
 
     public class TypeManagementOptionsFormatter : IOptionFormatter<TypeManagementOptions>
     {
-        public string Category { get; }
-
         public string Name => nameof(TypeManagementOptions);
 
         private TypeManagementOptions options;

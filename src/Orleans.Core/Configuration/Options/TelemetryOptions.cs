@@ -27,8 +27,6 @@ namespace Orleans.Hosting
 
     public class TelemetryOptionsFormatter : IOptionFormatter<TelemetryOptions>
     {
-        public string Category { get; }
-
         public string Name => nameof(TelemetryOptions);
 
         private TelemetryOptions options;

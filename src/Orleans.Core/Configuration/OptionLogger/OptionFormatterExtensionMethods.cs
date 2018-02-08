@@ -1,9 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Configuration;
 
 namespace Orleans
@@ -20,9 +16,16 @@ namespace Orleans
             where TOptions : class
             where TOptionFormatter : class, IOptionFormatter<TOptions>
         {
-
-            services.AddSingleton<IOptionFormatter<TOptions>, TOptionFormatter>()
-                .AddFromExisting<IOptionFormatter, IOptionFormatter<TOptions>>();
+            var registration = services.FirstOrDefault(service => service.ServiceType == typeof(IOptionFormatter<TOptions>));
+            if (registration == null)
+            {
+                services.AddSingleton<IOptionFormatter<TOptions>, TOptionFormatter>()
+                        .AddFromExisting<IOptionFormatter, IOptionFormatter<TOptions>>();
+            } else
+            {
+                // override IOptionFormatter<TOptions>
+                services.AddSingleton<IOptionFormatter<TOptions>, TOptionFormatter>();
+            }
             return services;
         }
 
@@ -39,7 +42,8 @@ namespace Orleans
         {
             var registration = services.FirstOrDefault(service => service.ServiceType == typeof(IOptionFormatter<TOptions>));
             if (registration == null)
-                services.ConfigureFormatter<TOptions, TOptionFormatter>();
+                services.AddSingleton<IOptionFormatter<TOptions>, TOptionFormatter>()
+                        .AddFromExisting<IOptionFormatter, IOptionFormatter<TOptions>>();
             return services;
         }
 
@@ -51,7 +55,7 @@ namespace Orleans
             where TOptionFormatterResolver : class, IOptionFormatterResolver<TOptions>
         {
             services.AddSingleton<IOptionFormatterResolver<TOptions>, TOptionFormatterResolver>()
-                .AddSingleton<IOptionFormatter>(sp => sp.GetService<IOptionFormatterResolver<TOptions>>().Resolve(name));
+                    .AddSingleton<IOptionFormatter>(sp => sp.GetService<IOptionFormatterResolver<TOptions>>().Resolve(name));
             return services;
         }
 
@@ -64,7 +68,8 @@ namespace Orleans
         {
             var registration = services.FirstOrDefault(service => service.ServiceType == typeof(IOptionFormatterResolver<TOptions>));
             if (registration == null)
-                services.ConfigureFormatter<TOptions, TOptionFormatterResolver>(name);
+                services.AddSingleton<IOptionFormatterResolver<TOptions>, TOptionFormatterResolver>();
+            services.AddSingleton<IOptionFormatter>(sp => sp.GetService<IOptionFormatterResolver<TOptions>>().Resolve(name));
             return services;
         }
     }
