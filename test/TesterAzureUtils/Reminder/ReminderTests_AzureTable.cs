@@ -149,7 +149,7 @@ namespace Tester.AzureUtils.TimerTests
             // start two extra silos ... although it will take it a while before they stabilize
             log.Info("Starting 2 extra silos");
 
-            await this.HostedCluster.StartAdditionalSilos(2);
+            await this.HostedCluster.StartAdditionalSilos(2, true);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             //Block until all tasks complete.
