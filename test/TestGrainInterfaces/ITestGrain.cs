@@ -56,6 +56,8 @@ namespace UnitTests.GrainInterfaces
         [OneWay]
         Task ThrowsOneWay();
 
+        Task<bool> NotifyOtherGrain(IOneWayGrain otherGrain, ISimpleGrainObserver observer);
+
         Task<int> GetCount();
     }
 

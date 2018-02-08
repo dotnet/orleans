@@ -50,7 +50,7 @@ namespace Tester.AzureUtils.Streaming
             this.HostedCluster.StopSilo(this.HostedCluster.Silos.ElementAt(2));
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [SkippableFact(Skip= "https://github.com/dotnet/orleans/issues/3993"), TestCategory("Functional")]
         public async Task DelayedQueueRebalancingTests_1()
         {
             await ValidateAgentsState(2, 2, "1");
@@ -60,7 +60,7 @@ namespace Tester.AzureUtils.Streaming
             await ValidateAgentsState(2, 4, "2");
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/3993"), TestCategory("Functional")]
         public async Task DelayedQueueRebalancingTests_2()
         {
             await ValidateAgentsState(2, 2, "1");

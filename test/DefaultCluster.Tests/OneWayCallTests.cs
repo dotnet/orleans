@@ -13,7 +13,7 @@ namespace DefaultCluster.Tests.General
         public OneWayCallTests(DefaultClusterFixture fixture) : base(fixture) { }
 
         [Fact]
-        public async Task OneWayMethodsReturnSynchronously()
+        public async Task OneWayMethodsReturnSynchronously_ViaClient()
         {
             var grain = this.Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
 
@@ -27,6 +27,21 @@ namespace DefaultCluster.Tests.General
             // This should not throw.
             task = grain.ThrowsOneWay();
             Assert.True(task.Status == TaskStatus.RanToCompletion, "Task should be synchronously completed.");
+        }
+
+        [Fact]
+        public async Task OneWayMethodReturnSynchronously_ViaGrain()
+        {
+            var grain = this.Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
+            var otherGrain = this.Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
+
+            var observer = new SimpleGrainObserver();
+            var observerReference = await this.Client.CreateObjectReference<ISimpleGrainObserver>(observer);
+            var completedSynchronously = await grain.NotifyOtherGrain(otherGrain, observerReference);
+            Assert.True(completedSynchronously, "Task should be synchronously completed.");
+            await observer.ReceivedValue.WithTimeout(TimeSpan.FromSeconds(10));
+            var count = await otherGrain.GetCount();
+            Assert.Equal(1, count);
         }
 
         [Fact]
