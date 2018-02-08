@@ -3,13 +3,14 @@ using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
+using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Scheduler;
 using Orleans.Providers;
-using Orleans.Configuration.Options;
 using System.Collections.Generic;
 
 namespace Orleans.Hosting
@@ -290,16 +291,14 @@ namespace Orleans.Hosting
                 {
                     options.IsRunningAsUnitTest = config.IsRunningAsUnitTest;
                 });
-
-            services.AddOptions<ReminderOptions>()
+            
+            services.AddOptions<MockReminderTableOptions>()
                 .Configure<GlobalConfiguration>((options, config) =>
                 {
-                    options.ReminderService = Remap(config.ReminderServiceType);
-                    options.ReminderTableAssembly = config.ReminderTableAssembly;
-                    options.UseMockReminderTable = config.UseMockReminderTable;
-                    options.MockReminderTableTimeout = config.MockReminderTableTimeout;
+                    options.OperationDelay = config.MockReminderTableTimeout;
                 });
-
+            services.AddSingleton<IReminderTable>(CreateReminderTable);
+            
             services.AddOptions<GrainVersioningOptions>()
                 .Configure<GlobalConfiguration>((options, config) =>
                 {
@@ -377,28 +376,45 @@ namespace Orleans.Hosting
             }
         }
 
-        private static string Remap(GlobalConfiguration.ReminderServiceProviderType type)
+        private static IReminderTable CreateReminderTable(IServiceProvider serviceProvider)
         {
-            switch (type)
-            {
-                case GlobalConfiguration.ReminderServiceProviderType.NotSpecified:
-                    return ReminderOptions.BuiltIn.NotSpecified;
-                case GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain:
-                    return ReminderOptions.BuiltIn.ReminderTableGrain;
-                case GlobalConfiguration.ReminderServiceProviderType.AzureTable:
-                    return ReminderOptions.BuiltIn.AzureTable;
-                case GlobalConfiguration.ReminderServiceProviderType.AdoNet:
-                    return ReminderOptions.BuiltIn.AdoNet;
-                case GlobalConfiguration.ReminderServiceProviderType.MockTable:
-                    return ReminderOptions.BuiltIn.MockTable;
-                case GlobalConfiguration.ReminderServiceProviderType.Disabled:
-                    return ReminderOptions.BuiltIn.Disabled;
-                case GlobalConfiguration.ReminderServiceProviderType.Custom:
-                    return ReminderOptions.BuiltIn.Custom;
-            }
-            throw new NotSupportedException($"ReminderServiceProviderType {type} is not supported");
-        }
+            var config = serviceProvider.GetRequiredService<GlobalConfiguration>();
+            var grainFactory = serviceProvider.GetRequiredService<IGrainFactory>();
+            var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
 
+            var serviceType = config.ReminderServiceType;
+            var logger = loggerFactory.CreateLogger("ReminderTableFactory");
+
+            switch (serviceType)
+            {
+                case GlobalConfiguration.ReminderServiceProviderType.AdoNet:
+                    return AssemblyLoader.LoadAndCreateInstance<IReminderTable>(
+                        Constants.ORLEANS_REMINDERS_ADONET,
+                        logger,
+                        serviceProvider);
+                case GlobalConfiguration.ReminderServiceProviderType.AzureTable:
+                    return AssemblyLoader.LoadAndCreateInstance<IReminderTable>(
+                        Constants.ORLEANS_REMINDERS_AZURESTORAGE,
+                        logger,
+                        serviceProvider);
+                case GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain:
+                    return grainFactory.GetGrain<IReminderTableGrain>(Constants.ReminderTableGrainId);
+                case GlobalConfiguration.ReminderServiceProviderType.MockTable:
+                    return ActivatorUtilities.GetServiceOrCreateInstance<MockReminderTable>(serviceProvider);
+                case GlobalConfiguration.ReminderServiceProviderType.Custom:
+                    return AssemblyLoader.LoadAndCreateInstance<IReminderTable>(
+                        config.ReminderTableAssembly,
+                        logger,
+                        serviceProvider);
+                case GlobalConfiguration.ReminderServiceProviderType.Disabled:
+                    logger.Info("Reminder service is disabled.");
+                    return null;
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(config.ReminderServiceType),
+                        $"The {nameof(config.ReminderServiceType)} value {serviceType} is not supported.");
+            }
+        }
 
     }
 }

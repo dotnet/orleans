@@ -119,9 +119,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<MembershipOracle>();
             services.TryAddFromExisting<IMembershipOracle, MembershipOracle>();
             services.TryAddFromExisting<ISiloStatusOracle, MembershipOracle>();
-            services.TryAddSingleton<ReminderTableFactory>();
-            services.TryAddSingleton<IReminderTable>(sp => sp.GetRequiredService<ReminderTableFactory>().Create());
-            services.TryAddSingleton<LocalReminderServiceFactory>();
             services.TryAddSingleton<ClientObserverRegistrar>();
             services.TryAddSingleton<SiloProviderRuntime>();
             services.TryAddFromExisting<IStreamProviderRuntime, SiloProviderRuntime>();
@@ -251,7 +248,7 @@ namespace Orleans.Hosting
             services.TryConfigureFormatter<SiloStatisticsOptions, SiloStatisticsOptionsFormatter>();
             services.TryConfigureFormatter<AdoNetOptions, AdoNetOptionsFormatter>();
             services.TryConfigureFormatter<GrainServiceOptions, GrainServiceOptionsFormatter>();
-            services.TryConfigureFormatter<ReminderOptions, ReminderOptionsFormatter>();
+            services.TryConfigureFormatter<MockReminderTableOptions, MockReminderTableOptionsFormatter>();
             services.TryConfigureFormatter<ServicePointOptions, ServicePointOptionsFormatter>();
             services.TryConfigureFormatter<TelemetryOptions, TelemetryOptionsFormatter>();
             services.TryConfigureFormatter<LoadSheddingOptions, LoadSheddingOptionsFormatter>();

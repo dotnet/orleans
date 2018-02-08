@@ -22,6 +22,7 @@ using Orleans.Runtime.LogConsistency;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.MultiClusterNetwork;
 using Orleans.Runtime.Providers;
+using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Scheduler;
 using Orleans.Services;
 using Orleans.Streams;
@@ -350,14 +351,14 @@ namespace Orleans.Runtime
 
             this.membershipOracle.SubscribeToSiloStatusEvents(Services.GetRequiredService<ClientObserverRegistrar>());
 
-            IOptions<ReminderOptions> reminderOptions = this.Services.GetRequiredService<IOptions<ReminderOptions>>();
-            if (!reminderOptions.Value.ReminderService.Equals(ReminderOptions.BuiltIn.Disabled))
+            var reminderTable = Services.GetService<IReminderTable>();
+            if (reminderTable != null)
             {
-                // start the reminder service system target
-                reminderService = Services.GetRequiredService<LocalReminderServiceFactory>()
-                                          .CreateReminderService(this, initTimeout, this.runtimeClient);
-                var reminderServiceSystemTarget = this.reminderService as SystemTarget;
-                if (reminderServiceSystemTarget != null) RegisterSystemTarget(reminderServiceSystemTarget);
+                logger.Info($"Creating reminder grain service for type={reminderTable.GetType()}");
+                
+                // Start the reminder service system target
+                reminderService = new LocalReminderService(this, reminderTable, this.initTimeout, this.loggerFactory); ;
+                RegisterSystemTarget((SystemTarget)reminderService);
             }
 
             RegisterSystemTarget(catalog);
@@ -436,8 +437,7 @@ namespace Orleans.Runtime
                 var grainTypeManager = Services.GetRequiredService<GrainTypeManager>();
                 implicitStreamSubscriberTable.InitImplicitStreamSubscribers(grainTypeManager.GrainClassTypeData.Select(t => t.Value.Type).ToArray());
             }
-
-
+            
             var siloProviderRuntime = Services.GetRequiredService<SiloProviderRuntime>();
             SiloStatisticsOptions statisticsOptions = Services.GetRequiredService<IOptions<SiloStatisticsOptions>>().Value;
             runtimeClient.CurrentStreamProviderRuntime = siloProviderRuntime;
