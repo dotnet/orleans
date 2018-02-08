@@ -57,35 +57,13 @@ namespace UnitTests.SqlStatisticsPublisherTests
             var instance = await RelationalStorageForTesting.SetupInstance(this.AdoInvariant, testDatabaseName);
             return instance.CurrentConnectionString;
         }
-
-        protected async Task SqlStatisticsPublisher_ReportMetrics_Client()
-        {
-            StatisticsPublisher.AddConfiguration("statisticsDeployment", "statisticsHostName", "statisticsClient", IPAddress.Loopback);
-            await RunParallel(10, () => StatisticsPublisher.ReportMetrics((IClientPerformanceMetrics)new DummyPerformanceMetrics()));
-        }
-
+        
         protected async Task SqlStatisticsPublisher_ReportStats()
         {
             StatisticsPublisher.AddConfiguration("statisticsDeployment", "statisticsHostName", "statisticsClient", IPAddress.Loopback);
             await RunParallel(10, () => StatisticsPublisher.ReportStats(new List<ICounter> { new DummyCounter(),new DummyCounter() }));
         }
-
-        protected async Task SqlStatisticsPublisher_ReportMetrics_Silo()
-        {
-            var options = new AdoNetClusteringOptions()
-            {
-                AdoInvariant = AdoInvariant,
-                ConnectionString = ConnectionString
-            };
-
-            IMembershipTable mbr = new AdoNetClusteringTable(this.environment.Services.GetRequiredService<IGrainReferenceConverter>(), 
-                this.environment.Services.GetRequiredService<IOptions<SiloOptions>>(), Options.Create(options), 
-                this.loggerFactory.CreateLogger<AdoNetClusteringTable>());
-            await mbr.InitializeMembershipTable(true).WithTimeout(TimeSpan.FromMinutes(1));
-            StatisticsPublisher.AddConfiguration("statisticsDeployment", true, "statisticsSiloId", SiloAddressUtils.NewLocalSiloAddress(0), new IPEndPoint(IPAddress.Loopback, 12345), "statisticsHostName");
-            await RunParallel(10, () => StatisticsPublisher.ReportMetrics((ISiloPerformanceMetrics)new DummyPerformanceMetrics()));
-        }
-
+        
         private Task RunParallel(int count, Func<Task> taskFactory)
         {
             return Task.WhenAll(Enumerable.Range(0, count).Select(x => taskFactory()));

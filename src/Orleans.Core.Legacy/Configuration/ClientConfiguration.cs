@@ -374,17 +374,16 @@ namespace Orleans.Runtime.Configuration
         }
 
 
-        public void RegisterStatisticsProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IStatisticsPublisher, IClientMetricsDataPublisher
+        public void RegisterStatisticsProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IStatisticsPublisher
         {
             TypeInfo providerTypeInfo = typeof(T).GetTypeInfo();
-            if (providerTypeInfo.IsAbstract ||
-                providerTypeInfo.IsGenericType ||
-                providerTypeInfo.IsGenericType ||
-                !(
-                typeof(IStatisticsPublisher).IsAssignableFrom(typeof(T)) &&
-                typeof(IClientMetricsDataPublisher).IsAssignableFrom(typeof(T))
-                ))
-                throw new ArgumentException("Expected non-generic, non-abstract type which implements IStatisticsPublisher, IClientMetricsDataPublisher interface", "typeof(T)");
+            if (providerTypeInfo.IsAbstract
+                || providerTypeInfo.IsGenericType
+                || providerTypeInfo.IsGenericType
+                || !typeof(IStatisticsPublisher).IsAssignableFrom(typeof(T)))
+            {
+                throw new ArgumentException("Expected non-generic, non-abstract type which implements IStatisticsPublisher interface", nameof(T));
+            }
 
             ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STATISTICS_PROVIDER_CATEGORY_NAME, providerTypeInfo.FullName, providerName, properties);
         }

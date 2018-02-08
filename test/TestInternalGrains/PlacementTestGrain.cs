@@ -4,21 +4,29 @@ using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+
 using Orleans;
 using Orleans.Concurrency;
+using Orleans.Hosting;
 using Orleans.Placement;
 using Orleans.Runtime;
+using Orleans.Runtime.TestHooks;
+
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
     internal abstract class PlacementTestGrainBase : Grain
     {
-        private readonly ISiloPerformanceMetrics siloPerformanceMetrics;
+        private readonly TestHooksHostEnvironmentStatistics hostEnvironmentStatistics;
 
-        public PlacementTestGrainBase(ISiloPerformanceMetrics siloPerformanceMetrics)
+        private readonly LoadSheddingOptions loadSheddingOptions;
+
+        public PlacementTestGrainBase(TestHooksHostEnvironmentStatistics hostEnvironmentStatistics, IOptions<LoadSheddingOptions> loadSheddingOptions)
         {
-            this.siloPerformanceMetrics = siloPerformanceMetrics;
+            this.hostEnvironmentStatistics = hostEnvironmentStatistics;
+            this.loadSheddingOptions = loadSheddingOptions.Value;
         }
 
         public Task<IPEndPoint> GetEndpoint()
@@ -82,25 +90,25 @@ namespace UnitTests.Grains
 
         public Task LatchOverloaded()
         {
-            this.siloPerformanceMetrics.LatchIsOverload(true);
+            this.hostEnvironmentStatistics.CpuUsage = this.loadSheddingOptions.LoadSheddingLimit + 1;
             return PropigateStatisticsToCluster(GrainFactory);
         }
 
         public Task UnlatchOverloaded()
         {
-            this.siloPerformanceMetrics.UnlatchIsOverloaded();
+            this.hostEnvironmentStatistics.CpuUsage = null;
             return PropigateStatisticsToCluster(GrainFactory);
         }
 
         public Task LatchCpuUsage(float value)
         {
-            this.siloPerformanceMetrics.LatchCpuUsage(value);
+            this.hostEnvironmentStatistics.CpuUsage = value;
             return PropigateStatisticsToCluster(GrainFactory);
         }
 
         public Task UnlatchCpuUsage()
         {
-            this.siloPerformanceMetrics.UnlatchCpuUsage();
+            this.hostEnvironmentStatistics.CpuUsage = null;
             return PropigateStatisticsToCluster(GrainFactory);
         }
 
@@ -112,37 +120,37 @@ namespace UnitTests.Grains
     }
 
     [RandomPlacement]
-    internal class RandomPlacementTestGrain :
-        PlacementTestGrainBase, IRandomPlacementTestGrain
+    internal class RandomPlacementTestGrain : PlacementTestGrainBase, IRandomPlacementTestGrain
     {
-        public RandomPlacementTestGrain(ISiloPerformanceMetrics siloPerformanceMetrics) : base(siloPerformanceMetrics)
+        public RandomPlacementTestGrain(TestHooksHostEnvironmentStatistics hostEnvironmentStatistics, IOptions<LoadSheddingOptions> loadSheddingOptions)
+            : base(hostEnvironmentStatistics, loadSheddingOptions)
         {
         }
     }
 
     [PreferLocalPlacement]
-    internal class PreferLocalPlacementTestGrain :
-       PlacementTestGrainBase, IPreferLocalPlacementTestGrain
+    internal class PreferLocalPlacementTestGrain : PlacementTestGrainBase, IPreferLocalPlacementTestGrain
     {
-        public PreferLocalPlacementTestGrain(ISiloPerformanceMetrics siloPerformanceMetrics) : base(siloPerformanceMetrics)
+        public PreferLocalPlacementTestGrain(TestHooksHostEnvironmentStatistics hostEnvironmentStatistics, IOptions<LoadSheddingOptions> loadSheddingOptions)
+            : base(hostEnvironmentStatistics, loadSheddingOptions)
         {
         }
     }
 
     [StatelessWorker]
-    internal class LocalPlacementTestGrain :
-        PlacementTestGrainBase, ILocalPlacementTestGrain
+    internal class LocalPlacementTestGrain : PlacementTestGrainBase, ILocalPlacementTestGrain
     {
-        public LocalPlacementTestGrain(ISiloPerformanceMetrics siloPerformanceMetrics) : base(siloPerformanceMetrics)
+        public LocalPlacementTestGrain(TestHooksHostEnvironmentStatistics hostEnvironmentStatistics, IOptions<LoadSheddingOptions> loadSheddingOptions)
+            : base(hostEnvironmentStatistics, loadSheddingOptions)
         {
         }
     }
 
     [ActivationCountBasedPlacement]
-    internal class ActivationCountBasedPlacementTestGrain :
-        PlacementTestGrainBase, IActivationCountBasedPlacementTestGrain
+    internal class ActivationCountBasedPlacementTestGrain : PlacementTestGrainBase, IActivationCountBasedPlacementTestGrain
     {
-        public ActivationCountBasedPlacementTestGrain(ISiloPerformanceMetrics siloPerformanceMetrics) : base(siloPerformanceMetrics)
+        public ActivationCountBasedPlacementTestGrain(TestHooksHostEnvironmentStatistics hostEnvironmentStatistics, IOptions<LoadSheddingOptions> loadSheddingOptions)
+            : base(hostEnvironmentStatistics, loadSheddingOptions)
         {
         }
     }

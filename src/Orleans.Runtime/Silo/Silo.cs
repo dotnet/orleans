@@ -91,7 +91,6 @@ namespace Orleans.Runtime
         internal ILocalGrainDirectory LocalGrainDirectory { get { return localGrainDirectory; } }
         internal IMultiClusterOracle LocalMultiClusterOracle { get { return multiClusterOracle; } }
         internal IConsistentRingProvider RingProvider { get; private set; }
-        internal ISiloPerformanceMetrics Metrics { get { return siloStatistics.MetricsTable; } }
         internal ICatalog Catalog => catalog;
 
         internal SystemStatus SystemStatus { get; set; }
@@ -206,10 +205,6 @@ namespace Orleans.Runtime
             RingProvider = Services.GetRequiredService<IConsistentRingProvider>();
 
             catalog = Services.GetRequiredService<Catalog>();
-            siloStatistics.MetricsTable.Scheduler = scheduler;
-            siloStatistics.MetricsTable.ActivationDirectory = activationDirectory;
-            siloStatistics.MetricsTable.ActivationCollector = catalog.ActivationCollector;
-            siloStatistics.MetricsTable.MessageCenter = messageCenter;
 
             executorService = Services.GetRequiredService<ExecutorService>();
 
@@ -445,9 +440,8 @@ namespace Orleans.Runtime
             async Task LoadStatsProvider()
             {
                 // can call SetSiloMetricsTableDataManager only after MessageCenter is created (dependency on this.SiloAddress).
-                await siloStatistics.SetSiloStatsTableDataManager(this, statisticsOptions).WithTimeout(initTimeout, $"SiloStatistics Setting SiloStatsTableDataManager failed due to timeout {initTimeout}");
-                await siloStatistics.SetSiloMetricsTableDataManager(this, statisticsOptions).WithTimeout(initTimeout,
-                    $"SiloStatistics Setting SiloMetricsTableDataManager failed due to timeout {initTimeout}");
+                await siloStatistics.SetSiloStatsTableDataManager(this, statisticsOptions)
+                    .WithTimeout(initTimeout, $"SiloStatistics Setting SiloStatsTableDataManager failed due to timeout {initTimeout}");
             }
             
             // This has to follow the above steps that start the runtime components

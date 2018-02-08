@@ -19,23 +19,11 @@ namespace UnitTests.SqlStatisticsPublisherTests
         public void SqlStatisticsPublisher_PostgreSql_Init()
         {
         }
-
-        [Fact(Skip = "Not Implemented"), TestCategory("Statistics"), TestCategory("PostgreSql")]
-        public async Task SqlStatisticsPublisher_PostgreSql_ReportMetrics_Client()
-        {
-            await SqlStatisticsPublisher_ReportMetrics_Client();
-        }
-
+        
         [Fact(Skip = "Not Implemented"), TestCategory("Statistics"), TestCategory("PostgreSql")]
         public async Task SqlStatisticsPublisher_PostgreSql_ReportStats()
         {
             await SqlStatisticsPublisher_ReportStats();
-        }
-
-        [Fact(Skip = "Not Implemented"), TestCategory("Statistics"), TestCategory("PostgreSql")]
-        public async Task SqlStatisticsPublisher_PostgreSql_ReportMetrics_Silo()
-        {
-            await SqlStatisticsPublisher_ReportMetrics_Silo();
         }
     }
 }

@@ -28,11 +28,11 @@ namespace Orleans.Runtime
         private readonly SiloMessagingOptions messagingOptions;
         private readonly PlacementDirectorsManager placementDirectorsManager;
         private readonly ILocalGrainDirectory localGrainDirectory;
-        private readonly MessageFactory messagefactory;
+        private readonly ActivationCollector activationCollector;
+        private readonly MessageFactory messageFactory;
         private readonly SerializationManager serializationManager;
         private readonly CompatibilityDirectorManager compatibilityDirectorManager;
         private readonly SchedulingOptions schedulingOptions;
-        private readonly SafeRandom random;
         private readonly ILogger invokeWorkItemLogger;
         internal Dispatcher(
             OrleansTaskScheduler scheduler, 
@@ -41,7 +41,8 @@ namespace Orleans.Runtime
             IOptions<SiloMessagingOptions> messagingOptions,
             PlacementDirectorsManager placementDirectorsManager,
             ILocalGrainDirectory localGrainDirectory,
-            MessageFactory messagefactory,
+            ActivationCollector activationCollector,
+            MessageFactory messageFactory,
             SerializationManager serializationManager,
             CompatibilityDirectorManager compatibilityDirectorManager,
             ILoggerFactory loggerFactory,
@@ -54,12 +55,12 @@ namespace Orleans.Runtime
             this.invokeWorkItemLogger = loggerFactory.CreateLogger<InvokeWorkItem>();
             this.placementDirectorsManager = placementDirectorsManager;
             this.localGrainDirectory = localGrainDirectory;
-            this.messagefactory = messagefactory;
+            this.activationCollector = activationCollector;
+            this.messageFactory = messageFactory;
             this.serializationManager = serializationManager;
             this.compatibilityDirectorManager = compatibilityDirectorManager;
             this.schedulingOptions = schedulerOptions.Value;
             logger = loggerFactory.CreateLogger<Dispatcher>();
-            random = new SafeRandom();
         }
 
         public ISiloRuntimeClient RuntimeClient => this.catalog.RuntimeClient;
@@ -116,7 +117,7 @@ namespace Orleans.Runtime
                 {
                     if (target.State == ActivationState.Valid)
                     {
-                        catalog.ActivationCollector.TryRescheduleCollection(target);
+                        this.activationCollector.TryRescheduleCollection(target);
                     }
                     // Silo is always capable to accept a new request. It's up to the activation to handle its internal state.
                     // If activation is shutting down, it will queue and later forward this request.
@@ -212,7 +213,7 @@ namespace Orleans.Runtime
             {
                 var str = String.Format("{0} {1}", rejectInfo ?? "", exc == null ? "" : exc.ToString());
                 MessagingStatisticsGroup.OnRejectedMessage(message);
-                Message rejection = this.messagefactory.CreateRejectionResponse(message, rejectType, str, exc);
+                Message rejection = this.messageFactory.CreateRejectionResponse(message, rejectType, str, exc);
                 SendRejectionMessage(rejection);
             }
             else
@@ -776,7 +777,7 @@ namespace Orleans.Runtime
         internal void SendResponse(Message request, Response response)
         {
             // create the response
-            var message = this.messagefactory.CreateResponseMessage(request);
+            var message = this.messageFactory.CreateResponseMessage(request);
             message.BodyObject = response;
 
             if (message.TargetGrain.IsSystemTarget)

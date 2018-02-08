@@ -16,7 +16,7 @@ namespace Orleans.Providers.AdoNet
     /// <summary>
     /// Plugin for publishing silos and client statistics to a SQL database.
     /// </summary>
-    public class AdoNetStatisticsPublisher: IConfigurableStatisticsPublisher, IConfigurableSiloMetricsDataPublisher, IConfigurableClientMetricsDataPublisher, IProvider
+    public class AdoNetStatisticsPublisher: IConfigurableStatisticsPublisher, IProvider
     {
         private string deploymentId;
         private IPAddress clientAddress;
@@ -103,57 +103,7 @@ namespace Orleans.Providers.AdoNet
                 generation = SiloAddress.AllocateNewGeneration();
             }
         }
-
-        Task IClientMetricsDataPublisher.Init(IPAddress address, string clientId)
-        {
-            return Task.CompletedTask;
-        }
-
-        /// <summary>
-        /// Writes metrics to the database
-        /// </summary>
-        /// <param name="metricsData">Metrics data</param>
-        /// <returns>Task for database operation</returns>
-        public async Task ReportMetrics(IClientPerformanceMetrics metricsData)
-        {
-            if(logger.IsEnabled(LogLevel.Trace)) logger.Trace("AdoNetStatisticsPublisher.ReportMetrics (client) called with data: {0}.", metricsData);
-            try
-            {
-                await orleansQueries.UpsertReportClientMetricsAsync(deploymentId, clientId, clientAddress, hostName, metricsData);
-            }
-            catch(Exception ex)
-            {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("AdoNetStatisticsPublisher.ReportMetrics (client) failed: {0}", ex);
-                throw;
-            }
-        }
-
-
-        Task ISiloMetricsDataPublisher.Init(string clusterId, string storageConnectionString, SiloAddress siloAddress, string siloName, IPEndPoint gateway, string hostName)
-        {
-            return Task.CompletedTask;
-        }
-
-        /// <summary>
-        /// Writes silo performance metrics to the database
-        /// </summary>
-        /// <param name="metricsData">Metrics data</param>
-        /// <returns>Task for database operation</returns>
-        public async Task ReportMetrics(ISiloPerformanceMetrics metricsData)
-        {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("AdoNetStatisticsPublisher.ReportMetrics (silo) called with data: {0}.", metricsData);
-            try
-            {
-                await orleansQueries.UpsertSiloMetricsAsync(deploymentId, siloName, gateway, siloAddress, hostName, metricsData);
-            }
-            catch(Exception ex)
-            {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("AdoNetStatisticsPublisher.ReportMetrics (silo) failed: {0}", ex);
-                throw;
-            }
-        }
-
-
+        
         Task IStatisticsPublisher.Init(bool isSilo, string storageConnectionString, string clusterId, string address, string siloName, string hostName)
         {
             return Task.CompletedTask;

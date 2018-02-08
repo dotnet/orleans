@@ -3,12 +3,10 @@ using System.Net;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.Hosting;
 using Microsoft.Extensions.Options;
 using Orleans.Messaging;
-using Orleans.Statistics;
 
 namespace Orleans.Runtime
 {
@@ -16,21 +14,15 @@ namespace Orleans.Runtime
     {
         private readonly ClientStatisticsOptions statisticsOptions;
         private readonly IServiceProvider serviceProvider;
-        private readonly IHostEnvironmentStatistics hostEnvironmentStatistics;
-        private readonly IAppEnvironmentStatistics appEnvironmentStatistics;
         private readonly ClusterClientOptions clusterClientOptions;
-        private ClientTableStatistics tableStatistics;
         private LogStatistics logStatistics;
         private readonly ILogger logger;
-        private readonly ILoggerFactory loggerFactory;
-        private MonitoringStorageOptions storageOptions;
-        private string dnsHostName;
+        private readonly MonitoringStorageOptions storageOptions;
+        private readonly string dnsHostName;
         public ClientStatisticsManager(
             IOptions<MonitoringStorageOptions> storageOptions,
             SerializationManager serializationManager, 
             IServiceProvider serviceProvider,
-            IHostEnvironmentStatistics hostEnvironmentStatistics,
-            IAppEnvironmentStatistics appEnvironmentStatistics,
             ILoggerFactory loggerFactory, 
             IOptions<ClientStatisticsOptions> statisticsOptions, 
             IOptions<ClusterClientOptions> clusterClientOptions)
@@ -38,12 +30,9 @@ namespace Orleans.Runtime
             this.statisticsOptions = statisticsOptions.Value;
             this.storageOptions = storageOptions.Value;
             this.serviceProvider = serviceProvider;
-            this.hostEnvironmentStatistics = hostEnvironmentStatistics;
-            this.appEnvironmentStatistics = appEnvironmentStatistics;
             this.clusterClientOptions = clusterClientOptions.Value;
             logStatistics = new LogStatistics(this.statisticsOptions.LogWriteInterval, false, serializationManager, loggerFactory);
             logger = loggerFactory.CreateLogger<ClientStatisticsManager>();
-            this.loggerFactory = loggerFactory;
             MessagingStatisticsGroup.Init(false);
             NetworkingStatisticsGroup.Init(false);
             ApplicationRequestsStatisticsGroup.Init();
@@ -52,31 +41,6 @@ namespace Orleans.Runtime
 
         internal async Task Start(IMessageCenter transport, GrainId clientId)
         {
-            IClientMetricsDataPublisher metricsDataPublisher = this.serviceProvider.GetService<IClientMetricsDataPublisher>();
-            if (metricsDataPublisher != null)
-            {
-                var configurableMetricsDataPublisher = metricsDataPublisher as IConfigurableClientMetricsDataPublisher;
-                if (configurableMetricsDataPublisher != null)
-                {
-                    configurableMetricsDataPublisher.AddConfiguration(
-                        this.clusterClientOptions.ClusterId, dnsHostName, clientId.ToString(), transport.MyAddress.Endpoint.Address);
-                }
-                tableStatistics = new ClientTableStatistics(transport, metricsDataPublisher, this.hostEnvironmentStatistics, this.appEnvironmentStatistics, this.loggerFactory)
-                {
-                    MetricsTableWriteInterval = statisticsOptions.MetricsTableWriteInterval
-                };
-            }
-            else if (CanUseAzureTable())
-            {
-                // Hook up to publish client metrics to Azure storage table
-                var publisher = AssemblyLoader.LoadAndCreateInstance<IClientMetricsDataPublisher>(Constants.ORLEANS_STATISTICS_AZURESTORAGE, logger, this.serviceProvider);
-                await publisher.Init(transport.MyAddress.Endpoint.Address, clientId.ToParsableString());
-                tableStatistics = new ClientTableStatistics(transport, publisher, this.hostEnvironmentStatistics, this.appEnvironmentStatistics, this.loggerFactory)
-                {
-                    MetricsTableWriteInterval = statisticsOptions.MetricsTableWriteInterval
-                };
-            }
-
             // Configure Statistics
             if (statisticsOptions.WriteLogStatisticsToTable)
             {
@@ -116,9 +80,6 @@ namespace Orleans.Runtime
             }
 
             logStatistics = null;
-
-            tableStatistics?.Dispose();
-            tableStatistics = null;
         }
 
         public void Dispose()

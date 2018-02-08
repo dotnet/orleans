@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
+using Orleans.Statistics;
 
 namespace Orleans.Runtime.Scheduler
 {
@@ -88,14 +89,14 @@ namespace Orleans.Runtime.Scheduler
         }
 
         internal readonly int WorkerThreadStatisticsNumber;
-        private readonly ICorePerformanceMetrics performanceMetrics;
+        private readonly IHostEnvironmentStatistics hostEnvironmentStatistics;
 
-        internal WorkerPoolThread(WorkerPool gtp, OrleansTaskScheduler sched, ExecutorService executorService, ILoggerFactory loggerFactory, ICorePerformanceMetrics performanceMetrics, int threadNumber, bool system = false)
+        internal WorkerPoolThread(WorkerPool gtp, OrleansTaskScheduler sched, ExecutorService executorService, ILoggerFactory loggerFactory, IHostEnvironmentStatistics hostEnvironmentStatistics, int threadNumber, bool system = false)
             : base((system ? "System." : "") + threadNumber, executorService, loggerFactory)
         {
             pool = gtp;
             scheduler = sched;
-            this.performanceMetrics = performanceMetrics;
+            this.hostEnvironmentStatistics = hostEnvironmentStatistics;
             ownsSemaphore = false;
             IsSystem = system;
             maxWorkQueueWait = IsSystem ? Constants.INFINITE_TIMESPAN : gtp.MaxWorkQueueWait;
@@ -329,7 +330,7 @@ namespace Orleans.Runtime.Scheduler
             // Note that we only do this if the current load is reasonably low and the current thread
             // count is reasonably small.
             if (!pool.ShouldInjectWorkerThread ||
-                !(this.performanceMetrics.CpuUsage < MAX_CPU_USAGE_TO_REPLACE)) return;
+                !(this.hostEnvironmentStatistics.CpuUsage < MAX_CPU_USAGE_TO_REPLACE)) return;
 
             if (Cts.IsCancellationRequested) return;
 

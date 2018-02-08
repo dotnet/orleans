@@ -48,6 +48,7 @@ namespace Orleans.TestingHost
 
             hostBuilder.ConfigureServices((context, services) =>
             {
+                services.AddSingleton<TestHooksHostEnvironmentStatistics>();
                 services.AddSingleton<TestHooksSystemTarget>();
                 ConfigureListeningPorts(context, services);
 

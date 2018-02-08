@@ -70,6 +70,7 @@ namespace Orleans.Hosting
 
             services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
             services.TryAddSingleton<IHostEnvironmentStatistics, NoOpHostEnvironmentStatistics>();
+            services.TryAddSingleton<OverloadDetector>();
 
             services.TryAddSingleton<ExecutorService>();
             // queue balancer contructing related
@@ -95,12 +96,11 @@ namespace Orleans.Hosting
             services.TryAddSingleton<IGrainReferenceRuntime, GrainReferenceRuntime>();
             services.TryAddSingleton<TypeMetadataCache>();
             services.TryAddSingleton<ActivationDirectory>();
+            services.TryAddSingleton<ActivationCollector>();
             services.TryAddSingleton<LocalGrainDirectory>();
             services.TryAddFromExisting<ILocalGrainDirectory, LocalGrainDirectory>();
             services.TryAddSingleton(sp => sp.GetRequiredService<LocalGrainDirectory>().GsiActivationMaintainer);
             services.TryAddSingleton<SiloStatisticsManager>();
-            services.TryAddSingleton<ISiloPerformanceMetrics>(sp => sp.GetRequiredService<SiloStatisticsManager>().MetricsTable);
-            services.TryAddFromExisting<ICorePerformanceMetrics, ISiloPerformanceMetrics>();
             services.TryAddSingleton<GrainTypeManager>();
             services.TryAddSingleton<MessageCenter>();
             services.TryAddFromExisting<IMessageCenter, MessageCenter>();
