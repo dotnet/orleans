@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -45,17 +45,17 @@ namespace Orleans.Runtime.TestHooks
 
         public Task<bool> HasStorageProvider(string providerName)
         {
-            return Task.FromResult(this.host.Services.GetServiceByName<IStorageProvider>(providerName) != null);
+            return Task.FromResult(this.host.Services.GetServiceByName<IGrainStorage>(providerName) != null);
         }
 
         public Task<bool> HasStreamProvider(string providerName)
         {
-            return Task.FromResult(this.host.Services.GetServiceByName<IStreamProvider>(providerName) != null);
+            return Task.FromResult(this.host.Services.GetServiceByName<IGrainStorage>(providerName) != null);
         }
 
         public Task<ICollection<string>> GetStorageProviderNames()
         {
-            var storageProviderCollection = this.host.Services.GetRequiredService<IKeyedServiceCollection<string, IStorageProvider>>();
+            var storageProviderCollection = this.host.Services.GetRequiredService<IKeyedServiceCollection<string, IGrainStorage>>();
             return Task.FromResult<ICollection<string>>(storageProviderCollection.GetServices(this.host.Services).Select(keyedService => keyedService.Key).ToArray());
         }
 

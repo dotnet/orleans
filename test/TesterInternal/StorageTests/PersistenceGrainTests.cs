@@ -989,7 +989,7 @@ namespace UnitTests.StorageTests
         public async Task Persistence_Grain_BadProvider()
         {
             IBadProviderTestGrain grain = this.HostedCluster.GrainFactory.GetGrain<IBadProviderTestGrain>(Guid.NewGuid());
-            var oex = await Assert.ThrowsAsync<BadProviderConfigException>(() => grain.DoSomething());
+            var oex = await Assert.ThrowsAsync<BadGrainStorageConfigException>(() => grain.DoSomething());
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]

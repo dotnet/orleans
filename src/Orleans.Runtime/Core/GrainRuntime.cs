@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Core;
@@ -62,9 +62,9 @@ namespace Orleans.Runtime
 
         public IStorage<TGrainState> GetStorage<TGrainState>(Grain grain) where TGrainState : new()
         {
-            IStorageProvider storageProvider = grain.GetStorageProvider(ServiceProvider);
+            IGrainStorage grainStorage = grain.GetGrainStorage(ServiceProvider);
             string grainTypeName = grain.GetType().FullName;
-            return new StateStorageBridge<TGrainState>(grainTypeName, grain.GrainReference, storageProvider, this.logger);
+            return new StateStorageBridge<TGrainState>(grainTypeName, grain.GrainReference, grainStorage, this.loggerFactory);
         }
     }
 }

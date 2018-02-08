@@ -46,7 +46,7 @@ namespace Orleans.Storage
     /// </example>
     public class AzureBlobStorage : IStorageProvider
     {
-        internal const string DataConnectionStringPropertyName = AzureTableStorage.DataConnectionStringPropertyName;
+        internal const string DataConnectionStringPropertyName = "DataConnectionString";
         internal const string ContainerNamePropertyName = "ContainerName";
         internal const string ContainerNameDefaultValue = "grainstate";
 

@@ -233,6 +233,7 @@ namespace Orleans.Hosting
                 SystemTarget fallbackSystemTarget = sp.GetRequiredService<FallbackSystemTarget>();
                 return (taskFunc) => scheduler.QueueTask(taskFunc, fallbackSystemTarget.SchedulingContext);
             });
+
             LegacyProviderConfigurator<ISiloLifecycle>.ConfigureServices(configuration.Globals.ProviderConfigurations, services, SiloDefaultProviderInitStage, SiloDefaultProviderStartStage);
 
             services.AddOptions<GrainPlacementOptions>().Configure<GlobalConfiguration>((options, config) =>

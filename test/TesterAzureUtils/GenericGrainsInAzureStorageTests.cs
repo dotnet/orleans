@@ -1,5 +1,8 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
+using Orleans.Hosting;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -17,16 +20,26 @@ namespace Tester.AzureUtils.General
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore");
-                });
+                builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
             }
 
             protected override void CheckPreconditionsOrThrow()
             {
                 base.CheckPreconditionsOrThrow();
                 StorageEmulatorUtilities.EnsureEmulatorIsNotUsed();
+            }
+
+            private class SiloBuilderConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder
+                        .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                        {
+                            options.ServiceId = silo.Value.ServiceId.ToString();
+                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        }));
+                }
             }
         }
 

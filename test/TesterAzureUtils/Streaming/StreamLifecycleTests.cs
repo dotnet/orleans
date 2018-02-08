@@ -11,6 +11,8 @@ using UnitTests.GrainInterfaces;
 using Xunit;
 using Xunit.Abstractions;
 using Tester;
+using Orleans.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace UnitTests.StreamingTests
 {
@@ -35,9 +37,6 @@ namespace UnitTests.StreamingTests
             {
                 legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
 
-                legacy.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore", deleteOnClear: true);
-                legacy.ClusterConfiguration.AddAzureTableStorageProvider("PubSubStore", deleteOnClear: true, useJsonFormat: false);
-
                 legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
                 legacy.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData",
                     fireAndForgetDelivery: false,
@@ -49,6 +48,27 @@ namespace UnitTests.StreamingTests
                 legacy.ClientConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
                 legacy.ClientConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
             });
+            builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+        }
+
+        private class SiloBuilderConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder
+                    .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                    {
+                        options.ServiceId = silo.Value.ServiceId.ToString();
+                        options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.DeleteStateOnClear = true;
+                    }))
+                    .AddAzureTableGrainStorage("PubSubStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                    {
+                        options.ServiceId = silo.Value.ServiceId.ToString();
+                        options.DeleteStateOnClear = true;
+                        options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    }));
+            }
         }
 
         public StreamLifecycleTests(ITestOutputHelper output)

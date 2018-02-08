@@ -63,31 +63,27 @@ namespace Orleans.Serialization
         /// <returns>The updated <see cref="JsonSerializerSettings" />.</returns>
         public static JsonSerializerSettings UpdateSerializerSettings(JsonSerializerSettings settings, IProviderConfiguration config)
         {
-            if (config.Properties.ContainsKey(UseFullAssemblyNamesProperty))
+            bool useFullAssemblyNames = config.GetBoolProperty(UseFullAssemblyNamesProperty, false);
+            bool indentJson = config.GetBoolProperty(IndentJsonProperty, false);
+            TypeNameHandling typeNameHandling = config.GetEnumProperty(TypeNameHandlingProperty, settings.TypeNameHandling);
+            return UpdateSerializerSettings(settings, useFullAssemblyNames, indentJson, typeNameHandling);
+        }
+
+        public static JsonSerializerSettings UpdateSerializerSettings(JsonSerializerSettings settings, bool useFullAssemblyNames, bool indentJson, TypeNameHandling? typeNameHandling)
+        {
+            if (useFullAssemblyNames)
             {
-                bool useFullAssemblyNames;
-                if (bool.TryParse(config.Properties[UseFullAssemblyNamesProperty], out useFullAssemblyNames) && useFullAssemblyNames)
-                {
-                    settings.TypeNameAssemblyFormatHandling = TypeNameAssemblyFormatHandling.Full;
-                }
+                settings.TypeNameAssemblyFormatHandling = TypeNameAssemblyFormatHandling.Full;
             }
 
-            if (config.Properties.ContainsKey(IndentJsonProperty))
+            if (indentJson)
             {
-                bool indentJson;
-                if (bool.TryParse(config.Properties[IndentJsonProperty], out indentJson) && indentJson)
-                {
-                    settings.Formatting = Formatting.Indented;
-                }
+                settings.Formatting = Formatting.Indented;
             }
 
-            if (config.Properties.ContainsKey(TypeNameHandlingProperty))
+            if (typeNameHandling.HasValue)
             {
-                TypeNameHandling typeNameHandling;
-                if (Enum.TryParse<TypeNameHandling>(config.Properties[TypeNameHandlingProperty], out typeNameHandling))
-                {
-                    settings.TypeNameHandling = typeNameHandling;
-                }
+                settings.TypeNameHandling = typeNameHandling.Value;
             }
             return settings;
         }

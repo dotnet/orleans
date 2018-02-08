@@ -1,32 +1,28 @@
-//#define REREAD_STATE_AFTER_WRITE_FAILED
-
 using System;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using Microsoft.Extensions.Options;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.TestingHost;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Hosting;
+using Orleans.TestingHost;
 using TestExtensions;
-
-// ReSharper disable RedundantAssignment
-// ReSharper disable UnusedVariable
-// ReSharper disable InconsistentNaming
 
 namespace Tester.AzureUtils.Persistence
 {
     /// <summary>
-    /// PersistenceGrainTests using AzureStore - Requires access to external Azure blob storage
+    /// PersistenceGrainTests using AzureGrainStorage - Requires access to external Azure table storage
     /// </summary>
     [TestCategory("Persistence"), TestCategory("Azure")]
-    public class PersistenceGrainTests_AzureBlobStore : Base_PersistenceGrainTests_AzureStore, IClassFixture<PersistenceGrainTests_AzureBlobStore.Fixture>
+    public class PersistenceGrainTests_AzureTableGrainStorage : Base_PersistenceGrainTests_AzureStore, IClassFixture<PersistenceGrainTests_AzureTableGrainStorage.Fixture>
     {
         public static Guid ServiceId = Guid.NewGuid();
         public class Fixture : BaseAzureTestClusterFixture
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                
                 builder.Options.InitialSilosCount = 4;
                 builder.Options.UseTestClusterMembership = false;
                 builder.ConfigureLegacyConfiguration(legacy =>
@@ -34,68 +30,95 @@ namespace Tester.AzureUtils.Persistence
                     legacy.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
 
                     legacy.ClusterConfiguration.Globals.ServiceId = ServiceId;
+
                     legacy.ClusterConfiguration.Globals.MaxResendCount = 0;
 
                     legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test1");
                     legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test2",
-                        new Dictionary<string, string> {{"Config1", "1"}, {"Config2", "2"}});
+                        new Dictionary<string, string> { { "Config1", "1" }, { "Config2", "2" } });
                     legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.ErrorInjectionStorageProvider>("ErrorInjector");
                     legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("lowercase");
 
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                    legacy.ClusterConfiguration.AddAzureBlobStorageProvider("AzureStore", legacy.ClusterConfiguration.Globals.DataConnectionString);
-                    legacy.ClusterConfiguration.AddAzureBlobStorageProvider("AzureStore1", legacy.ClusterConfiguration.Globals.DataConnectionString);
-                    legacy.ClusterConfiguration.AddAzureBlobStorageProvider("AzureStore2", legacy.ClusterConfiguration.Globals.DataConnectionString);
-                    legacy.ClusterConfiguration.AddAzureBlobStorageProvider("AzureStore3", legacy.ClusterConfiguration.Globals.DataConnectionString);
                 });
                 builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
                 builder.AddClientBuilderConfigurator<ClientBuilderConfigurator>();
+            }
+
+            private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder
+                        .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                        {
+                            options.ServiceId = silo.Value.ServiceId.ToString();
+                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.DeleteStateOnClear = true;
+                        }))
+                        .AddAzureTableGrainStorage("AzureStore1", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                        {
+                            options.ServiceId = silo.Value.ServiceId.ToString();
+                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        }))
+                        .AddAzureTableGrainStorage("AzureStore2", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                        {
+                            options.ServiceId = silo.Value.ServiceId.ToString();
+                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        }))
+                        .AddAzureTableGrainStorage("AzureStore3", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                        {
+                            options.ServiceId = silo.Value.ServiceId.ToString();
+                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        }));
+                }
             }
         }
 
-        public PersistenceGrainTests_AzureBlobStore(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
+        public PersistenceGrainTests_AzureTableGrainStorage(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
         {
             fixture.EnsurePreconditionsMet();
         }
-        
+
         [SkippableFact, TestCategory("Functional")]
-        public async Task Grain_AzureBlobStore_Delete()
+        public async Task Grain_AzureTableGrainStorage_Delete()
         {
             await base.Grain_AzureStore_Delete();
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task Grain_AzureBlobStore_Read()
+        public async Task Grain_AzureTableGrainStorage_Read()
         {
             await base.Grain_AzureStore_Read();
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task Grain_GuidKey_AzureBlobStore_Read_Write()
+        public async Task Grain_GuidKey_AzureTableGrainStorage_Read_Write()
         {
             await base.Grain_GuidKey_AzureStore_Read_Write();
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task Grain_LongKey_AzureBlobStore_Read_Write()
+        public async Task Grain_LongKey_AzureTableGrainStorage_Read_Write()
         {
             await base.Grain_LongKey_AzureStore_Read_Write();
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task Grain_LongKeyExtended_AzureBlobStore_Read_Write()
+        public async Task Grain_LongKeyExtended_AzureTableGrainStorage_Read_Write()
         {
             await base.Grain_LongKeyExtended_AzureStore_Read_Write();
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task Grain_GuidKeyExtended_AzureBlobStore_Read_Write()
+        public async Task Grain_GuidKeyExtended_AzureTableGrainStorage_Read_Write()
         {
             await base.Grain_GuidKeyExtended_AzureStore_Read_Write();
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task Grain_Generic_AzureBlobStore_Read_Write()
+        public async Task Grain_Generic_AzureTableGrainStorage_Read_Write()
         {
             StorageEmulatorUtilities.EnsureEmulatorIsNotUsed();
 
@@ -103,7 +126,7 @@ namespace Tester.AzureUtils.Persistence
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task Grain_Generic_AzureBlobStore_DiffTypes()
+        public async Task Grain_Generic_AzureTableGrainStorage_DiffTypes()
         {
             StorageEmulatorUtilities.EnsureEmulatorIsNotUsed();
 
@@ -111,43 +134,9 @@ namespace Tester.AzureUtils.Persistence
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task Grain_AzureBlobStore_SiloRestart()
+        public async Task Grain_AzureTableGrainStorage_SiloRestart()
         {
             await base.Grain_AzureStore_SiloRestart(ServiceId);
         }
-
-        [SkippableFact, TestCategory("CorePerf"), TestCategory("Performance"), TestCategory("Stress")]
-        public void Persistence_Perf_Activate_AzureBlobStore()
-        {
-            base.Persistence_Perf_Activate();
-        }
-
-        [SkippableFact, TestCategory("CorePerf"), TestCategory("Performance"), TestCategory("Stress")]
-        public void Persistence_Perf_Write_AzureBlobStore()
-        {
-            base.Persistence_Perf_Write();
-        }
-
-        [SkippableFact, TestCategory("CorePerf"), TestCategory("Performance"), TestCategory("Stress")]
-        public void Persistence_Perf_Write_Reread_AzureBlobStore()
-        {
-            base.Persistence_Perf_Write_Reread();
-        }
-
-      
-        [SkippableTheory, TestCategory("Functional")]
-        [InlineData("AzureStore")]
-        [InlineData("AzureStore1")]
-        [InlineData("AzureStore2")]
-        [InlineData("AzureStore3")]
-        public Task Persistence_Silo_StorageProvider_AzureBlobStore(string providerName)
-        {
-            return base.Persistence_Silo_StorageProvider_Azure(providerName);
-        }
-
     }
 }
-
-// ReSharper restore RedundantAssignment
-// ReSharper restore UnusedVariable
-// ReSharper restore InconsistentNaming

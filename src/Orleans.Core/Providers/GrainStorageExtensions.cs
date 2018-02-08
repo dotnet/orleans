@@ -13,12 +13,12 @@ namespace Orleans.Storage
         /// Aquire the storage provider associated with the grain type.
         /// </summary>
         /// <returns></returns>
-        public static IStorageProvider GetStorageProvider(this Grain grain, IServiceProvider services)
+        public static IGrainStorage GetGrainStorage(this Grain grain, IServiceProvider services)
         {
             StorageProviderAttribute attr = grain.GetType().GetCustomAttributes<StorageProviderAttribute>(true).FirstOrDefault();
-            IStorageProvider storageProvider = attr != null
-                ? services.GetServiceByName<IStorageProvider>(attr.ProviderName)
-                : services.GetService<IStorageProvider>();
+            IGrainStorage storageProvider = attr != null
+                ? services.GetServiceByName<IGrainStorage>(attr.ProviderName)
+                : services.GetService<IGrainStorage>();
             if (storageProvider == null)
             {
                 ThrowMissingProviderException(grain, attr?.ProviderName);
@@ -40,7 +40,7 @@ namespace Orleans.Storage
                 errMsg = $"No storage provider named \"{name}\" found loading grain type {grainTypeName}.";
             }
 
-            throw new BadProviderConfigException(errMsg);
+            throw new BadGrainStorageConfigException(errMsg);
         }
     }
 }

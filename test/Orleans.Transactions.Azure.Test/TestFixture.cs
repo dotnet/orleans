@@ -1,11 +1,12 @@
 using System;
 using Xunit;
-using Orleans.Runtime.Configuration;
 using Orleans.Hosting;
 using Orleans.TestingHost;
 using Orleans.Transactions.Tests;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
+using Orleans.Runtime;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {
@@ -19,10 +20,6 @@ namespace Orleans.Transactions.AzureStorage.Tests
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                legacy.ClusterConfiguration.AddAzureTableStorageProvider(TransactionTestConstants.TransactionStore);
-            });
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         }
 
@@ -30,11 +27,17 @@ namespace Orleans.Transactions.AzureStorage.Tests
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
-                var id = (uint) Guid.NewGuid().GetHashCode();
-                hostBuilder.UseInClusterTransactionManager()
+                var id = (uint) Guid.NewGuid().GetHashCode() % 100000;
+                hostBuilder
+                    .UseInClusterTransactionManager()
+                    .AddAzureTableGrainStorage(TransactionTestConstants.TransactionStore, builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                    {
+                        options.ServiceId = silo.Value.ServiceId.ToString();
+                        options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    }))
                     .UseAzureTransactionLog(options => {
                         // TODO: Find better way for test isolation.  Possibly different partition keys.
-                        options.TableName = $"TransactionLog{id % 100000:X}";
+                        options.TableName = $"TransactionLog{id:X}";
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     })
                     .UseTransactionalState();

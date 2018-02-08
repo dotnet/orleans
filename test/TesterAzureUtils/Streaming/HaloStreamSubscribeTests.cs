@@ -15,6 +15,8 @@ using Xunit;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Tester.AzureUtils;
+using Orleans.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace UnitTests.HaloTests.Streaming
 {
@@ -34,9 +36,6 @@ namespace UnitTests.HaloTests.Streaming
                 {
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
 
-                    legacy.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore", deleteOnClear: true);
-                    legacy.ClusterConfiguration.AddAzureTableStorageProvider("PubSubStore", deleteOnClear: true, useJsonFormat: false);
-
                     legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
                     legacy.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData",
                         fireAndForgetDelivery: false,
@@ -45,6 +44,27 @@ namespace UnitTests.HaloTests.Streaming
                     legacy.ClusterConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
                     legacy.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
                 });
+                builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+            }
+
+            private class SiloBuilderConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder
+                        .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                        {
+                            options.ServiceId = silo.Value.ServiceId.ToString();
+                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.DeleteStateOnClear = true;
+                        }))
+                        .AddAzureTableGrainStorage("PubSubStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                        {
+                            options.ServiceId = silo.Value.ServiceId.ToString();
+                            options.DeleteStateOnClear = true;
+                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        }));
+                }
             }
 
             public override void Dispose()
