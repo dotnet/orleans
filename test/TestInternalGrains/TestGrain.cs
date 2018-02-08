@@ -196,6 +196,14 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
+        public async Task<bool> NotifyOtherGrain(IOneWayGrain otherGrain, ISimpleGrainObserver observer)
+        {
+            var task = otherGrain.Notify(observer);
+            var completedSynchronously = task.Status == TaskStatus.RanToCompletion;
+            await task;
+            return completedSynchronously;
+        }
+
         public Task<int> GetCount() => Task.FromResult(this.count);
 
         public Task ThrowsOneWay()
