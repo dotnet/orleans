@@ -77,7 +77,7 @@ namespace Orleans.Hosting
             var formated = new List<string>()
             {
                 OptionFormattingUtilities.Format(nameof(this.options.HasMultiClusterNetwork), this.options.HasMultiClusterNetwork),
-                OptionFormattingUtilities.Format(nameof(this.options.DefaultMultiCluster), string.Join(";", this.options.DefaultMultiCluster)),
+                OptionFormattingUtilities.Format(nameof(this.options.DefaultMultiCluster), this.options.DefaultMultiCluster != null? string.Join(";", this.options.DefaultMultiCluster) : String.Empty),
                 OptionFormattingUtilities.Format(nameof(this.options.MaxMultiClusterGateways), this.options.MaxMultiClusterGateways),
                 OptionFormattingUtilities.Format(nameof(this.options.BackgroundGossipInterval), this.options.BackgroundGossipInterval),
                 OptionFormattingUtilities.Format(nameof(this.options.UseGlobalSingleInstanceByDefault), this.options.UseGlobalSingleInstanceByDefault),
