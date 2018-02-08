@@ -11,7 +11,7 @@ namespace Orleans.Hosting
     public static class AdoNetHostingExtensions
     {
         /// <summary>
-        /// Configure SiloHostBuilder with SqlMembership
+        /// Configure SiloHostBuilder with ADO.NET clustering
         /// </summary>
         public static ISiloHostBuilder UseAdoNetClustering(this ISiloHostBuilder builder,
             Action<AdoNetClusteringOptions> configureOptions)
@@ -20,7 +20,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure SiloHostBuilder with SqlMembership
+        /// Configure SiloHostBuilder with ADO.NET clustering
         /// </summary>
         public static ISiloHostBuilder UseAdoNetClustering(this ISiloHostBuilder builder,
             Action<OptionsBuilder<AdoNetClusteringOptions>> configureOptions)
@@ -29,7 +29,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure client to use AdoNetGatewayListProvider
+        /// Configure client to use ADO.NET gateway list provider
         /// </summary>
         public static IClientBuilder UseAdoNetlGatewayListProvider(this IClientBuilder builder, Action<AdoNetGatewayListProviderOptions> configureOptions)
         {
@@ -37,7 +37,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure client to use AdoNetGatewayListProvider
+        /// Configure client to use ADO.NET gateway list provider
         /// </summary>
         public static IClientBuilder UseAdoNetlGatewayListProvider(this IClientBuilder builder, Action<OptionsBuilder<AdoNetGatewayListProviderOptions>> configureOptions)
         {
@@ -45,7 +45,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure DI container with SqlMembership
+        /// Configure DI container with ADO.NET clustering
         /// </summary>
         public static IServiceCollection UseAdoNetClustering(this IServiceCollection services,
             Action<AdoNetClusteringOptions> configureOptions)
@@ -54,7 +54,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure DI container with SqlMembership
+        /// Configure DI container with ADO.NET clustering
         /// </summary>
         public static IServiceCollection UseAdoNetClustering(this IServiceCollection services,
             Action<OptionsBuilder<AdoNetClusteringOptions>> configureOptions)
@@ -64,7 +64,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure DI container with AdoNetGatewayListProvider
+        /// Configure DI container with ADO.NET gateway list provider
         /// </summary>
         public static IServiceCollection UseAdoNetlGatewayListProvider(this IServiceCollection services,
             Action<AdoNetGatewayListProviderOptions> configureOptions)
@@ -73,7 +73,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure DI container with SqlGatewayProvider
+        /// Configure DI container with ADO.NET gateway list provider
         /// </summary>
         public static IServiceCollection UseAdoNetlGatewayListProvider(this IServiceCollection services,
             Action<OptionsBuilder<AdoNetGatewayListProviderOptions>> configureOptions)
