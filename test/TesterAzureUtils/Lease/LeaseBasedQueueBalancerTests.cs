@@ -93,7 +93,7 @@ namespace Tester.AzureUtils.Lease
             this.HostedCluster.StopSilo(this.HostedCluster.SecondarySilos[0]);
             await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(3, 3, mgmtGrain, lastTry), TimeOut);
             //start one silo, 6 queues, 3 silo, then each agent manager should own 2 queues
-            this.HostedCluster.StartAdditionalSilo();
+            this.HostedCluster.StartAdditionalSilo(true);
             await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(2, 2, mgmtGrain, lastTry), TimeOut);
         }
 
@@ -110,7 +110,7 @@ namespace Tester.AzureUtils.Lease
             this.HostedCluster.KillSilo(this.HostedCluster.SecondarySilos[0]);
             await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(3, 3, mgmtGrain, lastTry), TimeOut);
             //start one silo, 6 queues, 3 silo, then each agent manager should own 2 queues
-            this.HostedCluster.StartAdditionalSilo();
+            this.HostedCluster.StartAdditionalSilo(true);
             await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(2, 2, mgmtGrain, lastTry), TimeOut);
         }
 

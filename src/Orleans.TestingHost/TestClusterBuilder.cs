@@ -117,38 +117,39 @@ namespace Orleans.TestingHost
             if (this.Options.BaseSiloPort == 0) this.Options.BaseSiloPort = baseSiloPort;
             if (this.Options.BaseGatewayPort == 0) this.Options.BaseGatewayPort = baseGatewayPort;
 
-            // Returns a pairs of ports which have the specified number of consecutive ports available for use.
-            ValueTuple<int, int> GetAvailableConsecutiveServerPortsPair(int consecutivePortsToCheck = 5)
+         
+        }
+        // Returns a pairs of ports which have the specified number of consecutive ports available for use.
+        internal static ValueTuple<int, int> GetAvailableConsecutiveServerPortsPair(int consecutivePortsToCheck = 5)
+        {
+            // Evaluate current system tcp connections
+            IPGlobalProperties ipGlobalProperties = IPGlobalProperties.GetIPGlobalProperties();
+            IPEndPoint[] tcpConnInfoArray = ipGlobalProperties.GetActiveTcpListeners();
+
+            // each returned port in the pair will have to have at least this amount of available ports following it
+
+            return (GetAvailableConsecutiveServerPorts(tcpConnInfoArray, 22300, 30000, consecutivePortsToCheck),
+                GetAvailableConsecutiveServerPorts(tcpConnInfoArray, 40000, 50000, consecutivePortsToCheck));
+        }
+
+        private static int GetAvailableConsecutiveServerPorts(IPEndPoint[] tcpConnInfoArray, int portStartRange, int portEndRange, int consecutivePortsToCheck)
+        {
+            const int MaxAttempts = 10;
+
+            for (int attempts = 0; attempts < MaxAttempts; attempts++)
             {
-                // Evaluate current system tcp connections
-                IPGlobalProperties ipGlobalProperties = IPGlobalProperties.GetIPGlobalProperties();
-                IPEndPoint[] tcpConnInfoArray = ipGlobalProperties.GetActiveTcpListeners();
+                int basePort = ThreadSafeRandom.Next(portStartRange, portEndRange);
 
-                // each returned port in the pair will have to have at least this amount of available ports following it
+                // get ports in buckets, so we don't interfere with parallel runs of this same function
+                basePort = basePort - (basePort % consecutivePortsToCheck);
+                int endPort = basePort + consecutivePortsToCheck;
 
-                return (GetAvailableConsecutiveServerPorts(tcpConnInfoArray, 22300, 30000, consecutivePortsToCheck),
-                    GetAvailableConsecutiveServerPorts(tcpConnInfoArray, 40000, 50000, consecutivePortsToCheck));
+                // make sure non of the ports in the sub range are in use
+                if (tcpConnInfoArray.All(endpoint => endpoint.Port < basePort || endpoint.Port >= endPort))
+                    return basePort;
             }
 
-            int GetAvailableConsecutiveServerPorts(IPEndPoint[] tcpConnInfoArray, int portStartRange, int portEndRange, int consecutivePortsToCheck)
-            {
-                const int MaxAttempts = 10;
-
-                for (int attempts = 0; attempts < MaxAttempts; attempts++)
-                {
-                    int basePort = ThreadSafeRandom.Next(portStartRange, portEndRange);
-
-                    // get ports in buckets, so we don't interfere with parallel runs of this same function
-                    basePort = basePort - (basePort % consecutivePortsToCheck);
-                    int endPort = basePort + consecutivePortsToCheck;
-
-                    // make sure non of the ports in the sub range are in use
-                    if (tcpConnInfoArray.All(endpoint => endpoint.Port < basePort || endpoint.Port >= endPort))
-                        return basePort;
-                }
-
-                throw new InvalidOperationException("Cannot find enough free ports to spin up a cluster");
-            }
+            throw new InvalidOperationException("Cannot find enough free ports to spin up a cluster");
         }
     }
 }
