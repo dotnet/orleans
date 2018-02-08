@@ -42,35 +42,41 @@ namespace Orleans
         {
             var registration = services.FirstOrDefault(service => service.ServiceType == typeof(IOptionFormatter<TOptions>));
             if (registration == null)
-                services.AddSingleton<IOptionFormatter<TOptions>, TOptionFormatter>()
-                        .AddFromExisting<IOptionFormatter, IOptionFormatter<TOptions>>();
+                services.ConfigureFormatter<TOptions, TOptionFormatter>();
             return services;
         }
 
         /// <summary>
         /// Configure option formatter resolver for named option TOptions
         /// </summary>
-        public static IServiceCollection ConfigureFormatter<TOptions, TOptionFormatterResolver>(this IServiceCollection services, string name)
+        public static IServiceCollection ConfigureFormatterResolver<TOptions, TOptionFormatterResolver>(this IServiceCollection services)
             where TOptions : class
             where TOptionFormatterResolver : class, IOptionFormatterResolver<TOptions>
         {
-            services.AddSingleton<IOptionFormatterResolver<TOptions>, TOptionFormatterResolver>()
-                    .AddSingleton<IOptionFormatter>(sp => sp.GetService<IOptionFormatterResolver<TOptions>>().Resolve(name));
-            return services;
+            return services.AddSingleton<IOptionFormatterResolver<TOptions>, TOptionFormatterResolver>();
         }
 
         /// <summary>
         /// Configure option formatter resolver for named option TOptions, if none is configured
         /// </summary>
-        public static IServiceCollection TryConfigureFormatter<TOptions, TOptionFormatterResolver>(this IServiceCollection services, string name)
+        public static IServiceCollection TryConfigureFormatterResolver<TOptions, TOptionFormatterResolver>(this IServiceCollection services)
             where TOptions : class
             where TOptionFormatterResolver : class, IOptionFormatterResolver<TOptions>
         {
             var registration = services.FirstOrDefault(service => service.ServiceType == typeof(IOptionFormatterResolver<TOptions>));
             if (registration == null)
-                services.AddSingleton<IOptionFormatterResolver<TOptions>, TOptionFormatterResolver>();
-            services.AddSingleton<IOptionFormatter>(sp => sp.GetService<IOptionFormatterResolver<TOptions>>().Resolve(name));
+                return services.ConfigureFormatterResolver<TOptions, TOptionFormatterResolver>();
             return services;
         }
+
+        /// <summary>
+        /// Configure a named option to be logged
+        /// </summary>
+        public static IServiceCollection ConfigureNamedOptionForLogging<TOptions>(this IServiceCollection services, string name)
+            where TOptions : class
+        {
+            return services.AddSingleton<IOptionFormatter>(sp => sp.GetService<IOptionFormatterResolver<TOptions>>().Resolve(name));
+        }
+
     }
 }

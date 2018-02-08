@@ -66,11 +66,6 @@ namespace Tester
             Assert.Single(logFormatters);
             Assert.True(logFormatters.First() is TestOptionsFormatter);
             Assert.True(logFormatters.First() is IOptionFormatter<TestOptions>);
-            // two type specific formaters, one of each.
-            logFormatters = servicesProvider.GetServices<IOptionFormatter<TestOptions>>();
-            Assert.True(logFormatters.Count() == 2);
-            Assert.True(logFormatters.First() is TestOptionsFormatter2);
-            Assert.True(logFormatters.ElementAt(1) is TestOptionsFormatter);
             // when resolving singe type specific formatter, we get the right one
             var logFormatter = servicesProvider.GetService<IOptionFormatter<TestOptions>>();
             Assert.True(logFormatter is TestOptionsFormatter);
@@ -93,8 +88,9 @@ namespace Tester
             services.AddSingleton(typeof(ILogger<>), typeof(TestLogger<>));
             services.AddSingleton<OptionsLogger, TestOptionsLogger>();
             services.Configure<TestOptions>(options => options.IntField = 1);
+            // pre register overrides
             services.ConfigureFormatter<TestOptions, TestOptionsFormatter>();
-            //TestOptionsFormatter2 is configured as the default 
+            // default
             services.TryConfigureFormatter<TestOptions, TestOptionsFormatter2>();
             var servicesProvider = services.BuildServiceProvider();
             servicesProvider.GetRequiredService<OptionsLogger>().LogOptions();
@@ -122,9 +118,10 @@ namespace Tester
             services.AddSingleton(typeof(ILogger<>), typeof(TestLogger<>));
             services.AddSingleton<OptionsLogger, TestOptionsLogger>();
             services.Configure<TestOptions>(options => options.IntField = 1);
+            // default
             services.TryConfigureFormatter<TestOptions, TestOptionsFormatter2>();
+            // post register overrides
             services.ConfigureFormatter<TestOptions, TestOptionsFormatter>();
-            //TestOptionsFormatter2 is configured as the default 
             var servicesProvider = services.BuildServiceProvider();
             servicesProvider.GetRequiredService<OptionsLogger>().LogOptions();
 
@@ -132,11 +129,6 @@ namespace Tester
             Assert.Single(logFormatters);
             Assert.True(logFormatters.First() is TestOptionsFormatter);
             Assert.True(logFormatters.First() is IOptionFormatter<TestOptions>);
-            // two type specific formaters, one of each.
-            logFormatters = servicesProvider.GetServices<IOptionFormatter<TestOptions>>();
-            Assert.True(logFormatters.Count() == 2);
-            Assert.True(logFormatters.First() is TestOptionsFormatter2);
-            Assert.True(logFormatters.ElementAt(1) is TestOptionsFormatter);
             // when resolving singe type specific formatter, we get the right one
             var logFormatter = servicesProvider.GetService<IOptionFormatter<TestOptions>>();
             Assert.True(logFormatter is TestOptionsFormatter);
@@ -158,6 +150,7 @@ namespace Tester
             services.AddSingleton<ILoggerFactory>(sp => sp.GetRequiredService<TestLoggerFactory>());
             services.AddSingleton(typeof(ILogger<>), typeof(TestLogger<>));
             services.AddSingleton<OptionsLogger, TestOptionsLogger>();
+            services.ConfigureFormatterResolver<TestOptions, TestOptionsFormatter.Resolver>();
             Enumerable
                 .Range(1, 3)
                 .ToList()
@@ -165,7 +158,7 @@ namespace Tester
                 {
                     string name = i.ToString();
                     services.Configure<TestOptions>(name, (options => options.IntField = i));
-                    services.ConfigureFormatter<TestOptions, TestOptionsFormatter.Resolver>(name);
+                    services.ConfigureNamedOptionForLogging<TestOptions>(name);
                 });
             var servicesProvider = services.BuildServiceProvider();
             servicesProvider.GetRequiredService<OptionsLogger>().LogOptions();
@@ -195,18 +188,19 @@ namespace Tester
             services.AddSingleton(typeof(ILogger<>), typeof(TestLogger<>));
             services.AddSingleton<OptionsLogger, TestOptionsLogger>();
             // pre register overrides
-            services.Configure<TestOptions>("1", (options => options.IntField = 1));
-            services.ConfigureFormatter<TestOptions, TestOptionsFormatter.Resolver>("1");
-            // defaults
+            services.ConfigureFormatterResolver<TestOptions, TestOptionsFormatter.Resolver>();
+            // configure options
             Enumerable
-                .Range(2, 2)
+                .Range(1, 3)
                 .ToList()
                 .ForEach(i =>
                 {
                     string name = i.ToString();
                     services.Configure<TestOptions>(name, (options => options.IntField = i));
-                    services.TryConfigureFormatter<TestOptions, TestOptionsFormatter2.Resolver>(name);
+                    services.ConfigureNamedOptionForLogging<TestOptions>(name);
                 });
+            // default
+            services.TryConfigureFormatterResolver<TestOptions, TestOptionsFormatter2.Resolver>();
             var servicesProvider = services.BuildServiceProvider();
             servicesProvider.GetRequiredService<OptionsLogger>().LogOptions();
 
@@ -235,18 +229,19 @@ namespace Tester
             services.AddSingleton(typeof(ILogger<>), typeof(TestLogger<>));
             services.AddSingleton<OptionsLogger, TestOptionsLogger>();
             // defaults
+            services.TryConfigureFormatterResolver<TestOptions, TestOptionsFormatter2.Resolver>();
+            // configure options
             Enumerable
-                .Range(1, 2)
+                .Range(1, 3)
                 .ToList()
                 .ForEach(i =>
                 {
                     string name = i.ToString();
                     services.Configure<TestOptions>(name, (options => options.IntField = i));
-                    services.TryConfigureFormatter<TestOptions, TestOptionsFormatter2.Resolver>(name);
+                    services.ConfigureNamedOptionForLogging<TestOptions>(name);
                 });
             // post register overrides
-            services.Configure<TestOptions>("3", (options => options.IntField = 3));
-            services.ConfigureFormatter<TestOptions, TestOptionsFormatter.Resolver>("3");
+            services.ConfigureFormatterResolver<TestOptions, TestOptionsFormatter.Resolver>();
             var servicesProvider = services.BuildServiceProvider();
             servicesProvider.GetRequiredService<OptionsLogger>().LogOptions();
 
