@@ -93,7 +93,7 @@ namespace UnitTests.Stats
         public void ApplicationRequestsStatisticsGroup_Perf()
         {
             StatisticsCollector.Initialize(StatisticsLevel.Info);
-            ApplicationRequestsStatisticsGroup.Init(TimeSpan.FromSeconds(30));
+            ApplicationRequestsStatisticsGroup.Init();
             const long nIterations = 10000000;
             const int nValues = 1000;
             var rand = new Random();

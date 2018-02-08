@@ -40,7 +40,6 @@ namespace Orleans
             this.built = true;
 
             // Configure default services and build the container.
-            this.ConfigureServices(EnsureClientConfigurationConfigured);
             this.ConfigureDefaults();
 
             var serviceProvider = this.serviceProviderBuilder.BuildServiceProvider(new HostBuilderContext(this.Properties));
@@ -50,15 +49,6 @@ namespace Orleans
             serviceProvider.GetService<SerializationManager>().RegisterSerializers(serviceProvider.GetService<IApplicationPartManager>());
             serviceProvider.GetRequiredService<OutsideRuntimeClient>().ConsumeServices(serviceProvider);
             return serviceProvider.GetRequiredService<IClusterClient>();
-        }
-
-        /// <inheritdoc />
-        public IClientBuilder UseConfiguration(ClientConfiguration configuration)
-        {
-            if (configuration == null) throw new ArgumentNullException(nameof(configuration));
-
-            this.serviceProviderBuilder.ConfigureServices((context, services) => services.AddLegacyClientConfigurationSupport(configuration));
-            return this;
         }
 
         /// <inheritdoc />
@@ -89,14 +79,6 @@ namespace Orleans
             foreach (var validator in validators)
             {
                 validator.ValidateConfiguration();
-            }
-        }
-
-        private static void EnsureClientConfigurationConfigured(IServiceCollection services)
-        {
-            if (services.TryGetClientConfiguration() == null)
-            {
-                services.AddLegacyClientConfigurationSupport();
             }
         }
     }

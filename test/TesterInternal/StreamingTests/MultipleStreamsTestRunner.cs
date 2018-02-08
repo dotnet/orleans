@@ -38,7 +38,7 @@ namespace UnitTests.Streaming
             logger.Info("\n\n************************ {0}_{1}_{2} ********************************* \n\n", streamProviderName, testNumber, testName);
         }
 
-        public async Task StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(Func<SiloHandle> startSiloFunc = null, Action<SiloHandle> stopSiloFunc = null)
+        public async Task StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(Func<bool,SiloHandle> startSiloFunc = null, Action<SiloHandle> stopSiloFunc = null)
         {
             Heading(String.Format("MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains"));
             List<SingleStreamTestRunner> runners = new List<SingleStreamTestRunner>();
@@ -57,7 +57,7 @@ namespace UnitTests.Streaming
             SiloHandle silo = null;
             if (startSiloFunc != null)
             {
-                silo = startSiloFunc();
+                silo = startSiloFunc(false);
             }
 
             foreach (var runner in runners)

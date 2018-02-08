@@ -294,7 +294,7 @@ namespace Orleans.ServiceBus.Providers
             };
 
             return new EventHubAdapterReceiver(config, this.CacheFactory, this.CheckpointerFactory, this.loggerFactory, this.ReceiverMonitorFactory(receiverMonitorDimensions, this.loggerFactory, this.telemetryProducer), 
-                this.serviceProvider.GetRequiredService<IOptions<SiloStatisticsOptions>>().Value,
+                this.serviceProvider.GetRequiredService<IOptions<LoadSheddingOptions>>().Value,
                 this.telemetryProducer,
                 this.EventHubReceiverFactory);
         }

@@ -16,11 +16,12 @@ namespace Orleans.Runtime.Counters
         internal SiloPerformanceMetrics MetricsTable;
         private readonly ILogger logger;
         private readonly ILocalSiloDetails siloDetails;
-        private readonly StorageOptions storageOptions;
+        private readonly MonitoringStorageOptions storageOptions;
 
         public SiloStatisticsManager(
             IOptions<SiloStatisticsOptions> statisticsOptions,
-            IOptions<StorageOptions> azureStorageOptions,
+            IOptions<LoadSheddingOptions> loadSheddingOptions,
+            IOptions<MonitoringStorageOptions> azureStorageOptions,
             ILocalSiloDetails siloDetails, 
             SerializationManager serializationManager, 
             ITelemetryProducer telemetryProducer,
@@ -34,14 +35,14 @@ namespace Orleans.Runtime.Counters
             MessagingStatisticsGroup.Init(true);
             MessagingProcessingStatisticsGroup.Init();
             NetworkingStatisticsGroup.Init(true);
-            ApplicationRequestsStatisticsGroup.Init(messagingOptions.Value.ResponseTimeout);
+            ApplicationRequestsStatisticsGroup.Init();
             SchedulerStatisticsGroup.Init(loggerFactory);
             StorageStatisticsGroup.Init();
             TransactionsStatisticsGroup.Init();
             this.logger = loggerFactory.CreateLogger<SiloStatisticsManager>();
             this.hostEnvironmentStatistics = hostEnvironmentStatistics;
             this.logStatistics = new LogStatistics(statisticsOptions.Value.LogWriteInterval, true, serializationManager, loggerFactory);
-            this.MetricsTable = new SiloPerformanceMetrics(this.hostEnvironmentStatistics, appEnvironmentStatistics, loggerFactory, statisticsOptions);
+            this.MetricsTable = new SiloPerformanceMetrics(this.hostEnvironmentStatistics, appEnvironmentStatistics, loggerFactory, loadSheddingOptions);
             this.countersPublisher = new CountersStatistics(statisticsOptions.Value.PerfCountersWriteInterval, telemetryProducer, loggerFactory);
         }
 

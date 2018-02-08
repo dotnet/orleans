@@ -26,33 +26,28 @@ namespace Orleans.Runtime.Management
         private readonly IMultiClusterOracle multiClusterOracle;
         private readonly IInternalGrainFactory internalGrainFactory;
         private readonly ISiloStatusOracle siloStatusOracle;
-        private readonly MembershipTableFactory membershipTableFactory;
         private readonly GrainTypeManager grainTypeManager;
         private readonly IVersionStore versionStore;
         private ILogger logger;
-
+        private IMembershipTable membershipTable;
         public ManagementGrain(
             IOptions<MultiClusterOptions> multiClusterOptions,
             IMultiClusterOracle multiClusterOracle,
             IInternalGrainFactory internalGrainFactory,
             ISiloStatusOracle siloStatusOracle,
-            MembershipTableFactory membershipTableFactory, 
+            IMembershipTable membershipTable, 
             GrainTypeManager grainTypeManager, 
-            IVersionStore versionStore)
+            IVersionStore versionStore,
+            ILogger<ManagementGrain> logger)
         {
             this.multiClusterOptions = multiClusterOptions.Value;
             this.multiClusterOracle = multiClusterOracle;
             this.internalGrainFactory = internalGrainFactory;
+            this.membershipTable = membershipTable;
             this.siloStatusOracle = siloStatusOracle;
-            this.membershipTableFactory = membershipTableFactory;
             this.grainTypeManager = grainTypeManager;
             this.versionStore = versionStore;
-        }
-
-        public override Task OnActivateAsync()
-        {
-            logger = this.ServiceProvider.GetRequiredService<ILogger<ManagementGrain>>();
-            return Task.CompletedTask;
+            this.logger = logger;
         }
 
         public async Task<Dictionary<SiloAddress, SiloStatus>> GetHosts(bool onlyActive = false)
@@ -287,7 +282,7 @@ namespace Orleans.Runtime.Management
         private Task<IMembershipTable> GetMembershipTable()
         {
             if (!(this.siloStatusOracle is MembershipOracle)) throw new InvalidOperationException("The current membership oracle does not support detailed silo status reporting.");
-            return this.membershipTableFactory.GetMembershipTable();
+            return Task.FromResult(this.membershipTable);
         }
 
         private SiloAddress[] GetSiloAddresses(SiloAddress[] silos)

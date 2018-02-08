@@ -41,7 +41,7 @@ namespace Orleans.ServiceBus.Providers
         private readonly ILogger logger;
         private readonly IQueueAdapterReceiverMonitor monitor;
         private readonly ITelemetryProducer telemetryProducer;
-        private readonly SiloStatisticsOptions statisticsOptions;
+        private readonly LoadSheddingOptions loadSheddingOptions;
 
         private IEventHubQueueCache cache;
 
@@ -68,7 +68,7 @@ namespace Orleans.ServiceBus.Providers
             Func<string, Task<IStreamQueueCheckpointer<string>>> checkpointerFactory,
             ILoggerFactory loggerFactory,
             IQueueAdapterReceiverMonitor monitor,
-            SiloStatisticsOptions statisticsOptions,
+            LoadSheddingOptions loadSheddingOptions,
             ITelemetryProducer telemetryProducer,
             Func<EventHubPartitionSettings, string, ILogger, ITelemetryProducer, Task<IEventHubReceiver>> eventHubReceiverFactory = null)
         {
@@ -77,7 +77,7 @@ namespace Orleans.ServiceBus.Providers
             if (checkpointerFactory == null) throw new ArgumentNullException(nameof(checkpointerFactory));
             if (loggerFactory == null) throw new ArgumentNullException(nameof(loggerFactory));
             if (monitor == null) throw new ArgumentNullException(nameof(monitor));
-            if (statisticsOptions == null) throw new ArgumentNullException(nameof(statisticsOptions));
+            if (loadSheddingOptions == null) throw new ArgumentNullException(nameof(loadSheddingOptions));
             if (telemetryProducer == null) throw new ArgumentNullException(nameof(telemetryProducer));
             this.settings = settings;
             this.cacheFactory = cacheFactory;
@@ -86,7 +86,7 @@ namespace Orleans.ServiceBus.Providers
             this.logger = this.loggerFactory.CreateLogger($"{this.GetType().FullName}.{settings.Hub.Path}.{settings.Partition}");
             this.monitor = monitor;
             this.telemetryProducer = telemetryProducer;
-            this.statisticsOptions = statisticsOptions;
+            this.loadSheddingOptions = loadSheddingOptions;
 
             this.eventHubReceiverFactory = eventHubReceiverFactory == null ? EventHubAdapterReceiver.CreateReceiver : eventHubReceiverFactory;
         }
@@ -116,7 +116,7 @@ namespace Orleans.ServiceBus.Providers
                     this.cache = null;
                 }
                 this.cache = this.cacheFactory(this.settings.Partition, this.checkpointer, this.loggerFactory, this.telemetryProducer);
-                this.flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { this.cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(this.statisticsOptions) };
+                this.flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { this.cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(this.loadSheddingOptions) };
                 string offset = await this.checkpointer.Load();
                 this.receiver = await this.eventHubReceiverFactory(this.settings, offset, this.logger, this.telemetryProducer);
                 watch.Stop();

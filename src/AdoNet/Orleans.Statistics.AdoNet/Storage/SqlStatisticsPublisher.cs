@@ -5,6 +5,8 @@ using System.Net;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Hosting;
 using Orleans.Statistics.AdoNet.Storage;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -28,7 +30,6 @@ namespace Orleans.Providers.SqlServer
         private RelationalOrleansQueries orleansQueries;
         private ILogger logger;
         private IGrainReferenceConverter grainReferenceConverter;
-
         /// <summary>
         /// Name of the provider
         /// </summary>
@@ -103,9 +104,9 @@ namespace Orleans.Providers.SqlServer
             }
         }
 
-        async Task IClientMetricsDataPublisher.Init(ClientConfiguration config, IPAddress address, string clientId)
+        Task IClientMetricsDataPublisher.Init(IPAddress address, string clientId)
         {
-            orleansQueries = await RelationalOrleansQueries.CreateInstance(config.AdoInvariant, config.DataConnectionString, this.grainReferenceConverter);
+            return Task.CompletedTask;
         }
 
         /// <summary>

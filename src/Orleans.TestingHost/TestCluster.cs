@@ -31,7 +31,6 @@ namespace Orleans.TestingHost
         private readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
         private readonly TestClusterOptions options;
         private readonly StringBuilder log = new StringBuilder();
-
         private int startedInstances;
 
         /// <summary>
@@ -236,9 +235,9 @@ namespace Orleans.TestingHost
         /// Start an additional silo, so that it joins the existing cluster.
         /// </summary>
         /// <returns>SiloHandle for the newly started silo.</returns>
-        public SiloHandle StartAdditionalSilo()
+        public SiloHandle StartAdditionalSilo(bool startAdditionalSiloOnNewPort = false)
         {
-            return this.StartAdditionalSilos(1).GetAwaiter().GetResult().Single();
+            return this.StartAdditionalSilos(1, startAdditionalSiloOnNewPort).GetAwaiter().GetResult().Single();
         }
 
         /// <summary>
@@ -246,13 +245,13 @@ namespace Orleans.TestingHost
         /// </summary>
         /// <param name="silosToStart">Number of silos to start.</param>
         /// <returns>List of SiloHandles for the newly started silos.</returns>
-        public async Task<List<SiloHandle>> StartAdditionalSilos(int silosToStart)
+        public async Task<List<SiloHandle>> StartAdditionalSilos(int silosToStart, bool startAdditionalSiloOnNewPort = false)
         {
             var instances = new List<SiloHandle>();
             if (silosToStart > 0)
             {
                 var siloStartTasks = Enumerable.Range(this.startedInstances, silosToStart)
-                    .Select(instanceNumber => Task.Run(() => StartOrleansSilo((short)instanceNumber, this.options))).ToArray();
+                    .Select(instanceNumber => Task.Run(() => StartOrleansSilo((short)instanceNumber, this.options, startAdditionalSiloOnNewPort))).ToArray();
 
                 try
                 {
@@ -445,9 +444,9 @@ namespace Orleans.TestingHost
             }
         }
 
-        private SiloHandle StartOrleansSilo(int instanceNumber, TestClusterOptions clusterOptions)
+        private SiloHandle StartOrleansSilo(int instanceNumber, TestClusterOptions clusterOptions, bool startSiloOnNewPort = false)
         {
-            return StartOrleansSilo(this, instanceNumber, clusterOptions);
+            return StartOrleansSilo(this, instanceNumber, clusterOptions, null, startSiloOnNewPort);
         }
 
         /// <summary>
@@ -457,8 +456,9 @@ namespace Orleans.TestingHost
         /// <param name="instanceNumber">The instance number to deploy</param>
         /// <param name="clusterOptions">The options to use.</param>
         /// <param name="configurationOverrides">Configuration overrides.</param>
+        /// <param name="startSiloOnNewPort">Whether we start this silo on a new port, instead of the default one</param>
         /// <returns>A handle to the silo deployed</returns>
-        public static SiloHandle StartOrleansSilo(TestCluster cluster, int instanceNumber, TestClusterOptions clusterOptions, IReadOnlyList<IConfigurationSource> configurationOverrides = null)
+        public static SiloHandle StartOrleansSilo(TestCluster cluster, int instanceNumber, TestClusterOptions clusterOptions, IReadOnlyList<IConfigurationSource> configurationOverrides = null, bool startSiloOnNewPort = false)
         {
             if (cluster == null) throw new ArgumentNullException(nameof(cluster));
             
@@ -466,8 +466,7 @@ namespace Orleans.TestingHost
 
             // Add overrides.
             if (configurationOverrides != null) configurationSources.AddRange(configurationOverrides);
-           
-            var siloSpecificOptions = TestSiloSpecificOptions.Create(clusterOptions, instanceNumber);
+            var siloSpecificOptions = TestSiloSpecificOptions.Create(clusterOptions, instanceNumber, startSiloOnNewPort);
             configurationSources.Add(new MemoryConfigurationSource
             {
                 InitialData = siloSpecificOptions.ToDictionary()

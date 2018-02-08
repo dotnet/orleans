@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Xml;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers;
 
@@ -137,8 +138,7 @@ namespace Orleans.Runtime.Configuration
         public TelemetryConfiguration TelemetryConfiguration { get; } = new TelemetryConfiguration();
 
         public LimitManager LimitManager { get; private set; }
-
-        private static readonly TimeSpan DEFAULT_GATEWAY_LIST_REFRESH_PERIOD = TimeSpan.FromMinutes(1);
+        
         private static readonly TimeSpan DEFAULT_STATS_PERF_COUNTERS_WRITE_PERIOD = Constants.INFINITE_TIMESPAN;
 
         /// <summary>
@@ -188,7 +188,7 @@ namespace Orleans.Runtime.Configuration
             
             PropagateActivityId = Constants.DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
 
-            GatewayListRefreshPeriod = DEFAULT_GATEWAY_LIST_REFRESH_PERIOD;
+            GatewayListRefreshPeriod = GatewayOptions.DEFAULT_GATEWAY_LIST_REFRESH_PERIOD;
             StatisticsProviderName = null;
             StatisticsMetricsTableWriteInterval = StatisticsOptions.DEFAULT_METRICS_TABLE_WRITE_PERIOD;
             StatisticsPerfCountersWriteInterval = DEFAULT_STATS_PERF_COUNTERS_WRITE_PERIOD;

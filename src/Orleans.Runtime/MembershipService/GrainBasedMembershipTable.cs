@@ -17,7 +17,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly ILogger logger;
         private IMembershipTableGrain grain;
 
-        public GrainBasedMembershipTable(IServiceProvider serviceProvider, ILogger<MembershipTableFactory> logger)
+        public GrainBasedMembershipTable(IServiceProvider serviceProvider, ILogger<GrainBasedMembershipTable> logger)
         {
             this.serviceProvider = serviceProvider;
             this.logger = logger;
@@ -62,7 +62,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 try
                 {
-                    await membershipTableGrain.ReadAll().WithTimeout(timespan);
+                    await membershipTableGrain.ReadAll().WithTimeout(timespan, $"MembershipGrain trying to read all content of the membership table, failed due to timeout {timespan}");
                     logger.Info(ErrorCode.MembershipTableGrainInit2, "-Connected to membership table provider.");
                     return;
                 }

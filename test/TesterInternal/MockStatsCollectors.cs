@@ -59,7 +59,7 @@ namespace UnitTests.Stats
             return Task.CompletedTask;
         }
 
-        public Task Init(ClientConfiguration config, IPAddress address, string clientId)
+        public Task Init(IPAddress address, string clientId)
         {
             throw new NotImplementedException();
         }

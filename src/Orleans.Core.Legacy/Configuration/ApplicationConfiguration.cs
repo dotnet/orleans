@@ -23,7 +23,7 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public TimeSpan DefaultCollectionAgeLimit
         {
-            get { return this.defaults.CollectionAgeLimit ?? GrainCollectionOptions.DEFAULT_COLLECTION_AGE_LIMIT; }
+            get { return this.defaults.CollectionAgeLimit ?? TimeSpan.FromHours(2); }
         }
 
         internal TimeSpan ShortestCollectionAgeLimit
@@ -288,7 +288,7 @@ namespace Orleans.Runtime.Configuration
                 this.collectionAgeLimit = null;
             }
 
-            TimeSpan minAgeLimit = GrainCollectionOptions.DEFAULT_COLLECTION_QUANTUM;
+            TimeSpan minAgeLimit = TimeSpan.FromMinutes(1);
             if (ageLimit < minAgeLimit)
             {
                 if (GlobalConfiguration.ENFORCE_MINIMUM_REQUIREMENT_FOR_AGE_LIMIT)

@@ -567,7 +567,7 @@ namespace UnitTests
                 .Build();
             try
             {
-                ClientConfiguration config = client.Configuration;
+                ClientConfiguration config = client.Configuration();
 
                 output.WriteLine(config);
 

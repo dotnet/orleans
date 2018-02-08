@@ -16,6 +16,23 @@ namespace Orleans.Runtime.Configuration
         /// <param name="config">The cluster configuration object to add provider to.</param>
         /// <param name="providerName">The provider name.</param>
         /// <param name="fireAndForgetDelivery">Specifies whether the producer waits for the consumer to process the event before continuing. Setting this to false is useful for troubleshooting serialization issues.</param>
+        /// <param name="optimizeForImmutableData">If set to true items transfered via the stream are always wrapped in Immutable for delivery.</param>>
+        /// <param name="pubSubType">Specifies how can grains subscribe to this stream.</param>
+        public static void AddSimpleMessageStreamProvider(this ClientConfiguration config, string providerName,
+            bool fireAndForgetDelivery = SimpleMessageStreamProvider.DEFAULT_VALUE_FIRE_AND_FORGET_DELIVERY,
+            bool optimizeForImmutableData = SimpleMessageStreamProvider.DEFAULT_VALUE_OPTIMIZE_FOR_IMMUTABLE_DATA,
+            StreamPubSubType pubSubType = SimpleMessageStreamProvider.DEFAULT_STREAM_PUBSUB_TYPE)
+        {
+            var properties = GetSimpleMessageStreamProviderConfiguration(providerName, fireAndForgetDelivery, optimizeForImmutableData, pubSubType);
+            config.RegisterStreamProvider<SimpleMessageStreamProvider>(providerName, properties);
+        }
+
+        /// <summary>
+        /// Adds a stream provider of type <see cref="SimpleMessageStreamProvider"/>
+        /// </summary>
+        /// <param name="config">The cluster configuration object to add provider to.</param>
+        /// <param name="providerName">The provider name.</param>
+        /// <param name="fireAndForgetDelivery">Specifies whether the producer waits for the consumer to process the event before continuing. Setting this to false is useful for troubleshooting serialization issues.</param>
         /// <param name="optimizeForImmutableData">If set to true items transfered via the stream are always wrapped in Immutable for delivery.</param>
         /// <param name="pubSubType">Specifies how can grains subscribe to this stream.</param>
         public static void AddSimpleMessageStreamProvider(this ClusterConfiguration config, string providerName, 

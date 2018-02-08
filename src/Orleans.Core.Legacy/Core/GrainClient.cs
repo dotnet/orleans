@@ -5,27 +5,12 @@ using System.IO;
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 
 namespace Orleans
 {
-    /// <summary>
-    /// Handler for client disconnection from a cluster.
-    /// </summary>
-    /// <param name="sender">The sender.</param>
-    /// <param name="e">The event arguments.</param>
-    public delegate void ConnectionToClusterLostHandler(object sender, EventArgs e);
-
-    /// <summary>
-    /// The delegate called before every request to a grain.
-    /// </summary>
-    /// <param name="request">The request.</param>
-    /// <param name="grain">The grain.</param>
-    public delegate void ClientInvokeCallback(InvokeMethodRequest request, IGrain grain);
-
     /// <summary>
     /// Client runtime for connecting to Orleans system
     /// </summary>
@@ -42,7 +27,7 @@ namespace Orleans
         [Obsolete(DeprecationMessage)]
         public static bool IsInitialized => isFullyInitialized && client.IsInitialized;
 
-        internal static ClientConfiguration CurrentConfig => client.Configuration;
+        internal static ClientConfiguration CurrentConfig => client.Configuration();
         internal static bool TestOnlyNoConnect { get; set; }
 
         private static bool isFullyInitialized = false;

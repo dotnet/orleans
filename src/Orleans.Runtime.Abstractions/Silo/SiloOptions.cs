@@ -1,6 +1,6 @@
-using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Runtime
 {
@@ -44,10 +44,10 @@ namespace Orleans.Runtime
         {
             return new List<string>()
             {
-                OptionFormattingUtilities.Format(nameof(options.SiloName),options.SiloName),
-                OptionFormattingUtilities.Format(nameof(options.ClusterId), options.ClusterId),
-                OptionFormattingUtilities.Format(nameof(options.ServiceId), options.ServiceId),
-                OptionFormattingUtilities.Format(nameof(options.FastKillOnCancelKeyPress), options.FastKillOnCancelKeyPress)
+                OptionFormattingUtilities.Format(nameof(this.options.SiloName),this.options.SiloName),
+                OptionFormattingUtilities.Format(nameof(this.options.ClusterId), this.options.ClusterId),
+                OptionFormattingUtilities.Format(nameof(this.options.ServiceId), this.options.ServiceId),
+                OptionFormattingUtilities.Format(nameof(this.options.FastKillOnCancelKeyPress), this.options.FastKillOnCancelKeyPress)
             };
         }
     }

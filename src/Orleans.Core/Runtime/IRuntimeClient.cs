@@ -63,8 +63,6 @@ namespace Orleans.Runtime
 
         IGrainTypeResolver GrainTypeResolver { get; }
 
-        SerializationManager SerializationManager { get; }
-
         IGrainReferenceRuntime GrainReferenceRuntime { get; }
 
         void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo);

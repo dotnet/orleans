@@ -1,9 +1,12 @@
-using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Type management settings for in place upgrade.
+    /// </summary>
     public class TypeManagementOptions
     {
         /// <summary>
@@ -29,7 +32,7 @@ namespace Orleans.Hosting
         {
             return new List<string>()
             {
-                OptionFormattingUtilities.Format(nameof(options.TypeMapRefreshInterval),options.TypeMapRefreshInterval),
+                OptionFormattingUtilities.Format(nameof(this.options.TypeMapRefreshInterval),this.options.TypeMapRefreshInterval),
             };
         }
     }

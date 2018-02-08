@@ -1,8 +1,11 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
+using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using TestGrainInterfaces;
@@ -10,6 +13,23 @@ using Xunit;
 
 namespace NonSilo.Tests
 {
+    public class NoOpGatewaylistProvider : IGatewayListProvider
+    {
+        public TimeSpan MaxStaleness => throw new NotImplementedException();
+
+        public bool IsUpdatable => throw new NotImplementedException();
+
+        public Task<IList<Uri>> GetGateways()
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task InitializeGatewayListProvider()
+        {
+            throw new NotImplementedException();
+        }
+    }
+
     /// <summary>
     /// Tests for <see cref="ClientBuilder"/>.
     /// </summary>
@@ -23,11 +43,13 @@ namespace NonSilo.Tests
         [Fact]
         public void ClientBuilder_AssembliesTest()
         {
-            var builder = (IClientBuilder)new ClientBuilder();
+            var builder = (IClientBuilder) new ClientBuilder()
+                .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
             Assert.Throws<OrleansConfigurationException>(() => builder.Build());
 
             // Adding an application assembly allows the builder to build successfully.
-            builder = new ClientBuilder().ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IAccountGrain).Assembly));
+            builder = new ClientBuilder().ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IAccountGrain).Assembly))
+                .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
             using (var client = builder.Build())
             {
                 Assert.NotNull(client);
@@ -40,7 +62,8 @@ namespace NonSilo.Tests
         [Fact]
         public void ClientBuilder_NoSpecifiedConfigurationTest()
         {
-            var builder = ClientBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators);
+            var builder = ClientBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators)
+                .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
             using (var client = builder.Build())
             {
                 Assert.NotNull(client);
@@ -53,7 +76,8 @@ namespace NonSilo.Tests
         [Fact]
         public void ClientBuilder_DoubleBuildTest()
         {
-            var builder = ClientBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators);
+            var builder = ClientBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators)
+                .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
             using (builder.Build())
             {
                 Assert.Throws<InvalidOperationException>(() => builder.Build());
@@ -88,7 +112,8 @@ namespace NonSilo.Tests
         [Fact]
         public void ClientBuilder_ServiceProviderTest()
         {
-            var builder = ClientBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators);
+            var builder = ClientBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators)
+                .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
 
             Assert.Throws<ArgumentNullException>(() => builder.ConfigureServices(null));
 

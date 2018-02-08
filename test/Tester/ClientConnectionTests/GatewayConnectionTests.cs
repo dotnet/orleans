@@ -90,7 +90,7 @@ namespace Tester.ClientConnectionTests
             var timeoutCount = 0;
 
             // Fake Gateway
-            var port = this.HostedCluster.Client.Configuration.Gateways.First().Port + 2;
+            var port = this.HostedCluster.Client.Configuration().Gateways.First().Port + 2;
             var endpoint = new IPEndPoint(IPAddress.Loopback, port);
             var evt = new SocketAsyncEventArgs();
             var gatewayManager = this.runtimeClient.ServiceProvider.GetService<TestGatewayManager>();
