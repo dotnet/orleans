@@ -24,7 +24,7 @@ namespace Orleans.Hosting
 
             /// <summary>SQL Server is used to store reminders information. 
             /// This option can be used in production.</summary>
-            public const string SqlServer = "SqlServer";
+            public const string AdoNet = "ADO.NET";
 
             /// <summary>Used for benchmarking; it simply delays for a specified delay during each operation.</summary>
             public const string MockTable = "MockTable";

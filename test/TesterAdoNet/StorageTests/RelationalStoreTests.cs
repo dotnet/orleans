@@ -12,7 +12,7 @@ using Orleans.Tests.SqlUtils;
 using UnitTests.General;
 using Xunit;
 
-namespace UnitTests.StorageTests.SQLAdapter
+namespace UnitTests.StorageTests.AdoNet
 {
     public class StreamingTest
     {
@@ -69,7 +69,7 @@ namespace UnitTests.StorageTests.SQLAdapter
             this.mySqlStorage = fixture.MySqlStorage;
         }
 
-        [SkippableFact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("SqlServer")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("AdoNet")]
         public async Task Streaming_SqlServer_Test()
         {
             using(var tokenSource = new CancellationTokenSource(StreamCancellationTimeoutLimit))
@@ -89,7 +89,7 @@ namespace UnitTests.StorageTests.SQLAdapter
             }
         }
 
-        [SkippableFact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("SqlServer")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("AdoNet")]
         public async Task CancellationToken_SqlServer_Test()
         {
             await CancellationTokenTest(sqlServerStorage, CancellationTestTimeoutLimit);

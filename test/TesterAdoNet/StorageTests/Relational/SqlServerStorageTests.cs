@@ -16,7 +16,7 @@ namespace UnitTests.StorageTests.Relational
     /// <remarks>To duplicate these tests to any back-end, not just for relational, copy and paste this class,
     /// optionally remove <see cref="RelationalStorageTests"/> inheritance and implement a provider and environment
     /// setup as done in <see cref="CommonFixture"/> and how it delegates it.</remarks>
-    [TestCategory("SqlServer"), TestCategory("Persistence")]
+    [TestCategory("AdoNet"), TestCategory("Persistence")]
     public class SqlServerStorageTests: RelationalStorageTests, IClassFixture<CommonFixture>
     {
         /// <summary>

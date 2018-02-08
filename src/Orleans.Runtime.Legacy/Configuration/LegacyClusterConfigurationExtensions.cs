@@ -386,8 +386,8 @@ namespace Orleans.Hosting
                     return ReminderOptions.BuiltIn.ReminderTableGrain;
                 case GlobalConfiguration.ReminderServiceProviderType.AzureTable:
                     return ReminderOptions.BuiltIn.AzureTable;
-                case GlobalConfiguration.ReminderServiceProviderType.SqlServer:
-                    return ReminderOptions.BuiltIn.SqlServer;
+                case GlobalConfiguration.ReminderServiceProviderType.AdoNet:
+                    return ReminderOptions.BuiltIn.AdoNet;
                 case GlobalConfiguration.ReminderServiceProviderType.MockTable:
                     return ReminderOptions.BuiltIn.MockTable;
                 case GlobalConfiguration.ReminderServiceProviderType.Disabled:

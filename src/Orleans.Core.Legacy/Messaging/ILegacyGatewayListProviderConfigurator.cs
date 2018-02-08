@@ -33,7 +33,7 @@ namespace Orleans.Messaging
                             Constants.ORLEANS_CLUSTERING_AZURESTORAGE);
                     break;
 
-                case ClientConfiguration.GatewayProviderType.SqlServer:
+                case ClientConfiguration.GatewayProviderType.AdoNet:
                     configurator = CreateInstanceWithParameterlessConstructor<ILegacyGatewayListProviderConfigurator>(Constants.ORLEANS_CLUSTERING_ADONET);
                     break;
 

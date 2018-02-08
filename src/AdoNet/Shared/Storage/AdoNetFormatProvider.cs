@@ -18,9 +18,9 @@ namespace Orleans.Tests.SqlUtils
     /// <summary>
     /// Formats .NET types appropriately for database consumption in non-parameterized queries.
     /// </summary>
-    internal class SqlFormatProvider: IFormatProvider
+    internal class AdoNetFormatProvider: IFormatProvider
     {
-        private readonly SqlFormatter formatter = new SqlFormatter();
+        private readonly AdoNetFormatter formatter = new AdoNetFormatter();
 
         /// <summary>
         /// Returns an instance of the formatter
@@ -33,7 +33,7 @@ namespace Orleans.Tests.SqlUtils
         }
 
 
-        private class SqlFormatter: ICustomFormatter
+        private class AdoNetFormatter: ICustomFormatter
         {
             public string Format(string format, object arg, IFormatProvider formatProvider)
             {

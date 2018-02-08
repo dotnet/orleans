@@ -8,7 +8,7 @@ using Xunit;
 using Xunit.Abstractions;
 using Orleans.Hosting;
 using Orleans.TestingHost.Utils;
-using OrleansSQLUtils.Configuration;
+using Orleans.AdoNet.Configuration;
 
 namespace UnitTests.MembershipTests
 {
@@ -25,37 +25,37 @@ namespace UnitTests.MembershipTests
             builder.ConfigureLegacyConfiguration(legacy =>
             {
                 legacy.ClusterConfiguration.Globals.DataConnectionString = relationalStorage.CurrentConnectionString;
-                legacy.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer;
+                legacy.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AdoNet;
                 legacy.ClusterConfiguration.PrimaryNode = null;
                 legacy.ClusterConfiguration.Globals.SeedNodes.Clear();
             });
         }
 
-        [Fact, TestCategory("Membership"), TestCategory("SqlServer")]
+        [Fact, TestCategory("Membership"), TestCategory("AdoNet")]
         public async Task Liveness_SqlServer_1()
         {
             await Do_Liveness_OracleTest_1();
         }
 
-        [Fact, TestCategory("Membership"), TestCategory("SqlServer")]
+        [Fact, TestCategory("Membership"), TestCategory("AdoNet")]
         public async Task Liveness_SqlServer_2_Restart_Primary()
         {
             await Do_Liveness_OracleTest_2(0);
         }
 
-        [Fact, TestCategory("Membership"), TestCategory("SqlServer")]
+        [Fact, TestCategory("Membership"), TestCategory("AdoNet")]
         public async Task Liveness_SqlServer_3_Restartl_GW()
         {
             await Do_Liveness_OracleTest_2(1);
         }
 
-        [Fact, TestCategory("Membership"), TestCategory("SqlServer")]
+        [Fact, TestCategory("Membership"), TestCategory("AdoNet")]
         public async Task Liveness_SqlServer_4_Restart_Silo_1()
         {
             await Do_Liveness_OracleTest_2(2);
         }
 
-        [Fact, TestCategory("Membership"), TestCategory("SqlServer")]
+        [Fact, TestCategory("Membership"), TestCategory("AdoNet")]
         public async Task Liveness_SqlServer_5_Kill_Silo_1_With_Timers()
         {
             await Do_Liveness_OracleTest_2(2, false, true);
@@ -74,7 +74,7 @@ namespace UnitTests.MembershipTests
             builder.ConfigureLegacyConfiguration(legacy =>
             {
                 legacy.ClusterConfiguration.Globals.DataConnectionString = relationalStorage.CurrentConnectionString;
-                legacy.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer;
+                legacy.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AdoNet;
                 legacy.ClusterConfiguration.Globals.AdoInvariant = AdoNetInvariants.InvariantNamePostgreSql;
                 legacy.ClusterConfiguration.PrimaryNode = null;
                 legacy.ClusterConfiguration.Globals.SeedNodes.Clear();
@@ -125,7 +125,7 @@ namespace UnitTests.MembershipTests
             builder.ConfigureLegacyConfiguration(legacy =>
             {
                 legacy.ClusterConfiguration.Globals.DataConnectionString = relationalStorage.CurrentConnectionString;
-                legacy.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer;
+                legacy.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AdoNet;
                 legacy.ClusterConfiguration.Globals.AdoInvariant = AdoNetInvariants.InvariantNameMySql;
                 legacy.ClusterConfiguration.PrimaryNode = null;
                 legacy.ClusterConfiguration.Globals.SeedNodes.Clear();

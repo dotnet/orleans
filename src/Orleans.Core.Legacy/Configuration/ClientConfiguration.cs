@@ -30,8 +30,8 @@ namespace Orleans.Runtime.Configuration
             /// <summary>use Azure, requires SystemStore element</summary>
             AzureTable,
 
-            /// <summary>use SQL, requires SystemStore element</summary>
-            SqlServer,
+            /// <summary>use ADO.NET, requires SystemStore element</summary>
+            AdoNet,
 
             /// <summary>use ZooKeeper, requires SystemStore element</summary>
             ZooKeeper,
@@ -154,11 +154,11 @@ namespace Orleans.Runtime.Configuration
 
         /// <summary>
         /// </summary>
-        public bool UseSqlSystemStore
+        public bool UseAdoNetSystemStore
         {
             get
             {
-                return GatewayProvider == GatewayProviderType.SqlServer
+                return GatewayProvider == GatewayProviderType.AdoNet
                 && !String.IsNullOrWhiteSpace(this.ClusterId)
                 && !String.IsNullOrWhiteSpace(DataConnectionString);
             }
@@ -531,8 +531,8 @@ namespace Orleans.Runtime.Configuration
                     if (!UseAzureSystemStore && !HasStaticGateways)
                         throw new ArgumentException("Config does not specify GatewayProviderType, and also does not have the adequate defaults: no Azure and or Gateway element(s) are specified.","GatewayProvider");
                     break;
-                case GatewayProviderType.SqlServer:
-                    if (!UseSqlSystemStore)
+                case GatewayProviderType.AdoNet:
+                    if (!UseAdoNetSystemStore)
                         throw new ArgumentException("Config specifies SqlServer based GatewayProviderType, but ClusterId or DataConnectionString are not specified or not complete.", "GatewayProvider");
                     break;
                 case GatewayProviderType.ZooKeeper:
