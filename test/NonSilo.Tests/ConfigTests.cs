@@ -669,7 +669,7 @@ namespace UnitTests
             Assert.Equal("SQL", statsProviders.Providers.Keys.First()); // Stats provider name
             ProviderConfiguration providerConfig = (ProviderConfiguration)statsProviders.Providers["SQL"];
             // Note: Use string here instead of typeof(SqlStatisticsPublisher).FullName to prevent cascade load of this type
-            Assert.Equal("Orleans.Providers.SqlServer.SqlStatisticsPublisher", providerConfig.Type); // Stats provider class name
+            Assert.Equal("Orleans.Providers.AdoNet.AdoNetStatisticsPublisher", providerConfig.Type); // Stats provider class name
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("AdoNet")]
@@ -712,7 +712,7 @@ namespace UnitTests
             Assert.Equal("SQL", statsProviders.Providers.Keys.First()); // Stats provider name
             ProviderConfiguration providerConfig = (ProviderConfiguration)statsProviders.Providers["SQL"];
             // Note: Use string here instead of typeof(SqlStatisticsPublisher).FullName to prevent cascade load of this type
-            Assert.Equal("Orleans.Providers.SqlServer.SqlStatisticsPublisher", providerConfig.Type); // Stats provider class name
+            Assert.Equal("Orleans.Providers.AdoNet.AdoNetStatisticsPublisher", providerConfig.Type); // Stats provider class name
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
