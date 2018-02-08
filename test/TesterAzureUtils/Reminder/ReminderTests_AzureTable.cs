@@ -205,7 +205,7 @@ namespace Tester.AzureUtils.TimerTests
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_2F_MultiGrain()
         {
-            List<SiloHandle> silos = await this.HostedCluster.StartAdditionalSilos(2);
+            List<SiloHandle> silos = await this.HostedCluster.StartAdditionalSilos(2,true);
 
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g2 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -272,7 +272,7 @@ namespace Tester.AzureUtils.TimerTests
                 this.HostedCluster.StopSilo(siloToKill);
                 return true;
             });
-            Task<bool> t2 = this.HostedCluster.StartAdditionalSilos(1).ContinueWith(t =>
+            Task<bool> t2 = this.HostedCluster.StartAdditionalSilos(1, true).ContinueWith(t =>
             {
                 t.GetAwaiter().GetResult();
                 return true;
