@@ -17,11 +17,11 @@ At the second level every grain activation has its own **ActivationTaskScheduler
 3.	Any subsequent Task created as part of the grain method execution is natively enqueued to the same ActivationTaskScheduler, via the standard TaskScheduler mechanism.
 4.	Every ActivationTaskScheduler has a queue of tasks queued for execution.
 5.	Orleans Scheduler has a set of worker threads that are collectively used by all the activation schedulers. Those threads periodically scan all the scheduler queues for work to execute. 
-    5.1	A thread takes a queue (each queue is taken by one thread at a time) and starts executing Tasks in that queue in the FIFO order.
-    5.2	The combination of one thread at a time taking a queue and the thread executing Tasks sequencially is what provides the single threaded execution semantics.
+6.	A thread takes a queue (each queue is taken by one thread at a time) and starts executing Tasks in that queue in FIFO order.
+7. The combination of one thread at a time taking a queue and the thread executing Tasks sequentially is what provides the single threaded execution semantics.
 
 ### Work Items:
-Orleans uses a notion of Work Items to designate the entry point into the scheduler. Every new request is enqueued initially as a work item which simply wraps the executing of the first Task for that request. Work items simply provide more contextual information about the scheduling activity (the caller, the name of the activity, logging) and sometimes some extra work that has to be done on behalf of that scheduling activity (post invocation activity in Invoke work item).
+Orleans uses a notion of Work Items to designate the entry point into the scheduler. Every new request is enqueued initially as a work item which simply wraps the execution of the first Task for that request. Work items simply provide more contextual information about the scheduling activity (the caller, the name of the activity, logging) and sometimes some extra work that has to be done on behalf of that scheduling activity (post invocation activity in Invoke work item).
 There are currently the following work item types:
 1.	Invoke work item – this is the mostly frequently used work item type. It represents execution of an application request. 
 2.	Request/Response work items – executes a system request (request to a SystemTarget) 
@@ -35,12 +35,18 @@ Scheduling Context is a tag, just an opaque object that represents scheduling ta
 
 ### High level Principles:
 1.	Tasks are always queued to the correct scheduler
+
     1.1	Tasks are never moved around from one scheduler to another. 
+    
     1.2	We never create tasks on behalf of other tasks to execute them.
+    
     1.3	WorkItems are wrapped within Task (that is, in order to execute a work item, we create a Task whose lambda function will just run the work item lambda). By always going via tasks we ensure that any activity is executed via an appropriate Task scheduler.
+    
 2.	Tasks are executed on the scheduler where they were queued by using base.TryExecute (and not by RunSynchronously)
 3.	There is a one to one mapping between ATS, WorkItem Group and Scheduling Context:
+
     3.1	Activation Task Scheduler (ATS) is a custom TPL scheduler. We keep ATS thin and store all the data in WorkItemGroup. ATS points to its WorkItemGroup.
+    
     3.2	WorkItem Group is the actual holder (data object) of the activation Tasks. The Tasks are stored in a List<Task> - the queue of all tasks for its ATS. WorkItemGroup points back to its ATS.
 
 
