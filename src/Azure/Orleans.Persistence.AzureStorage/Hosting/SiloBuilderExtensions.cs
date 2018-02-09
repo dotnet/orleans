@@ -73,7 +73,8 @@ namespace Orleans.Hosting
             Action<OptionsBuilder<AzureTableStorageOptions>> configureOptions = null)
         {
             configureOptions?.Invoke(services.AddOptions<AzureTableStorageOptions>(name));
-            services.TryConfigureFormatter<AzureTableStorageOptions, AzureTableStorageOptionsFormatterResolver>(name);
+            services.TryConfigureFormatterResolver<AzureTableStorageOptions, AzureTableStorageOptionsFormatterResolver>();
+            services.ConfigureNamedOptionForLogging<AzureTableStorageOptions>(name);
             services.TryAddSingleton<IGrainStorage>(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
             return services.AddSingletonNamedService<IGrainStorage>(name, AzureTableGrainStorageFactory.Create)
                            .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainStorage>(n));
