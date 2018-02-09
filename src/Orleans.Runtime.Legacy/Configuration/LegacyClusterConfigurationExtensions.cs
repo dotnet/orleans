@@ -291,13 +291,7 @@ namespace Orleans.Hosting
                 {
                     options.IsRunningAsUnitTest = config.IsRunningAsUnitTest;
                 });
-            
-            services.AddOptions<MockReminderTableOptions>()
-                .Configure<GlobalConfiguration>((options, config) =>
-                {
-                    options.OperationDelay = config.MockReminderTableTimeout;
-                });
-            services.AddSingleton<IReminderTable>(CreateReminderTable);
+            LegacyRemindersConfigurator.Configure(configuration.Globals, services);
             
             services.AddOptions<GrainVersioningOptions>()
                 .Configure<GlobalConfiguration>((options, config) =>
@@ -318,20 +312,6 @@ namespace Orleans.Hosting
                     options.DefaultConnectionLimit = config.DefaultConnectionLimit;
                     options.Expect100Continue = config.Expect100Continue;
                     options.UseNagleAlgorithm = config.UseNagleAlgorithm;
-                });
-
-            services.AddOptions<StorageOptions>()
-                .Configure<GlobalConfiguration>((options, config) =>
-                {
-                    options.DataConnectionString = config.DataConnectionString;
-                    options.DataConnectionStringForReminders = config.DataConnectionStringForReminders;
-                });
-
-            services.AddOptions<AdoNetOptions>()
-                .Configure<GlobalConfiguration>((options, config) =>
-                {
-                    options.Invariant = config.AdoInvariant;
-                    options.InvariantForReminders = config.AdoInvariantForReminders;
                 });
 
             services.AddOptions<TypeManagementOptions>()
@@ -375,46 +355,5 @@ namespace Orleans.Hosting
                     throw new NotSupportedException($"DirectoryCachingStrategyType {type} is not supported");
             }
         }
-
-        private static IReminderTable CreateReminderTable(IServiceProvider serviceProvider)
-        {
-            var config = serviceProvider.GetRequiredService<GlobalConfiguration>();
-            var grainFactory = serviceProvider.GetRequiredService<IGrainFactory>();
-            var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
-
-            var serviceType = config.ReminderServiceType;
-            var logger = loggerFactory.CreateLogger("ReminderTableFactory");
-
-            switch (serviceType)
-            {
-                case GlobalConfiguration.ReminderServiceProviderType.AdoNet:
-                    return AssemblyLoader.LoadAndCreateInstance<IReminderTable>(
-                        Constants.ORLEANS_REMINDERS_ADONET,
-                        logger,
-                        serviceProvider);
-                case GlobalConfiguration.ReminderServiceProviderType.AzureTable:
-                    return AssemblyLoader.LoadAndCreateInstance<IReminderTable>(
-                        Constants.ORLEANS_REMINDERS_AZURESTORAGE,
-                        logger,
-                        serviceProvider);
-                case GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain:
-                    return grainFactory.GetGrain<IReminderTableGrain>(Constants.ReminderTableGrainId);
-                case GlobalConfiguration.ReminderServiceProviderType.MockTable:
-                    return ActivatorUtilities.GetServiceOrCreateInstance<MockReminderTable>(serviceProvider);
-                case GlobalConfiguration.ReminderServiceProviderType.Custom:
-                    return AssemblyLoader.LoadAndCreateInstance<IReminderTable>(
-                        config.ReminderTableAssembly,
-                        logger,
-                        serviceProvider);
-                case GlobalConfiguration.ReminderServiceProviderType.Disabled:
-                    logger.Info("Reminder service is disabled.");
-                    return null;
-                default:
-                    throw new ArgumentOutOfRangeException(
-                        nameof(config.ReminderServiceType),
-                        $"The {nameof(config.ReminderServiceType)} value {serviceType} is not supported.");
-            }
-        }
-
     }
 }

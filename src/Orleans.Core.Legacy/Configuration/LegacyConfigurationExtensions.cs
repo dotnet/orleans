@@ -12,7 +12,6 @@ using Orleans.Configuration.Options;
 
 namespace Orleans.Configuration
 {
-
     public static class LegacyConfigurationExtensions
     {
         private const int ClusterClientDefaultProviderInitStage = 1000;

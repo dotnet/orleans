@@ -34,7 +34,7 @@ namespace OrleansAWSUtils.Reminders
         private const string TABLE_NAME_DEFAULT_VALUE = "OrleansReminders";
         private ILogger logger;
         private readonly ILoggerFactory loggerFactory;
-        private readonly StorageOptions storageOptions;
+        private readonly DynamoDBReminderTableOptions storageOptions;
         private DynamoDBStorage storage;
         private readonly Guid serviceId;
 
@@ -43,7 +43,7 @@ namespace OrleansAWSUtils.Reminders
         /// </summary>
         /// <param name="grainReferenceConverter">The grain factory.</param>
         /// <param name="loggerFactory">logger factory to use</param>
-        public DynamoDBReminderTable(IGrainReferenceConverter grainReferenceConverter, ILoggerFactory loggerFactory, IOptions<SiloOptions> siloOptions, IOptions<StorageOptions> storageOptions)
+        public DynamoDBReminderTable(IGrainReferenceConverter grainReferenceConverter, ILoggerFactory loggerFactory, IOptions<SiloOptions> siloOptions, IOptions<DynamoDBReminderTableOptions> storageOptions)
         {
             this.grainReferenceConverter = grainReferenceConverter;
             this.logger = loggerFactory.CreateLogger<DynamoDBReminderTable>();
@@ -59,7 +59,7 @@ namespace OrleansAWSUtils.Reminders
         /// <returns></returns>
         public Task Init()
         {
-            this.storage = new DynamoDBStorage(this.storageOptions.DataConnectionStringForReminders, this.loggerFactory);
+            this.storage = new DynamoDBStorage(this.storageOptions.ConnectionString, this.loggerFactory);
             this.logger.Info(ErrorCode.ReminderServiceBase, "Initializing AWS DynamoDB Reminders Table");
 
             var secondaryIndex = new GlobalSecondaryIndex

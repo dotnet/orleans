@@ -8,7 +8,7 @@ namespace Orleans.AdoNet
     /// <inheritdoc />
     public class LegacyAdoNetClusteringConfigurator : ILegacyMembershipConfigurator
     {
-        public void ConfigureServices(object configuration, IServiceCollection services)
+        public void Configure(object configuration, IServiceCollection services)
         {
             services.UseAdoNetClustering(
                 options =>

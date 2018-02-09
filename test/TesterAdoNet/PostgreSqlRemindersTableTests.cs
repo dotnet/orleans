@@ -1,7 +1,10 @@
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+
 using Orleans;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ReminderService;
@@ -28,7 +31,15 @@ namespace UnitTests.RemindersTest
 
         protected override IReminderTable CreateRemindersTable()
         {
-            return new AdoNetReminderTable(this.ClusterFixture.Services.GetRequiredService<IGrainReferenceConverter>(), this.siloOptions, this.adoNetOptions, this.storageOptions);
+            var options = new AdoNetReminderTableOptions
+            {
+                Invariant = this.GetAdoInvariant(),
+                ConnectionString = this.connectionStringFixture.ConnectionString
+            };
+            return new AdoNetReminderTable(
+                this.ClusterFixture.Services.GetRequiredService<IGrainReferenceConverter>(),
+                this.siloOptions,
+                Options.Create(options));
         }
 
         protected override string GetAdoInvariant()

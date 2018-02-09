@@ -9,22 +9,20 @@ namespace Orleans.Runtime.ReminderService
     internal class AdoNetReminderTable : IReminderTable
     {
         private readonly IGrainReferenceConverter grainReferenceConverter;
-        private readonly AdoNetOptions adoNetOptions;
-        private readonly StorageOptions storageOptions;
+        private readonly AdoNetReminderTableOptions options;
         private string serviceId;
         private RelationalOrleansQueries orleansQueries;
 
-        public AdoNetReminderTable(IGrainReferenceConverter grainReferenceConverter, IOptions<SiloOptions> siloOptions, IOptions<AdoNetOptions> adoNetOptions, IOptions<StorageOptions> storageOptions)
+        public AdoNetReminderTable(IGrainReferenceConverter grainReferenceConverter, IOptions<SiloOptions> siloOptions, IOptions<AdoNetReminderTableOptions> storageOptions)
         {
             this.grainReferenceConverter = grainReferenceConverter;
             this.serviceId = siloOptions.Value.ServiceId.ToString();
-            this.adoNetOptions = adoNetOptions.Value;
-            this.storageOptions = storageOptions.Value;
+            this.options = storageOptions.Value;
         }
 
         public async Task Init()
         {
-            this.orleansQueries = await RelationalOrleansQueries.CreateInstance(this.adoNetOptions.InvariantForReminders, this.storageOptions.DataConnectionStringForReminders, this.grainReferenceConverter);
+            this.orleansQueries = await RelationalOrleansQueries.CreateInstance(this.options.Invariant, this.options.ConnectionString, this.grainReferenceConverter);
         }
 
         public Task<ReminderTableData> ReadRows(GrainReference grainRef)

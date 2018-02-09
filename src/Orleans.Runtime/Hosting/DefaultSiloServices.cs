@@ -230,7 +230,7 @@ namespace Orleans.Hosting
             applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<SerializerFeature>());
             services.AddTransient<IConfigurationValidator, ApplicationPartValidator>();
 
-            //Add default option formatter if none is configured, for options which are requied to be configured 
+            //Add default option formatter if none is configured, for options which are required to be configured 
             services.TryConfigureFormatter<SiloOptions, SiloOptionsFormatter>();
             services.TryConfigureFormatter<SchedulingOptions, SchedulingOptionsFormatter>();
             services.TryConfigureFormatter<ThreadPoolOptions, ThreadPoolOptionsFormatter>();
@@ -246,9 +246,7 @@ namespace Orleans.Hosting
             services.TryConfigureFormatter<ConsistentRingOptions, ConsistentRingOptionsFormatter>();
             services.TryConfigureFormatter<MultiClusterOptions, MultiClusterOptionsFormatter>();
             services.TryConfigureFormatter<SiloStatisticsOptions, SiloStatisticsOptionsFormatter>();
-            services.TryConfigureFormatter<AdoNetOptions, AdoNetOptionsFormatter>();
             services.TryConfigureFormatter<GrainServiceOptions, GrainServiceOptionsFormatter>();
-            services.TryConfigureFormatter<MockReminderTableOptions, MockReminderTableOptionsFormatter>();
             services.TryConfigureFormatter<ServicePointOptions, ServicePointOptionsFormatter>();
             services.TryConfigureFormatter<TelemetryOptions, TelemetryOptionsFormatter>();
             services.TryConfigureFormatter<LoadSheddingOptions, LoadSheddingOptionsFormatter>();
