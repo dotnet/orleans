@@ -110,7 +110,7 @@ namespace Orleans
         /// <param name="period">Period of subsequent timer ticks.</param>
         /// <returns>Handle for this Timer.</returns>
         /// <seealso cref="IDisposable"/>
-        protected virtual IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
+        protected IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
         {
             if (asyncCallback == null) 
                 throw new ArgumentNullException(nameof(asyncCallback));
@@ -130,7 +130,7 @@ namespace Orleans
         /// <param name="dueTime">Due time for this reminder</param>
         /// <param name="period">Frequence period for this reminder</param>
         /// <returns>Promise for Reminder handle.</returns>
-        protected virtual Task<IGrainReminder> RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
+        protected Task<IGrainReminder> RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
         {
             if (string.IsNullOrWhiteSpace(reminderName))
                 throw new ArgumentNullException(nameof(reminderName));
@@ -146,7 +146,7 @@ namespace Orleans
         /// </summary>
         /// <param name="reminder">Reminder to unregister.</param>
         /// <returns>Completion promise for this operation.</returns>
-        protected virtual Task UnregisterReminder(IGrainReminder reminder)
+        protected Task UnregisterReminder(IGrainReminder reminder)
         {
             if (reminder == null)
                 throw new ArgumentNullException(nameof(reminder));
@@ -160,7 +160,7 @@ namespace Orleans
         /// </summary>
         /// <param name="reminderName">Reminder to return</param>
         /// <returns>Promise for Reminder handle.</returns>
-        protected virtual Task<IGrainReminder> GetReminder(string reminderName)
+        protected Task<IGrainReminder> GetReminder(string reminderName)
         {
             if (string.IsNullOrWhiteSpace(reminderName))
                 throw new ArgumentNullException(nameof(reminderName));
@@ -173,13 +173,13 @@ namespace Orleans
         /// Returns a list of all reminders registered by the grain.
         /// </summary>
         /// <returns>Promise for list of Reminders registered for this grain.</returns>
-        protected virtual Task<List<IGrainReminder>> GetReminders()
+        protected Task<List<IGrainReminder>> GetReminders()
         {
             EnsureRuntime();
             return Runtime.ReminderRegistry.GetReminders();
         }
 
-        protected virtual IStreamProvider GetStreamProvider(string name)
+        protected IStreamProvider GetStreamProvider(string name)
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentNullException(nameof(name));
@@ -193,7 +193,7 @@ namespace Orleans
         /// This call will mark this activation of the current grain to be deactivated and removed at the end of the current method.
         /// The next call to this grain will result in a different activation to be used, which typical means a new activation will be created automatically by the runtime.
         /// </summary>
-        protected virtual void DeactivateOnIdle()
+        protected void DeactivateOnIdle()
         {
             EnsureRuntime();
             Runtime.DeactivateOnIdle(this);
@@ -206,7 +206,7 @@ namespace Orleans
         /// DeactivateOnIdle method would undo / override any current “keep alive” setting, 
         /// making this grain immediately available for deactivation.
         /// </summary>
-        protected virtual void DelayDeactivation(TimeSpan timeSpan)
+        protected void DelayDeactivation(TimeSpan timeSpan)
         {
             EnsureRuntime();
             Runtime.DelayDeactivation(this, timeSpan);
