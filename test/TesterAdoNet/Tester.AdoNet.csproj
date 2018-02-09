@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <RootNamespace>Tester.SQLUtils</RootNamespace>
-    <AssemblyName>Tester.SQLUtils</AssemblyName>
+    <RootNamespace>Tester.AdoNet</RootNamespace>
+    <AssemblyName>Tester.AdoNet</AssemblyName>
     <DefineConstants>$(DefineConstants);TESTER_SQLUTILS</DefineConstants>
   </PropertyGroup>
 
@@ -51,6 +51,9 @@
   <ItemGroup>
     <None Include="App.config" />
     <None Include="Data\TestDb.mdf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Tester.AdoNet.xunit.runner.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
