@@ -12,10 +12,10 @@ namespace Orleans.Runtime
 
         public long? AvailableMemory => null;
 
-        public NoOpHostEnvironmentStatistics(ILoggerFactory loggerFactory)
+        public NoOpHostEnvironmentStatistics(ILogger<NoOpHostEnvironmentStatistics> logger)
         {
-            var logger = loggerFactory.CreateLogger<NoOpHostEnvironmentStatistics>();
-            logger.Warn(ErrorCode.PerfCounterNotRegistered,
+            logger.Warn(
+                ErrorCode.PerfCounterNotRegistered,
                 "No implementation of IHostEnvironmentStatistics was found. Load shedding will not work yet");
         }
     }

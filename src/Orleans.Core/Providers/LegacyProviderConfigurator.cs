@@ -72,8 +72,6 @@ namespace Orleans.Providers
                         // Looks like we only support a single statistics provider that can be any of the publisher interfaces. fml
                         // TODO: Kill our statistics system.. please!?
                         services.AddSingleton<IStatisticsPublisher>(sp => sp.GetServiceByName<IProvider>(providerConfig.Name) as IStatisticsPublisher);
-                        services.AddSingleton<ISiloMetricsDataPublisher>(sp => sp.GetServiceByName<IProvider>(providerConfig.Name) as ISiloMetricsDataPublisher);
-                        services.AddSingleton<IClientMetricsDataPublisher>(sp => sp.GetServiceByName<IProvider>(providerConfig.Name) as IClientMetricsDataPublisher);
                         RegisterProvider<IProvider>(providerConfig, services, defaultInitStage, defaultStartStage);
                     }
                 }

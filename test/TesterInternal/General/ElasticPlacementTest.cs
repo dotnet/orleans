@@ -26,6 +26,7 @@ namespace UnitTests.General
             {
                 legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
                 legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
+                legacy.ClusterConfiguration.ApplyToAllNodes(nodeConfig => nodeConfig.LoadSheddingEnabled = true);
             });
         }
 
@@ -133,6 +134,9 @@ namespace UnitTests.General
         {
             var taintedGrainPrimary = await GetGrainAtSilo(this.HostedCluster.Primary.SiloAddress);
             var taintedGrainSecondary = await GetGrainAtSilo(this.HostedCluster.SecondarySilos.First().SiloAddress);
+
+            await taintedGrainPrimary.EnableOverloadDetection(false);
+            await taintedGrainSecondary.EnableOverloadDetection(false);
 
             await taintedGrainPrimary.LatchCpuUsage(110.0f);
             await taintedGrainSecondary.LatchCpuUsage(110.0f);

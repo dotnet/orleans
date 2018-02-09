@@ -14,6 +14,9 @@ namespace Orleans.Runtime.Messaging
         private readonly CounterStatistic loadSheddingCounter;
         private readonly CounterStatistic gatewayTrafficCounter;
         private readonly ILocalSiloDetails siloDetails;
+
+        private readonly OverloadDetector overloadDetector;
+
         private readonly MultiClusterOptions multiClusterOptions;
 
         internal GatewayAcceptor(
@@ -25,13 +28,15 @@ namespace Orleans.Runtime.Messaging
             ExecutorService executorService,
             ILocalSiloDetails siloDetails,
             IOptions<MultiClusterOptions> multiClusterOptions,
-            ILoggerFactory loggerFactory)
+            ILoggerFactory loggerFactory,
+            OverloadDetector overloadDetector)
             : base(msgCtr, gatewayAddress, SocketDirection.GatewayToClient, messageFactory, serializationManager, executorService, loggerFactory)
         {
             this.gateway = gateway;
             this.loadSheddingCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_LOAD_SHEDDING);
             this.gatewayTrafficCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_RECEIVED);
             this.siloDetails = siloDetails;
+            this.overloadDetector = overloadDetector;
             this.multiClusterOptions = multiClusterOptions.Value;
         }
 
@@ -98,7 +103,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             // Are we overloaded?
-            if ((MessageCenter.Metrics != null) && MessageCenter.Metrics.IsOverloaded)
+            if (this.overloadDetector.Overloaded)
             {
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
                 Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.GatewayTooBusy, "Shedding load");

@@ -40,7 +40,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ILoggerFactory loggerFactory;
         private readonly SiloMessagingOptions messagingOptions;
         
-        public Gateway(MessageCenter msgCtr, ILocalSiloDetails siloDetails, MessageFactory messageFactory, SerializationManager serializationManager, ExecutorService executorService, ILoggerFactory loggerFactory, IOptions<SiloMessagingOptions> options, IOptions<MultiClusterOptions> multiClusterOptions)
+        public Gateway(MessageCenter msgCtr, ILocalSiloDetails siloDetails, MessageFactory messageFactory, SerializationManager serializationManager, ExecutorService executorService, ILoggerFactory loggerFactory, IOptions<SiloMessagingOptions> options, IOptions<MultiClusterOptions> multiClusterOptions, OverloadDetector overloadDetector)
         {
             this.messagingOptions = options.Value;
             this.loggerFactory = loggerFactory;
@@ -49,7 +49,17 @@ namespace Orleans.Runtime.Messaging
             this.logger = this.loggerFactory.CreateLogger<Gateway>();
             this.serializationManager = serializationManager;
             this.executorService = executorService;
-            acceptor = new GatewayAcceptor(msgCtr,this, siloDetails.GatewayAddress?.Endpoint, this.messageFactory, this.serializationManager, executorService, siloDetails, multiClusterOptions, loggerFactory);
+            acceptor = new GatewayAcceptor(
+                msgCtr,
+                this,
+                siloDetails.GatewayAddress?.Endpoint,
+                this.messageFactory,
+                this.serializationManager,
+                executorService,
+                siloDetails,
+                multiClusterOptions,
+                loggerFactory,
+                overloadDetector);
             senders = new Lazy<GatewaySender>[messagingOptions.GatewaySenderQueues];
             nextGatewaySenderToUseForRoundRobin = 0;
             dropper = new GatewayClientCleanupAgent(this, executorService, loggerFactory, messagingOptions.ClientDropTimeout);
