@@ -379,10 +379,14 @@ namespace Orleans.AzureUtils
             //Azure queue naming rules : https://docs.microsoft.com/en-us/rest/api/storageservices/Naming-Queues-and-Metadata?redirectedfrom=MSDN
             tmp = tmp.ToLowerInvariant();
             tmp = tmp
-                .Replace('/', '_')        // Forward slash
-                .Replace('\\', '_')       // Backslash
-                .Replace('#', '_')        // Pound sign
-                .Replace('?', '_');       // Question mark
+                .Replace('/', '-') // Forward slash
+                .Replace('\\', '-') // Backslash
+                .Replace('#', '-') // Pound sign
+                .Replace('?', '-') // Question mark
+                .Replace('&', '-')
+                .Replace('+', '-')
+                .Replace(':', '-')
+                .Replace('%', '-');
             return tmp;
         }
 
