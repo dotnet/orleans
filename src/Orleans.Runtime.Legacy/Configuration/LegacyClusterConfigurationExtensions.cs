@@ -166,10 +166,10 @@ namespace Orleans.Hosting
                 .Configure<IOptions<SiloOptions>>((options, siloOptions) =>
                 {
                     var nodeConfig = configuration.GetOrCreateNodeConfigurationForSilo(siloOptions.Value.SiloName);
-                    if (options.IPAddress == null && string.IsNullOrWhiteSpace(options.HostNameOrIPAddress))
+                    if (options.IPAddress == null)
                     {
                         options.IPAddress = nodeConfig.Endpoint.Address;
-                        options.Port = nodeConfig.Endpoint.Port;
+                        options.SiloPort = nodeConfig.Endpoint.Port;
                     }
                     if (options.ProxyPort == 0 && nodeConfig.ProxyGatewayEndpoint != null)
                     {
