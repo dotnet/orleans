@@ -14,6 +14,7 @@ using TestExtensions;
 using Xunit;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Hosting;
 
 namespace UnitTests.MembershipTests
 {
@@ -42,6 +43,7 @@ namespace UnitTests.MembershipTests
         protected IOptions<SiloOptions> siloOptions;
         protected IOptions<ClusterClientOptions> clientOptions;
         protected const string testDatabaseName = "OrleansMembershipTest";//for relational storage
+        protected readonly IOptions<GatewayOptions> gatewayOptions;
         protected readonly ClientConfiguration clientConfiguration;
         protected MembershipTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment, LoggerFilterOptions filters)
         {
@@ -69,6 +71,7 @@ namespace UnitTests.MembershipTests
                 DataConnectionString = fixture.ConnectionString
             };
 
+            this.gatewayOptions = Options.Create(new GatewayOptions());
             gatewayListProvider = CreateGatewayListProvider(logger);
             gatewayListProvider.InitializeGatewayListProvider().WithTimeout(TimeSpan.FromMinutes(1)).Wait();
         }

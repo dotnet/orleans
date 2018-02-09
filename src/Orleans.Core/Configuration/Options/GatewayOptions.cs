@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 
-namespace Orleans.Configuration
+namespace Orleans.Hosting
 {
     public class GatewayOptions
     {

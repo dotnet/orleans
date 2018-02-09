@@ -8,14 +8,6 @@ using Orleans.Runtime;
 
 namespace Orleans.Messaging
 {
-    /// <summary>
-    /// LegacyGatewayProviderConfigurator configure GatewayListProvider in the legacy way, which is from ClientConfiguration
-    /// </summary>
-    public interface ILegacyGatewayListProviderConfigurator
-    {
-        void ConfigureServices(ClientConfiguration configuration, IServiceCollection services);
-    }
-
     internal class LegacyGatewayListProviderConfigurator
     {
         public static void ConfigureServices(
@@ -69,11 +61,11 @@ namespace Orleans.Messaging
 
     internal class LegacyStaticGatewayProviderConfigurator : ILegacyGatewayListProviderConfigurator
     {
-        public void ConfigureServices(ClientConfiguration clientConfiguration, IServiceCollection services)
+        public void ConfigureServices(object clientConfiguration, IServiceCollection services)
         {
             services.UseStaticGatewayListProvider(options =>
             {
-                options.Gateways = clientConfiguration.Gateways.Select(ep => ep.ToGatewayUri()).ToList();
+                options.Gateways = ((ClientConfiguration)clientConfiguration).Gateways.Select(ep => ep.ToGatewayUri()).ToList();
             });
         }
     }
