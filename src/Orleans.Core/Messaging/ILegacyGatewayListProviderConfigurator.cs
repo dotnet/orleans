@@ -22,16 +22,22 @@ namespace Orleans.Messaging
 
         public ClientConfigurationReader(object configuration)
         {
-            this.configuration = configuration;
+            this.configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
             this.type = configuration.GetType();
             if (this.type.Name != "ClientConfiguration") throw new ArgumentException($"ClientConfiguration expected", nameof(configuration));
         }
 
         public T GetPropertyValue<T>(string propertyName)
         {
-            MethodInfo getMethod = this.type.GetProperty(propertyName).GetGetMethod();
-            return (T)getMethod.Invoke(this.configuration, null);
+            try
+            {
+                MethodInfo getMethod = this.type.GetProperty(propertyName).GetGetMethod();
+                return (T)getMethod.Invoke(this.configuration, null);
+            }
+            catch (Exception ex)
+            {
+                throw new ArgumentOutOfRangeException($"Could not get property {propertyName} of type {typeof(T)} from configuration of type {this.configuration.GetType()}", ex);
+            }
         }
     }
-
 }
