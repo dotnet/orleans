@@ -15,6 +15,7 @@ using Orleans.Configuration;
 using Orleans.Logging;
 using Orleans.Messaging;
 using Orleans.Runtime;
+using Orleans.Statistics;
 using Orleans.TestingHost.Utils;
 
 namespace Orleans.TestingHost
@@ -49,6 +50,7 @@ namespace Orleans.TestingHost
             hostBuilder.ConfigureServices((context, services) =>
             {
                 services.AddSingleton<TestHooksHostEnvironmentStatistics>();
+                services.AddFromExisting<IHostEnvironmentStatistics, TestHooksHostEnvironmentStatistics>();
                 services.AddSingleton<TestHooksSystemTarget>();
                 ConfigureListeningPorts(context, services);
 

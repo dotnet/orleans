@@ -113,20 +113,30 @@ namespace Orleans.Runtime.TestHooks
         {
             if (overloaded)
             {
-                this.hostEnvironmentStatistics.CpuUsage = this.loadSheddingOptions.LoadSheddingLimit + 1;
-                Task.Delay(latchPeriod).ContinueWith(t => this.UnlatchIsOverloaded()).Ignore();
+                this.LatchCpuUsage(this.loadSheddingOptions.LoadSheddingLimit + 1, latchPeriod);
             }
             else
             {
-                this.UnlatchIsOverloaded();
+                this.LatchCpuUsage(this.loadSheddingOptions.LoadSheddingLimit - 1, latchPeriod);
             }
 
             return Task.CompletedTask;
         }
 
-        private void UnlatchIsOverloaded()
+        private void LatchCpuUsage(float? cpuUsage, TimeSpan latchPeriod)
         {
-            this.hostEnvironmentStatistics.CpuUsage = this.loadSheddingOptions.LoadSheddingLimit - 1;
+            var previousValue = this.hostEnvironmentStatistics.CpuUsage;
+            this.hostEnvironmentStatistics.CpuUsage = cpuUsage;
+            Task.Delay(latchPeriod).ContinueWith(t =>
+                {
+                    var currentCpuUsage = this.hostEnvironmentStatistics.CpuUsage;
+
+                    // ReSharper disable once CompareOfFloatsByEqualityOperator
+                    if (currentCpuUsage == cpuUsage)
+                    {
+                        this.hostEnvironmentStatistics.CpuUsage = previousValue;
+                    }
+                }).Ignore();
         }
     }
 }

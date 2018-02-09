@@ -11,6 +11,7 @@ using Orleans.Concurrency;
 using Orleans.Hosting;
 using Orleans.Placement;
 using Orleans.Runtime;
+using Orleans.Runtime.Messaging;
 using Orleans.Runtime.TestHooks;
 
 using UnitTests.GrainInterfaces;
@@ -19,12 +20,18 @@ namespace UnitTests.Grains
 {
     internal abstract class PlacementTestGrainBase : Grain
     {
-        private readonly TestHooksHostEnvironmentStatistics hostEnvironmentStatistics;
+        private readonly OverloadDetector overloadDetector;
 
+        private readonly TestHooksHostEnvironmentStatistics hostEnvironmentStatistics;
+        
         private readonly LoadSheddingOptions loadSheddingOptions;
 
-        public PlacementTestGrainBase(TestHooksHostEnvironmentStatistics hostEnvironmentStatistics, IOptions<LoadSheddingOptions> loadSheddingOptions)
+        public PlacementTestGrainBase(
+            OverloadDetector overloadDetector,
+            TestHooksHostEnvironmentStatistics hostEnvironmentStatistics,
+            IOptions<LoadSheddingOptions> loadSheddingOptions)
         {
+            this.overloadDetector = overloadDetector;
             this.hostEnvironmentStatistics = hostEnvironmentStatistics;
             this.loadSheddingOptions = loadSheddingOptions.Value;
         }
@@ -88,6 +95,12 @@ namespace UnitTests.Grains
             await mgmtGrain.ForceRuntimeStatisticsCollection(keys);
         }
 
+        public Task EnableOverloadDetection(bool enabled)
+        {
+            this.overloadDetector.Enabled = enabled;
+            return Task.CompletedTask;
+        }
+
         public Task LatchOverloaded()
         {
             this.hostEnvironmentStatistics.CpuUsage = this.loadSheddingOptions.LoadSheddingLimit + 1;
@@ -122,8 +135,11 @@ namespace UnitTests.Grains
     [RandomPlacement]
     internal class RandomPlacementTestGrain : PlacementTestGrainBase, IRandomPlacementTestGrain
     {
-        public RandomPlacementTestGrain(TestHooksHostEnvironmentStatistics hostEnvironmentStatistics, IOptions<LoadSheddingOptions> loadSheddingOptions)
-            : base(hostEnvironmentStatistics, loadSheddingOptions)
+        public RandomPlacementTestGrain(
+            OverloadDetector overloadDetector,
+            TestHooksHostEnvironmentStatistics hostEnvironmentStatistics,
+            IOptions<LoadSheddingOptions> loadSheddingOptions)
+            : base(overloadDetector, hostEnvironmentStatistics, loadSheddingOptions)
         {
         }
     }
@@ -131,8 +147,11 @@ namespace UnitTests.Grains
     [PreferLocalPlacement]
     internal class PreferLocalPlacementTestGrain : PlacementTestGrainBase, IPreferLocalPlacementTestGrain
     {
-        public PreferLocalPlacementTestGrain(TestHooksHostEnvironmentStatistics hostEnvironmentStatistics, IOptions<LoadSheddingOptions> loadSheddingOptions)
-            : base(hostEnvironmentStatistics, loadSheddingOptions)
+        public PreferLocalPlacementTestGrain(
+            OverloadDetector overloadDetector,
+            TestHooksHostEnvironmentStatistics hostEnvironmentStatistics,
+            IOptions<LoadSheddingOptions> loadSheddingOptions)
+            : base(overloadDetector, hostEnvironmentStatistics, loadSheddingOptions)
         {
         }
     }
@@ -140,8 +159,11 @@ namespace UnitTests.Grains
     [StatelessWorker]
     internal class LocalPlacementTestGrain : PlacementTestGrainBase, ILocalPlacementTestGrain
     {
-        public LocalPlacementTestGrain(TestHooksHostEnvironmentStatistics hostEnvironmentStatistics, IOptions<LoadSheddingOptions> loadSheddingOptions)
-            : base(hostEnvironmentStatistics, loadSheddingOptions)
+        public LocalPlacementTestGrain(
+            OverloadDetector overloadDetector,
+            TestHooksHostEnvironmentStatistics hostEnvironmentStatistics,
+            IOptions<LoadSheddingOptions> loadSheddingOptions)
+            : base(overloadDetector, hostEnvironmentStatistics, loadSheddingOptions)
         {
         }
     }
@@ -149,8 +171,11 @@ namespace UnitTests.Grains
     [ActivationCountBasedPlacement]
     internal class ActivationCountBasedPlacementTestGrain : PlacementTestGrainBase, IActivationCountBasedPlacementTestGrain
     {
-        public ActivationCountBasedPlacementTestGrain(TestHooksHostEnvironmentStatistics hostEnvironmentStatistics, IOptions<LoadSheddingOptions> loadSheddingOptions)
-            : base(hostEnvironmentStatistics, loadSheddingOptions)
+        public ActivationCountBasedPlacementTestGrain(
+            OverloadDetector overloadDetector,
+            TestHooksHostEnvironmentStatistics hostEnvironmentStatistics,
+            IOptions<LoadSheddingOptions> loadSheddingOptions)
+            : base(overloadDetector, hostEnvironmentStatistics, loadSheddingOptions)
         {
         }
     }
