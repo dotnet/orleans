@@ -31,7 +31,7 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("OrleansBenchmarks")]
 [assembly: InternalsVisibleTo("Tester")]
 [assembly: InternalsVisibleTo("Tester.AzureUtils")]
-[assembly: InternalsVisibleTo("Tester.SQLUtils")]
+[assembly: InternalsVisibleTo("Tester.AdoNet")]
 [assembly: InternalsVisibleTo("Tester.ZooKeeperUtils")]
 [assembly: InternalsVisibleTo("TesterInternal")]
 [assembly: InternalsVisibleTo("TestExtensions")]
