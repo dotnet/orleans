@@ -1,8 +1,8 @@
-using System;
 using System.Linq;
-using System.Reflection;
+
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
+using Orleans.Core.Legacy;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime;
 
@@ -29,22 +29,31 @@ namespace Orleans.Messaging
             switch (clientConfiguration.GatewayProviderToUse)
             {
                 case ClientConfiguration.GatewayProviderType.AzureTable:
-                    configurator = CreateInstanceWithParameterlessConstructor<ILegacyGatewayListProviderConfigurator>(
-                            Constants.ORLEANS_CLUSTERING_AZURESTORAGE);
+                    {
+                        string assemblyName = Constants.ORLEANS_CLUSTERING_AZURESTORAGE;
+                        configurator = LegacyAssemblyLoader.LoadAndCreateInstance<ILegacyGatewayListProviderConfigurator>(assemblyName);
+                    }
                     break;
 
                 case ClientConfiguration.GatewayProviderType.AdoNet:
-                    configurator = CreateInstanceWithParameterlessConstructor<ILegacyGatewayListProviderConfigurator>(Constants.ORLEANS_CLUSTERING_ADONET);
+                    {
+                        string assemblyName = Constants.ORLEANS_CLUSTERING_ADONET;
+                        configurator = LegacyAssemblyLoader.LoadAndCreateInstance<ILegacyGatewayListProviderConfigurator>(assemblyName);
+                    }
                     break;
 
                 case ClientConfiguration.GatewayProviderType.Custom:
-                    configurator = CreateInstanceWithParameterlessConstructor<ILegacyGatewayListProviderConfigurator>(
-                            clientConfiguration.CustomGatewayProviderAssemblyName);
+                    {
+                        string assemblyName = clientConfiguration.CustomGatewayProviderAssemblyName;
+                        configurator = LegacyAssemblyLoader.LoadAndCreateInstance<ILegacyGatewayListProviderConfigurator>(assemblyName);
+                    }
                     break;
 
                 case ClientConfiguration.GatewayProviderType.ZooKeeper:
-                    configurator = CreateInstanceWithParameterlessConstructor<ILegacyGatewayListProviderConfigurator>(
-                            Constants.ORLEANS_CLUSTERING_ZOOKEEPER);
+                    {
+                        string assemblyName = Constants.ORLEANS_CLUSTERING_ZOOKEEPER;
+                        configurator = LegacyAssemblyLoader.LoadAndCreateInstance<ILegacyGatewayListProviderConfigurator>(assemblyName);
+                    }
                     break;
 
                 case ClientConfiguration.GatewayProviderType.Config:
@@ -55,22 +64,6 @@ namespace Orleans.Messaging
                     break;
             }
             configurator?.ConfigureServices(clientConfiguration, services);
-        }
-
-
-        /// <summary>
-        /// Create instance for type T in certain assembly, using its parameterless constructor
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="assemblyName"></param>
-        /// <returns></returns>
-        internal static T CreateInstanceWithParameterlessConstructor<T>(string assemblyName)
-        {
-            var assembly = Assembly.Load(new AssemblyName(assemblyName));
-            var foundType = TypeUtils.GetTypes(assembly, type => typeof(T).IsAssignableFrom(type), null).FirstOrDefault();
-            if(foundType == null)
-                throw new InvalidOperationException($"type {typeof(T)} was not found in assembly {assembly}");
-            return (T)Activator.CreateInstance(foundType, true);
         }
     }
 

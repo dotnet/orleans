@@ -3,13 +3,14 @@ using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
+using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Scheduler;
 using Orleans.Providers;
-using Orleans.Configuration.Options;
 using System.Collections.Generic;
 
 namespace Orleans.Hosting
@@ -290,16 +291,8 @@ namespace Orleans.Hosting
                 {
                     options.IsRunningAsUnitTest = config.IsRunningAsUnitTest;
                 });
-
-            services.AddOptions<ReminderOptions>()
-                .Configure<GlobalConfiguration>((options, config) =>
-                {
-                    options.ReminderService = Remap(config.ReminderServiceType);
-                    options.ReminderTableAssembly = config.ReminderTableAssembly;
-                    options.UseMockReminderTable = config.UseMockReminderTable;
-                    options.MockReminderTableTimeout = config.MockReminderTableTimeout;
-                });
-
+            LegacyRemindersConfigurator.Configure(configuration.Globals, services);
+            
             services.AddOptions<GrainVersioningOptions>()
                 .Configure<GlobalConfiguration>((options, config) =>
                 {
@@ -319,20 +312,6 @@ namespace Orleans.Hosting
                     options.DefaultConnectionLimit = config.DefaultConnectionLimit;
                     options.Expect100Continue = config.Expect100Continue;
                     options.UseNagleAlgorithm = config.UseNagleAlgorithm;
-                });
-
-            services.AddOptions<StorageOptions>()
-                .Configure<GlobalConfiguration>((options, config) =>
-                {
-                    options.DataConnectionString = config.DataConnectionString;
-                    options.DataConnectionStringForReminders = config.DataConnectionStringForReminders;
-                });
-
-            services.AddOptions<AdoNetOptions>()
-                .Configure<GlobalConfiguration>((options, config) =>
-                {
-                    options.Invariant = config.AdoInvariant;
-                    options.InvariantForReminders = config.AdoInvariantForReminders;
                 });
 
             services.AddOptions<TypeManagementOptions>()
@@ -376,29 +355,5 @@ namespace Orleans.Hosting
                     throw new NotSupportedException($"DirectoryCachingStrategyType {type} is not supported");
             }
         }
-
-        private static string Remap(GlobalConfiguration.ReminderServiceProviderType type)
-        {
-            switch (type)
-            {
-                case GlobalConfiguration.ReminderServiceProviderType.NotSpecified:
-                    return ReminderOptions.BuiltIn.NotSpecified;
-                case GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain:
-                    return ReminderOptions.BuiltIn.ReminderTableGrain;
-                case GlobalConfiguration.ReminderServiceProviderType.AzureTable:
-                    return ReminderOptions.BuiltIn.AzureTable;
-                case GlobalConfiguration.ReminderServiceProviderType.AdoNet:
-                    return ReminderOptions.BuiltIn.AdoNet;
-                case GlobalConfiguration.ReminderServiceProviderType.MockTable:
-                    return ReminderOptions.BuiltIn.MockTable;
-                case GlobalConfiguration.ReminderServiceProviderType.Disabled:
-                    return ReminderOptions.BuiltIn.Disabled;
-                case GlobalConfiguration.ReminderServiceProviderType.Custom:
-                    return ReminderOptions.BuiltIn.Custom;
-            }
-            throw new NotSupportedException($"ReminderServiceProviderType {type} is not supported");
-        }
-
-
     }
 }

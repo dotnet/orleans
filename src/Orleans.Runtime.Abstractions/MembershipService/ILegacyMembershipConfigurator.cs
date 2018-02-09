@@ -2,17 +2,35 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Reflection;
 
+using Orleans.Hosting;
+
 namespace Orleans.Runtime.MembershipService
 {
     /// <summary>
     /// LegacyMembershipConfigurator configure membership table in the legacy way, which is from global configuration
     /// </summary>
-    public interface ILegacyMembershipConfigurator
+    public interface ILegacyMembershipConfigurator : ILegacySiloConfigurationAdapter
+    {
+    }
+
+    /// <summary>
+    /// Configures reminders using legacy configuration.
+    /// </summary>
+    public interface ILegacyReminderTableAdapter : ILegacySiloConfigurationAdapter
+    {
+    }
+
+    /// <summary>
+    /// Configures a silo host using legacy configuration.
+    /// </summary>
+    public interface ILegacySiloConfigurationAdapter
     {
         /// <summary>
-        /// Configure the membership table in the legacy way 
+        /// Configures the provided <paramref name="builder"/> using <paramref name="configuration"/>.
         /// </summary>
-        void ConfigureServices(object configuration, IServiceCollection services);
+        /// <param name="configuration">The legacy GlobalConfiguration object.</param>
+        /// <param name="services">The silo services collection.</param>
+        void Configure(object configuration, IServiceCollection services);
     }
 
     /// <summary>

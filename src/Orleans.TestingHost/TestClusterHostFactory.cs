@@ -59,7 +59,7 @@ namespace Orleans.TestingHost
 
                 // TODO: make SiloHostBuilder work when not using the legacy configuration, similar to what we did with ClientBuilder.
                 // All The important information has been migrated to strongly typed options (everything should be migrated, but the minimum required set is already there).
-                var clusterConfiguration = GetOrCreateClusterConfiguration(services, context);
+                var clusterConfiguration = GetOrCreateClusterConfiguration(services);
                 if (Debugger.IsAttached)
                 {
                     // Test is running inside debugger - Make timeout ~= infinite
@@ -133,7 +133,7 @@ namespace Orleans.TestingHost
             });
         }
 
-        private static ClusterConfiguration GetOrCreateClusterConfiguration(IServiceCollection services, HostBuilderContext context)
+        private static ClusterConfiguration GetOrCreateClusterConfiguration(IServiceCollection services)
         {
             var clusterConfiguration = services
                 .FirstOrDefault(s => s.ServiceType == typeof(ClusterConfiguration))
