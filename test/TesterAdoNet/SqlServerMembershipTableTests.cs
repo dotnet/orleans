@@ -8,19 +8,19 @@ using Orleans.Runtime;
 using Orleans.Runtime.Membership;
 using Orleans.Runtime.MembershipService;
 using Orleans.Tests.SqlUtils;
-using OrleansSQLUtils.Configuration;
+using Orleans.AdoNet.Configuration;
 using TestExtensions;
 using UnitTests.General;
 using Xunit;
-using OrleansSQLUtils;
-using OrleansSQLUtils.Options;
+using Orleans.AdoNet;
+using Orleans.AdoNet.Options;
 
 namespace UnitTests.MembershipTests
 {
     /// <summary>
     /// Tests for operation of Orleans Membership Table using SQL Server
     /// </summary>
-    [TestCategory("Membership"), TestCategory("SqlServer")]
+    [TestCategory("Membership"), TestCategory("AdoNet")]
     public class SqlServerMembershipTableTests : MembershipTableTestsBase
     {
         public SqlServerMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
@@ -35,22 +35,22 @@ namespace UnitTests.MembershipTests
         }
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
         {
-            var options = new SqlMembershipOptions()
+            var options = new AdoNetClusteringOptions()
             {
                 AdoInvariant = GetAdoInvariant(),
                 ConnectionString = this.connectionString,
             };
-            return new SqlMembershipTable(this.GrainReferenceConverter, this.siloOptions, Options.Create(options),  this.loggerFactory.CreateLogger<SqlMembershipTable>());
+            return new AdoNetClusteringTable(this.GrainReferenceConverter, this.siloOptions, Options.Create(options),  this.loggerFactory.CreateLogger<AdoNetClusteringTable>());
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
-            var options = new SqlGatewayListProviderOptions()
+            var options = new AdoNetGatewayListProviderOptions()
             {
                 ConnectionString = this.connectionString,
                 AdoInvariant = GetAdoInvariant()
             };
-            return new SqlGatewayListProvider(this.loggerFactory.CreateLogger<SqlGatewayListProvider>(), this.GrainReferenceConverter, this.clientConfiguration, Options.Create(options), this.clientOptions);
+            return new AdoNetGatewayListProvider(this.loggerFactory.CreateLogger<AdoNetGatewayListProvider>(), this.GrainReferenceConverter, this.clientConfiguration, Options.Create(options), this.clientOptions);
         }
 
         protected override string GetAdoInvariant()

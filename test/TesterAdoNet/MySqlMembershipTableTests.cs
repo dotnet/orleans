@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -9,53 +9,55 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Membership;
 using Orleans.Runtime.MembershipService;
 using Orleans.Tests.SqlUtils;
-using OrleansSQLUtils.Configuration;
+using Orleans.AdoNet.Configuration;
 using TestExtensions;
 using UnitTests.General;
 using Xunit;
-using OrleansSQLUtils;
-using OrleansSQLUtils.Options;
+using Orleans.AdoNet;
+using Orleans.AdoNet.Options;
 
 namespace UnitTests.MembershipTests
 {
-    [TestCategory("Membership"), TestCategory("PostgreSql")]
-    public class PostgreSqlMembershipTableTests : MembershipTableTestsBase
+    /// <summary>
+    /// Tests for operation of Orleans Membership Table using MySQL
+    /// </summary>
+    [TestCategory("Membership"), TestCategory("MySql")]
+    public class MySqlMembershipTableTests : MembershipTableTestsBase
     {
-        public PostgreSqlMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
+        public MySqlMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
         {
         }
 
         private static LoggerFilterOptions CreateFilters()
         {
             var filters = new LoggerFilterOptions();
-            filters.AddFilter(typeof(PostgreSqlMembershipTableTests).Name, LogLevel.Trace);
+            filters.AddFilter(typeof(MySqlMembershipTableTests).Name, LogLevel.Trace);
             return filters;
         }
 
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
         {
-            var options = new SqlMembershipOptions()
+            var options = new AdoNetClusteringOptions()
             {
                 AdoInvariant = GetAdoInvariant(),
                 ConnectionString = this.connectionString,
             };
-            return new SqlMembershipTable(this.GrainReferenceConverter, this.siloOptions, Options.Create(options), this.loggerFactory.CreateLogger<SqlMembershipTable>());
+            return new AdoNetClusteringTable(this.GrainReferenceConverter, this.siloOptions, Options.Create(options), loggerFactory.CreateLogger<AdoNetClusteringTable>());
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
-            var options = new SqlGatewayListProviderOptions()
+            var options = new AdoNetGatewayListProviderOptions()
             {
                 ConnectionString = this.connectionString,
                 AdoInvariant = GetAdoInvariant()
             };
-            return new SqlGatewayListProvider(this.loggerFactory.CreateLogger<SqlGatewayListProvider>(), this.GrainReferenceConverter
-                ,this.clientConfiguration, Options.Create(options), this.clientOptions);
+            return new AdoNetGatewayListProvider(loggerFactory.CreateLogger<AdoNetGatewayListProvider>(), this.GrainReferenceConverter, this.clientConfiguration, Options.Create(options), this.clientOptions);
         }
 
         protected override string GetAdoInvariant()
         {
-            return AdoNetInvariants.InvariantNamePostgreSql;
+            return AdoNetInvariants.InvariantNameMySql;
         }
 
         protected override async Task<string> GetConnectionString()
@@ -65,54 +67,54 @@ namespace UnitTests.MembershipTests
         }
 
         [SkippableFact]
-        public void MembershipTable_PostgreSql_Init()
+        public void MembershipTable_MySql_Init()
         {
         }
 
         [SkippableFact]
-        public async Task MembershipTable_PostgreSql_GetGateways()
+        public async Task MembershipTable_MySql_GetGateways()
         {
             await MembershipTable_GetGateways();
         }
 
         [SkippableFact]
-        public async Task MembershipTable_PostgreSql_ReadAll_EmptyTable()
+        public async Task MembershipTable_MySql_ReadAll_EmptyTable()
         {
             await MembershipTable_ReadAll_EmptyTable();
         }
 
         [SkippableFact]
-        public async Task MembershipTable_PostgreSql_InsertRow()
+        public async Task MembershipTable_MySql_InsertRow()
         {
             await MembershipTable_InsertRow();
         }
 
         [SkippableFact]
-        public async Task MembershipTable_PostgreSql_ReadRow_Insert_Read()
+        public async Task MembershipTable_MySql_ReadRow_Insert_Read()
         {
             await MembershipTable_ReadRow_Insert_Read();
         }
 
         [SkippableFact]
-        public async Task MembershipTable_PostgreSql_ReadAll_Insert_ReadAll()
+        public async Task MembershipTable_MySql_ReadAll_Insert_ReadAll()
         {
             await MembershipTable_ReadAll_Insert_ReadAll();
         }
 
         [SkippableFact]
-        public async Task MembershipTable_PostgreSql_UpdateRow()
+        public async Task MembershipTable_MySql_UpdateRow()
         {
             await MembershipTable_UpdateRow();
         }
 
         [SkippableFact]
-        public async Task MembershipTable_PostgreSql_UpdateRowInParallel()
+        public async Task MembershipTable_MySql_UpdateRowInParallel()
         {
             await MembershipTable_UpdateRowInParallel();
         }
 
         [SkippableFact]
-        public async Task MembershipTable_PostgreSql_UpdateIAmAlive()
+        public async Task MembershipTable_MySql_UpdateIAmAlive()
         {
             await MembershipTable_UpdateIAmAlive();
         }

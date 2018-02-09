@@ -2,12 +2,12 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace OrleansSQLUtils.Configuration
+namespace Orleans.AdoNet.Configuration
 {
     /// <summary>
-    /// Options for SqlMembership
+    /// Options for ADO.NET clustering
     /// </summary>
-    public class SqlMembershipOptions
+    public class AdoNetClusteringOptions
     {
         /// <summary>
         /// Connection string for Sql Storage

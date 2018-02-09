@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <RootNamespace>Tester.SQLUtils</RootNamespace>
-    <AssemblyName>Tester.SQLUtils</AssemblyName>
+    <RootNamespace>Tester.AdoNet</RootNamespace>
+    <AssemblyName>Tester.AdoNet</AssemblyName>
     <DefineConstants>$(DefineConstants);TESTER_SQLUTILS</DefineConstants>
   </PropertyGroup>
 
@@ -30,7 +30,7 @@
     <Compile Include="..\..\src\AdoNet\Shared\Storage\RelationalOrleansQueries.cs" Link="Storage\RelationalOrleansQueries.cs" />
     <Compile Include="..\..\src\AdoNet\Shared\Storage\RelationalStorage.cs" Link="Storage\RelationalStorage.cs" />
     <Compile Include="..\..\src\AdoNet\Shared\Storage\RelationalStorageExtensions.cs" Link="Storage\RelationalStorageExtensions.cs" />
-    <Compile Include="..\..\src\AdoNet\Shared\Storage\SqlFormatProvider.cs" Link="Storage\SqlFormatProvider.cs" />
+    <Compile Include="..\..\src\AdoNet\Shared\Storage\AdoNetFormatProvider.cs" Link="Storage\AdoNetFormatProvider.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -53,7 +53,7 @@
     <None Include="Data\TestDb.mdf">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="Tester.SQLUtils.xunit.runner.json">
+    <None Include="Tester.AdoNet.xunit.runner.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

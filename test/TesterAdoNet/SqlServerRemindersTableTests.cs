@@ -14,7 +14,7 @@ namespace UnitTests.RemindersTest
     /// <summary>
     /// Tests for operation of Orleans Reminders Table using SQL Server
     /// </summary>
-    [TestCategory("Reminders"), TestCategory("SqlServer")]
+    [TestCategory("Reminders"), TestCategory("AdoNet")]
     public class SqlServerRemindersTableTests : ReminderTableTestsBase
     {
         public SqlServerRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
@@ -30,7 +30,7 @@ namespace UnitTests.RemindersTest
 
         protected override IReminderTable CreateRemindersTable()
         {
-            return new SqlReminderTable(this.ClusterFixture.Services.GetRequiredService<IGrainReferenceConverter>(), this.siloOptions, this.adoNetOptions, this.storageOptions);
+            return new AdoNetReminderTable(this.ClusterFixture.Services.GetRequiredService<IGrainReferenceConverter>(), this.siloOptions, this.adoNetOptions, this.storageOptions);
         }
 
         protected override string GetAdoInvariant()

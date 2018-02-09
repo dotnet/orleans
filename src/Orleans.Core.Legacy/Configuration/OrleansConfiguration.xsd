@@ -10,7 +10,7 @@
   <xs:simpleType name="SystemStorageType">
     <xs:restriction base="xs:string">
       <xs:enumeration value="None" />
-      <xs:enumeration value="SqlServer" />
+      <xs:enumeration value="AdoNet" />
       <xs:enumeration value="AzureTable" />
       <xs:enumeration value="ZooKeeper" />
       <xs:enumeration value="Custom" />
@@ -21,7 +21,7 @@
       <xs:enumeration value="SiloDirectoryGrain" />
       <xs:enumeration value="MembershipTableGrain" />
       <xs:enumeration value="File" />
-      <xs:enumeration value="SqlServer" />
+      <xs:enumeration value="AdoNet" />
       <xs:enumeration value="AzureTable" />
     </xs:restriction>
   </xs:simpleType>
@@ -29,7 +29,7 @@
     <xs:restriction base="xs:string">
       <xs:enumeration value="None" />
       <xs:enumeration value="ReminderTableGrain" />
-      <xs:enumeration value="SqlServer" />
+      <xs:enumeration value="AdoNet" />
       <xs:enumeration value="AzureTable" />
     </xs:restriction>
   </xs:simpleType>
@@ -334,7 +334,7 @@
     <xs:attribute name="SystemStoreType" type="tns:SystemStorageType" use="required">
       <xs:annotation>
         <xs:documentation>
-          Specifies the kind of system store that should be used: AzureTable or SqlServer.
+          Specifies the kind of system store that should be used: AzureTable or AdoNet.
         </xs:documentation>
       </xs:annotation>
     </xs:attribute>

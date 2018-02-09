@@ -6,7 +6,7 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.ReminderService
 {
-    internal class SqlReminderTable : IReminderTable
+    internal class AdoNetReminderTable : IReminderTable
     {
         private readonly IGrainReferenceConverter grainReferenceConverter;
         private readonly AdoNetOptions adoNetOptions;
@@ -14,7 +14,7 @@ namespace Orleans.Runtime.ReminderService
         private string serviceId;
         private RelationalOrleansQueries orleansQueries;
 
-        public SqlReminderTable(IGrainReferenceConverter grainReferenceConverter, IOptions<SiloOptions> siloOptions, IOptions<AdoNetOptions> adoNetOptions, IOptions<StorageOptions> storageOptions)
+        public AdoNetReminderTable(IGrainReferenceConverter grainReferenceConverter, IOptions<SiloOptions> siloOptions, IOptions<AdoNetOptions> adoNetOptions, IOptions<StorageOptions> storageOptions)
         {
             this.grainReferenceConverter = grainReferenceConverter;
             this.serviceId = siloOptions.Value.ServiceId.ToString();

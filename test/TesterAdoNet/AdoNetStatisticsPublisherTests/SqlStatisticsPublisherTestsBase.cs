@@ -8,12 +8,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans;
-using Orleans.Providers.SqlServer;
+using Orleans.Providers.AdoNet;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
 using Orleans.TestingHost.Utils;
-using OrleansSQLUtils.Configuration;
+using Orleans.AdoNet.Configuration;
 using TestExtensions;
 using UnitTests.General;
 using Xunit;
@@ -35,7 +35,7 @@ namespace UnitTests.SqlStatisticsPublisherTests
         
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
-        private readonly SqlStatisticsPublisher StatisticsPublisher;
+        private readonly AdoNetStatisticsPublisher StatisticsPublisher;
         
         protected SqlStatisticsPublisherTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment)
         {
@@ -47,7 +47,7 @@ namespace UnitTests.SqlStatisticsPublisherTests
 
             ConnectionString = fixture.ConnectionString;
 
-            StatisticsPublisher = new SqlStatisticsPublisher();
+            StatisticsPublisher = new AdoNetStatisticsPublisher();
             StatisticsPublisher.Init("Test", new StatisticsPublisherProviderRuntime(),
                 new StatisticsPublisherProviderConfig(AdoInvariant, ConnectionString)).Wait();
         }
@@ -72,15 +72,15 @@ namespace UnitTests.SqlStatisticsPublisherTests
 
         protected async Task SqlStatisticsPublisher_ReportMetrics_Silo()
         {
-            var options = new SqlMembershipOptions()
+            var options = new AdoNetClusteringOptions()
             {
                 AdoInvariant = AdoInvariant,
                 ConnectionString = ConnectionString
             };
 
-            IMembershipTable mbr = new SqlMembershipTable(this.environment.Services.GetRequiredService<IGrainReferenceConverter>(), 
+            IMembershipTable mbr = new AdoNetClusteringTable(this.environment.Services.GetRequiredService<IGrainReferenceConverter>(), 
                 this.environment.Services.GetRequiredService<IOptions<SiloOptions>>(), Options.Create(options), 
-                this.loggerFactory.CreateLogger<SqlMembershipTable>());
+                this.loggerFactory.CreateLogger<AdoNetClusteringTable>());
             await mbr.InitializeMembershipTable(true).WithTimeout(TimeSpan.FromMinutes(1));
             StatisticsPublisher.AddConfiguration("statisticsDeployment", true, "statisticsSiloId", SiloAddressUtils.NewLocalSiloAddress(0), new IPEndPoint(IPAddress.Loopback, 12345), "statisticsHostName");
             await RunParallel(10, () => StatisticsPublisher.ReportMetrics((ISiloPerformanceMetrics)new DummyPerformanceMetrics()));

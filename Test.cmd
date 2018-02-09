@@ -37,7 +37,7 @@ set TESTS=^
 %CMDHOME%\test\GoogleUtils.Tests,^
 %CMDHOME%\test\ServiceBus.Tests,^
 %CMDHOME%\test\TestServiceFabric,^
-%CMDHOME%\test\TesterSQLUtils,^
+%CMDHOME%\test\TesterAdoNet,^
 %CMDHOME%\test\TesterZooKeeperUtils,^
 %CMDHOME%\test\RuntimeCodeGen.Tests,^
 %CMDHOME%\test\Orleans.Transactions.Tests,^

@@ -30,7 +30,7 @@ namespace Orleans.Runtime.ReminderService
 
             switch (serviceType)
             {
-                case ReminderOptions.BuiltIn.SqlServer:
+                case ReminderOptions.BuiltIn.AdoNet:
                     return AssemblyLoader.LoadAndCreateInstance<IReminderTable>(
                         Constants.ORLEANS_REMINDERS_ADONET,
                         logger,

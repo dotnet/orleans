@@ -11,12 +11,12 @@ using Orleans.Statistics.AdoNet.Storage;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
-namespace Orleans.Providers.SqlServer
+namespace Orleans.Providers.AdoNet
 {
     /// <summary>
     /// Plugin for publishing silos and client statistics to a SQL database.
     /// </summary>
-    public class SqlStatisticsPublisher: IConfigurableStatisticsPublisher, IConfigurableSiloMetricsDataPublisher, IConfigurableClientMetricsDataPublisher, IProvider
+    public class AdoNetStatisticsPublisher: IConfigurableStatisticsPublisher, IConfigurableSiloMetricsDataPublisher, IConfigurableClientMetricsDataPublisher, IProvider
     {
         private string deploymentId;
         private IPAddress clientAddress;
@@ -45,7 +45,7 @@ namespace Orleans.Providers.SqlServer
         public async Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
         {
             Name = name;
-            logger = providerRuntime.ServiceProvider.GetRequiredService<ILogger<SqlStatisticsPublisher>>();
+            logger = providerRuntime.ServiceProvider.GetRequiredService<ILogger<AdoNetStatisticsPublisher>>();
             this.grainReferenceConverter = providerRuntime.ServiceProvider.GetRequiredService<IGrainReferenceConverter>();
 
             string adoInvariant = AdoNetInvariants.InvariantNameSqlServer;
@@ -116,14 +116,14 @@ namespace Orleans.Providers.SqlServer
         /// <returns>Task for database operation</returns>
         public async Task ReportMetrics(IClientPerformanceMetrics metricsData)
         {
-            if(logger.IsEnabled(LogLevel.Trace)) logger.Trace("SqlStatisticsPublisher.ReportMetrics (client) called with data: {0}.", metricsData);
+            if(logger.IsEnabled(LogLevel.Trace)) logger.Trace("AdoNetStatisticsPublisher.ReportMetrics (client) called with data: {0}.", metricsData);
             try
             {
                 await orleansQueries.UpsertReportClientMetricsAsync(deploymentId, clientId, clientAddress, hostName, metricsData);
             }
             catch(Exception ex)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("SqlStatisticsPublisher.ReportMetrics (client) failed: {0}", ex);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("AdoNetStatisticsPublisher.ReportMetrics (client) failed: {0}", ex);
                 throw;
             }
         }
@@ -141,14 +141,14 @@ namespace Orleans.Providers.SqlServer
         /// <returns>Task for database operation</returns>
         public async Task ReportMetrics(ISiloPerformanceMetrics metricsData)
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("SqlStatisticsPublisher.ReportMetrics (silo) called with data: {0}.", metricsData);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("AdoNetStatisticsPublisher.ReportMetrics (silo) called with data: {0}.", metricsData);
             try
             {
                 await orleansQueries.UpsertSiloMetricsAsync(deploymentId, siloName, gateway, siloAddress, hostName, metricsData);
             }
             catch(Exception ex)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("SqlStatisticsPublisher.ReportMetrics (silo) failed: {0}", ex);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("AdoNetStatisticsPublisher.ReportMetrics (silo) failed: {0}", ex);
                 throw;
             }
         }

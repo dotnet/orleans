@@ -18,24 +18,24 @@ namespace UnitTests.SqlStatisticsPublisherTests
             get { return AdoNetInvariants.InvariantNameSqlServer; }
         }
         
-        [Fact(Skip = "Not Implemented"), TestCategory("Statistics"), TestCategory("SqlServer")]
+        [Fact(Skip = "Not Implemented"), TestCategory("Statistics"), TestCategory("AdoNet")]
         public void SqlStatisticsPublisher_SqlServer_Init()
         {
         }
 
-        [Fact(Skip = "Not Implemented"), TestCategory("Statistics"), TestCategory("SqlServer")]
+        [Fact(Skip = "Not Implemented"), TestCategory("Statistics"), TestCategory("AdoNet")]
         public async Task SqlStatisticsPublisher_SqlServer_ReportMetrics_Client()
         {
             await SqlStatisticsPublisher_ReportMetrics_Client();
         }
 
-        [Fact(Skip = "Not Implemented"), TestCategory("Statistics"), TestCategory("SqlServer")]
+        [Fact(Skip = "Not Implemented"), TestCategory("Statistics"), TestCategory("AdoNet")]
         public async Task SqlStatisticsPublisher_SqlServer_ReportStats()
         {
             await SqlStatisticsPublisher_ReportStats();
         }
 
-        [Fact(Skip = "Not Implemented"), TestCategory("Statistics"), TestCategory("SqlServer")]
+        [Fact(Skip = "Not Implemented"), TestCategory("Statistics"), TestCategory("AdoNet")]
         public async Task SqlStatisticsPublisher_SqlServer_ReportMetrics_Silo()
         {
             await SqlStatisticsPublisher_ReportMetrics_Silo();

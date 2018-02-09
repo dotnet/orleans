@@ -17,7 +17,7 @@ using Orleans.Hosting;
 
 namespace Tester.SQLUtils
 {
-    public class SqlClientInitTests : OrleansTestingBase, IClassFixture<SqlClientInitTests.Fixture>
+    public class AdoNetClientInitTests : OrleansTestingBase, IClassFixture<AdoNetClientInitTests.Fixture>
     {
         public class Fixture : BaseTestClusterFixture
         {
@@ -34,16 +34,16 @@ namespace Tester.SQLUtils
                 builder.ConfigureLegacyConfiguration(legacy =>
                 {
                     legacy.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.MemoryStorage>("MemoryStore");
-                    legacy.ClusterConfiguration.Globals.RegisterStatisticsProvider<Orleans.Providers.SqlServer.SqlStatisticsPublisher>(statisticProviderName,
+                    legacy.ClusterConfiguration.Globals.RegisterStatisticsProvider<Orleans.Providers.AdoNet.AdoNetStatisticsPublisher>(statisticProviderName,
                         new Dictionary<string, string>() {{"ConnectionString", connectionString}});
                     legacy.ClusterConfiguration.ApplyToAllNodes(nc => nc.StatisticsProviderName = statisticProviderName);
-                    legacy.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer;
+                    legacy.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AdoNet;
                     legacy.ClusterConfiguration.Globals.DataConnectionString = connectionString;
                     legacy.ClusterConfiguration.ApplyToAllNodes(nc => nc.StatisticsMetricsTableWriteInterval = TimeSpan.FromSeconds(10));
 
-                    legacy.ClientConfiguration.RegisterStatisticsProvider<Orleans.Providers.SqlServer.SqlStatisticsPublisher>(statisticProviderName,
+                    legacy.ClientConfiguration.RegisterStatisticsProvider<Orleans.Providers.AdoNet.AdoNetStatisticsPublisher>(statisticProviderName,
                         new Dictionary<string, string>() {{"ConnectionString", connectionString}});
-                    legacy.ClientConfiguration.GatewayProvider = ClientConfiguration.GatewayProviderType.SqlServer;
+                    legacy.ClientConfiguration.GatewayProvider = ClientConfiguration.GatewayProviderType.AdoNet;
                     legacy.ClientConfiguration.DataConnectionString = connectionString;
                     legacy.ClientConfiguration.StatisticsMetricsTableWriteInterval = TimeSpan.FromSeconds(10);
                     this.ClientConfiguration = legacy.ClientConfiguration;
@@ -56,21 +56,21 @@ namespace Tester.SQLUtils
         private readonly Fixture fixture;
         protected TestCluster HostedCluster => this.fixture.HostedCluster;
 
-        public SqlClientInitTests(Fixture fixture)
+        public AdoNetClientInitTests(Fixture fixture)
         {
             this.fixture = fixture;
         }
 
-        [Fact, TestCategory("Client"), TestCategory("Stats"), TestCategory("SqlServer")]
-        public async Task ClientInit_SqlServer_WithStats()
+        [Fact, TestCategory("Client"), TestCategory("Stats"), TestCategory("AdoNet")]
+        public async Task ClientInit_AdoNet_WithStats()
         {
             Assert.True(this.HostedCluster.Client.IsInitialized);
 
             ClientConfiguration config = this.fixture.ClientConfiguration;
 
-            Assert.Equal(ClientConfiguration.GatewayProviderType.SqlServer, config.GatewayProvider);  // "GatewayProviderType"
+            Assert.Equal(ClientConfiguration.GatewayProviderType.AdoNet, config.GatewayProvider);  // "GatewayProviderType"
 
-            Assert.True(config.UseSqlSystemStore, "Client UseSqlSystemStore");
+            Assert.True(config.UseAdoNetSystemStore, "Client UseAdoNetSystemStore");
 
             var clientStatisticsManager = this.HostedCluster.ServiceProvider.GetService<ClientStatisticsManager>();
             Assert.NotNull(clientStatisticsManager); // Client Statistics Manager is setup

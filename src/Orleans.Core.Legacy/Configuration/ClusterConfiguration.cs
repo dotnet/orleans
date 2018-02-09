@@ -139,9 +139,9 @@ namespace Orleans.Runtime.Configuration
             if (this.Globals.LivenessEnabled &&
                 this.Globals.LivenessType == GlobalConfiguration.LivenessProviderType.NotSpecified)
             {
-                if (this.Globals.UseSqlSystemStore)
+                if (this.Globals.UseAdoNetSystemStore)
                 {
-                    this.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer;
+                    this.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AdoNet;
                 }
                 else if (this.Globals.UseAzureSystemStore)
                 {
@@ -163,9 +163,9 @@ namespace Orleans.Runtime.Configuration
             }
             else if (this.Globals.ReminderServiceType == GlobalConfiguration.ReminderServiceProviderType.NotSpecified)
             {
-                if (this.Globals.UseSqlSystemStore)
+                if (this.Globals.UseAdoNetSystemStore)
                 {
-                    this.Globals.SetReminderServiceType(GlobalConfiguration.ReminderServiceProviderType.SqlServer);
+                    this.Globals.SetReminderServiceType(GlobalConfiguration.ReminderServiceProviderType.AdoNet);
                 }
                 else if (this.Globals.UseAzureSystemStore)
                 {

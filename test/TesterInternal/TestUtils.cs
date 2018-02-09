@@ -22,13 +22,13 @@ namespace UnitTests.TestHelper
             return dbFile;
         }
 
-        public static string GetSqlConnectionString()
+        public static string GetAdoNetConnectionString()
         {
             string dbFileName = @"TestDb.mdf";
-            return GetSqlConnectionString(new DirectoryInfo(@".\Data"), dbFileName);
+            return GetAdoNetConnectionString(new DirectoryInfo(@".\Data"), dbFileName);
         }
 
-        private static string GetSqlConnectionString(DirectoryInfo dbDir, string dbFileName)
+        private static string GetAdoNetConnectionString(DirectoryInfo dbDir, string dbFileName)
         {
             FileInfo dbFile = GetDbFileLocation(dbDir, dbFileName);
 

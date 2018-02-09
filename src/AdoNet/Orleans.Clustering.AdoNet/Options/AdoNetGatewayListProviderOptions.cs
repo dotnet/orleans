@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace OrleansSQLUtils.Options
+namespace Orleans.AdoNet.Options
 {
-    public class SqlGatewayListProviderOptions
+    public class AdoNetGatewayListProviderOptions
     {
         /// <summary>
         /// Connection string for Sql

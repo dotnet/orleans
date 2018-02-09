@@ -3,14 +3,14 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
 using Orleans.Hosting;
 
-namespace OrleansSQLUtils
+namespace Orleans.AdoNet
 {
     /// <inheritdoc />
-    public class LegacySqlMembershipConfigurator : ILegacyMembershipConfigurator
+    public class LegacyAdoNetClusteringConfigurator : ILegacyMembershipConfigurator
     {
         public void ConfigureServices(object configuration, IServiceCollection services)
         {
-            services.UseSqlMembership(
+            services.UseAdoNetClustering(
                 options =>
                 {
                     var reader = new GlobalConfigurationReader(configuration);

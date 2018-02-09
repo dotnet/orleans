@@ -8,7 +8,7 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("LoadTestGrains")]
 [assembly: InternalsVisibleTo("NonSilo.Tests")]
 [assembly: InternalsVisibleTo("Tester.AzureUtils")]
-[assembly: InternalsVisibleTo("Tester.SQLUtils")]
+[assembly: InternalsVisibleTo("Tester.AdoNet")]
 [assembly: InternalsVisibleTo("TesterInternal")]
 [assembly: InternalsVisibleTo("TestInternalGrains")]
 [assembly: InternalsVisibleTo("UnitTestGrains")]

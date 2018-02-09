@@ -31,7 +31,7 @@ namespace UnitTests.TimerTests
                 builder.ConfigureLegacyConfiguration(legacy =>
                 {
                     legacy.ClusterConfiguration.Globals.DataConnectionString = connectionString;
-                    legacy.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.SqlServer;
+                    legacy.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.AdoNet;
                 });
             }
         }
@@ -46,13 +46,13 @@ namespace UnitTests.TimerTests
         
         // Basic tests
 
-        [Fact, TestCategory("ReminderService"), TestCategory("SqlServer")]
+        [Fact, TestCategory("ReminderService"), TestCategory("AdoNet")]
         public async Task Rem_Sql_Basic_StopByRef()
         {
             await Test_Reminders_Basic_StopByRef();
         }
 
-        [Fact, TestCategory("ReminderService"), TestCategory("SqlServer")]
+        [Fact, TestCategory("ReminderService"), TestCategory("AdoNet")]
         public async Task Rem_Sql_Basic_ListOps()
         {
             await Test_Reminders_Basic_ListOps();
@@ -60,13 +60,13 @@ namespace UnitTests.TimerTests
 
         // Single join tests ... multi grain, multi reminders
 
-        [Fact, TestCategory("ReminderService"), TestCategory("SqlServer")]
+        [Fact, TestCategory("ReminderService"), TestCategory("AdoNet")]
         public async Task Rem_Sql_1J_MultiGrainMultiReminders()
         {
             await Test_Reminders_1J_MultiGrainMultiReminders();
         }
 
-        [Fact, TestCategory("ReminderService"), TestCategory("SqlServer")]
+        [Fact, TestCategory("ReminderService"), TestCategory("AdoNet")]
         public async Task Rem_Sql_ReminderNotFound()
         {
             await Test_Reminders_ReminderNotFound();
