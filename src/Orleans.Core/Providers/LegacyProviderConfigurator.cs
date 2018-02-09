@@ -121,41 +121,76 @@ namespace Orleans.Providers
             private async Task Init(CancellationToken ct)
             {
                 var stopWatch = Stopwatch.StartNew();
-                IProvider provider = this.provider.Value;
-                IProviderRuntime runtime = this.services.GetRequiredService<IProviderRuntime>();
-                await Schedule(() => provider.Init(this.config.Name, runtime, this.config));
-                stopWatch.Stop();
-                this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Initializing provider {this.config.Name} of type {this.config.Type} in stage {this.initStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");
+                try
+                {
+                    IProvider provider = this.provider.Value;
+                    IProviderRuntime runtime = this.services.GetRequiredService<IProviderRuntime>();
+                    await Schedule(() => provider.Init(this.config.Name, runtime, this.config));
+                    stopWatch.Stop();
+                    this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Initializing provider {this.config.Name} of type {this.config.Type} in stage {this.initStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");
+                } catch(Exception ex)
+                {
+                    stopWatch.Stop();
+                    this.logger.Error(ErrorCode.SiloStartPerfMeasure, $"Initialization failed for provider {this.config.Name} of type {this.config.Type} in stage {this.initStage} in {stopWatch.ElapsedMilliseconds} Milliseconds.", ex);
+                    throw;
+                }
             }
 
             private async Task ProviderClose(CancellationToken ct)
             {
                 var stopWatch = Stopwatch.StartNew();
-                IProvider provider = this.provider.Value;
-                if (provider is IStreamProvider) return; // stream providers are closed in StreamProviderClose
-                await Schedule(() => provider.Close());
-                stopWatch.Stop();
-                this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Closing provider {this.config.Name} of type {this.config.Type} in stage {this.initStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");
+                try
+                {
+                    IProvider provider = this.provider.Value;
+                    if (provider is IStreamProvider) return; // stream providers are closed in StreamProviderClose
+                    await Schedule(() => provider.Close());
+                    stopWatch.Stop();
+                    this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Closing provider {this.config.Name} of type {this.config.Type} in stage {this.initStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");
+                }
+                catch (Exception ex)
+                {
+                    stopWatch.Stop();
+                    this.logger.Error(ErrorCode.SiloStartPerfMeasure, $"Close failed for provider {this.config.Name} of type {this.config.Type} in stage {this.initStage} in {stopWatch.ElapsedMilliseconds} Milliseconds.", ex);
+                    throw;
+                }
             }
 
             private async Task StreamProviderClose(CancellationToken ct)
             {
                 var stopWatch = Stopwatch.StartNew();
-                IProvider provider = this.provider.Value;
-                if (!(provider is IStreamProvider)) return; // only stream providers are closed here
-                await Schedule(() => provider.Close());
-                stopWatch.Stop();
-                this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Closing provider {this.config.Name} of type {this.config.Type} in stage {this.initStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");
+                try
+                {
+                    IProvider provider = this.provider.Value;
+                    if (!(provider is IStreamProvider)) return; // only stream providers are closed here
+                    await Schedule(() => provider.Close());
+                    stopWatch.Stop();
+                    this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Closing stream provider {this.config.Name} of type {this.config.Type} in stage {this.startStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");
+                }
+                catch (Exception ex)
+                {
+                    stopWatch.Stop();
+                    this.logger.Error(ErrorCode.SiloStartPerfMeasure, $"Close failed for stream provider {this.config.Name} of type {this.config.Type} in stage {this.startStage} in {stopWatch.ElapsedMilliseconds} Milliseconds.", ex);
+                    throw;
+                }
             }
 
             private async Task Start(CancellationToken ct)
             {
                 var stopWatch = Stopwatch.StartNew();
-                IStreamProviderImpl provider = this.provider.Value as IStreamProviderImpl;
-                if (provider == null) return;
-                await Schedule(() => provider.Start());
-                stopWatch.Stop();
-                this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Starting provider {this.config.Name} of type {this.config.Type} in stage {this.startStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");
+                try
+                {
+                    IStreamProviderImpl provider = this.provider.Value as IStreamProviderImpl;
+                    if (provider == null) return;
+                    await Schedule(() => provider.Start());
+                    stopWatch.Stop();
+                    this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Starting stream provider {this.config.Name} of type {this.config.Type} in stage {this.startStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");
+                }
+                catch (Exception ex)
+                {
+                    stopWatch.Stop();
+                    this.logger.Error(ErrorCode.SiloStartPerfMeasure, $"Start failed for stream provider {this.config.Name} of type {this.config.Type} in stage {this.startStage} in {stopWatch.ElapsedMilliseconds} Milliseconds.", ex);
+                    throw;
+                }
             }
 
             private Task Schedule(Func<Task> taskFunc)
