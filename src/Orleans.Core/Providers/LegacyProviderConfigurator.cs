@@ -131,7 +131,7 @@ namespace Orleans.Providers
                 } catch(Exception ex)
                 {
                     stopWatch.Stop();
-                    this.logger.Error(ErrorCode.SiloStartPerfMeasure, $"Initialization failed for provider {this.config.Name} of type {this.config.Type} in stage {this.initStage} in {stopWatch.ElapsedMilliseconds} Milliseconds.", ex);
+                    this.logger.Error(ErrorCode.Provider_ErrorFromInit, $"Initialization failed for provider {this.config.Name} of type {this.config.Type} in stage {this.initStage} in {stopWatch.ElapsedMilliseconds} Milliseconds.", ex);
                     throw;
                 }
             }
@@ -150,7 +150,7 @@ namespace Orleans.Providers
                 catch (Exception ex)
                 {
                     stopWatch.Stop();
-                    this.logger.Error(ErrorCode.SiloStartPerfMeasure, $"Close failed for provider {this.config.Name} of type {this.config.Type} in stage {this.initStage} in {stopWatch.ElapsedMilliseconds} Milliseconds.", ex);
+                    this.logger.Error(ErrorCode.Provider_ErrorFromClose, $"Close failed for provider {this.config.Name} of type {this.config.Type} in stage {this.initStage} in {stopWatch.ElapsedMilliseconds} Milliseconds.", ex);
                     throw;
                 }
             }
@@ -169,7 +169,7 @@ namespace Orleans.Providers
                 catch (Exception ex)
                 {
                     stopWatch.Stop();
-                    this.logger.Error(ErrorCode.SiloStartPerfMeasure, $"Close failed for stream provider {this.config.Name} of type {this.config.Type} in stage {this.startStage} in {stopWatch.ElapsedMilliseconds} Milliseconds.", ex);
+                    this.logger.Error(ErrorCode.Provider_ErrorFromStop, $"Close failed for stream provider {this.config.Name} of type {this.config.Type} in stage {this.startStage} in {stopWatch.ElapsedMilliseconds} Milliseconds.", ex);
                     throw;
                 }
             }
@@ -188,7 +188,7 @@ namespace Orleans.Providers
                 catch (Exception ex)
                 {
                     stopWatch.Stop();
-                    this.logger.Error(ErrorCode.SiloStartPerfMeasure, $"Start failed for stream provider {this.config.Name} of type {this.config.Type} in stage {this.startStage} in {stopWatch.ElapsedMilliseconds} Milliseconds.", ex);
+                    this.logger.Error(ErrorCode.Provider_ErrorFromStart, $"Start failed for stream provider {this.config.Name} of type {this.config.Type} in stage {this.startStage} in {stopWatch.ElapsedMilliseconds} Milliseconds.", ex);
                     throw;
                 }
             }
