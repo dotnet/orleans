@@ -5,6 +5,7 @@ using System.Reflection;
 using Orleans.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
+using System.Text;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -215,6 +216,11 @@ namespace Orleans.Runtime.MembershipService
         internal void UpdateMyFaultAndUpdateZone(MembershipEntry entry)
         {
             this.myFaultAndUpdateZones = new UpdateFaultCombo(entry.UpdateZone, entry.FaultZone);
+
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug($"-Updated my FaultZone={entry.FaultZone} UpdateZone={entry.UpdateZone}");
+
+            if (this.multiClusterActive)
+                localMultiClusterGatewaysCopy = DetermineMultiClusterGateways();
         }
 
         internal bool TryUpdateStatusAndNotify(MembershipEntry entry)
@@ -285,20 +291,35 @@ namespace Orleans.Runtime.MembershipService
             if (! this.multiClusterActive)
                 throw new OrleansException("internal error: should not call this function without multicluster network");
 
+            List<SiloAddress> result;
+
             // take all the active silos if their count does not exceed the desired number of gateways
             if (localTableCopyOnlyActive.Count <= this.maxMultiClusterGateways)
-                return localTableCopyOnlyActive.Keys.ToList();
+            {
+                result = localTableCopyOnlyActive.Keys.ToList();
+            }
+            else
+            {
+                result = DeterministicBalancedChoice<SiloAddress, UpdateFaultCombo>(
+                    localTableCopyOnlyActive.Keys,
+                    this.maxMultiClusterGateways,
+                   (SiloAddress a) => a.Equals(MyAddress) ? this.myFaultAndUpdateZones : new UpdateFaultCombo(localTable[a]),
+                   logger);
+            }
 
-            return DeterministicBalancedChoice<SiloAddress, UpdateFaultCombo>(
-                localTableCopyOnlyActive.Keys,
-                this.maxMultiClusterGateways,
-               (SiloAddress a) => a.Equals(MyAddress) ? this.myFaultAndUpdateZones : new UpdateFaultCombo(localTable[a]));
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                var gateways = string.Join(", ", result.Select(silo => silo.ToString()));
+                logger.Debug($"-DetermineMultiClusterGateways {gateways}");
+            }
+
+            return result;
         }
 
         // pick a specified number of elements from a set of candidates
         // - in a balanced way (try to pick evenly from groups)
         // - in a deterministic way (using sorting order on candidates and keys)
-        internal static List<T> DeterministicBalancedChoice<T, K>(IEnumerable<T> candidates, int count, Func<T, K> group)
+        internal static List<T> DeterministicBalancedChoice<T, K>(IEnumerable<T> candidates, int count, Func<T, K> group, ILogger logger = null)
             where T:IComparable where K:IComparable
         {
             // organize candidates by groups
@@ -325,6 +346,23 @@ namespace Orleans.Runtime.MembershipService
             keys.Sort();
             foreach(var kvp in groups)
                 kvp.Value.Sort();
+
+            // for debugging, trace all the gateway candidates
+            if (logger != null && logger.IsEnabled(LogLevel.Trace))
+            {
+                var b = new StringBuilder();
+                foreach (var k in keys)
+                {
+                    b.Append(k);
+                    b.Append(':');
+                    foreach (var s in groups[k])
+                    {
+                        b.Append(' ');
+                        b.Append(s);
+                    }
+                }
+                logger.Trace($"-DeterministicBalancedChoice candidates {b}");
+            }
               
             // pick round-robin from groups
             var  result = new List<T>();
@@ -361,6 +399,11 @@ namespace Orleans.Runtime.MembershipService
                 int comp = UpdateZone.CompareTo(other.UpdateZone);
                 if (comp != 0) return comp;
                 return FaultZone.CompareTo(other.FaultZone);
+            }
+
+            public override string ToString()
+            {
+                return $"({UpdateZone},{FaultZone})";
             }
         }
 
