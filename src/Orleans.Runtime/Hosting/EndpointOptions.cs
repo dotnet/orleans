@@ -1,4 +1,6 @@
-﻿using System.Net;
+﻿using Orleans.Runtime.Configuration;
+using System.Net;
+using System.Net.Sockets;
 
 namespace Orleans.Hosting
 {
@@ -35,28 +37,63 @@ namespace Orleans.Hosting
         public IPEndPoint ProxyListeningEndpoint { get; set; }
     }
 
-    internal static class EndpointOptionsExtensions
+    public static class EndpointOptionsExtensions
     {
-        public static IPEndPoint GetPublicSiloEndpoint(this EndpointOptions options)
+        public static ISiloHostBuilder ConfigureEndpoints(
+            this ISiloHostBuilder builder,
+            IPAddress ip,
+            int siloPort,
+            int proxyPort)
+        {
+            builder.Configure<EndpointOptions>(options =>
+            {
+                options.IPAddress = ip;
+                options.ProxyPort = proxyPort;
+                options.SiloPort = siloPort;
+            });
+            return builder;
+        }
+
+        public static ISiloHostBuilder ConfigureEndpoints(
+            this ISiloHostBuilder builder, 
+            string addrOrHost, 
+            int siloPort, 
+            int proxyPort,
+            AddressFamily addressFamily = AddressFamily.InterNetwork)
+        {
+            var ip = ConfigUtilities.ResolveIPAddress(addrOrHost, null, addressFamily).Result;
+            return builder.ConfigureEndpoints(ip, siloPort, proxyPort);
+        }
+
+        public static ISiloHostBuilder ConfigureEndpoints(
+            this ISiloHostBuilder builder,
+            int siloPort,
+            int proxyPort,
+            AddressFamily addressFamily = AddressFamily.InterNetwork)
+        {
+            return builder.ConfigureEndpoints(null, siloPort, proxyPort, addressFamily);
+        }
+
+        internal static IPEndPoint GetPublicSiloEndpoint(this EndpointOptions options)
         {
             return new IPEndPoint(options.IPAddress, options.SiloPort);
         }
 
-        public static IPEndPoint GetPublicProxyEndpoint(this EndpointOptions options)
+        internal static IPEndPoint GetPublicProxyEndpoint(this EndpointOptions options)
         {
             return options.ProxyPort != 0 
                 ? new IPEndPoint(options.IPAddress, options.ProxyPort)
                 : null;
         }
 
-        public static IPEndPoint GetListeningSiloEndpoint(this EndpointOptions options)
+        internal static IPEndPoint GetListeningSiloEndpoint(this EndpointOptions options)
         {
             return options.SiloListeningEndpoint != null
                 ? options.SiloListeningEndpoint
                 : options.GetPublicSiloEndpoint();
         }
 
-        public static IPEndPoint GetListeningProxyEndpoint(this EndpointOptions options)
+        internal static IPEndPoint GetListeningProxyEndpoint(this EndpointOptions options)
         {
             if (options.ProxyPort == 0)
                 return null;
