@@ -614,4 +614,3 @@ This file essentially tells `VSCode` that whenever you build the project, it wil
 ```
 
 Now you can just build the solution from `VSCode` (which will publish) and start both the Silo and the Client. It will send a `docker exec` command to the running `docker-compose` service instance/container to start the debugger to the application and thats it. You have the debugger attached to the container and use it as if it was a locally running Orleans application. The difference now is that it is inside the container, and once you are done, you can just publish the container to your registry and pull it on your Docker hosts in production.
-

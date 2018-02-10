@@ -73,7 +73,11 @@ The next walkthrough demonstrates how to get your Orleans application deployed i
 ## [On-Premise Deployment](On-Premise-Deployment.md)
 
 Orleans applications can be deployed both on your server equipment as well as in the cloud.
-In this walkthrough, you will see how to set up an on premise cluster and deploy your application to it.
+In this walkthrough, you will see how to set up an on premise cluster and deploy your application to it.`
+
+## [Docker Deployment](Docker-Deployment.md)
+
+Orleans can also be deployed using Docker containers
 
 ## [Custom Storage Providers](Custom-Storage-Providers.md)
 
