@@ -13,8 +13,6 @@ namespace Orleans.Hosting
 
     public class ClientStatisticsOptionsFormatter : StatisticsOptionsFormatter, IOptionFormatter<ClientStatisticsOptions>
     {
-        public string Category { get; }
-
         public string Name => nameof(ClientStatisticsOptions);
 
         private ClientStatisticsOptions options;

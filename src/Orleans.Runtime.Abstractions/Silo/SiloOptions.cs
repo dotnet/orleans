@@ -30,8 +30,6 @@ namespace Orleans.Runtime
 
     public class SiloOptionsFormatter : IOptionFormatter<SiloOptions>
     {
-        public string Category { get; }
-
         public string Name => nameof(SiloOptions);
 
         private SiloOptions options;

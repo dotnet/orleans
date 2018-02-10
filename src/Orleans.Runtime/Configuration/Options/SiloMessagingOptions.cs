@@ -80,8 +80,6 @@ namespace Orleans.Hosting
 
     public class SiloMessagingOptionFormatter : MessagingOptionsFormatter, IOptionFormatter<SiloMessagingOptions>
     {
-        public string Category { get; }
-
         public string Name => nameof(SiloMessagingOptions);
 
         private SiloMessagingOptions options;

@@ -29,8 +29,6 @@ namespace Orleans.Hosting
 
     public class ClientMessagingOptionFormatter : MessagingOptionsFormatter, IOptionFormatter<ClientMessagingOptions>
     {
-        public string Category { get; }
-
         public string Name => nameof(ClientMessagingOptions);
 
         private ClientMessagingOptions options;

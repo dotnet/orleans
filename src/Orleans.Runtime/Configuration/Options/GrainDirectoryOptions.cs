@@ -67,8 +67,6 @@ namespace Orleans.Hosting
 
     public class GrainDirectoryOptionsFormatter : IOptionFormatter<GrainDirectoryOptions>
     {
-        public string Category { get; }
-
         public string Name => nameof(GrainDirectoryOptions);
 
         private GrainDirectoryOptions options;

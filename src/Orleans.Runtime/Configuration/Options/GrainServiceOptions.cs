@@ -17,8 +17,6 @@ namespace Orleans.Hosting
 
     public class GrainServiceOptionsFormatter : IOptionFormatter<GrainServiceOptions>
     {
-        public string Category { get; }
-
         public string Name => nameof(GrainServiceOptions);
         private GrainServiceOptions options;
         public GrainServiceOptionsFormatter(IOptions<GrainServiceOptions> options)

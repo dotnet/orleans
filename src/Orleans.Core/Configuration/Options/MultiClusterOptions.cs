@@ -63,8 +63,6 @@ namespace Orleans.Hosting
 
     public class MultiClusterOptionsFormatter : IOptionFormatter<MultiClusterOptions>
     {
-        public string Category { get; }
-
         public string Name => nameof(MultiClusterOptions);
         private MultiClusterOptions options;
         public MultiClusterOptionsFormatter(IOptions<MultiClusterOptions> options)

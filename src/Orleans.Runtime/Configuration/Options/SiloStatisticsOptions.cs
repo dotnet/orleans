@@ -25,8 +25,6 @@ namespace Orleans.Hosting
 
     public class SiloStatisticsOptionsFormatter : StatisticsOptionsFormatter, IOptionFormatter<SiloStatisticsOptions>
     {
-        public string Category { get; }
-
         public string Name => nameof(SiloStatisticsOptions);
 
         private SiloStatisticsOptions options;

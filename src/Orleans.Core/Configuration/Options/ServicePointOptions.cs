@@ -21,8 +21,6 @@ namespace Orleans.Hosting
 
     public class ServicePointOptionsFormatter : IOptionFormatter<ServicePointOptions>
     {
-        public string Category { get; }
-
         public string Name => nameof(ServicePointOptions);
 
         private ServicePointOptions options;
