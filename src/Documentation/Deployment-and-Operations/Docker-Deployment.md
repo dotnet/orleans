@@ -529,8 +529,7 @@ To run this article in a `Swarm` cluster, you don't have any extra work. When yo
 
 # Google Kubernetes (K8s)
 
-Coming soon...
-
+If you plan to use [Kubernetes](https://kubernetes.io/) to host Orleans, there is a community-maintained clustering provider available at [OrleansContrib\Orleans.Clustering.Kubernetes](https://github.com/OrleansContrib/Orleans.Clustering.Kubernetes) and there you can find documentation and samples on how to host Orleans in Kubernetes seamlessly using the provider.
 
 # [Bonus topic] Debugging Orleans inside Containers
 
