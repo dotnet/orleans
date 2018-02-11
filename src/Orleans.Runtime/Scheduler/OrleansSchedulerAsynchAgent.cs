@@ -115,7 +115,7 @@ namespace Orleans.Runtime.Scheduler
                     }
                     else if (!context.CancellationTokenSource.IsCancellationRequested)
                     {
-                        log.Error(ErrorCode.Runtime_Error_100029, ThreadPoolExecutor.SR.Thread_On_Abort_Propagate, ex);
+                        log.Error(ErrorCode.Runtime_Error_100029, "Caught thread abort exception, allowing it to propagate outwards.", ex);
                     }
                 }
                 else

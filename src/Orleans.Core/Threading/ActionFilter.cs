@@ -4,14 +4,14 @@ using System.Linq;
 
 namespace Orleans.Threading
 {
-    internal class ActionFilter<T> where T : IExecutable
+    internal abstract class ActionFilter<T> where T : IExecutable
     {
         public virtual void OnActionExecuting(T executable) { }
 
         public virtual void OnActionExecuted(T executable) { }
     }
 
-    internal class ExceptionFilter<T> where T : IExecutable
+    internal abstract class ExceptionFilter<T> where T : IExecutable
     {
         public virtual bool ExceptionHandler(Exception ex, T executable)
         {

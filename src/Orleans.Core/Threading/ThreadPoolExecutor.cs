@@ -9,7 +9,7 @@ using Orleans.Runtime;
 namespace Orleans.Threading
 {
     /// <summary>
-    /// Essentially FixedThreadPool
+    /// Essentially FixedThreadPool with work stealing
     /// </summary>
     internal class ThreadPoolExecutor : IExecutor, IHealthCheckable
     {
@@ -70,10 +70,15 @@ namespace Orleans.Threading
             statistic.OnStartExecution();
             try
             {
-                while (!context.CancellationTokenSource.IsCancellationRequested)
+                while (!ShouldStop())
                 {
                     while (workQueue.TryDequeue(threadLocals, out var workItem))
                     {
+                        if (ShouldStop())
+                        {
+                            return;
+                        }
+
                         context.ExecuteWithFilters(workItem);
                     }
 
@@ -92,6 +97,11 @@ namespace Orleans.Threading
             finally
             {
                 statistic.OnStopExecution();
+            }
+
+            bool ShouldStop()
+            {
+                return context.CancellationTokenSource.IsCancellationRequested && !options.DrainAfterCancel;
             }
         }
 
@@ -240,8 +250,6 @@ namespace Orleans.Threading
             public const string On_Thread_Abort_Exit = "Received thread abort exception - exiting. {0}.";
 
             public const string Executor_On_Exception = "Executor {0} caught an exception.";
-
-            public const string Thread_On_Abort_Propagate = "Caught thread abort exception, allowing it to propagate outwards.";
         }
     }
 
@@ -410,7 +418,7 @@ namespace Orleans.Threading
         {
             if (ExecutorOptions.CollectDetailedQueueStatistics)
             {
-                queueTracking.OnEnQueueRequest(1, 0, workItem.ExecutionTime);
+                queueTracking.OnEnQueueRequest(1, queueLength: 0, itemInQueue: workItem.ExecutionTime);
             }
         }
 
