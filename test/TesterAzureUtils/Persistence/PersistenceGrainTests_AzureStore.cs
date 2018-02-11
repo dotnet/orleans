@@ -9,21 +9,16 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Xunit;
+using Xunit.Abstractions;
 using Orleans;
-using Orleans.AzureUtils;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.TestingHost;
-using Tester;
-using TestExtensions;
-using UnitTests;
-using UnitTests.GrainInterfaces;
-using Xunit;
-using Xunit.Abstractions;
 using Orleans.Providers;
-using Orleans.Runtime.Configuration;
-using Orleans.TestingHost.Utils;
 using Orleans.Persistence.AzureStorage;
+using TestExtensions;
+using UnitTests.GrainInterfaces;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable

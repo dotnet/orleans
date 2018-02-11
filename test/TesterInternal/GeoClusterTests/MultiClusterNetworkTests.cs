@@ -146,7 +146,7 @@ namespace Tests.GeoClusterTests
             }
         }
 
-        [SkippableFact(Skip = "Flaky test. SebastianBurckhardt to investigate."), TestCategory("Functional")]
+        [SkippableFact(), TestCategory("Functional")]
         public async Task TestMultiClusterConf_3_3()
         {
             // use a random global service id for testing purposes
@@ -164,12 +164,12 @@ namespace Tests.GeoClusterTests
             // create cluster A and clientA
             NewGeoCluster(globalserviceid, clusterA, 3, configcustomizer);
             var clientA = this.NewClient<ClientWrapper>(clusterA, 0, ClientWrapper.Factory);
-            var portsA = Clusters[clusterA].Cluster.GetActiveSilos().Select(x => x.SiloAddress.Endpoint.Port).ToArray();
+            var portsA = Clusters[clusterA].Cluster.GetActiveSilos().OrderBy(x => x.SiloAddress).Select(x => x.SiloAddress.Endpoint.Port).ToArray();
 
             // create cluster B and clientB
             NewGeoCluster(globalserviceid, clusterB, 3, configcustomizer);
             var clientB = this.NewClient<ClientWrapper>(clusterB, 0, ClientWrapper.Factory);
-            var portsB = Clusters[clusterB].Cluster.GetActiveSilos().Select(x => x.SiloAddress.Endpoint.Port).ToArray();
+            var portsB = Clusters[clusterB].Cluster.GetActiveSilos().OrderBy(x => x.SiloAddress).Select(x => x.SiloAddress.Endpoint.Port).ToArray();
 
             // wait for membership to stabilize
             await WaitForLivenessToStabilizeAsync();

@@ -52,9 +52,9 @@ namespace Orleans.Runtime.Configuration
             /// <summary>AzureTable is used to store membership information. 
             /// This option can be used in production.</summary>
             AzureTable,
-            /// <summary>SQL Server is used to store membership information. 
+            /// <summary>ADO.NET is used to store membership information. 
             /// This option can be used in production.</summary>
-            SqlServer,
+            AdoNet,
             /// <summary>Apache ZooKeeper is used to store membership information. 
             /// This option can be used in production.</summary>
             ZooKeeper,
@@ -75,37 +75,15 @@ namespace Orleans.Runtime.Configuration
             /// <summary>AzureTable is used to store reminders information. 
             /// This option can be used in production.</summary>
             AzureTable,
-            /// <summary>SQL Server is used to store reminders information. 
+            /// <summary>ADO.NET is used to store reminders information. 
             /// This option can be used in production.</summary>
-            SqlServer,
+            AdoNet,
             /// <summary>Used for benchmarking; it simply delays for a specified delay during each operation.</summary>
             MockTable,
             /// <summary>Reminder Service is disabled.</summary>
             Disabled,
             /// <summary>Use custom Reminder Service from third-party assembly</summary>
             Custom
-        }
-
-        public static string Remap(ReminderServiceProviderType type)
-        {
-            switch(type)
-            {
-                case ReminderServiceProviderType.NotSpecified:
-                    return ReminderOptions.BuiltIn.NotSpecified;
-                case ReminderServiceProviderType.ReminderTableGrain:
-                    return ReminderOptions.BuiltIn.ReminderTableGrain;
-                case ReminderServiceProviderType.AzureTable:
-                    return ReminderOptions.BuiltIn.AzureTable;
-                case ReminderServiceProviderType.SqlServer:
-                    return ReminderOptions.BuiltIn.SqlServer;
-                case ReminderServiceProviderType.MockTable:
-                    return ReminderOptions.BuiltIn.MockTable;
-                case ReminderServiceProviderType.Disabled:
-                    return ReminderOptions.BuiltIn.Disabled;
-                case ReminderServiceProviderType.Custom:
-                    return ReminderOptions.BuiltIn.Custom;
-            }
-            throw new NotSupportedException($"ReminderServiceProviderType {type} is not supported");
         }
 
         /// <summary>
@@ -157,35 +135,6 @@ namespace Orleans.Runtime.Configuration
             LRU,
             /// <summary>Adaptive caching with fixed maximum size and refresh. This option should be used in production.</summary>
             Adaptive
-        }
-
-        private static DirectoryCachingStrategyType Remap(GrainDirectoryOptions.CachingStrategyType type)
-        {
-            switch(type)
-            {
-                case GrainDirectoryOptions.CachingStrategyType.None:
-                    return DirectoryCachingStrategyType.None;
-                case GrainDirectoryOptions.CachingStrategyType.LRU:
-                    return DirectoryCachingStrategyType.LRU;
-                case GrainDirectoryOptions.CachingStrategyType.Adaptive:
-                    return DirectoryCachingStrategyType.Adaptive;
-                default:
-                    throw new NotSupportedException($"CachingStrategyType {type} is not supported");
-            }
-        }
-        public static GrainDirectoryOptions.CachingStrategyType Remap(DirectoryCachingStrategyType type)
-        {
-            switch (type)
-            {
-                case DirectoryCachingStrategyType.None:
-                    return GrainDirectoryOptions.CachingStrategyType.None;
-                case DirectoryCachingStrategyType.LRU:
-                    return GrainDirectoryOptions.CachingStrategyType.LRU;
-                case DirectoryCachingStrategyType.Adaptive:
-                    return GrainDirectoryOptions.CachingStrategyType.Adaptive;
-                default:
-                    throw new NotSupportedException($"DirectoryCachingStrategyType {type} is not supported");
-            }
         }
 
         public ApplicationConfiguration Application { get; private set; }
@@ -521,13 +470,13 @@ namespace Orleans.Runtime.Configuration
         /// Determines if ADO should be used for storage of Membership and Reminders info.
         /// True if either or both of LivenessType and ReminderServiceType are set to SqlServer, false otherwise.
         /// </summary>
-        public bool UseSqlSystemStore
+        public bool UseAdoNetSystemStore
         {
             get
             {
                 return !string.IsNullOrWhiteSpace(this.DataConnectionString) && (
-                    (this.LivenessEnabled && this.LivenessType == LivenessProviderType.SqlServer)
-                    || this.ReminderServiceType == ReminderServiceProviderType.SqlServer);
+                    (this.LivenessEnabled && this.LivenessType == LivenessProviderType.AdoNet)
+                    || this.ReminderServiceType == ReminderServiceProviderType.AdoNet);
             }
         }
 
@@ -553,7 +502,7 @@ namespace Orleans.Runtime.Configuration
             get
             {
                 return !string.IsNullOrWhiteSpace(this.DataConnectionString)
-                       && !this.UseSqlSystemStore && !this.UseZooKeeperSystemStore;
+                       && !this.UseAdoNetSystemStore && !this.UseZooKeeperSystemStore;
             }
         }
 
@@ -602,27 +551,27 @@ namespace Orleans.Runtime.Configuration
             // Assume the ado invariant is for sql server storage if not explicitly specified
             this.AdoInvariant = Constants.INVARIANT_NAME_SQL_SERVER;
 
-            this.MaxRequestProcessingTime = SiloMessagingOptions.DEFAULT_MAX_REQUEST_PROCESSING_TIME;
-            this.CollectionQuantum = GrainCollectionOptions.DEFAULT_COLLECTION_QUANTUM;
+            this.MaxRequestProcessingTime = TimeSpan.FromHours(2);
+            this.CollectionQuantum = TimeSpan.FromMinutes(1);
 
-            this.CacheSize = GrainDirectoryOptions.DEFAULT_CACHE_SIZE;
-            this.InitialCacheTTL = GrainDirectoryOptions.DEFAULT_INITIAL_CACHE_TTL;
-            this.MaximumCacheTTL = GrainDirectoryOptions.DEFAULT_MAXIMUM_CACHE_TTL;
-            this.CacheTTLExtensionFactor = GrainDirectoryOptions.DEFAULT_TTL_EXTENSION_FACTOR;
-            this.DirectoryCachingStrategy = Remap(GrainDirectoryOptions.DEFAULT_CACHING_STRATEGY);
-            this.DirectoryLazyDeregistrationDelay = GrainDirectoryOptions.DEFAULT_UNREGISTER_RACE_DELAY;
-            this.ClientRegistrationRefresh = SiloMessagingOptions.DEFAULT_CLIENT_REGISTRATION_REFRESH;
+            this.CacheSize = 1000000;
+            this.InitialCacheTTL = TimeSpan.FromSeconds(30);
+            this.MaximumCacheTTL = TimeSpan.FromSeconds(240);
+            this.CacheTTLExtensionFactor = 2.0;
+            this.DirectoryCachingStrategy = DirectoryCachingStrategyType.Adaptive;
+            this.DirectoryLazyDeregistrationDelay = TimeSpan.FromMinutes(1);
+            this.ClientRegistrationRefresh = TimeSpan.FromMinutes(5);
 
-            this.PerformDeadlockDetection = SchedulingOptions.DEFAULT_PERFORM_DEADLOCK_DETECTION;
-            this.AllowCallChainReentrancy = SchedulingOptions.DEFAULT_ALLOW_CALL_CHAIN_REENTRANCY;
+            this.PerformDeadlockDetection = false;
+            this.AllowCallChainReentrancy = false;
             this.reminderServiceType = ReminderServiceProviderType.NotSpecified;
-            this.DefaultPlacementStrategy = GrainPlacementOptions.DEFAULT_PLACEMENT_STRATEGY;
-            this.DeploymentLoadPublisherRefreshTime = SiloStatisticsOptions.DEFAULT_DEPLOYMENT_LOAD_PUBLISHER_REFRESH_TIME;
-            this.ActivationCountBasedPlacementChooseOutOf = GrainPlacementOptions.DEFAULT_ACTIVATION_COUNT_PLACEMENT_CHOOSE_OUT_OF;
-            this.UseVirtualBucketsConsistentRing = ConsistentRingOptions.DEFAULT_USE_VIRTUAL_RING_BUCKETS;
-            this.NumVirtualBucketsConsistentRing = ConsistentRingOptions.DEFAULT_NUM_VIRTUAL_RING_BUCKETS;
+            this.DefaultPlacementStrategy = nameof(RandomPlacement);
+            this.DeploymentLoadPublisherRefreshTime = TimeSpan.FromSeconds(1);
+            this.ActivationCountBasedPlacementChooseOutOf = 2;
+            this.UseVirtualBucketsConsistentRing = true;
+            this.NumVirtualBucketsConsistentRing = 30;
             this.UseMockReminderTable = false;
-            this.MockReminderTableTimeout = ReminderOptions.DEFAULT_MOCK_REMINDER_TABLE_TIMEOUT;
+            this.MockReminderTableTimeout = TimeSpan.FromMilliseconds(50);
             this.AssumeHomogenousSilosForTesting = false;
 
             this.ProviderConfigurations = new Dictionary<string, ProviderCategoryConfiguration>();
@@ -1129,17 +1078,16 @@ namespace Orleans.Runtime.Configuration
             ProviderConfigurationUtility.RegisterProvider(this.ProviderConfigurations, ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
         }
 
-        public void RegisterStatisticsProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IStatisticsPublisher, ISiloMetricsDataPublisher
+        public void RegisterStatisticsProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IStatisticsPublisher
         {
             Type providerType = typeof(T);
             var providerTypeInfo = providerType.GetTypeInfo();
-            if (providerTypeInfo.IsAbstract ||
-                providerTypeInfo.IsGenericType ||
-                !(
-                typeof(IStatisticsPublisher).IsAssignableFrom(providerType) &&
-                typeof(ISiloMetricsDataPublisher).IsAssignableFrom(providerType)
-                ))
+            if (providerTypeInfo.IsAbstract
+                || providerTypeInfo.IsGenericType
+                || !typeof(IStatisticsPublisher).IsAssignableFrom(providerType))
+            {
                 throw new ArgumentException("Expected non-generic, non-abstract type which implements IStatisticsPublisher, ISiloMetricsDataPublisher interface", "typeof(T)");
+            }
 
             ProviderConfigurationUtility.RegisterProvider(this.ProviderConfigurations, ProviderCategoryConfiguration.STATISTICS_PROVIDER_CATEGORY_NAME, providerTypeInfo.FullName, providerName, properties);
         }

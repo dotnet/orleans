@@ -11,8 +11,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Xunit;
 using Xunit.Abstractions;
-using Microsoft.Extensions.Logging;
-using Orleans.TestingHost.Utils;
+using Orleans.Hosting;
 
 namespace UnitTests.MessageCenterTests
 {
@@ -86,7 +85,12 @@ namespace UnitTests.MessageCenterTests
             {
                 Gateways = gatewayEndpoints
             };
-            var gatewayManager = new GatewayManager(cfg, listProvider, NullLoggerFactory.Instance);
+            var gatewayOptions = new GatewayOptions()
+            {
+                GatewayListRefreshPeriod = cfg.GatewayListRefreshPeriod,
+                PreferedGatewayIndex = cfg.PreferedGatewayIndex
+            };
+            var gatewayManager = new GatewayManager(gatewayOptions, listProvider, NullLoggerFactory.Instance);
 
             var counts = new int[4];
 

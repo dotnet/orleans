@@ -29,6 +29,9 @@ namespace Orleans
         }
     }
 
+    /// <summary>
+    /// Base class for client and silo default options loggers.
+    /// </summary>
     public abstract class OptionsLogger 
     {
         private ILogger logger;
@@ -38,16 +41,32 @@ namespace Orleans
             this.logger = logger;
             this.services = services;
         }
+
+        /// <summary>
+        /// Log all options with registered formatters
+        /// </summary>
         public void LogOptions()
         {
-            var optionFormatters = services.GetServices<IOptionFormatter>();
-            foreach (var optionFormatter in optionFormatters)
+            this.LogOptions(services.GetServices<IOptionFormatter>());
+        }
+
+        /// <summary>
+        /// Log options using a set of formatters
+        /// </summary>
+        /// <param name="formatters"></param>
+        public void LogOptions(IEnumerable<IOptionFormatter> formatters)
+        {
+            foreach (var optionFormatter in formatters.OrderBy(f => f.Name))
             {
-                LogOption(optionFormatter);
+                this.LogOption(optionFormatter);
             }
         }
 
-        private void LogOption(IOptionFormatter formatter)
+        /// <summary>
+        /// Log an options using a formatter
+        /// </summary>
+        /// <param name="formatter"></param>
+        public void LogOption(IOptionFormatter formatter)
         {
             var stringBuiler = new StringBuilder();
             stringBuiler.AppendLine($"Configuration {formatter.Name}: ");

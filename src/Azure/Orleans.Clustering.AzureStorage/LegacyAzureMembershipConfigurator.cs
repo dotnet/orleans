@@ -7,7 +7,7 @@ namespace Orleans.Runtime.MembershipService
     /// <inheritdoc />
     public class LegacyAzureTableMembershipConfigurator : ILegacyMembershipConfigurator
     {
-        public void ConfigureServices(object configuration, IServiceCollection services)
+        public void Configure(object configuration, IServiceCollection services)
         {
             services.UseAzureTableMembership(
                 options =>

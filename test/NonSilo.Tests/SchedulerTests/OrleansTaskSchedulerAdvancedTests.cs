@@ -8,8 +8,8 @@ using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Runtime;
-using Orleans.Runtime.Counters;
 using Orleans.Runtime.Scheduler;
+using Orleans.Runtime.TestHooks;
 using Orleans.Statistics;
 using UnitTests.TesterInternal;
 using Xunit;
@@ -20,7 +20,6 @@ namespace UnitTests.SchedulerTests
     public class OrleansTaskSchedulerAdvancedTests : MarshalByRefObject, IDisposable
     {
         private readonly ITestOutputHelper output;
-        private readonly SiloPerformanceMetrics performanceMetrics;
         private OrleansTaskScheduler orleansTaskScheduler;
 
         private bool mainDone;
@@ -31,13 +30,14 @@ namespace UnitTests.SchedulerTests
         private static readonly TimeSpan TwoSeconds = TimeSpan.FromSeconds(2);
 
         private static readonly int WaitFactor = Debugger.IsAttached ? 100 : 1;
-        private ILoggerFactory loggerFactory;
+        private readonly ILoggerFactory loggerFactory;
+        private readonly TestHooksHostEnvironmentStatistics performanceMetrics;
+
         public OrleansTaskSchedulerAdvancedTests(ITestOutputHelper output)
         {
             this.output = output;
             this.loggerFactory = OrleansTaskSchedulerBasicTests.InitSchedulerLogging();
-            this.performanceMetrics = new SiloPerformanceMetrics(new NoOpHostEnvironmentStatistics(this.loggerFactory), new AppEnvironmentStatistics(), this.loggerFactory, Options.Create<SiloStatisticsOptions>(new SiloStatisticsOptions()));
-            
+            this.performanceMetrics = new TestHooksHostEnvironmentStatistics();
         }
 
         public void Dispose()
@@ -47,7 +47,6 @@ namespace UnitTests.SchedulerTests
                 this.orleansTaskScheduler.Stop();
             }
             this.loggerFactory.Dispose();
-            this.performanceMetrics.Dispose();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]

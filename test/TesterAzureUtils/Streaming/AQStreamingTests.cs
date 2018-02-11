@@ -2,7 +2,10 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -27,15 +30,33 @@ namespace Tester.AzureUtils.Streaming
             {
                 legacy.ClusterConfiguration.AddMemoryStorageProvider();
 
-                legacy.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore", deleteOnClear: true);
-                legacy.ClusterConfiguration.AddAzureTableStorageProvider("PubSubStore", deleteOnClear: true, useJsonFormat: false);
-
                 legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
                 legacy.ClientConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
 
                 legacy.ClusterConfiguration.AddAzureQueueStreamProviderV2(AzureQueueStreamProviderName);
                 legacy.ClientConfiguration.AddAzureQueueStreamProviderV2(AzureQueueStreamProviderName);
             });
+            builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+        }
+
+        private class SiloBuilderConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder
+                    .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                    {
+                        options.ServiceId = silo.Value.ServiceId.ToString();
+                        options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.DeleteStateOnClear = true;
+                    }))
+                    .AddAzureTableGrainStorage("PubSubStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                     {
+                         options.ServiceId = silo.Value.ServiceId.ToString();
+                         options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                         options.DeleteStateOnClear = true;
+                     }));
+            }
         }
 
         public AQStreamingTests()

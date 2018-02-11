@@ -91,8 +91,8 @@ namespace Orleans.TestingHost
                 case GlobalConfiguration.LivenessProviderType.AzureTable:
                     config.GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable;
                     break;
-                case GlobalConfiguration.LivenessProviderType.SqlServer:
-                    config.GatewayProvider = ClientConfiguration.GatewayProviderType.SqlServer;
+                case GlobalConfiguration.LivenessProviderType.AdoNet:
+                    config.GatewayProvider = ClientConfiguration.GatewayProviderType.AdoNet;
                     break;
                 case GlobalConfiguration.LivenessProviderType.ZooKeeper:
                     config.GatewayProvider = ClientConfiguration.GatewayProviderType.ZooKeeper;

@@ -294,10 +294,10 @@ namespace Orleans.EventSourcing
         /// Called right after grain is constructed, to install the adaptor.
         /// The log-consistency provider contains a factory method that constructs the adaptor with chosen types for this grain
         /// </summary>
-        protected override void InstallAdaptor(ILogViewAdaptorFactory factory, object initialState, string graintypename, IStorageProvider storageProvider, ILogConsistencyProtocolServices services)
+        protected override void InstallAdaptor(ILogViewAdaptorFactory factory, object initialState, string graintypename, IGrainStorage grainStorage, ILogConsistencyProtocolServices services)
         {
             // call the log consistency provider to construct the adaptor, passing the type argument
-            LogViewAdaptor = factory.MakeLogViewAdaptor<TGrainState, TEventBase>(this, (TGrainState)initialState, graintypename, storageProvider, services);
+            LogViewAdaptor = factory.MakeLogViewAdaptor<TGrainState, TEventBase>(this, (TGrainState)initialState, graintypename, grainStorage, services);
         }
 
         /// <summary>

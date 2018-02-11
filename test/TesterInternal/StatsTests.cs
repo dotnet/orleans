@@ -59,21 +59,14 @@ namespace UnitTests.Stats
             // Check we got some stats & metrics callbacks on both client and server.
             var siloStatsCollector = this.fixture.GrainFactory.GetGrain<IStatsCollectorGrain>(0);
             var clientStatsCollector = MockStatsCollectorClient.StatsPublisherInstance;
-            var clientMetricsCollector = MockStatsCollectorClient.MetricsPublisherInstance;
 
             // Stats publishing is set to 1s interval in config files.
             await Task.Delay(TimeSpan.FromSeconds(3));
 
             long numClientStatsCalls = clientStatsCollector.NumStatsCalls;
-            long numClientMetricsCalls = clientMetricsCollector.NumMetricsCalls;
             long numSiloStatsCalls = await siloStatsCollector.GetReportStatsCallCount();
-            long numSiloMetricsCalls = await siloStatsCollector.GetReportMetricsCallCount();
-            output.WriteLine("Client - Metrics calls = {0} Stats calls = {1}", numClientMetricsCalls,
-                numClientMetricsCalls);
             output.WriteLine("Silo - Metrics calls = {0} Stats calls = {1}", numSiloStatsCalls, numSiloStatsCalls);
-
-            Assert.True(numClientMetricsCalls > 0, $"Some client metrics calls = {numClientMetricsCalls}");
-            Assert.True(numSiloMetricsCalls > 0, $"Some silo metrics calls = {numSiloMetricsCalls}");
+            
             Assert.True(numClientStatsCalls > 0, $"Some client stats calls = {numClientStatsCalls}");
             Assert.True(numSiloStatsCalls > 0, $"Some silo stats calls = {numSiloStatsCalls}");
         }
@@ -93,7 +86,7 @@ namespace UnitTests.Stats
         public void ApplicationRequestsStatisticsGroup_Perf()
         {
             StatisticsCollector.Initialize(StatisticsLevel.Info);
-            ApplicationRequestsStatisticsGroup.Init(TimeSpan.FromSeconds(30));
+            ApplicationRequestsStatisticsGroup.Init();
             const long nIterations = 10000000;
             const int nValues = 1000;
             var rand = new Random();

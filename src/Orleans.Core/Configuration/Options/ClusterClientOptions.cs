@@ -16,8 +16,6 @@ namespace Orleans.Runtime
 
     public class ClusterClientOptionsFormatter : IOptionFormatter<ClusterClientOptions>
     {
-        public string Category { get; }
-
         public string Name => nameof(ClusterClientOptions);
         private ClusterClientOptions options;
         public ClusterClientOptionsFormatter(IOptions<ClusterClientOptions> options)
@@ -29,7 +27,7 @@ namespace Orleans.Runtime
         {
             return new List<string>()
             {
-                OptionFormattingUtilities.Format(nameof(options.ClusterId), options.ClusterId)
+                OptionFormattingUtilities.Format(nameof(this.options.ClusterId), this.options.ClusterId)
             };
         }
     }

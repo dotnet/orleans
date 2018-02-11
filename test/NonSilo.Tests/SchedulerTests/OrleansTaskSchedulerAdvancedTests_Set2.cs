@@ -10,8 +10,8 @@ using Orleans;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Counters;
 using Orleans.Runtime.Scheduler;
+using Orleans.Runtime.TestHooks;
 using Orleans.Statistics;
 using TestExtensions;
 using UnitTests.Grains;
@@ -29,14 +29,15 @@ namespace UnitTests.SchedulerTests
         private readonly ITestOutputHelper output;
         private readonly OrleansTaskScheduler masterScheduler;
         private readonly UnitTestSchedulingContext context;
-        private readonly SiloPerformanceMetrics performanceMetrics;
+
+        private readonly IHostEnvironmentStatistics performanceMetrics;
         private readonly ILoggerFactory loggerFactory;
         public OrleansTaskSchedulerAdvancedTests_Set2(ITestOutputHelper output)
         {
             this.output = output;
             this.loggerFactory = OrleansTaskSchedulerBasicTests.InitSchedulerLogging();
             this.context = new UnitTestSchedulingContext();
-            this.performanceMetrics = new SiloPerformanceMetrics(new NoOpHostEnvironmentStatistics(this.loggerFactory), new AppEnvironmentStatistics(), this.loggerFactory, Options.Create<SiloStatisticsOptions>(new SiloStatisticsOptions()));
+            this.performanceMetrics = new TestHooksHostEnvironmentStatistics();
             this.masterScheduler = TestInternalHelper.InitializeSchedulerForTesting(this.context, this.performanceMetrics, this.loggerFactory);
         }
         
@@ -44,7 +45,6 @@ namespace UnitTests.SchedulerTests
         {
             this.masterScheduler.Stop();
             this.loggerFactory.Dispose();
-            this.performanceMetrics.Dispose();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]

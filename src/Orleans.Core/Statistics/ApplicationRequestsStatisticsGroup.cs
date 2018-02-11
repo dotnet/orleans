@@ -14,7 +14,7 @@ namespace Orleans.Runtime
         private static CounterStatistic appRequestsTotalLatency;
         private static FloatValueStatistic appRequestsAverageLatency;
         
-        internal static void Init(TimeSpan responseTimeout)
+        internal static void Init()
         {
             if (!StatisticsCollector.CollectApplicationRequestsStats) return;
 

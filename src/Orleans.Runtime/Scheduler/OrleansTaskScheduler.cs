@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Hosting;
+using Orleans.Statistics;
 
 namespace Orleans.Runtime.Scheduler
 {
@@ -36,7 +37,7 @@ namespace Orleans.Runtime.Scheduler
 
         public int RunQueueLength => systemAgent.Count + mainAgent.Count;
 
-        public static OrleansTaskScheduler CreateTestInstance(int maxActiveThreads, ICorePerformanceMetrics performanceMetrics, ILoggerFactory loggerFactory)
+        public static OrleansTaskScheduler CreateTestInstance(int maxActiveThreads, IHostEnvironmentStatistics hostStatistics, ILoggerFactory loggerFactory)
         {
             return new OrleansTaskScheduler(
                 maxActiveThreads,
@@ -46,21 +47,21 @@ namespace Orleans.Runtime.Scheduler
                 SchedulingOptions.DEFAULT_ENABLE_WORKER_THREAD_INJECTION,
                 SchedulingOptions.DEFAULT_MAX_PENDING_ITEMS_SOFT_LIMIT,
                 SchedulingOptions.DEFAULT_MAX_PENDING_ITEMS_HARD_LIMIT,
-                performanceMetrics,
+                hostStatistics,
                 new ExecutorService(), 
                 loggerFactory);
         }
 
-        public OrleansTaskScheduler(IOptions<SchedulingOptions> options, ICorePerformanceMetrics performanceMetrics, ExecutorService executorService, ILoggerFactory loggerFactory)
+        public OrleansTaskScheduler(IOptions<SchedulingOptions> options, IHostEnvironmentStatistics hostStatistics, ExecutorService executorService, ILoggerFactory loggerFactory)
             : this(options.Value.MaxActiveThreads, options.Value.DelayWarningThreshold, options.Value.ActivationSchedulingQuantum,
                     options.Value.TurnWarningLengthThreshold, options.Value.EnableWorkerThreadInjection, options.Value.MaxPendingWorkItemsSoftLimit,
-                    options.Value.MaxPendingWorkItemsHardLimit, performanceMetrics, executorService, loggerFactory)
+                    options.Value.MaxPendingWorkItemsHardLimit, hostStatistics, executorService, loggerFactory)
         {
         }
 
         private OrleansTaskScheduler(int maxActiveThreads, TimeSpan delayWarningThreshold, TimeSpan activationSchedulingQuantum,
             TimeSpan turnWarningLengthThreshold, bool injectMoreWorkerThreads, int maxPendingItemsSoftLimit, int maxPendingItemsHardLimit,
-            ICorePerformanceMetrics performanceMetrics, ExecutorService executorService, ILoggerFactory loggerFactory)
+            IHostEnvironmentStatistics hostStatistics, ExecutorService executorService, ILoggerFactory loggerFactory)
         {
             this.loggerFactory = loggerFactory;
             this.logger = loggerFactory.CreateLogger<OrleansTaskScheduler>();
@@ -92,7 +93,7 @@ namespace Orleans.Runtime.Scheduler
             systemAgent = CreateSchedulerAsynchAgent("Scheduler.LevelOne.SystemQueue", true, maxSystemThreads);
 
             this.taskWorkItemLogger = loggerFactory.CreateLogger<TaskWorkItem>();
-            logger.Info("Starting OrleansTaskScheduler with {0} Max Active application Threads and 1 system thread.", maxActiveThreads);
+            logger.Info("Starting OrleansTaskScheduler with {0} Max Active application Threads and 2 system thread.", maxActiveThreads);
             IntValueStatistic.FindOrCreate(StatisticNames.SCHEDULER_WORKITEMGROUP_COUNT, () => WorkItemGroupCount);
             IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.QUEUES_QUEUE_SIZE_INSTANTANEOUS_PER_QUEUE, "Scheduler.LevelOne"), () => RunQueueLength);
 

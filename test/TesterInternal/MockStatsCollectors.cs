@@ -19,10 +19,6 @@ namespace UnitTests.Stats
     {
         long NumStatsCalls { get; }
     }
-    internal interface IMockClientMetricsPublisher : IClientMetricsDataPublisher
-    {
-        long NumMetricsCalls { get; }
-    }
 
     /// <summary>
     /// Indirection for a test hook to client stats / metrics collector singleton instances
@@ -30,26 +26,21 @@ namespace UnitTests.Stats
     internal static class MockStatsCollectorClient
     {
         internal static IMockClientStatisticsPublisher StatsPublisherInstance;
-        internal static IMockClientMetricsPublisher MetricsPublisherInstance;
     }
 
     public class MockStatsClientCollector : MarshalByRefObject,
-        IMockClientStatisticsPublisher, IMockClientMetricsPublisher, // Stats providers have to be both Stats and Metrics publishers
+        IMockClientStatisticsPublisher,
         IProvider // Needs to be IProvider as well as *Publisher
     {
         public string Name { get; private set; }
         public long NumStatsCalls { get { return numStatsCalls; } }
-        public long NumMetricsCalls { get { return numMetricsCalls; } }
 
         private long numStatsCalls;
-        private long numMetricsCalls;
 
         public MockStatsClientCollector()
         {
             Trace.TraceInformation("{0} created", GetType().FullName);
             numStatsCalls = 0;
-            numMetricsCalls = 0;
-            MockStatsCollectorClient.MetricsPublisherInstance = this;
             MockStatsCollectorClient.StatsPublisherInstance = this;
         }
         public Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
@@ -59,17 +50,11 @@ namespace UnitTests.Stats
             return Task.CompletedTask;
         }
 
-        public Task Init(ClientConfiguration config, IPAddress address, string clientId)
+        public Task Init(IPAddress address, string clientId)
         {
             throw new NotImplementedException();
         }
-
-        public Task ReportMetrics(IClientPerformanceMetrics metricsData)
-        {
-            Trace.TraceInformation("{0} ReportMetrics called", GetType().Name);
-            Interlocked.Increment(ref numMetricsCalls);
-            return Task.CompletedTask;
-        }
+        
         public Task ReportStats(List<ICounter> statsCounters)
         {
             Trace.TraceInformation("{0} ReportStats called", GetType().Name);
@@ -90,7 +75,7 @@ namespace UnitTests.Stats
     }
 
     public class MockStatsSiloCollector :
-        IStatisticsPublisher, ISiloMetricsDataPublisher, // Stats providers have to be both Stats and Metrics publishers
+        IStatisticsPublisher,
         IProvider // Needs to be IProvider as well as *Publisher
     {
         public string Name { get; private set; }
@@ -117,12 +102,6 @@ namespace UnitTests.Stats
             throw new NotImplementedException();
         }
 
-        public Task ReportMetrics(ISiloPerformanceMetrics metricsData)
-        {
-            logger.Info("{0} ReportMetrics called", GetType().Name);
-            taskScheduler.QueueTask(() => grain.ReportMetricsCalled(), schedulingContext).Ignore();
-            return Task.CompletedTask;
-        }
         public Task ReportStats(List<ICounter> statsCounters)
         {
             logger.Info("{0} ReportStats called", GetType().Name);

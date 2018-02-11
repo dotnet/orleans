@@ -91,59 +91,7 @@ namespace Orleans.Tests.SqlUtils
         }
 
 #if STATISTICS_ADONET || TESTER_SQLUTILS
-
-        /// <summary>
-        /// Either inserts or updates a silo metrics row.
-        /// </summary>
-        /// <param name="deploymentId">The deployment ID.</param>
-        /// <param name="siloId">The silo ID.</param>
-        /// <param name="gateway">The gateway information.</param>
-        /// <param name="siloAddress">The silo address information.</param>
-        /// <param name="hostName">The host name.</param>
-        /// <param name="siloMetrics">The silo metrics to be either updated or inserted.</param>
-        /// <returns></returns>
-        internal Task UpsertSiloMetricsAsync(string deploymentId, string siloId, IPEndPoint gateway,
-            SiloAddress siloAddress, string hostName, ISiloPerformanceMetrics siloMetrics)
-        {
-            return ExecuteAsync(dbStoredQueries.UpsertSiloMetricsKey, command =>
-            {
-                var columns = new DbStoredQueries.Columns(command);
-
-                columns.DeploymentId = deploymentId;
-                columns.HostName = hostName;
-                columns.SiloMetrics = siloMetrics;
-                columns.SiloAddress = siloAddress;
-                columns.GatewayAddress = gateway.Address;
-                columns.GatewayPort = gateway.Port;
-                columns.SiloId = siloId;
-                return columns;
-            });
-        }
-
-        /// <summary>
-        /// Either inserts or updates a silo metrics row. 
-        /// </summary>
-        /// <param name="deploymentId">The deployment ID.</param>
-        /// <param name="clientId">The client ID.</param>
-        /// <param name="address">The client address information.</param>
-        /// <param name="hostName">The hostname.</param>
-        /// <param name="clientMetrics">The client metrics to be either updated or inserted.</param>
-        /// <returns></returns>
-        internal Task UpsertReportClientMetricsAsync(string deploymentId, string clientId, IPAddress address,
-            string hostName, IClientPerformanceMetrics clientMetrics)
-        {
-            return ExecuteAsync(dbStoredQueries.UpsertReportClientMetricsKey, command =>
-                new DbStoredQueries.Columns(command)
-                {
-                    DeploymentId = deploymentId,
-                    HostName = hostName,
-                    ClientMetrics = clientMetrics,
-                    ClientId = clientId,
-                    Address = address
-                });
-        }
-
-
+        
         /// <summary>
         /// Inserts the given statistics counters to the Orleans database.
         /// </summary>

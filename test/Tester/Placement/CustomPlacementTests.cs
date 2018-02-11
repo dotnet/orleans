@@ -31,7 +31,7 @@ namespace Tester.CustomPlacementTests
                 builder.AddSiloBuilderConfigurator<TestSiloBuilderConfigurator>();
                 builder.ConfigureLegacyConfiguration(legacy =>
                 {
-                    legacy.ClusterConfiguration.Globals.AssumeHomogenousSilosForTesting = false;
+                    legacy.ClusterConfiguration.Globals.AssumeHomogenousSilosForTesting = true;
                     legacy.ClusterConfiguration.Globals.TypeMapRefreshInterval = TimeSpan.FromMilliseconds(100);
                 });
             }
@@ -56,8 +56,8 @@ namespace Tester.CustomPlacementTests
             this.fixture = fixture;
 
             // sort silo IDs into an array
-            this.silos = fixture.HostedCluster.GetActiveSilos().Select(h => h.SiloAddress.ToString()).OrderBy(s => s).ToArray();
-            this.siloAddresses = fixture.HostedCluster.GetActiveSilos().Select(h => h.SiloAddress).OrderBy(s => s.ToString()).ToArray();
+            this.silos = fixture.HostedCluster.GetActiveSilos().OrderBy(s => s.SiloAddress).Select(h => h.SiloAddress.ToString()).ToArray();
+            this.siloAddresses = fixture.HostedCluster.GetActiveSilos().Select(h => h.SiloAddress).OrderBy(s => s).ToArray();
         }
 
         [Fact]

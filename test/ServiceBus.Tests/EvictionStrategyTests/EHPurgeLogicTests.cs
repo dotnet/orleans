@@ -208,9 +208,9 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             };
 
             this.receiver1 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance, 
-                new DefaultEventHubReceiverMonitor(monitorDimensions, this.telemetryProducer), new SiloStatisticsOptions(), this.telemetryProducer);
+                new DefaultEventHubReceiverMonitor(monitorDimensions, this.telemetryProducer), new LoadSheddingOptions(), this.telemetryProducer);
             this.receiver2 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance,
-                new DefaultEventHubReceiverMonitor(monitorDimensions, this.telemetryProducer), new SiloStatisticsOptions(), this.telemetryProducer);
+                new DefaultEventHubReceiverMonitor(monitorDimensions, this.telemetryProducer), new LoadSheddingOptions(), this.telemetryProducer);
             this.receiver1.Initialize(this.timeOut);
             this.receiver2.Initialize(this.timeOut);
         }

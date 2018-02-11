@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
@@ -46,7 +46,7 @@ namespace Orleans.Storage
     /// </example>
     public class AzureBlobStorage : IStorageProvider
     {
-        internal const string DataConnectionStringPropertyName = AzureTableStorage.DataConnectionStringPropertyName;
+        internal const string DataConnectionStringPropertyName = "DataConnectionString";
         internal const string ContainerNamePropertyName = "ContainerName";
         internal const string ContainerNameDefaultValue = "grainstate";
 
@@ -69,8 +69,8 @@ namespace Orleans.Storage
             try
             {
                 this.Name = name;
-                var serializationManager = providerRuntime.ServiceProvider.GetRequiredService<SerializationManager>();
-                this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(serializationManager, providerRuntime.GrainFactory), config);
+                var typeResolver = providerRuntime.ServiceProvider.GetRequiredService<ITypeResolver>();
+                this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(typeResolver, providerRuntime.GrainFactory), config);
 
                 if (!config.Properties.ContainsKey(DataConnectionStringPropertyName)) throw new BadProviderConfigException($"The {DataConnectionStringPropertyName} setting has not been configured in the cloud role. Please add a {DataConnectionStringPropertyName} setting with a valid Azure Storage connection string.");
 

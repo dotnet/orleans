@@ -24,7 +24,7 @@ namespace Orleans.Runtime
         private static readonly List<ActivationData> nothing = new List<ActivationData> { Capacity = 0 };
         private readonly ILogger logger;
 
-        public ActivationCollector(IOptions<GrainCollectionOptions> options, ILoggerFactory loggerFactory)
+        public ActivationCollector(IOptions<GrainCollectionOptions> options, ILogger<ActivationCollector> logger)
         {
             if (TimeSpan.Zero == options.Value.CollectionQuantum)
             {
@@ -37,7 +37,7 @@ namespace Orleans.Runtime
             buckets = new ConcurrentDictionary<DateTime, Bucket>();
             nextTicket = MakeTicketFromDateTime(DateTime.UtcNow);
             nextTicketLock = new object();
-            logger = loggerFactory.CreateLogger<ActivationCollector>();
+            this.logger = logger;
         }
 
         public TimeSpan Quantum { get { return quantum; } }

@@ -72,7 +72,7 @@ namespace Orleans.Runtime
 
         public SiloAddress LocalSilo { get; private set; }
         internal ISiloStatusOracle SiloStatusOracle { get; set; }
-        internal readonly ActivationCollector ActivationCollector;
+        private readonly ActivationCollector activationCollector;
 
         private readonly ILocalGrainDirectory directory;
         private readonly OrleansTaskScheduler scheduler;
@@ -103,6 +103,7 @@ namespace Orleans.Runtime
             GrainTypeManager typeManager,
             OrleansTaskScheduler scheduler,
             ActivationDirectory activationDirectory,
+            ActivationCollector activationCollector,
             GrainCreator grainCreator,
             ISiloMessageCenter messageCenter,
             PlacementDirectorsManager placementDirectorsManager,
@@ -117,15 +118,15 @@ namespace Orleans.Runtime
             IOptions<SiloMessagingOptions> messagingOptions)
             : base(Constants.CatalogId, messageCenter.MyAddress, loggerFactory)
         {
-            LocalSilo = localSiloDetails.SiloAddress;
-            localSiloName = localSiloDetails.Name;
-            directory = grainDirectory;
-            activations = activationDirectory;
+            this.LocalSilo = localSiloDetails.SiloAddress;
+            this.localSiloName = localSiloDetails.Name;
+            this.directory = grainDirectory;
+            this.activations = activationDirectory;
             this.scheduler = scheduler;
             this.loggerFactory = loggerFactory;
-            GrainTypeManager = typeManager;
-            collectionNumber = 0;
-            destroyActivationsNumber = 0;
+            this.GrainTypeManager = typeManager;
+            this.collectionNumber = 0;
+            this.destroyActivationsNumber = 0;
             this.grainCreator = grainCreator;
             this.serializationManager = serializationManager;
             this.versionSelectorManager = versionSelectorManager;
@@ -133,14 +134,16 @@ namespace Orleans.Runtime
             this.serviceProvider = serviceProvider;
             this.collectionOptions = collectionOptions;
             this.messagingOptions = messagingOptions;
-            logger = loggerFactory.CreateLogger<Catalog>();
-            ActivationCollector = new ActivationCollector(this.collectionOptions, loggerFactory);
-            this.Dispatcher = new Dispatcher(scheduler,
+            this.logger = loggerFactory.CreateLogger<Catalog>();
+            this.activationCollector = activationCollector;
+            this.Dispatcher = new Dispatcher(
+                scheduler,
                 messageCenter,
                 this,
                 this.messagingOptions,
                 placementDirectorsManager,
                 grainDirectory,
+                this.activationCollector,
                 messageFactory,
                 serializationManager,
                 versionSelectorManager.CompatibilityDirectorManager,
@@ -220,7 +223,7 @@ namespace Orleans.Runtime
                 OnTimer,
                 null,
                 TimeSpan.Zero,
-                ActivationCollector.Quantum,
+                this.activationCollector.Quantum,
                 "Catalog.GCTimer");
             t.Start();
             gcTimer = t;
@@ -243,8 +246,8 @@ namespace Orleans.Runtime
             var number = Interlocked.Increment(ref collectionNumber);
             long memBefore = GC.GetTotalMemory(false) / (1024 * 1024);
             logger.Info(ErrorCode.Catalog_BeforeCollection, "Before collection#{0}: memory={1}MB, #activations={2}, collector={3}.",
-                number, memBefore, activations.Count, ActivationCollector.ToString());
-            List<ActivationData> list = scanStale ? ActivationCollector.ScanStale() : ActivationCollector.ScanAll(ageLimit);
+                number, memBefore, activations.Count, this.activationCollector.ToString());
+            List<ActivationData> list = scanStale ? this.activationCollector.ScanStale() : this.activationCollector.ScanAll(ageLimit);
             collectionCounter.Increment();
             var count = 0;
             if (list != null && list.Count > 0)
@@ -256,7 +259,7 @@ namespace Orleans.Runtime
             long memAfter = GC.GetTotalMemory(false) / (1024 * 1024);
             watch.Stop();
             logger.Info(ErrorCode.Catalog_AfterCollection, "After collection#{0}: memory={1}MB, #activations={2}, collected {3} activations, collector={4}, collection time={5}.",
-                number, memAfter, activations.Count, count, ActivationCollector.ToString(), watch.Elapsed);
+                number, memAfter, activations.Count, count, this.activationCollector.ToString(), watch.Elapsed);
         }
 
         public List<Tuple<GrainId, string, int>> GetGrainStatistics()
@@ -372,7 +375,7 @@ namespace Orleans.Runtime
             activations.RemoveTarget(activation);
 
             // this should be removed once we've refactored the deactivation code path. For now safe to keep.
-            ActivationCollector.TryCancelCollection(activation);
+            this.activationCollector.TryCancelCollection(activation);
             activationsDestroyed.Increment();
 
             scheduler.UnregisterWorkContext(activation.SchedulingContext);
@@ -489,7 +492,7 @@ namespace Orleans.Runtime
                         genericArguments, 
                         placement, 
                         activationStrategy,
-                        ActivationCollector,
+                        this.activationCollector,
                         ageLimit,
                         this.messagingOptions,
                         this.maxWarningRequestProcessingTime,
@@ -560,7 +563,7 @@ namespace Orleans.Runtime
                 initStage = ActivationInitializationStage.InvokeActivate;
                 await InvokeActivate(activation, requestContextData);
 
-                ActivationCollector.ScheduleCollection(activation);
+                this.activationCollector.ScheduleCollection(activation);
 
                 // Success!! Log the result, and start processing messages
                 initStage = ActivationInitializationStage.Completed;
@@ -803,7 +806,7 @@ namespace Orleans.Runtime
                 {
                     // Change the ActivationData state here, since we're about to give up the lock.
                     data.PrepareForDeactivation(); // Don't accept any new messages
-                    ActivationCollector.TryCancelCollection(data);
+                    this.activationCollector.TryCancelCollection(data);
                     if (!data.IsCurrentlyExecuting)
                     {
                         promptly = true;
@@ -864,7 +867,7 @@ namespace Orleans.Runtime
                     {
                         // Change the ActivationData state here, since we're about to give up the lock.
                         activationData.PrepareForDeactivation(); // Don't accept any new messages
-                        ActivationCollector.TryCancelCollection(activationData);
+                        this.activationCollector.TryCancelCollection(activationData);
                         if (!activationData.IsCurrentlyExecuting)
                         {
                             if (destroyNow == null)

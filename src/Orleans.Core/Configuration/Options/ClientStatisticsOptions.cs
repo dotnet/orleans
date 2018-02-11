@@ -4,14 +4,15 @@ using Microsoft.Extensions.Options;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Statistics output related options for cluster client.
+    /// </summary>
     public class ClientStatisticsOptions : StatisticsOptions
     {
     }
 
     public class ClientStatisticsOptionsFormatter : StatisticsOptionsFormatter, IOptionFormatter<ClientStatisticsOptions>
     {
-        public string Category { get; }
-
         public string Name => nameof(ClientStatisticsOptions);
 
         private ClientStatisticsOptions options;

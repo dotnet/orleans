@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using Orleans.CodeGeneration;
 using Orleans.Runtime.Scheduler;
 using Microsoft.Extensions.Logging;
 
@@ -28,11 +29,10 @@ namespace Orleans.Runtime.ReminderService
 
         internal LocalReminderService(
             Silo silo,
-            GrainId id,
             IReminderTable reminderTable,
             TimeSpan initTimeout,
             ILoggerFactory loggerFactory)
-            : base(id, silo, loggerFactory)
+            : base(GetGrainId(), silo, loggerFactory)
         {
             this.timerLogger = loggerFactory.CreateLogger<GrainTimer>();
             localReminders = new Dictionary<ReminderIdentity, LocalReminderData>();
@@ -56,7 +56,7 @@ namespace Orleans.Runtime.ReminderService
         public override async Task Start()
         {
             // confirm that it can access the underlying store, as after this the ReminderService will load in the background, without the opportunity to prevent the Silo from starting
-            await reminderTable.Init().WithTimeout(initTimeout);
+            await reminderTable.Init().WithTimeout(initTimeout, $"ReminderTable Initialization failed due to timeout {initTimeout}");
 
             await base.Start();
         }
@@ -503,6 +503,12 @@ namespace Orleans.Runtime.ReminderService
         }
 
         #endregion
+        
+        private static GrainId GetGrainId()
+        {
+            var typeCode = GrainInterfaceUtils.GetGrainClassTypeCode(typeof(IReminderService));
+            return GrainId.GetGrainServiceGrainId(0, typeCode);
+        }
 
         private class LocalReminderData
         {

@@ -67,7 +67,7 @@ namespace Orleans
             //Add default option formatter if none is configured, for options which are requied to be configured 
             services.TryConfigureFormatter<ClusterClientOptions, ClusterClientOptionsFormatter>();
             services.TryConfigureFormatter<ClientMessagingOptions, ClientMessagingOptionFormatter>();
-            services.TryConfigureFormatter<NetworkingOptions, NetworkingOptionFormatter>();
+            services.TryConfigureFormatter<NetworkingOptions, NetworkingOptionsFormatter>();
             services.TryConfigureFormatter<ClientStatisticsOptions, ClientStatisticsOptionsFormatter>();
         }
     }

@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,9 +11,7 @@ using Orleans.TestingHost;
 using Xunit;
 using TestExtensions;
 using Tester;
-using Microsoft.Extensions.Logging;
-using Orleans.EventSourcing.CustomStorage;
-using Orleans.TestingHost.Utils;
+using Microsoft.Extensions.Options;
 
 namespace Tests.GeoClusterTests
 {
@@ -34,18 +31,34 @@ namespace Tests.GeoClusterTests
                 {
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                    legacy.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore");
-
-                    legacy.ClusterConfiguration.AddAzureTableStorageProvider();
                     legacy.ClusterConfiguration.AddStateStorageBasedLogConsistencyProvider();
                     legacy.ClusterConfiguration.AddLogStorageBasedLogConsistencyProvider();
                     legacy.ClusterConfiguration.AddCustomStorageInterfaceBasedLogConsistencyProvider("CustomStorage");
 
                     legacy.ClusterConfiguration.AddCustomStorageInterfaceBasedLogConsistencyProvider("CustomStoragePrimaryCluster", "A");
                 });
+                builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+            }
+
+            private class SiloBuilderConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder
+                        .AddAzureTableGrainStorageAsDefault(builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                        {
+                            options.ServiceId = silo.Value.ServiceId.ToString();
+                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        }))
+                        .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                        {
+                            options.ServiceId = silo.Value.ServiceId.ToString();
+                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        }));
+                }
             }
         }
-
+        
         public BasicLogTestGrainTests(Fixture fixture)
         {
             this.fixture = fixture;

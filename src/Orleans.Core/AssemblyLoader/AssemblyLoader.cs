@@ -89,7 +89,7 @@ namespace Orleans.Runtime
             loader.logger.Info("{0} assemblies loaded.", loadedAssemblies.Count);
             return loadedAssemblies;
         }
-        
+
         public static T LoadAndCreateInstance<T>(string assemblyName, ILogger logger, IServiceProvider serviceProvider) where T : class
         {
             try

@@ -1,4 +1,4 @@
-﻿using Orleans;
+using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
@@ -111,7 +111,7 @@ namespace UnitTests.GeoClusterTests
             // configuration for cluster
             Action<ClusterConfiguration> addtracing = (ClusterConfiguration c) =>
             {
-                c.AddAzureTableStorageProvider("PubSubStore", deleteOnClear:true, useJsonFormat:false, connectionString: TestDefaultConfiguration.DataConnectionString);
+                c.AddAzureBlobStorageProvider("PubSubStore", connectionString: TestDefaultConfiguration.DataConnectionString);
                 c.AddSimpleMessageStreamProvider("SMSProvider", fireAndForgetDelivery: false);
 
                 config_customizer?.Invoke(c);

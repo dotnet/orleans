@@ -11,62 +11,31 @@ namespace Orleans.Runtime.Counters
     internal class SiloStatisticsManager
     {
         private LogStatistics logStatistics;
-        private IHostEnvironmentStatistics hostEnvironmentStatistics;
         private CountersStatistics countersPublisher;
-        internal SiloPerformanceMetrics MetricsTable;
         private readonly ILogger logger;
         private readonly ILocalSiloDetails siloDetails;
-        private readonly StorageOptions storageOptions;
+        private readonly MonitoringStorageOptions storageOptions;
 
         public SiloStatisticsManager(
             IOptions<SiloStatisticsOptions> statisticsOptions,
-            IOptions<StorageOptions> azureStorageOptions,
+            IOptions<MonitoringStorageOptions> azureStorageOptions,
             ILocalSiloDetails siloDetails, 
             SerializationManager serializationManager, 
             ITelemetryProducer telemetryProducer,
-            IHostEnvironmentStatistics hostEnvironmentStatistics,
-            IAppEnvironmentStatistics appEnvironmentStatistics,
-            ILoggerFactory loggerFactory, 
-            IOptions<SiloMessagingOptions> messagingOptions)
+            ILoggerFactory loggerFactory)
         {
             this.siloDetails = siloDetails;
             this.storageOptions = azureStorageOptions.Value;
             MessagingStatisticsGroup.Init(true);
             MessagingProcessingStatisticsGroup.Init();
             NetworkingStatisticsGroup.Init(true);
-            ApplicationRequestsStatisticsGroup.Init(messagingOptions.Value.ResponseTimeout);
+            ApplicationRequestsStatisticsGroup.Init();
             SchedulerStatisticsGroup.Init(loggerFactory);
             StorageStatisticsGroup.Init();
             TransactionsStatisticsGroup.Init();
             this.logger = loggerFactory.CreateLogger<SiloStatisticsManager>();
-            this.hostEnvironmentStatistics = hostEnvironmentStatistics;
             this.logStatistics = new LogStatistics(statisticsOptions.Value.LogWriteInterval, true, serializationManager, loggerFactory);
-            this.MetricsTable = new SiloPerformanceMetrics(this.hostEnvironmentStatistics, appEnvironmentStatistics, loggerFactory, statisticsOptions);
             this.countersPublisher = new CountersStatistics(statisticsOptions.Value.PerfCountersWriteInterval, telemetryProducer, loggerFactory);
-        }
-
-        internal async Task SetSiloMetricsTableDataManager(Silo silo, StatisticsOptions options)
-        {
-            var metricsDataPublisher = silo.Services.GetService<ISiloMetricsDataPublisher>();
-            if (metricsDataPublisher != null)
-            {
-                var configurableMetricsDataPublisher = metricsDataPublisher as IConfigurableSiloMetricsDataPublisher;
-                if (configurableMetricsDataPublisher != null)
-                {
-                    var gateway = this.siloDetails.GatewayAddress?.Endpoint;
-                    configurableMetricsDataPublisher.AddConfiguration(
-                        this.siloDetails.ClusterId, true, this.siloDetails.Name, this.siloDetails.SiloAddress, gateway, this.siloDetails.DnsHostName);
-                }
-                MetricsTable.MetricsDataPublisher = metricsDataPublisher;
-            }
-            else if (CanUseAzureTable(silo, options))
-            {
-                // Hook up to publish silo metrics to Azure storage table
-                var gateway = this.siloDetails.GatewayAddress?.Endpoint;
-                metricsDataPublisher = AssemblyLoader.LoadAndCreateInstance<ISiloMetricsDataPublisher>(Constants.ORLEANS_STATISTICS_AZURESTORAGE, logger, silo.Services);
-                await metricsDataPublisher.Init(this.siloDetails.ClusterId, this.storageOptions.DataConnectionString, this.siloDetails.SiloAddress, this.siloDetails.Name, gateway, this.siloDetails.DnsHostName);
-                MetricsTable.MetricsDataPublisher = metricsDataPublisher;
-            }
         }
 
         internal async Task SetSiloStatsTableDataManager(Silo silo, StatisticsOptions options)
@@ -85,7 +54,7 @@ namespace Orleans.Runtime.Counters
                 }
                 logStatistics.StatsTablePublisher = statsDataPublisher;
             }
-            else if (CanUseAzureTable(silo, options))
+            else if (CanUseAzureTable(silo))
             {
                 statsDataPublisher = AssemblyLoader.LoadAndCreateInstance<IStatisticsPublisher>(Constants.ORLEANS_STATISTICS_AZURESTORAGE, logger, silo.Services);
                 await statsDataPublisher.Init(true, this.storageOptions.DataConnectionString, this.siloDetails.ClusterId, this.siloDetails.SiloAddress.ToLongString(), this.siloDetails.Name, this.siloDetails.DnsHostName);
@@ -94,9 +63,7 @@ namespace Orleans.Runtime.Counters
             // else no stats
         }
 
-        private bool CanUseAzureTable(
-            Silo silo,
-            StatisticsOptions options)
+        private bool CanUseAzureTable(Silo silo)
         {
             return
                 // TODO: find a better way? - jbragg
@@ -109,15 +76,10 @@ namespace Orleans.Runtime.Counters
         {
             countersPublisher.Start();
             logStatistics.Start();
-            // Start performance metrics publisher
-            MetricsTable.MetricsTableWriteInterval = options.MetricsTableWriteInterval;
         }
 
         internal void Stop()
         {
-            if (MetricsTable != null)
-                MetricsTable.Dispose();
-            MetricsTable = null;
             if (countersPublisher != null)
                 countersPublisher.Stop();
             countersPublisher = null;

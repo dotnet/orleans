@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
@@ -69,66 +69,66 @@ namespace Orleans.Runtime
         }
     }
 
-    public static class TransientKeyedServiceExtensions
+    public static class KeyedServiceExtensions
     {
         /// <summary>
         /// Register a transient keyed service
         /// </summary>
-        public static void AddTransientKeyedService<TKey, TService, TInstance>(this IServiceCollection collection, TKey key)
+        public static IServiceCollection AddTransientKeyedService<TKey, TService, TInstance>(this IServiceCollection collection, TKey key)
             where TInstance : class, TService
             where TService : class
         {
             collection.TryAddTransient<TInstance>();
-            collection.AddSingleton<IKeyedService<TKey, TService>>(sp => new KeyedService<TKey, TService, TInstance>(key));
+            return collection.AddSingleton<IKeyedService<TKey, TService>>(sp => new KeyedService<TKey, TService, TInstance>(key));
         }
 
         /// <summary>
         /// Register a singleton keyed service
         /// </summary>
-        public static void AddSingletonKeyedService<TKey, TService>(this IServiceCollection collection, TKey key, Func<IServiceProvider, TKey, TService> factory)
+        public static IServiceCollection AddSingletonKeyedService<TKey, TService>(this IServiceCollection collection, TKey key, Func<IServiceProvider, TKey, TService> factory)
             where TService : class
         {
-            collection.AddSingleton<IKeyedService<TKey, TService>>(sp => new KeyedSingletonService<TKey, TService>(key, sp, factory));
+            return collection.AddSingleton<IKeyedService<TKey, TService>>(sp => new KeyedSingletonService<TKey, TService>(key, sp, factory));
         }
 
         /// <summary>
         /// Register a singleton keyed service
         /// </summary>
-        public static void AddSingletonKeyedService<TKey, TService, TInstance>(this IServiceCollection collection, TKey key)
+        public static IServiceCollection AddSingletonKeyedService<TKey, TService, TInstance>(this IServiceCollection collection, TKey key)
             where TInstance : class, TService
             where TService : class
         {
             collection.TryAddTransient<TInstance>();
-            collection.AddSingleton<IKeyedService<TKey, TService>>(sp => new KeyedSingletonService<TKey, TService, TInstance>(key, sp));
+            return collection.AddSingleton<IKeyedService<TKey, TService>>(sp => new KeyedSingletonService<TKey, TService, TInstance>(key, sp));
         }
 
         /// <summary>
         /// Register a transient named service
         /// </summary>
-        public static void AddTransientNamedService<TService, TInstance>(this IServiceCollection collection, string name)
+        public static IServiceCollection AddTransientNamedService<TService, TInstance>(this IServiceCollection collection, string name)
             where TInstance : class, TService
             where TService : class
         {
-            collection.AddTransientKeyedService<string, TService, TInstance>(name);
+            return collection.AddTransientKeyedService<string, TService, TInstance>(name);
         }
 
         /// <summary>
         /// Register a singleton named service
         /// </summary>
-        public static void AddSingletonNamedService<TService>(this IServiceCollection collection, string name, Func<IServiceProvider, string, TService> factory)
+        public static IServiceCollection AddSingletonNamedService<TService>(this IServiceCollection collection, string name, Func<IServiceProvider, string, TService> factory)
             where TService : class
         {
-            collection.AddSingletonKeyedService<string, TService>(name, factory);
+            return collection.AddSingletonKeyedService<string, TService>(name, factory);
         }
 
         /// <summary>
         /// Register a singleton named service
         /// </summary>
-        public static void AddSingletonNamedService<TService, TInstance>(this IServiceCollection collection, string name)
+        public static IServiceCollection AddSingletonNamedService<TService, TInstance>(this IServiceCollection collection, string name)
             where TInstance : class, TService
             where TService : class
         {
-            collection.AddSingletonKeyedService<string, TService, TInstance>(name);
+            return collection.AddSingletonKeyedService<string, TService, TInstance>(name);
         }
     }
 }

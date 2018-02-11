@@ -1,4 +1,4 @@
-﻿using Orleans.Persistence.AdoNet.Storage;
+using Orleans.Persistence.AdoNet.Storage;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -552,7 +552,8 @@ namespace Orleans.Storage
             var deserializers = new List<IStorageDeserializer>();
             if(config.Properties.ContainsKey(UseJsonFormatPropertyName) && @true.Equals(config.Properties[UseJsonFormatPropertyName], StringComparison.OrdinalIgnoreCase))
             {
-                var jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(this.serializationManager, providerRuntime.GrainFactory), config);
+                var typeResolver = providerRuntime.ServiceProvider.GetRequiredService<ITypeResolver>();
+                var jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(typeResolver, providerRuntime.GrainFactory), config);
                 deserializers.Add(new OrleansStorageDefaultJsonDeserializer(jsonSettings, UseJsonFormatPropertyName));
             }
 
@@ -576,7 +577,8 @@ namespace Orleans.Storage
             var serializers = new List<IStorageSerializer>();
             if(config.Properties.ContainsKey(UseJsonFormatPropertyName) && @true.Equals(config.Properties[UseJsonFormatPropertyName], StringComparison.OrdinalIgnoreCase))
             {
-                var jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(this.serializationManager, providerRuntime.GrainFactory), config);
+                var typeResolver = providerRuntime.ServiceProvider.GetRequiredService<ITypeResolver>();
+                var jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(typeResolver, providerRuntime.GrainFactory), config);
                 serializers.Add(new OrleansStorageDefaultJsonSerializer(jsonSettings, UseJsonFormatPropertyName));
             }
 

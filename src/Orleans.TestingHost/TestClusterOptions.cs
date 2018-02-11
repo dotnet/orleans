@@ -18,7 +18,7 @@ namespace Orleans.TestingHost
         public bool AssumeHomogenousSilosForTesting { get; set; }
         public List<string> SiloBuilderConfiguratorTypes { get; } = new List<string>();
         public List<string> ClientBuilderConfiguratorTypes { get; } = new List<string>();
-        
+
         public Dictionary<string, string> ToDictionary()
         {
             var result = new Dictionary<string, string>
@@ -62,21 +62,34 @@ namespace Orleans.TestingHost
         public string SiloName { get; set; }
         public int PrimarySiloPort { get; set; }
 
-        public static TestSiloSpecificOptions Create(TestClusterOptions testClusterOptions, int instanceNumber)
+        public static TestSiloSpecificOptions Create(TestClusterOptions testClusterOptions, int instanceNumber, bool assignNewPort = false)
         {
             var siloName = testClusterOptions.UseTestClusterMembership && instanceNumber == 0
                 ? Silo.PrimarySiloName
                 : $"Secondary_{instanceNumber}";
-
-            var result = new TestSiloSpecificOptions
+            if (assignNewPort)
             {
-                SiloPort = testClusterOptions.BaseSiloPort + instanceNumber,
-                GatewayPort = testClusterOptions.BaseGatewayPort + instanceNumber,
-                SiloName = siloName,
-                PrimarySiloPort = testClusterOptions.UseTestClusterMembership ? testClusterOptions.BaseSiloPort : 0,
-            };
-
-            return result;
+                (int siloPort, int gatewayPort) = TestClusterBuilder.GetAvailableConsecutiveServerPortsPair(1);
+                var result = new TestSiloSpecificOptions
+                {
+                    SiloPort = siloPort,
+                    GatewayPort = gatewayPort,
+                    SiloName = siloName,
+                    PrimarySiloPort = testClusterOptions.UseTestClusterMembership ? testClusterOptions.BaseSiloPort : 0,
+                };
+                return result;
+            }
+            else
+            {
+                var result = new TestSiloSpecificOptions
+                {
+                    SiloPort = testClusterOptions.BaseSiloPort + instanceNumber,
+                    GatewayPort = testClusterOptions.BaseGatewayPort + instanceNumber,
+                    SiloName = siloName,
+                    PrimarySiloPort = testClusterOptions.UseTestClusterMembership ? testClusterOptions.BaseSiloPort : 0,
+                };
+                return result;
+            }
         }
 
         public Dictionary<string, string> ToDictionary() => new Dictionary<string, string>

@@ -1,14 +1,6 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
-using System.Text;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
-using Orleans.Configuration.Options;
-using Orleans.Runtime.Configuration;
-using Orleans.Runtime;
 
 namespace Orleans.Messaging
 {
@@ -17,75 +9,35 @@ namespace Orleans.Messaging
     /// </summary>
     public interface ILegacyGatewayListProviderConfigurator
     {
-        void ConfigureServices(ClientConfiguration configuration, IServiceCollection services);
+        void ConfigureServices(object configuration, IServiceCollection services);
     }
 
-    internal class LegacyGatewayListProviderConfigurator
+    /// <summary>
+    /// Wrapper for legacy client config.  Should not be used for any new developent, only adapting legacy systems.
+    /// </summary>
+    public class ClientConfigurationReader
     {
-        public static void ConfigureServices(
-            ClientConfiguration clientConfiguration,
-            IServiceCollection services)
+        private readonly object configuration;
+        private readonly Type type;
+
+        public ClientConfigurationReader(object configuration)
         {
-            // If a gateway list provider has already been configured in the service collection, use that instead.
-            if (services.Any(reg => reg.ServiceType == typeof(IGatewayListProvider))) return;
+            this.configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+            this.type = configuration.GetType();
+            if (this.type.Name != "ClientConfiguration") throw new ArgumentException($"ClientConfiguration expected", nameof(configuration));
+        }
 
-            ILegacyGatewayListProviderConfigurator configurator = null;
-            switch (clientConfiguration.GatewayProviderToUse)
+        public T GetPropertyValue<T>(string propertyName)
+        {
+            try
             {
-                case ClientConfiguration.GatewayProviderType.AzureTable:
-                    configurator = CreateInstanceWithParameterlessConstructor<ILegacyGatewayListProviderConfigurator>(
-                            Constants.ORLEANS_CLUSTERING_AZURESTORAGE);
-                    break;
-
-                case ClientConfiguration.GatewayProviderType.SqlServer:
-                    configurator = CreateInstanceWithParameterlessConstructor<ILegacyGatewayListProviderConfigurator>(Constants.ORLEANS_CLUSTERING_ADONET);
-                    break;
-
-                case ClientConfiguration.GatewayProviderType.Custom:
-                    configurator = CreateInstanceWithParameterlessConstructor<ILegacyGatewayListProviderConfigurator>(
-                            clientConfiguration.CustomGatewayProviderAssemblyName);
-                    break;
-
-                case ClientConfiguration.GatewayProviderType.ZooKeeper:
-                    configurator = CreateInstanceWithParameterlessConstructor<ILegacyGatewayListProviderConfigurator>(
-                            Constants.ORLEANS_CLUSTERING_ZOOKEEPER);
-                    break;
-
-                case ClientConfiguration.GatewayProviderType.Config:
-                    configurator = new LegacyStaticGatewayProviderConfigurator();
-                    break;
-
-                default:
-                    break;
+                MethodInfo getMethod = this.type.GetProperty(propertyName).GetGetMethod();
+                return (T)getMethod.Invoke(this.configuration, null);
             }
-            configurator?.ConfigureServices(clientConfiguration, services);
-        }
-
-
-        /// <summary>
-        /// Create instance for type T in certain assembly, using its parameterless constructor
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="assemblyName"></param>
-        /// <returns></returns>
-        internal static T CreateInstanceWithParameterlessConstructor<T>(string assemblyName)
-        {
-            var assembly = Assembly.Load(new AssemblyName(assemblyName));
-            var foundType = TypeUtils.GetTypes(assembly, type => typeof(T).IsAssignableFrom(type), null).FirstOrDefault();
-            if(foundType == null)
-                throw new InvalidOperationException($"type {typeof(T)} was not found in assembly {assembly}");
-            return (T)Activator.CreateInstance(foundType, true);
-        }
-    }
-
-    internal class LegacyStaticGatewayProviderConfigurator : ILegacyGatewayListProviderConfigurator
-    {
-        public void ConfigureServices(ClientConfiguration clientConfiguration, IServiceCollection services)
-        {
-            services.UseStaticGatewayListProvider(options =>
+            catch (Exception ex)
             {
-                options.Gateways = clientConfiguration.Gateways.Select(ep => ep.ToGatewayUri()).ToList();
-            });
+                throw new ArgumentOutOfRangeException($"Could not get property {propertyName} of type {typeof(T)} from configuration of type {this.configuration.GetType()}", ex);
+            }
         }
     }
 }

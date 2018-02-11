@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration.Options;
-using Orleans.Runtime.Configuration;
+using Orleans.Hosting;
 
 namespace Orleans.Messaging
 {
@@ -11,10 +11,10 @@ namespace Orleans.Messaging
     {
         private readonly StaticGatewayListProviderOptions options;
         private readonly TimeSpan maxStaleness;
-        public StaticGatewayListProvider(IOptions<StaticGatewayListProviderOptions> options, ClientConfiguration clientConfiguration )
+        public StaticGatewayListProvider(IOptions<StaticGatewayListProviderOptions> options, IOptions<GatewayOptions> gatewayOptions)
         {
             this.options = options.Value;
-            this.maxStaleness = clientConfiguration.GatewayListRefreshPeriod;
+            this.maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
         }
 
         #region Implementation of IGatewayListProvider

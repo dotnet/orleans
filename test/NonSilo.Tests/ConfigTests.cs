@@ -412,8 +412,8 @@ namespace UnitTests
                 "Removed account key info from Azure connection string " + azureConnectionString);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("SqlServer")]
-        public void Config_SqlConnectionInfo()
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("AdoNet")]
+        public void Config_AdoNetConnectionInfo()
         {
             string sqlConnectionStringInput =
                 @"Server=myServerName\myInstanceName;Database=myDataBase;User Id=myUsername;Password=myPassword";
@@ -567,7 +567,7 @@ namespace UnitTests
                 .Build();
             try
             {
-                ClientConfiguration config = client.Configuration;
+                ClientConfiguration config = client.Configuration();
 
                 output.WriteLine(config);
 
@@ -634,8 +634,8 @@ namespace UnitTests
             Assert.Equal(filename, Path.GetFileName(config.SourceFile)); // OrleansConfiguration.SourceFile
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("SqlServer")]
-        public void ClientConfig_SqlServer()
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("AdoNet")]
+        public void ClientConfig_AdoNet()
         {
             const string filename = "DevTestClientConfiguration.xml";
 
@@ -643,18 +643,18 @@ namespace UnitTests
 
             output.WriteLine(config);
 
-            Assert.Equal(ClientConfiguration.GatewayProviderType.SqlServer, config.GatewayProvider); // GatewayProviderType
-            Assert.Equal(ClientConfiguration.GatewayProviderType.SqlServer, config.GatewayProviderToUse); // GatewayProviderToUse
+            Assert.Equal(ClientConfiguration.GatewayProviderType.AdoNet, config.GatewayProvider); // GatewayProviderType
+            Assert.Equal(ClientConfiguration.GatewayProviderType.AdoNet, config.GatewayProviderToUse); // GatewayProviderToUse
 
             Assert.NotNull(config.DataConnectionString); // Connection string should not be null
             Assert.False(string.IsNullOrWhiteSpace(config.DataConnectionString)); // Connection string should not be blank
 
             Assert.False(config.UseAzureSystemStore); // Should not be using Azure storage
-            Assert.True(config.UseSqlSystemStore); // Should be using SqlServer storage
+            Assert.True(config.UseAdoNetSystemStore); // Should be using SqlServer storage
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("SqlServer")]
-        public void ClientConfig_SqlServer_StatsProvider()
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("AdoNet")]
+        public void ClientConfig_AdoNet_StatsProvider()
         {
             const string filename = "DevTestClientConfiguration.xml";
 
@@ -669,11 +669,11 @@ namespace UnitTests
             Assert.Equal("SQL", statsProviders.Providers.Keys.First()); // Stats provider name
             ProviderConfiguration providerConfig = (ProviderConfiguration)statsProviders.Providers["SQL"];
             // Note: Use string here instead of typeof(SqlStatisticsPublisher).FullName to prevent cascade load of this type
-            Assert.Equal("Orleans.Providers.SqlServer.SqlStatisticsPublisher", providerConfig.Type); // Stats provider class name
+            Assert.Equal("Orleans.Providers.AdoNet.AdoNetStatisticsPublisher", providerConfig.Type); // Stats provider class name
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("SqlServer")]
-        public void SiloConfig_SqlServer()
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("AdoNet")]
+        public void SiloConfig_AdoNet()
         {
             const string filename = "DevTestServerConfiguration.xml";
             Guid myGuid = Guid.Empty;
@@ -683,20 +683,20 @@ namespace UnitTests
 
             output.WriteLine(orleansConfig.Globals);
 
-            Assert.Equal(GlobalConfiguration.LivenessProviderType.SqlServer, orleansConfig.Globals.LivenessType); // LivenessType
-            Assert.Equal(GlobalConfiguration.ReminderServiceProviderType.SqlServer, orleansConfig.Globals.ReminderServiceType); // ReminderServiceType
+            Assert.Equal(GlobalConfiguration.LivenessProviderType.AdoNet, orleansConfig.Globals.LivenessType); // LivenessType
+            Assert.Equal(GlobalConfiguration.ReminderServiceProviderType.AdoNet, orleansConfig.Globals.ReminderServiceType); // ReminderServiceType
 
             Assert.NotNull(orleansConfig.Globals.DataConnectionString); // DataConnectionString should not be null
             Assert.False(string.IsNullOrWhiteSpace(orleansConfig.Globals.DataConnectionString)); // DataConnectionString should not be blank
 
             Assert.False(orleansConfig.Globals.UseAzureSystemStore); // Should not be using Azure storage
-            Assert.True(orleansConfig.Globals.UseSqlSystemStore); // Should be using SqlServer storage
+            Assert.True(orleansConfig.Globals.UseAdoNetSystemStore); // Should be using SqlServer storage
 
             Assert.Equal(orleansConfig.Globals.ServiceId, myGuid); // ServiceId
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("SqlServer")]
-        public void SiloConfig_SqlServer_StatsProvider()
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("AdoNet")]
+        public void SiloConfig_AdoNet_StatsProvider()
         {
             const string filename = "DevTestServerConfiguration.xml";
 
@@ -712,7 +712,7 @@ namespace UnitTests
             Assert.Equal("SQL", statsProviders.Providers.Keys.First()); // Stats provider name
             ProviderConfiguration providerConfig = (ProviderConfiguration)statsProviders.Providers["SQL"];
             // Note: Use string here instead of typeof(SqlStatisticsPublisher).FullName to prevent cascade load of this type
-            Assert.Equal("Orleans.Providers.SqlServer.SqlStatisticsPublisher", providerConfig.Type); // Stats provider class name
+            Assert.Equal("Orleans.Providers.AdoNet.AdoNetStatisticsPublisher", providerConfig.Type); // Stats provider class name
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
@@ -745,7 +745,7 @@ namespace UnitTests
             Assert.Equal(connectionString, siloConfig.Globals.DataConnectionString); // DataConnectionString
 
             Assert.True(siloConfig.Globals.UseAzureSystemStore, "Should be using Azure storage");
-            Assert.False(siloConfig.Globals.UseSqlSystemStore, "Should not be using SqlServer storage");
+            Assert.False(siloConfig.Globals.UseAdoNetSystemStore, "Should not be using SqlServer storage");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config")]
@@ -841,7 +841,7 @@ namespace UnitTests
             Assert.False(string.IsNullOrWhiteSpace(siloConfig.Globals.DataConnectionString)); // DataConnectionString should not be blank
 
             Assert.True(siloConfig.Globals.UseAzureSystemStore, "Should be using Azure storage");
-            Assert.False(siloConfig.Globals.UseSqlSystemStore, "Should not be using SqlServer storage");
+            Assert.False(siloConfig.Globals.UseAdoNetSystemStore, "Should not be using SqlServer storage");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
@@ -859,7 +859,7 @@ namespace UnitTests
             Assert.False(string.IsNullOrWhiteSpace(siloConfig.Globals.DataConnectionString), "DataConnectionString should not be blank");
 
             Assert.True(siloConfig.Globals.UseAzureSystemStore, "Should be using Azure storage");
-            Assert.False(siloConfig.Globals.UseSqlSystemStore, "Should not be using SqlServer storage");
+            Assert.False(siloConfig.Globals.UseAdoNetSystemStore, "Should not be using SqlServer storage");
         }
 
         internal static void DeleteIfExists(FileInfo fileInfo)

@@ -33,7 +33,6 @@ namespace Orleans.Runtime.Messaging
         private readonly Action<Message>[] localMessageHandlers;
 
         internal bool IsBlockingApplicationMessages { get; private set; }
-        internal ISiloPerformanceMetrics Metrics { get; private set; }
         
         public bool IsProxying { get { return Gateway != null; } }
 
@@ -50,7 +49,6 @@ namespace Orleans.Runtime.Messaging
             IOptions<SiloMessagingOptions> messagingOptions,
             IOptions<NetworkingOptions> networkingOptions,
             SerializationManager serializationManager,
-            ISiloPerformanceMetrics metrics,
             MessageFactory messageFactory,
             Factory<MessageCenter, Gateway> gatewayFactory,
             ExecutorService executorService,
@@ -61,7 +59,7 @@ namespace Orleans.Runtime.Messaging
             this.serializationManager = serializationManager;
             this.messageFactory = messageFactory;
             this.executorService = executorService;
-            this.Initialize(siloDetails.SiloAddress.Endpoint, siloDetails.SiloAddress.Generation, messagingOptions, networkingOptions, metrics);
+            this.Initialize(siloDetails.SiloAddress.Endpoint, siloDetails.SiloAddress.Generation, messagingOptions, networkingOptions);
             if (siloDetails.GatewayAddress != null)
             {
                 Gateway = gatewayFactory(this);
@@ -70,7 +68,7 @@ namespace Orleans.Runtime.Messaging
             localMessageHandlers = new Action<Message>[Enum.GetValues(typeof(Message.Categories)).Length];
         }
 
-        private void Initialize(IPEndPoint here, int generation, IOptions<SiloMessagingOptions> messagingOptions, IOptions<NetworkingOptions> networkingOptions, ISiloPerformanceMetrics metrics = null)
+        private void Initialize(IPEndPoint here, int generation, IOptions<SiloMessagingOptions> messagingOptions, IOptions<NetworkingOptions> networkingOptions)
         {
             if(log.IsEnabled(LogLevel.Trace)) log.Trace("Starting initialization.");
 
@@ -79,7 +77,6 @@ namespace Orleans.Runtime.Messaging
             MyAddress = SiloAddress.New((IPEndPoint)ima.AcceptingSocket.LocalEndPoint, generation);
             InboundQueue = new InboundMessageQueue(this.loggerFactory);
             OutboundQueue = new OutboundMessageQueue(this, messagingOptions, this.serializationManager, this.executorService, this.loggerFactory);
-            Metrics = metrics;
             
             sendQueueLengthCounter = IntValueStatistic.FindOrCreate(StatisticNames.MESSAGE_CENTER_SEND_QUEUE_LENGTH, () => SendQueueLength);
             receiveQueueLengthCounter = IntValueStatistic.FindOrCreate(StatisticNames.MESSAGE_CENTER_RECEIVE_QUEUE_LENGTH, () => ReceiveQueueLength);

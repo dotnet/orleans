@@ -3,13 +3,14 @@ using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
+using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Scheduler;
 using Orleans.Providers;
-using Orleans.Configuration.Options;
 using System.Collections.Generic;
 
 namespace Orleans.Hosting
@@ -118,14 +119,16 @@ namespace Orleans.Hosting
 
             services.AddOptions<SiloStatisticsOptions>()
                 .Configure<NodeConfiguration>((options, nodeConfig) => LegacyConfigurationExtensions.CopyStatisticsOptions(nodeConfig, options))
+                .Configure<GlobalConfiguration>((options, config) =>
+                {
+                    options.DeploymentLoadPublisherRefreshTime = config.DeploymentLoadPublisherRefreshTime;
+                });
+
+            services.AddOptions<LoadSheddingOptions>()
                 .Configure<NodeConfiguration>((options, nodeConfig) =>
                 {
                     options.LoadSheddingEnabled = nodeConfig.LoadSheddingEnabled;
                     options.LoadSheddingLimit = nodeConfig.LoadSheddingLimit;
-                })
-                .Configure<GlobalConfiguration>((options, config) =>
-                {
-                    options.DeploymentLoadPublisherRefreshTime = config.DeploymentLoadPublisherRefreshTime;
                 });
 
             // Translate legacy configuration to new Options
@@ -153,6 +156,12 @@ namespace Orleans.Hosting
                 });
 
             services.Configure<NetworkingOptions>(options => LegacyConfigurationExtensions.CopyNetworkingOptions(configuration.Globals, options));
+
+            //configure data connection string for metric table and statistic table
+            services.Configure<MonitoringStorageOptions>(options =>
+            {
+                options.DataConnectionString = configuration.Globals.DataConnectionString;
+            });
 
             services.AddOptions<EndpointOptions>()
                 .Configure<IOptions<SiloOptions>>((options, siloOptions) =>
@@ -225,6 +234,7 @@ namespace Orleans.Hosting
                 SystemTarget fallbackSystemTarget = sp.GetRequiredService<FallbackSystemTarget>();
                 return (taskFunc) => scheduler.QueueTask(taskFunc, fallbackSystemTarget.SchedulingContext);
             });
+
             LegacyProviderConfigurator<ISiloLifecycle>.ConfigureServices(configuration.Globals.ProviderConfigurations, services, SiloDefaultProviderInitStage, SiloDefaultProviderStartStage);
 
             services.AddOptions<GrainPlacementOptions>().Configure<GlobalConfiguration>((options, config) =>
@@ -281,21 +291,13 @@ namespace Orleans.Hosting
                 {
                     options.IsRunningAsUnitTest = config.IsRunningAsUnitTest;
                 });
-
-            services.AddOptions<ReminderOptions>()
+            LegacyRemindersConfigurator.Configure(configuration.Globals, services);
+            
+            services.AddOptions<GrainVersioningOptions>()
                 .Configure<GlobalConfiguration>((options, config) =>
                 {
-                    options.ReminderService = GlobalConfiguration.Remap(config.ReminderServiceType);
-                    options.ReminderTableAssembly = config.ReminderTableAssembly;
-                    options.UseMockReminderTable = config.UseMockReminderTable;
-                    options.MockReminderTableTimeout = config.MockReminderTableTimeout;
-                });
-
-            services.AddOptions<VersioningOptions>()
-                .Configure<GlobalConfiguration>((options, config) =>
-                {
-                    options.DefaultCompatibilityStrategy = config.DefaultCompatibilityStrategy?.GetType().Name ?? VersioningOptions.DEFAULT_COMPATABILITY_STRATEGY;
-                    options.DefaultVersionSelectorStrategy = config.DefaultVersionSelectorStrategy?.GetType().Name ?? VersioningOptions.DEFAULT_VERSION_SELECTOR_STRATEGY;
+                    options.DefaultCompatibilityStrategy = config.DefaultCompatibilityStrategy?.GetType().Name ?? GrainVersioningOptions.DEFAULT_COMPATABILITY_STRATEGY;
+                    options.DefaultVersionSelectorStrategy = config.DefaultVersionSelectorStrategy?.GetType().Name ?? GrainVersioningOptions.DEFAULT_VERSION_SELECTOR_STRATEGY;
                 });
 
             services.AddOptions<ThreadPoolOptions>()
@@ -312,20 +314,6 @@ namespace Orleans.Hosting
                     options.UseNagleAlgorithm = config.UseNagleAlgorithm;
                 });
 
-            services.AddOptions<StorageOptions>()
-                .Configure<GlobalConfiguration>((options, config) =>
-                {
-                    options.DataConnectionString = config.DataConnectionString;
-                    options.DataConnectionStringForReminders = config.DataConnectionStringForReminders;
-                });
-
-            services.AddOptions<AdoNetOptions>()
-                .Configure<GlobalConfiguration>((options, config) =>
-                {
-                    options.Invariant = config.AdoInvariant;
-                    options.InvariantForReminders = config.AdoInvariantForReminders;
-                });
-
             services.AddOptions<TypeManagementOptions>()
                 .Configure<GlobalConfiguration>((options, config) =>
                 {
@@ -335,7 +323,7 @@ namespace Orleans.Hosting
             services.AddOptions<GrainDirectoryOptions>()
                 .Configure<GlobalConfiguration>((options, config) =>
                 {
-                    options.CachingStrategy = GlobalConfiguration.Remap(config.DirectoryCachingStrategy);
+                    options.CachingStrategy = Remap(config.DirectoryCachingStrategy);
                     options.CacheSize = config.CacheSize;
                     options.InitialCacheTTL = config.InitialCacheTTL;
                     options.MaximumCacheTTL = config.MaximumCacheTTL;
@@ -351,6 +339,21 @@ namespace Orleans.Hosting
             return services
                 .FirstOrDefault(s => s.ServiceType == typeof(ClusterConfiguration))
                 ?.ImplementationInstance as ClusterConfiguration;
+        }
+
+        private static GrainDirectoryOptions.CachingStrategyType Remap(GlobalConfiguration.DirectoryCachingStrategyType type)
+        {
+            switch (type)
+            {
+                case GlobalConfiguration.DirectoryCachingStrategyType.None:
+                    return GrainDirectoryOptions.CachingStrategyType.None;
+                case GlobalConfiguration.DirectoryCachingStrategyType.LRU:
+                    return GrainDirectoryOptions.CachingStrategyType.LRU;
+                case GlobalConfiguration.DirectoryCachingStrategyType.Adaptive:
+                    return GrainDirectoryOptions.CachingStrategyType.Adaptive;
+                default:
+                    throw new NotSupportedException($"DirectoryCachingStrategyType {type} is not supported");
+            }
         }
     }
 }
