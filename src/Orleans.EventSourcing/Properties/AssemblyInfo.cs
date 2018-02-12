@@ -8,6 +8,3 @@ using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("LoadTestGrains")]
 [assembly: InternalsVisibleTo("TesterInternal")]
-[assembly: InternalsVisibleTo("UnitTestGrainInterfaces")]
-[assembly: InternalsVisibleTo("UnitTestGrains")]
-[assembly: InternalsVisibleTo("UnitTests")]

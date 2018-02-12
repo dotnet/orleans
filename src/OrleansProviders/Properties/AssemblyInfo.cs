@@ -8,8 +8,7 @@ using Orleans.Providers.Streams.Generator;
 [assembly: InternalsVisibleTo("Tester.AdoNet")]
 [assembly: InternalsVisibleTo("TesterInternal")]
 [assembly: InternalsVisibleTo("TestExtensions")]
-[assembly: InternalsVisibleTo("UnitTestGrains")]
-[assembly: InternalsVisibleTo("UnitTests")]
+[assembly: InternalsVisibleTo("DefaultCluster.Tests")]
 
 [assembly: KnownAssembly(typeof(EventSequenceTokenV2), TreatTypesAsSerializable = true)]
 
