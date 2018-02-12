@@ -56,12 +56,12 @@ namespace Orleans.Hosting
 
         public static ISiloHostBuilder ConfigureEndpoints(
             this ISiloHostBuilder builder, 
-            string addrOrHost, 
+            string hostname, 
             int siloPort, 
             int proxyPort,
             AddressFamily addressFamily = AddressFamily.InterNetwork)
         {
-            var ip = ConfigUtilities.ResolveIPAddress(addrOrHost, null, addressFamily).Result;
+            var ip = ConfigUtilities.ResolveIPAddress(hostname, null, addressFamily).Result;
             return builder.ConfigureEndpoints(ip, siloPort, proxyPort);
         }
 
