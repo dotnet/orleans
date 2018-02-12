@@ -12,7 +12,7 @@ namespace Orleans.Hosting
         /// <summary>
         /// The IP address used for clustering.
         /// </summary>
-        public IPAddress IPAddress { get; set; }
+        public IPAddress AdvertisedIPAddress { get; set; }
 
         /// <summary>
         /// The port this silo uses for silo-to-silo communication.
@@ -26,13 +26,13 @@ namespace Orleans.Hosting
 
         /// <summary>
         /// The endpoint used to listen for silo to silo communication. 
-        /// If not set will default to <see cref="IPAddress"/> + <see cref="SiloPort"/>
+        /// If not set will default to <see cref="AdvertisedIPAddress"/> + <see cref="SiloPort"/>
         /// </summary>
         public IPEndPoint SiloListeningEndpoint { get; set; }
 
         /// <summary>
         /// The endpoint used to listen for silo to silo communication. 
-        /// If not set will default to <see cref="IPAddress"/> + <see cref="ProxyPort"/>
+        /// If not set will default to <see cref="AdvertisedIPAddress"/> + <see cref="ProxyPort"/>
         /// </summary>
         public IPEndPoint ProxyListeningEndpoint { get; set; }
     }
@@ -47,7 +47,7 @@ namespace Orleans.Hosting
         {
             builder.Configure<EndpointOptions>(options =>
             {
-                options.IPAddress = ip;
+                options.AdvertisedIPAddress = ip;
                 options.ProxyPort = proxyPort;
                 options.SiloPort = siloPort;
             });
@@ -76,13 +76,13 @@ namespace Orleans.Hosting
 
         internal static IPEndPoint GetPublicSiloEndpoint(this EndpointOptions options)
         {
-            return new IPEndPoint(options.IPAddress, options.SiloPort);
+            return new IPEndPoint(options.AdvertisedIPAddress, options.SiloPort);
         }
 
         internal static IPEndPoint GetPublicProxyEndpoint(this EndpointOptions options)
         {
             return options.ProxyPort != 0 
-                ? new IPEndPoint(options.IPAddress, options.ProxyPort)
+                ? new IPEndPoint(options.AdvertisedIPAddress, options.ProxyPort)
                 : null;
         }
 

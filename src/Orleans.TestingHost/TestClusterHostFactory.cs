@@ -127,7 +127,7 @@ namespace Orleans.TestingHost
 
             services.Configure<EndpointOptions>(options =>
             {
-                options.IPAddress = IPAddress.Loopback;
+                options.AdvertisedIPAddress = IPAddress.Loopback;
                 options.SiloPort = siloPort;
                 options.ProxyPort = gatewayPort;
             });
