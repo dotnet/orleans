@@ -34,7 +34,7 @@ namespace Orleans.Hosting
         /// The endpoint used to listen for silo to silo communication. 
         /// If not set will default to <see cref="AdvertisedIPAddress"/> + <see cref="GatewayPort"/>
         /// </summary>
-        public IPEndPoint ProxyListeningEndpoint { get; set; }
+        public IPEndPoint GatewayListeningEndpoint { get; set; }
     }
 
     public static class EndpointOptionsExtensions
@@ -98,8 +98,8 @@ namespace Orleans.Hosting
             if (options.GatewayPort == 0)
                 return null;
 
-            return options.ProxyListeningEndpoint != null
-                ? options.ProxyListeningEndpoint
+            return options.GatewayListeningEndpoint != null
+                ? options.GatewayListeningEndpoint
                 : options.GetPublicProxyEndpoint();
         }
     }
