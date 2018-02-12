@@ -307,20 +307,6 @@ namespace OrleansClient
 
 We are not going into details about the grain implementation here since it is out of the scope of this article. Please check other documents related to it. Those files are essentially a minimal Orleans application and we will start from it to move forward with the remaining of this article.
 
-## Gateway configuration
-
-You may have noticed that we are not using the membership provider in our client configuration. The reason for that (and I figured out after days suffering and talking with Docker folks) is because the way our `client -> membership -> gateway(s) -> silo` works, is not _compatible_ with the way [Docker overlay network](https://docs.docker.com/engine/userguide/networking/get-started-overlay/) is designed. 
-
-The way we found to workaround this *limitation*, is to manually add a gateway yourself to the client configuration like this:
-
-```csharp
-var hostEntry = await Dns.GetHostEntryAsync("orleans-silo");
-var ip = hostEntry.AddressList[0];
-config.Gateways.Add(new IPEndPoint(ip, 10400));
-```
-
-The string `orleans-silo` here, is essentially the **service name** used in `docker-compose`, which we will dig into more details later on (keep reading!). It will resolve to one of the containers' ips inside that same service (like a Load Balancer). In a docker-compose project, a service is a group of multiple (exactly equal) instances of a give container. For example, we will have a service for our `OrleansSilo` project. Within that service, we will be able to scale the service up and down horizontally and adding each of those containers to the Orleans cluster automatically respecting Orleans Membership Protocol. More on that later.
-
 > **Note**: In this article we are using `OrleansAzureUtils` membership provider but you can use any other already supported by Orleans.
 
 # Dockerfile
