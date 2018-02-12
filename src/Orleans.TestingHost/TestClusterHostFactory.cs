@@ -129,7 +129,7 @@ namespace Orleans.TestingHost
             {
                 options.AdvertisedIPAddress = IPAddress.Loopback;
                 options.SiloPort = siloPort;
-                options.ProxyPort = gatewayPort;
+                options.GatewayPort = gatewayPort;
             });
         }
 

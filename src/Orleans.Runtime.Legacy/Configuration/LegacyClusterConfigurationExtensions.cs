@@ -172,9 +172,9 @@ namespace Orleans.Hosting
                         options.AdvertisedIPAddress = nodeConfig.Endpoint.Address;
                         options.SiloPort = nodeConfig.Endpoint.Port;
                     }
-                    if (options.ProxyPort == 0 && nodeConfig.ProxyGatewayEndpoint != null)
+                    if (options.GatewayPort == 0 && nodeConfig.ProxyGatewayEndpoint != null)
                     {
-                        options.ProxyPort = nodeConfig.ProxyGatewayEndpoint.Port;
+                        options.GatewayPort = nodeConfig.ProxyGatewayEndpoint.Port;
                     }
                 });
 
