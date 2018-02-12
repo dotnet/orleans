@@ -72,8 +72,6 @@ namespace Orleans.Hosting
 
     public class SchedulingOptionsFormatter : IOptionFormatter<SchedulingOptions>
     {
-        public string Category { get; }
-
         public string Name => nameof(SchedulingOptions);
 
         private SchedulingOptions options;

@@ -10,23 +10,51 @@ using Orleans.Runtime.ConsistentRing;
 using Orleans.Storage;
 using Orleans.Hosting;
 using Orleans.Runtime.Counters;
+using Orleans.Statistics;
 using Orleans.Streams;
 
 namespace Orleans.Runtime.TestHooks
 {
+    /// <summary>
+    /// A fake, test-only implementation of <see cref="IHostEnvironmentStatistics"/>.
+    /// </summary>
+    public class TestHooksHostEnvironmentStatistics : IHostEnvironmentStatistics
+    {
+        /// <inheritdoc />
+        public long? TotalPhysicalMemory { get; set; }
+
+        /// <inheritdoc />
+        public float? CpuUsage { get; set; }
+
+        /// <inheritdoc />
+        public long? AvailableMemory { get; set; }
+    }
+
     /// <summary>
     /// Test hook functions for white box testing implemented as a SystemTarget
     /// </summary>
     internal class TestHooksSystemTarget : SystemTarget, ITestHooksSystemTarget
     {
         private readonly ISiloHost host;
+
+        private readonly TestHooksHostEnvironmentStatistics hostEnvironmentStatistics;
+
+        private readonly LoadSheddingOptions loadSheddingOptions;
+
         private readonly IConsistentRingProvider consistentRingProvider;
 
-        public TestHooksSystemTarget(ISiloHost host, ILocalSiloDetails siloDetails, ILoggerFactory loggerFactory)
+        public TestHooksSystemTarget(
+            ISiloHost host,
+            ILocalSiloDetails siloDetails,
+            ILoggerFactory loggerFactory,
+            TestHooksHostEnvironmentStatistics hostEnvironmentStatistics,
+            IOptions<LoadSheddingOptions> loadSheddingOptions)
             : base(Constants.TestHooksSystemTargetId, siloDetails.SiloAddress, loggerFactory)
         {
             this.host = host;
-            consistentRingProvider = this.host.Services.GetRequiredService<IConsistentRingProvider>();
+            this.hostEnvironmentStatistics = hostEnvironmentStatistics;
+            this.loadSheddingOptions = loadSheddingOptions.Value;
+            this.consistentRingProvider = this.host.Services.GetRequiredService<IConsistentRingProvider>();
         }
 
         public Task<SiloAddress> GetConsistentRingPrimaryTargetSilo(uint key)
@@ -36,7 +64,7 @@ namespace Orleans.Runtime.TestHooks
 
         public Task<string> GetConsistentRingProviderDiagnosticInfo()
         {
-            return Task.FromResult(consistentRingProvider.ToString());
+            return Task.FromResult(consistentRingProvider.ToString()); 
         }
 
         public Task<bool> HasStatisticsProvider() => Task.FromResult(this.host.Services.GetServices<IStatisticsPublisher>() != null);
@@ -83,15 +111,32 @@ namespace Orleans.Runtime.TestHooks
         
         public Task LatchIsOverloaded(bool overloaded, TimeSpan latchPeriod)
         {
-            this.host.Services.GetRequiredService<SiloStatisticsManager>().MetricsTable.LatchIsOverload(overloaded);
-            
-            Task.Delay(latchPeriod).ContinueWith(t => UnlatchIsOverloaded()).Ignore();
+            if (overloaded)
+            {
+                this.LatchCpuUsage(this.loadSheddingOptions.LoadSheddingLimit + 1, latchPeriod);
+            }
+            else
+            {
+                this.LatchCpuUsage(this.loadSheddingOptions.LoadSheddingLimit - 1, latchPeriod);
+            }
+
             return Task.CompletedTask;
         }
 
-        private void UnlatchIsOverloaded()
+        private void LatchCpuUsage(float? cpuUsage, TimeSpan latchPeriod)
         {
-            this.host.Services.GetRequiredService<SiloStatisticsManager>().MetricsTable.UnlatchIsOverloaded();
+            var previousValue = this.hostEnvironmentStatistics.CpuUsage;
+            this.hostEnvironmentStatistics.CpuUsage = cpuUsage;
+            Task.Delay(latchPeriod).ContinueWith(t =>
+                {
+                    var currentCpuUsage = this.hostEnvironmentStatistics.CpuUsage;
+
+                    // ReSharper disable once CompareOfFloatsByEqualityOperator
+                    if (currentCpuUsage == cpuUsage)
+                    {
+                        this.hostEnvironmentStatistics.CpuUsage = previousValue;
+                    }
+                }).Ignore();
         }
     }
 }

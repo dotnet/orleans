@@ -16,6 +16,7 @@ namespace UnitTests.GrainInterfaces
         Task<Guid> StartPreferLocalGrain(Guid key);
         Task<List<IPEndPoint>> SampleLocalGrainEndpoint(Guid key, int sampleSize);
         Task Nop();
+        Task EnableOverloadDetection(bool enabled);
         Task LatchOverloaded();
         Task UnlatchOverloaded();
         Task LatchCpuUsage(float value);

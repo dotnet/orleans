@@ -22,6 +22,7 @@ using Orleans.Runtime.LogConsistency;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.MultiClusterNetwork;
 using Orleans.Runtime.Providers;
+using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Scheduler;
 using Orleans.Services;
 using Orleans.Streams;
@@ -91,7 +92,6 @@ namespace Orleans.Runtime
         internal ILocalGrainDirectory LocalGrainDirectory { get { return localGrainDirectory; } }
         internal IMultiClusterOracle LocalMultiClusterOracle { get { return multiClusterOracle; } }
         internal IConsistentRingProvider RingProvider { get; private set; }
-        internal ISiloPerformanceMetrics Metrics { get { return siloStatistics.MetricsTable; } }
         internal ICatalog Catalog => catalog;
 
         internal SystemStatus SystemStatus { get; set; }
@@ -206,10 +206,6 @@ namespace Orleans.Runtime
             RingProvider = Services.GetRequiredService<IConsistentRingProvider>();
 
             catalog = Services.GetRequiredService<Catalog>();
-            siloStatistics.MetricsTable.Scheduler = scheduler;
-            siloStatistics.MetricsTable.ActivationDirectory = activationDirectory;
-            siloStatistics.MetricsTable.ActivationCollector = catalog.ActivationCollector;
-            siloStatistics.MetricsTable.MessageCenter = messageCenter;
 
             executorService = Services.GetRequiredService<ExecutorService>();
 
@@ -350,14 +346,14 @@ namespace Orleans.Runtime
 
             this.membershipOracle.SubscribeToSiloStatusEvents(Services.GetRequiredService<ClientObserverRegistrar>());
 
-            IOptions<ReminderOptions> reminderOptions = this.Services.GetRequiredService<IOptions<ReminderOptions>>();
-            if (!reminderOptions.Value.ReminderService.Equals(ReminderOptions.BuiltIn.Disabled))
+            var reminderTable = Services.GetService<IReminderTable>();
+            if (reminderTable != null)
             {
-                // start the reminder service system target
-                reminderService = Services.GetRequiredService<LocalReminderServiceFactory>()
-                                          .CreateReminderService(this, initTimeout, this.runtimeClient);
-                var reminderServiceSystemTarget = this.reminderService as SystemTarget;
-                if (reminderServiceSystemTarget != null) RegisterSystemTarget(reminderServiceSystemTarget);
+                logger.Info($"Creating reminder grain service for type={reminderTable.GetType()}");
+                
+                // Start the reminder service system target
+                reminderService = new LocalReminderService(this, reminderTable, this.initTimeout, this.loggerFactory); ;
+                RegisterSystemTarget((SystemTarget)reminderService);
             }
 
             RegisterSystemTarget(catalog);
@@ -436,8 +432,7 @@ namespace Orleans.Runtime
                 var grainTypeManager = Services.GetRequiredService<GrainTypeManager>();
                 implicitStreamSubscriberTable.InitImplicitStreamSubscribers(grainTypeManager.GrainClassTypeData.Select(t => t.Value.Type).ToArray());
             }
-
-
+            
             var siloProviderRuntime = Services.GetRequiredService<SiloProviderRuntime>();
             SiloStatisticsOptions statisticsOptions = Services.GetRequiredService<IOptions<SiloStatisticsOptions>>().Value;
             runtimeClient.CurrentStreamProviderRuntime = siloProviderRuntime;
@@ -445,9 +440,8 @@ namespace Orleans.Runtime
             async Task LoadStatsProvider()
             {
                 // can call SetSiloMetricsTableDataManager only after MessageCenter is created (dependency on this.SiloAddress).
-                await siloStatistics.SetSiloStatsTableDataManager(this, statisticsOptions).WithTimeout(initTimeout, $"SiloStatistics Setting SiloStatsTableDataManager failed due to timeout {initTimeout}");
-                await siloStatistics.SetSiloMetricsTableDataManager(this, statisticsOptions).WithTimeout(initTimeout,
-                    $"SiloStatistics Setting SiloMetricsTableDataManager failed due to timeout {initTimeout}");
+                await siloStatistics.SetSiloStatsTableDataManager(this, statisticsOptions)
+                    .WithTimeout(initTimeout, $"SiloStatistics Setting SiloStatsTableDataManager failed due to timeout {initTimeout}");
             }
             
             // This has to follow the above steps that start the runtime components

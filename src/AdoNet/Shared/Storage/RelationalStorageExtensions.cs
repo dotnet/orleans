@@ -30,7 +30,7 @@ namespace Orleans.Statistics.AdoNet.Storage
         /// <summary>
         /// Used to format .NET objects suitable to relational database format.
         /// </summary>
-        private static readonly SqlFormatProvider sqlFormatProvider = new SqlFormatProvider();
+        private static readonly AdoNetFormatProvider adoNetFormatProvider = new AdoNetFormatProvider();
 
         /// <summary>
         /// This is a template to produce query parameters that are indexed.
@@ -97,7 +97,7 @@ namespace Orleans.Statistics.AdoNet.Storage
                         }
                         else
                         {
-                            onlyOnceRow.Add(string.Format(sqlFormatProvider, "{0}", parameterValue));
+                            onlyOnceRow.Add(string.Format(adoNetFormatProvider, "{0}", parameterValue));
                         }
                     }
                 }
@@ -120,7 +120,7 @@ namespace Orleans.Statistics.AdoNet.Storage
                         }
                         else
                         {
-                            dataRows.Add(string.Format(sqlFormatProvider, "{0}", parameterValue));
+                            dataRows.Add(string.Format(adoNetFormatProvider, "{0}", parameterValue));
                         }
                     }
 

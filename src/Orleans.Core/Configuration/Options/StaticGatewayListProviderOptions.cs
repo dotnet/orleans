@@ -17,8 +17,6 @@ namespace Orleans.Configuration.Options
 
     public class StaticGatewayListProviderOptionsFormatter : IOptionFormatter<StaticGatewayListProviderOptions>
     {
-        public string Category { get; }
-
         public string Name => nameof(StaticGatewayListProviderOptions);
 
         private StaticGatewayListProviderOptions options;

@@ -26,8 +26,6 @@ namespace Orleans.Hosting
 
     public class GrainVersioningOptionsFormatter : IOptionFormatter<GrainVersioningOptions>
     {
-        public string Category { get; }
-
         public string Name => nameof(GrainVersioningOptions);
 
         private GrainVersioningOptions options;

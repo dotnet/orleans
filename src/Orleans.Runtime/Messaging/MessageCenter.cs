@@ -32,7 +32,6 @@ namespace Orleans.Runtime.Messaging
         private readonly ExecutorService executorService;
 
         internal bool IsBlockingApplicationMessages { get; private set; }
-        internal ISiloPerformanceMetrics Metrics { get; private set; }
         
         public bool IsProxying { get { return Gateway != null; } }
 
@@ -50,7 +49,6 @@ namespace Orleans.Runtime.Messaging
             IOptions<SiloMessagingOptions> messagingOptions,
             IOptions<NetworkingOptions> networkingOptions,
             SerializationManager serializationManager,
-            ISiloPerformanceMetrics metrics,
             MessageFactory messageFactory,
             Factory<MessageCenter, Gateway> gatewayFactory,
             ExecutorService executorService,
@@ -62,14 +60,14 @@ namespace Orleans.Runtime.Messaging
             this.messageFactory = messageFactory;
             this.executorService = executorService;
             this.MyAddress = siloDetails.SiloAddress;
-            this.Initialize(endpointOptions, messagingOptions, networkingOptions, metrics);
+            this.Initialize(endpointOptions, messagingOptions, networkingOptions);
             if (siloDetails.GatewayAddress != null)
             {
                 Gateway = gatewayFactory(this);
             }
         }
 
-        private void Initialize(IOptions<EndpointOptions> endpointOptions, IOptions<SiloMessagingOptions> messagingOptions, IOptions<NetworkingOptions> networkingOptions, ISiloPerformanceMetrics metrics = null)
+        private void Initialize(IOptions<EndpointOptions> endpointOptions, IOptions<SiloMessagingOptions> messagingOptions, IOptions<NetworkingOptions> networkingOptions)
         {
             if(log.IsEnabled(LogLevel.Trace)) log.Trace("Starting initialization.");
 
@@ -78,7 +76,6 @@ namespace Orleans.Runtime.Messaging
             ima = new IncomingMessageAcceptor(this, listeningEndpoint, SocketDirection.SiloToSilo, this.messageFactory, this.serializationManager, this.executorService, this.loggerFactory);
             InboundQueue = new InboundMessageQueue(this.loggerFactory);
             OutboundQueue = new OutboundMessageQueue(this, messagingOptions, this.serializationManager, this.executorService, this.loggerFactory);
-            Metrics = metrics;
             
             sendQueueLengthCounter = IntValueStatistic.FindOrCreate(StatisticNames.MESSAGE_CENTER_SEND_QUEUE_LENGTH, () => SendQueueLength);
             receiveQueueLengthCounter = IntValueStatistic.FindOrCreate(StatisticNames.MESSAGE_CENTER_RECEIVE_QUEUE_LENGTH, () => ReceiveQueueLength);

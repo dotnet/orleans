@@ -24,8 +24,6 @@ namespace Orleans.Hosting
 
     public class NetworkingOptionsFormatter : IOptionFormatter<NetworkingOptions>
     {
-        public string Category { get; }
-
         public string Name => nameof(NetworkingOptions);
 
         private NetworkingOptions options;

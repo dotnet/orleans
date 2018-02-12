@@ -781,7 +781,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
                 || (myStatus.Status == GatewayStatus.Active
                       && myStatus.HeartbeatTimestamp - existingEntry.HeartbeatTimestamp > this.resendActiveStatusAfter))
             {
-                logger.Trace("-InjectLocalStatus {0}", myStatus);
+                logger.Info($"Report as {myStatus}");
 
                 // update current data with status
                 var delta = this.localData.ApplyDataAndNotify(new MultiClusterData(myStatus));

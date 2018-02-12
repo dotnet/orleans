@@ -25,8 +25,6 @@ namespace Orleans.Hosting
 
     public class GrainPlacementOptionsFormatter : IOptionFormatter<GrainPlacementOptions>
     {
-        public string Category { get; }
-
         public string Name => nameof(GrainPlacementOptions);
 
         private GrainPlacementOptions options;

@@ -917,6 +917,9 @@ namespace Orleans
         Provider_ProviderNotControllable        = ProviderManagerBase + 16,
         Provider_CatalogNoLogConsistencyProvider       = ProviderManagerBase + 17,
         Provider_CatalogLogConsistencyProviderAllocated = ProviderManagerBase + 18,
+        Provider_ErrorFromClose                  = ProviderManagerBase + 19,
+        Provider_ErrorFromStart                  = ProviderManagerBase + 20,
+        Provider_ErrorFromStop                   = ProviderManagerBase + 21,
 
         PersistentStreamPullingAgentBase = Runtime + 3300,
         PersistentStreamPullingAgent_01 = PersistentStreamPullingAgentBase + 1,

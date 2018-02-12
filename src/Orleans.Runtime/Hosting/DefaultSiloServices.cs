@@ -70,6 +70,7 @@ namespace Orleans.Hosting
 
             services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
             services.TryAddSingleton<IHostEnvironmentStatistics, NoOpHostEnvironmentStatistics>();
+            services.TryAddSingleton<OverloadDetector>();
 
             services.TryAddSingleton<ExecutorService>();
             // queue balancer contructing related
@@ -95,12 +96,11 @@ namespace Orleans.Hosting
             services.TryAddSingleton<IGrainReferenceRuntime, GrainReferenceRuntime>();
             services.TryAddSingleton<TypeMetadataCache>();
             services.TryAddSingleton<ActivationDirectory>();
+            services.TryAddSingleton<ActivationCollector>();
             services.TryAddSingleton<LocalGrainDirectory>();
             services.TryAddFromExisting<ILocalGrainDirectory, LocalGrainDirectory>();
             services.TryAddSingleton(sp => sp.GetRequiredService<LocalGrainDirectory>().GsiActivationMaintainer);
             services.TryAddSingleton<SiloStatisticsManager>();
-            services.TryAddSingleton<ISiloPerformanceMetrics>(sp => sp.GetRequiredService<SiloStatisticsManager>().MetricsTable);
-            services.TryAddFromExisting<ICorePerformanceMetrics, ISiloPerformanceMetrics>();
             services.TryAddSingleton<GrainTypeManager>();
             services.TryAddSingleton<MessageCenter>();
             services.TryAddFromExisting<IMessageCenter, MessageCenter>();
@@ -119,9 +119,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<MembershipOracle>();
             services.TryAddFromExisting<IMembershipOracle, MembershipOracle>();
             services.TryAddFromExisting<ISiloStatusOracle, MembershipOracle>();
-            services.TryAddSingleton<ReminderTableFactory>();
-            services.TryAddSingleton<IReminderTable>(sp => sp.GetRequiredService<ReminderTableFactory>().Create());
-            services.TryAddSingleton<LocalReminderServiceFactory>();
             services.TryAddSingleton<ClientObserverRegistrar>();
             services.TryAddSingleton<SiloProviderRuntime>();
             services.TryAddFromExisting<IStreamProviderRuntime, SiloProviderRuntime>();
@@ -233,7 +230,7 @@ namespace Orleans.Hosting
             applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<SerializerFeature>());
             services.AddTransient<IConfigurationValidator, ApplicationPartValidator>();
 
-            //Add default option formatter if none is configured, for options which are requied to be configured 
+            //Add default option formatter if none is configured, for options which are required to be configured 
             services.TryConfigureFormatter<SiloOptions, SiloOptionsFormatter>();
             services.TryConfigureFormatter<SchedulingOptions, SchedulingOptionsFormatter>();
             services.TryConfigureFormatter<ThreadPoolOptions, ThreadPoolOptionsFormatter>();
@@ -249,9 +246,7 @@ namespace Orleans.Hosting
             services.TryConfigureFormatter<ConsistentRingOptions, ConsistentRingOptionsFormatter>();
             services.TryConfigureFormatter<MultiClusterOptions, MultiClusterOptionsFormatter>();
             services.TryConfigureFormatter<SiloStatisticsOptions, SiloStatisticsOptionsFormatter>();
-            services.TryConfigureFormatter<AdoNetOptions, AdoNetOptionsFormatter>();
             services.TryConfigureFormatter<GrainServiceOptions, GrainServiceOptionsFormatter>();
-            services.TryConfigureFormatter<ReminderOptions, ReminderOptionsFormatter>();
             services.TryConfigureFormatter<ServicePointOptions, ServicePointOptionsFormatter>();
             services.TryConfigureFormatter<TelemetryOptions, TelemetryOptionsFormatter>();
             services.TryConfigureFormatter<LoadSheddingOptions, LoadSheddingOptionsFormatter>();

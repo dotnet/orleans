@@ -26,12 +26,14 @@ namespace UnitTests.RemindersTest
         private readonly IReminderTable remindersTable;
         protected ILoggerFactory loggerFactory;
         protected IOptions<SiloOptions> siloOptions;
-        protected IOptions<StorageOptions> storageOptions;
-        protected IOptions<AdoNetOptions> adoNetOptions;
+
+        protected ConnectionStringFixture connectionStringFixture;
+
         protected const string testDatabaseName = "OrleansReminderTest";//for relational storage
 
         protected ReminderTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture clusterFixture, LoggerFilterOptions filters)
         {
+            this.connectionStringFixture = fixture;
             fixture.InitializeConnectionStringAccessor(GetConnectionString);
             loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType()}.log", filters);
             this.ClusterFixture = clusterFixture;
@@ -41,17 +43,7 @@ namespace UnitTests.RemindersTest
 
             logger.Info("ClusterId={0}", clusterId);
             this.siloOptions = Options.Create(new SiloOptions { ClusterId = clusterId, ServiceId = serviceId });
-            this.storageOptions = Options.Create(new StorageOptions { DataConnectionStringForReminders = fixture.ConnectionString });
-            this.adoNetOptions = Options.Create(new AdoNetOptions() { InvariantForReminders = GetAdoInvariant() });
-
-            var globalConfiguration = new GlobalConfiguration
-            {
-                ServiceId = serviceId,
-                ClusterId = clusterId,
-                AdoInvariantForReminders = GetAdoInvariant(),
-                DataConnectionStringForReminders = fixture.ConnectionString
-            };
-
+            
             var rmndr = CreateRemindersTable();
             rmndr.Init().WithTimeout(TimeSpan.FromMinutes(1)).Wait();
             remindersTable = rmndr;

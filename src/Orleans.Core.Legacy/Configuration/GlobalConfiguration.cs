@@ -52,9 +52,9 @@ namespace Orleans.Runtime.Configuration
             /// <summary>AzureTable is used to store membership information. 
             /// This option can be used in production.</summary>
             AzureTable,
-            /// <summary>SQL Server is used to store membership information. 
+            /// <summary>ADO.NET is used to store membership information. 
             /// This option can be used in production.</summary>
-            SqlServer,
+            AdoNet,
             /// <summary>Apache ZooKeeper is used to store membership information. 
             /// This option can be used in production.</summary>
             ZooKeeper,
@@ -75,9 +75,9 @@ namespace Orleans.Runtime.Configuration
             /// <summary>AzureTable is used to store reminders information. 
             /// This option can be used in production.</summary>
             AzureTable,
-            /// <summary>SQL Server is used to store reminders information. 
+            /// <summary>ADO.NET is used to store reminders information. 
             /// This option can be used in production.</summary>
-            SqlServer,
+            AdoNet,
             /// <summary>Used for benchmarking; it simply delays for a specified delay during each operation.</summary>
             MockTable,
             /// <summary>Reminder Service is disabled.</summary>
@@ -470,13 +470,13 @@ namespace Orleans.Runtime.Configuration
         /// Determines if ADO should be used for storage of Membership and Reminders info.
         /// True if either or both of LivenessType and ReminderServiceType are set to SqlServer, false otherwise.
         /// </summary>
-        public bool UseSqlSystemStore
+        public bool UseAdoNetSystemStore
         {
             get
             {
                 return !string.IsNullOrWhiteSpace(this.DataConnectionString) && (
-                    (this.LivenessEnabled && this.LivenessType == LivenessProviderType.SqlServer)
-                    || this.ReminderServiceType == ReminderServiceProviderType.SqlServer);
+                    (this.LivenessEnabled && this.LivenessType == LivenessProviderType.AdoNet)
+                    || this.ReminderServiceType == ReminderServiceProviderType.AdoNet);
             }
         }
 
@@ -502,7 +502,7 @@ namespace Orleans.Runtime.Configuration
             get
             {
                 return !string.IsNullOrWhiteSpace(this.DataConnectionString)
-                       && !this.UseSqlSystemStore && !this.UseZooKeeperSystemStore;
+                       && !this.UseAdoNetSystemStore && !this.UseZooKeeperSystemStore;
             }
         }
 
@@ -1078,17 +1078,16 @@ namespace Orleans.Runtime.Configuration
             ProviderConfigurationUtility.RegisterProvider(this.ProviderConfigurations, ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
         }
 
-        public void RegisterStatisticsProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IStatisticsPublisher, ISiloMetricsDataPublisher
+        public void RegisterStatisticsProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IStatisticsPublisher
         {
             Type providerType = typeof(T);
             var providerTypeInfo = providerType.GetTypeInfo();
-            if (providerTypeInfo.IsAbstract ||
-                providerTypeInfo.IsGenericType ||
-                !(
-                typeof(IStatisticsPublisher).IsAssignableFrom(providerType) &&
-                typeof(ISiloMetricsDataPublisher).IsAssignableFrom(providerType)
-                ))
+            if (providerTypeInfo.IsAbstract
+                || providerTypeInfo.IsGenericType
+                || !typeof(IStatisticsPublisher).IsAssignableFrom(providerType))
+            {
                 throw new ArgumentException("Expected non-generic, non-abstract type which implements IStatisticsPublisher, ISiloMetricsDataPublisher interface", "typeof(T)");
+            }
 
             ProviderConfigurationUtility.RegisterProvider(this.ProviderConfigurations, ProviderCategoryConfiguration.STATISTICS_PROVIDER_CATEGORY_NAME, providerTypeInfo.FullName, providerName, properties);
         }

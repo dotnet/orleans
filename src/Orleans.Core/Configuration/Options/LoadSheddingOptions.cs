@@ -25,8 +25,6 @@ namespace Orleans.Hosting
 
     public class LoadSheddingOptionsFormatter : IOptionFormatter<LoadSheddingOptions>
     {
-        public string Category { get; }
-
         public string Name => nameof(LoadSheddingOptions);
 
         private readonly LoadSheddingOptions options;

@@ -30,8 +30,8 @@ namespace Orleans.Runtime.Configuration
             /// <summary>use Azure, requires SystemStore element</summary>
             AzureTable,
 
-            /// <summary>use SQL, requires SystemStore element</summary>
-            SqlServer,
+            /// <summary>use ADO.NET, requires SystemStore element</summary>
+            AdoNet,
 
             /// <summary>use ZooKeeper, requires SystemStore element</summary>
             ZooKeeper,
@@ -154,11 +154,11 @@ namespace Orleans.Runtime.Configuration
 
         /// <summary>
         /// </summary>
-        public bool UseSqlSystemStore
+        public bool UseAdoNetSystemStore
         {
             get
             {
-                return GatewayProvider == GatewayProviderType.SqlServer
+                return GatewayProvider == GatewayProviderType.AdoNet
                 && !String.IsNullOrWhiteSpace(this.ClusterId)
                 && !String.IsNullOrWhiteSpace(DataConnectionString);
             }
@@ -374,17 +374,16 @@ namespace Orleans.Runtime.Configuration
         }
 
 
-        public void RegisterStatisticsProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IStatisticsPublisher, IClientMetricsDataPublisher
+        public void RegisterStatisticsProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IStatisticsPublisher
         {
             TypeInfo providerTypeInfo = typeof(T).GetTypeInfo();
-            if (providerTypeInfo.IsAbstract ||
-                providerTypeInfo.IsGenericType ||
-                providerTypeInfo.IsGenericType ||
-                !(
-                typeof(IStatisticsPublisher).IsAssignableFrom(typeof(T)) &&
-                typeof(IClientMetricsDataPublisher).IsAssignableFrom(typeof(T))
-                ))
-                throw new ArgumentException("Expected non-generic, non-abstract type which implements IStatisticsPublisher, IClientMetricsDataPublisher interface", "typeof(T)");
+            if (providerTypeInfo.IsAbstract
+                || providerTypeInfo.IsGenericType
+                || providerTypeInfo.IsGenericType
+                || !typeof(IStatisticsPublisher).IsAssignableFrom(typeof(T)))
+            {
+                throw new ArgumentException("Expected non-generic, non-abstract type which implements IStatisticsPublisher interface", nameof(T));
+            }
 
             ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STATISTICS_PROVIDER_CATEGORY_NAME, providerTypeInfo.FullName, providerName, properties);
         }
@@ -531,8 +530,8 @@ namespace Orleans.Runtime.Configuration
                     if (!UseAzureSystemStore && !HasStaticGateways)
                         throw new ArgumentException("Config does not specify GatewayProviderType, and also does not have the adequate defaults: no Azure and or Gateway element(s) are specified.","GatewayProvider");
                     break;
-                case GatewayProviderType.SqlServer:
-                    if (!UseSqlSystemStore)
+                case GatewayProviderType.AdoNet:
+                    if (!UseAdoNetSystemStore)
                         throw new ArgumentException("Config specifies SqlServer based GatewayProviderType, but ClusterId or DataConnectionString are not specified or not complete.", "GatewayProvider");
                     break;
                 case GatewayProviderType.ZooKeeper:

@@ -15,10 +15,10 @@ namespace Orleans.Runtime.ReminderService
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         private readonly SiloOptions siloOptions;
-        private readonly StorageOptions storageOptions;
+        private readonly AzureTableReminderStorageOptions storageOptions;
         private RemindersTableManager remTableManager;
 
-        public AzureBasedReminderTable(IGrainReferenceConverter grainReferenceConverter, ILoggerFactory loggerFactory, IOptions<SiloOptions> siloOptions, IOptions<StorageOptions> storageOptions)
+        public AzureBasedReminderTable(IGrainReferenceConverter grainReferenceConverter, ILoggerFactory loggerFactory, IOptions<SiloOptions> siloOptions, IOptions<AzureTableReminderStorageOptions> storageOptions)
         {
             this.grainReferenceConverter = grainReferenceConverter;
             this.logger = loggerFactory.CreateLogger<AzureBasedReminderTable>();
@@ -29,7 +29,7 @@ namespace Orleans.Runtime.ReminderService
 
         public async Task Init()
         {
-            this.remTableManager = await RemindersTableManager.GetManager(this.siloOptions.ServiceId, this.siloOptions.ClusterId, this.storageOptions.DataConnectionStringForReminders, this.loggerFactory);
+            this.remTableManager = await RemindersTableManager.GetManager(this.siloOptions.ServiceId, this.siloOptions.ClusterId, this.storageOptions.ConnectionString, this.loggerFactory);
         }
 
         #region Utility methods

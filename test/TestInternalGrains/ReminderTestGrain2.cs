@@ -204,7 +204,7 @@ namespace UnitTests.Grains
             {
                 period = 12; // azure operations take more time ... so we use a larger period
             }
-            else if (config.Globals.UseSqlSystemStore)
+            else if (config.Globals.UseAdoNetSystemStore)
             {
                 period = 12; // SQL operations are quite fast ... so we use a shorter period
             }

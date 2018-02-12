@@ -22,8 +22,6 @@ namespace Orleans.Hosting
 
     public class SerializationProviderOptionsFormatter : IOptionFormatter<SerializationProviderOptions>
     {
-        public string Category { get; }
-
         public string Name => nameof(SerializationProviderOptions);
         private SerializationProviderOptions options;
         public SerializationProviderOptionsFormatter(IOptions<SerializationProviderOptions> options)

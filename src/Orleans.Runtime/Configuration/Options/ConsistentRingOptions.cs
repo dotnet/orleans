@@ -26,8 +26,6 @@ namespace Orleans.Hosting
 
     public class ConsistentRingOptionsFormatter : IOptionFormatter<ConsistentRingOptions>
     {
-        public string Category { get; }
-
         public string Name => nameof(ConsistentRingOptions);
         private ConsistentRingOptions options;
         public ConsistentRingOptionsFormatter(IOptions<ConsistentRingOptions> options)
