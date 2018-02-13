@@ -1,12 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
+using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Providers.Azure;
 using Orleans.Runtime;
@@ -19,99 +22,32 @@ namespace Orleans.Storage
     /// <summary>
     /// Simple storage provider for writing grain state data to Azure blob storage in JSON format.
     /// </summary>
-    /// <remarks>
-    /// <para>
-    /// Required configuration params: <c>DataConnectionString</c>
-    /// </para>
-    /// <para>
-    /// Optional configuration params:
-    /// <c>ContainerName</c> -- defaults to <c>grainstate</c>
-    /// <c>SerializeTypeNames</c> -- defaults to <c>OrleansGrainState</c>
-    /// <c>PreserveReferencesHandling</c> -- defaults to <c>false</c>
-    /// <c>UseFullAssemblyNames</c> -- defaults to <c>false</c>
-    /// <c>IndentJSON</c> -- defaults to <c>false</c>
-    /// </para>
-    /// </remarks>
-    /// <example>
-    /// Example configuration for this storage provider in OrleansConfiguration.xml file:
-    /// <code>
-    /// &lt;OrleansConfiguration xmlns="urn:orleans">
-    ///   &lt;Globals>
-    ///     &lt;StorageProviders>
-    ///       &lt;Provider Type="Orleans.Storage.AzureBlobStorage" Name="AzureStore"
-    ///         DataConnectionString="UseDevelopmentStorage=true"
-    ///       />
-    ///   &lt;/StorageProviders>
-    /// </code>
-    /// </example>
-    public class AzureBlobStorage : IStorageProvider
+    public class AzureBlobGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
     {
-        internal const string DataConnectionStringPropertyName = "DataConnectionString";
-        internal const string ContainerNamePropertyName = "ContainerName";
-        internal const string ContainerNameDefaultValue = "grainstate";
-
         private JsonSerializerSettings jsonSettings;
 
         private CloudBlobContainer container;
         private ILogger logger;
-        /// <summary> Name of this storage provider instance. </summary>
-        /// <see cref="IProvider.Name"/>
-        public string Name { get; private set; }
+        private AzureBlobStorageOptions options;
+        private SerializationManager serializationManager;
+        private IGrainFactory grainFactory;
+        private ITypeResolver typeResolver;
+        private ILoggerFactory loggerFactory;
 
-        /// <summary> Initialization function for this storage provider. </summary>
-        /// <see cref="IProvider.Init"/>
-        public async Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
+        /// <summary> Default constructor </summary>
+        public AzureBlobGrainStorage(
+            AzureBlobStorageOptions options, 
+            SerializationManager serializationManager, 
+            IGrainFactory grainFactory, 
+            ITypeResolver typeResolver, 
+            ILoggerFactory loggerFactory)
         {
-            var loggerFactory = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>();
-            var loggerName = $"{this.GetType().FullName}.{name}";
-            this.logger = loggerFactory.CreateLogger(loggerName);
-
-            try
-            {
-                this.Name = name;
-                var typeResolver = providerRuntime.ServiceProvider.GetRequiredService<ITypeResolver>();
-                this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(typeResolver, providerRuntime.GrainFactory), config);
-
-                if (!config.Properties.ContainsKey(DataConnectionStringPropertyName)) throw new BadProviderConfigException($"The {DataConnectionStringPropertyName} setting has not been configured in the cloud role. Please add a {DataConnectionStringPropertyName} setting with a valid Azure Storage connection string.");
-
-                var account = CloudStorageAccount.Parse(config.Properties[DataConnectionStringPropertyName]);
-                var blobClient = account.CreateCloudBlobClient();
-                var containerName = config.Properties.ContainsKey(ContainerNamePropertyName) ? config.Properties[ContainerNamePropertyName] : ContainerNameDefaultValue;
-                container = blobClient.GetContainerReference(containerName);
-                await container.CreateIfNotExistsAsync().ConfigureAwait(false);
-
-                logger.Info((int)AzureProviderErrorCode.AzureBlobProvider_InitProvider, "Init: Name={0} ServiceId={1} {2}", name, providerRuntime.ServiceId.ToString(), string.Join(" ", FormatPropertyMessage(config)));
-                logger.Info((int)AzureProviderErrorCode.AzureBlobProvider_ParamConnectionString, "AzureBlobStorage Provider is using DataConnectionString: {0}", ConfigUtilities.RedactConnectionStringInfo(config.Properties["DataConnectionString"]));
-            }
-            catch (Exception ex)
-            {
-                logger.Error((int)AzureProviderErrorCode.AzureBlobProvider_InitProvider, ex.ToString(), ex);
-                throw;
-            }
-        }
-
-        IEnumerable<string> FormatPropertyMessage(IProviderConfiguration config)
-        {
-            var properties = new[]
-            {
-                ContainerNamePropertyName,
-                "SerializeTypeNames",
-                "PreserveReferencesHandling",
-                OrleansJsonSerializer.UseFullAssemblyNamesProperty,
-                OrleansJsonSerializer.IndentJsonProperty
-            };
-            foreach (var property in properties)
-            {
-                if (!config.Properties.ContainsKey(property)) continue;
-                yield return string.Format("{0}={1}", property, config.Properties[property]);
-            }
-        }
-
-        /// <summary> Shutdown this storage provider. </summary>
-        /// <see cref="IProvider.Close"/>
-        public Task Close()
-        {
-            return Task.CompletedTask;
+            this.options = options;
+            this.serializationManager = serializationManager;
+            this.grainFactory = grainFactory;
+            this.typeResolver = typeResolver;
+            this.loggerFactory = loggerFactory;
+            this.logger = this.loggerFactory.CreateLogger<AzureTableGrainStorage>();
         }
 
         /// <summary> Read state data function for this storage provider. </summary>
@@ -253,6 +189,43 @@ namespace Orleans.Storage
             {
                 throw new InconsistentStateException($"Blob storage condition not Satisfied.  BlobName: {blob.Name}, Container: {blob.Container?.Name}, CurrentETag: {currentETag}", "Unknown", currentETag, ex);
             }
+        }
+
+        public void Participate(ISiloLifecycle lifecycle)
+        {
+            lifecycle.Subscribe(this.options.InitStage, Init);
+        }
+
+        /// <summary> Initialization function for this storage provider. </summary>
+        /// <see cref="IProvider.Init"/>
+        private async Task Init(CancellationToken ct)
+        {
+            try
+            {
+                this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(this.typeResolver, this.grainFactory), this.options.UseFullAssemblyNames, this.options.IndentJson, this.options.TypeNameHandling);
+                this.logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_InitProvider, $"AzureTableGrainStorage initializing: {this.options.ToString()}");
+                this.logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_ParamConnectionString, "AzureTableGrainStorage is using DataConnectionString: {0}", ConfigUtilities.RedactConnectionStringInfo(this.options.DataConnectionString));
+                this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(this.typeResolver, this.grainFactory), this.options.UseFullAssemblyNames, this.options.IndentJson, this.options.TypeNameHandling);
+
+                var account = CloudStorageAccount.Parse(this.options.DataConnectionString);
+                var blobClient = account.CreateCloudBlobClient();
+                container = blobClient.GetContainerReference(this.options.ContainerName);
+                await container.CreateIfNotExistsAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                logger.Error((int)AzureProviderErrorCode.AzureBlobProvider_InitProvider, ex.ToString(), ex);
+                throw;
+            }
+        }
+    }
+
+    public static class AzureBlobGrainStorageFactory
+    {
+        public static IGrainStorage Create(IServiceProvider services, string name)
+        {
+            IOptionsSnapshot<AzureBlobStorageOptions> optionsSnapshot = services.GetRequiredService<IOptionsSnapshot<AzureBlobStorageOptions>>();
+            return ActivatorUtilities.CreateInstance<AzureBlobGrainStorage>(services, optionsSnapshot.Get(name));
         }
     }
 }

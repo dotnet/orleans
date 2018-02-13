@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Storage;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -75,9 +76,15 @@ namespace Tester.AzureUtils.General
 
         public class Fixture : BaseAzureTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            private class StorageSiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                builder.ConfigureLegacyConfiguration(legacy => legacy.ClusterConfiguration.AddAzureBlobStorageProvider("AzureStore"));
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder.AddAzureBlobGrainStorage("AzureStore", (AzureBlobStorageOptions options) =>
+                    {
+                        options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    });
+                }
             }
 
             protected override void CheckPreconditionsOrThrow()

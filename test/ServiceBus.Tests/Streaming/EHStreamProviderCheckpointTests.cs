@@ -19,6 +19,8 @@ using UnitTests.Grains;
 using Xunit;
 using Microsoft.WindowsAzure.Storage.Table;
 using Microsoft.Extensions.Logging.Abstractions;
+using Orleans.Hosting;
+using Orleans.Storage;
 
 namespace ServiceBus.Tests.StreamingTests
 {
@@ -44,8 +46,22 @@ namespace ServiceBus.Tests.StreamingTests
         private static readonly EventHubStreamProviderSettings ProviderSettings =
             new EventHubStreamProviderSettings(StreamProviderName);
 
+        private class SiloBuilderConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder.AddAzureBlobGrainStorage(
+                    ImplicitSubscription_RecoverableStream_CollectorGrain.StorageProviderName,
+                    (AzureBlobStorageOptions options) =>
+                    {
+                        options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    });
+            }
+        }
+
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
+            builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
             builder.ConfigureLegacyConfiguration(legacy =>
             {
                 AdjustConfig(legacy.ClusterConfiguration);
@@ -172,7 +188,6 @@ namespace ServiceBus.Tests.StreamingTests
         {
             // register stream provider
             config.Globals.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
-            config.AddAzureBlobStorageProvider(ImplicitSubscription_RecoverableStream_CollectorGrain.StorageProviderName);
         }
 
         private static void AdjustConfig(ClientConfiguration config)
