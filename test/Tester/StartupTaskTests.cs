@@ -54,7 +54,7 @@ namespace DefaultCluster.Tests
                 this.grainFactory = grainFactory;
             }
 
-            public async Task OnStarted(CancellationToken cancellationToken)
+            public async Task Execute(CancellationToken cancellationToken)
             {
                 var grain = this.grainFactory.GetGrain<ISimpleGrain>(98052);
                 await grain.SetA(1331);

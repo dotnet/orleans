@@ -134,7 +134,7 @@ namespace Orleans.Hosting
                     {
                         foreach (var task in this.startupTasks)
                         {
-                            await task.OnStarted(cancellationToken);
+                            await task.Execute(cancellationToken);
                         }
                     },
                     this.schedulingTarget.SchedulingContext);
@@ -162,7 +162,7 @@ namespace Orleans.Hosting
                 this.startupTask = startupTask;
             }
 
-            public Task OnStarted(CancellationToken cancellationToken) => this.startupTask(this.serviceProvider, cancellationToken);
+            public Task Execute(CancellationToken cancellationToken) => this.startupTask(this.serviceProvider, cancellationToken);
         }
     }
 }
