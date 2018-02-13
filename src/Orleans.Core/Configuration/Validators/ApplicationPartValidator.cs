@@ -7,6 +7,9 @@ using Orleans.Runtime;
 
 namespace Orleans.Configuration.Validators
 {
+    /// <summary>
+    /// Validates that application libraries (grains, serializers, etc) have been configured.
+    /// </summary>
     internal class ApplicationPartValidator : IConfigurationValidator
     {
         private readonly IApplicationPartManager applicationPartManager;
@@ -16,6 +19,7 @@ namespace Orleans.Configuration.Validators
             this.applicationPartManager = applicationPartManager;
         }
 
+        /// <inheritdoc />
         public void ValidateConfiguration()
         {
             var hasApplicationAssembly = this.applicationPartManager.ApplicationParts.OfType<AssemblyPart>().Any(part => !part.IsFrameworkAssembly);
