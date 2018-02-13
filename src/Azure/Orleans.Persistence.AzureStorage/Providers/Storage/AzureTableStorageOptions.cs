@@ -17,9 +17,9 @@ namespace Orleans.Hosting
         public string ServiceId { get; set; } = string.Empty;
 
         /// <summary>
-        /// Azure data connection string
+        /// Azure table connection string
         /// </summary>
-        public string DataConnectionString { get; set; }
+        public string ConnectionString { get; set; }
 
         /// <summary>
         /// Table name where grain stage is stored
@@ -45,6 +45,27 @@ namespace Orleans.Hosting
         public TypeNameHandling? TypeNameHandling { get; set; }
         #endregion json serialization
     }
+    /// <summary>
+    /// Configuration validator for AzureTableStorageOptions
+    /// </summary>
+    public class AzureTableGrainStorageOptionsValidator : IConfigurationValidator
+    {
+        private readonly AzureTableStorageOptions options;
+        private readonly string name;
+        public AzureTableGrainStorageOptionsValidator(AzureTableStorageOptions options, string name)
+        {
+            this.options = options;
+            this.name = name;
+        }
+
+        public void ValidateConfiguration()
+        {
+            if (string.IsNullOrEmpty(this.options.ConnectionString))
+                throw new OrleansConfigurationException(
+                    $"Configuration for AzureTableStorageProvider {name} is invalid. Connection is required.");
+        }
+    }
+
 
     public class AzureTableStorageOptionsFormatterResolver : IOptionFormatterResolver<AzureTableStorageOptions>
     {
@@ -75,7 +96,7 @@ namespace Orleans.Hosting
                 return new List<string>()
                 {
                     OptionFormattingUtilities.Format(nameof(this.options.ServiceId),this.options.ServiceId),
-                    OptionFormattingUtilities.Format(nameof(this.options.DataConnectionString), ConfigUtilities.RedactConnectionStringInfo(this.options.DataConnectionString)),
+                    OptionFormattingUtilities.Format(nameof(this.options.ConnectionString), ConfigUtilities.RedactConnectionStringInfo(this.options.ConnectionString)),
                     OptionFormattingUtilities.Format(nameof(this.options.TableName),this.options.TableName),
                     OptionFormattingUtilities.Format(nameof(this.options.DeleteStateOnClear),this.options.DeleteStateOnClear),
                     OptionFormattingUtilities.Format(nameof(this.options.InitStage),this.options.InitStage),

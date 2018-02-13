@@ -55,14 +55,14 @@ namespace UnitTests.HaloTests.Streaming
                         .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
                         {
                             options.ServiceId = silo.Value.ServiceId.ToString();
-                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.DeleteStateOnClear = true;
                         }))
                         .AddAzureTableGrainStorage("PubSubStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
                         {
                             options.ServiceId = silo.Value.ServiceId.ToString();
                             options.DeleteStateOnClear = true;
-                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         }));
                 }
             }
