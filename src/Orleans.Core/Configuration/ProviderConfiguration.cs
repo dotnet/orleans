@@ -159,7 +159,6 @@ namespace Orleans.Runtime.Configuration
         public const string STORAGE_PROVIDER_CATEGORY_NAME = "Storage";
         public const string STREAM_PROVIDER_CATEGORY_NAME = "Stream";
         public const string LOG_CONSISTENCY_PROVIDER_CATEGORY_NAME = "LogConsistency";
-        public const string STATISTICS_PROVIDER_CATEGORY_NAME = "Statistics";
 
         public string Name { get; set; }
         public IDictionary<string, IProviderConfiguration> Providers { get; set; }

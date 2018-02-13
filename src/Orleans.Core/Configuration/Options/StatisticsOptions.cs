@@ -23,13 +23,7 @@ namespace Orleans.Hosting
         /// </summary>
         public TimeSpan LogWriteInterval { get; set; } = DEFAULT_LOG_WRITE_PERIOD;
         public static readonly TimeSpan DEFAULT_LOG_WRITE_PERIOD = TimeSpan.FromMinutes(5);
-
-        /// <summary>
-        /// The WriteLogStatisticsToTable property specifies whether log statistics should also be written into a separate, special Azure table.
-        ///  The default is yes.
-        /// </summary>
-        public bool WriteLogStatisticsToTable { get; set; } = DEFAULT_LOG_TO_TABLE;
-        public const bool DEFAULT_LOG_TO_TABLE = true;
+        
 
         /// <summary>
         /// The CollectionLevel property specifies the verbosity level of statistics to collect. The default is Info.
@@ -40,7 +34,7 @@ namespace Orleans.Hosting
 
     public abstract class StatisticsOptionsFormatter
     {
-        private StatisticsOptions options;
+        private readonly StatisticsOptions options;
 
         protected StatisticsOptionsFormatter(StatisticsOptions options)
         {
@@ -53,7 +47,6 @@ namespace Orleans.Hosting
             {
                 OptionFormattingUtilities.Format(nameof(this.options.PerfCountersWriteInterval), this.options.PerfCountersWriteInterval),
                 OptionFormattingUtilities.Format(nameof(this.options.LogWriteInterval), this.options.LogWriteInterval),
-                OptionFormattingUtilities.Format(nameof(this.options.WriteLogStatisticsToTable), this.options.WriteLogStatisticsToTable),
                 OptionFormattingUtilities.Format(nameof(this.options.CollectionLevel), this.options.CollectionLevel),
             };
         }

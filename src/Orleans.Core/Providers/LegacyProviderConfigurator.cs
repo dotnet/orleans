@@ -64,17 +64,6 @@ namespace Orleans.Providers
                         RegisterProvider<ILogConsistencyProvider>(providerConfig, services, defaultInitStage, defaultStartStage);
                     }
                 }
-                else if (providerGroup.Key == ProviderCategoryConfiguration.STATISTICS_PROVIDER_CATEGORY_NAME)
-                {
-                    IProviderConfiguration providerConfig = providerGroup.SelectMany(kvp => kvp.Value.Providers.Values).FirstOrDefault();
-                    if(providerConfig != null)
-                    {
-                        // Looks like we only support a single statistics provider that can be any of the publisher interfaces. fml
-                        // TODO: Kill our statistics system.. please!?
-                        services.AddSingleton<IStatisticsPublisher>(sp => sp.GetServiceByName<IProvider>(providerConfig.Name) as IStatisticsPublisher);
-                        RegisterProvider<IProvider>(providerConfig, services, defaultInitStage, defaultStartStage);
-                    }
-                }
                 else
                 {
                     foreach (IProviderConfiguration providerConfig in providerGroup.SelectMany(kvp => kvp.Value.Providers.Values))

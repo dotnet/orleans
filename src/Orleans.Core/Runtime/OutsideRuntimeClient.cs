@@ -227,8 +227,7 @@ namespace Orleans
                 ct).Ignore();
             grainTypeResolver = await transport.GetGrainTypeResolver(this.InternalGrainFactory);
 
-            await ClientStatistics.Start(transport, clientId)
-                .WithTimeout(initTimeout, $"Starting ClientStatistics failed due to timeout {initTimeout}");
+            ClientStatistics.Start(transport, clientId);
 
             await StreamingInitialize();
         }
