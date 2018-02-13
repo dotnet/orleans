@@ -9,10 +9,13 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Options for AdonetGrainStorage
+    /// </summary>
     public class AdoNetGrainStorageOptions
     {
         /// <summary>
-        /// Connection string for AdoNet storage
+        /// Connection string for AdoNet storage.
         /// </summary>
         public string ConnectionString { get; set; }
 
@@ -21,18 +24,18 @@ namespace Orleans.Hosting
         /// </summary>
         public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
         /// <summary>
-        /// Default init stage in silo lifecycle
+        /// Default init stage in silo lifecycle.
         /// </summary>
         public const int DEFAULT_INIT_STAGE = SiloLifecycleStage.ApplicationServices;
 
         /// <summary>
         /// The default ADO.NET invariant used for storage if none is given. 
         /// </summary>
-        public const string DEFAULT_ADONET_INVARIANTS = AdoNetInvariants.InvariantNameSqlServer;
+        public const string DEFAULT_ADONET_INVARIANT = AdoNetInvariants.InvariantNameSqlServer;
         /// <summary>
-        /// The invariant name for storage
+        /// The invariant name for storage.
         /// </summary>
-        public string AdoInvariant { get; set; } = DEFAULT_ADONET_INVARIANTS;
+        public string AdoInvariant { get; set; } = DEFAULT_ADONET_INVARIANT;
 
         #region json serialization related settings
         /// <summary>
@@ -48,16 +51,27 @@ namespace Orleans.Hosting
         /// </summary>
         public bool UseXmlFormat { get; set; }
     }
+
+    /// <summary>
+    /// ConfigurationValidator for AdoNetGrainStorageOptions
+    /// </summary>
     public class AdoNetGrainStorageOptionsValidator : IConfigurationValidator
     {
         private readonly AdoNetGrainStorageOptions options;
         private readonly string name;
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="configurationOptions">The option to be validated.</param>
+        /// <param name="name">The name of the option to be validated.</param>
         public AdoNetGrainStorageOptionsValidator(AdoNetGrainStorageOptions configurationOptions, string name)
         {
+            if(configurationOptions == null)
+                throw new OrleansConfigurationException($"Invalid AdoNetGrainStorageOptions for AdoNetGrainStorage {name}. Options is required.");
             this.options = configurationOptions;
             this.name = name;
         }
-
+        /// <inheritdoc cref="IConfigurationValidator"/>
         public void ValidateConfiguration()
         {
             if (string.IsNullOrWhiteSpace(this.options.ConnectionString))
@@ -71,14 +85,22 @@ namespace Orleans.Hosting
         }
     }
 
+    /// <summary>
+    /// Formatter resolver for AdoNetGrainStorageOptions
+    /// </summary>
     public class AdoNetStorageOptionsFormatterResolver : IOptionFormatterResolver<AdoNetGrainStorageOptions>
     {
         private IOptionsSnapshot<AdoNetGrainStorageOptions> optionsSnapshot;
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="optionsSnapshot">Option snapshot for AdoNetGrainStorageOptions</param>
         public AdoNetStorageOptionsFormatterResolver(IOptionsSnapshot<AdoNetGrainStorageOptions> optionsSnapshot)
         {
             this.optionsSnapshot = optionsSnapshot;
         }
 
+        /// <inheritdoc cref="IOptionFormatterResolver"/>
         public IOptionFormatter<AdoNetGrainStorageOptions> Resolve(string name)
         {
             return new AzureTableStorageOptionsFormatter(name, optionsSnapshot.Get(name));

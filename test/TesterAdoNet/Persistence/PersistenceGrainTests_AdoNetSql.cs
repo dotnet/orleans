@@ -21,10 +21,7 @@ using Xunit.Abstractions;
 
 namespace Tester.AdoNet.Persistence
 {
-    /// <summary>
-    /// PersistenceGrainTests using AzureGrainStorage - Requires access to external Azure table storage
-    /// </summary>
-    [TestCategory("Persistence"), TestCategory("Functional")]
+    [TestCategory("Persistence"), TestCategory("SqlServer")]
     public class PersistenceGrainTests_Sql : GrainPersistenceTestsRunner, IClassFixture<PersistenceGrainTests_Sql.Fixture>
     {
         public const string TestDatabaseName = "OrleansTest";
@@ -76,10 +73,12 @@ namespace Tester.AdoNet.Persistence
             }
         }
 
+        private Fixture fixture;
+
         public PersistenceGrainTests_Sql(ITestOutputHelper output, Fixture fixture) : base(output, fixture, ServiceId)
         {
-           
-            fixture.EnsurePreconditionsMet();
+            this.fixture = fixture;
+            this.fixture.EnsurePreconditionsMet();
         }
     }
 }
