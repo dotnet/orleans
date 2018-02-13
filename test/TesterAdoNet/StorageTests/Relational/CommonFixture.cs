@@ -60,7 +60,6 @@ namespace UnitTests.StorageTests.Relational
             DefaultProviderRuntime = new ClientProviderRuntime(this.InternalGrainFactory, this.Services, NullLoggerFactory.Instance);
         }
 
-
         /// <summary>
         /// Returns a correct implementation of the persistence provider according to environment variables.
         /// </summary>

@@ -20,7 +20,7 @@ using Orleans.Hosting;
 namespace Orleans.Storage
 {
     /// <summary>
-    /// Logging codes used by <see cref="AdoNetGrainStorage"/>.
+    /// Logging codes used by <see cref="AdoNetStorageProvider"/>.
     /// </summary>
     /// <remarks> These are taken from <em>Orleans.Providers.ProviderErrorCode</em> and <em>Orleans.Providers.AzureProviderErrorCode</em>.</remarks>
     internal enum RelationalStorageProviderCodes
@@ -48,7 +48,7 @@ namespace Orleans.Storage
         public static IGrainStorage Create(IServiceProvider services, string name)
         {
             IOptionsSnapshot<AdoNetGrainStorageOptions> optionsSnapshot = services.GetRequiredService<IOptionsSnapshot<AdoNetGrainStorageOptions>>();
-            return ActivatorUtilities.CreateInstance<AdoNetGrainStorage>(services, optionsSnapshot.Get(name), name);
+            return ActivatorUtilities.CreateInstance<AdoNetGrainStorage>(services, Options.Create(optionsSnapshot.Get(name)), name);
         }
     }
 
