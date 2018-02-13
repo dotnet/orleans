@@ -36,6 +36,9 @@ using Orleans.Metadata;
 using Orleans.Statistics;
 using Microsoft.Extensions.Options;
 
+using Orleans.Configuration.Validators;
+using Orleans.Runtime.Configuration;
+
 namespace Orleans.Hosting
 {
     internal static class DefaultSiloServices
@@ -111,14 +114,18 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<IRuntimeClient, InsideRuntimeClient>();
             services.TryAddFromExisting<ISiloRuntimeClient, InsideRuntimeClient>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, InsideRuntimeClient>();
+            
             services.TryAddSingleton<MultiClusterGossipChannelFactory>();
             services.TryAddSingleton<MultiClusterOracle>();
             services.TryAddSingleton<MultiClusterRegistrationStrategyManager>();
             services.TryAddFromExisting<IMultiClusterOracle, MultiClusterOracle>();
             services.TryAddSingleton<DeploymentLoadPublisher>();
+
             services.TryAddSingleton<MembershipOracle>();
             services.TryAddFromExisting<IMembershipOracle, MembershipOracle>();
             services.TryAddFromExisting<ISiloStatusOracle, MembershipOracle>();
+            services.AddTransient<IConfigurationValidator, SiloClusteringValidator>();
+
             services.TryAddSingleton<ClientObserverRegistrar>();
             services.TryAddSingleton<SiloProviderRuntime>();
             services.TryAddFromExisting<IStreamProviderRuntime, SiloProviderRuntime>();
@@ -250,6 +257,9 @@ namespace Orleans.Hosting
             services.TryConfigureFormatter<ServicePointOptions, ServicePointOptionsFormatter>();
             services.TryConfigureFormatter<TelemetryOptions, TelemetryOptionsFormatter>();
             services.TryConfigureFormatter<LoadSheddingOptions, LoadSheddingOptionsFormatter>();
+            services.TryConfigureFormatter<EndpointOptions, EndpointOptionsFormatter>();
+
+            services.AddTransient<IConfigurationValidator, EndpointOptionsValidator>();
         }
     }
 }
