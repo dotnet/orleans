@@ -12,6 +12,7 @@ using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Scheduler;
 using Orleans.Providers;
 using System.Collections.Generic;
+using System.Net;
 
 namespace Orleans.Hosting
 {
@@ -176,6 +177,19 @@ namespace Orleans.Hosting
                     {
                         options.ProxyPort = nodeConfig.ProxyGatewayEndpoint.Port;
                     }
+
+                    if (options.ProxyPort != 0 && options.ProxyIPAddress == null)
+                    {
+                        if (nodeConfig.ProxyGatewayEndpoint == null || nodeConfig.ProxyGatewayEndpoint.Address == IPAddress.None)
+                        {
+                            options.ProxyIPAddress = options.IPAddress;
+                        }
+                        else
+                        {
+                            options.ProxyIPAddress = nodeConfig.ProxyGatewayEndpoint.Address;
+                        }
+                    }
+
                 });
 
             services.Configure<SerializationProviderOptions>(options =>
