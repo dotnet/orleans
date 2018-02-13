@@ -6,10 +6,9 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Concurrency;
-using Orleans.Runtime.Configuration;
 using DateTime = System.DateTime;
-using Orleans.Hosting;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace Orleans.Transactions
 {

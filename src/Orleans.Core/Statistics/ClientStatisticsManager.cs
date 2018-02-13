@@ -4,8 +4,8 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
-using Orleans.Hosting;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Messaging;
 
 namespace Orleans.Runtime

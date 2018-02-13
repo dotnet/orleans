@@ -2,9 +2,8 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Hosting;
+using Orleans.Configuration;
 using Orleans.Serialization;
-using Orleans.Statistics;
 
 namespace Orleans.Runtime.Counters
 {

@@ -5,8 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
+using Orleans.Configuration;
 using Orleans.Runtime.Scheduler;
 using Orleans.Statistics;
 

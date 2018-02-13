@@ -7,6 +7,7 @@ using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.ConsulUtils.Options;
 
 namespace Orleans.Runtime.Membership

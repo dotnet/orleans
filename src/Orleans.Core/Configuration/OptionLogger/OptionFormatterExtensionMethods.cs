@@ -1,8 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using System.Linq;
-using Orleans.Configuration;
-
-namespace Orleans
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Extension methods on IServiceCollection, to provider better usability to IOptionFormatter

@@ -13,8 +13,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
 using Orleans.Core;
-using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Counters;
 using Orleans.Runtime.GrainDirectory;
@@ -30,6 +28,7 @@ using Orleans.Transactions;
 using Orleans.Runtime.Versions;
 using Orleans.Versions;
 using Orleans.ApplicationParts;
+using Orleans.Configuration;
 using Orleans.Serialization;
 
 namespace Orleans.Runtime

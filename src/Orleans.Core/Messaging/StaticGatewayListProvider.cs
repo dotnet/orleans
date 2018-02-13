@@ -2,8 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
-using Orleans.Configuration.Options;
-using Orleans.Hosting;
+using Orleans.Configuration;
 
 namespace Orleans.Messaging
 {

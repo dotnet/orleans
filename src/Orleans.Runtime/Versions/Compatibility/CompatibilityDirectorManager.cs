@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Options;
-using Orleans.Hosting;
+using Orleans.Configuration;
 using Orleans.Versions.Compatibility;
 
 namespace Orleans.Runtime.Versions.Compatibility

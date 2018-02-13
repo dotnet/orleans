@@ -3,9 +3,8 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 
 using Microsoft.Extensions.Options;
-
+using Orleans.Configuration;
 using Orleans.Core;
-using Orleans.Hosting;
 using Orleans.Statistics;
 
 namespace Orleans.Runtime

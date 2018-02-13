@@ -2,9 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
-using Microsoft.Extensions.Options;
-using Orleans.Hosting;
-
+using Orleans.Configuration;
 namespace Orleans.Runtime
 {
     internal class BufferPool

@@ -5,8 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime
 {

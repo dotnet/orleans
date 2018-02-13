@@ -5,10 +5,9 @@ using System.Collections.Concurrent;
 using System.Threading;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
-using Orleans.Runtime.Configuration;
-using Orleans.Hosting;
 
 namespace Orleans.Transactions
 { 
