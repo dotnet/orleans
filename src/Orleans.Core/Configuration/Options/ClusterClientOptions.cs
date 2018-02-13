@@ -17,7 +17,7 @@ namespace Orleans.Runtime
     public class ClusterClientOptionsFormatter : IOptionFormatter<ClusterClientOptions>
     {
         public string Name => nameof(ClusterClientOptions);
-        private ClusterClientOptions options;
+        private readonly ClusterClientOptions options;
         public ClusterClientOptionsFormatter(IOptions<ClusterClientOptions> options)
         {
             this.options = options.Value;

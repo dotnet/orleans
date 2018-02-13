@@ -15,8 +15,6 @@ namespace Orleans.Persistence.AdoNet.Storage
 namespace Orleans.Reminders.AdoNet.Storage
 #elif TESTER_SQLUTILS
 namespace Orleans.Tests.SqlUtils
-#elif STATISTICS_ADONET
-namespace Orleans.Statistics.AdoNet.Storage
 #else
 // No default namespace intentionally to cause compile errors if something is not defined
 #endif

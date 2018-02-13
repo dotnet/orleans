@@ -47,10 +47,6 @@ namespace Orleans.Configuration
                     options.ClusterId = configuration.ClusterId;
                 }
             });
-            services.Configure<MonitoringStorageOptions>(options =>
-            {
-                options.DataConnectionString = configuration.DataConnectionString;
-            });
 
             // Translate legacy configuration to new Options
             services.Configure<ClientMessagingOptions>(options =>
@@ -132,7 +128,6 @@ namespace Orleans.Configuration
         {
             options.PerfCountersWriteInterval = configuration.StatisticsPerfCountersWriteInterval;
             options.LogWriteInterval = configuration.StatisticsLogWriteInterval;
-            options.WriteLogStatisticsToTable = configuration.StatisticsWriteLogStatisticsToTable;
             options.CollectionLevel = configuration.StatisticsCollectionLevel;
         }
     }

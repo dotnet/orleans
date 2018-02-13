@@ -22,9 +22,6 @@ namespace Orleans.Runtime.Configuration
     {
         TimeSpan StatisticsPerfCountersWriteInterval { get; set; }
         TimeSpan StatisticsLogWriteInterval { get; set; }
-        bool StatisticsWriteLogStatisticsToTable { get; set; }
         StatisticsLevel StatisticsCollectionLevel { get; set; }
-
-        string StatisticsProviderName { get; set; }
     }
 }

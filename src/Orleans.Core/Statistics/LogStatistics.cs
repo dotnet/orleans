@@ -19,7 +19,6 @@ namespace Orleans.Runtime
 
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
-        public IStatisticsPublisher StatsTablePublisher;
 
         internal LogStatistics(TimeSpan writeInterval, bool isSilo, SerializationManager serializationManager, ILoggerFactory loggerFactory)
         {
@@ -35,17 +34,19 @@ namespace Orleans.Runtime
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        private async Task Reporter(object context)
+        private Task Reporter(object context)
         {
             try
             {
-                await DumpCounters();
+                this.DumpCounters();
             }
             catch (Exception exc)
             {
                 var e = exc.GetBaseException();
-                logger.Error(ErrorCode.Runtime_Error_100101, "Exception occurred during LogStatistics reporter.", e);
+                this.logger.Error(ErrorCode.Runtime_Error_100101, "Exception occurred during LogStatistics reporter.", e);
             }
+
+            return Task.CompletedTask;
         }
 
         public void Stop()
@@ -58,7 +59,7 @@ namespace Orleans.Runtime
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        internal async Task DumpCounters()
+        internal void DumpCounters()
         {
             List<ICounter> allCounters = new List<ICounter>();
             CounterStatistic.AddCounters(allCounters, cs => cs.Storage != CounterStorage.DontStore);
@@ -78,20 +79,7 @@ namespace Orleans.Runtime
                 WriteStatsLogEntry(stat.GetDisplayString());
             }
             WriteStatsLogEntry(null); // Write any remaining log data
-
-            try
-            {
-                if (StatsTablePublisher != null && allCounters.Count > 0)
-                {
-                    await StatsTablePublisher.ReportStats(allCounters);
-                }
-            }
-            catch (Exception exc)
-            {
-                var e = exc.GetBaseException();
-                logger.Error(ErrorCode.Runtime_Error_100101, "Exception occurred during Stats reporter.", e);
-            }
-
+            
             // Reset current value for counter that have delta.
             // Do it ONLY after all counters have been logged.
             foreach (ICounter stat in allCounters.Where(cs => cs.Storage != CounterStorage.DontStore).Union(additionalCounters).Where(cs => cs.IsValueDelta))

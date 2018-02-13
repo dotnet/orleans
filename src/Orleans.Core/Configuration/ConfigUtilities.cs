@@ -93,10 +93,6 @@ namespace Orleans.Runtime.Configuration
 
         internal static void ParseStatistics(IStatisticsConfiguration config, XmlElement root, string nodeName)
         {
-            if (root.HasAttribute("ProviderType"))
-            {
-                config.StatisticsProviderName = root.GetAttribute("ProviderType");
-            }
             if (root.HasAttribute("PerfCounterWriteInterval"))
             {
                 config.StatisticsPerfCountersWriteInterval = ParseTimeSpan(root.GetAttribute("PerfCounterWriteInterval"),
@@ -106,11 +102,6 @@ namespace Orleans.Runtime.Configuration
             {
                 config.StatisticsLogWriteInterval = ParseTimeSpan(root.GetAttribute("LogWriteInterval"),
                     "Invalid TimeSpan value for Statistics.LogWriteInterval attribute on Statistics element for " + nodeName);
-            }
-            if (root.HasAttribute("WriteLogStatisticsToTable"))
-            {
-                config.StatisticsWriteLogStatisticsToTable = ParseBool(root.GetAttribute("WriteLogStatisticsToTable"),
-                    "Invalid bool value for Statistics.WriteLogStatisticsToTable attribute on Statistics element for " + nodeName);
             }
             if (root.HasAttribute("StatisticsCollectionLevel"))
             {
@@ -470,13 +461,10 @@ namespace Orleans.Runtime.Configuration
             sb.Append("   Statistics: ").AppendLine();
             sb.Append("     PerfCounterWriteInterval: ").Append(config.StatisticsPerfCountersWriteInterval).AppendLine();
             sb.Append("     LogWriteInterval: ").Append(config.StatisticsLogWriteInterval).AppendLine();
-            sb.Append("     WriteLogStatisticsToTable: ").Append(config.StatisticsWriteLogStatisticsToTable).AppendLine();
             sb.Append("     StatisticsCollectionLevel: ").Append(config.StatisticsCollectionLevel).AppendLine();
 #if TRACK_DETAILED_STATS
             sb.Append("     TRACK_DETAILED_STATS: true").AppendLine();
 #endif
-            if (!string.IsNullOrEmpty(config.StatisticsProviderName))
-                sb.Append("     StatisticsProviderName:").Append(config.StatisticsProviderName).AppendLine();
             return sb.ToString();
         }
 

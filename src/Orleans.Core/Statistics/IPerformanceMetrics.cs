@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 
 using Microsoft.Extensions.Options;
 
@@ -10,17 +9,6 @@ using Orleans.Statistics;
 
 namespace Orleans.Runtime
 {
-    public interface IStatisticsPublisher
-    {
-        Task ReportStats(List<ICounter> statsCounters);
-        Task Init(bool isSilo, string storageConnectionString, string clusterId, string address, string siloName, string hostName);
-    }
-
-    public interface IConfigurableStatisticsPublisher : IStatisticsPublisher
-    {
-        void AddConfiguration(string clusterId, bool isSilo, string siloName, SiloAddress address, System.Net.IPEndPoint gateway, string hostName);
-    }
-
     /// <summary>
     /// Snapshot of current runtime statistics for a silo
     /// </summary>
