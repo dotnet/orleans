@@ -19,11 +19,11 @@ namespace Orleans.Messaging
     // This class is used on the client only.
     // It provides the client counterpart to the Gateway and GatewayAcceptor classes on the silo side.
     // 
-    // There is one ProxiedMessageCenter instance per OutsideRuntimeClient. There can be multiple ProxiedMessageCenter instances
+    // There is one ClientMessageCenter instance per OutsideRuntimeClient. There can be multiple ClientMessageCenter instances
     // in a single process, but because RuntimeClient keeps a static pointer to a single OutsideRuntimeClient instance, this is not
     // generally done in practice.
     // 
-    // Each ProxiedMessageCenter keeps a collection of GatewayConnection instances. Each of these represents a bidirectional connection
+    // Each ClientMessageCenter keeps a collection of GatewayConnection instances. Each of these represents a bidirectional connection
     // to a single gateway endpoint. Requests are assigned to a specific connection based on the target grain ID, so that requests to
     // the same grain will go to the same gateway, in sending order. To do this efficiently and scalably, we bucket grains together
     // based on their hash code mod a reasonably large number (currently 8192).
@@ -41,26 +41,26 @@ namespace Orleans.Messaging
     // The list of known gateways is managed by the GatewayManager class. See comments there for details...
     // =======================================================================================================================================
     // Locking and lock protocol:
-    // The ProxiedMessageCenter instance itself may be accessed by many client threads simultaneously, and each GatewayConnection instance
-    // is accessed by its own thread, by the thread for its Receiver, and potentially by client threads from within the ProxiedMessageCenter.
+    // The ClientMessageCenter instance itself may be accessed by many client threads simultaneously, and each GatewayConnection instance
+    // is accessed by its own thread, by the thread for its Receiver, and potentially by client threads from within the ClientMessageCenter.
     // Thus, we need locks to protect the various data structured from concurrent modifications.
     // 
     // Each GatewayConnection instance has a "lockable" field that is used to lock local information. This lock is used by both the GatewayConnection
     // thread and the Receiver thread.
     // 
-    // The ProxiedMessageCenter instance also has a "lockable" field. This lock is used by any client thread running methods within the instance.
+    // The ClientMessageCenter instance also has a "lockable" field. This lock is used by any client thread running methods within the instance.
     // 
     // Note that we take care to ensure that client threads never need locked access to GatewayConnection state and GatewayConnection threads never need
-    // locked access to ProxiedMessageCenter state. Thus, we don't need to worry about lock ordering across these objects.
+    // locked access to ClientMessageCenter state. Thus, we don't need to worry about lock ordering across these objects.
     // 
-    // Finally, the GatewayManager instance within the ProxiedMessageCenter has two collections, knownGateways and knownDead, that it needs to
+    // Finally, the GatewayManager instance within the ClientMessageCenter has two collections, knownGateways and knownDead, that it needs to
     // protect with locks. Rather than using a "lockable" field, each collection is lcoked to protect the collection.
     // All sorts of threads can run within the GatewayManager, including client threads and GatewayConnection threads, so we need to
     // be careful about locks here. The protocol we use is to always take GatewayManager locks last, to only take them within GatewayManager methods,
     // and to always release them before returning from the method. In addition, we never simultaneously hold the knownGateways and knownDead locks,
     // so there's no need to worry about the order in which we take and release those locks.
     // </summary>
-    internal class ProxiedMessageCenter : IMessageCenter, IDisposable
+    internal class ClientMessageCenter : IMessageCenter, IDisposable
     {
         internal readonly SerializationManager SerializationManager;
 
@@ -95,7 +95,7 @@ namespace Orleans.Messaging
         private readonly TimeSpan openConnectionTimeout;
         private readonly ExecutorService executorService;
 
-        public ProxiedMessageCenter(
+        public ClientMessageCenter(
             IOptions<GatewayOptions> gatewayOptions,
             IOptions<ClientMessagingOptions> clientMessagingOptions,
             IPAddress localAddress,
@@ -126,7 +126,7 @@ namespace Orleans.Messaging
             gatewayConnections = new Dictionary<Uri, GatewayConnection>();
             numMessages = 0;
             grainBuckets = new WeakReference[clientMessagingOptions.Value.ClientSenderBuckets];
-            logger = loggerFactory.CreateLogger<ProxiedMessageCenter>();
+            logger = loggerFactory.CreateLogger<ClientMessageCenter>();
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Proxy grain client constructed");
             IntValueStatistic.FindOrCreate(
                 StatisticNames.CLIENT_CONNECTED_GATEWAY_COUNT,
