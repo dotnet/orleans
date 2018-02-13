@@ -104,14 +104,12 @@ namespace Orleans.Hosting
 
         internal static IPEndPoint GetPublicSiloEndpoint(this EndpointOptions options)
         {
-            return options?.AdvertisedIPAddress != null
-                ? new IPEndPoint(options.AdvertisedIPAddress, options.SiloPort)
-                : null;
+            return new IPEndPoint(options.AdvertisedIPAddress, options.SiloPort);
         }
 
         internal static IPEndPoint GetPublicProxyEndpoint(this EndpointOptions options)
         {
-            return options.GatewayPort != 0 && options.AdvertisedIPAddress != null
+            return options.GatewayPort != 0 
                 ? new IPEndPoint(options.AdvertisedIPAddress, options.GatewayPort)
                 : null;
         }
