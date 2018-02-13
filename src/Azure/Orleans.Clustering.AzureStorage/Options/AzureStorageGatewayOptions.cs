@@ -1,6 +1,6 @@
 ﻿namespace Orleans.Configuration
 {
-    public class AzureTableGatewayListProviderOptions
+    public class AzureStorageGatewayOptions
     {
         /// <summary>
         /// Connection string for Azure Storage

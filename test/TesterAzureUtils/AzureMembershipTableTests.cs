@@ -38,7 +38,7 @@ namespace Tester.AzureUtils
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
         {
             TestUtils.CheckForAzureStorage();
-            var options = new AzureTableMembershipOptions()
+            var options = new AzureStorageClusteringOptions()
             {
                 MaxStorageBusyRetries = 3,
                 ConnectionString = this.connectionString,
@@ -48,7 +48,7 @@ namespace Tester.AzureUtils
 
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
-            var options = new AzureTableGatewayListProviderOptions()
+            var options = new AzureStorageGatewayOptions()
             {
                 ConnectionString = this.connectionString
             };
