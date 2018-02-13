@@ -66,14 +66,14 @@ namespace NonSilo.Tests
         public void SiloHostBuilder_AssembliesTest()
         {
             var builder = new SiloHostBuilder()
-                .ConfigureEndpoints(IPAddress.Any, 9999, 0)
+                .ConfigureEndpoints(IPAddress.Loopback, 9999, 0)
                 .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
             Assert.Throws<OrleansConfigurationException>(() => builder.Build());
 
             // Adding an application assembly allows the silo to be correctly built.
             builder = new SiloHostBuilder()
                 .ConfigureOrleans()
-                .ConfigureEndpoints(IPAddress.Any, 9999, 0)
+                .ConfigureEndpoints(IPAddress.Loopback, 9999, 0)
                 .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IAccountGrain).Assembly))
                 .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>())
                 .ConfigureServices(RemoveConfigValidators);
