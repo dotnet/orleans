@@ -31,7 +31,7 @@ namespace Orleans
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
         private readonly ConcurrentDictionary<GuidId, LocalObjectData> localObjects;
 
-        private ProxiedMessageCenter transport;
+        private ClientMessageCenter transport;
         private bool listenForMessages;
         private CancellationTokenSource listeningCts;
         private bool firstMessageReceived;
@@ -200,7 +200,7 @@ namespace Orleans
                                .WithTimeout(initTimeout, $"gatewayListProvider.InitializeGatewayListProvider failed due to timeout {initTimeout}");
 
             var generation = -SiloAddress.AllocateNewGeneration(); // Client generations are negative
-            transport = ActivatorUtilities.CreateInstance<ProxiedMessageCenter>(this.ServiceProvider, localAddress, generation, handshakeClientId);
+            transport = ActivatorUtilities.CreateInstance<ClientMessageCenter>(this.ServiceProvider, localAddress, generation, handshakeClientId);
             transport.Start();
             CurrentActivationAddress = ActivationAddress.NewActivationAddress(transport.MyAddress, handshakeClientId);
 
