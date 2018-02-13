@@ -7,7 +7,7 @@ namespace Orleans.Configuration
     /// <summary>
     /// Option to configure ZooKeeperMembership
     /// </summary>
-    public class ZooKeeperMembershipOptions
+    public class ZooKeeperClusteringSiloOptions
     {
         /// <summary>
         /// Connection string for ZooKeeper Storage

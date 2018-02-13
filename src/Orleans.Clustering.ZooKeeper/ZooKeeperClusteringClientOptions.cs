@@ -10,7 +10,7 @@ using Orleans.Configuration;
 
 namespace Orleans.Runtime.Membership
 {
-    public class ZooKeeperGatewayListProvider : IGatewayListProvider
+    public class ZooKeeperClusteringClientOptions : IGatewayListProvider
     {
         private ZooKeeperWatcher watcher;
         /// <summary>
@@ -23,7 +23,7 @@ namespace Orleans.Runtime.Membership
         /// </summary>
         private string deploymentConnectionString;
         private TimeSpan maxStaleness;
-        public ZooKeeperGatewayListProvider(ILogger<ZooKeeperGatewayListProvider> logger, ClientConfiguration clientConfiguration,
+        public ZooKeeperClusteringClientOptions(ILogger<ZooKeeperClusteringClientOptions> logger, ClientConfiguration clientConfiguration,
             IOptions<ZooKeeperGatewayListProviderOptions> options,
             IOptions<ClusterClientOptions> clusterClientOptions)
         {
