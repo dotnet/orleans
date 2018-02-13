@@ -1,7 +1,9 @@
 ﻿using System;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Hosting;
+
+using Orleans.Configuration;
 using Orleans.Messaging;
+using Orleans.Runtime.Membership;
 
 namespace Orleans.ConsulUtils
 {
@@ -11,11 +13,13 @@ namespace Orleans.ConsulUtils
         /// <inheritdoc/>
         public void ConfigureServices(object configuration, IServiceCollection services)
         {
-            services.UseConsulGatewayListProvider(options =>
-            {
-                var reader = new ClientConfigurationReader(configuration);
-                options.Address = new Uri(reader.GetPropertyValue<string>("DataConnectionString"));
-            });
+            services.Configure<ConsulClusteringClientOptions>(
+                options =>
+                {
+                    var reader = new ClientConfigurationReader(configuration);
+                    options.Address = new Uri(reader.GetPropertyValue<string>("DataConnectionString"));
+                });
+            services.AddSingleton<IGatewayListProvider, ConsulGatewayListProvider>();
         }
     }
 }

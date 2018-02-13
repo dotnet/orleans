@@ -7,7 +7,7 @@ namespace Orleans.Configuration
     /// <summary>
     /// Options for configuring ConsulBasedMembership
     /// </summary>
-    public class ConsulMembershipOptions
+    public class ConsulClusteringSiloOptions
     {
         /// <summary>
         /// Address for consul client

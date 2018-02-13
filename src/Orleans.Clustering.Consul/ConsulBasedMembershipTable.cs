@@ -20,17 +20,17 @@ namespace Orleans.Runtime.Membership
 
         private ILogger _logger;
         private readonly ConsulClient _consulClient;
-        private readonly ConsulMembershipOptions membershipTableOptions;
+        private readonly ConsulClusteringSiloOptions clusteringSiloTableOptions;
         private readonly string clusterId;
 
         public ConsulBasedMembershipTable(ILogger<ConsulBasedMembershipTable> logger,
-            IOptions<ConsulMembershipOptions> membershipTableOptions, IOptions<SiloOptions> siloOptions)
+            IOptions<ConsulClusteringSiloOptions> membershipTableOptions, IOptions<SiloOptions> siloOptions)
         {
             this.clusterId = siloOptions.Value.ClusterId;
             this._logger = logger;
-            this.membershipTableOptions = membershipTableOptions.Value;
+            this.clusteringSiloTableOptions = membershipTableOptions.Value;
             _consulClient =
-                new ConsulClient(config => config.Address = this.membershipTableOptions.Address);
+                new ConsulClient(config => config.Address = this.clusteringSiloTableOptions.Address);
         }
 
         /// <summary>
