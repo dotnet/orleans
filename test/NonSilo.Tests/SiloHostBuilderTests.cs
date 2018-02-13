@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -62,13 +63,15 @@ namespace NonSilo.Tests
         [Fact]
         public void SiloHostBuilder_AssembliesTest()
         {
-            var builder = (ISiloHostBuilder) new SiloHostBuilder()
-                                                .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
+            var builder = new SiloHostBuilder().ConfigureEndpoints(IPAddress.Any, 9999, 0)
+                .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
             Assert.Throws<OrleansConfigurationException>(() => builder.Build());
 
-            // Adding an application assembly causes the 
-            builder = new SiloHostBuilder().UseConfiguration(new ClusterConfiguration()).ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IAccountGrain).Assembly))
-                .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>()); ;
+            // Adding an application assembly allows the silo to be correctly built.
+            builder = new SiloHostBuilder().UseConfiguration(new ClusterConfiguration())
+                .ConfigureEndpoints(IPAddress.Any, 9999, 0)
+                .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IAccountGrain).Assembly))
+                .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
             using (var silo = builder.Build())
             {
                 Assert.NotNull(silo);

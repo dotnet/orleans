@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.ApplicationParts;
 using Orleans.Configuration;
+using Orleans.Configuration.Validators;
 using Orleans.Hosting;
 using Orleans.Metadata;
 using Orleans.Providers;
@@ -64,11 +65,13 @@ namespace Orleans
 
             services.TryAddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
 
-            //Add default option formatter if none is configured, for options which are requied to be configured 
+            // Add default option formatter if none is configured, for options which are requied to be configured 
             services.TryConfigureFormatter<ClusterClientOptions, ClusterClientOptionsFormatter>();
             services.TryConfigureFormatter<ClientMessagingOptions, ClientMessagingOptionFormatter>();
             services.TryConfigureFormatter<NetworkingOptions, NetworkingOptionsFormatter>();
             services.TryConfigureFormatter<ClientStatisticsOptions, ClientStatisticsOptionsFormatter>();
+            
+            services.AddTransient<IConfigurationValidator, ClientClusteringValidator>();
         }
     }
 }
