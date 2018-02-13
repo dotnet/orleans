@@ -18,7 +18,7 @@ namespace NetCore.Tests
 
         public ExceptionTests()
         {
-            this.silo = SiloHostBuilder.CreateDefault()
+            this.silo = new SiloHostBuilder()
                 .ConfigureApplicationParts(
                     parts =>
                         parts.AddApplicationPart(typeof(ExceptionGrain).Assembly).WithReferences())
@@ -26,7 +26,11 @@ namespace NetCore.Tests
                 .Build();
             this.silo.StartAsync().GetAwaiter().GetResult();
 
-            this.client = ClientBuilder.CreateDefault()
+            this.client = new ClientBuilder()
+                .ConfigureApplicationParts(
+                    parts => parts
+                        .AddFromApplicationBaseDirectory()
+                        .AddFromAppDomain())
                 .ConfigureApplicationParts(parts =>
                     parts.AddApplicationPart(typeof(IExceptionGrain).Assembly).WithReferences())
                 .UseConfiguration(ClientConfiguration.LocalhostSilo())
