@@ -70,38 +70,35 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure silo to use Development membership
         /// </summary>
-        public static ISiloHostBuilder UseDevelopmentMembership(this ISiloHostBuilder builder, Action<DevelopmentMembershipOptions> configureOptions)
+        public static ISiloHostBuilder UseDevelopmentClustering(this ISiloHostBuilder builder, Action<DevelopmentMembershipOptions> configureOptions)
         {
-            return builder.ConfigureServices(services => services.UseDevelopmentMembership(configureOptions));
+            return builder.ConfigureServices(
+                services =>
+                {
+                    if (configureOptions != null)
+                    {
+                        services.Configure(configureOptions);
+                    }
+
+                    services
+                        .AddSingleton<GrainBasedMembershipTable>()
+                        .AddFromExisting<IMembershipTable, GrainBasedMembershipTable>();
+                });
         }
 
         /// <summary>
         /// Configure silo to use Development membership
         /// </summary>
-        public static ISiloHostBuilder UseDevelopmentMembership(this ISiloHostBuilder builder, Action<OptionsBuilder<DevelopmentMembershipOptions>> configureOptions)
+        public static ISiloHostBuilder UseDevelopmentClustering(this ISiloHostBuilder builder, Action<OptionsBuilder<DevelopmentMembershipOptions>> configureOptions)
         {
-            return builder.ConfigureServices(services => services.UseDevelopmentMembership(configureOptions));
-        }
-
-        /// <summary>
-        /// Configure silo to use Development membership
-        /// </summary>
-        public static IServiceCollection UseDevelopmentMembership(this IServiceCollection services, Action<DevelopmentMembershipOptions> configureOptions)
-        {
-            return services.UseDevelopmentMembership(ob => ob.Configure(configureOptions));
-        }
-
-        /// <summary>
-        /// Configure silo to use Development membership
-        /// </summary>
-        public static IServiceCollection UseDevelopmentMembership(this IServiceCollection services, Action<OptionsBuilder<DevelopmentMembershipOptions>> configureOptions)
-        {
-            configureOptions?.Invoke(services.AddOptions<DevelopmentMembershipOptions>());
-            services
-                .AddSingleton<GrainBasedMembershipTable>()
-                .AddFromExisting<IMembershipTable, GrainBasedMembershipTable>();
-
-            return services;
+            return builder.ConfigureServices(
+                services =>
+                {
+                    configureOptions?.Invoke(services.AddOptions<DevelopmentMembershipOptions>());
+                    services
+                        .AddSingleton<GrainBasedMembershipTable>()
+                        .AddFromExisting<IMembershipTable, GrainBasedMembershipTable>();
+                });
         }
     }
 }
