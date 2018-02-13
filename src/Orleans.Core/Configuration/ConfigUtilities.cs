@@ -97,11 +97,6 @@ namespace Orleans.Runtime.Configuration
             {
                 config.StatisticsProviderName = root.GetAttribute("ProviderType");
             }
-            if (root.HasAttribute("MetricsTableWriteInterval"))
-            {
-                config.StatisticsMetricsTableWriteInterval = ParseTimeSpan(root.GetAttribute("MetricsTableWriteInterval"),
-                    "Invalid TimeSpan value for Statistics.MetricsTableWriteInterval attribute on Statistics element for " + nodeName);
-            }
             if (root.HasAttribute("PerfCounterWriteInterval"))
             {
                 config.StatisticsPerfCountersWriteInterval = ParseTimeSpan(root.GetAttribute("PerfCounterWriteInterval"),
@@ -473,7 +468,6 @@ namespace Orleans.Runtime.Configuration
         {
             var sb = new StringBuilder();
             sb.Append("   Statistics: ").AppendLine();
-            sb.Append("     MetricsTableWriteInterval: ").Append(config.StatisticsMetricsTableWriteInterval).AppendLine();
             sb.Append("     PerfCounterWriteInterval: ").Append(config.StatisticsPerfCountersWriteInterval).AppendLine();
             sb.Append("     LogWriteInterval: ").Append(config.StatisticsLogWriteInterval).AppendLine();
             sb.Append("     WriteLogStatisticsToTable: ").Append(config.StatisticsWriteLogStatisticsToTable).AppendLine();

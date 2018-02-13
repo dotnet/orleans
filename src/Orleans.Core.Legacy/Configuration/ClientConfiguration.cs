@@ -129,7 +129,6 @@ namespace Orleans.Runtime.Configuration
         public TimeSpan GatewayListRefreshPeriod { get; set; }
 
         public string StatisticsProviderName { get; set; }
-        public TimeSpan StatisticsMetricsTableWriteInterval { get; set; }
         public TimeSpan StatisticsPerfCountersWriteInterval { get; set; }
         public TimeSpan StatisticsLogWriteInterval { get; set; }
         public bool StatisticsWriteLogStatisticsToTable { get; set; }
@@ -190,7 +189,6 @@ namespace Orleans.Runtime.Configuration
 
             GatewayListRefreshPeriod = GatewayOptions.DEFAULT_GATEWAY_LIST_REFRESH_PERIOD;
             StatisticsProviderName = null;
-            StatisticsMetricsTableWriteInterval = StatisticsOptions.DEFAULT_METRICS_TABLE_WRITE_PERIOD;
             StatisticsPerfCountersWriteInterval = DEFAULT_STATS_PERF_COUNTERS_WRITE_PERIOD;
             StatisticsLogWriteInterval = StatisticsOptions.DEFAULT_LOG_WRITE_PERIOD;
             StatisticsWriteLogStatisticsToTable = StatisticsOptions.DEFAULT_LOG_TO_TABLE;
