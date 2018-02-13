@@ -4,11 +4,10 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.GrainDirectory;
-using Orleans.Hosting;
 using Orleans.SystemTargetInterfaces;
 using OutcomeState = Orleans.Runtime.GrainDirectory.GlobalSingleInstanceResponseOutcome.OutcomeState;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MultiClusterNetwork;
 
 namespace Orleans.Runtime.GrainDirectory

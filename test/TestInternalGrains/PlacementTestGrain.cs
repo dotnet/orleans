@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 
 using Orleans;
 using Orleans.Concurrency;
-using Orleans.Hosting;
+using Orleans.Configuration;
 using Orleans.Placement;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;

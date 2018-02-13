@@ -4,10 +4,10 @@ using System.Threading.Tasks;
 using Xunit.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging.Abstractions;
+using Orleans.Configuration;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.Development;
 using Orleans.TestingHost.Utils;
-using Orleans.Hosting;
 
 namespace Orleans.Transactions.Tests
 {

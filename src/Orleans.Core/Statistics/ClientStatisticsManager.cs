@@ -3,7 +3,7 @@ using System;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-using Orleans.Hosting;
+using Orleans.Configuration;
 using Orleans.Serialization;
 
 namespace Orleans.Runtime

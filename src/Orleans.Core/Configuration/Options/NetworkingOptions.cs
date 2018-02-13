@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Configures networking options.

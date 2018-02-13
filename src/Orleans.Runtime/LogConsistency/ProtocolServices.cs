@@ -4,13 +4,12 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.LogConsistency;
 using Orleans.MultiCluster;
 using Orleans.SystemTargetInterfaces;
 using Orleans.GrainDirectory;
-using Orleans.Hosting;
 using Orleans.Serialization;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MultiClusterNetwork;
 
 namespace Orleans.Runtime.LogConsistency

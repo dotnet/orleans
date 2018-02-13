@@ -18,8 +18,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.ApplicationParts;
 using Orleans.CodeGeneration;
+using Orleans.Configuration;
 using Orleans.Runtime;
-using Orleans.Hosting;
 using Orleans.Metadata;
 using Orleans.Utilities;
 

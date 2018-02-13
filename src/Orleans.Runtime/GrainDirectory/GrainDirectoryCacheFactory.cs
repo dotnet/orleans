@@ -1,8 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
-using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime.GrainDirectory
 {

@@ -1,4 +1,3 @@
-using Orleans;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -11,14 +10,13 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using Microsoft.Azure.EventHubs;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Orleans.Configuration;
 using TestExtensions;
 using Xunit;
 using Orleans.ServiceBus.Providers.Testing;
-using Orleans.Hosting;
 
 namespace ServiceBus.Tests.EvictionStrategyTests
 {

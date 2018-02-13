@@ -6,14 +6,13 @@ using System.Net;
 using System.Reflection;
 using System.Text;
 using System.Xml;
+using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Providers;
 using Orleans.Storage;
-using Orleans.Streams;
 using Orleans.LogConsistency;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
-using Orleans.Hosting;
 
 namespace Orleans.Runtime.Configuration
 {

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Hosting;
+using Orleans.Configuration;
 using Orleans.Runtime;
 
 namespace Orleans.Messaging

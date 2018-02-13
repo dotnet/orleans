@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Orleans.Hosting;
 using System;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime.Placement
 {
