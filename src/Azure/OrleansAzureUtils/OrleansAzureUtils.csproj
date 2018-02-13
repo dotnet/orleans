@@ -12,7 +12,6 @@
     <ProjectReference Include="..\Orleans.Hosting.AzureCloudServices\Orleans.Hosting.AzureCloudServices.csproj" />
     <ProjectReference Include="..\Orleans.Persistence.AzureStorage\Orleans.Persistence.AzureStorage.csproj" />
     <ProjectReference Include="..\Orleans.Reminders.AzureStorage\Orleans.Reminders.AzureStorage.csproj" />
-    <ProjectReference Include="..\Orleans.Statistics.AzureStorage\Orleans.Statistics.AzureStorage.csproj" />
     <ProjectReference Include="..\Orleans.Streaming.AzureStorage\Orleans.Streaming.AzureStorage.csproj" />
   </ItemGroup>
 

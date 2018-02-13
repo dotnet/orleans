@@ -20,7 +20,6 @@ namespace Orleans.Runtime
 
         public const string ORLEANS_CLUSTERING_AZURESTORAGE = "Orleans.Clustering.AzureStorage";
         public const string ORLEANS_REMINDERS_AZURESTORAGE = "Orleans.Reminders.AzureStorage";
-        public const string ORLEANS_STATISTICS_AZURESTORAGE = "Orleans.Statistics.AzureStorage";
 
         public const string ORLEANS_CLUSTERING_ADONET = "Orleans.Clustering.AdoNet";
         public const string ORLEANS_REMINDERS_ADONET = "Orleans.Reminders.AdoNet";

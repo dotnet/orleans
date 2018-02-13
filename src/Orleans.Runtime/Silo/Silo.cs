@@ -431,17 +431,8 @@ namespace Orleans.Runtime
                 var grainTypeManager = Services.GetRequiredService<GrainTypeManager>();
                 implicitStreamSubscriberTable.InitImplicitStreamSubscribers(grainTypeManager.GrainClassTypeData.Select(t => t.Value.Type).ToArray());
             }
-            
-            var siloProviderRuntime = Services.GetRequiredService<SiloProviderRuntime>();
-            SiloStatisticsOptions statisticsOptions = Services.GetRequiredService<IOptions<SiloStatisticsOptions>>().Value;
-            runtimeClient.CurrentStreamProviderRuntime = siloProviderRuntime;
-            await StartAsyncTaskWithPerfAnalysis("Load StatisticProviders", LoadStatsProvider, stopWatch);
-            async Task LoadStatsProvider()
-            {
-                // can call SetSiloMetricsTableDataManager only after MessageCenter is created (dependency on this.SiloAddress).
-                await siloStatistics.SetSiloStatsTableDataManager(this, statisticsOptions)
-                    .WithTimeout(initTimeout, $"SiloStatistics Setting SiloStatsTableDataManager failed due to timeout {initTimeout}");
-            }
+
+            this.runtimeClient.CurrentStreamProviderRuntime = this.Services.GetRequiredService<SiloProviderRuntime>();
             
             // This has to follow the above steps that start the runtime components
             await StartAsyncTaskWithPerfAnalysis("Create system targets and inject dependencies", () =>

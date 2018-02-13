@@ -10,8 +10,6 @@ namespace Orleans.Clustering.AzureStorage.Utilities
 namespace Orleans.Persistence.AzureStorage.Utilities
 #elif ORLEANS_REMINDERS
 namespace Orleans.Reminders.AzureStorage.Utilities
-#elif ORLEANS_STATISTICS
-namespace Orleans.Statistics.AzureStorage.Utilities
 #elif ORLEANS_STREAMING
 namespace Orleans.Streaming.AzureStorage.Utilities
 #elif ORLEANS_EVENTHUBS

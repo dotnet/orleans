@@ -27,7 +27,7 @@ namespace Orleans.Configuration
     {
         public string Name => nameof(SiloStatisticsOptions);
 
-        private SiloStatisticsOptions options;
+        private readonly SiloStatisticsOptions options;
 
         public SiloStatisticsOptionsFormatter(IOptions<SiloStatisticsOptions> options)
             :base(options.Value)

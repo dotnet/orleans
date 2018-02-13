@@ -12,8 +12,6 @@ namespace Orleans.Clustering.AdoNet.Storage
 namespace Orleans.Persistence.AdoNet.Storage
 #elif REMINDERS_ADONET
 namespace Orleans.Reminders.AdoNet.Storage
-#elif STATISTICS_ADONET
-namespace Orleans.Statistics.AdoNet.Storage
 #elif TESTER_SQLUTILS
 namespace Orleans.Tests.SqlUtils
 #else
@@ -89,96 +87,7 @@ namespace Orleans.Tests.SqlUtils
             var ret = await storage.ReadAsync(query, selector, command => parameterProvider(command));
             return aggregator(ret);
         }
-
-#if STATISTICS_ADONET || TESTER_SQLUTILS
         
-        /// <summary>
-        /// Inserts the given statistics counters to the Orleans database.
-        /// </summary>
-        /// <param name="deploymentId">The deployment ID.</param>
-        /// <param name="hostName">The hostname.</param>
-        /// <param name="siloOrClientName">The silo or client name.</param>
-        /// <param name="id">The silo address or client ID.</param>
-        /// <param name="counters">The counters to be inserted.</param>        
-        internal Task InsertStatisticsCountersAsync(string deploymentId, string hostName, string siloOrClientName,
-            string id, List<ICounter> counters)
-        {
-            var queryTemplate = dbStoredQueries.InsertOrleansStatisticsKey;
-            //Zero statistic values mean either that the system is not running or no updates. Such values are not inserted and pruned
-            //here so that no insert query or parameters are generated.
-            counters =
-                counters.Where(i => !"0".Equals(i.IsValueDelta ? i.GetDeltaString() : i.GetValueString())).ToList();
-            if (counters.Count == 0)
-            {
-                return Task.CompletedTask;
-            }
-
-            //Note that the following is almost the same as RelationalStorageExtensions.ExecuteMultipleInsertIntoAsync
-            //the only difference being that some columns are skipped. Likely it would be beneficial to introduce
-            //a "skip list" to RelationalStorageExtensions.ExecuteMultipleInsertIntoAsync.
-
-            //The template contains an insert for online. The part after SELECT is copied
-            //out so that certain parameters can be multiplied by their count. Effectively
-            //this turns a query of type (transaction details vary by vendor)
-            //BEGIN TRANSACTION; INSERT INTO [OrleansStatisticsTable] <columns> SELECT <variables>; COMMIT TRANSACTION;
-            //to BEGIN TRANSACTION; INSERT INTO [OrleansStatisticsTable] <columns> SELECT <variables>; UNION ALL <variables> COMMIT TRANSACTION;
-            //where the UNION ALL is multiplied as many times as there are counters to insert.
-            int startFrom = queryTemplate.IndexOf("SELECT", StringComparison.Ordinal) + "SELECT".Length + 1;
-            //This +1 is to have a space between SELECT and the first parameter name to not to have a SQL syntax error.
-            int lastSemicolon = queryTemplate.LastIndexOf(";", StringComparison.Ordinal);
-            int endTo = lastSemicolon > 0 ? queryTemplate.LastIndexOf(";", lastSemicolon - 1, StringComparison.Ordinal) : -1;
-            var template = queryTemplate.Substring(startFrom, endTo - startFrom);
-
-            //HACK: The oracle query template ends with FROM DUAL, other providers queries don´t.
-            //It has to stay in the query template, but needs to removed from the template variable, because
-            //the otherwise the Replace which used for the union generation below would generate an invalid query  
-            template = template.Replace(" FROM DUAL", String.Empty);
-
-            var parameterNames = template.Split(new[] { "," }, StringSplitOptions.RemoveEmptyEntries)
-                                         .Select(i => i.Trim()).ToArray();
-
-            var collectionOfParametersToBeUnionized = new List<string>();
-            var parametersToBeUnioned = new string[parameterNames.Length];
-            for (int counterIndex = 0; counterIndex < counters.Count; ++counterIndex)
-            {
-                for (int parameterNameIndex = 0; parameterNameIndex < parameterNames.Length; ++parameterNameIndex)
-                {
-                    //The column names in InsertStatisticsMultiupdateColumns are without parameter placeholders,
-                    //but parameterNames are with placeholders. As the placeholder is provider dependent, we are ignoring 
-                    //the placeholder when looking for columns.
-                    if (InsertStatisticsMultiupdateColumns.Any(x => parameterNames[parameterNameIndex].EndsWith(x)))
-                    {
-                        //These parameters change for each row. The format is
-                        //@StatValue0, @StatValue1, @StatValue2, ... @sStatValue{counters.Count}.
-                        parametersToBeUnioned[parameterNameIndex] = $"{parameterNames[parameterNameIndex]}{counterIndex}";
-                    }
-                    else
-                    {
-                        //These parameters remain constant for every and each row.
-                        parametersToBeUnioned[parameterNameIndex] = parameterNames[parameterNameIndex];
-                    }
-                }
-                collectionOfParametersToBeUnionized.Add($"{string.Join(",", parametersToBeUnioned)}");
-            }
-
-            var storageConsts = DbConstantsStore.GetDbConstants(storage.InvariantName);
-            var query = queryTemplate.Replace(template, string.Join(storageConsts.UnionAllSelectTemplate, collectionOfParametersToBeUnionized));
-            return ExecuteAsync(query, command =>
-            {
-                var columns = new DbStoredQueries.Columns(command)
-                {
-                    DeploymentId = deploymentId,
-                    HostName = hostName,
-                    Name = siloOrClientName,
-                    Id = id
-                };
-                columns.Counters = counters;
-                return columns;
-            });
-        }
-
-#endif
-
 #if REMINDERS_ADONET || TESTER_SQLUTILS
 
         /// <summary>

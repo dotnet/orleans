@@ -30,11 +30,15 @@ namespace Orleans.Transactions
         public TimeSpan TransactionRecordPreservationDuration { get; set; }
         public static readonly TimeSpan DefaultTransactionRecordPreservationDuration = TimeSpan.FromMinutes(1);
 
+        public TimeSpan MetricsWritePeriod { get; set; }
+        public static readonly TimeSpan DefaultMetricsWritePeriod = TimeSpan.FromSeconds(30);
+
         private void UseDefaults()
         {
             this.TransactionIdAllocationBatchSize = DefaultTransactionIdAllocationBatchSize;
             this.AvailableTransactionIdThreshold = DefaultAvailableTransactionIdThreshold;
             this.TransactionRecordPreservationDuration = DefaultTransactionRecordPreservationDuration;
+            this.MetricsWritePeriod = DefaultMetricsWritePeriod;
         }
     }
 }
