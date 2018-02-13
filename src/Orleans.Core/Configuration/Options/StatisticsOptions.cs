@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     /// <summary>
     /// The StatisticsOptions type contains various statistics output related options.

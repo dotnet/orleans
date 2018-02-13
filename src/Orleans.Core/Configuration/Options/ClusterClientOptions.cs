@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Microsoft.Extensions.Options;
 
-namespace Orleans.Runtime
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Configures the Orleans cluster client.

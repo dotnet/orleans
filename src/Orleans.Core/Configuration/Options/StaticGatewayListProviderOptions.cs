@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Options;
 
-namespace Orleans.Configuration.Options
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Options for Configure StaticGatewayListProvider

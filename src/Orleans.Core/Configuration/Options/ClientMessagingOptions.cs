@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Net.Sockets;
 using Microsoft.Extensions.Options;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Specifies global messaging options that are client related.

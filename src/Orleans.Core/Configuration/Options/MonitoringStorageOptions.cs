@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     public class MonitoringStorageOptions
     {

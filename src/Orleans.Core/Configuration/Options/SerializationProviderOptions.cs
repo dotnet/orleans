@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using Microsoft.Extensions.Options;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Specifies serialization provider and fallback serializer options.

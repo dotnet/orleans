@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Options;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Configuration of silo grain services.

@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Versioning options govern grain implementation selection in heterogeneous deployments.
