@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 
-namespace Orleans.ConsulUtils.Options
+namespace Orleans.Configuration
 {
     public class ConsulGatewayListProviderOptions
     {

@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Orleans.Transactions
+namespace Orleans.Configuration
 {
     public class TransactionsOptions
     {

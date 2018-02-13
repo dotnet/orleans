@@ -13,6 +13,7 @@ using Xunit.Abstractions;
 using Tester;
 using Orleans.Hosting;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace UnitTests.StreamingTests
 {

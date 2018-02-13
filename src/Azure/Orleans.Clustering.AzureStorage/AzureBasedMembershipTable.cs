@@ -8,7 +8,7 @@ using Microsoft.WindowsAzure.Storage;
 using Orleans.AzureUtils;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.AzureUtils.Configuration;
+using Orleans.Configuration;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 using Orleans.Runtime.Configuration;
 using Orleans.Clustering.AzureStorage;

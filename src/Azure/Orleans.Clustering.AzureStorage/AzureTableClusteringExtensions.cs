@@ -1,14 +1,13 @@
 ﻿using System;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.AzureUtils;
-using Orleans.AzureUtils.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime.MembershipService;
-using Orleans.AzureUtils.Options;
+using Orleans.Configuration;
 
 namespace Orleans.Hosting
 {
-    public static class AzureTableMembershipHostingOptions
+    public static class AzureTableClusteringExtensions
     {
         /// <summary>
         /// Configure ISiloHostBuilder to use AzureTableBasedMembership

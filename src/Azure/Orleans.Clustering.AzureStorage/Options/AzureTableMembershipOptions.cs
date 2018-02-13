@@ -1,4 +1,4 @@
-﻿namespace Orleans.AzureUtils.Configuration
+﻿namespace Orleans.Configuration
 {
     /// <summary>
     /// Specify options used for AzureTableBasedMembership

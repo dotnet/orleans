@@ -3,8 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Messaging;
 using Orleans.Runtime.Membership;
 using Orleans.Runtime.MembershipService;
-using OrleansAWSUtils.Configuration;
-using OrleansAWSUtils.Options;
+using Orleans.Configuration;
 
 namespace Orleans.Hosting
 {

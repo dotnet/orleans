@@ -2,8 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Messaging;
 using Orleans.Runtime.Membership;
-using OrleansZooKeeperUtils.Configuration;
-using OrleansZooKeeperUtils.Options;
+using Orleans.Configuration;
 
 namespace Orleans.Hosting
 {

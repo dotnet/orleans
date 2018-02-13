@@ -9,14 +9,13 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Membership;
 using Orleans.Runtime.MembershipService;
-using OrleansAWSUtils.Configuration;
 using TestExtensions;
 using UnitTests;
 using UnitTests.MembershipTests;
 using Xunit;
 using OrleansAWSUtils;
 using OrleansAWSUtils.Membership;
-using OrleansAWSUtils.Options;
+using Orleans.Configuration;
 
 namespace AWSUtils.Tests.MembershipTests
 {

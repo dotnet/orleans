@@ -4,9 +4,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using Orleans;
-using Orleans.Hosting;
+using Orleans.Configuration;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ReminderService;
 using Orleans.Tests.SqlUtils;
 using TestExtensions;

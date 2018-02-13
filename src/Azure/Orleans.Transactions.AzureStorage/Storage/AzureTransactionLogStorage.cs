@@ -6,6 +6,7 @@ using Microsoft.WindowsAzure.Storage.Table;
 using Microsoft.WindowsAzure.Storage.RetryPolicies;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Configuration;
 using Orleans.Serialization;
 using Orleans.Transactions.Abstractions;
 

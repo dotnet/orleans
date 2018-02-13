@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 
 using Orleans.Runtime.Configuration;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Configuration for Amazon DynamoDB reminder storage.

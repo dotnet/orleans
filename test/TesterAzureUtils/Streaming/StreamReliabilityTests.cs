@@ -14,7 +14,6 @@ using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
-using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
@@ -23,6 +22,7 @@ using Xunit;
 using Xunit.Abstractions;
 using Tester;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 // ReSharper disable ConvertToConstant.Local
 // ReSharper disable CheckNamespace

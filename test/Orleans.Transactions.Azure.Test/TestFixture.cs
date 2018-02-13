@@ -5,8 +5,8 @@ using Orleans.TestingHost;
 using Orleans.Transactions.Tests;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
-using Orleans.Runtime;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {

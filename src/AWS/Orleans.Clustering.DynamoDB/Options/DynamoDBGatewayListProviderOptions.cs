@@ -1,6 +1,6 @@
 ﻿using Orleans.Clustering.DynamoDB;
 
-namespace OrleansAWSUtils.Options
+namespace Orleans.Configuration
 {
     public class DynamoDBGatewayListProviderOptions
     {

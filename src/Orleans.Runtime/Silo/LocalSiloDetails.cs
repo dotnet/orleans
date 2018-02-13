@@ -1,9 +1,7 @@
 using System;
 using System.Net;
-using System.Net.Sockets;
 using Microsoft.Extensions.Options;
-using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime
 {

@@ -1,4 +1,4 @@
-﻿namespace Orleans.AzureUtils.Options
+﻿namespace Orleans.Configuration
 {
     public class AzureTableGatewayListProviderOptions
     {

@@ -7,7 +7,6 @@ using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using OrleansZooKeeperUtils.Options;
 
 namespace Orleans.Runtime.Membership
 {
