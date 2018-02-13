@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Runtime.Configuration;
+
+using Orleans.Configuration;
 using Orleans.Runtime.MembershipService;
-using Orleans.Hosting;
 
 namespace Orleans.AdoNet
 {
@@ -10,13 +10,14 @@ namespace Orleans.AdoNet
     {
         public void Configure(object configuration, IServiceCollection services)
         {
-            services.UseAdoNetClustering(
+            services.Configure<AdoNetClusteringSiloOptions>(
                 options =>
                 {
                     var reader = new GlobalConfigurationReader(configuration);
                     options.AdoInvariant = reader.GetPropertyValue<string>("AdoInvariant");
                     options.ConnectionString = reader.GetPropertyValue<string>("DataConnectionString");
                 });
+            services.AddSingleton<IMembershipTable, AdoNetClusteringTable>();
         }
     }
 }

@@ -10,75 +10,107 @@ namespace Orleans.Hosting
     public static class AdoNetHostingExtensions
     {
         /// <summary>
-        /// Configure SiloHostBuilder with ADO.NET clustering
+        /// Configures this silo to use ADO.NET for clustering.
         /// </summary>
-        public static ISiloHostBuilder UseAdoNetClustering(this ISiloHostBuilder builder,
-            Action<AdoNetClusteringOptions> configureOptions)
+        /// <param name="builder">
+        /// The builder.
+        /// </param>
+        /// <param name="configureOptions">
+        /// The configuration delegate.
+        /// </param>
+        /// <returns>
+        /// The provided <see cref="ISiloHostBuilder"/>.
+        /// </returns>
+        public static ISiloHostBuilder UseAdoNetClustering(
+            this ISiloHostBuilder builder,
+            Action<AdoNetClusteringSiloOptions> configureOptions)
         {
-            return builder.ConfigureServices(services => services.UseAdoNetClustering(configureOptions));
+            return builder.ConfigureServices(
+                services =>
+                {
+                    if (configureOptions != null)
+                    {
+                        services.Configure(configureOptions);
+                    }
+
+                    services.AddSingleton<IMembershipTable, AdoNetClusteringTable>();
+                });
         }
 
         /// <summary>
-        /// Configure SiloHostBuilder with ADO.NET clustering
+        /// Configures this silo to use ADO.NET for clustering.
         /// </summary>
-        public static ISiloHostBuilder UseAdoNetClustering(this ISiloHostBuilder builder,
-            Action<OptionsBuilder<AdoNetClusteringOptions>> configureOptions)
+        /// <param name="builder">
+        /// The builder.
+        /// </param>
+        /// <param name="configureOptions">
+        /// The configuration delegate.
+        /// </param>
+        /// <returns>
+        /// The provided <see cref="ISiloHostBuilder"/>.
+        /// </returns>
+        public static ISiloHostBuilder UseAdoNetClustering(
+            this ISiloHostBuilder builder,
+            Action<OptionsBuilder<AdoNetClusteringSiloOptions>> configureOptions)
         {
-            return builder.ConfigureServices(services => services.UseAdoNetClustering(configureOptions));
+            return builder.ConfigureServices(
+                services =>
+                {
+                    configureOptions?.Invoke(services.AddOptions<AdoNetClusteringSiloOptions>());
+                    services.AddSingleton<IMembershipTable, AdoNetClusteringTable>();
+                });
         }
 
         /// <summary>
-        /// Configure client to use ADO.NET gateway list provider
+        /// Configures this client to use ADO.NET for clustering.
         /// </summary>
-        public static IClientBuilder UseAdoNetlGatewayListProvider(this IClientBuilder builder, Action<AdoNetGatewayListProviderOptions> configureOptions)
+        /// <param name="builder">
+        /// The builder.
+        /// </param>
+        /// <param name="configureOptions">
+        /// The configuration delegate.
+        /// </param>
+        /// <returns>
+        /// The provided <see cref="IClientBuilder"/>.
+        /// </returns>
+        public static IClientBuilder UseAdoNetClustering(
+            this IClientBuilder builder,
+            Action<AdoNetClusteringClientOptions> configureOptions)
         {
-            return builder.ConfigureServices(services => services.UseAdoNetlGatewayListProvider(configureOptions));
+            return builder.ConfigureServices(
+                services =>
+                {
+                    if (configureOptions != null)
+                    {
+                        services.Configure(configureOptions);
+                    }
+
+                    services.AddSingleton<IGatewayListProvider, AdoNetGatewayListProvider>();
+                });
         }
 
         /// <summary>
-        /// Configure client to use ADO.NET gateway list provider
+        /// Configures this client to use ADO.NET for clustering.
         /// </summary>
-        public static IClientBuilder UseAdoNetlGatewayListProvider(this IClientBuilder builder, Action<OptionsBuilder<AdoNetGatewayListProviderOptions>> configureOptions)
+        /// <param name="builder">
+        /// The builder.
+        /// </param>
+        /// <param name="configureOptions">
+        /// The configuration delegate.
+        /// </param>
+        /// <returns>
+        /// The provided <see cref="IClientBuilder"/>.
+        /// </returns>
+        public static IClientBuilder UseAdoNetClustering(
+            this IClientBuilder builder,
+            Action<OptionsBuilder<AdoNetClusteringClientOptions>> configureOptions)
         {
-            return builder.ConfigureServices(services => services.UseAdoNetlGatewayListProvider(configureOptions));
-        }
-
-        /// <summary>
-        /// Configure DI container with ADO.NET clustering
-        /// </summary>
-        public static IServiceCollection UseAdoNetClustering(this IServiceCollection services,
-            Action<AdoNetClusteringOptions> configureOptions)
-        {
-            return services.UseAdoNetClustering(ob => ob.Configure(configureOptions));
-        }
-
-        /// <summary>
-        /// Configure DI container with ADO.NET clustering
-        /// </summary>
-        public static IServiceCollection UseAdoNetClustering(this IServiceCollection services,
-            Action<OptionsBuilder<AdoNetClusteringOptions>> configureOptions)
-        {
-            configureOptions?.Invoke(services.AddOptions<AdoNetClusteringOptions>());
-            return services.AddSingleton<IMembershipTable, AdoNetClusteringTable>();
-        }
-
-        /// <summary>
-        /// Configure DI container with ADO.NET gateway list provider
-        /// </summary>
-        public static IServiceCollection UseAdoNetlGatewayListProvider(this IServiceCollection services,
-            Action<AdoNetGatewayListProviderOptions> configureOptions)
-        {
-            return services.UseAdoNetlGatewayListProvider(ob => ob.Configure(configureOptions));
-        }
-
-        /// <summary>
-        /// Configure DI container with ADO.NET gateway list provider
-        /// </summary>
-        public static IServiceCollection UseAdoNetlGatewayListProvider(this IServiceCollection services,
-            Action<OptionsBuilder<AdoNetGatewayListProviderOptions>> configureOptions)
-        {
-            configureOptions?.Invoke(services.AddOptions<AdoNetGatewayListProviderOptions>());
-            return services.AddSingleton<IGatewayListProvider, AdoNetGatewayListProvider>();
+            return builder.ConfigureServices(
+                services =>
+                {
+                    configureOptions?.Invoke(services.AddOptions<AdoNetClusteringClientOptions>());
+                    services.AddSingleton<IGatewayListProvider, AdoNetGatewayListProvider>();
+                });
         }
     }
 }

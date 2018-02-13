@@ -3,7 +3,6 @@ using System.Linq;
 
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
-using Orleans.Configuration;
 using Orleans.Core.Legacy;
 using Orleans.Hosting;
 using Orleans.Runtime.Configuration;

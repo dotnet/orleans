@@ -34,7 +34,7 @@ namespace UnitTests.MembershipTests
         }
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
         {
-            var options = new AdoNetClusteringOptions()
+            var options = new AdoNetClusteringSiloOptions()
             {
                 AdoInvariant = GetAdoInvariant(),
                 ConnectionString = this.connectionString,
@@ -44,7 +44,7 @@ namespace UnitTests.MembershipTests
 
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
-            var options = new AdoNetGatewayListProviderOptions()
+            var options = new AdoNetClusteringClientOptions()
             {
                 ConnectionString = this.connectionString,
                 AdoInvariant = GetAdoInvariant()
