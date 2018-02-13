@@ -22,9 +22,9 @@ namespace Orleans.Runtime.Membership
         private string clusterId;
         private readonly string INSTANCE_STATUS_ACTIVE = ((int)SiloStatus.Active).ToString();
         private readonly ILoggerFactory loggerFactory;
-        private readonly DynamoDBGatewayListProviderOptions options;
+        private readonly DynamoDBClusteringClientOptions options;
         private readonly TimeSpan maxStaleness;
-        public DynamoDBGatewayListProvider(ILoggerFactory loggerFactory, ClientConfiguration clientConfiguration, IOptions<DynamoDBGatewayListProviderOptions> options, IOptions<ClusterClientOptions> clusterClientOptions)
+        public DynamoDBGatewayListProvider(ILoggerFactory loggerFactory, ClientConfiguration clientConfiguration, IOptions<DynamoDBClusteringClientOptions> options, IOptions<ClusterClientOptions> clusterClientOptions)
         {
             this.loggerFactory = loggerFactory;
             this.options = options.Value;

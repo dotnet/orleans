@@ -2,7 +2,7 @@
 
 namespace Orleans.Configuration
 {
-    public class DynamoDBGatewayListProviderOptions
+    public class DynamoDBClusteringClientOptions
     {
         /// <summary>
         /// AccessKey string for DynamoDB Storage

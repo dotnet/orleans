@@ -1,6 +1,6 @@
 ﻿namespace Orleans.Configuration
 {
-    public class DynamoDBMembershipOptions
+    public class DynamoDBClusteringSiloOptions
     {
         /// <summary>
         /// Connection string for DynamoDB Storage
