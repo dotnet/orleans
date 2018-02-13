@@ -37,6 +37,7 @@ namespace Orleans.Runtime
         public static readonly GrainId MembershipOracleId = GrainId.GetSystemTargetGrainId(15);
         public static readonly GrainId TypeManagerId = GrainId.GetSystemTargetGrainId(17);
         public static readonly GrainId FallbackSystemTargetId = GrainId.GetSystemTargetGrainId(19);
+        public static readonly GrainId StartupTaskSystemTargetId = GrainId.GetSystemTargetGrainId(20);
         public static readonly GrainId DeploymentLoadPublisherSystemTargetId = GrainId.GetSystemTargetGrainId(22);
         public static readonly GrainId MultiClusterOracleId = GrainId.GetSystemTargetGrainId(23);
         public static readonly GrainId ClusterDirectoryServiceId = GrainId.GetSystemTargetGrainId(24);

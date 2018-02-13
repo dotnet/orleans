@@ -361,7 +361,6 @@ namespace Orleans.Runtime
 
             // SystemTarget for provider init calls
             this.fallbackScheduler = Services.GetRequiredService<FallbackSystemTarget>();
-
             RegisterSystemTarget(fallbackScheduler);
         }
 
