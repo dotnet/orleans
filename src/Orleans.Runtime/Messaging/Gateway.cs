@@ -40,7 +40,17 @@ namespace Orleans.Runtime.Messaging
         private readonly ILoggerFactory loggerFactory;
         private readonly SiloMessagingOptions messagingOptions;
         
-        public Gateway(MessageCenter msgCtr, ILocalSiloDetails siloDetails, MessageFactory messageFactory, SerializationManager serializationManager, ExecutorService executorService, ILoggerFactory loggerFactory, IOptions<SiloMessagingOptions> options, IOptions<MultiClusterOptions> multiClusterOptions, OverloadDetector overloadDetector)
+        public Gateway(
+            MessageCenter msgCtr, 
+            ILocalSiloDetails siloDetails, 
+            MessageFactory messageFactory, 
+            SerializationManager serializationManager, 
+            ExecutorService executorService, 
+            ILoggerFactory loggerFactory, 
+            IOptions<EndpointOptions> endpointOptions,
+            IOptions<SiloMessagingOptions> options, 
+            IOptions<MultiClusterOptions> multiClusterOptions,
+            OverloadDetector overloadDetector)
         {
             this.messagingOptions = options.Value;
             this.loggerFactory = loggerFactory;
@@ -52,7 +62,7 @@ namespace Orleans.Runtime.Messaging
             acceptor = new GatewayAcceptor(
                 msgCtr,
                 this,
-                siloDetails.GatewayAddress?.Endpoint,
+                endpointOptions.Value.GetListeningProxyEndpoint(),
                 this.messageFactory,
                 this.serializationManager,
                 executorService,
