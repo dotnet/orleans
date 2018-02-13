@@ -1,11 +1,11 @@
 using System.Linq;
 using System.Reflection;
+
 using Orleans.ApplicationParts;
-using Orleans.Hosting;
 using Orleans.Metadata;
 using Orleans.Runtime;
 
-namespace Orleans
+namespace Orleans.Configuration.Validators
 {
     internal class ApplicationPartValidator : IConfigurationValidator
     {
