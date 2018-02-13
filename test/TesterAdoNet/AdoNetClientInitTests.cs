@@ -45,7 +45,6 @@ namespace Tester.SQLUtils
                         new Dictionary<string, string>() {{"ConnectionString", connectionString}});
                     legacy.ClientConfiguration.GatewayProvider = ClientConfiguration.GatewayProviderType.AdoNet;
                     legacy.ClientConfiguration.DataConnectionString = connectionString;
-                    legacy.ClientConfiguration.StatisticsMetricsTableWriteInterval = TimeSpan.FromSeconds(10);
                     this.ClientConfiguration = legacy.ClientConfiguration;
                     this.ClusterConfiguration = legacy.ClusterConfiguration;
                 });

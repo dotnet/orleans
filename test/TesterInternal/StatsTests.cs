@@ -32,7 +32,6 @@ namespace UnitTests.Stats
                     legacy.ClusterConfiguration.ApplyToAllNodes(nc => nc.StatisticsLogWriteInterval = TimeSpan.FromSeconds(1));
 
                     legacy.ClientConfiguration.RegisterStatisticsProvider<UnitTests.Stats.MockStatsClientCollector>("MockStats");
-                    legacy.ClientConfiguration.StatisticsMetricsTableWriteInterval = TimeSpan.FromSeconds(1);
                     legacy.ClientConfiguration.StatisticsLogWriteInterval = TimeSpan.FromSeconds(1);
                 });
             }

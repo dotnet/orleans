@@ -20,7 +20,6 @@ namespace Orleans.Runtime.Configuration
     /// </summary>
     public interface IStatisticsConfiguration
     {
-        TimeSpan StatisticsMetricsTableWriteInterval { get; set; }
         TimeSpan StatisticsPerfCountersWriteInterval { get; set; }
         TimeSpan StatisticsLogWriteInterval { get; set; }
         bool StatisticsWriteLogStatisticsToTable { get; set; }

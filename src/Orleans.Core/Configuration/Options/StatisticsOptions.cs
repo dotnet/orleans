@@ -11,13 +11,6 @@ namespace Orleans.Hosting
     public abstract class StatisticsOptions
     {
         /// <summary>
-        /// The MetricsTableWriteInterval property specifies the frequency of updating the metrics in Azure table.
-        ///  The default is 30 seconds.
-        /// </summary>
-        public TimeSpan MetricsTableWriteInterval { get; set; } = DEFAULT_METRICS_TABLE_WRITE_PERIOD;
-        public static readonly TimeSpan DEFAULT_METRICS_TABLE_WRITE_PERIOD = TimeSpan.FromSeconds(30);
-
-        /// <summary>
         /// The PerfCounterWriteInterval property specifies the frequency of updating the windows performance counters.
         /// The default is 30 seconds.
         /// </summary>
@@ -58,7 +51,6 @@ namespace Orleans.Hosting
         {
             return new List<string>()
             {
-                OptionFormattingUtilities.Format(nameof(this.options.MetricsTableWriteInterval), this.options.MetricsTableWriteInterval),
                 OptionFormattingUtilities.Format(nameof(this.options.PerfCountersWriteInterval), this.options.PerfCountersWriteInterval),
                 OptionFormattingUtilities.Format(nameof(this.options.LogWriteInterval), this.options.LogWriteInterval),
                 OptionFormattingUtilities.Format(nameof(this.options.WriteLogStatisticsToTable), this.options.WriteLogStatisticsToTable),

@@ -119,7 +119,12 @@ namespace Orleans.Transactions
 
         //metrics related
         private TransactionAgentMetrics metrics;
-        public TransactionAgent(ILocalSiloDetails siloDetails, ITransactionManagerService tmService, ILoggerFactory loggerFactory, ITelemetryProducer telemetryProducer, IOptions<SiloStatisticsOptions> statisticsOptions)
+        public TransactionAgent(
+            ILocalSiloDetails siloDetails, 
+            ITransactionManagerService tmService, 
+            ILoggerFactory loggerFactory, 
+            ITelemetryProducer telemetryProducer, 
+            IOptions<TransactionsOptions> options)
             : base(Constants.TransactionAgentSystemTargetId, siloDetails.SiloAddress, loggerFactory)
         {
             logger = loggerFactory.CreateLogger<TransactionAgent>();
@@ -134,7 +139,7 @@ namespace Orleans.Transactions
             transactionCommitQueue = new ConcurrentQueue<TransactionInfo>();
             commitCompletions = new ConcurrentDictionary<long, TaskCompletionSource<bool>>();
             outstandingCommits = new HashSet<long>();
-            this.metrics = new TransactionAgentMetrics(telemetryProducer, statisticsOptions.Value.MetricsTableWriteInterval);
+            this.metrics = new TransactionAgentMetrics(telemetryProducer, options.Value.MetricsWritePeriod);
         }
 
         #region ITransactionAgent
