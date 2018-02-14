@@ -46,12 +46,12 @@ namespace Tests.GeoClusterTests
                         .AddAzureTableGrainStorageAsDefault(builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
                         {
                             options.ServiceId = silo.Value.ServiceId.ToString();
-                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         }))
                         .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
                         {
                             options.ServiceId = silo.Value.ServiceId.ToString();
-                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         }));
                 }
             }

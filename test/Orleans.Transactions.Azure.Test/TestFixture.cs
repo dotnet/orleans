@@ -33,7 +33,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
                     .AddAzureTableGrainStorage(TransactionTestConstants.TransactionStore, builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
                     {
                         options.ServiceId = silo.Value.ServiceId.ToString();
-                        options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     }))
                     .UseAzureTransactionLog(options => {
                         // TODO: Find better way for test isolation.  Possibly different partition keys.

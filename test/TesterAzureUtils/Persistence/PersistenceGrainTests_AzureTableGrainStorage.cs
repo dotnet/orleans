@@ -54,23 +54,23 @@ namespace Tester.AzureUtils.Persistence
                         .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
                         {
                             options.ServiceId = silo.Value.ServiceId.ToString();
-                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.DeleteStateOnClear = true;
                         }))
                         .AddAzureTableGrainStorage("AzureStore1", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
                         {
                             options.ServiceId = silo.Value.ServiceId.ToString();
-                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         }))
                         .AddAzureTableGrainStorage("AzureStore2", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
                         {
                             options.ServiceId = silo.Value.ServiceId.ToString();
-                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         }))
                         .AddAzureTableGrainStorage("AzureStore3", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
                         {
                             options.ServiceId = silo.Value.ServiceId.ToString();
-                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         }));
                 }
             }
