@@ -156,20 +156,13 @@ namespace Orleans.Hosting
                 });
 
             services.Configure<NetworkingOptions>(options => LegacyConfigurationExtensions.CopyNetworkingOptions(configuration.Globals, options));
-            
+
             services.AddOptions<EndpointOptions>()
                 .Configure<IOptions<SiloOptions>>((options, siloOptions) =>
                 {
                     var nodeConfig = configuration.GetOrCreateNodeConfigurationForSilo(siloOptions.Value.SiloName);
-                    if (options.AdvertisedIPAddress == null)
-                    {
-                        options.AdvertisedIPAddress = nodeConfig.Endpoint.Address;
-                        options.SiloPort = nodeConfig.Endpoint.Port;
-                    }
-                    if (options.GatewayPort == 0 && nodeConfig.ProxyGatewayEndpoint != null)
-                    {
-                        options.GatewayPort = nodeConfig.ProxyGatewayEndpoint.Port;
-                    }
+                    options.AdvertisedIPAddress = nodeConfig.Endpoint.Address;
+                    options.SiloPort = nodeConfig.Endpoint.Port;
                 });
 
             services.Configure<SerializationProviderOptions>(options =>
