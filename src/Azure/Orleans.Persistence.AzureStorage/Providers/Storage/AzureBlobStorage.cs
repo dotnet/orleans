@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -28,6 +29,7 @@ namespace Orleans.Storage
 
         private CloudBlobContainer container;
         private ILogger logger;
+        private readonly string name;
         private AzureBlobStorageOptions options;
         private SerializationManager serializationManager;
         private IGrainFactory grainFactory;
@@ -36,18 +38,20 @@ namespace Orleans.Storage
 
         /// <summary> Default constructor </summary>
         public AzureBlobGrainStorage(
+            string name,
             AzureBlobStorageOptions options, 
             SerializationManager serializationManager, 
             IGrainFactory grainFactory, 
             ITypeResolver typeResolver, 
             ILoggerFactory loggerFactory)
         {
+            this.name = name;
             this.options = options;
             this.serializationManager = serializationManager;
             this.grainFactory = grainFactory;
             this.typeResolver = typeResolver;
             this.loggerFactory = loggerFactory;
-            this.logger = this.loggerFactory.CreateLogger<AzureTableGrainStorage>();
+            this.logger = this.loggerFactory.CreateLogger($"{typeof(AzureTableGrainStorageFactory).FullName}.{name}");
         }
 
         /// <summary> Read state data function for this storage provider. </summary>
@@ -200,6 +204,8 @@ namespace Orleans.Storage
         /// <see cref="IProvider.Init"/>
         private async Task Init(CancellationToken ct)
         {
+            var stopWatch = Stopwatch.StartNew();
+
             try
             {
                 this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(this.typeResolver, this.grainFactory), this.options.UseFullAssemblyNames, this.options.IndentJson, this.options.TypeNameHandling);
@@ -211,10 +217,13 @@ namespace Orleans.Storage
                 var blobClient = account.CreateCloudBlobClient();
                 container = blobClient.GetContainerReference(this.options.ContainerName);
                 await container.CreateIfNotExistsAsync().ConfigureAwait(false);
+                stopWatch.Stop();
+                this.logger.LogInformation((int)AzureProviderErrorCode.AzureBlobProvider_InitProvider, $"Initializing provider {this.name} of type {this.GetType().Name} in stage {this.options.InitStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");
             }
             catch (Exception ex)
             {
-                logger.Error((int)AzureProviderErrorCode.AzureBlobProvider_InitProvider, ex.ToString(), ex);
+                stopWatch.Stop();
+                this.logger.LogError((int)ErrorCode.Provider_ErrorFromInit, $"Initialization failed for provider {this.name} of type {this.GetType().Name} in stage {this.options.InitStage} in {stopWatch.ElapsedMilliseconds} Milliseconds.", ex);
                 throw;
             }
         }
