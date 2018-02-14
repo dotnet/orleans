@@ -379,7 +379,7 @@ namespace Orleans.Runtime
 
             var processExitHandlingOptions = this.Services.GetService<IOptions<ProcessExitHandlingOptions>>().Value;
             if(processExitHandlingOptions.FastKillOnProcessExit)
-             AppDomain.CurrentDomain.ProcessExit += HandleProcessExit;
+                AppDomain.CurrentDomain.ProcessExit += HandleProcessExit;
 
             //TODO: setup thead pool directly to lifecycle
             StartTaskWithPerfAnalysis("ConfigureThreadPoolAndServicePointSettings",
