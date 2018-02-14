@@ -16,7 +16,7 @@ using Xunit;
 
 namespace DefaultCluster.Tests
 {
-    [TestCategory("BVT")]
+    [TestCategory("BVT"), TestCategory("Lifecycle")]
     public class StartupTaskTests : IClassFixture<StartupTaskTests.Fixture>
     {
         public class Fixture : BaseTestClusterFixture
