@@ -40,6 +40,7 @@ namespace Orleans.Hosting
         #region json serialization related settings
         /// <summary>
         /// Whether storage string payload should be formatted in JSON.
+        /// <remarks>If neither <see cref="UseJsonFormat"/> nor <see cref="UseXmlFormat"/> is set to true, then BinaryFormatSerializer will be configured to format storage string payload.</remarks>
         /// </summary>
         public bool UseJsonFormat { get; set; }
         public bool UseFullAssemblyNames { get; set; }
@@ -48,6 +49,7 @@ namespace Orleans.Hosting
         #endregion
         /// <summary>
         /// Whether storage string payload should be formatted in Xml.
+        /// <remarks>If neither <see cref="UseJsonFormat"/> nor <see cref="UseXmlFormat"/> is set to true, then BinaryFormatSerializer will be configured to format storage string payload.</remarks>
         /// </summary>
         public bool UseXmlFormat { get; set; }
     }
