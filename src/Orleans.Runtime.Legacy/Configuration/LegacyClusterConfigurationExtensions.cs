@@ -93,7 +93,6 @@ namespace Orleans.Hosting
                 {
                     options.ServiceId = configuration.Globals.ServiceId;
                 }
-                options.FastKillOnCancelKeyPress = configuration.Globals.FastKillOnCancelKeyPress;
             });
 
             services.Configure<MultiClusterOptions>(options =>

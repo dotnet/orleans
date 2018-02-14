@@ -463,8 +463,6 @@ namespace Orleans.Runtime.Configuration
 
         public bool AssumeHomogenousSilosForTesting { get; set; }
 
-        public bool FastKillOnCancelKeyPress { get; set; }
-
         /// <summary>
         /// Determines if ADO should be used for storage of Membership and Reminders info.
         /// True if either or both of LivenessType and ReminderServiceType are set to SqlServer, false otherwise.
@@ -577,8 +575,6 @@ namespace Orleans.Runtime.Configuration
             this.GrainServiceConfigurations = new GrainServiceConfigurations();
             this.DefaultCompatibilityStrategy = BackwardCompatible.Singleton;
             this.DefaultVersionSelectorStrategy = AllCompatibleVersions.Singleton;
-
-            this.FastKillOnCancelKeyPress = true;
         }
 
         public override string ToString()

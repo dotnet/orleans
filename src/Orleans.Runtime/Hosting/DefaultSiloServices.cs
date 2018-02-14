@@ -239,6 +239,7 @@ namespace Orleans.Hosting
 
             //Add default option formatter if none is configured, for options which are required to be configured 
             services.TryConfigureFormatter<SiloOptions, SiloOptionsFormatter>();
+            services.TryConfigureFormatter<ProcessExitHandlingOptions, ProcessExitHandlingOptionsFormatter>();
             services.TryConfigureFormatter<SchedulingOptions, SchedulingOptionsFormatter>();
             services.TryConfigureFormatter<ThreadPoolOptions, ThreadPoolOptionsFormatter>();
             services.TryConfigureFormatter<SerializationProviderOptions, SerializationProviderOptionsFormatter>();
