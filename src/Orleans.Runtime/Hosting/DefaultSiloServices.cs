@@ -240,7 +240,7 @@ namespace Orleans.Hosting
             //Add default option formatter if none is configured, for options which are required to be configured 
             services.TryConfigureFormatter<SiloOptions, SiloOptionsFormatter>();
             services.TryConfigureFormatter<SchedulingOptions, SchedulingOptionsFormatter>();
-            services.TryConfigureFormatter<ThreadPoolOptions, ThreadPoolOptionsFormatter>();
+            services.TryConfigureFormatter<PerformanceTuningOptions, PerformanceTuningOptionsFormatter>();
             services.TryConfigureFormatter<SerializationProviderOptions, SerializationProviderOptionsFormatter>();
             services.TryConfigureFormatter<NetworkingOptions, NetworkingOptionsFormatter>();
             services.TryConfigureFormatter<SiloMessagingOptions, SiloMessagingOptionFormatter>();
@@ -254,7 +254,6 @@ namespace Orleans.Hosting
             services.TryConfigureFormatter<MultiClusterOptions, MultiClusterOptionsFormatter>();
             services.TryConfigureFormatter<SiloStatisticsOptions, SiloStatisticsOptionsFormatter>();
             services.TryConfigureFormatter<GrainServiceOptions, GrainServiceOptionsFormatter>();
-            services.TryConfigureFormatter<ServicePointOptions, ServicePointOptionsFormatter>();
             services.TryConfigureFormatter<TelemetryOptions, TelemetryOptionsFormatter>();
             services.TryConfigureFormatter<LoadSheddingOptions, LoadSheddingOptionsFormatter>();
             services.TryConfigureFormatter<EndpointOptions, EndpointOptionsFormatter>();

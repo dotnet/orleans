@@ -294,18 +294,13 @@ namespace Orleans.Hosting
                     options.DefaultVersionSelectorStrategy = config.DefaultVersionSelectorStrategy?.GetType().Name ?? GrainVersioningOptions.DEFAULT_VERSION_SELECTOR_STRATEGY;
                 });
 
-            services.AddOptions<ThreadPoolOptions>()
-                .Configure<NodeConfiguration>((options, config) =>
-                {
-                    options.MinDotNetThreadPoolSize = config.MinDotNetThreadPoolSize;
-                });
-
-            services.AddOptions<ServicePointOptions>()
+            services.AddOptions<PerformanceTuningOptions>()
                 .Configure<NodeConfiguration>((options, config) =>
                 {
                     options.DefaultConnectionLimit = config.DefaultConnectionLimit;
                     options.Expect100Continue = config.Expect100Continue;
                     options.UseNagleAlgorithm = config.UseNagleAlgorithm;
+                    options.MinDotNetThreadPoolSize = config.MinDotNetThreadPoolSize;
                 });
 
             services.AddOptions<TypeManagementOptions>()

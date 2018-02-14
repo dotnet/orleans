@@ -588,18 +588,18 @@ namespace Orleans.Runtime
 
         private void ConfigureThreadPoolAndServicePointSettings()
         {
-            ThreadPoolOptions threadPoolOptions = Services.GetRequiredService<IOptions<ThreadPoolOptions>>().Value;
-            if (threadPoolOptions.MinDotNetThreadPoolSize > 0)
+            PerformanceTuningOptions performanceTuningOptions = Services.GetRequiredService<IOptions<PerformanceTuningOptions>>().Value;
+            if (performanceTuningOptions.MinDotNetThreadPoolSize > 0)
             {
                 int workerThreads;
                 int completionPortThreads;
                 ThreadPool.GetMinThreads(out workerThreads, out completionPortThreads);
-                if (threadPoolOptions.MinDotNetThreadPoolSize > workerThreads ||
-                    threadPoolOptions.MinDotNetThreadPoolSize > completionPortThreads)
+                if (performanceTuningOptions.MinDotNetThreadPoolSize > workerThreads ||
+                    performanceTuningOptions.MinDotNetThreadPoolSize > completionPortThreads)
                 {
                     // if at least one of the new values is larger, set the new min values to be the larger of the prev. and new config value.
-                    int newWorkerThreads = Math.Max(threadPoolOptions.MinDotNetThreadPoolSize, workerThreads);
-                    int newCompletionPortThreads = Math.Max(threadPoolOptions.MinDotNetThreadPoolSize, completionPortThreads);
+                    int newWorkerThreads = Math.Max(performanceTuningOptions.MinDotNetThreadPoolSize, workerThreads);
+                    int newCompletionPortThreads = Math.Max(performanceTuningOptions.MinDotNetThreadPoolSize, completionPortThreads);
                     bool ok = ThreadPool.SetMinThreads(newWorkerThreads, newCompletionPortThreads);
                     if (ok)
                     {
@@ -618,13 +618,12 @@ namespace Orleans.Runtime
 
             // Set .NET ServicePointManager settings to optimize throughput performance when using Azure storage
             // http://blogs.msdn.com/b/windowsazurestorage/archive/2010/06/25/nagle-s-algorithm-is-not-friendly-towards-small-requests.aspx
-            ServicePointOptions servicePointOptions = Services.GetRequiredService<IOptions<ServicePointOptions>>().Value;
             logger.Info(ErrorCode.SiloConfiguredServicePointManager,
                 "Configured .NET ServicePointManager to Expect100Continue={0}, DefaultConnectionLimit={1}, UseNagleAlgorithm={2} to improve Azure storage performance.",
-                servicePointOptions.Expect100Continue, servicePointOptions.DefaultConnectionLimit, servicePointOptions.UseNagleAlgorithm);
-            ServicePointManager.Expect100Continue = servicePointOptions.Expect100Continue;
-            ServicePointManager.DefaultConnectionLimit = servicePointOptions.DefaultConnectionLimit;
-            ServicePointManager.UseNagleAlgorithm = servicePointOptions.UseNagleAlgorithm;
+                performanceTuningOptions.Expect100Continue, performanceTuningOptions.DefaultConnectionLimit, performanceTuningOptions.UseNagleAlgorithm);
+            ServicePointManager.Expect100Continue = performanceTuningOptions.Expect100Continue;
+            ServicePointManager.DefaultConnectionLimit = performanceTuningOptions.DefaultConnectionLimit;
+            ServicePointManager.UseNagleAlgorithm = performanceTuningOptions.UseNagleAlgorithm;
         }
 
         /// <summary>

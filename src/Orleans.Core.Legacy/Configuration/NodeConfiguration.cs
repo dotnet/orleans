@@ -237,11 +237,11 @@ namespace Orleans.Runtime.Configuration
 
             this.LimitManager = new LimitManager();
 
-            this.MinDotNetThreadPoolSize = ThreadPoolOptions.DEFAULT_MIN_DOT_NET_THREAD_POOL_SIZE;
+            this.MinDotNetThreadPoolSize = PerformanceTuningOptions.DEFAULT_MIN_DOT_NET_THREAD_POOL_SIZE;
 
             // .NET ServicePointManager settings / optimizations
             this.Expect100Continue = false;
-            this.DefaultConnectionLimit = ServicePointOptions.DEFAULT_MIN_DOT_NET_CONNECTION_LIMIT;
+            this.DefaultConnectionLimit = PerformanceTuningOptions.DEFAULT_MIN_DOT_NET_CONNECTION_LIMIT;
             this.UseNagleAlgorithm = false;
 
             this.AdditionalAssemblyDirectories = new Dictionary<string, SearchOption>();
