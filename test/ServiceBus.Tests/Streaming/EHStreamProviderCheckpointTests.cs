@@ -54,7 +54,7 @@ namespace ServiceBus.Tests.StreamingTests
                     ImplicitSubscription_RecoverableStream_CollectorGrain.StorageProviderName,
                     (AzureBlobStorageOptions options) =>
                     {
-                        options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     });
             }
         }

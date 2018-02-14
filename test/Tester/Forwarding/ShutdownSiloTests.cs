@@ -27,7 +27,7 @@ namespace Tester.Forwarding
             {
                 hostBuilder.AddAzureBlobGrainStorage("MemoryStore", (AzureBlobStorageOptions options) =>
                 {
-                    options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                 });
             }
         }

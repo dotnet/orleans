@@ -82,7 +82,7 @@ namespace Tester.AzureUtils.General
                 {
                     hostBuilder.AddAzureBlobGrainStorage("AzureStore", (AzureBlobStorageOptions options) =>
                     {
-                        options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     });
                 }
             }

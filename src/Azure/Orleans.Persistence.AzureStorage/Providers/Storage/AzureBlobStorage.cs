@@ -204,10 +204,10 @@ namespace Orleans.Storage
             {
                 this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(this.typeResolver, this.grainFactory), this.options.UseFullAssemblyNames, this.options.IndentJson, this.options.TypeNameHandling);
                 this.logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_InitProvider, $"AzureTableGrainStorage initializing: {this.options.ToString()}");
-                this.logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_ParamConnectionString, "AzureTableGrainStorage is using DataConnectionString: {0}", ConfigUtilities.RedactConnectionStringInfo(this.options.DataConnectionString));
+                this.logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_ParamConnectionString, "AzureTableGrainStorage is using DataConnectionString: {0}", ConfigUtilities.RedactConnectionStringInfo(this.options.ConnectionString));
                 this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(this.typeResolver, this.grainFactory), this.options.UseFullAssemblyNames, this.options.IndentJson, this.options.TypeNameHandling);
 
-                var account = CloudStorageAccount.Parse(this.options.DataConnectionString);
+                var account = CloudStorageAccount.Parse(this.options.ConnectionString);
                 var blobClient = account.CreateCloudBlobClient();
                 container = blobClient.GetContainerReference(this.options.ContainerName);
                 await container.CreateIfNotExistsAsync().ConfigureAwait(false);

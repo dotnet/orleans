@@ -177,7 +177,7 @@ namespace Tests.GeoClusterTests
                 });
                 hostBuilder.AddAzureBlobGrainStorage("PubSubStore", (AzureBlobStorageOptions options) =>
                 {
-                    options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                 });
             }
         }

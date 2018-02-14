@@ -32,19 +32,19 @@ namespace Tester.AzureUtils.Persistence
                 {
                     hostBuilder.AddAzureBlobGrainStorage("AzureStore", (AzureBlobStorageOptions options) =>
                     {
-                        options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     });
                     hostBuilder.AddAzureBlobGrainStorage("AzureStore1", (AzureBlobStorageOptions options) =>
                     {
-                        options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     });
                     hostBuilder.AddAzureBlobGrainStorage("AzureStore2", (AzureBlobStorageOptions options) =>
                     {
-                        options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     });
                     hostBuilder.AddAzureBlobGrainStorage("AzureStore3", (AzureBlobStorageOptions options) =>
                     {
-                        options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     });
                 }
             }

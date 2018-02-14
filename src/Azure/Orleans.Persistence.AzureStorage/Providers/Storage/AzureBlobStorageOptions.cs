@@ -9,9 +9,9 @@ namespace Orleans.Hosting
     public class AzureBlobStorageOptions
     {
         /// <summary>
-        /// Azure data connection string
+        /// Azure connection string
         /// </summary>
-        public string DataConnectionString { get; set; }
+        public string ConnectionString { get; set; }
 
         /// <summary>
         /// Container name where grain stage is stored
@@ -63,7 +63,7 @@ namespace Orleans.Hosting
             {
                 return new List<string>()
                 {
-                    OptionFormattingUtilities.Format(nameof(this.options.DataConnectionString), ConfigUtilities.RedactConnectionStringInfo(this.options.DataConnectionString)),
+                    OptionFormattingUtilities.Format(nameof(this.options.ConnectionString), ConfigUtilities.RedactConnectionStringInfo(this.options.ConnectionString)),
                     OptionFormattingUtilities.Format(nameof(this.options.ContainerName),this.options.ContainerName),
                     OptionFormattingUtilities.Format(nameof(this.options.InitStage),this.options.InitStage),
                     OptionFormattingUtilities.Format(nameof(this.options.UseJson),this.options.UseJson),
