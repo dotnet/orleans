@@ -35,7 +35,7 @@ namespace Orleans.Hosting
         /// <summary>
         /// The invariant name for storage.
         /// </summary>
-        public string AdoInvariant { get; set; } = DEFAULT_ADONET_INVARIANT;
+        public string Invariant { get; set; } = DEFAULT_ADONET_INVARIANT;
 
         #region json serialization related settings
         /// <summary>
@@ -125,7 +125,7 @@ namespace Orleans.Hosting
                 {
                     OptionFormattingUtilities.Format(nameof(this.options.ConnectionString),this.options.ConnectionString),
                     OptionFormattingUtilities.Format(nameof(this.options.InitStage),this.options.InitStage),
-                    OptionFormattingUtilities.Format(nameof(this.options.AdoInvariant),this.options.AdoInvariant),
+                    OptionFormattingUtilities.Format(nameof(this.options.Invariant),this.options.Invariant),
                     OptionFormattingUtilities.Format(nameof(this.options.UseJsonFormat),this.options.UseJsonFormat),
                     OptionFormattingUtilities.Format(nameof(this.options.UseFullAssemblyNames),this.options.UseFullAssemblyNames),
                     OptionFormattingUtilities.Format(nameof(this.options.IndentJson),this.options.IndentJson),

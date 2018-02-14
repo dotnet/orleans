@@ -82,7 +82,7 @@ namespace UnitTests.StorageTests.Relational
                             var options = new AdoNetGrainStorageOptions()
                             {
                                 ConnectionString = Storage.Storage.ConnectionString,
-                                AdoInvariant = storageInvariant
+                                Invariant = storageInvariant
                             };
                             var storageProvider = new AdoNetGrainStorage(DefaultProviderRuntime.ServiceProvider.GetService<ILogger<AdoNetGrainStorage>>(), DefaultProviderRuntime, Options.Create(options), storageInvariant + "_StorageProvider");
                             var siloLifeCycle = new SiloLifecycle(NullLoggerFactory.Instance);

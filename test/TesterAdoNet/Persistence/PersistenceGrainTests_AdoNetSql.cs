@@ -67,7 +67,7 @@ namespace Tester.AdoNet.Persistence
                         .AddAdoNetGrainStorage("GrainStorageForTest", options =>
                         {
                             options.ConnectionString = (string)connectionString;
-                            options.AdoInvariant = AdoInvariant;
+                            options.Invariant = AdoInvariant;
                         });
                 }
             }

@@ -391,7 +391,7 @@ namespace Orleans.Storage
             //with no regard to state update or serializer changes. Maybe have this serialized as a JSON in props and read via a key?
             StorageSerializationPicker = new DefaultRelationalStoragePicker(this.ConfigureDeserializers(options, providerRuntime), this.ConfigureSerializers(options, providerRuntime));
 
-            Storage = RelationalStorage.CreateInstance(options.AdoInvariant, options.ConnectionString);
+            Storage = RelationalStorage.CreateInstance(options.Invariant, options.ConnectionString);
             var queries = await Storage.ReadAsync(DefaultInitializationQuery, command => { }, (selector, resultSetCount, token) =>
             {
                 return Task.FromResult(Tuple.Create(selector.GetValue<string>("QueryKey"), selector.GetValue<string>("QueryText")));
