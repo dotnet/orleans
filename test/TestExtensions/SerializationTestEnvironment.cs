@@ -17,7 +17,12 @@ namespace TestExtensions
         {
             if (config == null) config = this.DefaultConfig();
 
-            var builder = ClientBuilder.CreateDefault();
+            var builder = new ClientBuilder()
+                .ConfigureDefaults()
+                .ConfigureApplicationParts(
+                    parts => parts
+                        .AddFromApplicationBaseDirectory()
+                        .AddFromAppDomain());
             builder.UseConfiguration(config);
             builder.ConfigureApplicationParts(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory());
             configureClientBuilder?.Invoke(builder);

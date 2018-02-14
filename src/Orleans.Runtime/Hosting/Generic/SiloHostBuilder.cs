@@ -20,14 +20,6 @@ namespace Orleans.Hosting
         private IHostingEnvironment hostingEnvironment;
         private bool built;
 
-        /// <summary>
-        /// Returns a new default silo builder.
-        /// </summary>
-        /// <returns>A new default silo builder.</returns>
-        public static ISiloHostBuilder CreateDefault()
-            => new SiloHostBuilder()
-                .ConfigureOrleans();
-
         /// <inheritdoc />
         public IDictionary<object, object> Properties { get; } = new Dictionary<object, object>();
 

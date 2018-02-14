@@ -43,7 +43,7 @@ namespace NonSilo.Tests
         [Fact]
         public void ClientBuilder_AssembliesTest()
         {
-            var builder = (IClientBuilder) new ClientBuilder()
+            var builder = new ClientBuilder()
                 .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
             Assert.Throws<OrleansConfigurationException>(() => builder.Build());
 
@@ -62,7 +62,12 @@ namespace NonSilo.Tests
         [Fact]
         public void ClientBuilder_NoSpecifiedConfigurationTest()
         {
-            var builder = ClientBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators)
+            var builder = new ClientBuilder()
+                .ConfigureDefaults()
+                .ConfigureApplicationParts(
+                    parts => parts
+                        .AddFromApplicationBaseDirectory()
+                        .AddFromAppDomain()).ConfigureServices(RemoveConfigValidators)
                 .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
             using (var client = builder.Build())
             {
@@ -76,7 +81,12 @@ namespace NonSilo.Tests
         [Fact]
         public void ClientBuilder_DoubleBuildTest()
         {
-            var builder = ClientBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators)
+            var builder = new ClientBuilder()
+                .ConfigureDefaults()
+                .ConfigureApplicationParts(
+                    parts => parts
+                        .AddFromApplicationBaseDirectory()
+                        .AddFromAppDomain()).ConfigureServices(RemoveConfigValidators)
                 .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
             using (builder.Build())
             {
@@ -90,7 +100,12 @@ namespace NonSilo.Tests
         [Fact]
         public void ClientBuilder_DoubleSpecifyConfigurationTest()
         {
-            var builder = ClientBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators)
+            var builder = new ClientBuilder()
+                .ConfigureDefaults()
+                .ConfigureApplicationParts(
+                    parts => parts
+                        .AddFromApplicationBaseDirectory()
+                        .AddFromAppDomain()).ConfigureServices(RemoveConfigValidators)
                 .UseConfiguration(new ClientConfiguration())
                 .UseConfiguration(new ClientConfiguration());
             Assert.Throws<InvalidOperationException>(() => builder.Build());
@@ -102,17 +117,28 @@ namespace NonSilo.Tests
         [Fact]
         public void ClientBuilder_NullConfigurationTest()
         {
-            var builder = ClientBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators);
+            var builder = new ClientBuilder()
+                .ConfigureDefaults()
+                .ConfigureApplicationParts(
+                    parts => parts
+                        .AddFromApplicationBaseDirectory()
+                        .AddFromAppDomain()).ConfigureServices(RemoveConfigValidators);
             Assert.Throws<ArgumentNullException>(() => builder.UseConfiguration(null));
         }
         
+
         /// <summary>
         /// Tests that the <see cref="IClientBuilder.ConfigureServices"/> delegate works as expected.
         /// </summary>
         [Fact]
         public void ClientBuilder_ServiceProviderTest()
         {
-            var builder = ClientBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators)
+            var builder = new ClientBuilder()
+                .ConfigureDefaults()
+                .ConfigureApplicationParts(
+                    parts => parts
+                        .AddFromApplicationBaseDirectory()
+                        .AddFromAppDomain()).ConfigureServices(RemoveConfigValidators)
                 .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
 
             Assert.Throws<ArgumentNullException>(() => builder.ConfigureServices(null));
