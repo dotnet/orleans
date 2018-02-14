@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using Orleans.Messaging;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.AzureUtils.Options;
 using Orleans.Configuration;
 
 namespace Orleans.AzureUtils

@@ -3,7 +3,7 @@ using Orleans.Clustering.DynamoDB;
 using Orleans.Hosting;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
-using OrleansAWSUtils.Options;
+using Orleans.Configuration;
 
 namespace OrleansAWSUtils.Membership
 {

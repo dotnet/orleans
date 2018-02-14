@@ -5,7 +5,7 @@ using Consul;
 using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.ConsulUtils.Configuration;
+using Orleans.Configuration;
 using Orleans.Runtime.Host;
 
 namespace Orleans.Runtime.Membership

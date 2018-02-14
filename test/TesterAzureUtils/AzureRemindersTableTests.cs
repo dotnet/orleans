@@ -5,9 +5,8 @@ using Microsoft.Extensions.Options;
 
 using Orleans;
 using Orleans.AzureUtils;
-using Orleans.Hosting;
+using Orleans.Configuration;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ReminderService;
 using Tester;
 using TestExtensions;

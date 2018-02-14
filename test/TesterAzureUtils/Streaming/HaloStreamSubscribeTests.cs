@@ -1,7 +1,6 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -14,9 +13,9 @@ using UnitTests.StreamingTests;
 using Xunit;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using Tester.AzureUtils;
 using Orleans.Hosting;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace UnitTests.HaloTests.Streaming
 {

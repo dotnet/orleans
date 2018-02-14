@@ -1,11 +1,9 @@
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
-using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using TestExtensions;

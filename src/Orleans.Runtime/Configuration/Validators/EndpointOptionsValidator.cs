@@ -2,10 +2,10 @@ using System;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-
+using Orleans.Runtime;
 using Orleans.Hosting;
 
-namespace Orleans.Runtime.Configuration
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Validates basic <see cref="EndpointOptions"/> configuration.

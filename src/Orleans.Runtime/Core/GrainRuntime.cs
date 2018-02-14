@@ -1,9 +1,8 @@
 using System;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Core;
-using Orleans.Runtime.Configuration;
-using Orleans.Streams;
 using Orleans.Timers;
 using Orleans.Storage;
 

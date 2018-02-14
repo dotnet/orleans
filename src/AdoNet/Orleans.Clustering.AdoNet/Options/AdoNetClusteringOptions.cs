@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Orleans.AdoNet.Configuration
+﻿namespace Orleans.Configuration
 {
     /// <summary>
     /// Options for ADO.NET clustering

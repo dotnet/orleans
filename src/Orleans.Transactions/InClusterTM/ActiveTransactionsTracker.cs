@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 
 namespace Orleans.Transactions
 {

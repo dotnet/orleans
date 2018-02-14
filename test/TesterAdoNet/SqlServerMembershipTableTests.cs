@@ -8,12 +8,11 @@ using Orleans.Runtime;
 using Orleans.Runtime.Membership;
 using Orleans.Runtime.MembershipService;
 using Orleans.Tests.SqlUtils;
-using Orleans.AdoNet.Configuration;
 using TestExtensions;
 using UnitTests.General;
 using Xunit;
 using Orleans.AdoNet;
-using Orleans.AdoNet.Options;
+using Orleans.Configuration;
 
 namespace UnitTests.MembershipTests
 {

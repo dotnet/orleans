@@ -9,7 +9,6 @@ using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
-using OrleansAWSUtils.Options;
 using Orleans.Clustering.DynamoDB;
 using Orleans.Configuration;
 

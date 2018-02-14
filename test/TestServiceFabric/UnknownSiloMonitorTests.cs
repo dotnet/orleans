@@ -4,6 +4,7 @@ using System.Net;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Clustering.ServiceFabric;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Xunit;
 using Xunit.Abstractions;

@@ -3,13 +3,13 @@ using System.Threading.Tasks;
 
 using Orleans.Concurrency;
 using Orleans.Providers;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Scheduler;
 using Orleans.Streams;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime.Providers
 {

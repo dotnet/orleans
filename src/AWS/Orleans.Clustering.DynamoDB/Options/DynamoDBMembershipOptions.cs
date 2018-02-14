@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace OrleansAWSUtils.Configuration
+﻿namespace Orleans.Configuration
 {
     public class DynamoDBMembershipOptions
     {

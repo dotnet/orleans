@@ -4,7 +4,7 @@ using Newtonsoft.Json;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Configuration for AzureTableGrainStorage

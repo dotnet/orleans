@@ -5,7 +5,7 @@ using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Extension methods for adding configuration related options services to the DI container via <see cref="OptionsBuilder{TOptions}"/>. This will be deprecated and superseded Mirosoft.Extensions.Options v2.1.0.0 once it ships.

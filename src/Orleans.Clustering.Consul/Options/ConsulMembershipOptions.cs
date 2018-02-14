@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Orleans.ConsulUtils.Configuration
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Options for configuring ConsulBasedMembership

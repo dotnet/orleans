@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Orleans.AdoNet.Options
+﻿namespace Orleans.Configuration
 {
     public class AdoNetGatewayListProviderOptions
     {

@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace OrleansZooKeeperUtils.Configuration
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Option to configure ZooKeeperMembership

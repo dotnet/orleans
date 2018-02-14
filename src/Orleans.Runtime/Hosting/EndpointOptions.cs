@@ -3,10 +3,10 @@
 using Orleans.Runtime.Configuration;
 using System.Net;
 using System.Net.Sockets;
-
+using Orleans.Hosting;
 using Microsoft.Extensions.Options;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Configures the Silo endpoint options

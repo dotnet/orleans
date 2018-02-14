@@ -8,7 +8,7 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
-using OrleansAWSUtils.Configuration;
+using Orleans.Configuration;
 using Orleans.Clustering.DynamoDB;
 
 namespace Orleans.Runtime.MembershipService

@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Concurrency;
-using Orleans.Hosting;
+using Orleans.Configuration;
 using Orleans.MultiCluster;
 using Orleans.Serialization;
 

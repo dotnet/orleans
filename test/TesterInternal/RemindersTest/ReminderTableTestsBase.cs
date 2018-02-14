@@ -1,19 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using TestExtensions;
 using UnitTests.MembershipTests;
 using Xunit;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.TestingHost.Utils;
-using Orleans.Hosting;
 
 namespace UnitTests.RemindersTest
 {

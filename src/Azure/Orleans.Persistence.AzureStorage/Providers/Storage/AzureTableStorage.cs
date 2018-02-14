@@ -12,12 +12,12 @@ using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
 using Newtonsoft.Json;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.Providers.Azure;
 using Orleans.Persistence.AzureStorage;
-using Orleans.Hosting;
 
 namespace Orleans.Storage
 {
