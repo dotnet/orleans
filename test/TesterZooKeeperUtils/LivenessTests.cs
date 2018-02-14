@@ -34,7 +34,7 @@ namespace Tester.ZooKeeperUtils
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
-                hostBuilder.UseZooKeeperMembership(options => { options.ConnectionString = TestDefaultConfiguration.DataConnectionString; });
+                hostBuilder.UseZooKeeperClustering(options => { options.ConnectionString = TestDefaultConfiguration.DataConnectionString; });
             }
         }
 

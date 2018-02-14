@@ -1,9 +1,11 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using System;
+
+using Microsoft.Extensions.DependencyInjection;
+
 using Orleans.Clustering.DynamoDB;
-using Orleans.Hosting;
-using Orleans.Messaging;
-using Orleans.Runtime.Configuration;
 using Orleans.Configuration;
+using Orleans.Messaging;
+using Orleans.Runtime.Membership;
 
 namespace OrleansAWSUtils.Membership
 {
@@ -13,11 +15,14 @@ namespace OrleansAWSUtils.Membership
         /// <inheritdoc/>
         public void ConfigureServices(object configuration, IServiceCollection services)
         {
-            services.UseDynamoDBGatewayListProvider(options =>
-            {
-                var reader = new ClientConfigurationReader(configuration);
-                ParseDataConnectionString(reader.GetPropertyValue<string>("DataConnectionString"), options);
-            });
+            services.Configure<DynamoDBClusteringClientOptions>(
+                options =>
+                {
+                    var reader = new ClientConfigurationReader(configuration);
+                    ParseDataConnectionString(reader.GetPropertyValue<string>("DataConnectionString"), options);
+                });
+
+            services.AddSingleton<IGatewayListProvider, DynamoDBGatewayListProvider>();
         }
 
         /// <summary>
@@ -25,7 +30,7 @@ namespace OrleansAWSUtils.Membership
         /// </summary>
         /// <param name="dataConnectionString"></param>
         /// <param name="options"></param>
-        public static void ParseDataConnectionString(string dataConnectionString, DynamoDBGatewayListProviderOptions options)
+        public static void ParseDataConnectionString(string dataConnectionString, DynamoDBClusteringClientOptions options)
         {
             DynamoDBStorage.ParseDataConnectionString(dataConnectionString, out var accessKey, out var secretKey, out var service, out var readCapacityUnits, out var writeCapacityUnits);
             options.AccessKey = accessKey;

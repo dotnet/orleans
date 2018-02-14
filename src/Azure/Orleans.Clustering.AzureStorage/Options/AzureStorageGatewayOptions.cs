@@ -1,9 +1,9 @@
 ﻿namespace Orleans.Configuration
 {
-    public class DynamoDBMembershipOptions
+    public class AzureStorageGatewayOptions
     {
         /// <summary>
-        /// Connection string for DynamoDB Storage
+        /// Connection string for Azure Storage
         /// </summary>
         public string ConnectionString { get; set; }
     }

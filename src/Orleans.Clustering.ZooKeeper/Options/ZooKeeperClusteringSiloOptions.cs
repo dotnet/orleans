@@ -5,13 +5,13 @@ using System.Text;
 namespace Orleans.Configuration
 {
     /// <summary>
-    /// Options for configuring ConsulBasedMembership
+    /// Option to configure ZooKeeperMembership
     /// </summary>
-    public class ConsulMembershipOptions
+    public class ZooKeeperClusteringSiloOptions
     {
         /// <summary>
-        /// Address for consul client
+        /// Connection string for ZooKeeper Storage
         /// </summary>
-        public Uri Address { get; set; }
+        public string ConnectionString { get; set; }
     }
 }

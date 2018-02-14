@@ -1,7 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Runtime.Configuration;
+
+using Orleans;
+using Orleans.Configuration;
 using Orleans.Runtime.MembershipService;
-using Orleans.Hosting;
+using Orleans.Runtime.Membership;
 
 namespace OrleansZooKeeperUtils
 {
@@ -11,7 +13,8 @@ namespace OrleansZooKeeperUtils
         public void Configure(object configuration, IServiceCollection services)
         {
             var reader = new GlobalConfigurationReader(configuration);
-            services.UseZooKeeperMembership(options => options.ConnectionString = reader.GetPropertyValue<string>("DataConnectionString"));
+            services.Configure<ZooKeeperClusteringSiloOptions>(options => options.ConnectionString = reader.GetPropertyValue<string>("DataConnectionString"));
+            services.AddSingleton<IMembershipTable, ZooKeeperBasedMembershipTable>();
         }
     }
 }

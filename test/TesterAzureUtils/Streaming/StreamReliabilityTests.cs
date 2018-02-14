@@ -71,7 +71,7 @@ namespace UnitTests.Streaming.Reliability
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
-                clientBuilder.UseAzureTableGatewayListProvider(gatewayOptions =>
+                clientBuilder.UseAzureStorageClustering(gatewayOptions =>
                 {
                     gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                 });
@@ -82,7 +82,7 @@ namespace UnitTests.Streaming.Reliability
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
-                hostBuilder.UseAzureTableMembership(options =>
+                hostBuilder.UseAzureStorageClustering(options =>
                 {
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     options.MaxStorageBusyRetries = 3;

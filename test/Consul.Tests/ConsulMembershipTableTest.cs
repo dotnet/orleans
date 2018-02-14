@@ -37,7 +37,7 @@ namespace Consul.Tests
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
         {
             ConsulTestUtils.EnsureConsul();
-            var options = new ConsulMembershipOptions()
+            var options = new ConsulClusteringSiloOptions()
             {
                 Address = new Uri(this.connectionString)
             };
@@ -47,7 +47,7 @@ namespace Consul.Tests
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
             ConsulTestUtils.EnsureConsul();
-            var options = new ConsulGatewayListProviderOptions()
+            var options = new ConsulClusteringClientOptions()
             {
                 Address = new Uri(this.connectionString)
             };

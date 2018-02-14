@@ -3,7 +3,7 @@
     /// <summary>
     /// Specify options used for AzureTableBasedMembership
     /// </summary>
-    public class AzureTableMembershipOptions
+    public class AzureStorageClusteringOptions
     {
         /// <summary>
         /// Retry count for Azure Table operations. 

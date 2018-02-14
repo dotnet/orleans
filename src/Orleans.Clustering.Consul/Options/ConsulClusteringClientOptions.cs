@@ -2,7 +2,7 @@
 
 namespace Orleans.Configuration
 {
-    public class ConsulGatewayListProviderOptions
+    public class ConsulClusteringClientOptions
     {
         /// <summary>
         /// Address for ConsulClient

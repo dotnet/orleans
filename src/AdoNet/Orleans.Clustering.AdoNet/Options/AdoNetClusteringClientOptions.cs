@@ -1,6 +1,6 @@
 ﻿namespace Orleans.Configuration
 {
-    public class AdoNetGatewayListProviderOptions
+    public class AdoNetClusteringClientOptions
     {
         /// <summary>
         /// Connection string for Sql

@@ -1,6 +1,8 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Hosting;
+
+using Orleans.Configuration;
+using Orleans.Runtime.Membership;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -10,7 +12,9 @@ namespace Orleans.Runtime.MembershipService
         public void Configure(object configuration, IServiceCollection services)
         {
             var reader = new GlobalConfigurationReader(configuration);
-            services.UseConsulMembership(options => options.Address = new Uri(reader.GetPropertyValue<string>("DataConnectionString")));
+
+            services.Configure<ConsulClusteringSiloOptions>(options => options.Address = new Uri(reader.GetPropertyValue<string>("DataConnectionString")));
+            services.AddSingleton<IMembershipTable, ConsulBasedMembershipTable>();
         }
     }
 }

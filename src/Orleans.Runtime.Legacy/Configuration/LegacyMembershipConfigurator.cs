@@ -66,7 +66,10 @@ namespace Orleans.Runtime.MembershipService
 
             private void ConfigureServices(GlobalConfiguration configuration, IServiceCollection services)
             {
-                services.UseDevelopmentMembership(options => CopyGlobalGrainBasedMembershipOptions(configuration, options));
+                services.Configure<DevelopmentMembershipOptions>(options => CopyGlobalGrainBasedMembershipOptions(configuration, options));
+                services
+                    .AddSingleton<GrainBasedMembershipTable>()
+                    .AddFromExisting<IMembershipTable, GrainBasedMembershipTable>();
             }
 
             private static void CopyGlobalGrainBasedMembershipOptions(GlobalConfiguration configuration, DevelopmentMembershipOptions options)

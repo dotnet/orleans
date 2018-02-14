@@ -42,7 +42,7 @@ namespace AWSUtils.Tests.MembershipTests
         {
             if (!AWSTestConstants.IsDynamoDbAvailable)
                 throw new SkipException("Unable to connect to AWS DynamoDB simulator");
-            var options = new DynamoDBMembershipOptions()
+            var options = new DynamoDBClusteringSiloOptions()
             {
                 ConnectionString = this.connectionString,
             };
@@ -51,7 +51,7 @@ namespace AWSUtils.Tests.MembershipTests
 
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
-            var options = new DynamoDBGatewayListProviderOptions();
+            var options = new DynamoDBClusteringClientOptions();
             LegacyDynamoDBGatewayListProviderConfigurator.ParseDataConnectionString(this.connectionString, options);
             return new DynamoDBGatewayListProvider(this.loggerFactory, this.clientConfiguration, Options.Create(options), this.clientOptions);
         }

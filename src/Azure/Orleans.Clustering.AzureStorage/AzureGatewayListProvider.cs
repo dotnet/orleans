@@ -12,11 +12,11 @@ namespace Orleans.AzureUtils
     {
         private OrleansSiloInstanceManager siloInstanceManager;
         private readonly string clusterId;
-        private readonly AzureTableGatewayListProviderOptions options;
+        private readonly AzureStorageGatewayOptions options;
         private readonly ILoggerFactory loggerFactory;
         private readonly TimeSpan maxStaleness;
 
-        public AzureGatewayListProvider(ILoggerFactory loggerFactory, IOptions<AzureTableGatewayListProviderOptions> options, IOptions<ClusterClientOptions> clusterClientOptions, IOptions<GatewayOptions> gatewayOptions)
+        public AzureGatewayListProvider(ILoggerFactory loggerFactory, IOptions<AzureStorageGatewayOptions> options, IOptions<ClusterClientOptions> clusterClientOptions, IOptions<GatewayOptions> gatewayOptions)
         {
             this.loggerFactory = loggerFactory;
             this.clusterId = clusterClientOptions.Value.ClusterId;

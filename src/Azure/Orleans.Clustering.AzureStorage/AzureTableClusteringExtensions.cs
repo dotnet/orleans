@@ -10,77 +10,107 @@ namespace Orleans.Hosting
     public static class AzureTableClusteringExtensions
     {
         /// <summary>
-        /// Configure ISiloHostBuilder to use AzureTableBasedMembership
+        /// Configures the silo to use Azure Storage for clustering.
         /// </summary>
-        public static ISiloHostBuilder UseAzureTableMembership(this ISiloHostBuilder builder,
-            Action<AzureTableMembershipOptions> configureOptions)
+        /// <param name="builder">
+        /// The silo builder.
+        /// </param>
+        /// <param name="configureOptions">
+        /// The configuration delegate.
+        /// </param>
+        /// <returns>
+        /// The provided <see cref="ISiloHostBuilder"/>.
+        /// </returns>
+        public static ISiloHostBuilder UseAzureStorageClustering(
+            this ISiloHostBuilder builder,
+            Action<AzureStorageClusteringOptions> configureOptions)
         {
-            return builder.ConfigureServices(services => services.UseAzureTableMembership(configureOptions));
+            return builder.ConfigureServices(
+                services =>
+                {
+                    if (configureOptions != null)
+                    {
+                        services.Configure(configureOptions);
+                    }
+
+                    services.AddSingleton<IMembershipTable, AzureBasedMembershipTable>();
+                });
         }
 
         /// <summary>
-        /// Configure ISiloHostBuilder to use AzureTableBasedMembership
+        /// Configures the silo to use Azure Storage for clustering.
         /// </summary>
-        public static ISiloHostBuilder UseAzureTableMembership(this ISiloHostBuilder builder,
-            Action<OptionsBuilder<AzureTableMembershipOptions>> configureOptions)
+        /// <param name="builder">
+        /// The silo builder.
+        /// </param>
+        /// <param name="configureOptions">
+        /// The configuration delegate.
+        /// </param>
+        /// <returns>
+        /// The provided <see cref="ISiloHostBuilder"/>.
+        /// </returns>
+        public static ISiloHostBuilder UseAzureStorageClustering(
+            this ISiloHostBuilder builder,
+            Action<OptionsBuilder<AzureStorageClusteringOptions>> configureOptions)
         {
-            return builder.ConfigureServices(services => services.UseAzureTableMembership(configureOptions));
-        }
-
-        /// Configure client to use AzureTableGatewayListProvider
-        /// </summary>
-        public static IClientBuilder UseAzureTableGatewayListProvider(this IClientBuilder builder,
-            Action<AzureTableGatewayListProviderOptions> configureOptions)
-        {
-            return builder.ConfigureServices(services => services.UseAzureTableGatewayListProvider(configureOptions));
-        }
-
-        /// <summary>
-        /// Configure client to use AzureTableGatewayListProvider
-        /// </summary>
-        public static IClientBuilder UseAzureTableGatewayListProvider(this IClientBuilder builder,
-            Action<OptionsBuilder<AzureTableGatewayListProviderOptions>> configureOptions)
-        {
-            return builder.ConfigureServices(services => services.UseAzureTableGatewayListProvider(configureOptions));
-        }
-
-        /// <summary>
-        /// Configure DI container to use AzureTableBasedMembership
-        /// </summary>
-        public static IServiceCollection UseAzureTableMembership(this IServiceCollection services,
-            Action<AzureTableMembershipOptions> configureOptions)
-        {
-            return services.UseAzureTableMembership(ob => ob.Configure(configureOptions));
+            return builder.ConfigureServices(
+                services =>
+                {
+                    configureOptions?.Invoke(services.AddOptions<AzureStorageClusteringOptions>());
+                    services.AddSingleton<IMembershipTable, AzureBasedMembershipTable>();
+                });
         }
 
         /// <summary>
-        /// Configure DI container to use AzureTableBasedMembership
+        /// Configures the client to use Azure Storage for clustering.
         /// </summary>
-        public static IServiceCollection UseAzureTableMembership(this IServiceCollection services,
-            Action<OptionsBuilder<AzureTableMembershipOptions>> configureOptions)
+        /// <param name="builder">
+        /// The client builder.
+        /// </param>
+        /// <param name="configureOptions">
+        /// The configuration delegate.
+        /// </param>
+        /// <returns>
+        /// The provided <see cref="IClientBuilder"/>.
+        /// </returns>
+        public static IClientBuilder UseAzureStorageClustering(
+            this IClientBuilder builder,
+            Action<AzureStorageGatewayOptions> configureOptions)
         {
-            configureOptions?.Invoke(services.AddOptions<AzureTableMembershipOptions>());
-            services.AddSingleton<IMembershipTable, AzureBasedMembershipTable>();
-            return services;
+            return builder.ConfigureServices(
+                services =>
+                {
+                    if (configureOptions != null)
+                    {
+                        services.Configure(configureOptions);
+                    }
+
+                    services.AddSingleton<IGatewayListProvider, AzureGatewayListProvider>();
+                });
         }
 
         /// <summary>
-        /// Configure DI container to use AzureTableGatewayListProvider
+        /// Configures the client to use Azure Storage for clustering.
         /// </summary>
-        public static IServiceCollection UseAzureTableGatewayListProvider(this IServiceCollection services,
-            Action<AzureTableGatewayListProviderOptions> configureOptions)
+        /// <param name="builder">
+        /// The client builder.
+        /// </param>
+        /// <param name="configureOptions">
+        /// The configuration delegate.
+        /// </param>
+        /// <returns>
+        /// The provided <see cref="IClientBuilder"/>.
+        /// </returns>
+        public static IClientBuilder UseAzureStorageClustering(
+            this IClientBuilder builder,
+            Action<OptionsBuilder<AzureStorageGatewayOptions>> configureOptions)
         {
-            return services.UseAzureTableGatewayListProvider(ob => ob.Configure(configureOptions));
-        }
-
-        /// <summary>
-        /// Configure DI container to use AzureTableGatewayListProvider
-        /// </summary>
-        public static IServiceCollection UseAzureTableGatewayListProvider(this IServiceCollection services,
-            Action<OptionsBuilder<AzureTableGatewayListProviderOptions>> configureOptions)
-        {
-            configureOptions?.Invoke(services.AddOptions<AzureTableGatewayListProviderOptions>());
-            return services.AddSingleton<IGatewayListProvider, AzureGatewayListProvider>();
+            return builder.ConfigureServices(
+                services =>
+                {
+                    configureOptions?.Invoke(services.AddOptions<AzureStorageGatewayOptions>());
+                    services.AddSingleton<IGatewayListProvider, AzureGatewayListProvider>();
+                });
         }
     }
 }
