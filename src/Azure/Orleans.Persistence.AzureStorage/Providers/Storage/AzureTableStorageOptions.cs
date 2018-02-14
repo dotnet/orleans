@@ -1,6 +1,9 @@
+using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Options;
+using Microsoft.WindowsAzure.Storage;
 using Newtonsoft.Json;
+using Orleans.Persistence.AzureStorage;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
@@ -52,6 +55,12 @@ namespace Orleans.Hosting
     {
         private readonly AzureTableStorageOptions options;
         private readonly string name;
+
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="options">The option to be validated.</param>
+        /// <param name="name">The option name to be validated.</param>
         public AzureTableGrainStorageOptionsValidator(AzureTableStorageOptions options, string name)
         {
             this.options = options;
@@ -60,9 +69,18 @@ namespace Orleans.Hosting
 
         public void ValidateConfiguration()
         {
-            if (string.IsNullOrEmpty(this.options.ConnectionString))
+            if (!CloudStorageAccount.TryParse(this.options.ConnectionString, out var ignore))
                 throw new OrleansConfigurationException(
-                    $"Configuration for AzureTableStorageProvider {name} is invalid. Connection is required.");
+                    $"Configuration for AzureTableStorageProvider {name} is invalid. {nameof(this.options.ConnectionString)} is not valid.");
+            try
+            {
+                AzureStorageUtils.ValidateTableName(this.options.TableName);
+            }
+            catch (Exception e)
+            {
+                throw new OrleansConfigurationException(
+                    $"Configuration for AzureTableStorageProvider {name} is invalid. {nameof(this.options.TableName)} is not valid", e);
+            }
         }
     }
 

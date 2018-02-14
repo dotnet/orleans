@@ -46,8 +46,10 @@ namespace Orleans.Storage
         private const string BINARY_DATA_PROPERTY_NAME = "Data";
         private const string STRING_DATA_PROPERTY_NAME = "StringData";
         private string name;
+
         /// <summary> Default constructor </summary>
-        public AzureTableGrainStorage(AzureTableStorageOptions options, SerializationManager serializationManager, IGrainFactory grainFactory, ITypeResolver typeResolver, ILoggerFactory loggerFactory, string name)
+        public AzureTableGrainStorage(string name, AzureTableStorageOptions options, SerializationManager serializationManager, 
+            IGrainFactory grainFactory, ITypeResolver typeResolver, ILoggerFactory loggerFactory)
         {
             this.options = options;
             this.name = name;
