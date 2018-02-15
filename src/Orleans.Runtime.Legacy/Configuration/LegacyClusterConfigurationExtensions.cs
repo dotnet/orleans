@@ -216,13 +216,6 @@ namespace Orleans.Hosting
                 };
             });
 
-            services.TryAddSingleton<LegacyProviderConfigurator.ScheduleTask>(sp =>
-            {
-                OrleansTaskScheduler scheduler = sp.GetRequiredService<OrleansTaskScheduler>();
-                SystemTarget fallbackSystemTarget = sp.GetRequiredService<FallbackSystemTarget>();
-                return (taskFunc) => scheduler.QueueTask(taskFunc, fallbackSystemTarget.SchedulingContext);
-            });
-
             LegacyProviderConfigurator<ISiloLifecycle>.ConfigureServices(configuration.Globals.ProviderConfigurations, services, SiloDefaultProviderInitStage, SiloDefaultProviderStartStage);
 
             services.AddOptions<GrainPlacementOptions>().Configure<GlobalConfiguration>((options, config) =>

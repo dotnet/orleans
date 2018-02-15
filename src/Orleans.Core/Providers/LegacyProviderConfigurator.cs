@@ -19,8 +19,6 @@ namespace Orleans.Providers
     {
         public const string InitStageName = "ProviderInitStage";
         public const string StartStageName = "ProviderStartStage";
-        // Optional task scheduling behavior, may not always be set.
-        internal delegate Task ScheduleTask(Func<Task> taskFunc);
     }
 
     internal static class LegacyProviderConfigurator<TLifecycle>
@@ -80,7 +78,6 @@ namespace Orleans.Providers
             private readonly ILogger logger;
             private readonly IProviderConfiguration config;
             private readonly IServiceProvider services;
-            private readonly LegacyProviderConfigurator.ScheduleTask schedule;
             private readonly int defaultInitStage;
             private int initStage;
             private readonly int defaultStartStage;
@@ -94,7 +91,6 @@ namespace Orleans.Providers
                 this.config = config;
                 this.defaultInitStage = defaultInitStage;
                 this.defaultStartStage = defaultStartStage;
-                this.schedule = services.GetService<LegacyProviderConfigurator.ScheduleTask>();
                 this.provider = new Lazy<IProvider>(() => services.GetServiceByName<TService>(this.config.Name) as IProvider);
             }
 
@@ -114,7 +110,7 @@ namespace Orleans.Providers
                 {
                     IProvider provider = this.provider.Value;
                     IProviderRuntime runtime = this.services.GetRequiredService<IProviderRuntime>();
-                    await Schedule(() => provider.Init(this.config.Name, runtime, this.config));
+                    await provider.Init(this.config.Name, runtime, this.config);
                     stopWatch.Stop();
                     this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Initializing provider {this.config.Name} of type {this.config.Type} in stage {this.initStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");
                 } catch(Exception ex)
@@ -132,7 +128,7 @@ namespace Orleans.Providers
                 {
                     IProvider provider = this.provider.Value;
                     if (provider is IStreamProvider) return; // stream providers are closed in StreamProviderClose
-                    await Schedule(() => provider.Close());
+                    await provider.Close();
                     stopWatch.Stop();
                     this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Closing provider {this.config.Name} of type {this.config.Type} in stage {this.initStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");
                 }
@@ -151,7 +147,7 @@ namespace Orleans.Providers
                 {
                     IProvider provider = this.provider.Value;
                     if (!(provider is IStreamProvider)) return; // only stream providers are closed here
-                    await Schedule(() => provider.Close());
+                    await provider.Close();
                     stopWatch.Stop();
                     this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Closing stream provider {this.config.Name} of type {this.config.Type} in stage {this.startStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");
                 }
@@ -170,7 +166,7 @@ namespace Orleans.Providers
                 {
                     IStreamProviderImpl provider = this.provider.Value as IStreamProviderImpl;
                     if (provider == null) return;
-                    await Schedule(() => provider.Start());
+                    await provider.Start();
                     stopWatch.Stop();
                     this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Starting stream provider {this.config.Name} of type {this.config.Type} in stage {this.startStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");
                 }
@@ -180,13 +176,6 @@ namespace Orleans.Providers
                     this.logger.Error(ErrorCode.Provider_ErrorFromStart, $"Start failed for stream provider {this.config.Name} of type {this.config.Type} in stage {this.startStage} in {stopWatch.ElapsedMilliseconds} Milliseconds.", ex);
                     throw;
                 }
-            }
-
-            private Task Schedule(Func<Task> taskFunc)
-            {
-                return this.schedule != null
-                    ? this.schedule.Invoke(taskFunc)
-                    : taskFunc();
             }
         }
 

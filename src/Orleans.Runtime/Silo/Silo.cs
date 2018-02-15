@@ -365,9 +365,6 @@ namespace Orleans.Runtime
             await scheduler.QueueAction(catalog.Start, catalog.SchedulingContext)
                 .WithTimeout(initTimeout, $"Starting Catalog failed due to timeout {initTimeout}");
 
-            // SystemTarget for startup tasks
-            var startupTaskTarget = Services.GetRequiredService<StartupTaskSystemTarget>();
-            RegisterSystemTarget(startupTaskTarget);
         }
 
         private Task OnRuntimeInitializeStart(CancellationToken ct)
@@ -866,15 +863,6 @@ namespace Orleans.Runtime
     {
         public FallbackSystemTarget(ILocalSiloDetails localSiloDetails, ILoggerFactory loggerFactory)
             : base(Constants.FallbackSystemTargetId, localSiloDetails.SiloAddress, loggerFactory)
-        {
-        }
-    }
-
-    // A dummy system target for scheduling startup tasks.
-    internal class StartupTaskSystemTarget : SystemTarget
-    {
-        public StartupTaskSystemTarget(ILocalSiloDetails localSiloDetails, ILoggerFactory loggerFactory)
-            : base(Constants.StartupTaskSystemTargetId, localSiloDetails.SiloAddress, loggerFactory)
         {
         }
     }

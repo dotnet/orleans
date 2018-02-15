@@ -260,9 +260,6 @@ namespace Orleans.Hosting
             services.TryConfigureFormatter<EndpointOptions, EndpointOptionsFormatter>();
 
             services.AddTransient<IConfigurationValidator, EndpointOptionsValidator>();
-            
-            services.AddSingleton<StartupTaskSystemTarget>();
-
         }
     }
 }
