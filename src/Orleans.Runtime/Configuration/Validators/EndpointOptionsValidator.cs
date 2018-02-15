@@ -1,5 +1,5 @@
 using System;
-
+using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
@@ -29,6 +29,15 @@ namespace Orleans.Configuration
                 throw new OrleansConfigurationException(
                     $"No listening address specified. Use {nameof(ISiloHostBuilder)}.{nameof(EndpointOptionsExtensions.ConfigureEndpoints)}(...) "
                     + $"to configure endpoints and ensure that {nameof(options.AdvertisedIPAddress)} is set.");
+            }
+
+            if (options.AdvertisedIPAddress == IPAddress.Any 
+                || options.AdvertisedIPAddress == IPAddress.IPv6Any 
+                || options.AdvertisedIPAddress == IPAddress.None 
+                || options.AdvertisedIPAddress == IPAddress.IPv6None)
+            {
+                throw new OrleansConfigurationException(
+                    $"Invalid value specified for {nameof(options.AdvertisedIPAddress)}. The value was {options.AdvertisedIPAddress}");
             }
 
             if (options.SiloPort == 0)
