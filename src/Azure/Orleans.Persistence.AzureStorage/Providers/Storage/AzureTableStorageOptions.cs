@@ -39,7 +39,7 @@ namespace Orleans.Configuration
         /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialzed prior to use.
         /// </summary>
         public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
-        public const int DEFAULT_INIT_STAGE = SiloLifecycleStage.ApplicationServices;
+        public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
 
         #region json serialization
         public bool UseJson { get; set; }

@@ -850,9 +850,9 @@ namespace Orleans.Runtime
 
         private void Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe(SiloLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
-            lifecycle.Subscribe(SiloLifecycleStage.RuntimeServices, OnRuntimeServicesStart, OnRuntimeServicesStop);
-            lifecycle.Subscribe(SiloLifecycleStage.RuntimeGrainServices, OnRuntimeGrainServicesStart, OnRuntimeGrainServicesStop);
+            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
+            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeServices, OnRuntimeServicesStart, OnRuntimeServicesStop);
+            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeGrainServices, OnRuntimeGrainServicesStart, OnRuntimeGrainServicesStop);
             
         }
     }
