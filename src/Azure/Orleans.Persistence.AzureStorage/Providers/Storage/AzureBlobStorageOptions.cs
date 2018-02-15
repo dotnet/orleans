@@ -60,6 +60,15 @@ namespace Orleans.Hosting
             if (!CloudStorageAccount.TryParse(this.options.ConnectionString, out var ignore))
                 throw new OrleansConfigurationException(
                     $"Configuration for AzureTableStorageProvider {name} is invalid. {nameof(this.options.ConnectionString)} is not valid.");
+            try
+            {
+                AzureStorageUtils.ValidateContainerName(options.ContainerName);
+            }
+            catch(ArgumentException e)
+            {
+                throw new OrleansConfigurationException(
+                    $"Configuration for AzureBlobStorageOptions {name} is invalid. {nameof(this.options.ContainerName)} is not valid", e);
+            }
         }
     }
 
