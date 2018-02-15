@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -85,7 +86,11 @@ namespace UnitTests.StorageTests.Relational
                                 ConnectionString = Storage.Storage.ConnectionString,
                                 Invariant = storageInvariant
                             };
-                            var storageProvider = new AdoNetGrainStorage(DefaultProviderRuntime.ServiceProvider.GetService<ILogger<AdoNetGrainStorage>>(), DefaultProviderRuntime, Options.Create(options), storageInvariant + "_StorageProvider");
+                            var siloOptions = new SiloOptions()
+                            {
+                                ServiceId = Guid.NewGuid()
+                            };
+                            var storageProvider = new AdoNetGrainStorage(DefaultProviderRuntime.ServiceProvider.GetService<ILogger<AdoNetGrainStorage>>(), DefaultProviderRuntime, Options.Create(options), Options.Create(siloOptions), storageInvariant + "_StorageProvider");
                             var siloLifeCycle = new SiloLifecycle(NullLoggerFactory.Instance);
                             storageProvider.Participate(siloLifeCycle);
                             await siloLifeCycle.OnStart(CancellationToken.None);

@@ -6,6 +6,7 @@ using Newtonsoft.Json;
 using Orleans.Persistence.AdoNet.Storage;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Storage;
 
 namespace Orleans.Configuration
 {
@@ -78,11 +79,11 @@ namespace Orleans.Configuration
         {
             if (string.IsNullOrWhiteSpace(this.options.ConnectionString))
             {
-                throw new OrleansConfigurationException($"Invalid AdoNetGrainStorageOptions for AdoNetGrainStorage {name}. ConnectionString is required.");
+                throw new OrleansConfigurationException($"Invalid {nameof(AdoNetGrainStorageOptions)} values for {nameof(AdoNetGrainStorage)} \"{name}\". ConnectionString is required.");
             }
             if (options.UseXmlFormat&&options.UseJsonFormat)
             {
-                throw new OrleansConfigurationException($"Invalid AdoNetGrainStorageOptions for AdoNetGrainStorage {name}. Only one serializer and deserializer should be given.");
+                throw new OrleansConfigurationException($"Invalid {nameof(AdoNetGrainStorageOptions)} values for {nameof(AdoNetGrainStorage)} \"{name}\". {nameof(options.UseXmlFormat)} and {nameof(options.UseJsonFormat)} cannot both be set to true");
             }
         }
     }
@@ -105,15 +106,15 @@ namespace Orleans.Configuration
         /// <inheritdoc cref="IOptionFormatterResolver"/>
         public IOptionFormatter<AdoNetGrainStorageOptions> Resolve(string name)
         {
-            return new AzureTableStorageOptionsFormatter(name, optionsSnapshot.Get(name));
+            return new AdoNetStorageOptionsFormatteFormatter(name, optionsSnapshot.Get(name));
         }
 
-        private class AzureTableStorageOptionsFormatter : IOptionFormatter<AdoNetGrainStorageOptions>
+        private class AdoNetStorageOptionsFormatteFormatter : IOptionFormatter<AdoNetGrainStorageOptions>
         {
             public string Name { get; }
 
             private AdoNetGrainStorageOptions options;
-            public AzureTableStorageOptionsFormatter(string name, AdoNetGrainStorageOptions options)
+            public AdoNetStorageOptionsFormatteFormatter(string name, AdoNetGrainStorageOptions options)
             {
                 this.options = options;
                 this.Name = OptionFormattingUtilities.Name<AdoNetGrainStorageOptions>(name);
@@ -123,7 +124,7 @@ namespace Orleans.Configuration
             {
                 return new List<string>()
                 {
-                    OptionFormattingUtilities.Format(nameof(this.options.ConnectionString),this.options.ConnectionString),
+                    OptionFormattingUtilities.Format(nameof(this.options.ConnectionString), ConfigUtilities.RedactConnectionStringInfo(this.options.ConnectionString)),
                     OptionFormattingUtilities.Format(nameof(this.options.InitStage),this.options.InitStage),
                     OptionFormattingUtilities.Format(nameof(this.options.Invariant),this.options.Invariant),
                     OptionFormattingUtilities.Format(nameof(this.options.UseJsonFormat),this.options.UseJsonFormat),
