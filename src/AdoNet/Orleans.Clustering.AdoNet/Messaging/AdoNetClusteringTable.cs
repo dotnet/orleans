@@ -76,7 +76,7 @@ namespace Orleans.Runtime.MembershipService
 
         public async Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(string.Format("AdoNetClusteringTable.InsertRow called with entry {0} and tableVersion {1}.", entry, tableVersion));
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace($"AdoNetClusteringTable.InsertRow called with entry {entry} and tableVersion {tableVersion}.");
 
             //The "tableVersion" parameter should always exist when inserting a row as Init should
             //have been called and membership version created and read. This is an optimization to

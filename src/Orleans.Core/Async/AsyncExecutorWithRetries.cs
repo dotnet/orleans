@@ -252,7 +252,7 @@ namespace Orleans
             }
             currMax = StandardExtensions.Min(currMax, maxDelay);
 
-            if (minDelay >= currMax) throw new ArgumentOutOfRangeException(String.Format("minDelay {0}, currMax = {1}", minDelay, currMax));
+            if (minDelay >= currMax) throw new ArgumentOutOfRangeException($"minDelay {minDelay}, currMax = {currMax}");
             return random.NextTimeSpan(minDelay, currMax);
         }
     }

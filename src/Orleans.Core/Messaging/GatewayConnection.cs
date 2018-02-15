@@ -97,7 +97,7 @@ namespace Orleans.Messaging
                 {
                     s = Socket;
                     Socket = null;
-                    Log.Warn(ErrorCode.ProxyClient_MarkGatewayDisconnected, String.Format("Marking gateway at address {0} as Disconnected", Address));
+                    Log.Warn(ErrorCode.ProxyClient_MarkGatewayDisconnected, $"Marking gateway at address {Address} as Disconnected");
                     if ( MsgCenter != null && MsgCenter.GatewayManager != null)
                         // We need a refresh...
                         MsgCenter.GatewayManager.ExpediteUpdateLiveGatewaysSnapshot();
@@ -114,7 +114,7 @@ namespace Orleans.Messaging
 
         public void MarkAsDead()
         {
-            Log.Warn(ErrorCode.ProxyClient_MarkGatewayDead, String.Format("Marking gateway at address {0} as Dead in my client local gateway list.", Address));
+            Log.Warn(ErrorCode.ProxyClient_MarkGatewayDead, $"Marking gateway at address {Address} as Dead in my client local gateway list.");
             MsgCenter.GatewayManager.MarkAsDead(Address);
             Stop();
         }
@@ -253,8 +253,8 @@ namespace Orleans.Messaging
         {
             // we only get here if we failed to serialise the msg (or any other catastrophic failure).
             // Request msg fails to serialise on the sending silo, so we just enqueue a rejection msg.
-            Log.Warn(ErrorCode.ProxyClient_SerializationError, String.Format("Unexpected error serializing message to gateway {0}.", Address), exc);
-            FailMessage(msg, String.Format("Unexpected error serializing message to gateway {0}. {1}", Address, exc));
+            Log.Warn(ErrorCode.ProxyClient_SerializationError, $"Unexpected error serializing message to gateway {Address}.", exc);
+            FailMessage(msg, $"Unexpected error serializing message to gateway {Address}. {exc}");
             if (msg.Direction == Message.Directions.Request || msg.Direction == Message.Directions.OneWay)
             {
                 return;

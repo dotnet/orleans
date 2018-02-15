@@ -50,8 +50,7 @@ namespace Orleans.Messaging
             catch (Exception ex)
             {
                 buffer.Reset();
-                Log.Warn(ErrorCode.ProxyClientUnhandledExceptionWhileReceiving, String.Format("Unexpected/unhandled exception while receiving: {0}. Restarting gateway receiver for {1}.",
-                    ex, gatewayConnection.Address), ex);
+                Log.Warn(ErrorCode.ProxyClientUnhandledExceptionWhileReceiving, $"Unexpected/unhandled exception while receiving: {ex}. Restarting gateway receiver for {gatewayConnection.Address}.", ex);
                 throw;
             }
         }
@@ -85,7 +84,7 @@ namespace Orleans.Messaging
                 // Only try to reconnect if we're not shutting down
                 if (Cts.IsCancellationRequested) return 0;
 
-                Log.Warn(ErrorCode.Runtime_Error_100158, String.Format("Exception receiving from gateway {0}: {1}", gatewayConnection.Address, ex.Message));
+                Log.Warn(ErrorCode.Runtime_Error_100158, $"Exception receiving from gateway {gatewayConnection.Address}: {ex.Message}", ex);
                 gatewayConnection.MarkAsDisconnected(socket);
                 socket = null;
                 return 0;

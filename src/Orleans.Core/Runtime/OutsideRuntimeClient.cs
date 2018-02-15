@@ -180,7 +180,7 @@ namespace Orleans
 
         private void UnhandledException(ISchedulingContext context, Exception exception)
         {
-            logger.Error(ErrorCode.Runtime_Error_100007, String.Format("OutsideRuntimeClient caught an UnobservedException."), exception);
+            logger.Error(ErrorCode.Runtime_Error_100007, "OutsideRuntimeClient caught an UnobservedException.", exception);
             logger.Assert(ErrorCode.Runtime_Error_100008, context == null, "context should be not null only inside OrleansRuntime and not on the client.");
         }
 
@@ -283,7 +283,7 @@ namespace Orleans
                             break;
                         }
                     default:
-                        logger.Error(ErrorCode.Runtime_Error_100327, String.Format("Message not supported: {0}.", message));
+                        logger.Error(ErrorCode.Runtime_Error_100327, $"Message not supported: {message}.");
                         break;
                 }
 #if TRACK_DETAILED_STATS
@@ -308,7 +308,7 @@ namespace Orleans
             {
                 logger.Error(
                     ErrorCode.ProxyClient_OGC_TargetNotFound_2,
-                    String.Format("Did not find TargetObserverId header in the message = {0}. A request message to a client is expected to have an observerId.", message));
+                    $"Did not find TargetObserverId header in the message = {message}. A request message to a client is expected to have an observerId.");
                 return;
             }
 
@@ -318,10 +318,7 @@ namespace Orleans
             {
                 logger.Error(
                     ErrorCode.ProxyClient_OGC_TargetNotFound,
-                    String.Format(
-                        "Unexpected target grain in request: {0}. Message={1}",
-                        message.TargetGrain,
-                        message));
+                    $"Unexpected target grain in request: {message.TargetGrain}. Message={message}");
             }
         }
 
@@ -332,7 +329,7 @@ namespace Orleans
             {
                 //// Remove from the dictionary record for the garbage collected object? But now we won't be able to detect invalid dispatch IDs anymore.
                 logger.Warn(ErrorCode.Runtime_Error_100162,
-                    String.Format("Object associated with Observer ID {0} has been garbage collected. Deleting object reference and unregistering it. Message = {1}", objectData.ObserverId, message));
+                    $"Object associated with Observer ID {objectData.ObserverId} has been garbage collected. Deleting object reference and unregistering it. Message = {message}");
 
                 LocalObjectData ignore;
                 // Try to remove. If it's not there, we don't care.
@@ -477,10 +474,7 @@ namespace Orleans
                     {
                         logger.Error(
                             ErrorCode.ProxyClient_OGC_UnhandledExceptionInOneWayInvoke,
-                            String.Format(
-                                "Exception during invocation of notification method {0}, interface {1}. Ignoring exception because this is a one way request.",
-                                request.MethodId,
-                                request.InterfaceId),
+                            $"Exception during invocation of notification method {request.MethodId}, interface {request.InterfaceId}. Ignoring exception because this is a one way request.",
                             exception);
                         break;
                     }
@@ -776,7 +770,7 @@ namespace Orleans
             try
             {
                 logger.Warn(ErrorCode.ProxyClient_AppDomain_Unload,
-                    String.Format("Current AppDomain={0} is unloading.", PrintAppDomainDetails()));
+                    $"Current AppDomain={PrintAppDomainDetails()} is unloading.");
             }
             catch (Exception)
             {
