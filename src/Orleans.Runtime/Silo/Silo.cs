@@ -263,9 +263,15 @@ namespace Orleans.Runtime
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
+            StartTaskWithPerfAnalysis("Start Scheduler", scheduler.Start, new Stopwatch());
+
+            // SystemTarget for provider init calls
+            this.fallbackScheduler = Services.GetRequiredService<FallbackSystemTarget>();
+            RegisterSystemTarget(fallbackScheduler);
+
             try
             {
-                await this.siloLifecycle.OnStart(cancellationToken);
+                await this.scheduler.QueueTask(() => this.siloLifecycle.OnStart(cancellationToken), this.fallbackScheduler.SchedulingContext);
             }
             catch (Exception exc)
             {
@@ -359,10 +365,6 @@ namespace Orleans.Runtime
             await scheduler.QueueAction(catalog.Start, catalog.SchedulingContext)
                 .WithTimeout(initTimeout, $"Starting Catalog failed due to timeout {initTimeout}");
 
-            // SystemTarget for provider init calls
-            this.fallbackScheduler = Services.GetRequiredService<FallbackSystemTarget>();
-            RegisterSystemTarget(fallbackScheduler);
-
             // SystemTarget for startup tasks
             var startupTaskTarget = Services.GetRequiredService<StartupTaskSystemTarget>();
             RegisterSystemTarget(startupTaskTarget);
@@ -411,7 +413,6 @@ namespace Orleans.Runtime
             //TODO: Setup all (or as many as possible) of the class started in this call to work directly with lifecyce
             var stopWatch = Stopwatch.StartNew();
             // The order of these 4 is pretty much arbitrary.
-            StartTaskWithPerfAnalysis("Start Scheduler", scheduler.Start, stopWatch);
             StartTaskWithPerfAnalysis("Start Message center",messageCenter.Start,stopWatch);
             StartTaskWithPerfAnalysis("Start Incoming message agents", IncomingMessageAgentsStart, stopWatch);
             void IncomingMessageAgentsStart()
@@ -655,7 +656,7 @@ namespace Orleans.Runtime
         /// Gracefully stop the run time system only, but not the application. 
         /// Applications requests would be abruptly terminated, while the internal system state gracefully stopped and saved as much as possible.
         /// </summary>
-        public Task StopAsync(CancellationToken cancellationToken)
+        public async Task StopAsync(CancellationToken cancellationToken)
         {
             bool gracefully = !cancellationToken.IsCancellationRequested;
             string operation = gracefully ? "Shutdown()" : "Stop()";
@@ -691,9 +692,14 @@ namespace Orleans.Runtime
                     logger.Info(ErrorCode.WaitingForSiloStop, "Waiting {0} for termination to complete", pause);
                     Thread.Sleep(pause);
                 }
-                return this.siloTerminatedTask.Task;
+
+                await this.siloTerminatedTask.Task;
+                return;
             }
-            return this.siloLifecycle.OnStop(cancellationToken);
+
+            await this.scheduler.QueueTask(() => this.siloLifecycle.OnStop(cancellationToken), this.fallbackScheduler.SchedulingContext);
+            SafeExecute(scheduler.Stop);
+            SafeExecute(scheduler.PrintStatistics);
         }
 
         private Task OnRuntimeServicesStop(CancellationToken cancellationToken)
@@ -773,8 +779,6 @@ namespace Orleans.Runtime
             if (platformWatchdog != null) 
                 SafeExecute(platformWatchdog.Stop); // Silo may be dying before platformWatchdog was set up
 
-            SafeExecute(scheduler.Stop);
-            SafeExecute(scheduler.PrintStatistics);
             SafeExecute(activationDirectory.PrintActivationDirectory);
             SafeExecute(messageCenter.Stop);
             SafeExecute(siloStatistics.Stop);
