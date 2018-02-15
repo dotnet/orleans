@@ -174,8 +174,7 @@ namespace Orleans.Runtime
                 string stats = Utils.EnumerableToString(activations.Values.OrderBy(act => act.Name), act => string.Format("++{0}", act.DumpStatus()), Environment.NewLine);
                 if (stats.Length > 0)
                 {
-                    logger.Info(ErrorCode.Catalog_ActivationDirectory_Statistics, String.Format("ActivationDirectory.PrintActivationDirectory(): Size = {0}, Directory:" + Environment.NewLine + "{1}",
-                        activations.Count, stats));
+                    logger.Info(ErrorCode.Catalog_ActivationDirectory_Statistics, $"ActivationDirectory.PrintActivationDirectory(): Size = { activations.Count}, Directory:{Environment.NewLine}{stats}");
                 }
             }
         }

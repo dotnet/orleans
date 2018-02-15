@@ -51,7 +51,7 @@ namespace Tester.AzureUtils.Persistence
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                        .AddAzureTableGrainStorage("GrainStorageForTest", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
                         {
                             options.ServiceId = silo.Value.ServiceId.ToString();
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
@@ -76,7 +76,7 @@ namespace Tester.AzureUtils.Persistence
             }
         }
 
-        public PersistenceGrainTests_AzureTableGrainStorage(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
+        public PersistenceGrainTests_AzureTableGrainStorage(ITestOutputHelper output, Fixture fixture) : base(output, fixture, ServiceId)
         {
             fixture.EnsurePreconditionsMet();
         }
@@ -136,7 +136,7 @@ namespace Tester.AzureUtils.Persistence
         [SkippableFact, TestCategory("Functional")]
         public async Task Grain_AzureTableGrainStorage_SiloRestart()
         {
-            await base.Grain_AzureStore_SiloRestart(ServiceId);
+            await base.Grain_AzureStore_SiloRestart();
         }
     }
 }

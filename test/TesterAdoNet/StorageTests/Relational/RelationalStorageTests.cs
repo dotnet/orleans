@@ -16,21 +16,21 @@ namespace UnitTests.StorageTests.Relational
     public abstract class RelationalStorageTests
     {
         private IStorageSerializationPicker JsonPicker { get; } = new DefaultRelationalStoragePicker(
-           new[] { new OrleansStorageDefaultJsonDeserializer(new Newtonsoft.Json.JsonSerializerSettings(), AdoNetStorageProvider.UseJsonFormatPropertyName)
-        }, new[] { new OrleansStorageDefaultJsonSerializer(new Newtonsoft.Json.JsonSerializerSettings(), AdoNetStorageProvider.UseJsonFormatPropertyName) });
+           new[] { new OrleansStorageDefaultJsonDeserializer(new Newtonsoft.Json.JsonSerializerSettings(), AdoNetGrainStorage.JsonFormatSerializerTag)
+        }, new[] { new OrleansStorageDefaultJsonSerializer(new Newtonsoft.Json.JsonSerializerSettings(), AdoNetGrainStorage.JsonFormatSerializerTag) });
 
         private IStorageSerializationPicker JsonStreamingPicker { get; } = new DefaultRelationalStoragePicker(
-           new[] { new OrleansStorageDefaultJsonDeserializer(new Newtonsoft.Json.JsonSerializerSettings(), AdoNetStorageProvider.UseJsonFormatPropertyName)
-        }, new[] { new OrleansStorageDefaultJsonSerializer(new Newtonsoft.Json.JsonSerializerSettings(), AdoNetStorageProvider.UseJsonFormatPropertyName) });
+           new[] { new OrleansStorageDefaultJsonDeserializer(new Newtonsoft.Json.JsonSerializerSettings(), AdoNetGrainStorage.JsonFormatSerializerTag)
+        }, new[] { new OrleansStorageDefaultJsonSerializer(new Newtonsoft.Json.JsonSerializerSettings(), AdoNetGrainStorage.JsonFormatSerializerTag) });
 
 
         private IStorageSerializationPicker XmlPicker { get; } = new DefaultRelationalStoragePicker(
-            new[] { new OrleansStorageDefaultXmlDeserializer(AdoNetStorageProvider.UseXmlFormatPropertyName) },
-            new[] { new OrleansStorageDefaultXmlSerializer(AdoNetStorageProvider.UseXmlFormatPropertyName) });
+            new[] { new OrleansStorageDefaultXmlDeserializer(AdoNetGrainStorage.XmlFormatSerializerTag) },
+            new[] { new OrleansStorageDefaultXmlSerializer(AdoNetGrainStorage.XmlFormatSerializerTag) });
 
         private IStorageSerializationPicker XmlStreamingPicker { get; } = new DefaultRelationalStoragePicker(
-            new[] { new OrleansStorageDefaultXmlDeserializer(AdoNetStorageProvider.UseXmlFormatPropertyName) },
-            new[] { new OrleansStorageDefaultXmlSerializer(AdoNetStorageProvider.UseXmlFormatPropertyName) });
+            new[] { new OrleansStorageDefaultXmlDeserializer(AdoNetGrainStorage.XmlFormatSerializerTag) },
+            new[] { new OrleansStorageDefaultXmlSerializer(AdoNetGrainStorage.XmlFormatSerializerTag) });
 
         private IStorageHasherPicker ConstantHasher { get; } = new StorageHasherPicker(new[] { new ConstantHasher() });
 
@@ -70,7 +70,7 @@ namespace UnitTests.StorageTests.Relational
 
         internal async Task Relational_HashCollisionTests()
         {
-            ((AdoNetStorageProvider)PersistenceStorageTests.Storage).HashPicker = ConstantHasher;
+            ((AdoNetGrainStorage)PersistenceStorageTests.Storage).HashPicker = ConstantHasher;
             await PersistenceStorageTests.PersistenceStorage_WriteReadWriteReadStatesInParallel(nameof(Relational_HashCollisionTests), 2);
         }
 
@@ -91,28 +91,28 @@ namespace UnitTests.StorageTests.Relational
 
         internal async Task Relational_Json_WriteRead(string grainType, GrainReference grainReference, GrainState<TestStateGeneric1<string>> grainState)
         {
-            ((AdoNetStorageProvider)PersistenceStorageTests.Storage).StorageSerializationPicker = JsonPicker;
+            ((AdoNetGrainStorage)PersistenceStorageTests.Storage).StorageSerializationPicker = JsonPicker;
             await PersistenceStorageTests.Store_WriteRead(grainType, grainReference, grainState);
         }
 
 
         internal async Task Relational_Json_WriteReadStreaming(string grainType, GrainReference grainReference, GrainState<TestStateGeneric1<string>> grainState)
         {
-            ((AdoNetStorageProvider)PersistenceStorageTests.Storage).StorageSerializationPicker = JsonStreamingPicker;
+            ((AdoNetGrainStorage)PersistenceStorageTests.Storage).StorageSerializationPicker = JsonStreamingPicker;
             await PersistenceStorageTests.Store_WriteRead(grainType, grainReference, grainState);
         }
 
 
         internal async Task Relational_Xml_WriteRead(string grainType, GrainReference grainReference, GrainState<TestStateGeneric1<string>> grainState)
         {
-            ((AdoNetStorageProvider)PersistenceStorageTests.Storage).StorageSerializationPicker = XmlPicker;
+            ((AdoNetGrainStorage)PersistenceStorageTests.Storage).StorageSerializationPicker = XmlPicker;
             await PersistenceStorageTests.Store_WriteRead(grainType, grainReference, grainState);
         }
 
 
         internal async Task Relational_Xml_WriteReadStreaming(string grainType, GrainReference grainReference, GrainState<TestStateGeneric1<string>> grainState)
         {
-            ((AdoNetStorageProvider)PersistenceStorageTests.Storage).StorageSerializationPicker = XmlStreamingPicker;
+            ((AdoNetGrainStorage)PersistenceStorageTests.Storage).StorageSerializationPicker = XmlStreamingPicker;
             await PersistenceStorageTests.Store_WriteRead(grainType, grainReference, grainState);
         }
 
@@ -129,7 +129,7 @@ namespace UnitTests.StorageTests.Relational
             //might not be in memory upon first read but the previous serializer format would need to used to retrieve data and the
             //new one to write and after that the new one used to both read and write data.
             //Change both the serializer and deserializer and do writing and reading once more just to be sure.
-            ((AdoNetStorageProvider)PersistenceStorageTests.Storage).StorageSerializationPicker = JsonPicker;
+            ((AdoNetGrainStorage)PersistenceStorageTests.Storage).StorageSerializationPicker = JsonPicker;
             await PersistenceStorageTests.Store_WriteRead(grainType, grainReference, grainState);
             var secondVersion = grainState.ETag;
             Assert.NotEqual(firstVersion, secondVersion);

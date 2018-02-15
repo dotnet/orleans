@@ -485,8 +485,10 @@ namespace Orleans.Runtime.Configuration
                 "Password=",                                // SQL
                 "SecretKey=", "SessionToken=",              // DynamoDb
             };
-
+            var mark = "<--SNIP-->";
             if (String.IsNullOrEmpty(connectionString)) return "null";
+            //if connection string format doesn't contain any secretKey, then return just <--SNIP-->
+            if (!secretKeys.Any(key => connectionString.Contains(key))) return mark;
 
             string connectionInfo = connectionString;
 
@@ -496,7 +498,7 @@ namespace Orleans.Runtime.Configuration
                 int keyPos = connectionInfo.IndexOf(secretKey, StringComparison.OrdinalIgnoreCase);
                 if (keyPos >= 0)
                 {
-                    connectionInfo = connectionInfo.Remove(keyPos + secretKey.Length) + "<--SNIP-->";
+                    connectionInfo = connectionInfo.Remove(keyPos + secretKey.Length) + mark;
                 }
             }
 

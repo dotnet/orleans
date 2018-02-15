@@ -1,9 +1,17 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Orleans;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Providers;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Tests.SqlUtils;
 using Orleans.Storage;
@@ -24,7 +32,7 @@ namespace UnitTests.StorageTests.Relational
         /// The value will be <em>null</em> if environment invariants have failed to hold upon
         /// storage provider creation.
         /// </summary>
-        private Dictionary<string, IStorageProvider> StorageProviders { get; set; } = new Dictionary<string, IStorageProvider>();
+        private Dictionary<string, IGrainStorage> StorageProviders { get; set; } = new Dictionary<string, IGrainStorage>();
 
         /// <summary>
         /// This is used to lock the storage providers dictionary.
@@ -54,13 +62,12 @@ namespace UnitTests.StorageTests.Relational
             DefaultProviderRuntime = new ClientProviderRuntime(this.InternalGrainFactory, this.Services, NullLoggerFactory.Instance);
         }
 
-
         /// <summary>
         /// Returns a correct implementation of the persistence provider according to environment variables.
         /// </summary>
         /// <remarks>If the environment invariants have failed to hold upon creation of the storage provider,
         /// a <em>null</em> value will be provided.</remarks>
-        public async Task<IStorageProvider> GetStorageProvider(string storageInvariant)
+        public async Task<IGrainStorage> GetStorageProvider(string storageInvariant)
         {
             //Make sure the environment invariants hold before trying to give a functioning SUT instantiation.
             //This is done instead of the constructor to have more granularity on how the environment should be initialized.
@@ -74,13 +81,19 @@ namespace UnitTests.StorageTests.Relational
                         {
                             Storage = Invariants.EnsureStorageForTesting(Invariants.ActiveSettings.ConnectionStrings.First(i => i.StorageInvariant == storageInvariant));
 
-                            var properties = new Dictionary<string, string>();
-                            properties["DataConnectionString"] = Storage.Storage.ConnectionString;
-                            properties["AdoInvariant"] = storageInvariant;
-
-                            var config = new ProviderConfiguration(properties);
-                            var storageProvider = new AdoNetStorageProvider();
-                            await storageProvider.Init(storageInvariant + "_StorageProvider", DefaultProviderRuntime, config);
+                            var options = new AdoNetGrainStorageOptions()
+                            {
+                                ConnectionString = Storage.Storage.ConnectionString,
+                                Invariant = storageInvariant
+                            };
+                            var siloOptions = new SiloOptions()
+                            {
+                                ServiceId = Guid.NewGuid()
+                            };
+                            var storageProvider = new AdoNetGrainStorage(DefaultProviderRuntime.ServiceProvider.GetService<ILogger<AdoNetGrainStorage>>(), DefaultProviderRuntime, Options.Create(options), Options.Create(siloOptions), storageInvariant + "_StorageProvider");
+                            var siloLifeCycle = new SiloLifecycle(NullLoggerFactory.Instance);
+                            storageProvider.Participate(siloLifeCycle);
+                            await siloLifeCycle.OnStart(CancellationToken.None);
 
                             StorageProviders[storageInvariant] = storageProvider;
                         }

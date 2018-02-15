@@ -42,8 +42,9 @@ namespace UnitTests.GrainInterfaces
         Task<int> DoRead();
         Task DoDelete();
     }
+    
 
-    public interface IAzureStorageTestGrain : IGrainWithGuidKey
+    public interface IGrainStorageTestGrain : IGrainWithGuidKey
     {
         Task<int> GetValue();
         Task DoWrite(int val);
@@ -51,7 +52,7 @@ namespace UnitTests.GrainInterfaces
         Task DoDelete();
     }
 
-    public interface IAzureStorageGenericGrain<T> : IGrainWithIntegerKey
+    public interface IGrainStorageGenericGrain<T> : IGrainWithIntegerKey
     {
         Task<T> GetValue();
         Task DoWrite(T val);
@@ -59,7 +60,7 @@ namespace UnitTests.GrainInterfaces
         Task DoDelete();
     }
 
-    public interface IAzureStorageTestGrain_GuidExtendedKey : IGrainWithGuidCompoundKey
+    public interface IGrainStorageTestGrain_GuidExtendedKey : IGrainWithGuidCompoundKey
     {
         Task<string> GetExtendedKeyValue();
         Task<int> GetValue();
@@ -68,7 +69,7 @@ namespace UnitTests.GrainInterfaces
         Task DoDelete();
     }
 
-    public interface IAzureStorageTestGrain_LongKey : IGrainWithIntegerKey
+    public interface IGrainStorageTestGrain_LongKey : IGrainWithIntegerKey
     {
         Task<int> GetValue();
         Task DoWrite(int val);
@@ -76,7 +77,7 @@ namespace UnitTests.GrainInterfaces
         Task DoDelete();
     }
 
-    public interface IAzureStorageTestGrain_LongExtendedKey : IGrainWithIntegerCompoundKey
+    public interface IGrainStorageTestGrain_LongExtendedKey : IGrainWithIntegerCompoundKey
     {
         Task<string> GetExtendedKeyValue();
         Task<int> GetValue();

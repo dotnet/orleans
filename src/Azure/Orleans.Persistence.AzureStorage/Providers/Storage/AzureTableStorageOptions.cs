@@ -95,7 +95,7 @@ namespace Orleans.Configuration
 
         public IOptionFormatter<AzureTableStorageOptions> Resolve(string name)
         {
-            return new AzureTableStorageOptionsFormatter(name, Options.Create(optionsSnapshot.Get(name)).Value);
+            return new AzureTableStorageOptionsFormatter(name, optionsSnapshot.Get(name));
         }
 
         private class AzureTableStorageOptionsFormatter : IOptionFormatter<AzureTableStorageOptions>

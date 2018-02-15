@@ -6,7 +6,7 @@
     public class AdoNetClusteringSiloOptions
     {
         /// <summary>
-        /// Connection string for Sql Storage
+        /// Connection string for AdoNet Storage
         /// </summary>
         public string ConnectionString { get; set; }
 

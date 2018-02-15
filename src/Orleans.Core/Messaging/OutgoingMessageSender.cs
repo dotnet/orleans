@@ -75,7 +75,7 @@ namespace Orleans.Messaging
                 {
                     // The complete message wasn't sent, even though no error was reported; treat this as an error
                     countMismatchSending = true;
-                    sendErrorStr = String.Format("Byte count mismatch on sending to {0}: sent {1}, expected {2}", targetSilo, bytesSent, length);
+                    sendErrorStr = $"Byte count mismatch on sending to {targetSilo}: sent {bytesSent}, expected {length}";
                     Log.Warn(ErrorCode.Messaging_CountMismatchSending, sendErrorStr);
                 }
             }
@@ -84,7 +84,7 @@ namespace Orleans.Messaging
                 exceptionSending = true;
                 if (!(exc is ObjectDisposedException))
                 {
-                    sendErrorStr = String.Format("Exception sending message to {0}. Message: {1}. {2}", targetSilo, msg, exc);
+                    sendErrorStr = $"Exception sending message to {targetSilo}. Message: {msg}. {exc}";
                     Log.Warn(ErrorCode.Messaging_ExceptionSending, sendErrorStr, exc);
                 }
             }

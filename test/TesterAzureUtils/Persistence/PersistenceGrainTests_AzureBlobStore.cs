@@ -75,7 +75,7 @@ namespace Tester.AzureUtils.Persistence
             }
         }
 
-        public PersistenceGrainTests_AzureBlobStore(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
+        public PersistenceGrainTests_AzureBlobStore(ITestOutputHelper output, Fixture fixture) : base(output, fixture, ServiceId)
         {
             fixture.EnsurePreconditionsMet();
         }
@@ -135,7 +135,7 @@ namespace Tester.AzureUtils.Persistence
         [SkippableFact, TestCategory("Functional")]
         public async Task Grain_AzureBlobStore_SiloRestart()
         {
-            await base.Grain_AzureStore_SiloRestart(ServiceId);
+            await base.Grain_AzureStore_SiloRestart();
         }
 
         [SkippableFact, TestCategory("CorePerf"), TestCategory("Performance"), TestCategory("Stress")]
