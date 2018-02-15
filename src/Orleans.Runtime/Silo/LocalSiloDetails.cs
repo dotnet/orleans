@@ -1,9 +1,7 @@
 using System;
 using System.Net;
-using System.Net.Sockets;
 using Microsoft.Extensions.Options;
-using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime
 {
@@ -22,24 +20,8 @@ namespace Orleans.Runtime
             this.DnsHostName = Dns.GetHostName();
 
             var endpointOptions = siloEndpointOptions.Value;
-            this.siloAddressLazy = new Lazy<SiloAddress>(() => SiloAddress.New(ResolveEndpoint(endpointOptions), SiloAddress.AllocateNewGeneration()));
-            this.gatewayAddressLazy = new Lazy<SiloAddress>(() => endpointOptions.ProxyPort != 0 ? SiloAddress.New(new IPEndPoint(this.SiloAddress.Endpoint.Address, endpointOptions.ProxyPort), 0) : null);
-        }
-
-        private static IPEndPoint ResolveEndpoint(EndpointOptions options)
-        {
-            IPAddress ipAddress;
-            if (options.IPAddress != null)
-            {
-                ipAddress = options.IPAddress;
-            }
-            else
-            {
-                // TODO: refactor this out of ClusterConfiguration
-                ipAddress = ConfigUtilities.ResolveIPAddress(options.HostNameOrIPAddress, null, AddressFamily.InterNetwork).GetAwaiter().GetResult();
-            }
-
-            return new IPEndPoint(ipAddress, options.Port);
+            this.siloAddressLazy = new Lazy<SiloAddress>(() => SiloAddress.New(endpointOptions.GetPublicSiloEndpoint(), SiloAddress.AllocateNewGeneration()));
+            this.gatewayAddressLazy = new Lazy<SiloAddress>(() => endpointOptions.GatewayPort != 0 ? SiloAddress.New(endpointOptions.GetPublicProxyEndpoint(), 0) : null);
         }
 
         /// <inheritdoc />

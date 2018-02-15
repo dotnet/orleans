@@ -76,7 +76,7 @@ namespace AWSUtils.Tests.Liveness
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
-                hostBuilder.UseDynamoDBMembership(options => { options.ConnectionString = ConnectionString; });
+                hostBuilder.UseDynamoDBClustering(options => { options.ConnectionString = ConnectionString; });
             }
         }
 
@@ -84,7 +84,7 @@ namespace AWSUtils.Tests.Liveness
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
-                clientBuilder.UseDynamoDBGatewayListProvider(gatewayOptions =>
+                clientBuilder.UseDynamoDBClustering(gatewayOptions =>
                 {
                     LegacyDynamoDBGatewayListProviderConfigurator.ParseDataConnectionString(ConnectionString, gatewayOptions);
                 });

@@ -6,12 +6,12 @@ using System.Net;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.Hosting;
 
 namespace UnitTests.MessageCenterTests
 {

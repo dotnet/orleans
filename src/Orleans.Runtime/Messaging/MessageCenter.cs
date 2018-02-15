@@ -1,11 +1,10 @@
 using System;
-using System.Net;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.Messaging;
-using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Hosting;
 
 namespace Orleans.Runtime.Messaging
@@ -46,6 +45,7 @@ namespace Orleans.Runtime.Messaging
 
         public MessageCenter(
             ILocalSiloDetails siloDetails,
+            IOptions<EndpointOptions> endpointOptions,
             IOptions<SiloMessagingOptions> messagingOptions,
             IOptions<NetworkingOptions> networkingOptions,
             SerializationManager serializationManager,
@@ -59,7 +59,8 @@ namespace Orleans.Runtime.Messaging
             this.serializationManager = serializationManager;
             this.messageFactory = messageFactory;
             this.executorService = executorService;
-            this.Initialize(siloDetails.SiloAddress.Endpoint, siloDetails.SiloAddress.Generation, messagingOptions, networkingOptions);
+            this.MyAddress = siloDetails.SiloAddress;
+            this.Initialize(endpointOptions, messagingOptions, networkingOptions);
             if (siloDetails.GatewayAddress != null)
             {
                 Gateway = gatewayFactory(this);
@@ -68,13 +69,13 @@ namespace Orleans.Runtime.Messaging
             localMessageHandlers = new Action<Message>[Enum.GetValues(typeof(Message.Categories)).Length];
         }
 
-        private void Initialize(IPEndPoint here, int generation, IOptions<SiloMessagingOptions> messagingOptions, IOptions<NetworkingOptions> networkingOptions)
+        private void Initialize(IOptions<EndpointOptions> endpointOptions, IOptions<SiloMessagingOptions> messagingOptions, IOptions<NetworkingOptions> networkingOptions)
         {
             if(log.IsEnabled(LogLevel.Trace)) log.Trace("Starting initialization.");
 
             SocketManager = new SocketManager(networkingOptions, this.loggerFactory);
-            ima = new IncomingMessageAcceptor(this, here, SocketDirection.SiloToSilo, this.messageFactory, this.serializationManager, this.executorService, this.loggerFactory);
-            MyAddress = SiloAddress.New((IPEndPoint)ima.AcceptingSocket.LocalEndPoint, generation);
+            var listeningEndpoint = endpointOptions.Value.GetListeningSiloEndpoint();
+            ima = new IncomingMessageAcceptor(this, listeningEndpoint, SocketDirection.SiloToSilo, this.messageFactory, this.serializationManager, this.executorService, this.loggerFactory);
             InboundQueue = new InboundMessageQueue(this.loggerFactory);
             OutboundQueue = new OutboundMessageQueue(this, messagingOptions, this.serializationManager, this.executorService, this.loggerFactory);
             

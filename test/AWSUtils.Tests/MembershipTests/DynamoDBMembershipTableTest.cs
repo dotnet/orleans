@@ -9,14 +9,13 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Membership;
 using Orleans.Runtime.MembershipService;
-using OrleansAWSUtils.Configuration;
 using TestExtensions;
 using UnitTests;
 using UnitTests.MembershipTests;
 using Xunit;
 using OrleansAWSUtils;
 using OrleansAWSUtils.Membership;
-using OrleansAWSUtils.Options;
+using Orleans.Configuration;
 
 namespace AWSUtils.Tests.MembershipTests
 {
@@ -43,7 +42,7 @@ namespace AWSUtils.Tests.MembershipTests
         {
             if (!AWSTestConstants.IsDynamoDbAvailable)
                 throw new SkipException("Unable to connect to AWS DynamoDB simulator");
-            var options = new DynamoDBMembershipOptions()
+            var options = new DynamoDBClusteringSiloOptions()
             {
                 ConnectionString = this.connectionString,
             };
@@ -52,7 +51,7 @@ namespace AWSUtils.Tests.MembershipTests
 
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
-            var options = new DynamoDBGatewayListProviderOptions();
+            var options = new DynamoDBClusteringClientOptions();
             LegacyDynamoDBGatewayListProviderConfigurator.ParseDataConnectionString(this.connectionString, options);
             return new DynamoDBGatewayListProvider(this.loggerFactory, this.clientConfiguration, Options.Create(options), this.clientOptions);
         }

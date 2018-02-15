@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     public class GatewayOptions
     {

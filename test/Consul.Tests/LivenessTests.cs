@@ -37,7 +37,7 @@ namespace Consul.Tests
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
-                hostBuilder.UseConsulMembership(options => { options.Address = new Uri(ConsulTestUtils.CONSUL_ENDPOINT); });
+                hostBuilder.UseConsulClustering(options => { options.Address = new Uri(ConsulTestUtils.CONSUL_ENDPOINT); });
             }
         }
 
@@ -46,7 +46,7 @@ namespace Consul.Tests
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .UseConsulGatewayListProvider(gatewayOptions =>
+                    .UseConsulClustering(gatewayOptions =>
                     {
                         gatewayOptions.Address = new Uri(ConsulTestUtils.CONSUL_ENDPOINT);
                         ;

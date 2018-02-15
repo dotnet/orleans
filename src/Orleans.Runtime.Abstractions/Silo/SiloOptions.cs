@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Options;
 
-namespace Orleans.Runtime
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Silo configuration options.
@@ -23,9 +23,6 @@ namespace Orleans.Runtime
         /// Gets or sets a unique identifier for this service, which should survive deployment and redeployment, where as <see cref="ClusterId"/> might not.
         /// </summary>
         public Guid ServiceId { get; set; }
-
-        public bool FastKillOnCancelKeyPress { get; set; } = DEFAULT_FAST_KILL_ON_CANCEL;
-        public const bool DEFAULT_FAST_KILL_ON_CANCEL = true;
     }
 
     public class SiloOptionsFormatter : IOptionFormatter<SiloOptions>
@@ -44,8 +41,7 @@ namespace Orleans.Runtime
             {
                 OptionFormattingUtilities.Format(nameof(this.options.SiloName),this.options.SiloName),
                 OptionFormattingUtilities.Format(nameof(this.options.ClusterId), this.options.ClusterId),
-                OptionFormattingUtilities.Format(nameof(this.options.ServiceId), this.options.ServiceId),
-                OptionFormattingUtilities.Format(nameof(this.options.FastKillOnCancelKeyPress), this.options.FastKillOnCancelKeyPress)
+                OptionFormattingUtilities.Format(nameof(this.options.ServiceId), this.options.ServiceId)
             };
         }
     }

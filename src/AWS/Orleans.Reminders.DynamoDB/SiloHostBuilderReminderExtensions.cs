@@ -1,7 +1,7 @@
 using System;
 
 using Microsoft.Extensions.DependencyInjection;
-
+using Orleans.Configuration;
 using OrleansAWSUtils.Reminders;
 
 namespace Orleans.Hosting

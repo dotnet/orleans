@@ -1,8 +1,8 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Hosting;
-using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -37,7 +37,7 @@ namespace Tester.AzureUtils.General
                         .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
                         {
                             options.ServiceId = silo.Value.ServiceId.ToString();
-                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         }));
                 }
             }

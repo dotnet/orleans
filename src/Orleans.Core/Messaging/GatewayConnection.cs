@@ -16,7 +16,7 @@ namespace Orleans.Messaging
     {
         private readonly MessageFactory messageFactory;
         internal bool IsLive { get; private set; }
-        internal ProxiedMessageCenter MsgCenter { get; private set; }
+        internal ClientMessageCenter MsgCenter { get; private set; }
 
         private Uri addr;
         internal Uri Address
@@ -37,7 +37,7 @@ namespace Orleans.Messaging
 
         private DateTime lastConnect;
 
-        internal GatewayConnection(Uri address, ProxiedMessageCenter mc, MessageFactory messageFactory, ExecutorService executorService, ILoggerFactory loggerFactory, TimeSpan openConnectionTimeout)
+        internal GatewayConnection(Uri address, ClientMessageCenter mc, MessageFactory messageFactory, ExecutorService executorService, ILoggerFactory loggerFactory, TimeSpan openConnectionTimeout)
             : base("GatewayClientSender_" + address, mc.SerializationManager, executorService, loggerFactory)
         {
             this.messageFactory = messageFactory;
@@ -96,7 +96,7 @@ namespace Orleans.Messaging
                 {
                     s = Socket;
                     Socket = null;
-                    Log.Warn(ErrorCode.ProxyClient_MarkGatewayDisconnected, String.Format("Marking gateway at address {0} as Disconnected", Address));
+                    Log.Warn(ErrorCode.ProxyClient_MarkGatewayDisconnected, $"Marking gateway at address {Address} as Disconnected");
                     if ( MsgCenter != null && MsgCenter.GatewayManager != null)
                         // We need a refresh...
                         MsgCenter.GatewayManager.ExpediteUpdateLiveGatewaysSnapshot();
@@ -113,7 +113,7 @@ namespace Orleans.Messaging
 
         public void MarkAsDead()
         {
-            Log.Warn(ErrorCode.ProxyClient_MarkGatewayDead, String.Format("Marking gateway at address {0} as Dead in my client local gateway list.", Address));
+            Log.Warn(ErrorCode.ProxyClient_MarkGatewayDead, $"Marking gateway at address {Address} as Dead in my client local gateway list.");
             MsgCenter.GatewayManager.MarkAsDead(Address);
             Stop();
         }
@@ -139,7 +139,7 @@ namespace Orleans.Messaging
                     return; // if the connection is already marked as dead, don't try to reconnect. It has been doomed.
                 }
 
-                for (var i = 0; i < ProxiedMessageCenter.CONNECT_RETRY_COUNT; i++)
+                for (var i = 0; i < ClientMessageCenter.CONNECT_RETRY_COUNT; i++)
                 {
                     try
                     {
@@ -158,11 +158,11 @@ namespace Orleans.Messaging
                             if (!MsgCenter.GatewayManager.GetLiveGateways().Contains(Address))
                                 break;
 
-                            // Wait at least ProxiedMessageCenter.MINIMUM_INTERCONNECT_DELAY before reconnection tries
+                            // Wait at least ClientMessageCenter.MINIMUM_INTERCONNECT_DELAY before reconnection tries
                             var millisecondsSinceLastAttempt = DateTime.UtcNow - lastConnect;
-                            if (millisecondsSinceLastAttempt < ProxiedMessageCenter.MINIMUM_INTERCONNECT_DELAY)
+                            if (millisecondsSinceLastAttempt < ClientMessageCenter.MINIMUM_INTERCONNECT_DELAY)
                             {
-                                var wait = ProxiedMessageCenter.MINIMUM_INTERCONNECT_DELAY - millisecondsSinceLastAttempt;
+                                var wait = ClientMessageCenter.MINIMUM_INTERCONNECT_DELAY - millisecondsSinceLastAttempt;
                                 if (Log.IsEnabled(LogLevel.Debug)) Log.Debug(ErrorCode.ProxyClient_PauseBeforeRetry, "Pausing for {0} before trying to connect to gateway {1} on trial {2}", wait, Address, i);
                                 Thread.Sleep(wait);
                             }
@@ -252,8 +252,8 @@ namespace Orleans.Messaging
         {
             // we only get here if we failed to serialise the msg (or any other catastrophic failure).
             // Request msg fails to serialise on the sending silo, so we just enqueue a rejection msg.
-            Log.Warn(ErrorCode.ProxyClient_SerializationError, String.Format("Unexpected error serializing message to gateway {0}.", Address), exc);
-            FailMessage(msg, String.Format("Unexpected error serializing message to gateway {0}. {1}", Address, exc));
+            Log.Warn(ErrorCode.ProxyClient_SerializationError, $"Unexpected error serializing message to gateway {Address}.", exc);
+            FailMessage(msg, $"Unexpected error serializing message to gateway {Address}. {exc}");
             if (msg.Direction == Message.Directions.Request || msg.Direction == Message.Directions.OneWay)
             {
                 return;

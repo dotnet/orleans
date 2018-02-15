@@ -6,9 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
-using Orleans.GrainDirectory;
-using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
+using Orleans.Configuration;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
@@ -133,7 +131,7 @@ namespace Orleans.Runtime
                     var nea = ex as Catalog.NonExistentActivationException;
                     if (nea == null)
                     {
-                        var str = String.Format("Error creating activation for {0}. Message {1}", message.NewGrainType, message);
+                        var str = $"Error creating activation for {message.NewGrainType}. Message {message}";
                         logger.Error(ErrorCode.Dispatcher_ErrorCreatingActivation, str, ex);
                         throw new OrleansException(str, ex);
                     }
@@ -141,12 +139,12 @@ namespace Orleans.Runtime
                     if (nea.IsStatelessWorker)
                     {
                         if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Dispatcher_Intermediate_GetOrCreateActivation,
-                           String.Format("Intermediate StatelessWorker NonExistentActivation for message {0}", message), ex);
+                           $"Intermediate StatelessWorker NonExistentActivation for message {message}, Exception {ex}");
                     }
                     else
                     {
                         logger.Info(ErrorCode.Dispatcher_Intermediate_GetOrCreateActivation,
-                            String.Format("Intermediate NonExistentActivation for message {0}", message), ex);
+                            $"Intermediate NonExistentActivation for message {message}, with Exception {ex}");
                     }
 
                     ActivationAddress nonExistentActivation = nea.NonExistentActivation;
@@ -173,8 +171,7 @@ namespace Orleans.Runtime
                                 catch (Exception exc)
                                 {
                                     logger.Warn(ErrorCode.Dispatcher_FailedToUnregisterNonExistingAct,
-                                        String.Format("Failed to un-register NonExistentActivation {0}",
-                                            nonExistentActivation), exc);
+                                        $"Failed to un-register NonExistentActivation {nonExistentActivation}", exc);
                                 }
                             },
                             "LocalGrainDirectory.UnregisterAfterNonexistingActivation"),
@@ -503,9 +500,7 @@ namespace Orleans.Runtime
             if (logger.IsEnabled(LogLevel.Information))
             {
                 logger.Info(ErrorCode.Messaging_Dispatcher_ForwardingRequests,
-                    string.Format("Forwarding {0} requests destined for address {1} to address {2} after {3}.",
-                        messages.Count, oldAddress, forwardingAddress,
-                        failedOperation));
+                    $"Forwarding {messages.Count} requests destined for address {oldAddress} to address {forwardingAddress} after {failedOperation}.");
             }
 
             // IMPORTANT: do not do anything on activation context anymore, since this activation is invalid already.
@@ -534,8 +529,7 @@ namespace Orleans.Runtime
             try
             {
 
-                logger.Info(ErrorCode.Messaging_Dispatcher_TryForward, 
-                    String.Format("Trying to forward after {0}, ForwardCount = {1}. Message {2}.", failedOperation, message.ForwardCount, message));
+                logger.Info(ErrorCode.Messaging_Dispatcher_TryForward, $"Trying to forward after {failedOperation}, ForwardCount = {message.ForwardCount}. Message {message}.");
 
                 // if this message is from a different cluster and hit a non-existing activation
                 // in this cluster (which can happen due to stale cache or directory states)
@@ -548,8 +542,7 @@ namespace Orleans.Runtime
                 {
                     message.IsReturnedFromRemoteCluster = true; // marks message to force invalidation of stale directory entry
                     forwardingAddress = ActivationAddress.NewActivationAddress(message.SendingSilo, message.TargetGrain);
-                    logger.Info(ErrorCode.Messaging_Dispatcher_ReturnToOriginCluster,
-                        String.Format("Forwarding back to origin cluster, to fictional activation {0}", message));
+                    logger.Info(ErrorCode.Messaging_Dispatcher_ReturnToOriginCluster, $"Forwarding back to origin cluster, to fictional activation {message}");
                 }
 
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageReRouted(message);
@@ -569,8 +562,7 @@ namespace Orleans.Runtime
             {
                 if (!forwardingSucceded)
                 {
-                    var str = String.Format("Forwarding failed: tried to forward message {0} for {1} times after {2} to invalid activation. Rejecting now.", 
-                        message, message.ForwardCount, failedOperation);
+                    var str = $"Forwarding failed: tried to forward message {message} for {message.ForwardCount} times after {failedOperation} to invalid activation. Rejecting now.";
                     logger.Warn(ErrorCode.Messaging_Dispatcher_TryForwardFailed, str, exc);
                     RejectMessage(message, Message.RejectionTypes.Transient, exc, str);
                 }

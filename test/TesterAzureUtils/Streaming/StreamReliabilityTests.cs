@@ -14,7 +14,6 @@ using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
-using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
@@ -23,6 +22,7 @@ using Xunit;
 using Xunit.Abstractions;
 using Tester;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 // ReSharper disable ConvertToConstant.Local
 // ReSharper disable CheckNamespace
@@ -71,7 +71,7 @@ namespace UnitTests.Streaming.Reliability
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
-                clientBuilder.UseAzureTableGatewayListProvider(gatewayOptions =>
+                clientBuilder.UseAzureStorageClustering(gatewayOptions =>
                 {
                     gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                 });
@@ -82,7 +82,7 @@ namespace UnitTests.Streaming.Reliability
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
-                hostBuilder.UseAzureTableMembership(options =>
+                hostBuilder.UseAzureStorageClustering(options =>
                 {
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     options.MaxStorageBusyRetries = 3;
@@ -90,14 +90,14 @@ namespace UnitTests.Streaming.Reliability
                 .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
                     {
                         options.ServiceId = silo.Value.ServiceId.ToString();
-                        options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         options.DeleteStateOnClear = true;
                     }))
                 .AddAzureTableGrainStorage("PubSubStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
                 {
                     options.ServiceId = silo.Value.ServiceId.ToString();
                     options.DeleteStateOnClear = true;
-                    options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                 }));
             }
         }

@@ -8,12 +8,11 @@ using Orleans.Runtime;
 using Orleans.Runtime.Membership;
 using Orleans.Runtime.MembershipService;
 using Orleans.Tests.SqlUtils;
-using Orleans.AdoNet.Configuration;
 using TestExtensions;
 using UnitTests.General;
 using Xunit;
 using Orleans.AdoNet;
-using Orleans.AdoNet.Options;
+using Orleans.Configuration;
 
 namespace UnitTests.MembershipTests
 {
@@ -35,7 +34,7 @@ namespace UnitTests.MembershipTests
         }
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
         {
-            var options = new AdoNetClusteringOptions()
+            var options = new AdoNetClusteringSiloOptions()
             {
                 AdoInvariant = GetAdoInvariant(),
                 ConnectionString = this.connectionString,
@@ -45,7 +44,7 @@ namespace UnitTests.MembershipTests
 
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
-            var options = new AdoNetGatewayListProviderOptions()
+            var options = new AdoNetClusteringClientOptions()
             {
                 ConnectionString = this.connectionString,
                 AdoInvariant = GetAdoInvariant()

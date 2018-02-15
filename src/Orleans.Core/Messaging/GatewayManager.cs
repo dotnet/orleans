@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Hosting;
+using Orleans.Configuration;
 using Orleans.Runtime;
 
 namespace Orleans.Messaging
@@ -48,7 +48,7 @@ namespace Orleans.Messaging
             if (knownGateways.Count == 0)
             {
                 string gatewayProviderType = gatewayListProvider.GetType().FullName;
-                string err = String.Format("Could not find any gateway in {0}. Orleans client cannot initialize.", gatewayProviderType);
+                string err = $"Could not find any gateway in {gatewayProviderType}. Orleans client cannot initialize.";
                 logger.Error(ErrorCode.GatewayManager_NoGateways, err);
                 throw new OrleansException(err);
             }

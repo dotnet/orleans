@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Text;
@@ -12,12 +13,12 @@ using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
 using Newtonsoft.Json;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.Providers.Azure;
 using Orleans.Persistence.AzureStorage;
-using Orleans.Hosting;
 
 namespace Orleans.Storage
 {
@@ -44,16 +45,20 @@ namespace Orleans.Storage
 
         private const string BINARY_DATA_PROPERTY_NAME = "Data";
         private const string STRING_DATA_PROPERTY_NAME = "StringData";
+        private string name;
 
         /// <summary> Default constructor </summary>
-        public AzureTableGrainStorage(AzureTableStorageOptions options, SerializationManager serializationManager, IGrainFactory grainFactory, ITypeResolver typeResolver, ILoggerFactory loggerFactory)
+        public AzureTableGrainStorage(string name, AzureTableStorageOptions options, SerializationManager serializationManager, 
+            IGrainFactory grainFactory, ITypeResolver typeResolver, ILoggerFactory loggerFactory)
         {
             this.options = options;
+            this.name = name;
             this.serializationManager = serializationManager;
             this.grainFactory = grainFactory;
             this.typeResolver = typeResolver;
             this.loggerFactory = loggerFactory;
-            this.logger = this.loggerFactory.CreateLogger<AzureTableGrainStorage>();
+            var loggerName = $"{typeof(AzureTableGrainStorageFactory).FullName}.{name}";
+            this.logger = this.loggerFactory.CreateLogger(loggerName);
         }
 
         /// <summary> Read state data function for this storage provider. </summary>
@@ -455,11 +460,23 @@ namespace Orleans.Storage
 
         private async Task Init(CancellationToken ct)
         {
-            this.logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_InitProvider, $"AzureTableGrainStorage initializing: {this.options.ToString()}");
-            this.logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_ParamConnectionString, "AzureTableGrainStorage is using DataConnectionString: {0}", ConfigUtilities.RedactConnectionStringInfo(this.options.DataConnectionString));
-            this.JsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(this.typeResolver, this.grainFactory), this.options.UseFullAssemblyNames, this.options.IndentJson, this.options.TypeNameHandling);
-            this.tableDataManager = new GrainStateTableDataManager(this.options.TableName, this.options.DataConnectionString, this.loggerFactory);
-            await this.tableDataManager.InitTableAsync();
+            var stopWatch = Stopwatch.StartNew();
+            try
+            {
+                this.logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_InitProvider, $"AzureTableGrainStorage {name} initializing: {this.options.ToString()}");
+                this.logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_ParamConnectionString, $"AzureTableGrainStorage {name} is using DataConnectionString: {ConfigUtilities.RedactConnectionStringInfo(this.options.ConnectionString)}");
+                this.JsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(this.typeResolver, this.grainFactory), this.options.UseFullAssemblyNames, this.options.IndentJson, this.options.TypeNameHandling);
+                this.tableDataManager = new GrainStateTableDataManager(this.options.TableName, this.options.ConnectionString, this.loggerFactory);
+                await this.tableDataManager.InitTableAsync();
+                stopWatch.Stop();
+                this.logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_InitProvider, $"Initializing provider {this.name} of type {this.GetType().Name} in stage {this.options.InitStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");
+            }
+            catch (Exception ex)
+            {
+                stopWatch.Stop();
+                this.logger.LogError((int)ErrorCode.Provider_ErrorFromInit, $"Initialization failed for provider {this.name} of type {this.GetType().Name} in stage {this.options.InitStage} in {stopWatch.ElapsedMilliseconds} Milliseconds.", ex);
+                throw;
+            }
         }
 
         private Task Close(CancellationToken ct)
@@ -479,7 +496,7 @@ namespace Orleans.Storage
         public static IGrainStorage Create(IServiceProvider services, string name)
         {
             IOptionsSnapshot<AzureTableStorageOptions> optionsSnapshot = services.GetRequiredService<IOptionsSnapshot<AzureTableStorageOptions>>();
-            return ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(services, optionsSnapshot.Get(name));
+            return ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(services, optionsSnapshot.Get(name), name);
         }
     }
 }

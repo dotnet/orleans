@@ -1,4 +1,3 @@
-
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -7,8 +6,8 @@ using System.Diagnostics;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Runtime.Configuration;
-using Orleans.Hosting;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions;
 using Orleans.Transactions.Development;

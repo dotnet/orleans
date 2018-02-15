@@ -2,9 +2,9 @@ using System;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Hosting;
 using Orleans.TestingHost;
@@ -51,32 +51,32 @@ namespace Tester.AzureUtils.Persistence
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                        .AddAzureTableGrainStorage("GrainStorageForTest", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
                         {
                             options.ServiceId = silo.Value.ServiceId.ToString();
-                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.DeleteStateOnClear = true;
                         }))
                         .AddAzureTableGrainStorage("AzureStore1", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
                         {
                             options.ServiceId = silo.Value.ServiceId.ToString();
-                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         }))
                         .AddAzureTableGrainStorage("AzureStore2", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
                         {
                             options.ServiceId = silo.Value.ServiceId.ToString();
-                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         }))
                         .AddAzureTableGrainStorage("AzureStore3", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
                         {
                             options.ServiceId = silo.Value.ServiceId.ToString();
-                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         }));
                 }
             }
         }
 
-        public PersistenceGrainTests_AzureTableGrainStorage(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
+        public PersistenceGrainTests_AzureTableGrainStorage(ITestOutputHelper output, Fixture fixture) : base(output, fixture, ServiceId)
         {
             fixture.EnsurePreconditionsMet();
         }
@@ -136,7 +136,7 @@ namespace Tester.AzureUtils.Persistence
         [SkippableFact, TestCategory("Functional")]
         public async Task Grain_AzureTableGrainStorage_SiloRestart()
         {
-            await base.Grain_AzureStore_SiloRestart(ServiceId);
+            await base.Grain_AzureStore_SiloRestart();
         }
     }
 }

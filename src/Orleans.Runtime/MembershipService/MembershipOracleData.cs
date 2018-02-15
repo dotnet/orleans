@@ -2,10 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using Orleans.Hosting;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime.Configuration;
 using System.Text;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime.MembershipService
 {

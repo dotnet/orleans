@@ -9,6 +9,7 @@ using Orleans.GrainDirectory;
 using Orleans.Hosting;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.MultiClusterNetwork;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime.GrainDirectory
 {

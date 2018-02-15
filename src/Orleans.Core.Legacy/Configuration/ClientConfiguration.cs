@@ -129,9 +129,10 @@ namespace Orleans.Runtime.Configuration
         public TimeSpan GatewayListRefreshPeriod { get; set; }
 
         public string StatisticsProviderName { get; set; }
-        public TimeSpan StatisticsMetricsTableWriteInterval { get; set; }
         public TimeSpan StatisticsPerfCountersWriteInterval { get; set; }
         public TimeSpan StatisticsLogWriteInterval { get; set; }
+
+        [Obsolete("Statistics table is no longer supported.")]
         public bool StatisticsWriteLogStatisticsToTable { get; set; }
         public StatisticsLevel StatisticsCollectionLevel { get; set; }
 
@@ -190,10 +191,8 @@ namespace Orleans.Runtime.Configuration
 
             GatewayListRefreshPeriod = GatewayOptions.DEFAULT_GATEWAY_LIST_REFRESH_PERIOD;
             StatisticsProviderName = null;
-            StatisticsMetricsTableWriteInterval = StatisticsOptions.DEFAULT_METRICS_TABLE_WRITE_PERIOD;
             StatisticsPerfCountersWriteInterval = DEFAULT_STATS_PERF_COUNTERS_WRITE_PERIOD;
             StatisticsLogWriteInterval = StatisticsOptions.DEFAULT_LOG_WRITE_PERIOD;
-            StatisticsWriteLogStatisticsToTable = StatisticsOptions.DEFAULT_LOG_TO_TABLE;
             StatisticsCollectionLevel = StatisticsOptions.DEFAULT_COLLECTION_LEVEL;
             LimitManager = new LimitManager();
             ProviderConfigurations = new Dictionary<string, ProviderCategoryConfiguration>();
@@ -372,31 +371,7 @@ namespace Orleans.Runtime.Configuration
         {
             ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
         }
-
-
-        public void RegisterStatisticsProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IStatisticsPublisher
-        {
-            TypeInfo providerTypeInfo = typeof(T).GetTypeInfo();
-            if (providerTypeInfo.IsAbstract
-                || providerTypeInfo.IsGenericType
-                || providerTypeInfo.IsGenericType
-                || !typeof(IStatisticsPublisher).IsAssignableFrom(typeof(T)))
-            {
-                throw new ArgumentException("Expected non-generic, non-abstract type which implements IStatisticsPublisher interface", nameof(T));
-            }
-
-            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STATISTICS_PROVIDER_CATEGORY_NAME, providerTypeInfo.FullName, providerName, properties);
-        }
-
-        public void RegisterStatisticsProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
-        {
-            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STATISTICS_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
-        }
-
-
-
-
-
+        
         /// <summary>
         /// Retrieves an existing provider configuration
         /// </summary>

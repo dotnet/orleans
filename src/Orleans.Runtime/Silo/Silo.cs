@@ -13,8 +13,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
 using Orleans.Core;
-using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Counters;
 using Orleans.Runtime.GrainDirectory;
@@ -30,6 +28,7 @@ using Orleans.Transactions;
 using Orleans.Runtime.Versions;
 using Orleans.Versions;
 using Orleans.ApplicationParts;
+using Orleans.Configuration;
 using Orleans.Serialization;
 
 namespace Orleans.Runtime
@@ -362,8 +361,11 @@ namespace Orleans.Runtime
 
             // SystemTarget for provider init calls
             this.fallbackScheduler = Services.GetRequiredService<FallbackSystemTarget>();
-
             RegisterSystemTarget(fallbackScheduler);
+
+            // SystemTarget for startup tasks
+            var startupTaskTarget = Services.GetRequiredService<StartupTaskSystemTarget>();
+            RegisterSystemTarget(startupTaskTarget);
         }
 
         private Task OnRuntimeInitializeStart(CancellationToken ct)
@@ -378,10 +380,10 @@ namespace Orleans.Runtime
 
             logger.Info(ErrorCode.SiloStarting, "Silo Start()");
 
-            // Hook up to receive notification of process exit / Ctrl-C events
-            AppDomain.CurrentDomain.ProcessExit += HandleProcessExit;
-            if (this.siloOptions.FastKillOnCancelKeyPress)
-                Console.CancelKeyPress += HandleConsoleCancelKeyPress;
+            var processExitHandlingOptions = this.Services.GetService<IOptions<ProcessExitHandlingOptions>>().Value;
+            if(processExitHandlingOptions.FastKillOnProcessExit)
+                AppDomain.CurrentDomain.ProcessExit += HandleProcessExit;
+
             //TODO: setup thead pool directly to lifecycle
             StartTaskWithPerfAnalysis("ConfigureThreadPoolAndServicePointSettings",
                 this.ConfigureThreadPoolAndServicePointSettings, Stopwatch.StartNew());
@@ -432,17 +434,8 @@ namespace Orleans.Runtime
                 var grainTypeManager = Services.GetRequiredService<GrainTypeManager>();
                 implicitStreamSubscriberTable.InitImplicitStreamSubscribers(grainTypeManager.GrainClassTypeData.Select(t => t.Value.Type).ToArray());
             }
-            
-            var siloProviderRuntime = Services.GetRequiredService<SiloProviderRuntime>();
-            SiloStatisticsOptions statisticsOptions = Services.GetRequiredService<IOptions<SiloStatisticsOptions>>().Value;
-            runtimeClient.CurrentStreamProviderRuntime = siloProviderRuntime;
-            await StartAsyncTaskWithPerfAnalysis("Load StatisticProviders", LoadStatsProvider, stopWatch);
-            async Task LoadStatsProvider()
-            {
-                // can call SetSiloMetricsTableDataManager only after MessageCenter is created (dependency on this.SiloAddress).
-                await siloStatistics.SetSiloStatsTableDataManager(this, statisticsOptions)
-                    .WithTimeout(initTimeout, $"SiloStatistics Setting SiloStatsTableDataManager failed due to timeout {initTimeout}");
-            }
+
+            this.runtimeClient.CurrentStreamProviderRuntime = this.Services.GetRequiredService<SiloProviderRuntime>();
             
             // This has to follow the above steps that start the runtime components
             await StartAsyncTaskWithPerfAnalysis("Create system targets and inject dependencies", () =>
@@ -598,18 +591,18 @@ namespace Orleans.Runtime
 
         private void ConfigureThreadPoolAndServicePointSettings()
         {
-            ThreadPoolOptions threadPoolOptions = Services.GetRequiredService<IOptions<ThreadPoolOptions>>().Value;
-            if (threadPoolOptions.MinDotNetThreadPoolSize > 0)
+            PerformanceTuningOptions performanceTuningOptions = Services.GetRequiredService<IOptions<PerformanceTuningOptions>>().Value;
+            if (performanceTuningOptions.MinDotNetThreadPoolSize > 0)
             {
                 int workerThreads;
                 int completionPortThreads;
                 ThreadPool.GetMinThreads(out workerThreads, out completionPortThreads);
-                if (threadPoolOptions.MinDotNetThreadPoolSize > workerThreads ||
-                    threadPoolOptions.MinDotNetThreadPoolSize > completionPortThreads)
+                if (performanceTuningOptions.MinDotNetThreadPoolSize > workerThreads ||
+                    performanceTuningOptions.MinDotNetThreadPoolSize > completionPortThreads)
                 {
                     // if at least one of the new values is larger, set the new min values to be the larger of the prev. and new config value.
-                    int newWorkerThreads = Math.Max(threadPoolOptions.MinDotNetThreadPoolSize, workerThreads);
-                    int newCompletionPortThreads = Math.Max(threadPoolOptions.MinDotNetThreadPoolSize, completionPortThreads);
+                    int newWorkerThreads = Math.Max(performanceTuningOptions.MinDotNetThreadPoolSize, workerThreads);
+                    int newCompletionPortThreads = Math.Max(performanceTuningOptions.MinDotNetThreadPoolSize, completionPortThreads);
                     bool ok = ThreadPool.SetMinThreads(newWorkerThreads, newCompletionPortThreads);
                     if (ok)
                     {
@@ -628,13 +621,12 @@ namespace Orleans.Runtime
 
             // Set .NET ServicePointManager settings to optimize throughput performance when using Azure storage
             // http://blogs.msdn.com/b/windowsazurestorage/archive/2010/06/25/nagle-s-algorithm-is-not-friendly-towards-small-requests.aspx
-            ServicePointOptions servicePointOptions = Services.GetRequiredService<IOptions<ServicePointOptions>>().Value;
             logger.Info(ErrorCode.SiloConfiguredServicePointManager,
                 "Configured .NET ServicePointManager to Expect100Continue={0}, DefaultConnectionLimit={1}, UseNagleAlgorithm={2} to improve Azure storage performance.",
-                servicePointOptions.Expect100Continue, servicePointOptions.DefaultConnectionLimit, servicePointOptions.UseNagleAlgorithm);
-            ServicePointManager.Expect100Continue = servicePointOptions.Expect100Continue;
-            ServicePointManager.DefaultConnectionLimit = servicePointOptions.DefaultConnectionLimit;
-            ServicePointManager.UseNagleAlgorithm = servicePointOptions.UseNagleAlgorithm;
+                performanceTuningOptions.Expect100Continue, performanceTuningOptions.DefaultConnectionLimit, performanceTuningOptions.UseNagleAlgorithm);
+            ServicePointManager.Expect100Continue = performanceTuningOptions.Expect100Continue;
+            ServicePointManager.DefaultConnectionLimit = performanceTuningOptions.DefaultConnectionLimit;
+            ServicePointManager.UseNagleAlgorithm = performanceTuningOptions.UseNagleAlgorithm;
         }
 
         /// <summary>
@@ -808,12 +800,6 @@ namespace Orleans.Runtime
             this.Stop();
         }
 
-        private void HandleConsoleCancelKeyPress(object sender, EventArgs e)
-        {
-            // Gracefully terminate the silo.
-            this.Shutdown();
-        }
-
         internal void RegisterSystemTarget(SystemTarget target)
         {
             var providerRuntime = this.Services.GetRequiredService<SiloProviderRuntime>();
@@ -864,9 +850,9 @@ namespace Orleans.Runtime
 
         private void Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe(SiloLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
-            lifecycle.Subscribe(SiloLifecycleStage.RuntimeServices, OnRuntimeServicesStart, OnRuntimeServicesStop);
-            lifecycle.Subscribe(SiloLifecycleStage.RuntimeGrainServices, OnRuntimeGrainServicesStart, OnRuntimeGrainServicesStop);
+            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
+            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeServices, OnRuntimeServicesStart, OnRuntimeServicesStop);
+            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeGrainServices, OnRuntimeGrainServicesStart, OnRuntimeGrainServicesStop);
             
         }
     }
@@ -876,6 +862,15 @@ namespace Orleans.Runtime
     {
         public FallbackSystemTarget(ILocalSiloDetails localSiloDetails, ILoggerFactory loggerFactory)
             : base(Constants.FallbackSystemTargetId, localSiloDetails.SiloAddress, loggerFactory)
+        {
+        }
+    }
+
+    // A dummy system target for scheduling startup tasks.
+    internal class StartupTaskSystemTarget : SystemTarget
+    {
+        public StartupTaskSystemTarget(ILocalSiloDetails localSiloDetails, ILoggerFactory loggerFactory)
+            : base(Constants.StartupTaskSystemTargetId, localSiloDetails.SiloAddress, loggerFactory)
         {
         }
     }

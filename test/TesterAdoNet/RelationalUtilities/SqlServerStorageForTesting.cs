@@ -28,8 +28,7 @@ namespace UnitTests.General
                     "SQLServer-Main.sql",
                     "SQLServer-Clustering.sql",
                     "SQLServer-Persistence.sql",
-                    "SQLServer-Reminders.sql",
-                    "SQLServer-Statistics.sql"
+                    "SQLServer-Reminders.sql"
                 };
             }
         }

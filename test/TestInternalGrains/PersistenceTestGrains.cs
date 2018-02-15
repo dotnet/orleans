@@ -11,9 +11,9 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Concurrency;
+using Orleans.Configuration;
 using Orleans.Core;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;
 using UnitTests.GrainInterfaces;
@@ -303,9 +303,9 @@ namespace UnitTests.Grains
         }
     }
 
-    [Orleans.Providers.StorageProvider(ProviderName = "AzureStore")]
-    public class AzureStorageTestGrain : Grain<PersistenceTestGrainState>,
-        IAzureStorageTestGrain, IAzureStorageTestGrain_LongKey
+    [Orleans.Providers.StorageProvider(ProviderName = "GrainStorageForTest")]
+    public class GrainStorageTestGrain : Grain<PersistenceTestGrainState>,
+        IGrainStorageTestGrain, IGrainStorageTestGrain_LongKey
     {
         public override Task OnActivateAsync()
         {
@@ -335,9 +335,9 @@ namespace UnitTests.Grains
         }
     }
 
-    [Orleans.Providers.StorageProvider(ProviderName = "AzureStore")]
-    public class AzureStorageGenericGrain<T> : Grain<PersistenceGenericGrainState<T>>,
-        IAzureStorageGenericGrain<T>
+    [Orleans.Providers.StorageProvider(ProviderName = "GrainStorageForTest")]
+    public class GrainStorageGenericGrain<T> : Grain<PersistenceGenericGrainState<T>>,
+        IGrainStorageGenericGrain<T>
     {
         public override Task OnActivateAsync()
         {
@@ -367,9 +367,9 @@ namespace UnitTests.Grains
         }
     }
 
-    [Orleans.Providers.StorageProvider(ProviderName = "AzureStore")]
-    public class AzureStorageTestGrainExtendedKey : Grain<PersistenceTestGrainState>,
-        IAzureStorageTestGrain_GuidExtendedKey, IAzureStorageTestGrain_LongExtendedKey
+    [Orleans.Providers.StorageProvider(ProviderName = "GrainStorageForTest")]
+    public class GrainStorageTestGrainExtendedKey : Grain<PersistenceTestGrainState>,
+        IGrainStorageTestGrain_GuidExtendedKey, IGrainStorageTestGrain_LongExtendedKey
     {
         public override Task OnActivateAsync()
         {

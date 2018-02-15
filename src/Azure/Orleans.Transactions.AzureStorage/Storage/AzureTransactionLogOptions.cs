@@ -2,7 +2,7 @@
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 
-namespace Orleans.Transactions.AzureStorage
+namespace Orleans.Configuration
 {
     public class AzureTransactionLogOptions
     {

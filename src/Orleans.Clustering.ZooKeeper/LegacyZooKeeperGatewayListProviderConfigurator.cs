@@ -1,6 +1,8 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using Orleans.Hosting;
+
+using Orleans.Configuration;
 using Orleans.Messaging;
+using Orleans.Runtime.Membership;
 
 namespace OrleansZooKeeperUtils
 {
@@ -9,11 +11,13 @@ namespace OrleansZooKeeperUtils
     {
         public void ConfigureServices(object configuration, IServiceCollection services)
         {
-            services.UseZooKeeperGatewayListProvider(options =>
-            {
-                var reader = new ClientConfigurationReader(configuration);
-                options.ConnectionString = reader.GetPropertyValue<string>("DataConnectionString");
-            });
+            services.Configure<ZooKeeperGatewayListProviderOptions>(
+                options =>
+                {
+                    var reader = new ClientConfigurationReader(configuration);
+                    options.ConnectionString = reader.GetPropertyValue<string>("DataConnectionString");
+                });
+            services.AddSingleton<IGatewayListProvider, ZooKeeperClusteringClientOptions>();
         }
     }
 }

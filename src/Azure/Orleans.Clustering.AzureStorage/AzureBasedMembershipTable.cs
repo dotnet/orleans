@@ -8,7 +8,7 @@ using Microsoft.WindowsAzure.Storage;
 using Orleans.AzureUtils;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.AzureUtils.Configuration;
+using Orleans.Configuration;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 using Orleans.Runtime.Configuration;
 using Orleans.Clustering.AzureStorage;
@@ -21,9 +21,9 @@ namespace Orleans.Runtime.MembershipService
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         private OrleansSiloInstanceManager tableManager;
-        private readonly AzureTableMembershipOptions options;
+        private readonly AzureStorageClusteringOptions options;
         private readonly string clusterId;
-        public AzureBasedMembershipTable(ILoggerFactory loggerFactory, IOptions<AzureTableMembershipOptions> membershipOptions, IOptions<SiloOptions> siloOptions)
+        public AzureBasedMembershipTable(ILoggerFactory loggerFactory, IOptions<AzureStorageClusteringOptions> membershipOptions, IOptions<SiloOptions> siloOptions)
         {
             this.loggerFactory = loggerFactory;
             logger = loggerFactory.CreateLogger<AzureBasedMembershipTable>();

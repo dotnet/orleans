@@ -3,12 +3,12 @@ using System.Threading.Tasks;
 using Xunit.Abstractions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Runtime.Configuration;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.Tests;
 using TestExtensions;
 using Orleans.TestingHost.Utils;
-using Orleans.Hosting;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {

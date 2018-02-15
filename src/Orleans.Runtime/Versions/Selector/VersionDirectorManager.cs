@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
+using Orleans.Configuration;
 using Orleans.Versions.Selector;
 
 namespace Orleans.Runtime.Versions.Selector

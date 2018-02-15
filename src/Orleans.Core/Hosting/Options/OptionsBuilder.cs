@@ -5,7 +5,7 @@ using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Used to configure TOptions instances. This will be deprecated and superseded Mirosoft.Extensions.Options v2.1.0.0 once it ships.

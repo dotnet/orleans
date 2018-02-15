@@ -1,10 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using System.Collections.Generic;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans;
 using Orleans.Hosting;
-using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using UnitTests.GrainInterfaces;
 using Orleans.TestingHost;
@@ -12,6 +9,7 @@ using Xunit;
 using TestExtensions;
 using Tester;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace Tests.GeoClusterTests
 {
@@ -48,12 +46,12 @@ namespace Tests.GeoClusterTests
                         .AddAzureTableGrainStorageAsDefault(builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
                         {
                             options.ServiceId = silo.Value.ServiceId.ToString();
-                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         }))
                         .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
                         {
                             options.ServiceId = silo.Value.ServiceId.ToString();
-                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         }));
                 }
             }

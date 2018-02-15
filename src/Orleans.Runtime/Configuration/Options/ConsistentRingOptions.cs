@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using Microsoft.Extensions.Options;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Configuration options for consistent hashing algorithm, used to balance resource allocations across the cluster.

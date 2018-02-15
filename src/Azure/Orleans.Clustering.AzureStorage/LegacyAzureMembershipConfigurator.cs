@@ -1,4 +1,8 @@
+using System;
+
 using Microsoft.Extensions.DependencyInjection;
+
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 
@@ -9,13 +13,14 @@ namespace Orleans.Runtime.MembershipService
     {
         public void Configure(object configuration, IServiceCollection services)
         {
-            services.UseAzureTableMembership(
-                options =>
+            services.Configure((Action<AzureStorageClusteringOptions>)(options =>
                 {
                     var reader = new GlobalConfigurationReader(configuration);
                     options.MaxStorageBusyRetries = reader.GetPropertyValue<int>("MaxStorageBusyRetries");
                     options.ConnectionString = reader.GetPropertyValue<string>("DataConnectionString");
-                });
+                }));
+            services.AddSingleton<IMembershipTable, AzureBasedMembershipTable>();
+            IServiceCollection temp = services;
         }
     }
 }

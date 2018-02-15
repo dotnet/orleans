@@ -43,7 +43,7 @@ namespace Tester.AzureUtils.Persistence
                     legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("lowercase");
 
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                    legacy.ClusterConfiguration.AddAzureBlobStorageProvider("AzureStore", legacy.ClusterConfiguration.Globals.DataConnectionString);
+                    legacy.ClusterConfiguration.AddAzureBlobStorageProvider("GrainStorageForTest", legacy.ClusterConfiguration.Globals.DataConnectionString);
                     legacy.ClusterConfiguration.AddAzureBlobStorageProvider("AzureStore1", legacy.ClusterConfiguration.Globals.DataConnectionString);
                     legacy.ClusterConfiguration.AddAzureBlobStorageProvider("AzureStore2", legacy.ClusterConfiguration.Globals.DataConnectionString);
                     legacy.ClusterConfiguration.AddAzureBlobStorageProvider("AzureStore3", legacy.ClusterConfiguration.Globals.DataConnectionString);
@@ -53,7 +53,7 @@ namespace Tester.AzureUtils.Persistence
             }
         }
 
-        public PersistenceGrainTests_AzureBlobStore(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
+        public PersistenceGrainTests_AzureBlobStore(ITestOutputHelper output, Fixture fixture) : base(output, fixture, ServiceId)
         {
             fixture.EnsurePreconditionsMet();
         }
@@ -113,7 +113,7 @@ namespace Tester.AzureUtils.Persistence
         [SkippableFact, TestCategory("Functional")]
         public async Task Grain_AzureBlobStore_SiloRestart()
         {
-            await base.Grain_AzureStore_SiloRestart(ServiceId);
+            await base.Grain_AzureStore_SiloRestart();
         }
 
         [SkippableFact, TestCategory("CorePerf"), TestCategory("Performance"), TestCategory("Stress")]

@@ -6,14 +6,13 @@ using System.Net;
 using System.Reflection;
 using System.Text;
 using System.Xml;
+using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Providers;
 using Orleans.Storage;
-using Orleans.Streams;
 using Orleans.LogConsistency;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
-using Orleans.Hosting;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -464,8 +463,6 @@ namespace Orleans.Runtime.Configuration
 
         public bool AssumeHomogenousSilosForTesting { get; set; }
 
-        public bool FastKillOnCancelKeyPress { get; set; }
-
         /// <summary>
         /// Determines if ADO should be used for storage of Membership and Reminders info.
         /// True if either or both of LivenessType and ReminderServiceType are set to SqlServer, false otherwise.
@@ -578,8 +575,6 @@ namespace Orleans.Runtime.Configuration
             this.GrainServiceConfigurations = new GrainServiceConfigurations();
             this.DefaultCompatibilityStrategy = BackwardCompatible.Singleton;
             this.DefaultVersionSelectorStrategy = AllCompatibleVersions.Singleton;
-
-            this.FastKillOnCancelKeyPress = true;
         }
 
         public override string ToString()
@@ -1076,25 +1071,6 @@ namespace Orleans.Runtime.Configuration
         public void RegisterStorageProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
         {
             ProviderConfigurationUtility.RegisterProvider(this.ProviderConfigurations, ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
-        }
-
-        public void RegisterStatisticsProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IStatisticsPublisher
-        {
-            Type providerType = typeof(T);
-            var providerTypeInfo = providerType.GetTypeInfo();
-            if (providerTypeInfo.IsAbstract
-                || providerTypeInfo.IsGenericType
-                || !typeof(IStatisticsPublisher).IsAssignableFrom(providerType))
-            {
-                throw new ArgumentException("Expected non-generic, non-abstract type which implements IStatisticsPublisher, ISiloMetricsDataPublisher interface", "typeof(T)");
-            }
-
-            ProviderConfigurationUtility.RegisterProvider(this.ProviderConfigurations, ProviderCategoryConfiguration.STATISTICS_PROVIDER_CATEGORY_NAME, providerTypeInfo.FullName, providerName, properties);
-        }
-
-        public void RegisterStatisticsProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
-        {
-            ProviderConfigurationUtility.RegisterProvider(this.ProviderConfigurations, ProviderCategoryConfiguration.STATISTICS_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
         }
 
         /// <summary>

@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Clustering.AdoNet.Storage;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
-using Orleans.AdoNet.Options;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime.Membership
 {
@@ -14,12 +14,12 @@ namespace Orleans.Runtime.Membership
     {
         private readonly ILogger logger;
         private string clusterId;
-        private readonly AdoNetGatewayListProviderOptions options;
+        private readonly AdoNetClusteringClientOptions options;
         private RelationalOrleansQueries orleansQueries;
         private readonly IGrainReferenceConverter grainReferenceConverter;
         private readonly TimeSpan maxStaleness;
         public AdoNetGatewayListProvider(ILogger<AdoNetGatewayListProvider> logger, IGrainReferenceConverter grainReferenceConverter, ClientConfiguration clientConfiguration,
-            IOptions<AdoNetGatewayListProviderOptions> options,
+            IOptions<AdoNetClusteringClientOptions> options,
             IOptions<ClusterClientOptions> clusterClientOptions)
         {
             this.logger = logger;

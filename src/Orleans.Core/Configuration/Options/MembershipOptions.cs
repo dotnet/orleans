@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Options;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Settings for cluster membership.
@@ -30,38 +30,39 @@ namespace Orleans.Hosting
         /// <summary>
         /// The number of seconds to periodically probe other silos for their liveness or for the silo to send "I am alive" heartbeat  messages about itself.
         /// </summary>
-        public TimeSpan ProbeTimeout { get; set; }
+        public TimeSpan ProbeTimeout { get; set; } = DEFAULT_LIVENESS_PROBE_TIMEOUT;
         public static readonly TimeSpan DEFAULT_LIVENESS_PROBE_TIMEOUT = TimeSpan.FromSeconds(10);
 
         /// <summary>
         /// The number of seconds to periodically fetch updates from the membership table.
         /// </summary>
-        public TimeSpan TableRefreshTimeout { get; set; }
+        public TimeSpan TableRefreshTimeout { get; set; } = DEFAULT_LIVENESS_TABLE_REFRESH_TIMEOUT;
         public static readonly TimeSpan DEFAULT_LIVENESS_TABLE_REFRESH_TIMEOUT = TimeSpan.FromSeconds(60);
 
         /// <summary>
         /// Expiration time in seconds for death vote in the membership table.
         /// </summary>
-        public TimeSpan DeathVoteExpirationTimeout { get; set; }
+        public TimeSpan DeathVoteExpirationTimeout { get; set; } = DEFAULT_LIVENESS_DEATH_VOTE_EXPIRATION_TIMEOUT;
         public static readonly TimeSpan DEFAULT_LIVENESS_DEATH_VOTE_EXPIRATION_TIMEOUT = TimeSpan.FromSeconds(120);
 
         /// <summary>
         /// The number of seconds to periodically write in the membership table that this silo is alive. Used ony for diagnostics.
         /// </summary>
-        public TimeSpan IAmAliveTablePublishTimeout { get; set; }
+        public TimeSpan IAmAliveTablePublishTimeout { get; set; } = DEFAULT_LIVENESS_I_AM_ALIVE_TABLE_PUBLISH_TIMEOUT;
         public static readonly TimeSpan DEFAULT_LIVENESS_I_AM_ALIVE_TABLE_PUBLISH_TIMEOUT = TimeSpan.FromMinutes(5);
 
         /// <summary>
         /// The number of seconds to attempt to join a cluster of silos before giving up.
         /// </summary>
-        public TimeSpan MaxJoinAttemptTime { get; set; }
+        public TimeSpan MaxJoinAttemptTime { get; set; } = DEFAULT_LIVENESS_MAX_JOIN_ATTEMPT_TIME;
         public static readonly TimeSpan DEFAULT_LIVENESS_MAX_JOIN_ATTEMPT_TIME = TimeSpan.FromMinutes(5); // 5 min
 
         /// <summary>
         /// The expected size of a cluster. Need not be very accurate, can be an overestimate.
         /// </summary>
-        public int ExpectedClusterSize { get; set; }
-
+        public int ExpectedClusterSize { get; set; } = DEFAULT_LIVENESS_EXPECTED_CLUSTER_SIZE;
+        public static readonly int DEFAULT_LIVENESS_EXPECTED_CLUSTER_SIZE = 20;
+        
         /// <summary>
         /// Whether new silo that joins the cluster has to validate the initial connectivity with all other Active silos.
         /// </summary>

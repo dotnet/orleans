@@ -178,7 +178,7 @@ namespace Orleans
         {
             if (!task.Wait(timeout))
             {
-                throw new TimeoutException(String.Format("Task.WaitWithThrow has timed out after {0}.", timeout));
+                throw new TimeoutException($"Task.WaitWithThrow has timed out after {timeout}.");
             }
         }
 
@@ -186,7 +186,7 @@ namespace Orleans
         {
             if (!task.Wait(timeout))
             {
-                throw new TimeoutException(String.Format("Task<T>.WaitForResultWithThrow has timed out after {0}.", timeout));
+                throw new TimeoutException($"Task<T>.WaitForResultWithThrow has timed out after {timeout}.");
             }
             return task.Result;
         }

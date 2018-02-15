@@ -1,13 +1,10 @@
 using System;
-using System.IO;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
-using Orleans.Configuration.Options;
 using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
 using Orleans.ApplicationParts;
-using Orleans.Runtime;
+using Orleans.Messaging;
 
 namespace Orleans
 {
@@ -94,24 +91,35 @@ namespace Orleans
         }
 
         /// <summary>
-        /// Configure the client to use <see cref="StaticGatewayListProvider"/>
+        /// Configures the client to use static clustering.
         /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="configureOptions"></param>
-        /// <returns></returns>
-        public static IClientBuilder UseStaticGatewayListProvider(this IClientBuilder builder, Action<StaticGatewayListProviderOptions> configureOptions)
+        public static IClientBuilder UseStaticClustering(this IClientBuilder builder, Action<StaticGatewayListProviderOptions> configureOptions)
         {
-            return builder.ConfigureServices(collection =>
-                collection.UseStaticGatewayListProvider(configureOptions));
+            return builder.ConfigureServices(
+                collection =>
+                {
+                    if (configureOptions != null)
+                    {
+                        collection.Configure(configureOptions);
+                    }
+
+                    collection.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>()
+                        .TryConfigureFormatter<StaticGatewayListProviderOptions, StaticGatewayListProviderOptionsFormatter>();
+                });
         }
 
         /// <summary>
-        /// Configure the client to use <see cref="StaticGatewayListProvider"/>
+        /// Configures the client to use static clustering.
         /// </summary>
-        public static IClientBuilder UseStaticGatewayListProvider(this IClientBuilder builder, Action<OptionsBuilder<StaticGatewayListProviderOptions>> configureOptions)
+        public static IClientBuilder UseStaticClustering(this IClientBuilder builder, Action<OptionsBuilder<StaticGatewayListProviderOptions>> configureOptions)
         {
-            return builder.ConfigureServices(collection =>
-                collection.UseStaticGatewayListProvider(configureOptions));
+            return builder.ConfigureServices(
+                collection =>
+                {
+                    configureOptions?.Invoke(collection.AddOptions<StaticGatewayListProviderOptions>());
+                    collection.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>()
+                        .TryConfigureFormatter<StaticGatewayListProviderOptions, StaticGatewayListProviderOptionsFormatter>();
+                });
         }
 
         /// <summary>

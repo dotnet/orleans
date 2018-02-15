@@ -18,6 +18,7 @@ using Orleans.TestingHost;
 using Orleans.Providers;
 using Orleans.Persistence.AzureStorage;
 using TestExtensions;
+using TestExtensions.Runners;
 using UnitTests.GrainInterfaces;
 
 // ReSharper disable RedundantAssignment
@@ -37,14 +38,14 @@ namespace Tester.AzureUtils.Persistence
         protected readonly ILogger logger;
         private const int LoopIterations_Grain = 1000;
         private const int BatchSize = 100;
-
+        private GrainPersistenceTestsRunner basicPersistenceTestsRunner;
         private const int MaxReadTime = 200;
         private const int MaxWriteTime = 2000;
         public class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
-                hostBuilder.UseAzureTableMembership(options =>
+                hostBuilder.UseAzureStorageClustering(options =>
                 {
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     options.MaxStorageBusyRetries = 3;
@@ -56,7 +57,7 @@ namespace Tester.AzureUtils.Persistence
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
-                clientBuilder.UseAzureTableGatewayListProvider(gatewayOptions => { gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString; });
+                clientBuilder.UseAzureStorageClustering(gatewayOptions => { gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString; });
             }
         }
 
@@ -67,274 +68,61 @@ namespace Tester.AzureUtils.Persistence
             return providerConfig.First();
         }
 
-        public Base_PersistenceGrainTests_AzureStore(ITestOutputHelper output, BaseTestClusterFixture fixture)
+        public Base_PersistenceGrainTests_AzureStore(ITestOutputHelper output, BaseTestClusterFixture fixture, Guid serviceId)
         {
             this.output = output;
             this.logger = fixture.Logger;
             HostedCluster = fixture.HostedCluster;
             GrainFactory = fixture.GrainFactory;
             timingFactor = TestUtils.CalibrateTimings();
+            this.basicPersistenceTestsRunner = new GrainPersistenceTestsRunner(output, fixture, serviceId);
         }
 
         public IGrainFactory GrainFactory { get; }
 
-        protected async Task Grain_AzureStore_Delete()
+        protected Task Grain_AzureStore_Delete()
         {
-            Guid id = Guid.NewGuid();
-            IAzureStorageTestGrain grain = this.GrainFactory.GetGrain<IAzureStorageTestGrain>(id);
-
-            await grain.DoWrite(1);
-
-            await grain.DoDelete();
-
-            int val = await grain.GetValue(); // Should this throw instead?
-            Assert.Equal(0,  val);  // "Value after Delete"
-
-            await grain.DoWrite(2);
-
-            val = await grain.GetValue();
-            Assert.Equal(2,  val);  // "Value after Delete + New Write"
+            return this.basicPersistenceTestsRunner.Grain_GrainStorage_Delete();
         }
 
-        protected async Task Grain_AzureStore_Read()
+        protected Task Grain_AzureStore_Read()
         {
-            Guid id = Guid.NewGuid();
-            IAzureStorageTestGrain grain = this.GrainFactory.GetGrain<IAzureStorageTestGrain>(id);
-
-            int val = await grain.GetValue();
-
-            Assert.Equal(0,  val);  // "Initial value"
+            return this.basicPersistenceTestsRunner.Grain_GrainStorage_Read();
         }
 
-        protected async Task Grain_GuidKey_AzureStore_Read_Write()
+        protected Task Grain_GuidKey_AzureStore_Read_Write()
         {
-            Guid id = Guid.NewGuid();
-            IAzureStorageTestGrain grain = this.GrainFactory.GetGrain<IAzureStorageTestGrain>(id);
-
-            int val = await grain.GetValue();
-
-            Assert.Equal(0,  val);  // "Initial value"
-
-            await grain.DoWrite(1);
-            val = await grain.GetValue();
-            Assert.Equal(1,  val);  // "Value after Write-1"
-
-            await grain.DoWrite(2);
-            val = await grain.GetValue();
-            Assert.Equal(2,  val);  // "Value after Write-2"
-
-            val = await grain.DoRead();
-
-            Assert.Equal(2,  val);  // "Value after Re-Read"
+            return this.basicPersistenceTestsRunner.Grain_GuidKey_GrainStorage_Read_Write();
         }
 
-        protected async Task Grain_LongKey_AzureStore_Read_Write()
+        protected Task Grain_LongKey_AzureStore_Read_Write()
         {
-            long id = random.Next();
-            IAzureStorageTestGrain_LongKey grain = this.GrainFactory.GetGrain<IAzureStorageTestGrain_LongKey>(id);
-
-            int val = await grain.GetValue();
-
-            Assert.Equal(0,  val);  // "Initial value"
-
-            await grain.DoWrite(1);
-            val = await grain.GetValue();
-            Assert.Equal(1,  val);  // "Value after Write-1"
-
-            await grain.DoWrite(2);
-            val = await grain.GetValue();
-            Assert.Equal(2,  val);  // "Value after Write-2"
-
-            val = await grain.DoRead();
-
-            Assert.Equal(2,  val);  // "Value after Re-Read"
+            return this.basicPersistenceTestsRunner.Grain_LongKey_GrainStorage_Read_Write();
         }
 
-        protected async Task Grain_LongKeyExtended_AzureStore_Read_Write()
+        protected Task Grain_LongKeyExtended_AzureStore_Read_Write()
         {
-            long id = random.Next();
-            string extKey = random.Next().ToString(CultureInfo.InvariantCulture);
-
-            IAzureStorageTestGrain_LongExtendedKey
-                grain = this.GrainFactory.GetGrain<IAzureStorageTestGrain_LongExtendedKey>(id, extKey, null);
-
-            int val = await grain.GetValue();
-
-            Assert.Equal(0,  val);  // "Initial value"
-
-            await grain.DoWrite(1);
-            val = await grain.GetValue();
-            Assert.Equal(1,  val);  // "Value after Write-1"
-
-            await grain.DoWrite(2);
-            val = await grain.GetValue();
-            Assert.Equal(2,  val);  // "Value after Write-2"
-
-            val = await grain.DoRead();
-            Assert.Equal(2,  val);  // "Value after DoRead"
-
-            val = await grain.GetValue();
-            Assert.Equal(2,  val);  // "Value after Re-Read"
-
-            string extKeyValue = await grain.GetExtendedKeyValue();
-            Assert.Equal(extKey,  extKeyValue);  // "Extended Key"
+            return this.basicPersistenceTestsRunner.Grain_LongKeyExtended_GrainStorage_Read_Write();
         }
 
-        protected async Task Grain_GuidKeyExtended_AzureStore_Read_Write()
+        protected Task Grain_GuidKeyExtended_AzureStore_Read_Write()
         {
-            var id = Guid.NewGuid();
-            string extKey = random.Next().ToString(CultureInfo.InvariantCulture);
-
-            IAzureStorageTestGrain_GuidExtendedKey
-                grain = this.GrainFactory.GetGrain<IAzureStorageTestGrain_GuidExtendedKey>(id, extKey, null);
-
-            int val = await grain.GetValue();
-
-            Assert.Equal(0,  val);  // "Initial value"
-
-            await grain.DoWrite(1);
-            val = await grain.GetValue();
-            Assert.Equal(1,  val);  // "Value after Write-1"
-
-            await grain.DoWrite(2);
-            val = await grain.GetValue();
-            Assert.Equal(2,  val);  // "Value after Write-2"
-
-            val = await grain.DoRead();
-            Assert.Equal(2,  val);  // "Value after DoRead"
-
-            val = await grain.GetValue();
-            Assert.Equal(2,  val);  // "Value after Re-Read"
-
-            string extKeyValue = await grain.GetExtendedKeyValue();
-            Assert.Equal(extKey,  extKeyValue);  // "Extended Key"
+            return this.basicPersistenceTestsRunner.Grain_GuidKeyExtended_GrainStorage_Read_Write();
         }
 
-        protected async Task Grain_Generic_AzureStore_Read_Write()
+        protected Task Grain_Generic_AzureStore_Read_Write()
         {
-            long id = random.Next();
-
-            IAzureStorageGenericGrain<int> grain = this.GrainFactory.GetGrain<IAzureStorageGenericGrain<int>>(id);
-
-            int val = await grain.GetValue();
-
-            Assert.Equal(0,  val);  // "Initial value"
-
-            await grain.DoWrite(1);
-            val = await grain.GetValue();
-            Assert.Equal(1,  val);  // "Value after Write-1"
-
-            await grain.DoWrite(2);
-            val = await grain.GetValue();
-            Assert.Equal(2,  val);  // "Value after Write-2"
-
-            val = await grain.DoRead();
-
-            Assert.Equal(2,  val);  // "Value after Re-Read"
+            return this.basicPersistenceTestsRunner.Grain_Generic_GrainStorage_Read_Write();
         }
 
-        protected async Task Grain_Generic_AzureStore_DiffTypes()
+        protected Task Grain_Generic_AzureStore_DiffTypes()
         {
-            long id1 = random.Next();
-            long id2 = id1;
-            long id3 = id1;
-
-            IAzureStorageGenericGrain<int> grain1 = this.GrainFactory.GetGrain<IAzureStorageGenericGrain<int>>(id1);
-
-            IAzureStorageGenericGrain<string> grain2 = this.GrainFactory.GetGrain<IAzureStorageGenericGrain<string>>(id2);
-
-            IAzureStorageGenericGrain<double> grain3 = this.GrainFactory.GetGrain<IAzureStorageGenericGrain<double>>(id3);
-
-            int val1 = await grain1.GetValue();
-            Assert.Equal(0,  val1);  // "Initial value - 1"
-
-            string val2 = await grain2.GetValue();
-            Assert.Null(val2);  // "Initial value - 2"
-
-            double val3 = await grain3.GetValue();
-            Assert.Equal(0.0,  val3);  // "Initial value - 3"
-
-            int expected1 = 1;
-            await grain1.DoWrite(expected1);
-            val1 = await grain1.GetValue();
-            Assert.Equal(expected1,  val1);  // "Value after Write#1 - 1"
-
-            string expected2 = "Three";
-            await grain2.DoWrite(expected2);
-            val2 = await grain2.GetValue();
-            Assert.Equal(expected2,  val2);  // "Value after Write#1 - 2"
-
-            double expected3 = 5.1;
-            await grain3.DoWrite(expected3);
-            val3 = await grain3.GetValue();
-            Assert.Equal(expected3,  val3);  // "Value after Write#1 - 3"
-
-            val1 = await grain1.GetValue();
-            Assert.Equal(expected1,  val1);  // "Value before Write#2 - 1"
-            expected1 = 2;
-            await grain1.DoWrite(expected1);
-            val1 = await grain1.GetValue();
-            Assert.Equal(expected1,  val1);  // "Value after Write#2 - 1"
-            val1 = await grain1.DoRead();
-            Assert.Equal(expected1,  val1);  // "Value after Re-Read - 1"
-
-            val2 = await grain2.GetValue();
-            Assert.Equal(expected2,  val2);  // "Value before Write#2 - 2"
-            expected2 = "Four";
-            await grain2.DoWrite(expected2);
-            val2 = await grain2.GetValue();
-            Assert.Equal(expected2,  val2);  // "Value after Write#2 - 2"
-            val2 = await grain2.DoRead();
-            Assert.Equal(expected2,  val2);  // "Value after Re-Read - 2"
-
-            val3 = await grain3.GetValue();
-            Assert.Equal(expected3,  val3);  // "Value before Write#2 - 3"
-            expected3 = 6.2;
-            await grain3.DoWrite(expected3);
-            val3 = await grain3.GetValue();
-            Assert.Equal(expected3,  val3);  // "Value after Write#2 - 3"
-            val3 = await grain3.DoRead();
-            Assert.Equal(expected3,  val3);  // "Value after Re-Read - 3"
+            return this.basicPersistenceTestsRunner.Grain_Generic_GrainStorage_DiffTypes();
         }
 
-        protected async Task Grain_AzureStore_SiloRestart(Guid serviceID)
+        protected Task Grain_AzureStore_SiloRestart()
         {
-            var initialServiceId = serviceID;
-
-            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.Options.ClusterId, serviceID);
-
-            Guid id = Guid.NewGuid();
-            IAzureStorageTestGrain grain = this.GrainFactory.GetGrain<IAzureStorageTestGrain>(id);
-
-            int val = await grain.GetValue();
-
-            Assert.Equal(0,  val);  // "Initial value"
-
-            await grain.DoWrite(1);
-
-            output.WriteLine("About to reset Silos");
-            foreach (var silo in this.HostedCluster.GetActiveSilos().ToList())
-            {
-                this.HostedCluster.RestartSilo(silo);
-            }
-            this.HostedCluster.InitializeClient();
-
-            output.WriteLine("Silos restarted");
-
-            var serviceId = await this.GrainFactory.GetGrain<IServiceIdGrain>(Guid.Empty).GetServiceId();
-            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.Options.ClusterId, serviceId);
-            Assert.Equal(initialServiceId, serviceId);  // "ServiceId same after restart."
-            
-            val = await grain.GetValue();
-            Assert.Equal(1,  val);  // "Value after Write-1"
-
-            await grain.DoWrite(2);
-            val = await grain.GetValue();
-            Assert.Equal(2,  val);  // "Value after Write-2"
-
-            val = await grain.DoRead();
-
-            Assert.Equal(2,  val);  // "Value after Re-Read"
+            return this.basicPersistenceTestsRunner.Grain_GrainStorage_SiloRestart();
         }
 
         protected void Persistence_Perf_Activate()
@@ -405,11 +193,11 @@ namespace Tester.AzureUtils.Persistence
             Func<IEchoTaskGrain, Task> actionNoState,
             Func<IPersistenceTestGrain, Task> actionMemory,
             Func<IMemoryStorageTestGrain, Task> actionMemoryStore,
-            Func<IAzureStorageTestGrain, Task> actionAzureTable)
+            Func<IGrainStorageTestGrain, Task> actionAzureTable)
         {
             IEchoTaskGrain[] noStateGrains = new IEchoTaskGrain[n];
             IPersistenceTestGrain[] memoryGrains = new IPersistenceTestGrain[n];
-            IAzureStorageTestGrain[] azureStoreGrains = new IAzureStorageTestGrain[n];
+            IGrainStorageTestGrain[] azureStoreGrains = new IGrainStorageTestGrain[n];
             IMemoryStorageTestGrain[] memoryStoreGrains = new IMemoryStorageTestGrain[n];
 
             for (int i = 0; i < n; i++)
@@ -417,7 +205,7 @@ namespace Tester.AzureUtils.Persistence
                 Guid id = Guid.NewGuid();
                 noStateGrains[i] = this.GrainFactory.GetGrain<IEchoTaskGrain>(id);
                 memoryGrains[i] = this.GrainFactory.GetGrain<IPersistenceTestGrain>(id);
-                azureStoreGrains[i] = this.GrainFactory.GetGrain<IAzureStorageTestGrain>(id);
+                azureStoreGrains[i] = this.GrainFactory.GetGrain<IGrainStorageTestGrain>(id);
                 memoryStoreGrains[i] = this.GrainFactory.GetGrain<IMemoryStorageTestGrain>(id);
             }
 

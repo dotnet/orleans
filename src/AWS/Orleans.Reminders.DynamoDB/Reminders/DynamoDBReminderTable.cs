@@ -3,13 +3,12 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Amazon.DynamoDBv2.Model;
 using Amazon.DynamoDBv2;
 using Microsoft.Extensions.Logging;
 using Orleans.Reminders.DynamoDB;
 using Microsoft.Extensions.Options;
-using Orleans.Hosting;
+using Orleans.Configuration;
 
 namespace OrleansAWSUtils.Reminders
 {

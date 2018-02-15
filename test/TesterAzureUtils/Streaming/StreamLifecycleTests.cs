@@ -13,6 +13,7 @@ using Xunit.Abstractions;
 using Tester;
 using Orleans.Hosting;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace UnitTests.StreamingTests
 {
@@ -59,14 +60,14 @@ namespace UnitTests.StreamingTests
                     .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
                     {
                         options.ServiceId = silo.Value.ServiceId.ToString();
-                        options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         options.DeleteStateOnClear = true;
                     }))
                     .AddAzureTableGrainStorage("PubSubStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
                     {
                         options.ServiceId = silo.Value.ServiceId.ToString();
                         options.DeleteStateOnClear = true;
-                        options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     }));
             }
         }

@@ -1,4 +1,3 @@
-using Orleans.Hosting;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -8,6 +7,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Xml;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -144,7 +144,9 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public string StartupTypeName { get; set; }
 
+        [Obsolete("Statistics publishers are no longer supported.")]
         public string StatisticsProviderName { get; set; }
+
         /// <summary>
         /// The MetricsTableWriteInterval attribute specifies the frequency of updating the metrics in Azure table.
         ///  The default is 30 seconds.
@@ -160,10 +162,12 @@ namespace Orleans.Runtime.Configuration
         /// The default is 5 minutes.
         /// </summary>
         public TimeSpan StatisticsLogWriteInterval { get; set; }
+
         /// <summary>
         /// The WriteLogStatisticsToTable attribute specifies whether log statistics should also be written into a separate, special Azure table.
         ///  The default is yes.
         /// </summary>
+        [Obsolete("Statistics table is no longer supported.")]
         public bool StatisticsWriteLogStatisticsToTable { get; set; }
         /// <summary>
         /// </summary>
@@ -201,7 +205,6 @@ namespace Orleans.Runtime.Configuration
 		private static TimeSpan DEFAULT_LOG_WRITE_PERIOD = TimeSpan.FromMinutes(5);
 
         private const bool DEFAULT_ENABLE_WORKER_THREAD_INJECTION = false;
-		private const bool DEFAULT_LOG_TO_TABLE = true;
 		private const StatisticsLevel DEFAULT_COLLECTION_LEVEL = StatisticsLevel.Info;
 
         public NodeConfiguration()
@@ -230,16 +233,15 @@ namespace Orleans.Runtime.Configuration
             this.StatisticsMetricsTableWriteInterval = DEFAULT_METRICS_TABLE_WRITE_PERIOD;
             this.StatisticsPerfCountersWriteInterval = SILO_DEFAULT_PERF_COUNTERS_WRITE_PERIOD;
             this.StatisticsLogWriteInterval = DEFAULT_LOG_WRITE_PERIOD;
-            this.StatisticsWriteLogStatisticsToTable = DEFAULT_LOG_TO_TABLE;
             this.StatisticsCollectionLevel = DEFAULT_COLLECTION_LEVEL;
 
             this.LimitManager = new LimitManager();
 
-            this.MinDotNetThreadPoolSize = ThreadPoolOptions.DEFAULT_MIN_DOT_NET_THREAD_POOL_SIZE;
+            this.MinDotNetThreadPoolSize = PerformanceTuningOptions.DEFAULT_MIN_DOT_NET_THREAD_POOL_SIZE;
 
             // .NET ServicePointManager settings / optimizations
             this.Expect100Continue = false;
-            this.DefaultConnectionLimit = ServicePointOptions.DEFAULT_MIN_DOT_NET_CONNECTION_LIMIT;
+            this.DefaultConnectionLimit = PerformanceTuningOptions.DEFAULT_MIN_DOT_NET_CONNECTION_LIMIT;
             this.UseNagleAlgorithm = false;
 
             this.AdditionalAssemblyDirectories = new Dictionary<string, SearchOption>();
@@ -269,11 +271,15 @@ namespace Orleans.Runtime.Configuration
 
             this.PropagateActivityId = other.PropagateActivityId;
 
+#pragma warning disable CS0618 // Type or member is obsolete
             this.StatisticsProviderName = other.StatisticsProviderName;
+#pragma warning restore CS0618 // Type or member is obsolete
             this.StatisticsMetricsTableWriteInterval = other.StatisticsMetricsTableWriteInterval;
             this.StatisticsPerfCountersWriteInterval = other.StatisticsPerfCountersWriteInterval;
             this.StatisticsLogWriteInterval = other.StatisticsLogWriteInterval;
+#pragma warning disable CS0618 // Type or member is obsolete
             this.StatisticsWriteLogStatisticsToTable = other.StatisticsWriteLogStatisticsToTable;
+#pragma warning restore CS0618 // Type or member is obsolete
             this.StatisticsCollectionLevel = other.StatisticsCollectionLevel;
 
             this.LimitManager = new LimitManager(other.LimitManager); // Shallow copy

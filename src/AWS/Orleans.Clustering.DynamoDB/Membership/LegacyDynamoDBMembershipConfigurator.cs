@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
+
+using Orleans.Configuration;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -10,7 +10,9 @@ namespace Orleans.Runtime.MembershipService
         public void Configure(object configuration, IServiceCollection services)
         {
             var reader = new GlobalConfigurationReader(configuration);
-            services.UseDynamoDBMembership(options => options.ConnectionString = reader.GetPropertyValue<string>("DataConnectionString"));
+
+            services.Configure<DynamoDBClusteringSiloOptions>(options => options.ConnectionString = reader.GetPropertyValue<string>("DataConnectionString"));
+            services.AddSingleton<IMembershipTable, DynamoDBMembershipTable>();
         }
     }
 }
