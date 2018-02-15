@@ -42,6 +42,32 @@ namespace Tester
         }
 
         [Fact]
+        public void CanResolveGenericFormatter()
+        {
+            // expected output
+            TestLoggerFactory expected = BuildOptionsExpectedResult();
+
+            // actual output
+            var services = new ServiceCollection();
+            services.AddOptions();
+            services.AddSingleton<TestLoggerFactory>();
+            services.AddSingleton<ILoggerFactory>(sp => sp.GetRequiredService<TestLoggerFactory>());
+            services.AddSingleton(typeof(ILogger<>), typeof(TestLogger<>));
+            services.AddSingleton<OptionsLogger, TestOptionsLogger>();
+            services.Configure<TestOptions>(options => options.IntField = 1);
+            services.ConfigureFormatter<TestOptions>();
+            var servicesProvider = services.BuildServiceProvider();
+            servicesProvider.GetRequiredService<OptionsLogger>().LogOptions();
+
+            var logFormatters = servicesProvider.GetServices<IOptionFormatter>();
+            Assert.Single(logFormatters);
+            Assert.True(logFormatters.First() is IOptionFormatter<TestOptions>);
+            // ensure logging output is as expected
+            var actual = servicesProvider.GetRequiredService<TestLoggerFactory>();
+            Assert.Equal(expected.ToString(), actual.ToString());
+        }
+
+        [Fact]
         public void FormatterConfiguredTwiceDoesNotLeadToDuplicatedFormatter()
         {
             // expected output
@@ -171,6 +197,39 @@ namespace Tester
             Assert.True(logFormatters.ElementAt(2) is TestOptionsFormatter);
             var logFormatter = servicesProvider.GetService<IOptionFormatterResolver<TestOptions>>();
             Assert.True(logFormatter is TestOptionsFormatter.Resolver);
+            var actual = servicesProvider.GetRequiredService<TestLoggerFactory>();
+            Assert.Equal(expected.ToString(), actual.ToString());
+        }
+
+        [Fact]
+        public void NamedGenericFormatterGoldenPath()
+        {
+            // expected output
+            TestLoggerFactory expected = BuildNamedOptionsExpectedResult();
+
+            // actual output
+            var services = new ServiceCollection();
+            services.AddOptions();
+            services.AddSingleton<TestLoggerFactory>();
+            services.AddSingleton<ILoggerFactory>(sp => sp.GetRequiredService<TestLoggerFactory>());
+            services.AddSingleton(typeof(ILogger<>), typeof(TestLogger<>));
+            services.AddSingleton<OptionsLogger, TestOptionsLogger>();
+            services.ConfigureFormatterResolver<TestOptions>();
+            Enumerable
+                .Range(1, 3)
+                .ToList()
+                .ForEach(i =>
+                {
+                    string name = i.ToString();
+                    services.Configure<TestOptions>(name, (options => options.IntField = i));
+                    services.ConfigureNamedOptionForLogging<TestOptions>(name);
+                });
+            var servicesProvider = services.BuildServiceProvider();
+            servicesProvider.GetRequiredService<OptionsLogger>().LogOptions();
+
+            var logFormatters = servicesProvider.GetServices<IOptionFormatter>();
+            Assert.Equal(3, logFormatters.Count());
+            var logFormatter = servicesProvider.GetService<IOptionFormatterResolver<TestOptions>>();
             var actual = servicesProvider.GetRequiredService<TestLoggerFactory>();
             Assert.Equal(expected.ToString(), actual.ToString());
         }
@@ -340,13 +399,13 @@ namespace Tester
             public TestOptionsFormatter(IOptions<TestOptions> options)
             {
                 this.options = options.Value;
-                this.Name = nameof(TestOptions);
+                this.Name = typeof(TestOptions).FullName;
             }
 
             public static TestOptionsFormatter CreateNamed(string name, IOptions<TestOptions> options)
             {
                 var result = new TestOptionsFormatter(options);
-                result.Name = $"{nameof(TestOptions)}-{name}";
+                result.Name = $"{typeof(TestOptions).FullName}-{name}";
                 return result;
             }
 
