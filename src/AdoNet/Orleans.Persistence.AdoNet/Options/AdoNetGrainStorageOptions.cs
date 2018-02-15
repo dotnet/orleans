@@ -7,7 +7,7 @@ using Orleans.Persistence.AdoNet.Storage;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Options for AdonetGrainStorage
