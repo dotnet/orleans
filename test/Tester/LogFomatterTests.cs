@@ -68,6 +68,35 @@ namespace Tester
         }
 
         [Fact]
+        public void GenericFormatterRedact()
+        {
+            // actual output
+            var services = new ServiceCollection();
+            services.AddOptions();
+            services.AddSingleton<TestLoggerFactory>();
+            services.AddSingleton<ILoggerFactory>(sp => sp.GetRequiredService<TestLoggerFactory>());
+            services.AddSingleton(typeof(ILogger<>), typeof(TestLogger<>));
+            services.AddSingleton<OptionsLogger, TestOptionsLogger>();
+            services.Configure<TestOptionsWithSecrets>(options => {
+                options.Data = "Hello";
+                options.Password = "v3ryS3cur3!!!";
+                options.SomeConnectionString = "DefaultEndpointsProtocol=https;AccountName=someAccount;AccountKey=someKey;EndpointSuffix=core.windows.net";
+            });
+            services.ConfigureFormatter<TestOptionsWithSecrets>();
+            var servicesProvider = services.BuildServiceProvider();
+            servicesProvider.GetRequiredService<OptionsLogger>().LogOptions();
+
+            var logFormatters = servicesProvider.GetServices<IOptionFormatter>();
+            Assert.Single(logFormatters);
+            Assert.True(logFormatters.First() is IOptionFormatter<TestOptionsWithSecrets>);
+            // ensure logging output is as expected
+            var actual = servicesProvider.GetRequiredService<TestLoggerFactory>();
+            Assert.Contains("Hello", actual.ToString());
+            Assert.Contains("Password: REDACTED", actual.ToString());
+            Assert.Contains("SomeConnectionString: DefaultEndpointsProtocol=https;AccountName=someAccount;AccountKey=<--SNIP-->", actual.ToString());
+        }
+
+        [Fact]
         public void FormatterConfiguredTwiceDoesNotLeadToDuplicatedFormatter()
         {
             // expected output
@@ -341,6 +370,17 @@ namespace Tester
             var optionsLogger = new TestOptionsLogger(expected.CreateLogger<TestOptionsLogger>(), services.BuildServiceProvider());
             optionsLogger.LogOptions(formatters);
             return expected;
+        }
+
+        private class TestOptionsWithSecrets
+        {
+            [Redact()]
+            public string Password { get; set; }
+
+            public string Data { get; set; }
+
+            [RedactConnectionString()]
+            public string SomeConnectionString { get; set; }
         }
 
         private class TestOptions

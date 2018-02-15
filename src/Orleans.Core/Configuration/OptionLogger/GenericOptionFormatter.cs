@@ -37,8 +37,13 @@ namespace Orleans
         {
             var name = property.Name;
             var value = property.GetValue(this.options);
+            var redactAttribute = property.GetCustomAttribute<RedactAttribute>(inherit: true);
 
-            return OptionFormattingUtilities.Format(name, value);
+            return OptionFormattingUtilities.Format(
+                name, 
+                redactAttribute != null 
+                    ? redactAttribute.Redact((string) value)
+                    : value);
         }
     }
 
