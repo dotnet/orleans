@@ -23,7 +23,7 @@ namespace UnitTests.StorageTests.Relational
         /// <summary>
         /// The storage provider under test.
         /// </summary>
-        public IStorageProvider Storage { get; }
+        public IGrainStorage Storage { get; }
 
 
         /// <summary>
@@ -31,7 +31,7 @@ namespace UnitTests.StorageTests.Relational
         /// </summary>
         /// <param name="grainFactory"></param>
         /// <param name="storage"></param>
-        public CommonStorageTests(IInternalGrainFactory grainFactory, IStorageProvider storage)
+        public CommonStorageTests(IInternalGrainFactory grainFactory, IGrainStorage storage)
         {
             this.grainFactory = grainFactory;
             Storage = storage;

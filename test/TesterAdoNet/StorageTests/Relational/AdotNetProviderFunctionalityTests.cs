@@ -31,8 +31,6 @@ namespace UnitTests.StorageTests.Relational
             });
         }
 
-
-
         [TestCategory("Functional"), TestCategory("Persistence")]
         [Fact]
         public void LongGrainIdToN1KeyAreSame()

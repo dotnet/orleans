@@ -4,7 +4,7 @@
 namespace Orleans.Storage
 {
     /// <summary>
-    /// A container class for the queries currently used by the <see cref="AdoNetStorageProvider"/>.
+    /// A container class for the queries currently used by the <see cref="AdoNetGrainStorage"/>.
     /// </summary>
     /// <remarks>This is provided as a separate entity in order to make these dynamically updatable.</remarks>
     public class RelationalStorageProviderQueries
