@@ -6,13 +6,14 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 using Orleans.Providers;
+using Orleans.Runtime;
 
 namespace Orleans.Configuration
 {
     public static class LegacyConfigurationExtensions
     {
-        private const int ClusterClientDefaultProviderInitStage = 1000;
-        private const int ClusterClientDefaultProviderStartStage = 2000;
+        private const int ClusterClientDefaultProviderInitStage = ServiceLifecycleStage.RuntimeStorageServices;
+        private const int ClusterClientDefaultProviderStartStage = ServiceLifecycleStage.RuntimeStorageServices;
 
         public static IServiceCollection AddLegacyClientConfigurationSupport(this IServiceCollection services, ClientConfiguration configuration = null)
         {
