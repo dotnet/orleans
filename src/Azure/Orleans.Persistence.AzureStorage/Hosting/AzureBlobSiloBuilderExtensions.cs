@@ -6,6 +6,7 @@ using Orleans.Storage;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Providers;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace Orleans.Hosting
 {
@@ -30,7 +31,7 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure silo to use azure blob storage as the default grain storage.
         /// </summary>
-        public static ISiloHostBuilder AddAzureBlobGrainStorageDefault(this ISiloHostBuilder builder, Action<OptionsBuilder<AzureBlobStorageOptions>> configureOptions = null)
+        public static ISiloHostBuilder AddAzureBlobGrainStorageAsDefault(this ISiloHostBuilder builder, Action<OptionsBuilder<AzureBlobStorageOptions>> configureOptions = null)
         {
             return builder.AddAzureBlobGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
         }
