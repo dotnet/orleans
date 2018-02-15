@@ -21,7 +21,7 @@ namespace Orleans.Hosting
         /// The builder.
         /// </param>
         /// <param name="stage">
-        /// The stage to execute the startup task, see values in <see cref="SiloLifecycleStage"/>.
+        /// The stage to execute the startup task, see values in <see cref="ServiceLifecycleStage"/>.
         /// </param>
         /// <typeparam name="TStartup">
         /// The startup task type.
@@ -31,7 +31,7 @@ namespace Orleans.Hosting
         /// </returns>
         public static ISiloHostBuilder AddStartupTask<TStartup>(
             this ISiloHostBuilder builder,
-            int stage = SiloLifecycleStage.SiloActive)
+            int stage = ServiceLifecycleStage.Active)
             where TStartup : class, IStartupTask
         {
             return builder.AddStartupTask((sp, ct) => ActivatorUtilities.GetServiceOrCreateInstance<TStartup>(sp).Execute(ct), stage);
@@ -47,7 +47,7 @@ namespace Orleans.Hosting
         /// The startup task.
         /// </param>
         /// <param name="stage">
-        /// The stage to execute the startup task, see values in <see cref="SiloLifecycleStage"/>.
+        /// The stage to execute the startup task, see values in <see cref="ServiceLifecycleStage"/>.
         /// </param>
         /// <returns>
         /// The provided <see cref="ISiloHostBuilder"/>.
@@ -55,7 +55,7 @@ namespace Orleans.Hosting
         public static ISiloHostBuilder AddStartupTask(
             this ISiloHostBuilder builder,
             IStartupTask startupTask,
-            int stage = SiloLifecycleStage.SiloActive)
+            int stage = ServiceLifecycleStage.Active)
         {
             return builder.AddStartupTask((sp, ct) => startupTask.Execute(ct), stage);
         }
@@ -70,7 +70,7 @@ namespace Orleans.Hosting
         /// The startup task.
         /// </param>
         /// <param name="stage">
-        /// The stage to execute the startup task, see values in <see cref="SiloLifecycleStage"/>.
+        /// The stage to execute the startup task, see values in <see cref="ServiceLifecycleStage"/>.
         /// </param>
         /// <returns>
         /// The provided <see cref="ISiloHostBuilder"/>.
@@ -78,7 +78,7 @@ namespace Orleans.Hosting
         public static ISiloHostBuilder AddStartupTask(
             this ISiloHostBuilder builder,
             Func<IServiceProvider, CancellationToken, Task> startupTask,
-            int stage = SiloLifecycleStage.SiloActive)
+            int stage = ServiceLifecycleStage.Active)
         {
             builder.ConfigureServices(services =>
                 services.AddTransient<ILifecycleParticipant<ISiloLifecycle>>(sp =>

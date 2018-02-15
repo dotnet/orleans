@@ -27,7 +27,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// Default init stage in silo lifecycle.
         /// </summary>
-        public const int DEFAULT_INIT_STAGE = SiloLifecycleStage.ApplicationServices;
+        public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
 
         /// <summary>
         /// The default ADO.NET invariant used for storage if none is given. 

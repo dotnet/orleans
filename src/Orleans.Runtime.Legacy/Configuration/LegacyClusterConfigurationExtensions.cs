@@ -8,7 +8,6 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
-using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Scheduler;
 using Orleans.Providers;
 using System.Collections.Generic;
@@ -17,8 +16,8 @@ namespace Orleans.Hosting
 {
     public static class LegacyClusterConfigurationExtensions
     {
-        private const int SiloDefaultProviderInitStage = SiloLifecycleStage.RuntimeStorageServices;
-        private const int SiloDefaultProviderStartStage = SiloLifecycleStage.ApplicationServices;
+        private const int SiloDefaultProviderInitStage = ServiceLifecycleStage.RuntimeStorageServices;
+        private const int SiloDefaultProviderStartStage = ServiceLifecycleStage.ApplicationServices;
 
         /// <summary>
         /// Specifies the configuration to use for this silo.
@@ -155,19 +154,15 @@ namespace Orleans.Hosting
                 });
 
             services.Configure<NetworkingOptions>(options => LegacyConfigurationExtensions.CopyNetworkingOptions(configuration.Globals, options));
-            
+
             services.AddOptions<EndpointOptions>()
                 .Configure<IOptions<SiloOptions>>((options, siloOptions) =>
                 {
                     var nodeConfig = configuration.GetOrCreateNodeConfigurationForSilo(siloOptions.Value.SiloName);
-                    if (options.AdvertisedIPAddress == null)
+                    if (!string.IsNullOrEmpty(nodeConfig.HostNameOrIPAddress) || nodeConfig.Port != 0)
                     {
                         options.AdvertisedIPAddress = nodeConfig.Endpoint.Address;
                         options.SiloPort = nodeConfig.Endpoint.Port;
-                    }
-                    if (options.GatewayPort == 0 && nodeConfig.ProxyGatewayEndpoint != null)
-                    {
-                        options.GatewayPort = nodeConfig.ProxyGatewayEndpoint.Port;
                     }
                 });
 

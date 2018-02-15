@@ -258,7 +258,7 @@ namespace Orleans.Statistics
 
         public void Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe(SiloLifecycleStage.RuntimeInitialize, this);
+            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeInitialize, this);
         }
 
         #endregion Lifecycle
