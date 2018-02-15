@@ -18,7 +18,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Azure\Orleans.Statistics.AzureStorage\Orleans.Statistics.AzureStorage.csproj" />
     <ProjectReference Include="..\..\src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\Azure\Orleans.Clustering.AzureStorage\Orleans.Clustering.AzureStorage.csproj" />
     <ProjectReference Include="..\..\src\Azure\Orleans.Hosting.AzureCloudServices\Orleans.Hosting.AzureCloudServices.csproj" />

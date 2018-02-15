@@ -11,7 +11,6 @@
     <ProjectReference Include="..\Orleans.Clustering.AdoNet\Orleans.Clustering.AdoNet.csproj" />
     <ProjectReference Include="..\Orleans.Persistence.AdoNet\Orleans.Persistence.AdoNet.csproj" />
     <ProjectReference Include="..\Orleans.Reminders.AdoNet\Orleans.Reminders.AdoNet.csproj" />
-    <ProjectReference Include="..\Orleans.Statistics.AdoNet\Orleans.Statistics.AdoNet.csproj" />
   </ItemGroup>
 
 </Project>

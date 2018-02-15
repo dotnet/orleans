@@ -2,7 +2,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using System;
-using Orleans.Configuration.Options;
 using Orleans.Hosting;
 using Orleans.Messaging;
 
@@ -81,32 +80,6 @@ namespace Orleans.Configuration
             return services.AddSingleton<IGrainCallFilter>(
                 new GrainCallFilterWrapper(filter));
         }
-
-        /// <summary>
-        /// Add an <see cref="StaticGatewayListProvider"/> and configure it using <paramref name="configureOptions"/>
-        /// </summary>
-        public static IServiceCollection UseStaticGatewayListProvider(this IServiceCollection services,
-            Action<StaticGatewayListProviderOptions> configureOptions)
-        {
-            return services.UseStaticGatewayListProvider(ob => ob.Configure(configureOptions));
-        }
-
-        /// <summary>
-        /// Add an <see cref="StaticGatewayListProvider"/> and configure it using <paramref name="configureOptions"/>
-        /// </summary>
-        public static IServiceCollection UseStaticGatewayListProvider(this IServiceCollection services,
-            Action<OptionsBuilder<StaticGatewayListProviderOptions>> configureOptions)
-        {
-            configureOptions?.Invoke(services.AddOptions<StaticGatewayListProviderOptions>());
-            return services.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>()
-                .TryConfigureFormatter<StaticGatewayListProviderOptions,StaticGatewayListProviderOptionsFormatter>();
-        }
-
-        public static bool IsInCollection<T>(this IServiceCollection services)
-        {
-            return services.Any(s => s.ServiceType == typeof(T));
-        }
-
 
         private class GrainCallFilterWrapper : IGrainCallFilter
         {

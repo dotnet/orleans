@@ -44,7 +44,7 @@ namespace Tester.AzureUtils.Persistence
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
-                hostBuilder.UseAzureTableMembership(options =>
+                hostBuilder.UseAzureStorageClustering(options =>
                 {
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     options.MaxStorageBusyRetries = 3;
@@ -56,7 +56,7 @@ namespace Tester.AzureUtils.Persistence
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
-                clientBuilder.UseAzureTableGatewayListProvider(gatewayOptions => { gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString; });
+                clientBuilder.UseAzureStorageClustering(gatewayOptions => { gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString; });
             }
         }
 

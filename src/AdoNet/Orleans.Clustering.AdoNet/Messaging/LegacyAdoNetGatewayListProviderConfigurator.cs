@@ -1,6 +1,8 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using Orleans.Hosting;
+
+using Orleans.Configuration;
 using Orleans.Messaging;
+using Orleans.Runtime.Membership;
 
 namespace Orleans.AdoNet.Messaging
 {
@@ -9,12 +11,14 @@ namespace Orleans.AdoNet.Messaging
     {
         public void ConfigureServices(object configuration, IServiceCollection services)
         {
-            services.UseAdoNetlGatewayListProvider(options =>
-            {
-                var reader = new ClientConfigurationReader(configuration);
-                options.ConnectionString = reader.GetPropertyValue<string>("DataConnectionString");
-                options.AdoInvariant = reader.GetPropertyValue<string>("AdoInvariant");
-            });
+            services.Configure<AdoNetClusteringClientOptions>(
+                options =>
+                {
+                    var reader = new ClientConfigurationReader(configuration);
+                    options.ConnectionString = reader.GetPropertyValue<string>("DataConnectionString");
+                    options.AdoInvariant = reader.GetPropertyValue<string>("AdoInvariant");
+                });
+            services.AddSingleton<IGatewayListProvider, AdoNetGatewayListProvider>();
         }
     }
 }

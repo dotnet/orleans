@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Orleans.Runtime;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Specifies global messaging options that are common to client and silo.

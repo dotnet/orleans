@@ -2,12 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging.Abstractions;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Streams;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.Hosting;
 using TestExtensions;
 
 namespace UnitTests.LivenessTests

@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Clustering.AdoNet.Storage;
-using Orleans.AdoNet.Configuration;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime.MembershipService
 { 
@@ -13,8 +13,8 @@ namespace Orleans.Runtime.MembershipService
         private string clusterId;        
         private ILogger logger;
         private RelationalOrleansQueries orleansQueries;
-        private readonly AdoNetClusteringOptions clusteringTableOptions;
-        public AdoNetClusteringTable(IGrainReferenceConverter grainReferenceConverter, IOptions<SiloOptions> siloOptions, IOptions<AdoNetClusteringOptions> clusterinOptions, ILogger<AdoNetClusteringTable> logger)
+        private readonly AdoNetClusteringSiloOptions clusteringTableOptions;
+        public AdoNetClusteringTable(IGrainReferenceConverter grainReferenceConverter, IOptions<SiloOptions> siloOptions, IOptions<AdoNetClusteringSiloOptions> clusterinOptions, ILogger<AdoNetClusteringTable> logger)
         {
             this.grainReferenceConverter = grainReferenceConverter;
             this.logger = logger;

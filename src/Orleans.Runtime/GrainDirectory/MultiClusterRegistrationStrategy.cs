@@ -2,7 +2,7 @@
 using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.Options;
-using Orleans.Hosting;
+using Orleans.Configuration;
 using Orleans.MultiCluster;
 
 namespace Orleans.GrainDirectory

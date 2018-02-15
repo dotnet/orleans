@@ -1,10 +1,8 @@
 using System.Collections.Generic;
-
 using Microsoft.Extensions.Options;
-
 using Orleans.Runtime.Configuration;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Options for ADO.NET reminder storage.

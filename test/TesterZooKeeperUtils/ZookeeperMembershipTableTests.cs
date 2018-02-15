@@ -7,7 +7,7 @@ using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Host;
 using Orleans.Runtime.Membership;
-using OrleansZooKeeperUtils.Configuration;
+using Orleans.Configuration;
 using TestExtensions;
 using Xunit;
 using Tester.ZooKeeperUtils;
@@ -34,7 +34,7 @@ namespace UnitTests.MembershipTests
 
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
         {
-            var options = new ZooKeeperMembershipOptions();
+            var options = new ZooKeeperClusteringSiloOptions();
             options.ConnectionString = this.connectionString;
            
             return new ZooKeeperBasedMembershipTable(this.Services.GetService<ILogger<ZooKeeperBasedMembershipTable>>(), Options.Create(options), this.siloOptions);

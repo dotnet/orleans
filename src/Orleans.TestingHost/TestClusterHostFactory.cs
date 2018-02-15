@@ -15,6 +15,7 @@ using Orleans.Configuration;
 using Orleans.Logging;
 using Orleans.Messaging;
 using Orleans.Runtime;
+using Orleans.Runtime.MembershipService;
 using Orleans.Statistics;
 using Orleans.TestingHost.Utils;
 
@@ -127,9 +128,9 @@ namespace Orleans.TestingHost
 
             services.Configure<EndpointOptions>(options =>
             {
-                options.IPAddress = IPAddress.Loopback;
-                options.Port = siloPort;
-                options.ProxyPort = gatewayPort;
+                options.AdvertisedIPAddress = IPAddress.Loopback;
+                options.SiloPort = siloPort;
+                options.GatewayPort = gatewayPort;
             });
         }
 
@@ -206,7 +207,10 @@ namespace Orleans.TestingHost
             {
                 var primarySiloEndPoint = new IPEndPoint(IPAddress.Loopback, int.Parse(context.Configuration[nameof(TestSiloSpecificOptions.PrimarySiloPort)]));
 
-                services.UseDevelopmentMembership(options => options.PrimarySiloEndpoint = primarySiloEndPoint);
+                services.Configure<DevelopmentMembershipOptions>(options => options.PrimarySiloEndpoint = primarySiloEndPoint);
+                services
+                    .AddSingleton<GrainBasedMembershipTable>()
+                    .AddFromExisting<IMembershipTable, GrainBasedMembershipTable>();
             }
         }
 
@@ -215,15 +219,22 @@ namespace Orleans.TestingHost
             bool.TryParse(configuration[nameof(TestClusterOptions.UseTestClusterMembership)], out bool useTestClusterMembership);
             if (useTestClusterMembership && services.All(svc => svc.ServiceType != typeof(IGatewayListProvider)))
             {
-                services.UseStaticGatewayListProvider(options =>
-                {
-                    int baseGatewayPort = int.Parse(configuration[nameof(TestClusterOptions.BaseGatewayPort)]);
-                    int initialSilosCount = int.Parse(configuration[nameof(TestClusterOptions.InitialSilosCount)]);
+                Action<StaticGatewayListProviderOptions> configureOptions = options =>
+                    {
+                        int baseGatewayPort = int.Parse(configuration[nameof(TestClusterOptions.BaseGatewayPort)]);
+                        int initialSilosCount = int.Parse(configuration[nameof(TestClusterOptions.InitialSilosCount)]);
 
-                    options.Gateways = Enumerable.Range(baseGatewayPort, initialSilosCount)
-                        .Select(port => new IPEndPoint(IPAddress.Loopback, port).ToGatewayUri())
-                        .ToList();
-                });
+                        options.Gateways = Enumerable.Range(baseGatewayPort, initialSilosCount)
+                            .Select(port => new IPEndPoint(IPAddress.Loopback, port).ToGatewayUri())
+                            .ToList();
+                    };
+                if (configureOptions != null)
+                {
+                    services.Configure(configureOptions);
+                }
+
+                services.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>()
+                    .TryConfigureFormatter<StaticGatewayListProviderOptions, StaticGatewayListProviderOptionsFormatter>();
             }
         }
 

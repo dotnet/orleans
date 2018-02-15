@@ -1,11 +1,9 @@
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
-using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -47,13 +45,13 @@ namespace Tester.AzureUtils.Streaming
                     .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
                     {
                         options.ServiceId = silo.Value.ServiceId.ToString();
-                        options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         options.DeleteStateOnClear = true;
                     }))
                     .AddAzureTableGrainStorage("PubSubStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
                      {
                          options.ServiceId = silo.Value.ServiceId.ToString();
-                         options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                          options.DeleteStateOnClear = true;
                      }));
             }

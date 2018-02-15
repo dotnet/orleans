@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Orleans.Clustering.ServiceFabric
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Options for Service Fabric cluster membership.

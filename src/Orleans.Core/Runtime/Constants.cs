@@ -20,7 +20,6 @@ namespace Orleans.Runtime
 
         public const string ORLEANS_CLUSTERING_AZURESTORAGE = "Orleans.Clustering.AzureStorage";
         public const string ORLEANS_REMINDERS_AZURESTORAGE = "Orleans.Reminders.AzureStorage";
-        public const string ORLEANS_STATISTICS_AZURESTORAGE = "Orleans.Statistics.AzureStorage";
 
         public const string ORLEANS_CLUSTERING_ADONET = "Orleans.Clustering.AdoNet";
         public const string ORLEANS_REMINDERS_ADONET = "Orleans.Reminders.AdoNet";
@@ -38,6 +37,7 @@ namespace Orleans.Runtime
         public static readonly GrainId MembershipOracleId = GrainId.GetSystemTargetGrainId(15);
         public static readonly GrainId TypeManagerId = GrainId.GetSystemTargetGrainId(17);
         public static readonly GrainId FallbackSystemTargetId = GrainId.GetSystemTargetGrainId(19);
+        public static readonly GrainId StartupTaskSystemTargetId = GrainId.GetSystemTargetGrainId(20);
         public static readonly GrainId DeploymentLoadPublisherSystemTargetId = GrainId.GetSystemTargetGrainId(22);
         public static readonly GrainId MultiClusterOracleId = GrainId.GetSystemTargetGrainId(23);
         public static readonly GrainId ClusterDirectoryServiceId = GrainId.GetSystemTargetGrainId(24);

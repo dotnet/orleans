@@ -93,7 +93,6 @@ namespace Orleans.Hosting
                 {
                     options.ServiceId = configuration.Globals.ServiceId;
                 }
-                options.FastKillOnCancelKeyPress = configuration.Globals.FastKillOnCancelKeyPress;
             });
 
             services.Configure<MultiClusterOptions>(options =>
@@ -156,25 +155,19 @@ namespace Orleans.Hosting
                 });
 
             services.Configure<NetworkingOptions>(options => LegacyConfigurationExtensions.CopyNetworkingOptions(configuration.Globals, options));
-
-            //configure data connection string for metric table and statistic table
-            services.Configure<MonitoringStorageOptions>(options =>
-            {
-                options.DataConnectionString = configuration.Globals.DataConnectionString;
-            });
-
+            
             services.AddOptions<EndpointOptions>()
                 .Configure<IOptions<SiloOptions>>((options, siloOptions) =>
                 {
                     var nodeConfig = configuration.GetOrCreateNodeConfigurationForSilo(siloOptions.Value.SiloName);
-                    if (options.IPAddress == null && string.IsNullOrWhiteSpace(options.HostNameOrIPAddress))
+                    if (options.AdvertisedIPAddress == null)
                     {
-                        options.IPAddress = nodeConfig.Endpoint.Address;
-                        options.Port = nodeConfig.Endpoint.Port;
+                        options.AdvertisedIPAddress = nodeConfig.Endpoint.Address;
+                        options.SiloPort = nodeConfig.Endpoint.Port;
                     }
-                    if (options.ProxyPort == 0 && nodeConfig.ProxyGatewayEndpoint != null)
+                    if (options.GatewayPort == 0 && nodeConfig.ProxyGatewayEndpoint != null)
                     {
-                        options.ProxyPort = nodeConfig.ProxyGatewayEndpoint.Port;
+                        options.GatewayPort = nodeConfig.ProxyGatewayEndpoint.Port;
                     }
                 });
 
@@ -300,18 +293,13 @@ namespace Orleans.Hosting
                     options.DefaultVersionSelectorStrategy = config.DefaultVersionSelectorStrategy?.GetType().Name ?? GrainVersioningOptions.DEFAULT_VERSION_SELECTOR_STRATEGY;
                 });
 
-            services.AddOptions<ThreadPoolOptions>()
-                .Configure<NodeConfiguration>((options, config) =>
-                {
-                    options.MinDotNetThreadPoolSize = config.MinDotNetThreadPoolSize;
-                });
-
-            services.AddOptions<ServicePointOptions>()
+            services.AddOptions<PerformanceTuningOptions>()
                 .Configure<NodeConfiguration>((options, config) =>
                 {
                     options.DefaultConnectionLimit = config.DefaultConnectionLimit;
                     options.Expect100Continue = config.Expect100Continue;
                     options.UseNagleAlgorithm = config.UseNagleAlgorithm;
+                    options.MinDotNetThreadPoolSize = config.MinDotNetThreadPoolSize;
                 });
 
             services.AddOptions<TypeManagementOptions>()

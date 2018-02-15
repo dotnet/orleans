@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Options;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Statistics output related options for silo.
@@ -27,7 +27,7 @@ namespace Orleans.Hosting
     {
         public string Name => nameof(SiloStatisticsOptions);
 
-        private SiloStatisticsOptions options;
+        private readonly SiloStatisticsOptions options;
 
         public SiloStatisticsOptionsFormatter(IOptions<SiloStatisticsOptions> options)
             :base(options.Value)

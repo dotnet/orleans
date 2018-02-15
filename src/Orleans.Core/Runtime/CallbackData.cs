@@ -1,8 +1,8 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 using Orleans.Transactions;
-using Orleans.Hosting;
 
 namespace Orleans.Runtime
 {

@@ -1,6 +1,6 @@
 using System.Net;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     /// <summary>Configures development clustering options</summary>
     public class DevelopmentMembershipOptions

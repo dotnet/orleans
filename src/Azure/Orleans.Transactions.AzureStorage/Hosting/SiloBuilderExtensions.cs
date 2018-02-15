@@ -1,6 +1,6 @@
 ﻿using System;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Hosting;
+using Orleans.Configuration;
 using Orleans.Transactions.AzureStorage;
 
 namespace Orleans.Hosting

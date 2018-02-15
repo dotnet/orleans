@@ -1,8 +1,7 @@
 
 using System;
-using Orleans.Hosting;
+using Orleans.Configuration;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans.Streams
 {

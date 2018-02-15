@@ -4,9 +4,8 @@ using System.Linq;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.GrainDirectory;
-using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.GrainDirectory
 {

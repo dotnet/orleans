@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -63,10 +64,14 @@ namespace Orleans.Messaging
     {
         public void ConfigureServices(object clientConfiguration, IServiceCollection services)
         {
-            services.UseStaticGatewayListProvider(options =>
-            {
-                options.Gateways = ((ClientConfiguration)clientConfiguration).Gateways.Select(ep => ep.ToGatewayUri()).ToList();
-            });
+            services.Configure<StaticGatewayListProviderOptions>(
+                options =>
+                {
+                    options.Gateways = ((ClientConfiguration)clientConfiguration).Gateways.Select(ep => ep.ToGatewayUri()).ToList();
+                });
+
+            services.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>()
+                .TryConfigureFormatter<StaticGatewayListProviderOptions, StaticGatewayListProviderOptionsFormatter>();
         }
     }
 }

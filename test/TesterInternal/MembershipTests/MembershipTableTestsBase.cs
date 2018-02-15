@@ -14,7 +14,7 @@ using TestExtensions;
 using Xunit;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Hosting;
+using Orleans.Configuration;
 
 namespace UnitTests.MembershipTests
 {

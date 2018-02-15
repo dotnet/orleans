@@ -1,8 +1,7 @@
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
-using Orleans.Hosting;
+using Orleans.Configuration;
 using Orleans.Reminders.AdoNet.Storage;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.ReminderService
 {

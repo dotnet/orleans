@@ -8,9 +8,9 @@ using Microsoft.WindowsAzure.Storage.Table;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Storage;
 using TestExtensions;
@@ -282,7 +282,7 @@ namespace Tester.AzureUtils.Persistence
         {
             var options = new AzureTableStorageOptions
             {
-                DataConnectionString = TestDefaultConfiguration.DataConnectionString,
+                ConnectionString = TestDefaultConfiguration.DataConnectionString,
                 UseJson = useJson
             };
             return InitAzureTableGrainStorage(options);

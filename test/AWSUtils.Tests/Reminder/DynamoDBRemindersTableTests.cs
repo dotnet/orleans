@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using Orleans;
-using Orleans.Hosting;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using OrleansAWSUtils.Reminders;
 using TestExtensions;

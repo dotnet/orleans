@@ -5,10 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
-using Orleans.Hosting;
-using Orleans.Runtime;
 using Orleans.Providers;
-using Orleans.Configuration.Options;
 
 namespace Orleans.Configuration
 {
@@ -46,10 +43,6 @@ namespace Orleans.Configuration
                 {
                     options.ClusterId = configuration.ClusterId;
                 }
-            });
-            services.Configure<MonitoringStorageOptions>(options =>
-            {
-                options.DataConnectionString = configuration.DataConnectionString;
             });
 
             // Translate legacy configuration to new Options
@@ -130,10 +123,8 @@ namespace Orleans.Configuration
 
         internal static void CopyStatisticsOptions(IStatisticsConfiguration configuration, StatisticsOptions options)
         {
-            options.MetricsTableWriteInterval = configuration.StatisticsMetricsTableWriteInterval;
             options.PerfCountersWriteInterval = configuration.StatisticsPerfCountersWriteInterval;
             options.LogWriteInterval = configuration.StatisticsLogWriteInterval;
-            options.WriteLogStatisticsToTable = configuration.StatisticsWriteLogStatisticsToTable;
             options.CollectionLevel = configuration.StatisticsCollectionLevel;
         }
     }

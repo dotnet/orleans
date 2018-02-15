@@ -5,11 +5,10 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Orleans.Providers;
+using Orleans.Configuration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Storage;
 using Orleans.Hosting;
-using Orleans.Runtime.Counters;
 using Orleans.Statistics;
 using Orleans.Streams;
 
@@ -66,9 +65,7 @@ namespace Orleans.Runtime.TestHooks
         {
             return Task.FromResult(consistentRingProvider.ToString()); 
         }
-
-        public Task<bool> HasStatisticsProvider() => Task.FromResult(this.host.Services.GetServices<IStatisticsPublisher>() != null);
-
+        
         public Task<Guid> GetServiceId() => Task.FromResult(this.host.Services.GetRequiredService<IOptions<SiloOptions>>().Value.ServiceId);
 
         public Task<bool> HasStorageProvider(string providerName)
@@ -99,11 +96,8 @@ namespace Orleans.Runtime.TestHooks
 
             allProviders.AddRange(await GetStorageProviderNames());
 
-            allProviders.AddRange(await GetStorageProviderNames());
-
-            var statisticsPublisherCollection = this.host.Services.GetRequiredService<IKeyedServiceCollection<string, IStatisticsPublisher>>(); ;
-            allProviders.AddRange(statisticsPublisherCollection.GetServices(this.host.Services).Select(keyedService => keyedService.Key));
-
+            allProviders.AddRange(await GetStreamProviderNames());
+            
             return allProviders;
         }
 

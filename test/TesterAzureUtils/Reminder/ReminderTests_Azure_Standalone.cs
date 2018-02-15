@@ -5,15 +5,13 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ReminderService;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-
-using Orleans.Hosting;
+using Orleans.Configuration;
 using Orleans.TestingHost.Utils;
 
 // ReSharper disable InconsistentNaming
