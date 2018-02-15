@@ -161,8 +161,11 @@ namespace Orleans.Hosting
                 .Configure<IOptions<SiloOptions>>((options, siloOptions) =>
                 {
                     var nodeConfig = configuration.GetOrCreateNodeConfigurationForSilo(siloOptions.Value.SiloName);
-                    options.AdvertisedIPAddress = nodeConfig.Endpoint.Address;
-                    options.SiloPort = nodeConfig.Endpoint.Port;
+                    if (!string.IsNullOrEmpty(nodeConfig.HostNameOrIPAddress) || nodeConfig.Port != 0)
+                    {
+                        options.AdvertisedIPAddress = nodeConfig.Endpoint.Address;
+                        options.SiloPort = nodeConfig.Endpoint.Port;
+                    }
                 });
 
             services.Configure<SerializationProviderOptions>(options =>
