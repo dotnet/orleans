@@ -6,20 +6,20 @@ using System.Reflection;
 
 namespace Orleans
 {
-    internal class GenericOptionsFormatter<T> : IOptionFormatter<T>
+    internal class DefaultOptionsFormatter<T> : IOptionFormatter<T>
          where T : class, new()
     {
         public string Name { get; }
 
         private T options;
 
-        public GenericOptionsFormatter(IOptions<T> options)
+        public DefaultOptionsFormatter(IOptions<T> options)
         {
             this.options = options.Value;
             this.Name = OptionFormattingUtilities.Name<T>();
         }
 
-        internal GenericOptionsFormatter(string name, T options)
+        internal DefaultOptionsFormatter(string name, T options)
         {
             this.options = options;
             this.Name = OptionFormattingUtilities.Name<T>(name);
@@ -47,19 +47,19 @@ namespace Orleans
         }
     }
 
-    internal class GenericOptionsFormatterResolver<T> : IOptionFormatterResolver<T> 
+    internal class DefaultOptionsFormatterResolver<T> : IOptionFormatterResolver<T> 
         where T: class, new()
     {
         private IOptionsSnapshot<T> optionsSnapshot;
 
-        public GenericOptionsFormatterResolver(IOptionsSnapshot<T> optionsSnapshot)
+        public DefaultOptionsFormatterResolver(IOptionsSnapshot<T> optionsSnapshot)
         {
             this.optionsSnapshot = optionsSnapshot;
         }
 
         public IOptionFormatter<T> Resolve(string name)
         {
-            return new GenericOptionsFormatter<T>(name, Options.Create(optionsSnapshot.Get(name)).Value);
+            return new DefaultOptionsFormatter<T>(name, Options.Create(optionsSnapshot.Get(name)).Value);
         }
     }
 }

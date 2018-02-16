@@ -33,7 +33,7 @@ namespace Orleans.Configuration
         public static IServiceCollection ConfigureFormatter<TOptions>(this IServiceCollection services)
             where TOptions : class, new()
         {
-            return services.ConfigureFormatter<TOptions, GenericOptionsFormatter<TOptions>>();
+            return services.ConfigureFormatter<TOptions, DefaultOptionsFormatter<TOptions>>();
         }
 
         /// <summary>
@@ -63,7 +63,7 @@ namespace Orleans.Configuration
         public static IServiceCollection TryConfigureFormatter<TOptions>(this IServiceCollection services)
             where TOptions : class, new()
         {
-            return services.TryConfigureFormatter<TOptions, GenericOptionsFormatter<TOptions>>();
+            return services.TryConfigureFormatter<TOptions, DefaultOptionsFormatter<TOptions>>();
         }
 
         /// <summary>
@@ -82,7 +82,7 @@ namespace Orleans.Configuration
         public static IServiceCollection ConfigureFormatterResolver<TOptions>(this IServiceCollection services)
             where TOptions : class, new()
         {
-            return services.ConfigureFormatterResolver<TOptions, GenericOptionsFormatterResolver<TOptions>>();
+            return services.ConfigureFormatterResolver<TOptions, DefaultOptionsFormatterResolver<TOptions>>();
         }
 
         /// <summary>
@@ -104,7 +104,7 @@ namespace Orleans.Configuration
         public static IServiceCollection TryConfigureFormatterResolver<TOptions>(this IServiceCollection services)
             where TOptions : class, new()
         {
-            return services.TryConfigureFormatterResolver<TOptions, GenericOptionsFormatterResolver<TOptions>>();
+            return services.TryConfigureFormatterResolver<TOptions, DefaultOptionsFormatterResolver<TOptions>>();
         }
 
         /// <summary>
