@@ -43,7 +43,7 @@ namespace Orleans
             return OptionFormattingUtilities.Format(
                 name, 
                 redactAttribute != null 
-                    ? redactAttribute.Redact((string) value)
+                    ? redactAttribute.Redact(value)
                     : value);
         }
     }
