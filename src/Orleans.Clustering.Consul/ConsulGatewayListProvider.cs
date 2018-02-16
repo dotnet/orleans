@@ -18,11 +18,11 @@ namespace Orleans.Runtime.Membership
         private ILogger logger;
         private readonly ConsulClusteringClientOptions options;
         private readonly TimeSpan maxStaleness;
-        public ConsulGatewayListProvider(ILogger<ConsulGatewayListProvider> logger, ClientConfiguration clientConfig, IOptions<ConsulClusteringClientOptions> options, IOptions<ClusterClientOptions> clusterClientOptions)
+        public ConsulGatewayListProvider(ILogger<ConsulGatewayListProvider> logger, IOptions<ConsulClusteringClientOptions> options, IOptions<GatewayOptions> gatewayOptions, IOptions<ClusterClientOptions> clusterClientOptions)
         {
             this.logger = logger;
             this.clusterId = clusterClientOptions.Value.ClusterId;
-            this.maxStaleness = clientConfig.GatewayListRefreshPeriod;
+            this.maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
             this.options = options.Value;
         }
 
