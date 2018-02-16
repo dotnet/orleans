@@ -60,7 +60,7 @@ namespace Orleans
 
         public IOptionFormatter<T> Resolve(string name)
         {
-            return new DefaultOptionsFormatter<T>(name, Options.Create(optionsSnapshot.Get(name)).Value);
+            return new DefaultOptionsFormatter<T>(name, optionsSnapshot.Get(name));
         }
     }
 }
