@@ -111,7 +111,6 @@ namespace UnitTests.GeoClusterTests
             // configuration for cluster
             Action<ClusterConfiguration> addtracing = (ClusterConfiguration c) =>
             {
-                c.AddAzureBlobStorageProvider("PubSubStore", connectionString: TestDefaultConfiguration.DataConnectionString);
                 c.AddSimpleMessageStreamProvider("SMSProvider", fireAndForgetDelivery: false);
 
                 config_customizer?.Invoke(c);

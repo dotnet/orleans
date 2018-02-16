@@ -9,7 +9,7 @@ using Orleans.Providers;
 
 namespace Orleans.Hosting
 {
-    public static class SiloBuilderExtensions
+    public static class AzureTableSiloBuilderExtensions
     {
         /// <summary>
         /// Configure silo to use azure table storage as the default grain storage.
