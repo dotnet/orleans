@@ -3,6 +3,7 @@ using System;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
+using Orleans.Providers.Streams.SimpleMessageStream;
 using Orleans.Runtime;
 using Orleans.Streams;
 
@@ -48,6 +49,48 @@ namespace Orleans.Hosting
             return services.AddSingletonNamedService<IStreamProvider>(name, PersistentStreamProvider.Create<TOptions>)
                            .AddSingletonNamedService<ILifecycleParticipant<IClusterClientLifecycle>>(name, (s, n) => ((PersistentStreamProvider)s.GetRequiredServiceByName<IStreamProvider>(n)).ParticipateIn<IClusterClientLifecycle>())
                            .AddSingletonNamedService<IQueueAdapterFactory>(name, adapterFactory);
+        }
+
+        /// <summary>
+        /// Configure client to use SimpleMessageProvider
+        /// </summary>
+        public static IClientBuilder AddSimpleMessageStreamProvider(this IClientBuilder builder, string name,
+            Action<SimpleMessageStreamProviderOptions> configureOptions)
+
+        {
+            return builder.ConfigureServices(services =>
+                services.AddClusterClientSimpleMessageStreamProvider(name, configureOptions));
+        }
+
+        /// <summary>
+        /// Configure client to use SimpleMessageProvider
+        /// </summary>
+        public static IClientBuilder AddSimpleMessageStreamProvider(this IClientBuilder builder, string name,
+            Action<OptionsBuilder<SimpleMessageStreamProviderOptions>> configureOptions = null)
+
+        {
+            return builder.ConfigureServices(services =>
+                services.AddClusterClientSimpleMessageStreamProvider(name, configureOptions));
+        }
+
+        /// <summary>
+        /// Configure client to use simple message stream provider
+        /// </summary>
+        public static IServiceCollection AddClusterClientSimpleMessageStreamProvider(this IServiceCollection services, string name,
+            Action<SimpleMessageStreamProviderOptions> configureOptions = null)
+        {
+            return services.AddClusterClientSimpleMessageStreamProvider(name, ob => ob.Configure(configureOptions));
+        }
+
+        /// <summary>
+        /// Configure client to use simple message provider
+        /// </summary>
+        public static IServiceCollection AddClusterClientSimpleMessageStreamProvider(this IServiceCollection services, string name,
+        Action<OptionsBuilder<SimpleMessageStreamProviderOptions>> configureOptions = null)
+        {
+            configureOptions?.Invoke(services.AddOptions<SimpleMessageStreamProviderOptions>(name));
+            return services.ConfigureNamedOptionForLogging<SimpleMessageStreamProviderOptions>(name)
+                           .AddSingletonNamedService<IStreamProvider>(name, SimpleMessageStreamProvider.Create);
         }
     }
 }

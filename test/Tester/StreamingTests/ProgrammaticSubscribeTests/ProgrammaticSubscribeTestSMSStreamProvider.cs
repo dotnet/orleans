@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Orleans;
+using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost;
@@ -23,15 +26,17 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
                 {
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-                    legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamProviderName,
-                        false,
-                        true,
-                        StreamPubSubType.ExplicitGrainBasedAndImplicit);
-                    legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamProviderName2,
-                        false,
-                        true,
-                        StreamPubSubType.ExplicitGrainBasedOnly);
                 });
+                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+            }
+        }
+
+        public class SiloConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder.AddSimpleMessageStreamProvider(StreamProviderName);
+                hostBuilder.AddSimpleMessageStreamProvider(StreamProviderName2, options => options.PubSubType = StreamPubSubType.ExplicitGrainBasedOnly);
             }
         }
 

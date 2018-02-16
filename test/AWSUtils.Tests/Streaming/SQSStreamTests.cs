@@ -35,10 +35,6 @@ namespace AWSUtils.Tests.Streaming
                 //from the config files
                 options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
 
-                options.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProvider", fireAndForgetDelivery: false);
-
-                options.ClientConfiguration.AddSimpleMessageStreamProvider("SMSProvider", fireAndForgetDelivery: false);
-
                 //previous silo creation
                 options.ClusterConfiguration.Globals.DataConnectionString = AWSTestConstants.DefaultSQSConnectionString;
                 options.ClientConfiguration.DataConnectionString = AWSTestConstants.DefaultSQSConnectionString;
@@ -66,6 +62,7 @@ namespace AWSUtils.Tests.Streaming
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
+                    .AddSimpleMessageStreamProvider("SMSProvider")
                     .AddSqsStreams("SQSProvider", options =>
                     {
                         options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
@@ -82,6 +79,7 @@ namespace AWSUtils.Tests.Streaming
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
+                    .AddSimpleMessageStreamProvider("SMSProvider")
                     .AddSqsStreams("SQSProvider", options =>
                     {
                         options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;

@@ -2,6 +2,9 @@ using System;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Orleans;
+using Orleans.Hosting;
 using Xunit;
 using TestExtensions;
 using UnitTests.StreamingTests;
@@ -19,10 +22,24 @@ namespace Tester.StreamingTests
                 {
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-
-                    legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamProvider, false);
-                    legacy.ClientConfiguration.AddSimpleMessageStreamProvider(StreamProvider, false);
                 });
+                builder.AddClientBuilderConfigurator<ClientConfiguretor>();
+                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+            }
+
+            public class SiloConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder.AddSimpleMessageStreamProvider(StreamProvider);
+                }
+            }
+            public class ClientConfiguretor : IClientBuilderConfigurator
+            {
+                public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+                {
+                    clientBuilder.AddSimpleMessageStreamProvider(StreamProvider);
+                }
             }
         }
 

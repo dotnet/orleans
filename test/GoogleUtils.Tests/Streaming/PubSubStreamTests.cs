@@ -31,8 +31,6 @@ namespace GoogleUtils.Tests.Streaming
             {
                 //from the config files
                 legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
-                legacy.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProvider", fireAndForgetDelivery: false);
-                legacy.ClientConfiguration.AddSimpleMessageStreamProvider("SMSProvider", fireAndForgetDelivery: false);
 
                 legacy.ClusterConfiguration.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
             });
@@ -45,6 +43,7 @@ namespace GoogleUtils.Tests.Streaming
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
+                    .AddSimpleMessageStreamProvider("SMSProvider")
                     .AddPubSubStreams<PubSubDataAdapter>(PUBSUB_STREAM_PROVIDER_NAME, options =>
                     {
                         options.ProjectId = GoogleTestUtils.ProjectId;
@@ -60,6 +59,7 @@ namespace GoogleUtils.Tests.Streaming
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
+                    .AddSimpleMessageStreamProvider("SMSProvider")
                     .AddPubSubStreams<PubSubDataAdapter>(PUBSUB_STREAM_PROVIDER_NAME, options =>
                     {
                         options.ProjectId = GoogleTestUtils.ProjectId;
