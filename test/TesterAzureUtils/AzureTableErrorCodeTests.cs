@@ -51,6 +51,18 @@ namespace Tester.AzureUtils
         }
 
         [Fact, TestCategory("Functional")]
+        public void AzureStorageUtils_ContainerName()
+        {
+            Assert.Throws<ArgumentException>(() => AzureStorageUtils.ValidateContainerName("this is a test"));
+            Assert.Throws<ArgumentException>(() => AzureStorageUtils.ValidateContainerName("MyContainer"));
+            Assert.Throws<ArgumentException>(() => AzureStorageUtils.ValidateContainerName("my_container123"));
+            Assert.Throws<ArgumentException>(() => AzureStorageUtils.ValidateContainerName("_container"));
+            AzureStorageUtils.ValidateContainerName("123");
+            AzureStorageUtils.ValidateContainerName("container");
+            AzureStorageUtils.ValidateContainerName("my-container123");
+        }
+
+        [Fact, TestCategory("Functional")]
         public void AzureStorageUtils_TablePropertyShouldBeSanitized()
         {
             var tableProperty = "/A\\C#?";

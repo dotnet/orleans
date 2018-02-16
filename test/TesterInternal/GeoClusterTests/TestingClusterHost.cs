@@ -16,6 +16,7 @@ using Orleans.MultiCluster;
 using Orleans.Runtime;
 using Microsoft.Extensions.Logging;
 using Orleans.TestingHost.Utils;
+using Orleans.Storage;
 
 namespace Tests.GeoClusterTests
 {
@@ -173,6 +174,10 @@ namespace Tests.GeoClusterTests
                     builder.AddFilter("Runtime.Catalog", LogLevel.Debug);
                     builder.AddFilter("Runtime.Dispatcher", LogLevel.Trace);
                     builder.AddFilter("Orleans.GrainDirectory.LocalGrainDirectory", LogLevel.Trace);
+                });
+                hostBuilder.AddAzureBlobGrainStorage("PubSubStore", (AzureBlobStorageOptions options) =>
+                {
+                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                 });
             }
         }
