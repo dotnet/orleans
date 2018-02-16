@@ -13,7 +13,7 @@ namespace Orleans.Configuration
     public static class LegacyConfigurationExtensions
     {
         private const int ClusterClientDefaultProviderInitStage = ServiceLifecycleStage.RuntimeStorageServices;
-        private const int ClusterClientDefaultProviderStartStage = ServiceLifecycleStage.RuntimeStorageServices;
+        private const int ClusterClientDefaultProviderStartStage = ServiceLifecycleStage.ApplicationServices;
 
         public static IServiceCollection AddLegacyClientConfigurationSupport(this IServiceCollection services, ClientConfiguration configuration = null)
         {
