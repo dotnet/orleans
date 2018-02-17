@@ -53,6 +53,7 @@ namespace Tester
             services.AddSingleton<TestLoggerFactory>();
             services.AddSingleton<ILoggerFactory>(sp => sp.GetRequiredService<TestLoggerFactory>());
             services.AddSingleton(typeof(ILogger<>), typeof(TestLogger<>));
+            services.AddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
             services.AddSingleton<OptionsLogger, TestOptionsLogger>();
             services.Configure<TestOptions>(options => options.IntField = 1);
             services.ConfigureFormatter<TestOptions>();
@@ -76,6 +77,7 @@ namespace Tester
             services.AddSingleton<TestLoggerFactory>();
             services.AddSingleton<ILoggerFactory>(sp => sp.GetRequiredService<TestLoggerFactory>());
             services.AddSingleton(typeof(ILogger<>), typeof(TestLogger<>));
+            services.AddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
             services.AddSingleton<OptionsLogger, TestOptionsLogger>();
             services.Configure<TestOptionsWithSecrets>(options => {
                 options.Data = "Hello";
@@ -242,8 +244,9 @@ namespace Tester
             services.AddSingleton<TestLoggerFactory>();
             services.AddSingleton<ILoggerFactory>(sp => sp.GetRequiredService<TestLoggerFactory>());
             services.AddSingleton(typeof(ILogger<>), typeof(TestLogger<>));
+            services.AddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
+            services.AddSingleton(typeof(IOptionFormatterResolver<>), typeof(DefaultOptionsFormatterResolver<>));
             services.AddSingleton<OptionsLogger, TestOptionsLogger>();
-            services.ConfigureFormatterResolver<TestOptions>();
             Enumerable
                 .Range(1, 3)
                 .ToList()

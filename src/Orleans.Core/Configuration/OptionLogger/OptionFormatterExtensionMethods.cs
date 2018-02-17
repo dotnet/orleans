@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using System.Linq;
 namespace Orleans.Configuration
 {
@@ -17,8 +18,9 @@ namespace Orleans.Configuration
             var registration = services.FirstOrDefault(service => service.ServiceType == typeof(IOptionFormatter<TOptions>));
             if (registration == null)
             {
-                services.AddSingleton<IOptionFormatter<TOptions>, TOptionFormatter>()
-                        .AddFromExisting<IOptionFormatter, IOptionFormatter<TOptions>>();
+                services
+                    .AddSingleton<IOptionFormatter<TOptions>, TOptionFormatter>()
+                    .AddFromExisting<IOptionFormatter, IOptionFormatter<TOptions>>();
             } else
             {
                 // override IOptionFormatter<TOptions>
@@ -33,7 +35,7 @@ namespace Orleans.Configuration
         public static IServiceCollection ConfigureFormatter<TOptions>(this IServiceCollection services)
             where TOptions : class, new()
         {
-            return services.ConfigureFormatter<TOptions, DefaultOptionsFormatter<TOptions>>();
+            return services.AddSingleton<IOptionFormatter>(sp => sp.GetService<IOptionFormatter<TOptions>>());
         }
 
         /// <summary>
@@ -63,7 +65,8 @@ namespace Orleans.Configuration
         public static IServiceCollection TryConfigureFormatter<TOptions>(this IServiceCollection services)
             where TOptions : class, new()
         {
-            return services.TryConfigureFormatter<TOptions, DefaultOptionsFormatter<TOptions>>();
+            services.TryAddSingleton<IOptionFormatter>(sp => sp.GetService<IOptionFormatter<TOptions>>());
+            return services;
         }
 
         /// <summary>
@@ -77,15 +80,6 @@ namespace Orleans.Configuration
         }
 
         /// <summary>
-        /// Configure option formatter resolver for named option TOptions
-        /// </summary>
-        public static IServiceCollection ConfigureFormatterResolver<TOptions>(this IServiceCollection services)
-            where TOptions : class, new()
-        {
-            return services.ConfigureFormatterResolver<TOptions, DefaultOptionsFormatterResolver<TOptions>>();
-        }
-
-        /// <summary>
         /// Configure option formatter resolver for named option TOptions, if none is configured
         /// </summary>
         public static IServiceCollection TryConfigureFormatterResolver<TOptions, TOptionFormatterResolver>(this IServiceCollection services)
@@ -96,15 +90,6 @@ namespace Orleans.Configuration
             if (registration == null)
                 return services.ConfigureFormatterResolver<TOptions, TOptionFormatterResolver>();
             return services;
-        }
-
-        /// <summary>
-        /// Configure option formatter resolver for named option TOptions, if none is configured
-        /// </summary>
-        public static IServiceCollection TryConfigureFormatterResolver<TOptions>(this IServiceCollection services)
-            where TOptions : class, new()
-        {
-            return services.TryConfigureFormatterResolver<TOptions, DefaultOptionsFormatterResolver<TOptions>>();
         }
 
         /// <summary>
