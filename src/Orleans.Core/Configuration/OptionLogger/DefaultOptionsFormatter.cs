@@ -28,7 +28,7 @@ namespace Orleans
         public IEnumerable<string> Format()
         {
             return typeof(T)
-                .GetProperties(BindingFlags.Public)
+                .GetProperties()
                 .Where(prop => prop.GetGetMethod() != null && prop.GetSetMethod() != null)
                 .Select(FormatProperty)
                 .ToList();
