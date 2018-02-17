@@ -1,18 +1,15 @@
-using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Messaging;
-using Orleans.Runtime;
 using Orleans.Runtime.Membership;
 using Orleans.Runtime.MembershipService;
 using Orleans.Tests.SqlUtils;
 using TestExtensions;
 using UnitTests.General;
 using Xunit;
-using Orleans.AdoNet;
-using Orleans.Configuration;
 
 namespace UnitTests.MembershipTests
 {
@@ -49,7 +46,7 @@ namespace UnitTests.MembershipTests
                 ConnectionString = this.connectionString,
                 AdoInvariant = GetAdoInvariant()
             };
-            return new AdoNetGatewayListProvider(this.loggerFactory.CreateLogger<AdoNetGatewayListProvider>(), this.GrainReferenceConverter, this.clientConfiguration, Options.Create(options), this.clientOptions);
+            return new AdoNetGatewayListProvider(this.loggerFactory.CreateLogger<AdoNetGatewayListProvider>(), this.GrainReferenceConverter, Options.Create(options), gatewayOptions, this.clientOptions);
         }
 
         protected override string GetAdoInvariant()

@@ -5,7 +5,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Clustering.AdoNet.Storage;
 using Orleans.Messaging;
-using Orleans.Runtime.Configuration;
 using Orleans.Configuration;
 
 namespace Orleans.Runtime.Membership
@@ -18,15 +17,16 @@ namespace Orleans.Runtime.Membership
         private RelationalOrleansQueries orleansQueries;
         private readonly IGrainReferenceConverter grainReferenceConverter;
         private readonly TimeSpan maxStaleness;
-        public AdoNetGatewayListProvider(ILogger<AdoNetGatewayListProvider> logger, IGrainReferenceConverter grainReferenceConverter, ClientConfiguration clientConfiguration,
+        public AdoNetGatewayListProvider(ILogger<AdoNetGatewayListProvider> logger, IGrainReferenceConverter grainReferenceConverter,
             IOptions<AdoNetClusteringClientOptions> options,
+            IOptions<GatewayOptions> gatewayOptions,
             IOptions<ClusterClientOptions> clusterClientOptions)
         {
             this.logger = logger;
             this.grainReferenceConverter = grainReferenceConverter;
             this.options = options.Value;
             this.clusterId = clusterClientOptions.Value.ClusterId;
-            this.maxStaleness = clientConfiguration.GatewayListRefreshPeriod;
+            this.maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
         }
 
         public TimeSpan MaxStaleness

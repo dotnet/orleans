@@ -24,12 +24,12 @@ namespace Orleans.Runtime.Membership
         private readonly ILoggerFactory loggerFactory;
         private readonly DynamoDBClusteringClientOptions options;
         private readonly TimeSpan maxStaleness;
-        public DynamoDBGatewayListProvider(ILoggerFactory loggerFactory, ClientConfiguration clientConfiguration, IOptions<DynamoDBClusteringClientOptions> options, IOptions<ClusterClientOptions> clusterClientOptions)
+        public DynamoDBGatewayListProvider(ILoggerFactory loggerFactory, IOptions<DynamoDBClusteringClientOptions> options, IOptions<GatewayOptions> gatewayOptions, IOptions<ClusterClientOptions> clusterClientOptions)
         {
             this.loggerFactory = loggerFactory;
             this.options = options.Value;
             this.clusterId = clusterClientOptions.Value.ClusterId;
-            this.maxStaleness = clientConfiguration.GatewayListRefreshPeriod;
+            this.maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
         }
 
         #region Implementation of IGatewayListProvider
