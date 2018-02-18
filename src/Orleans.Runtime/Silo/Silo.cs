@@ -111,6 +111,7 @@ namespace Orleans.Runtime
         private SchedulingContext membershipOracleContext;
         private SchedulingContext multiClusterOracleContext;
         private SchedulingContext reminderServiceContext;
+        private LifecycleSchedulingSystemTarget lifecycleSchedulingSystemTarget;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Silo"/> class.
@@ -266,12 +267,13 @@ namespace Orleans.Runtime
             StartTaskWithPerfAnalysis("Start Scheduler", scheduler.Start, new Stopwatch());
 
             // SystemTarget for provider init calls
+            this.lifecycleSchedulingSystemTarget = Services.GetRequiredService<LifecycleSchedulingSystemTarget>();
             this.fallbackScheduler = Services.GetRequiredService<FallbackSystemTarget>();
-            RegisterSystemTarget(fallbackScheduler);
+            RegisterSystemTarget(lifecycleSchedulingSystemTarget);
 
             try
             {
-                await this.scheduler.QueueTask(() => this.siloLifecycle.OnStart(cancellationToken), this.fallbackScheduler.SchedulingContext);
+                await this.scheduler.QueueTask(() => this.siloLifecycle.OnStart(cancellationToken), this.lifecycleSchedulingSystemTarget.SchedulingContext);
             }
             catch (Exception exc)
             {
@@ -365,6 +367,9 @@ namespace Orleans.Runtime
             await scheduler.QueueAction(catalog.Start, catalog.SchedulingContext)
                 .WithTimeout(initTimeout, $"Starting Catalog failed due to timeout {initTimeout}");
 
+            // SystemTarget for provider init calls
+            this.fallbackScheduler = Services.GetRequiredService<FallbackSystemTarget>();
+            RegisterSystemTarget(fallbackScheduler);
         }
 
         private Task OnRuntimeInitializeStart(CancellationToken ct)
@@ -694,7 +699,7 @@ namespace Orleans.Runtime
                 return;
             }
 
-            await this.scheduler.QueueTask(() => this.siloLifecycle.OnStop(cancellationToken), this.fallbackScheduler.SchedulingContext);
+            await this.scheduler.QueueTask(() => this.siloLifecycle.OnStop(cancellationToken), this.lifecycleSchedulingSystemTarget.SchedulingContext);
             SafeExecute(scheduler.Stop);
             SafeExecute(scheduler.PrintStatistics);
         }
@@ -863,6 +868,15 @@ namespace Orleans.Runtime
     {
         public FallbackSystemTarget(ILocalSiloDetails localSiloDetails, ILoggerFactory loggerFactory)
             : base(Constants.FallbackSystemTargetId, localSiloDetails.SiloAddress, loggerFactory)
+        {
+        }
+    }
+
+    // A dummy system target for fallback scheduler
+    internal class LifecycleSchedulingSystemTarget : SystemTarget
+    {
+        public LifecycleSchedulingSystemTarget(ILocalSiloDetails localSiloDetails, ILoggerFactory loggerFactory)
+            : base(Constants.LifecycleSchedulingSystemTargetId, localSiloDetails.SiloAddress, loggerFactory)
         {
         }
     }
