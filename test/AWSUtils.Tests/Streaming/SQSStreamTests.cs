@@ -44,14 +44,15 @@ namespace AWSUtils.Tests.Streaming
                     {"DataConnectionString", $"Service={AWSTestConstants.Service}"},
                     {"DeleteStateOnClear", "true"}
                 };
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("DynamoDBStore", storageConnectionString);
-                var storageConnectionString2 = new Dictionary<string, string>
-                {
-                    {"DataConnectionString", $"Service={AWSTestConstants.Service}"},
-                    {"DeleteStateOnClear", "true"},
-                    {"UseJsonFormat", "true"}
-                };
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("PubSubStore", storageConnectionString2);
+                // FIXME: How to configure TestClusterBuilder with the extension methods
+                //options.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBGrainStorage>("DynamoDBStore", storageConnectionString);
+                //var storageConnectionString2 = new Dictionary<string, string>
+                //{
+                //    {"DataConnectionString", $"Service={AWSTestConstants.Service}"},
+                //    {"DeleteStateOnClear", "true"},
+                //    {"UseJsonFormat", "true"}
+                //};
+                //options.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBGrainStorage>("PubSubStore", storageConnectionString2);
             });
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();

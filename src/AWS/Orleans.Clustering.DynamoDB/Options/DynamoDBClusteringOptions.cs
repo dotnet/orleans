@@ -2,7 +2,7 @@
 
 namespace Orleans.Configuration
 {
-    public class DynamoDBClusteringClientOptions
+    public class DynamoDBClusteringOptions
     {
         /// <summary>
         /// AccessKey string for DynamoDB Storage
@@ -10,23 +10,29 @@ namespace Orleans.Configuration
         public string AccessKey { get; set; }
 
         /// <summary>
-        /// Secret key for dynamoDB storage
+        /// Secret key for DynamoDB storage
         /// </summary>
         public string SecretKey { get; set; }
 
         /// <summary>
-        /// Service name 
+        /// DynamoDB Service name 
         /// </summary>
         public string Service { get; set; }
 
         /// <summary>
-        /// Read capacity unit for dynamoDB storage
+        /// Read capacity unit for DynamoDB storage
         /// </summary>
         public int ReadCapacityUnits { get; set; } = DynamoDBStorage.DefaultReadCapacityUnits;
 
         /// <summary>
-        /// Write capacity unit for dynamoDB storage
+        /// Write capacity unit for DynamoDB storage
         /// </summary>
         public int WriteCapacityUnits { get; set; } = DynamoDBStorage.DefaultWriteCapacityUnits;
+
+        /// <summary>
+        /// DynamoDB table name.
+        /// Defaults to 'OrleansSilos'.
+        /// </summary>
+        public string TableName { get; set; } = "OrleansSilos";
     }
 }

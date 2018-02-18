@@ -1,0 +1,141 @@
+﻿using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
+using Orleans.Persistence.DynamoDB;
+using Orleans.Runtime;
+using System.Collections.Generic;
+
+namespace Orleans.Configuration
+{
+    public class DynamoDBStorageOptions
+    {
+        /// <summary>
+        /// Gets or sets a unique identifier for this service, which should survive deployment and redeployment.
+        /// </summary>
+        public string ServiceId { get; set; } = string.Empty;
+
+        /// <summary>
+        /// AccessKey string for DynamoDB Storage
+        /// </summary>
+        public string AccessKey { get; set; }
+
+        /// <summary>
+        /// Secret key for DynamoDB storage
+        /// </summary>
+        public string SecretKey { get; set; }
+
+        /// <summary>
+        /// DynamoDB Service name 
+        /// </summary>
+        public string Service { get; set; }
+
+        /// <summary>
+        /// Read capacity unit for DynamoDB storage
+        /// </summary>
+        public int ReadCapacityUnits { get; set; } = DynamoDBStorage.DefaultReadCapacityUnits;
+
+        /// <summary>
+        /// Write capacity unit for DynamoDB storage
+        /// </summary>
+        public int WriteCapacityUnits { get; set; } = DynamoDBStorage.DefaultWriteCapacityUnits;
+
+        /// <summary>
+        /// DynamoDB table name.
+        /// Defaults to 'OrleansGrainState'.
+        /// </summary>
+        public string TableName { get; set; } = "OrleansGrainState";
+
+        /// <summary>
+        /// Indicates if grain data should be deleted or reset to defaults when a grain clears it's state.
+        /// </summary>
+        public bool DeleteStateOnClear { get; set; } = false;
+
+        /// <summary>
+        /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialzed prior to use.
+        /// </summary>
+        public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
+        public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
+
+        #region JSON Serialization
+        public bool UseJson { get; set; }
+        public bool UseFullAssemblyNames { get; set; }
+        public bool IndentJson { get; set; }
+        public TypeNameHandling? TypeNameHandling { get; set; }
+        #endregion
+    }
+
+    /// <summary>
+    /// Configuration validator for DynamoDBStorageOptions
+    /// </summary>
+    public class DynamoDBGrainStorageOptionsValidator : IConfigurationValidator
+    {
+        private readonly DynamoDBStorageOptions _options;
+        private readonly string _name;
+
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="options">The option to be validated.</param>
+        /// <param name="name">The option name to be validated.</param>
+        public DynamoDBGrainStorageOptionsValidator(DynamoDBStorageOptions options, string name)
+        {
+            this._options = options;
+            this._name = name;
+        }
+
+        public void ValidateConfiguration()
+        {
+            if (string.IsNullOrWhiteSpace(this._options.TableName))
+                throw new OrleansConfigurationException(
+                    $"Configuration for DynamoDBGrainStorage {_name} is invalid. {nameof(this._options.TableName)} is not valid.");
+
+            if (this._options.ReadCapacityUnits == 0)
+                throw new OrleansConfigurationException(
+                    $"Configuration for DynamoDBGrainStorage {_name} is invalid. {nameof(this._options.ReadCapacityUnits)} is not valid.");
+
+            if (this._options.WriteCapacityUnits == 0)
+                throw new OrleansConfigurationException(
+                    $"Configuration for DynamoDBGrainStorage {_name} is invalid. {nameof(this._options.WriteCapacityUnits)} is not valid.");
+        }
+    }
+
+    public class DynamoDBStorageOptionsFormatterResolver : IOptionFormatterResolver<DynamoDBStorageOptions>
+    {
+        private IOptionsSnapshot<DynamoDBStorageOptions> optionsSnapshot;
+        public DynamoDBStorageOptionsFormatterResolver(IOptionsSnapshot<DynamoDBStorageOptions> optionsSnapshot)
+        {
+            this.optionsSnapshot = optionsSnapshot;
+        }
+
+        public IOptionFormatter<DynamoDBStorageOptions> Resolve(string name)
+        {
+            return new DynamoDBStorageOptionsFormatter(name, optionsSnapshot.Get(name));
+        }
+
+        private class DynamoDBStorageOptionsFormatter : IOptionFormatter<DynamoDBStorageOptions>
+        {
+            public string Name { get; }
+
+            private DynamoDBStorageOptions options;
+            public DynamoDBStorageOptionsFormatter(string name, DynamoDBStorageOptions options)
+            {
+                this.options = options;
+                this.Name = OptionFormattingUtilities.Name<DynamoDBStorageOptions>(name);
+            }
+
+            public IEnumerable<string> Format()
+            {
+                return new List<string>()
+                {
+                    OptionFormattingUtilities.Format(nameof(this.options.ServiceId),this.options.ServiceId),
+                    OptionFormattingUtilities.Format(nameof(this.options.TableName),this.options.TableName),
+                    OptionFormattingUtilities.Format(nameof(this.options.DeleteStateOnClear),this.options.DeleteStateOnClear),
+                    OptionFormattingUtilities.Format(nameof(this.options.InitStage),this.options.InitStage),
+                    OptionFormattingUtilities.Format(nameof(this.options.UseJson),this.options.UseJson),
+                    OptionFormattingUtilities.Format(nameof(this.options.UseFullAssemblyNames),this.options.UseFullAssemblyNames),
+                    OptionFormattingUtilities.Format(nameof(this.options.IndentJson),this.options.IndentJson),
+                    OptionFormattingUtilities.Format(nameof(this.options.TypeNameHandling),this.options.TypeNameHandling),
+                };
+            }
+        }
+    }
+}

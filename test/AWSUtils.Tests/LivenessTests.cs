@@ -1,18 +1,16 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Amazon.Runtime;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;
-using Orleans.AWSUtils.Tests;
+using Orleans.Clustering.DynamoDB;
 using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
-using Orleans.TestingHost.Utils;
-using OrleansAWSUtils.Membership;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnitTests.MembershipTests;
 using Xunit;
 using Xunit.Abstractions;
@@ -26,10 +24,10 @@ namespace AWSUtils.Tests.Liveness
         {
             try
             {
-                DynamoDBStorage storage;
+                Orleans.AWSUtils.Tests.DynamoDBStorage storage;
                 try
                 {
-                    storage = new DynamoDBStorage($"Service=http://localhost:8000", NullLoggerFactory.Instance);
+                    storage = new Orleans.AWSUtils.Tests.DynamoDBStorage(NullLoggerFactory.Instance, "http://localhost:8000");
                 }
                 catch (AmazonServiceException)
                 {
@@ -55,7 +53,7 @@ namespace AWSUtils.Tests.Liveness
         {
         }
 
-        public static string ConnectionString = "Service=http://localhost:8000;";
+        public static string Service = "http://localhost:8000";
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
@@ -65,7 +63,7 @@ namespace AWSUtils.Tests.Liveness
             builder.AddClientBuilderConfigurator<ClientBuilderConfigurator>();
             builder.ConfigureLegacyConfiguration(legacy =>
             {
-                legacy.ClusterConfiguration.Globals.DataConnectionString = ConnectionString;
+                legacy.ClusterConfiguration.Globals.DataConnectionString = $"Service={Service}";
                 legacy.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
                 legacy.ClusterConfiguration.PrimaryNode = null;
                 legacy.ClusterConfiguration.Globals.SeedNodes.Clear();
@@ -76,7 +74,7 @@ namespace AWSUtils.Tests.Liveness
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
-                hostBuilder.UseDynamoDBClustering(options => { options.ConnectionString = ConnectionString; });
+                hostBuilder.UseDynamoDBClustering(options => { options.Service = Service; });
             }
         }
 
@@ -86,7 +84,7 @@ namespace AWSUtils.Tests.Liveness
             {
                 clientBuilder.UseDynamoDBClustering(gatewayOptions =>
                 {
-                    LegacyDynamoDBGatewayListProviderConfigurator.ParseDataConnectionString(ConnectionString, gatewayOptions);
+                    LegacyDynamoDBGatewayListProviderConfigurator.ParseDataConnectionString($"Service={Service}", gatewayOptions);
                 });
             }
         }
