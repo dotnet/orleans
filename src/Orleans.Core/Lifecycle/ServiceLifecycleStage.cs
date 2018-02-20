@@ -42,7 +42,7 @@ namespace Orleans
         public const int Active = 20000;
 
         /// <summary>
-        /// First stage in service's lifecycle
+        /// Last stage in service's lifecycle
         /// </summary>
         public const int Last = int.MaxValue;
     }
