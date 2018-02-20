@@ -111,6 +111,7 @@ namespace Orleans.Runtime
         private SchedulingContext membershipOracleContext;
         private SchedulingContext multiClusterOracleContext;
         private SchedulingContext reminderServiceContext;
+        private LifecycleSchedulingSystemTarget lifecycleSchedulingSystemTarget;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Silo"/> class.
@@ -263,9 +264,16 @@ namespace Orleans.Runtime
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
+            StartTaskWithPerfAnalysis("Start Scheduler", scheduler.Start, new Stopwatch());
+
+            // SystemTarget for provider init calls
+            this.lifecycleSchedulingSystemTarget = Services.GetRequiredService<LifecycleSchedulingSystemTarget>();
+            this.fallbackScheduler = Services.GetRequiredService<FallbackSystemTarget>();
+            RegisterSystemTarget(lifecycleSchedulingSystemTarget);
+
             try
             {
-                await this.siloLifecycle.OnStart(cancellationToken);
+                await this.scheduler.QueueTask(() => this.siloLifecycle.OnStart(cancellationToken), this.lifecycleSchedulingSystemTarget.SchedulingContext);
             }
             catch (Exception exc)
             {
@@ -362,10 +370,6 @@ namespace Orleans.Runtime
             // SystemTarget for provider init calls
             this.fallbackScheduler = Services.GetRequiredService<FallbackSystemTarget>();
             RegisterSystemTarget(fallbackScheduler);
-
-            // SystemTarget for startup tasks
-            var startupTaskTarget = Services.GetRequiredService<StartupTaskSystemTarget>();
-            RegisterSystemTarget(startupTaskTarget);
         }
 
         private Task OnRuntimeInitializeStart(CancellationToken ct)
@@ -411,7 +415,6 @@ namespace Orleans.Runtime
             //TODO: Setup all (or as many as possible) of the class started in this call to work directly with lifecyce
             var stopWatch = Stopwatch.StartNew();
             // The order of these 4 is pretty much arbitrary.
-            StartTaskWithPerfAnalysis("Start Scheduler", scheduler.Start, stopWatch);
             StartTaskWithPerfAnalysis("Start Message center",messageCenter.Start,stopWatch);
             StartTaskWithPerfAnalysis("Start Incoming message agents", IncomingMessageAgentsStart, stopWatch);
             void IncomingMessageAgentsStart()
@@ -655,7 +658,7 @@ namespace Orleans.Runtime
         /// Gracefully stop the run time system only, but not the application. 
         /// Applications requests would be abruptly terminated, while the internal system state gracefully stopped and saved as much as possible.
         /// </summary>
-        public Task StopAsync(CancellationToken cancellationToken)
+        public async Task StopAsync(CancellationToken cancellationToken)
         {
             bool gracefully = !cancellationToken.IsCancellationRequested;
             string operation = gracefully ? "Shutdown()" : "Stop()";
@@ -691,9 +694,14 @@ namespace Orleans.Runtime
                     logger.Info(ErrorCode.WaitingForSiloStop, "Waiting {0} for termination to complete", pause);
                     Thread.Sleep(pause);
                 }
-                return this.siloTerminatedTask.Task;
+
+                await this.siloTerminatedTask.Task;
+                return;
             }
-            return this.siloLifecycle.OnStop(cancellationToken);
+
+            await this.scheduler.QueueTask(() => this.siloLifecycle.OnStop(cancellationToken), this.lifecycleSchedulingSystemTarget.SchedulingContext);
+            SafeExecute(scheduler.Stop);
+            SafeExecute(scheduler.PrintStatistics);
         }
 
         private Task OnRuntimeServicesStop(CancellationToken cancellationToken)
@@ -773,8 +781,6 @@ namespace Orleans.Runtime
             if (platformWatchdog != null) 
                 SafeExecute(platformWatchdog.Stop); // Silo may be dying before platformWatchdog was set up
 
-            SafeExecute(scheduler.Stop);
-            SafeExecute(scheduler.PrintStatistics);
             SafeExecute(activationDirectory.PrintActivationDirectory);
             SafeExecute(messageCenter.Stop);
             SafeExecute(siloStatistics.Stop);
@@ -866,11 +872,11 @@ namespace Orleans.Runtime
         }
     }
 
-    // A dummy system target for scheduling startup tasks.
-    internal class StartupTaskSystemTarget : SystemTarget
+    // A dummy system target for fallback scheduler
+    internal class LifecycleSchedulingSystemTarget : SystemTarget
     {
-        public StartupTaskSystemTarget(ILocalSiloDetails localSiloDetails, ILoggerFactory loggerFactory)
-            : base(Constants.StartupTaskSystemTargetId, localSiloDetails.SiloAddress, loggerFactory)
+        public LifecycleSchedulingSystemTarget(ILocalSiloDetails localSiloDetails, ILoggerFactory loggerFactory)
+            : base(Constants.LifecycleSchedulingSystemTargetId, localSiloDetails.SiloAddress, loggerFactory)
         {
         }
     }

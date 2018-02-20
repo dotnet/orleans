@@ -84,6 +84,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<IStreamSubscriptionHandleFactory, StreamSubscriptionHandlerFactory>();
 
             services.TryAddSingleton<FallbackSystemTarget>();
+            services.TryAddSingleton<LifecycleSchedulingSystemTarget>();
 
             services.AddLogging();
             services.TryAddSingleton<ITimerRegistry, TimerRegistry>();
@@ -260,9 +261,6 @@ namespace Orleans.Hosting
             services.TryConfigureFormatter<EndpointOptions, EndpointOptionsFormatter>();
 
             services.AddTransient<IConfigurationValidator, EndpointOptionsValidator>();
-            
-            services.AddSingleton<StartupTaskSystemTarget>();
-
         }
     }
 }

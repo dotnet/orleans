@@ -84,8 +84,6 @@ namespace Orleans.Hosting
                 services.AddTransient<ILifecycleParticipant<ISiloLifecycle>>(sp =>
                     new StartupTask(
                         sp,
-                        sp.GetRequiredService<OrleansTaskScheduler>(),
-                        sp.GetRequiredService<StartupTaskSystemTarget>(),
                         startupTask,
                         stage)));
             return builder;
@@ -95,22 +93,16 @@ namespace Orleans.Hosting
         private class StartupTask : ILifecycleParticipant<ISiloLifecycle>
         {
             private readonly IServiceProvider serviceProvider;
-            private readonly OrleansTaskScheduler scheduler;
-            private readonly StartupTaskSystemTarget schedulingTarget;
             private readonly Func<IServiceProvider, CancellationToken, Task> startupTask;
 
             private readonly int stage;
 
             public StartupTask(
                 IServiceProvider serviceProvider,
-                OrleansTaskScheduler scheduler,
-                StartupTaskSystemTarget schedulingTarget,
                 Func<IServiceProvider, CancellationToken, Task> startupTask,
                 int stage)
             {
                 this.serviceProvider = serviceProvider;
-                this.scheduler = scheduler;
-                this.schedulingTarget = schedulingTarget;
                 this.startupTask = startupTask;
                 this.stage = stage;
             }
@@ -120,9 +112,7 @@ namespace Orleans.Hosting
             {
                 lifecycle.Subscribe(
                     this.stage,
-                    cancellation => this.scheduler.QueueTask(
-                        () => this.startupTask(this.serviceProvider, cancellation),
-                        this.schedulingTarget.SchedulingContext));
+                    cancellation => this.startupTask(this.serviceProvider, cancellation));
             }
         }
     }
