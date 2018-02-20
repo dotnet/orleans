@@ -22,24 +22,4 @@ namespace Orleans.Configuration
         public int ActivationCountPlacementChooseOutOf { get; set; } = DEFAULT_ACTIVATION_COUNT_PLACEMENT_CHOOSE_OUT_OF;
         public const int DEFAULT_ACTIVATION_COUNT_PLACEMENT_CHOOSE_OUT_OF = 2;
     }
-
-    public class GrainPlacementOptionsFormatter : IOptionFormatter<GrainPlacementOptions>
-    {
-        public string Name => nameof(GrainPlacementOptions);
-
-        private GrainPlacementOptions options;
-        public GrainPlacementOptionsFormatter(IOptions<GrainPlacementOptions> options)
-        {
-            this.options = options.Value;
-        }
-
-        public IEnumerable<string> Format()
-        {
-            return new List<string>()
-            {
-                OptionFormattingUtilities.Format(nameof(this.options.DefaultPlacementStrategy),this.options.DefaultPlacementStrategy),
-                OptionFormattingUtilities.Format(nameof(this.options.ActivationCountPlacementChooseOutOf), this.options.ActivationCountPlacementChooseOutOf),
-            };
-        }
-    }
 }

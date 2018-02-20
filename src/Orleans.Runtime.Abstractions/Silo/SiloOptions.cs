@@ -24,25 +24,4 @@ namespace Orleans.Configuration
         /// </summary>
         public Guid ServiceId { get; set; }
     }
-
-    public class SiloOptionsFormatter : IOptionFormatter<SiloOptions>
-    {
-        public string Name => nameof(SiloOptions);
-
-        private SiloOptions options;
-        public SiloOptionsFormatter(IOptions<SiloOptions> options)
-        {
-            this.options = options.Value;
-        }
-
-        public IEnumerable<string> Format()
-        {
-            return new List<string>()
-            {
-                OptionFormattingUtilities.Format(nameof(this.options.SiloName),this.options.SiloName),
-                OptionFormattingUtilities.Format(nameof(this.options.ClusterId), this.options.ClusterId),
-                OptionFormattingUtilities.Format(nameof(this.options.ServiceId), this.options.ServiceId)
-            };
-        }
-    }
 }

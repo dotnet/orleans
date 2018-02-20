@@ -23,24 +23,4 @@ namespace Orleans.Configuration
         public string DefaultVersionSelectorStrategy { get; set; } = DEFAULT_VERSION_SELECTOR_STRATEGY;
         public const string DEFAULT_VERSION_SELECTOR_STRATEGY = nameof(AllCompatibleVersions);
     }
-
-    public class GrainVersioningOptionsFormatter : IOptionFormatter<GrainVersioningOptions>
-    {
-        public string Name => nameof(GrainVersioningOptions);
-
-        private GrainVersioningOptions options;
-        public GrainVersioningOptionsFormatter(IOptions<GrainVersioningOptions> options)
-        {
-            this.options = options.Value;
-        }
-
-        public IEnumerable<string> Format()
-        {
-            return new List<string>()
-            {
-                OptionFormattingUtilities.Format(nameof(this.options.DefaultCompatibilityStrategy),this.options.DefaultCompatibilityStrategy),
-                OptionFormattingUtilities.Format(nameof(this.options.DefaultVersionSelectorStrategy),this.options.DefaultVersionSelectorStrategy),
-            };
-        }
-    }
 }

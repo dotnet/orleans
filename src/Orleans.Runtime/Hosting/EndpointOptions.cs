@@ -43,30 +43,6 @@ namespace Orleans.Configuration
         public IPEndPoint GatewayListeningEndpoint { get; set; }
     }
 
-    internal class EndpointOptionsFormatter : IOptionFormatter<EndpointOptions>
-    {
-        private readonly EndpointOptions options;
-
-        public EndpointOptionsFormatter(IOptions<EndpointOptions> options)
-        {
-            this.options = options.Value;
-        }
-
-        public string Name => nameof(EndpointOptions);
-
-        public IEnumerable<string> Format()
-        {
-            return new[]
-            {
-                OptionFormattingUtilities.Format(nameof(this.options.AdvertisedIPAddress), this.options.AdvertisedIPAddress),
-                OptionFormattingUtilities.Format(nameof(this.options.SiloListeningEndpoint), this.options.SiloListeningEndpoint),
-                OptionFormattingUtilities.Format(nameof(this.options.SiloPort), this.options.SiloPort),
-                OptionFormattingUtilities.Format(nameof(this.options.GatewayListeningEndpoint), this.options.GatewayListeningEndpoint),
-                OptionFormattingUtilities.Format(nameof(this.options.GatewayPort), this.options.GatewayPort),
-            };
-        }
-    }
-
     public static class EndpointOptionsExtensions
     {
         public static ISiloHostBuilder ConfigureEndpoints(

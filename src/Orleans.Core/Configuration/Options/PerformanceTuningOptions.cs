@@ -26,29 +26,4 @@ namespace Orleans.Configuration
         public int MinDotNetThreadPoolSize { get; set; } = DEFAULT_MIN_DOT_NET_THREAD_POOL_SIZE;
         public const int DEFAULT_MIN_DOT_NET_THREAD_POOL_SIZE = 200;
     }
-
-    /// <summary>
-    /// Options formatter for PerformanceTuningOptions
-    /// </summary>
-    public class PerformanceTuningOptionsFormatter : IOptionFormatter<PerformanceTuningOptions>
-    {
-        public string Name => nameof(PerformanceTuningOptions);
-
-        private PerformanceTuningOptions options;
-        public PerformanceTuningOptionsFormatter(IOptions<PerformanceTuningOptions> options)
-        {
-            this.options = options.Value;
-        }
-
-        public IEnumerable<string> Format()
-        {
-            return new List<string>()
-            {
-                OptionFormattingUtilities.Format(nameof(this.options.DefaultConnectionLimit), this.options.DefaultConnectionLimit),
-                OptionFormattingUtilities.Format(nameof(this.options.Expect100Continue), this.options.Expect100Continue),
-                OptionFormattingUtilities.Format(nameof(this.options.UseNagleAlgorithm), this.options.UseNagleAlgorithm),
-                OptionFormattingUtilities.Format(nameof(this.options.MinDotNetThreadPoolSize),this.options.MinDotNetThreadPoolSize)
-            };
-        }
-    }
 }
