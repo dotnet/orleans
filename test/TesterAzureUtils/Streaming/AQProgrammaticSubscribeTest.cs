@@ -1,5 +1,9 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Tester.StreamingTests;
@@ -20,12 +24,29 @@ namespace Tester.AzureUtils.Streaming
                 {
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-                    legacy.ClusterConfiguration.AddAzureQueueStreamProviderV2(StreamProviderName);
-                    legacy.ClusterConfiguration.AddAzureQueueStreamProviderV2(StreamProviderName2);
                 });
+                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             }
 
-            public override void Dispose()
+            private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder
+                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamProviderName,
+                            options =>
+                            {
+                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            })
+                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamProviderName2,
+                            options =>
+                            {
+                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            });
+                }
+            }
+
+        public override void Dispose()
             {
                 base.Dispose();
                 var clusterId = this.HostedCluster?.Options.ClusterId;

@@ -1,18 +1,18 @@
 
 using System;
 using System.Collections.Generic;
-using System.Globalization;
+using Microsoft.Extensions.Options;
+using Orleans.Providers.Streams.Generator;
 
-namespace Orleans.Providers.Streams.Generator
+namespace Orleans.Hosting
 {
     /// <summary>
     /// Simple generator configuration class.
     /// This class is used to configure a generator stream provider to generate streams using the SimpleGenerator
     /// </summary>
     [Serializable]
-    public class SimpleGeneratorConfig : IStreamGeneratorConfig
+    public class SimpleGeneratorOptions : IStreamGeneratorConfig
     {
-        private const string StreamNamespaceName = "StreamNamespace";
         /// <summary>
         /// Stream namespace
         /// </summary>
@@ -26,37 +26,45 @@ namespace Orleans.Providers.Streams.Generator
         /// <summary>
         /// Nuber of events to generate on this stream
         /// </summary>
-        public int EventsInStream { get; set; }
-        private const string EventsInStreamName = "EventsInStream";
-        private const int EventsInStreamDefault = 100;
+        public int EventsInStream { get; set; } = DEFAULT_EVENTS_IN_STREAM;
+        public const int DEFAULT_EVENTS_IN_STREAM = 100;
+    }
 
-        /// <summary>
-        /// Configuration for simple stream generator
-        /// </summary>
-        public SimpleGeneratorConfig()
+    public class SimpleGeneratorOptionsFormatterResolver : IOptionFormatterResolver<SimpleGeneratorOptions>
+    {
+        private IOptionsSnapshot<SimpleGeneratorOptions> optionsSnapshot;
+
+        public SimpleGeneratorOptionsFormatterResolver(IOptionsSnapshot<SimpleGeneratorOptions> optionsSnapshot)
         {
-            EventsInStream = EventsInStreamDefault;
+            this.optionsSnapshot = optionsSnapshot;
         }
 
-        /// <summary>
-        /// Utility function to convert config to property bag for use in stream provider configuration
-        /// </summary>
-        /// <returns></returns>
-        public void WriteProperties(Dictionary<string, string> properties)
+        public IOptionFormatter<SimpleGeneratorOptions> Resolve(string name)
         {
-            properties.Add(GeneratorAdapterFactory.GeneratorConfigTypeName, GetType().AssemblyQualifiedName);
-            properties.Add(EventsInStreamName, EventsInStream.ToString(CultureInfo.InvariantCulture));
-            properties.Add(StreamNamespaceName, StreamNamespace);
+            return new Formatter(name, optionsSnapshot.Get(name));
         }
 
-        /// <summary>
-        /// Utility function to populate config from provider config
-        /// </summary>
-        /// <param name="providerConfiguration"></param>
-        public void PopulateFromProviderConfig(IProviderConfiguration providerConfiguration)
+        private class Formatter : IOptionFormatter<SimpleGeneratorOptions>
         {
-            EventsInStream = providerConfiguration.GetIntProperty(EventsInStreamName, EventsInStreamDefault);
-            StreamNamespace = providerConfiguration.GetProperty(StreamNamespaceName, null);
+            private SimpleGeneratorOptions options;
+
+            public string Name { get; }
+
+            public Formatter(string name, SimpleGeneratorOptions options)
+            {
+                this.options = options;
+                this.Name = OptionFormattingUtilities.Name<SimpleGeneratorOptions>(name);
+            }
+
+            public IEnumerable<string> Format()
+            {
+                return new List<string> 
+                {
+                    OptionFormattingUtilities.Format(nameof(this.options.StreamNamespace), this.options.StreamNamespace),
+                    OptionFormattingUtilities.Format(nameof(this.options.StreamGeneratorType), this.options.StreamGeneratorType),
+                    OptionFormattingUtilities.Format(nameof(this.options.EventsInStream), this.options.EventsInStream),
+                };
+            }
         }
     }
 }

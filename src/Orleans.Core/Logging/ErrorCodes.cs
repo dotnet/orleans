@@ -392,7 +392,7 @@ namespace Orleans
         LifecycleStopFailure            = SiloBase + 51,
         SiloStartPerfMeasure            = SiloBase + 52,
 
-        CatalogBase                     = Runtime + 500,
+        CatalogBase = Runtime + 500,
         CatalogNonExistingActivation1   = CatalogBase + 1,
         Catalog_UnregisterManyAsync     = CatalogBase + 2,
         Catalog_DestroyActivations       = CatalogBase + 3,
@@ -918,8 +918,6 @@ namespace Orleans
         Provider_CatalogNoLogConsistencyProvider       = ProviderManagerBase + 17,
         Provider_CatalogLogConsistencyProviderAllocated = ProviderManagerBase + 18,
         Provider_ErrorFromClose                  = ProviderManagerBase + 19,
-        Provider_ErrorFromStart                  = ProviderManagerBase + 20,
-        Provider_ErrorFromStop                   = ProviderManagerBase + 21,
 
         PersistentStreamPullingAgentBase = Runtime + 3300,
         PersistentStreamPullingAgent_01 = PersistentStreamPullingAgentBase + 1,

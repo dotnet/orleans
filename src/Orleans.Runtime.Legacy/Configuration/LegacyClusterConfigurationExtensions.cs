@@ -3,7 +3,6 @@ using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -16,9 +15,6 @@ namespace Orleans.Hosting
 {
     public static class LegacyClusterConfigurationExtensions
     {
-        private const int SiloDefaultProviderInitStage = ServiceLifecycleStage.RuntimeStorageServices;
-        private const int SiloDefaultProviderStartStage = ServiceLifecycleStage.ApplicationServices;
-
         /// <summary>
         /// Specifies the configuration to use for this silo.
         /// </summary>
@@ -216,7 +212,7 @@ namespace Orleans.Hosting
                 };
             });
 
-            LegacyProviderConfigurator<ISiloLifecycle>.ConfigureServices(configuration.Globals.ProviderConfigurations, services, SiloDefaultProviderInitStage, SiloDefaultProviderStartStage);
+            LegacyProviderConfigurator<ISiloLifecycle>.ConfigureServices(configuration.Globals.ProviderConfigurations, services);
 
             services.AddOptions<GrainPlacementOptions>().Configure<GlobalConfiguration>((options, config) =>
             {

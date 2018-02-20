@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
@@ -13,10 +13,7 @@ using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.MultiCluster;
-using Orleans.Runtime;
-using Microsoft.Extensions.Logging;
-using Orleans.TestingHost.Utils;
-using Orleans.Storage;
+using Orleans.Configuration;
 
 namespace Tests.GeoClusterTests
 {

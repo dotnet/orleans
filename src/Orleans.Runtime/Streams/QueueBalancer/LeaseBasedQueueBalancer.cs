@@ -1,20 +1,15 @@
-using Orleans.LeaseProviders;
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.Streams;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.Providers;
-using Orleans.Hosting;
 using Microsoft.Extensions.Options;
+using Orleans.LeaseProviders;
+using Orleans.Runtime;
+using Orleans.Hosting;
+using Orleans.Configuration;
 
 namespace Orleans.Streams
 {
@@ -79,63 +74,6 @@ namespace Orleans.Streams
     }
 
     /// <summary>
-    /// Config for LeaseBasedQueueBalancer. User need to add this config to its stream provder's IProviderConfiguration in order to use LeaseBasedQueueBalancer in the stream provider
-    /// </summary>
-    public class LeaseBasedQueueBalancerConfig
-    {
-        /// <summary>
-        /// LeaseProviderType
-        /// </summary>
-        public Type LeaseProviderType { get; set; }
-        /// <summary>
-        /// LeaseProviderTypeName
-        /// </summary>
-        public const string LeaseProviderTypeName = nameof(LeaseProviderType);
-        /// <summary>
-        /// LeaseLength
-        /// </summary>
-        public TimeSpan LeaseLength { get; set; } = TimeSpan.FromSeconds(60);
-        /// <summary>
-        /// LeaseLengthName
-        /// </summary>
-        public const string LeaseLengthName = nameof(LeaseLengthName);
-        /// <summary>
-        /// Constructor
-        /// </summary>
-        public LeaseBasedQueueBalancerConfig()
-        { }
-        /// <summary>
-        /// Constructor
-        /// </summary>
-        /// <param name="providerConfig"></param>
-        public LeaseBasedQueueBalancerConfig(IProviderConfiguration providerConfig)
-        {
-            string leaseLength;
-            if (providerConfig.Properties.TryGetValue(LeaseLengthName, out leaseLength))
-            {
-                this.LeaseLength = ConfigUtilities.ParseTimeSpan(leaseLength,
-                    "Invalid time value for the " + LeaseLengthName + " property in the provider config values.");
-            }
-
-            this.LeaseProviderType = providerConfig.GetTypeProperty(LeaseProviderTypeName, null);
-            if (this.LeaseProviderType == null)
-                throw new ArgumentOutOfRangeException(LeaseProviderTypeName, "LeaseProviderType not set");
-        }
-
-        /// <summary>
-        /// Write properties to IProviderConfiguration's property bag
-        /// </summary>
-        /// <param name="properties"></param>
-        public void WriterProperties(Dictionary<string, string> properties)
-        {
-            properties[LeaseLengthName] = ConfigUtilities.ToParseableTimeSpan(this.LeaseLength);
-            if (this.LeaseProviderType != null)
-                properties[LeaseProviderTypeName] = this.LeaseProviderType.AssemblyQualifiedName;
-            else
-                throw new ArgumentOutOfRangeException(LeaseProviderTypeName, "LeaseProviderType not set");
-        }
-    }
-    /// <summary>
     /// LeaseBasedQueueBalancer. This balancer supports queue balancing in cluster auto-scale scenario, unexpected server failure scenario, and try to support ideal distribution 
     /// as much as possible. 
     /// </summary>
@@ -190,15 +128,18 @@ namespace Orleans.Streams
         }
 
         /// <inheritdoc/>
-        public override Task Initialize(string strProviderName, IStreamQueueMapper queueMapper, TimeSpan siloMaturityPeriod, IProviderConfiguration providerConfig)
+        public override Task Initialize(string strProviderName, IStreamQueueMapper queueMapper, TimeSpan siloMaturityPeriod)
         {
             if (queueMapper == null)
             {
                 throw new ArgumentNullException("queueMapper");
             }
-            var balancerConfig = new LeaseBasedQueueBalancerConfig(providerConfig);
-            this.leaseProvider = this.serviceProvider.GetRequiredService(balancerConfig.LeaseProviderType) as ILeaseProvider;
-            this.leaseLength = balancerConfig.LeaseLength;
+            var options = this.serviceProvider.GetServiceByName<LeaseBasedQueueBalancerOptions>(strProviderName)
+                ?? this.serviceProvider.GetService<LeaseBasedQueueBalancerOptions>();
+            if (options == null)
+                throw new KeyNotFoundException($"No lease base queue balancer options was configured for provider {strProviderName}, nor was a default configured.");
+            this.leaseProvider = this.serviceProvider.GetRequiredService(options.LeaseProviderType) as ILeaseProvider;
+            this.leaseLength = options.LeaseLength;
             this.allQueues = new ReadOnlyCollection<QueueId>(queueMapper.GetAllQueues().ToList());
             this.siloMaturityPeriod = siloMaturityPeriod;
             NotifyAfterStart().Ignore();

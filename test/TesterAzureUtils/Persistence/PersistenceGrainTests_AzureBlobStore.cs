@@ -9,7 +9,7 @@ using Orleans.TestingHost;
 using Orleans.Runtime.Configuration;
 using TestExtensions;
 using Orleans.Hosting;
-using Orleans.Storage;
+using Orleans.Configuration;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
