@@ -1,9 +1,12 @@
 using System;
+using System.Collections.Generic;
 using Xunit;
 using Orleans.Hosting;
 using Orleans.TestingHost;
 using TestExtensions;
 using AWSUtils.Tests.StorageTests;
+using Orleans.Transactions.Tests;
+using Orleans.Storage;
 
 namespace Orleans.Transactions.DynamoDB.Tests
 {
@@ -18,6 +21,13 @@ namespace Orleans.Transactions.DynamoDB.Tests
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+            builder.ConfigureLegacyConfiguration((legacy) =>
+            {
+                legacy.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>(TransactionTestConstants.TransactionStore, new Dictionary<string, string>
+                {
+                    { "DataConnectionString", $"Service={AWSTestConstants.Service}" }
+                });
+            });
         }
 
         private class SiloBuilderConfigurator : ISiloBuilderConfigurator
