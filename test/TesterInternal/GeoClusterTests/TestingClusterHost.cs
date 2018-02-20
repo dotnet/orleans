@@ -312,7 +312,6 @@ namespace Tests.GeoClusterTests
                 configCustomizer?.Invoke(config);
 
                 this.InternalClient = (IInternalClusterClient) new ClientBuilder()
-                    .ConfigureApplicationParts(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory())
                     .UseConfiguration(config)
                     .Build();
                 this.InternalClient.Connect().Wait();

@@ -29,6 +29,7 @@ namespace Orleans
 
             // Configure default services and build the container.
             this.ConfigureDefaults();
+            this.ConfigureApplicationParts(parts => parts.ConfigureDefaults());
 
             var serviceProvider = this.serviceProviderBuilder.BuildServiceProvider(new HostBuilderContext(this.Properties));
             ValidateSystemConfiguration(serviceProvider);

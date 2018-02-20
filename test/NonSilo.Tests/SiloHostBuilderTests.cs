@@ -60,37 +60,12 @@ namespace NonSilo.Tests
     public class SiloHostBuilderTests
     {
         /// <summary>
-        /// Tests that the silo builder will fail if no assemblies are configured.
-        /// </summary>
-        [Fact]
-        public void SiloHostBuilder_AssembliesTest()
-        {
-            var builder = new SiloHostBuilder()
-                .ConfigureEndpoints(IPAddress.Loopback, 9999, 0)
-                .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
-            Assert.Throws<OrleansConfigurationException>(() => builder.Build());
-
-            // Adding an application assembly allows the silo to be correctly built.
-            builder = new SiloHostBuilder()
-                .ConfigureOrleans()
-                .ConfigureEndpoints(IPAddress.Loopback, 9999, 0)
-                .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IAccountGrain).Assembly))
-                .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>())
-                .ConfigureServices(RemoveConfigValidators);
-            using (var silo = builder.Build())
-            {
-                Assert.NotNull(silo);
-            }
-        }
-
-        /// <summary>
         /// Tests that a silo can be created without specifying configuration.
         /// </summary>
         [Fact]
         public void SiloHostBuilder_NoSpecifiedConfigurationTest()
         {
             var builder = new SiloHostBuilder().ConfigureOrleans()
-                .ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory().AddFromAppDomain())
                 .UseConfiguration(new ClusterConfiguration())
                 .ConfigureServices(RemoveConfigValidators)
                 .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
@@ -107,7 +82,6 @@ namespace NonSilo.Tests
         public void SiloHostBuilder_DoubleBuildTest()
         {
             var builder = new SiloHostBuilder().ConfigureOrleans()
-                .ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory().AddFromAppDomain())
                 .UseConfiguration(new ClusterConfiguration())
                 .ConfigureServices(RemoveConfigValidators)
                 .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
@@ -124,7 +98,6 @@ namespace NonSilo.Tests
         public void SiloHostBuilder_DoubleSpecifyConfigurationTest()
         {
             var builder = new SiloHostBuilder().ConfigureOrleans()
-                .ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory().AddFromAppDomain())
                 .ConfigureServices(RemoveConfigValidators)
                 .UseConfiguration(new ClusterConfiguration())
                 .UseConfiguration(new ClusterConfiguration());
@@ -138,7 +111,6 @@ namespace NonSilo.Tests
         public void SiloHostBuilder_NullConfigurationTest()
         {
             var builder = new SiloHostBuilder().ConfigureOrleans()
-                .ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory().AddFromAppDomain())
                 .ConfigureServices(RemoveConfigValidators);
             Assert.Throws<ArgumentNullException>(() => builder.UseConfiguration(null));
         }
@@ -150,7 +122,6 @@ namespace NonSilo.Tests
         public void SiloHostBuilder_ServiceProviderTest()
         {
             var builder = new SiloHostBuilder().ConfigureOrleans()
-                .ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory().AddFromAppDomain())
                 .UseConfiguration(new ClusterConfiguration())
                 .ConfigureServices(RemoveConfigValidators)
                 .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());

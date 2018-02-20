@@ -27,10 +27,6 @@ namespace NetCore.Tests
             this.silo.StartAsync().GetAwaiter().GetResult();
 
             this.client = new ClientBuilder()
-                .ConfigureApplicationParts(
-                    parts => parts
-                        .AddFromApplicationBaseDirectory()
-                        .AddFromAppDomain())
                 .ConfigureApplicationParts(parts =>
                     parts.AddApplicationPart(typeof(IExceptionGrain).Assembly).WithReferences())
                 .UseConfiguration(ClientConfiguration.LocalhostSilo())

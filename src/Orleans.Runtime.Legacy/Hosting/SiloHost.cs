@@ -103,10 +103,7 @@ namespace Orleans.Runtime.Host
                 if (!this.ConfigLoaded) LoadOrleansConfig();
                 var builder = new SiloHostBuilder()
                     .ConfigureSiloName(this.Name)
-                    .UseConfiguration(this.Config)
-                    .ConfigureApplicationParts(parts => parts
-                        .AddFromAppDomain()
-                        .AddFromApplicationBaseDirectory());
+                    .UseConfiguration(this.Config);
 
                 if (!string.IsNullOrWhiteSpace(this.Config.Defaults.StartupTypeName))
                 {
