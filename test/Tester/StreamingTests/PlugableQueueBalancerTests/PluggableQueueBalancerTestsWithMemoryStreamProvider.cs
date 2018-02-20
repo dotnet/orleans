@@ -41,6 +41,7 @@ namespace Tester.StreamingTests.PlugableQueueBalancerTests
                         .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, options =>
                         {
                             options.TotalQueueCount = totalQueueCount;
+                            options.BalancerType = typeof(LeaseBasedQueueBalancerForTest);
                         });
                 }
             }

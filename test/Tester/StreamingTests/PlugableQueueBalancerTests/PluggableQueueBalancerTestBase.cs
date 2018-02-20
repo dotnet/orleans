@@ -13,12 +13,6 @@ namespace Tester.StreamingTests
     {
         private static Type QueueBalancerType = typeof(LeaseBasedQueueBalancerForTest);
 
-        public static PersistentStreamOptions ConfigWithCustomBalancerType(PersistentStreamOptions options)
-        {
-            options.BalancerType = QueueBalancerType;
-            return options;
-        }
-
         public virtual async Task ShouldUseInjectedQueueBalancerAndBalanceCorrectly(BaseTestClusterFixture fixture, string streamProviderName, int siloCount, int totalQueueCount)
         {
             var leaseManager = fixture.GrainFactory.GetGrain<ILeaseManagerGrain>(streamProviderName);
