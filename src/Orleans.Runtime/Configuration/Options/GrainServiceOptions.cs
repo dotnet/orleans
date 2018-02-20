@@ -14,19 +14,4 @@ namespace Orleans.Configuration
         /// </summary>
         public List<KeyValuePair<string, short>> GrainServices { get; set; } = new List<KeyValuePair<string, short>>();
     }
-
-    public class GrainServiceOptionsFormatter : IOptionFormatter<GrainServiceOptions>
-    {
-        public string Name => nameof(GrainServiceOptions);
-        private GrainServiceOptions options;
-        public GrainServiceOptionsFormatter(IOptions<GrainServiceOptions> options)
-        {
-            this.options = options.Value;
-        }
-
-        public IEnumerable<string> Format()
-        {
-            return this.options.GrainServices.Select(kvp => OptionFormattingUtilities.Format($"{nameof(this.options.GrainServices)}.{kvp.Key}", kvp.Value)).ToList();
-        }
-    }
 }

@@ -71,7 +71,7 @@ namespace Orleans.Messaging
                 });
 
             services.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>()
-                .TryConfigureFormatter<StaticGatewayListProviderOptions, StaticGatewayListProviderOptionsFormatter>();
+                .TryConfigureFormatter<StaticGatewayListProviderOptions>();
         }
     }
 }

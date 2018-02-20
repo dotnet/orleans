@@ -247,20 +247,20 @@ namespace Orleans.Hosting
             services.TryConfigureFormatter<ProcessExitHandlingOptions>();
             services.TryConfigureFormatter<SchedulingOptions>();
             services.TryConfigureFormatter<PerformanceTuningOptions>();
-            services.TryConfigureFormatter<SerializationProviderOptions, SerializationProviderOptionsFormatter>();
+            services.TryConfigureFormatter<SerializationProviderOptions>();
             services.TryConfigureFormatter<NetworkingOptions>();
             services.TryConfigureFormatter<SiloMessagingOptions>();
             services.TryConfigureFormatter<TypeManagementOptions>();
             services.TryConfigureFormatter<MembershipOptions>();
             services.TryConfigureFormatter<GrainDirectoryOptions>();
             services.TryConfigureFormatter<GrainPlacementOptions>();
-            services.TryConfigureFormatter<GrainCollectionOptions, GrainCollectionOptionsFormatter>();
+            services.TryConfigureFormatter<GrainCollectionOptions>();
             services.TryConfigureFormatter<GrainVersioningOptions>();
             services.TryConfigureFormatter<ConsistentRingOptions>();
-            services.TryConfigureFormatter<MultiClusterOptions, MultiClusterOptionsFormatter>();
+            services.TryConfigureFormatter<MultiClusterOptions>();
             services.TryConfigureFormatter<SiloStatisticsOptions>();
-            services.TryConfigureFormatter<GrainServiceOptions, GrainServiceOptionsFormatter>();
-            services.TryConfigureFormatter<TelemetryOptions, TelemetryOptionsFormatter>();
+            services.TryConfigureFormatter<GrainServiceOptions>();
+            services.TryConfigureFormatter<TelemetryOptions>();
             services.TryConfigureFormatter<LoadSheddingOptions>();
             services.TryConfigureFormatter<EndpointOptions>();
 
