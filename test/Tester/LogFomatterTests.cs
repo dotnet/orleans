@@ -99,6 +99,42 @@ namespace Tester
         }
 
         [Fact]
+        public void GenericFormatterWithListAndDictionary()
+        {
+            // actual output
+            var services = new ServiceCollection();
+            services.AddOptions();
+            services.AddSingleton<TestLoggerFactory>();
+            services.AddSingleton<ILoggerFactory>(sp => sp.GetRequiredService<TestLoggerFactory>());
+            services.AddSingleton(typeof(ILogger<>), typeof(TestLogger<>));
+            services.AddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
+            services.AddSingleton<OptionsLogger, TestOptionsLogger>();
+            services.Configure<TestOptionsWithListAndDictionary>(options => {
+                options.SomeDictionary.Add("Account1", "Key1");
+                options.SomeDictionary.Add("Account2", "Key2");
+                options.SomeDictionary.Add("Account3", "Key3");
+                options.SomeList.Add(10);
+                options.SomeList.Add(11);
+            });
+            services.ConfigureFormatter<TestOptionsWithListAndDictionary>();
+            var servicesProvider = services.BuildServiceProvider();
+            servicesProvider.GetRequiredService<OptionsLogger>().LogOptions();
+
+            var logFormatters = servicesProvider.GetServices<IOptionFormatter>();
+            Assert.Single(logFormatters);
+            Assert.True(logFormatters.First() is IOptionFormatter<TestOptionsWithListAndDictionary>);
+            // ensure logging output is as expected
+            var actual = servicesProvider.GetRequiredService<TestLoggerFactory>();
+            var txt = actual.ToString();
+            Assert.Contains("SomeList: 10, 11", actual.ToString());
+            Assert.Contains("dict.Account1: Key1", actual.ToString());
+            Assert.Contains("dict.Account2: Key2", actual.ToString());
+            Assert.Contains("dict.Account3: Key3", actual.ToString());
+            Assert.Contains("NullList:", actual.ToString());
+            Assert.Contains("NullDictionary:", actual.ToString());
+        }
+
+        [Fact]
         public void FormatterConfiguredTwiceDoesNotLeadToDuplicatedFormatter()
         {
             // expected output
@@ -389,6 +425,17 @@ namespace Tester
         private class TestOptions
         {
             public int IntField { get; set; } = 0;
+        }
+
+        private class TestOptionsWithListAndDictionary
+        {
+            public List<int> SomeList { get; set; } = new List<int>();
+
+            public Dictionary<string, string> SomeDictionary { get; set; } = new Dictionary<string, string>();
+
+            public List<int> NullList { get; set; } = null;
+
+            public Dictionary<string, string> NullDictionary { get; set; } = null;
         }
 
         private class TestOptionsFormatter2 : IOptionFormatter<TestOptions>
