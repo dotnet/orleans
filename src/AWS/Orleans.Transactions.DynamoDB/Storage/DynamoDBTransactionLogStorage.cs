@@ -20,7 +20,6 @@ namespace Orleans.Transactions.DynamoDB
         private const string RowKey = "RowKey";
         private const string PartitionKey = "PartitionKey";
         private const string AllocatedTransactionIdsKey = "AllocatedTransactionIds";
-        private const string FirstLSNKey = "FirstLSN";
         private const string TransactionsKey = "Transactions";
         private const string RowKeyAlias = ":RowKey";
         private const string PartitionKeyAlias = ":PartitionKey";
@@ -162,7 +161,7 @@ namespace Orleans.Transactions.DynamoDB
             if (currentQueryResultIndex == currentQueryResult.Count)
             {
                 // No more rows in our current segment, retrieve the next segment from the Table.
-                if (currentLastEvaluatedKey == null)
+                if (currentLastEvaluatedKey == null || currentLastEvaluatedKey.Count == 0)
                 {
                     currentQueryResult = null;
                     return null;
@@ -366,7 +365,7 @@ namespace Orleans.Transactions.DynamoDB
 
         private static Func<Dictionary<string, AttributeValue>, CommitRow> CommitRowResolver => (fields) =>
         {
-            var commitRow = new CommitRow(AttributeToLong(fields[FirstLSNKey]));
+            var commitRow = new CommitRow(AttributeToLong(fields[RowKey]));
             var stream = fields[TransactionsKey].B;
             if (stream.TryGetBuffer(out ArraySegment<byte> buffer))
             {
