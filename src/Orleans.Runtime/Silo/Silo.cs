@@ -699,9 +699,14 @@ namespace Orleans.Runtime
                 return;
             }
 
-            await this.scheduler.QueueTask(() => this.siloLifecycle.OnStop(cancellationToken), this.lifecycleSchedulingSystemTarget.SchedulingContext);
-            SafeExecute(scheduler.Stop);
-            SafeExecute(scheduler.PrintStatistics);
+            try
+            {
+                await this.scheduler.QueueTask(() => this.siloLifecycle.OnStop(cancellationToken), this.lifecycleSchedulingSystemTarget.SchedulingContext);
+            } finally
+            {
+                SafeExecute(scheduler.Stop);
+                SafeExecute(scheduler.PrintStatistics);
+            }
         }
 
         private Task OnRuntimeServicesStop(CancellationToken cancellationToken)
@@ -856,10 +861,9 @@ namespace Orleans.Runtime
 
         private void Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
-            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeServices, OnRuntimeServicesStart, OnRuntimeServicesStop);
-            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeGrainServices, OnRuntimeGrainServicesStart, OnRuntimeGrainServicesStop);
-            
+            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeInitialize, (ct) => Task.Run(() => OnRuntimeInitializeStart(ct)), (ct) => Task.Run(() => OnRuntimeInitializeStop(ct)));
+            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeServices, (ct) => Task.Run(() => OnRuntimeServicesStart(ct)), (ct) => Task.Run(() => OnRuntimeServicesStop(ct)));
+            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeGrainServices, (ct) => Task.Run(() => OnRuntimeGrainServicesStart(ct)), (ct) => Task.Run(() => OnRuntimeGrainServicesStop(ct)));
         }
     }
 
