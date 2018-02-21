@@ -104,7 +104,7 @@ namespace Orleans
                     }
 
                     collection.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>()
-                        .TryConfigureFormatter<StaticGatewayListProviderOptions>();
+                        .ConfigureFormatter<StaticGatewayListProviderOptions>();
                 });
         }
 
@@ -118,7 +118,7 @@ namespace Orleans
                 {
                     configureOptions?.Invoke(collection.AddOptions<StaticGatewayListProviderOptions>());
                     collection.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>()
-                        .TryConfigureFormatter<StaticGatewayListProviderOptions>();
+                        .ConfigureFormatter<StaticGatewayListProviderOptions>();
                 });
         }
 

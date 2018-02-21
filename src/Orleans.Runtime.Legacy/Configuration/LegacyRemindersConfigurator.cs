@@ -48,7 +48,7 @@ namespace Orleans.Runtime.MembershipService
                         services.AddSingleton<IReminderTable, MockReminderTable>();
                         services.AddOptions<MockReminderTableOptions>()
                             .Configure<GlobalConfiguration>((options, config) => { options.OperationDelay = config.MockReminderTableTimeout; });
-                        services.TryConfigureFormatter<MockReminderTableOptions>();
+                        services.ConfigureFormatter<MockReminderTableOptions>();
                         break;
                     }
 

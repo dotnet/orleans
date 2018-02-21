@@ -70,10 +70,10 @@ namespace Orleans
             services.TryAddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
 
             // Add default option formatter if none is configured, for options which are requied to be configured 
-            services.TryConfigureFormatter<ClusterClientOptions>();
-            services.TryConfigureFormatter<ClientMessagingOptions>();
-            services.TryConfigureFormatter<NetworkingOptions>();
-            services.TryConfigureFormatter<ClientStatisticsOptions>();
+            services.ConfigureFormatter<ClusterClientOptions>();
+            services.ConfigureFormatter<ClientMessagingOptions>();
+            services.ConfigureFormatter<NetworkingOptions>();
+            services.ConfigureFormatter<ClientStatisticsOptions>();
             
             services.AddTransient<IConfigurationValidator, ClientClusteringValidator>();
         }

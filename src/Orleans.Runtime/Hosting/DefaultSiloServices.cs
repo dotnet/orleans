@@ -243,26 +243,26 @@ namespace Orleans.Hosting
             services.AddTransient<IConfigurationValidator, ApplicationPartValidator>();
 
             //Add default option formatter if none is configured, for options which are required to be configured 
-            services.TryConfigureFormatter<SiloOptions>();
-            services.TryConfigureFormatter<ProcessExitHandlingOptions>();
-            services.TryConfigureFormatter<SchedulingOptions>();
-            services.TryConfigureFormatter<PerformanceTuningOptions>();
-            services.TryConfigureFormatter<SerializationProviderOptions>();
-            services.TryConfigureFormatter<NetworkingOptions>();
-            services.TryConfigureFormatter<SiloMessagingOptions>();
-            services.TryConfigureFormatter<TypeManagementOptions>();
-            services.TryConfigureFormatter<MembershipOptions>();
-            services.TryConfigureFormatter<GrainDirectoryOptions>();
-            services.TryConfigureFormatter<GrainPlacementOptions>();
-            services.TryConfigureFormatter<GrainCollectionOptions>();
-            services.TryConfigureFormatter<GrainVersioningOptions>();
-            services.TryConfigureFormatter<ConsistentRingOptions>();
-            services.TryConfigureFormatter<MultiClusterOptions>();
-            services.TryConfigureFormatter<SiloStatisticsOptions>();
-            services.TryConfigureFormatter<GrainServiceOptions>();
-            services.TryConfigureFormatter<TelemetryOptions>();
-            services.TryConfigureFormatter<LoadSheddingOptions>();
-            services.TryConfigureFormatter<EndpointOptions>();
+            services.ConfigureFormatter<SiloOptions>();
+            services.ConfigureFormatter<ProcessExitHandlingOptions>();
+            services.ConfigureFormatter<SchedulingOptions>();
+            services.ConfigureFormatter<PerformanceTuningOptions>();
+            services.ConfigureFormatter<SerializationProviderOptions>();
+            services.ConfigureFormatter<NetworkingOptions>();
+            services.ConfigureFormatter<SiloMessagingOptions>();
+            services.ConfigureFormatter<TypeManagementOptions>();
+            services.ConfigureFormatter<MembershipOptions>();
+            services.ConfigureFormatter<GrainDirectoryOptions>();
+            services.ConfigureFormatter<GrainPlacementOptions>();
+            services.ConfigureFormatter<GrainCollectionOptions>();
+            services.ConfigureFormatter<GrainVersioningOptions>();
+            services.ConfigureFormatter<ConsistentRingOptions>();
+            services.ConfigureFormatter<MultiClusterOptions>();
+            services.ConfigureFormatter<SiloStatisticsOptions>();
+            services.ConfigureFormatter<GrainServiceOptions>();
+            services.ConfigureFormatter<TelemetryOptions>();
+            services.ConfigureFormatter<LoadSheddingOptions>();
+            services.ConfigureFormatter<EndpointOptions>();
 
             services.AddTransient<IConfigurationValidator, EndpointOptionsValidator>();
         }

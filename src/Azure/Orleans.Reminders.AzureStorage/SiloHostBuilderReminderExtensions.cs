@@ -63,7 +63,7 @@ namespace Orleans.Hosting
         {
             services.AddSingleton<IReminderTable, AzureBasedReminderTable>();
             services.Configure(configure);
-            services.TryConfigureFormatter<AzureTableReminderStorageOptions>();
+            services.ConfigureFormatter<AzureTableReminderStorageOptions>();
             return services;
         }
 
