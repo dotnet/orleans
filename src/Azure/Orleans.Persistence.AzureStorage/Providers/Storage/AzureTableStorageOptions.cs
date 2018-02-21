@@ -22,6 +22,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// Azure table connection string
         /// </summary>
+        [RedactConnectionString]
         public string ConnectionString { get; set; }
 
         /// <summary>

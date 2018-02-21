@@ -18,6 +18,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// Connection string for AdoNet storage.
         /// </summary>
+        [Redact]
         public string ConnectionString { get; set; }
 
         /// <summary>

@@ -5,6 +5,7 @@
         /// <summary>
         /// Connection string for Sql
         /// </summary>
+        [Redact]
         public string ConnectionString { get; set; }
 
         /// <summary>

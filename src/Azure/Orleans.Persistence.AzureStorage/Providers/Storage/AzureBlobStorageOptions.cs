@@ -14,6 +14,7 @@ namespace Orleans.Hosting
         /// <summary>
         /// Azure connection string
         /// </summary>
+        [RedactConnectionString]
         public string ConnectionString { get; set; }
 
         /// <summary>
