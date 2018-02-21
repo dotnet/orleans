@@ -58,7 +58,7 @@ namespace Orleans
                     var dict = (IDictionary)value;
                     foreach (DictionaryEntry kvp in dict)
                     {
-                        result.Add(OptionFormattingUtilities.Format($"{nameof(name)}.{kvp.Key}", kvp.Value));
+                        result.Add(OptionFormattingUtilities.Format($"{name}.{kvp.Key}", kvp.Value));
                     }
                 }
                 // If it is a simple collection -> one line per item
@@ -70,7 +70,7 @@ namespace Orleans
                         var index = 0;
                         foreach (var item in coll)
                         {
-                            result.Add(OptionFormattingUtilities.Format($"{nameof(name)}.{index}", item));
+                            result.Add(OptionFormattingUtilities.Format($"{name}.{index}", item));
                             index++;
                         }
                     }

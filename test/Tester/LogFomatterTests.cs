@@ -126,10 +126,11 @@ namespace Tester
             // ensure logging output is as expected
             var actual = servicesProvider.GetRequiredService<TestLoggerFactory>();
             var txt = actual.ToString();
-            Assert.Contains("SomeList: 10, 11", actual.ToString());
-            Assert.Contains("dict.Account1: Key1", actual.ToString());
-            Assert.Contains("dict.Account2: Key2", actual.ToString());
-            Assert.Contains("dict.Account3: Key3", actual.ToString());
+            Assert.Contains("SomeList.0: 10", actual.ToString());
+            Assert.Contains("SomeList.1: 11", actual.ToString());
+            Assert.Contains("SomeDictionary.Account1: Key1", actual.ToString());
+            Assert.Contains("SomeDictionary.Account2: Key2", actual.ToString());
+            Assert.Contains("SomeDictionary.Account3: Key3", actual.ToString());
             Assert.Contains("NullList:", actual.ToString());
             Assert.Contains("NullDictionary:", actual.ToString());
         }
