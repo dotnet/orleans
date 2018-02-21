@@ -14,6 +14,7 @@ using UnitTests.GrainInterfaces;
 using Xunit;
 using Xunit.Abstractions;
 using static Orleans.Storage.DynamoDBGrainStorage;
+using Orleans.Hosting;
 
 namespace AWSUtils.Tests.StorageTests
 {
@@ -44,8 +45,6 @@ namespace AWSUtils.Tests.StorageTests
                         legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.ErrorInjectionStorageProvider>("ErrorInjector");
                         legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("lowercase");
 
-                        legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-
                         // FIXME: How to configure the TestClusterBuilder to use the new extensions?
                         //legacy.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBGrainStorage>("DDBStore",
                         //    new Dictionary<string, string> {{"DeleteStateOnClear", "true"}, {"DataConnectionString", dataConnectionString}});
@@ -56,6 +55,15 @@ namespace AWSUtils.Tests.StorageTests
                         //legacy.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBGrainStorage>("DDBStore3",
                         //    new Dictionary<string, string> {{"DataConnectionString", dataConnectionString}});
                     });
+                    builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+                }
+            }
+
+            public class SiloBuilderConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder.AddMemoryGrainStorage("MemoryStore");
                 }
             }
         }

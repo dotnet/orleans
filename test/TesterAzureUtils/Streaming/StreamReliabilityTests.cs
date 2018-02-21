@@ -50,10 +50,6 @@ namespace UnitTests.Streaming.Reliability
             this.numExpectedSilos = 2;
             builder.Options.InitialSilosCount = (short) this.numExpectedSilos;
             builder.Options.UseTestClusterMembership = false;
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
-            });
 
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
             builder.AddClientBuilderConfigurator<ClientBuilderConfigurator>();
@@ -91,6 +87,7 @@ namespace UnitTests.Streaming.Reliability
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         options.DeleteStateOnClear = true;
                     }))
+                .AddMemoryGrainStorage("MemoryStore", options => options.NumStorageGrains = 1)
                 .AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME)
                 .AddAzureTableGrainStorage("PubSubStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                 {

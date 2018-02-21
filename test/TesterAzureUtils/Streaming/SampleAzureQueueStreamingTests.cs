@@ -27,10 +27,6 @@ namespace Tester.AzureUtils.Streaming
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             TestUtils.CheckForAzureStorage();
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-            });
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
         }
 
@@ -43,7 +39,8 @@ namespace Tester.AzureUtils.Streaming
                         options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        });
+                        })
+                    .AddMemoryGrainStorage("PubSubStore");
             }
         }
 

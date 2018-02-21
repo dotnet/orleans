@@ -40,12 +40,6 @@ namespace ServiceBus.Tests.StreamingTests
             {
                 // poor fault injection requires grain instances stay on same host, so only single host for this test
                 builder.Options.InitialSilosCount = 1;
-
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    // register stream provider
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
-                });
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
                 builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
             }
@@ -75,7 +69,8 @@ namespace ServiceBus.Tests.StreamingTests
                             options.CheckpointTableName = EHCheckpointTable;
                             options.CheckpointNamespace = CheckpointNamespace;
                             options.CheckpointPersistInterval = TimeSpan.FromSeconds(1);
-                        });
+                        })
+                        .AddMemoryGrainStorageAsDefault();
                 }
             }
 

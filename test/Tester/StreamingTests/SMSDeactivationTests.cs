@@ -30,8 +30,6 @@ namespace UnitTests.StreamingTests
                 legacy.ClusterConfiguration.Globals.Application.SetDefaultCollectionAgeLimit(TimeSpan.FromMinutes(1));
                 legacy.ClusterConfiguration.Globals.Application.SetCollectionAgeLimit(typeof(MultipleSubscriptionConsumerGrain), TimeSpan.FromHours(2));
                 legacy.ClusterConfiguration.Globals.ResponseTimeout = TimeSpan.FromMinutes(30);
-
-                legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
             });
             builder.AddClientBuilderConfigurator<ClientConfiguretor>();
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
@@ -41,7 +39,8 @@ namespace UnitTests.StreamingTests
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
-                hostBuilder.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
+                hostBuilder.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME)
+                     .AddMemoryGrainStorage("PubSubStore");
             }
         }
         public class ClientConfiguretor : IClientBuilderConfigurator

@@ -35,10 +35,6 @@ namespace Tester.AzureUtils.Lease
             TestUtils.CheckForAzureStorage();
             builder.Options.InitialSilosCount = siloCount;
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                AdjustClusterConfiguration(legacy.ClusterConfiguration);
-            });
         }
 
         public class SiloBuilderConfigurator : ISiloBuilderConfigurator
@@ -67,13 +63,9 @@ namespace Tester.AzureUtils.Lease
                      {
                          options.TotalQueueCount = totalQueueCount;
                          options.BalancerType = StreamQueueBalancerType.ClusterConfigDeploymentLeaseBasedBalancer;
-                     });
+                     })
+                    .AddMemoryGrainStorage("PubSubStore");
             }
-        }
-
-        private static void AdjustClusterConfiguration(ClusterConfiguration config)
-        {
-            config.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
         }
 
         [SkippableFact]

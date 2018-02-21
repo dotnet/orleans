@@ -34,14 +34,9 @@ namespace ServiceBus.Tests.MonitorTests
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.Options.InitialSilosCount = 1;
-                builder.ConfigureLegacyConfiguration(legacy => AdjustClusterConfiguration(legacy.ClusterConfiguration));
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             }
 
-            private static void AdjustClusterConfiguration(ClusterConfiguration config)
-            {
-                config.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
-            }
 
             private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
             {
@@ -56,7 +51,8 @@ namespace ServiceBus.Tests.MonitorTests
                         .ConfigureServices(services =>
                         {
                             services.AddTransientNamedService<Func<IStreamIdentity, IStreamDataGenerator<EventData>>>(StreamProviderName, (s, n) => SimpleStreamEventDataGenerator.CreateFactory(s));
-                        });
+                        })
+                        .AddMemoryGrainStorage("PubSubStore");
                 }
             }
 

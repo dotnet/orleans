@@ -3,6 +3,8 @@ using System.Threading.Tasks;
 using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Configuration;
+using Orleans.Hosting;
+using Orleans.Providers.Streams;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using UnitTests.StreamingTests;
@@ -11,7 +13,6 @@ using Orleans.Runtime.Configuration;
 using TestExtensions;
 using UnitTests.Streaming;
 using OrleansAWSUtils.Streams;
-using Orleans.Hosting;
 using Orleans;
 
 namespace AWSUtils.Tests.Streaming
@@ -32,9 +33,6 @@ namespace AWSUtils.Tests.Streaming
 
             builder.ConfigureLegacyConfiguration(options =>
             {
-                //from the config files
-                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
-
                 //previous silo creation
                 options.ClusterConfiguration.Globals.DataConnectionString = AWSTestConstants.DefaultSQSConnectionString;
                 options.ClientConfiguration.DataConnectionString = AWSTestConstants.DefaultSQSConnectionString;
@@ -76,7 +74,8 @@ namespace AWSUtils.Tests.Streaming
                         options.Service = AWSTestConstants.Service;
                         options.SecretKey = AWSTestConstants.SecretKey;
                         options.AccessKey = AWSTestConstants.AccessKey;
-                    });
+                    })
+                    .AddMemoryGrainStorage("MemoryStore", op=>op.NumStorageGrains = 1);
             }
         }
 

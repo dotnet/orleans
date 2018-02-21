@@ -45,7 +45,6 @@ namespace AWSUtils.Tests.Streaming
             var clusterId = Guid.NewGuid().ToString();
             builder.ConfigureLegacyConfiguration(legacy =>
             {
-                legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
 
                 legacy.ClusterConfiguration.Globals.ClusterId = clusterId;
                 legacy.ClientConfiguration.ClusterId = clusterId;
@@ -65,7 +64,8 @@ namespace AWSUtils.Tests.Streaming
                     .AddSqsStreams(SQSStreamProviderName, options => 
                     {
                         options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
-                    });
+                    })
+                    .AddMemoryGrainStorage("PubSubStore");
             }
         }
 

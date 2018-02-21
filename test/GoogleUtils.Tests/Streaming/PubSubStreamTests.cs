@@ -27,13 +27,6 @@ namespace GoogleUtils.Tests.Streaming
                 throw new SkipException("Google PubSub Simulator not available");
             }
 
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                //from the config files
-                legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
-
-                legacy.ClusterConfiguration.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
-            });
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
         }
@@ -50,7 +43,9 @@ namespace GoogleUtils.Tests.Streaming
                         options.TopicId = GoogleTestUtils.TopicId;
                         options.ClusterId = GoogleTestUtils.DeploymentId.ToString();
                         options.Deadline = TimeSpan.FromSeconds(600);
-                    });
+                    })
+                    .AddMemoryGrainStorage("MemoryStore", op => op.NumStorageGrains = 1)
+                    .AddMemoryGrainStorage("PubSubStorage");
             }
         }
 

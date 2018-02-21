@@ -7,12 +7,15 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Storage.Internal;
 
 namespace Orleans.Storage
 {
+
     /// <summary>
     /// This is a simple in-memory grain implementation of a storage provider.
     /// </summary>
@@ -33,67 +36,47 @@ namespace Orleans.Storage
     /// </code>
     /// </example>
     [DebuggerDisplay("MemoryStore:{Name}")]
-    public class MemoryStorage : IStorageProvider
+    public class MemoryGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
     {
-        /// <summary>
-        /// Default number of queue storage grains.
-        /// </summary>
-        public const int NumStorageGrainsDefaultValue = 10;
-        /// <summary>
-        /// Config string name for number of queue storage grains.
-        /// </summary>
-        public const string NumStorageGrainsPropertyName = "NumStorageGrains";
-        private int numStorageGrains;
+        private MemoryGrainStorageOptions options;
         private const string STATE_STORE_NAME = "MemoryStorage";
         private Lazy<IMemoryStorageGrain>[] storageGrains;
         private ILogger logger;
+        private IGrainFactory grainFactory;
+
         /// <summary> Name of this storage provider instance. </summary>
-        /// <see cref="IProvider.Name"/>
-        public string Name { get; private set; }
+        private readonly string name;
 
         /// <summary> Default constructor. </summary>
-        public MemoryStorage()
-            : this(NumStorageGrainsDefaultValue)
+        public MemoryGrainStorage(string name, MemoryGrainStorageOptions options, ILoggerFactory loggerFactory, IGrainFactory grainFactory)
         {
+            this.options = options;
+            this.name = name;
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().FullName}.{name}");
+            this.grainFactory = grainFactory;
         }
 
-        /// <summary> Constructor - use the specificed number of store grains. </summary>
-        /// <param name="numStoreGrains">Number of store grains to use.</param>
-        protected MemoryStorage(int numStoreGrains)
-        {
-            numStorageGrains = numStoreGrains;
-        }
 
         #region IStorageProvider methods
 
         /// <summary> Initialization function for this storage provider. </summary>
-        /// <see cref="IProvider.Init"/>
-        public virtual Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
+        protected virtual Task Init(CancellationToken tk)
         {
-            Name = name;
-            var loggerName = $"{this.GetType().FullName}.{Name}";
-            var loggerFactory = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>();
-            this.logger = loggerFactory.CreateLogger(loggerName);
+            logger.Info("Init: Name={0} NumStorageGrains={1}", name, this.options.NumStorageGrains);
 
-            string numStorageGrainsStr;
-            if (config.Properties.TryGetValue(NumStorageGrainsPropertyName, out numStorageGrainsStr))
-                numStorageGrains = Int32.Parse(numStorageGrainsStr);
-            
-            logger.Info("Init: Name={0} NumStorageGrains={1}", Name, numStorageGrains);
-
-            storageGrains = new Lazy<IMemoryStorageGrain>[numStorageGrains];
-            for (int i = 0; i < numStorageGrains; i++)
+            storageGrains = new Lazy<IMemoryStorageGrain>[this.options.NumStorageGrains];
+            for (int i = 0; i < this.options.NumStorageGrains; i++)
             {
                 int idx = i; // Capture variable to avoid modified closure error
-                storageGrains[idx] = new Lazy<IMemoryStorageGrain>(() => providerRuntime.GrainFactory.GetGrain<IMemoryStorageGrain>(idx));
+                storageGrains[idx] = new Lazy<IMemoryStorageGrain>(() => this.grainFactory.GetGrain<IMemoryStorageGrain>(idx));
             }
             return Task.CompletedTask;
         }
 
         /// <summary> Shutdown function for this storage provider. </summary>
-        public virtual Task Close()
+        protected virtual Task Close(CancellationToken tk)
         {
-            for (int i = 0; i < numStorageGrains; i++)
+            for (int i = 0; i < this.options.NumStorageGrains; i++)
                 storageGrains[i] = null;
             
             return Task.CompletedTask;
@@ -167,7 +150,7 @@ namespace Orleans.Storage
 
         private IMemoryStorageGrain GetStorageGrain(string id)
         {
-            int idx = StorageProviderUtils.PositiveHash(id.GetHashCode(), numStorageGrains);
+            int idx = StorageProviderUtils.PositiveHash(id.GetHashCode(), this.options.NumStorageGrains);
             IMemoryStorageGrain storageGrain = storageGrains[idx].Value;
             return storageGrain;
         }
@@ -227,6 +210,23 @@ namespace Orleans.Storage
                 };
             }
             return compareClause;
+        }
+
+        public void Participate(ISiloLifecycle lifecycle)
+        {
+            lifecycle.Subscribe(this.options.InitStage, this.Init, this.Close);
+        }
+    }
+
+    /// <summary>
+    /// Factory for creating MemoryGrainStorage
+    /// </summary>
+    public class MemoryGrainStorageFactory
+    {
+        public static IGrainStorage Create(IServiceProvider services, string name)
+        {
+            return ActivatorUtilities.CreateInstance<MemoryGrainStorage>(services,
+                services.GetRequiredService<IOptionsSnapshot<MemoryGrainStorageOptions>>().Get(name), name);
         }
     }
 }

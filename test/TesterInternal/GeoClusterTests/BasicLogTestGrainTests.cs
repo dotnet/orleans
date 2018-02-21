@@ -27,8 +27,6 @@ namespace Tests.GeoClusterTests
 
                 builder.ConfigureLegacyConfiguration(legacy =>
                 {
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
                     legacy.ClusterConfiguration.AddStateStorageBasedLogConsistencyProvider();
                     legacy.ClusterConfiguration.AddLogStorageBasedLogConsistencyProvider();
                     legacy.ClusterConfiguration.AddCustomStorageInterfaceBasedLogConsistencyProvider("CustomStorage");
@@ -52,7 +50,9 @@ namespace Tests.GeoClusterTests
                         {
                             options.ServiceId = silo.Value.ServiceId.ToString();
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        }));
+                        }))
+                        .AddMemoryGrainStorageAsDefault()
+                        .AddMemoryGrainStorage("MemoryStore"); 
                 }
             }
         }

@@ -28,9 +28,6 @@ namespace UnitTests.StreamingTests
 
                 builder.ConfigureLegacyConfiguration(legacy =>
                 {
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-
                     legacy.ClusterConfiguration.Globals.ServiceId = ServiceId;
                     this.ClusterConfiguration = legacy.ClusterConfiguration;
                 });
@@ -48,7 +45,9 @@ namespace UnitTests.StreamingTests
                             {
                                 options.OptimizeForImmutableData = false;
                                 options.FireAndForgetDelivery = SMSFireAndForgetOnSilo;
-                            });
+                            })
+                        .AddMemoryGrainStorage("MemoryStore", op => op.NumStorageGrains = 1)
+                        .AddMemoryGrainStorage("PubSubStore");
                 }
             }
             public class ClientConfiguretor : IClientBuilderConfigurator

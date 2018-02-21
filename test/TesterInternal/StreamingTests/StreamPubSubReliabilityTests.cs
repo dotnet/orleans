@@ -23,7 +23,6 @@ namespace UnitTests.StreamingTests
 
                 builder.ConfigureLegacyConfiguration(legacy =>
                 {
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
                     legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.ErrorInjectionStorageProvider>(PubSubStoreProviderName);
 
                     legacy.ClusterConfiguration.Globals.MaxResendCount = 0;
@@ -42,7 +41,8 @@ namespace UnitTests.StreamingTests
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
-                hostBuilder.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
+                hostBuilder.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME)
+                    .AddMemoryGrainStorage("MemoryStore", op => op.NumStorageGrains = 1);
             }
         }
         public class ClientConfiguretor : IClientBuilderConfigurator

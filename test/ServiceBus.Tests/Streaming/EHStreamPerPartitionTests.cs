@@ -35,11 +35,6 @@ namespace ServiceBus.Tests.StreamingTests
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    // register stream provider
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-                });
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
                 builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
             }
@@ -60,7 +55,8 @@ namespace ServiceBus.Tests.StreamingTests
                             options.CheckpointTableName = EHCheckpointTable;
                             options.CheckpointNamespace = CheckpointNamespace;
                             options.CheckpointPersistInterval = TimeSpan.FromSeconds(1);
-                        });
+                        })
+                        .AddMemoryGrainStorage("PubSubStore");
                 }
             }
 

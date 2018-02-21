@@ -5,6 +5,7 @@ using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers.Streams.Common;
+using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.ServiceBus.Providers.Testing;
@@ -36,13 +37,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.ConfigureLegacyConfiguration(legacy => AdjustClusterConfiguration(legacy.ClusterConfiguration));
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
-            }
-
-            private static void AdjustClusterConfiguration(ClusterConfiguration config)
-            {
-                config.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
             }
 
             private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
@@ -55,7 +50,8 @@ namespace ServiceBus.Tests.SlowConsumingTests
                         options.SlowConsumingMonitorFlowControlThreshold = flowControlThredhold;
                         options.AveragingCachePressureMonitorFlowControlThreshold = null;
                         options.BalancerType = StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer;
-                    });
+                    })
+                    .AddMemoryGrainStorage("PubSubStore");
                 }
             }
         }

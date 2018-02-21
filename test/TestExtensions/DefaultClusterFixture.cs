@@ -14,11 +14,19 @@ namespace TestExtensions
         {
             builder.ConfigureLegacyConfiguration(legacy =>
             {
-                legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
-                legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
                 this.ClusterConfiguration = legacy.ClusterConfiguration;
                 this.ClientConfiguration = legacy.ClientConfiguration;
             });
+            builder.AddSiloBuilderConfigurator<SiloHostConfigurator>();
+        }
+
+        public class SiloHostConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder.AddMemoryGrainStorageAsDefault()
+                    .AddMemoryGrainStorage("MemoryStore");
+            }
         }
     }
 }

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
@@ -27,12 +28,18 @@ namespace UnitTests.General
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
-            });
+            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
         }
+
+        private class SiloConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder.AddMemoryGrainStorage("MemoryStore")
+                    .AddMemoryGrainStorageAsDefault();
+            }
+        }
+
 
         [Fact, TestCategory("Placement"), TestCategory("Functional")]
         public async Task DefaultPlacementShouldBeRandom()

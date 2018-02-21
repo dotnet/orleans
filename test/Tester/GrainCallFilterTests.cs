@@ -27,12 +27,6 @@ namespace UnitTests.General
             {
                 builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
                 builder.AddSiloBuilderConfigurator<SiloInvokerTestSiloBuilderConfigurator>();
-                builder.AddClientBuilderConfigurator<ClientConfigurator>();
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-                });
                 builder.AddClientBuilderConfigurator<ClientConfiguretor>();
                 builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             }
@@ -41,7 +35,9 @@ namespace UnitTests.General
             {
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
-                    hostBuilder.AddSimpleMessageStreamProvider("SMSProvider");
+                    hostBuilder.AddSimpleMessageStreamProvider("SMSProvider")
+                        .AddMemoryGrainStorageAsDefault()
+                        .AddMemoryGrainStorage("PubSubStore");
                 }
             }
             public class ClientConfiguretor : IClientBuilderConfigurator

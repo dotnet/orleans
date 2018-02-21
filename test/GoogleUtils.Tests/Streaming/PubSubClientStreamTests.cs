@@ -39,7 +39,6 @@ namespace GoogleUtils.Tests.Streaming
 
             builder.ConfigureLegacyConfiguration(legacy =>
             {
-                legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
                 legacy.ClusterConfiguration.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
             });
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
@@ -57,7 +56,8 @@ namespace GoogleUtils.Tests.Streaming
                         options.TopicId = GoogleTestUtils.TopicId;
                         options.ClusterId = GoogleTestUtils.DeploymentId.ToString();
                         options.Deadline = TimeSpan.FromSeconds(600);
-                    });
+                    })
+                    .AddMemoryGrainStorage("PubSubStore");
             }
         }
 

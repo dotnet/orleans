@@ -216,12 +216,11 @@ namespace Tests.GeoClusterTests
                 builder.AddSiloBuilderConfigurator<TSiloBuilderConfigurator>();
                 builder.ConfigureLegacyConfiguration(legacy =>
                 {
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
                     customizer?.Invoke(legacy.ClusterConfiguration);
                     if (myCount == 0)
                         gossipStabilizationTime = GetGossipStabilizationTime(legacy.ClusterConfiguration.Globals);
                 });
+                builder.AddSiloBuilderConfigurator<SiloHostConfigurator>();
                 testCluster = builder.Build();
                 testCluster.Deploy();
 
@@ -232,6 +231,15 @@ namespace Tests.GeoClusterTests
                 };
                 
                 WriteLog("Cluster {0} started. [{1}]", clusterId, string.Join(" ", testCluster.GetActiveSilos().Select(s => s.ToString())));
+            }
+        }
+
+        public class SiloHostConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder.AddMemoryGrainStorage("MemoryStore")
+                    .AddMemoryGrainStorageAsDefault();
             }
         }
 

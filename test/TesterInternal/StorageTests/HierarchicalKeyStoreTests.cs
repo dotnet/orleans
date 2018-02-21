@@ -39,7 +39,7 @@ namespace UnitTests.StorageTests
             string fromValue = "Rem10";
             string toValue = "Rem11";
 
-            var compareClause = MemoryStorage.GetComparer(rangeParamName, fromValue, toValue);
+            var compareClause = MemoryGrainStorage.GetComparer(rangeParamName, fromValue, toValue);
 
             var data = new Dictionary<string, object>();
 
@@ -68,7 +68,7 @@ namespace UnitTests.StorageTests
             string toValue = "Rem10";
             string fromValue = "Rem12";
 
-            var compareClause = MemoryStorage.GetComparer(rangeParamName, fromValue, toValue);
+            var compareClause = MemoryGrainStorage.GetComparer(rangeParamName, fromValue, toValue);
 
             var data = new Dictionary<string, object>();
 
@@ -97,7 +97,7 @@ namespace UnitTests.StorageTests
             string fromValue = "Rem11";
             string toValue = "Rem11";
 
-            var compareClause = MemoryStorage.GetComparer(rangeParamName, fromValue, toValue);
+            var compareClause = MemoryGrainStorage.GetComparer(rangeParamName, fromValue, toValue);
 
             var data = new Dictionary<string, object>();
 

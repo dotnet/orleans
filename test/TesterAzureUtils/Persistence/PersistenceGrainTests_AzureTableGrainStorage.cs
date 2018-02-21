@@ -38,8 +38,7 @@ namespace Tester.AzureUtils.Persistence
                         new Dictionary<string, string> { { "Config1", "1" }, { "Config2", "2" } });
                     legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.ErrorInjectionStorageProvider>("ErrorInjector");
                     legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("lowercase");
-
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+                    
                 });
                 builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
@@ -71,7 +70,8 @@ namespace Tester.AzureUtils.Persistence
                         {
                             options.ServiceId = silo.Value.ServiceId.ToString();
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        }));
+                        }))
+                        .AddMemoryGrainStorage("MemoryStore");
                 }
             }
         }

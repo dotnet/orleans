@@ -27,10 +27,6 @@ namespace UnitTests.StreamingTests
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-                });
                 builder.AddSiloBuilderConfigurator<SiloConfigurator>();
                 builder.AddClientBuilderConfigurator<ClientConfiguretor>();
             }
@@ -39,7 +35,8 @@ namespace UnitTests.StreamingTests
             {
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
-                    hostBuilder.AddSimpleMessageStreamProvider(StreamProvider);
+                    hostBuilder.AddSimpleMessageStreamProvider(StreamProvider)
+                         .AddMemoryGrainStorage("PubSubStore");
                 }
             }
             public class ClientConfiguretor : IClientBuilderConfigurator
