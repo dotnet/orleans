@@ -75,7 +75,7 @@ namespace OrleansPSUtils
                 }
 
                 this.client = builder
-                    .ConfigureApplicationParts(parts => parts.AddFromAppDomain())
+                    .ConfigureApplicationParts(parts => parts.ConfigureDefaults())
                     .Build();
                 this.client.Connect().GetAwaiter().GetResult();
                 this.SetClient(this.client);

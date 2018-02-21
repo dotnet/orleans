@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using Microsoft.Extensions.DependencyModel;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.ApplicationParts;
 using Orleans.Hosting;
@@ -26,6 +27,25 @@ namespace Orleans
         /// <param name="context">The context.</param>
         /// <returns>The <see cref="ApplicationPartManager"/> belonging to the provided context.</returns>
         public static ApplicationPartManager GetApplicationPartManager(this HostBuilderContext context) => GetApplicationPartManager(context.Properties);
+
+        /// <summary>
+        /// Adds default application parts if no non-framework parts have been added.
+        /// </summary>
+        /// <param name="applicationPartManager">The application part manager.</param>
+        /// <returns>The application part manager.</returns>
+        public static IApplicationPartManager ConfigureDefaults(this IApplicationPartManager applicationPartsManager)
+        {
+            var hasApplicationParts = applicationPartsManager.ApplicationParts.OfType<AssemblyPart>()
+                .Any(part => !part.IsFrameworkAssembly);
+            if (!hasApplicationParts)
+            {
+                applicationPartsManager.AddFromDependencyContext();
+                applicationPartsManager.AddFromAppDomain();
+                applicationPartsManager.AddFromApplicationBaseDirectory();
+            }
+
+            return applicationPartsManager;
+        }
 
         /// <summary>
         /// Creates and populates a feature.
@@ -57,7 +77,7 @@ namespace Orleans
             {
                 throw new ArgumentNullException(nameof(assembly));
             }
-
+            
             return new ApplicationPartManagerWithAssemblies(manager.AddApplicationPart(new AssemblyPart(assembly)), new[] { assembly });
         }
 
@@ -176,6 +196,55 @@ namespace Orleans
         }
 
         /// <summary>
+        /// Adds all assemblies referencing Orleans found in the application's <see cref="DependencyContext"/>.
+        /// </summary>
+        /// <param name="manager">The builder.</param>
+        /// <returns>The builder with the additionally included assemblies.</returns>
+        public static IApplicationPartManagerWithAssemblies AddFromDependencyContext(this IApplicationPartManager manager)
+        {
+            return manager.AddFromDependencyContext(Assembly.GetCallingAssembly())
+                .AddFromDependencyContext(Assembly.GetEntryAssembly())
+                .AddFromDependencyContext(Assembly.GetExecutingAssembly());
+        }
+
+        /// <summary>
+        /// Adds all assemblies referencing Orleans found in the provided assembly's <see cref="DependencyContext"/>.
+        /// </summary>
+        /// <param name="manager">The builder.</param>
+        /// <returns>The builder with the additionally included assemblies.</returns>
+        public static IApplicationPartManagerWithAssemblies AddFromDependencyContext(this IApplicationPartManager manager, Assembly entryAssembly)
+        {
+            entryAssembly = entryAssembly ?? Assembly.GetCallingAssembly();
+            var dependencyContext = DependencyContext.Default;
+            if (entryAssembly != null)
+            {
+                dependencyContext = DependencyContext.Load(entryAssembly) ?? DependencyContext.Default;
+                manager = manager.AddApplicationPart(entryAssembly);
+            }
+            
+            if (dependencyContext == null) return new ApplicationPartManagerWithAssemblies(manager, Array.Empty<Assembly>());
+            
+            var assemblies = new List<Assembly>();
+            foreach (var lib in dependencyContext.RuntimeLibraries)
+            {
+                if (!lib.Dependencies.Any(dep => dep.Name.Contains("Orleans"))) continue;
+
+                try
+                {
+                    var asm = Assembly.Load(lib.Name);
+                    manager.AddApplicationPart(new AssemblyPart(asm));
+                    assemblies.Add(asm);
+                }
+                catch
+                {
+                    // Ignore any exceptions thrown during non-explicit assembly loading.
+                }
+            }
+
+            return new ApplicationPartManagerWithAssemblies(manager, assemblies);
+        }
+
+        /// <summary>
         /// Returns the <see cref="ApplicationPartManager"/> for the provided properties.
         /// </summary>
         /// <param name="properties">The properties.</param>
@@ -205,7 +274,7 @@ namespace Orleans
                 if (manager is ApplicationPartManagerWithAssemblies builderWithAssemblies)
                 {
                     this.manager = builderWithAssemblies.manager;
-                    this.Assemblies = builderWithAssemblies.Assemblies.Concat(additionalAssemblies).ToList();
+                    this.Assemblies = builderWithAssemblies.Assemblies.Concat(additionalAssemblies).Distinct().ToList();
                 }
                 else
                 {
