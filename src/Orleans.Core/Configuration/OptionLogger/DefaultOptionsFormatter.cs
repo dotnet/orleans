@@ -43,39 +43,46 @@ namespace Orleans
             var value = property.GetValue(this.options);
             var redactAttribute = property.GetCustomAttribute<RedactAttribute>(inherit: true);
 
-            // If it is a dictionary -> one line per item
-            if (typeof(IDictionary).IsInstanceOfType(value))
-            {
-                var dict = (IDictionary)value;
-                foreach (DictionaryEntry kvp in dict)
-                {
-                    result.Add(OptionFormattingUtilities.Format($"{nameof(dict)}.{kvp.Key}", RedactIfNeeded(redactAttribute, kvp.Value)));
-                }
-            }
-            // if it is a simple collection, flatten everything in one line
-            else if (typeof(ICollection).IsInstanceOfType(value))
-            {
-                var coll = (ICollection)value;
-                if (coll.Count > 0)
-                {
-                    StringBuilder sb = null;
-                    foreach (var item in coll)
-                    {
-                        if (sb == null)
-                            sb = new StringBuilder(RedactIfNeeded(redactAttribute, item).ToString());
-                        else
-                            sb.Append($", {RedactIfNeeded(redactAttribute, item).ToString()}");
-                    }
-                    result.Add(OptionFormattingUtilities.Format(name, sb.ToString()));
-                }
-            }
-            // Simple case, redact if needed
-            else
+            // If redact specified, let the attribute implementation do the work
+            if (redactAttribute != null)
             {
                 result.Add(
-                    OptionFormattingUtilities.Format(
-                        name,
-                        RedactIfNeeded(redactAttribute, value)));
+                   OptionFormattingUtilities.Format(
+                       name,
+                       redactAttribute.Redact(value)));
+            }
+            else {
+                // If it is a dictionary -> one line per item
+                if (typeof(IDictionary).IsInstanceOfType(value))
+                {
+                    var dict = (IDictionary)value;
+                    foreach (DictionaryEntry kvp in dict)
+                    {
+                        result.Add(OptionFormattingUtilities.Format($"{nameof(name)}.{kvp.Key}", kvp.Value));
+                    }
+                }
+                // If it is a simple collection -> one line per item
+                else if (typeof(ICollection).IsInstanceOfType(value))
+                {
+                    var coll = (ICollection)value;
+                    if (coll.Count > 0)
+                    {
+                        var index = 0;
+                        foreach (var item in coll)
+                        {
+                            result.Add(OptionFormattingUtilities.Format($"{nameof(name)}.{index}", item));
+                            index++;
+                        }
+                    }
+                }
+                // Simple case
+                else
+                {
+                    result.Add(
+                        OptionFormattingUtilities.Format(
+                            name,
+                            value));
+                }
             }
 
             return result;

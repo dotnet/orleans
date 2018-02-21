@@ -17,7 +17,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets or sets the connection string.
         /// </summary>
-        [RedactConnectionString]
+        [Redact]
         public string ConnectionString { get; set; }
     }
 }
