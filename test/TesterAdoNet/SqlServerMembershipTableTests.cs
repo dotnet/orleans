@@ -46,7 +46,7 @@ namespace UnitTests.MembershipTests
                 ConnectionString = this.connectionString,
                 AdoInvariant = GetAdoInvariant()
             };
-            return new AdoNetGatewayListProvider(this.loggerFactory.CreateLogger<AdoNetGatewayListProvider>(), this.GrainReferenceConverter, Options.Create(options), gatewayOptions, this.clientOptions);
+            return new AdoNetGatewayListProvider(this.loggerFactory.CreateLogger<AdoNetGatewayListProvider>(), this.GrainReferenceConverter, Options.Create(options), gatewayOptions, this.clusterOptions);
         }
 
         protected override string GetAdoInvariant()

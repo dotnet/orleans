@@ -45,7 +45,7 @@ namespace AWSUtils.Tests.MembershipTests
         {
             var options = new DynamoDBGatewayOptions();
             LegacyDynamoDBGatewayListProviderConfigurator.ParseDataConnectionString(this.connectionString, options);
-            return new DynamoDBGatewayListProvider(this.loggerFactory, Options.Create(options), this.clientOptions, this.gatewayOptions);
+            return new DynamoDBGatewayListProvider(this.loggerFactory, Options.Create(options), this.clusterOptions, this.gatewayOptions);
         }
 
         protected override Task<string> GetConnectionString()

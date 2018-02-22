@@ -86,7 +86,7 @@ namespace Orleans.TestingHost
 
             var builder = new ClientBuilder();
             builder.Properties["Configuration"] = configuration;
-            builder.ConfigureClusterClient(ob => ob.Bind(configuration));
+            builder.ConfigureCluster(ob => ob.Bind(configuration));
             ConfigureAppServices(configuration, builder);
 
             builder.ConfigureServices(services =>

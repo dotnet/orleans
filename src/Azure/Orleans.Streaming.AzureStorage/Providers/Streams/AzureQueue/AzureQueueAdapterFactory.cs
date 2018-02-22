@@ -32,7 +32,13 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// </summary>
         protected Func<QueueId, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { private get; set; }
 
-        public AzureQueueAdapterFactory(string name, AzureQueueStreamOptions options, IServiceProvider serviceProvider, IOptions<SiloOptions> siloOptions, SerializationManager serializationManager, ILoggerFactory loggerFactory)
+        public AzureQueueAdapterFactory(
+            string name, 
+            AzureQueueStreamOptions options, 
+            IServiceProvider serviceProvider, 
+            IOptions<SiloOptions> siloOptions, 
+            SerializationManager serializationManager, 
+            ILoggerFactory loggerFactory)
         {
             this.providerName = name;
             this.options = options ?? throw new ArgumentNullException(nameof(options));
@@ -54,7 +60,15 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <summary>Creates the Azure Queue based adapter.</summary>
         public virtual Task<IQueueAdapter> CreateAdapter()
         {
-            var adapter = new AzureQueueAdapter<TDataAdapter>(this.dataAadaptorFactory(), this.SerializationManager, this.streamQueueMapper, this.loggerFactory, this.options.ConnectionString, this.options.ClusterId ?? this.siloOptions.ClusterId, this.providerName, this.options.MessageVisibilityTimeout);
+            var adapter = new AzureQueueAdapter<TDataAdapter>(
+                this.dataAadaptorFactory(), 
+                this.SerializationManager, 
+                this.streamQueueMapper, 
+                this.loggerFactory, 
+                this.options.ConnectionString, 
+                this.options.ClusterId ?? this.siloOptions.ClusterId, 
+                this.providerName, 
+                this.options.MessageVisibilityTimeout);
             return Task.FromResult<IQueueAdapter>(adapter);
         }
 

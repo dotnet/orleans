@@ -22,12 +22,15 @@ namespace Orleans.Clustering.DynamoDB
         private readonly DynamoDBGatewayOptions options;
         private readonly TimeSpan maxStaleness;
 
-        public DynamoDBGatewayListProvider(ILoggerFactory loggerFactory, IOptions<DynamoDBGatewayOptions> options,
-            IOptions<ClusterClientOptions> clusterClientOptions, IOptions<GatewayOptions> gatewayOptions)
+        public DynamoDBGatewayListProvider(
+            ILoggerFactory loggerFactory, 
+            IOptions<DynamoDBGatewayOptions> options,
+            IOptions<ClusterOptions> clusterOptions, 
+            IOptions<GatewayOptions> gatewayOptions)
         {
             this.loggerFactory = loggerFactory;
             this.options = options.Value;
-            this.clusterId = clusterClientOptions.Value.ClusterId;
+            this.clusterId = clusterOptions.Value.ClusterId;
             this.maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
         }
 

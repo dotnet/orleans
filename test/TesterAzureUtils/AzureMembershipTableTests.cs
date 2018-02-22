@@ -52,7 +52,7 @@ namespace Tester.AzureUtils
             {
                 ConnectionString = this.connectionString
             };
-            return new AzureGatewayListProvider(loggerFactory, Options.Create(options), this.clientOptions, this.gatewayOptions);
+            return new AzureGatewayListProvider(loggerFactory, Options.Create(options), this.clusterOptions, this.gatewayOptions);
         }
 
         protected override Task<string> GetConnectionString()

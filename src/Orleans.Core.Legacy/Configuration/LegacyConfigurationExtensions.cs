@@ -34,7 +34,7 @@ namespace Orleans.Configuration
             services.TryAddSingleton(configuration);
             services.TryAddFromExisting<IMessagingConfiguration, ClientConfiguration>();
 
-            services.Configure<ClusterClientOptions>(options =>
+            services.Configure<ClusterOptions>(options =>
             {
                 if (string.IsNullOrWhiteSpace(options.ClusterId) && !string.IsNullOrWhiteSpace(configuration.ClusterId))
                 {
