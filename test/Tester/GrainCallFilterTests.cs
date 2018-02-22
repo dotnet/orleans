@@ -28,17 +28,6 @@ namespace UnitTests.General
                 builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
                 builder.AddSiloBuilderConfigurator<SiloInvokerTestSiloBuilderConfigurator>();
                 builder.AddClientBuilderConfigurator<ClientConfigurator>();
-                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
-            }
-
-            public class SiloConfigurator : ISiloBuilderConfigurator
-            {
-                public void Configure(ISiloHostBuilder hostBuilder)
-                {
-                    hostBuilder.AddSimpleMessageStreamProvider("SMSProvider")
-                        .AddMemoryGrainStorageAsDefault()
-                        .AddMemoryGrainStorage("PubSubStore");
-                }
             }
 
             private class SiloInvokerTestSiloBuilderConfigurator : ISiloBuilderConfigurator
@@ -67,7 +56,10 @@ namespace UnitTests.General
                             }
 
                             await ctx.Invoke();
-                        });
+                        })
+                        .AddSimpleMessageStreamProvider("SMSProvider")
+                        .AddMemoryGrainStorageAsDefault()
+                        .AddMemoryGrainStorage("PubSubStore");
                 }
             }
 

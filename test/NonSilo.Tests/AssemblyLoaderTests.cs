@@ -6,6 +6,7 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Storage;
 using Orleans.TestingHost.Utils;
 using Xunit;
 
@@ -132,7 +133,7 @@ namespace UnitTests
             var loadProvidersCriteria =
                 new AssemblyLoaderReflectionCriterion[]
                     {
-                        AssemblyLoaderCriteria.LoadTypesAssignableFrom(typeof(IProvider))
+                        AssemblyLoaderCriteria.LoadTypesAssignableFrom(typeof(IGrainStorage))
                     };
 
             return AssemblyLoader.NewAssemblyLoader(directories, excludeCriteria, loadProvidersCriteria, logger);
