@@ -10,7 +10,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 {
     using Orleans.Serialization;
 
-    public class SimpleMessageStreamProvider : IInternalStreamProvider, IStreamSubscriptionManagerRetriever
+    public class SimpleMessageStreamProvider : IStreamProvider, IProvider, IInternalStreamProvider, IStreamSubscriptionManagerRetriever
     {
         public string                       Name { get; private set; }
 
@@ -101,7 +101,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         private IInternalAsyncObservable<T> GetConsumerInterfaceImpl<T>(IAsyncStream<T> stream)
         {
             return new StreamConsumer<T>((StreamImpl<T>)stream, Name, providerRuntime,
-                providerRuntime.PubSub(pubSubType), this.loggerFactory, IsRewindable);
+                providerRuntime.PubSub(pubSubType), this.logger, IsRewindable);
         }
     }
 }

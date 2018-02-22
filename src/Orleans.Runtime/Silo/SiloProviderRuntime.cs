@@ -2,7 +2,6 @@ using System;
 using System.Threading.Tasks;
 
 using Orleans.Concurrency;
-using Orleans.Providers;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Scheduler;
 using Orleans.Streams;
@@ -10,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Hosting;
 
 namespace Orleans.Runtime.Providers
 {
@@ -100,12 +100,11 @@ namespace Orleans.Runtime.Providers
             string streamProviderName,
             IQueueAdapterFactory adapterFactory,
             IQueueAdapter queueAdapter,
-            PersistentStreamProviderConfig config,
-            IProviderConfiguration providerConfig)
+            PersistentStreamOptions options)
         {
-            IStreamQueueBalancer queueBalancer = CreateQueueBalancer(config, streamProviderName);
+            IStreamQueueBalancer queueBalancer = CreateQueueBalancer(options, streamProviderName);
             var managerId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE);
-            var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, this.PubSub(config.PubSubType), adapterFactory, queueBalancer, config, providerConfig, this.loggerFactory);
+            var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, this.PubSub(options.PubSubType), adapterFactory, queueBalancer, options, this.loggerFactory);
             this.RegisterSystemTarget(manager);
             // Init the manager only after it was registered locally.
             var pullingAgentManager = manager.AsReference<IPersistentStreamPullingManager>();
@@ -114,21 +113,21 @@ namespace Orleans.Runtime.Providers
             return pullingAgentManager;
         }
 
-        private IStreamQueueBalancer CreateQueueBalancer(PersistentStreamProviderConfig config, string streamProviderName)
+        private IStreamQueueBalancer CreateQueueBalancer(PersistentStreamOptions options, string streamProviderName)
         {
             //default type is ConsistentRingBalancer
-            if (config.BalancerType == null)
-                config.BalancerType = StreamQueueBalancerType.ConsistentRingBalancer;
+            if (options.BalancerType == null)
+                options.BalancerType = StreamQueueBalancerType.ConsistentRingBalancer;
             try
             {
-                var balancer = this.ServiceProvider.GetRequiredService(config.BalancerType) as IStreamQueueBalancer;
+                var balancer = this.ServiceProvider.GetRequiredService(options.BalancerType) as IStreamQueueBalancer;
                 if (balancer == null)
-                    throw new ArgumentOutOfRangeException("balancerType", $"Configured BalancerType isn't a type which implements IStreamQueueBalancer. BalancerType: {config.BalancerType}, StreamProvider: {streamProviderName}");
+                    throw new ArgumentOutOfRangeException("balancerType", $"Configured BalancerType isn't a type which implements IStreamQueueBalancer. BalancerType: {options.BalancerType}, StreamProvider: {streamProviderName}");
                 return balancer;
             }
             catch (Exception e)
             {
-                string error = $"Unsupported balancerType for stream provider. BalancerType: {config.BalancerType}, StreamProvider: {streamProviderName}, Exception: {e}";
+                string error = $"Unsupported balancerType for stream provider. BalancerType: {options.BalancerType}, StreamProvider: {streamProviderName}, Exception: {e}";
                 throw new ArgumentOutOfRangeException("balancerType", error);
             }
         }

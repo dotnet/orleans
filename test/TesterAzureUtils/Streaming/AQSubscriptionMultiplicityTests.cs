@@ -10,6 +10,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using UnitTests.StreamingTests;
 using Xunit;
+using Microsoft.Extensions.Configuration;
+using Orleans;
+using Orleans.Hosting;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace Tester.AzureUtils.Streaming
 {
@@ -25,9 +30,35 @@ namespace Tester.AzureUtils.Streaming
             builder.ConfigureLegacyConfiguration(legacy =>
             {
                 legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-                legacy.ClusterConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
-                legacy.ClientConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
             });
+            builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+            builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
+        }
+
+        private class MyClientBuilderConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder
+                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AQStreamProviderName,
+                        options =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        });
+            }
+        }
+
+        private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder
+                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AQStreamProviderName,
+                        options =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        });
+            }
         }
 
         public AQSubscriptionMultiplicityTests()

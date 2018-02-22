@@ -78,5 +78,4 @@ namespace Orleans.Configuration
             };
         }
     }
-
 }

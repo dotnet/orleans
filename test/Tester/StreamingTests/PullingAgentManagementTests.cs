@@ -1,6 +1,9 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
@@ -23,13 +26,17 @@ namespace UnitTests.StreamingTests
                 builder.ConfigureLegacyConfiguration(legacy =>
                 {
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-
-                    // register stream providers
-                    // options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME, false);
-                    // options.ClientConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME, false);
-
-                    legacy.ClusterConfiguration.AddAzureQueueStreamProvider(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME);
                 });
+                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+            }
+
+            private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder) => hostBuilder
+                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME, options =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        });
             }
 
             protected override void CheckPreconditionsOrThrow()
@@ -41,7 +48,7 @@ namespace UnitTests.StreamingTests
 
         private const string adapterName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
 #pragma warning disable 618
-        private readonly string adapterType = typeof(AzureQueueStreamProvider).FullName;
+        private readonly string adapterType = typeof(PersistentStreamProvider).FullName;
 #pragma warning restore 618
 
         public PullingAgentManagementTests(Fixture fixture)
@@ -55,21 +62,21 @@ namespace UnitTests.StreamingTests
         {
             var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);;
 
-            await ValidateAgentsState(PersistentStreamProviderState.AgentsStarted);
+            await ValidateAgentsState(PersistentStreamOptions.RunState.AgentsStarted);
 
             await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.StartAgents);
-            await ValidateAgentsState(PersistentStreamProviderState.AgentsStarted);
+            await ValidateAgentsState(PersistentStreamOptions.RunState.AgentsStarted);
 
             await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.StopAgents);
-            await ValidateAgentsState(PersistentStreamProviderState.AgentsStopped);
+            await ValidateAgentsState(PersistentStreamOptions.RunState.AgentsStopped);
 
 
             await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.StartAgents);
-            await ValidateAgentsState(PersistentStreamProviderState.AgentsStarted);
+            await ValidateAgentsState(PersistentStreamOptions.RunState.AgentsStarted);
 
         }
 
-        private async Task ValidateAgentsState(PersistentStreamProviderState expectedState)
+        private async Task ValidateAgentsState(PersistentStreamOptions.RunState expectedState)
         {
             var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
 
@@ -77,7 +84,7 @@ namespace UnitTests.StreamingTests
             Assert.Equal(2, states.Length);
             foreach (var state in states)
             {
-                PersistentStreamProviderState providerState;
+                PersistentStreamOptions.RunState providerState;
                 Enum.TryParse(state.ToString(), out providerState);
                 Assert.Equal(expectedState, providerState);
             }
@@ -85,9 +92,9 @@ namespace UnitTests.StreamingTests
             var numAgents = await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents);
             Assert.Equal(2, numAgents.Length);
             int totalNumAgents = numAgents.Select(Convert.ToInt32).Sum();
-            if (expectedState == PersistentStreamProviderState.AgentsStarted)
+            if (expectedState == PersistentStreamOptions.RunState.AgentsStarted)
             {
-                Assert.Equal(AzureQueueAdapterConstants.NumQueuesDefaultValue, totalNumAgents);
+                Assert.Equal(AzureQueueStreamOptions.DEFAULT_NUM_QUEUES, totalNumAgents);
             }
             else
             {

@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Logging.Abstractions;
-using Orleans.Providers.Streams;
+using Microsoft.Extensions.Configuration;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using UnitTests.StreamingTests;
@@ -11,6 +11,8 @@ using Orleans.Runtime.Configuration;
 using TestExtensions;
 using UnitTests.Streaming;
 using OrleansAWSUtils.Streams;
+using Orleans.Hosting;
+using Orleans;
 
 namespace AWSUtils.Tests.Streaming
 {
@@ -40,15 +42,6 @@ namespace AWSUtils.Tests.Streaming
                 //previous silo creation
                 options.ClusterConfiguration.Globals.DataConnectionString = AWSTestConstants.DefaultSQSConnectionString;
                 options.ClientConfiguration.DataConnectionString = AWSTestConstants.DefaultSQSConnectionString;
-                var streamConnectionString = new Dictionary<string, string>
-                {
-                    {"DataConnectionString", AWSTestConstants.DefaultSQSConnectionString}
-                };
-
-                options.ClientConfiguration.RegisterStreamProvider<SQSStreamProvider>("SQSProvider", streamConnectionString);
-
-                options.ClusterConfiguration.Globals.RegisterStreamProvider<SQSStreamProvider>("SQSProvider", streamConnectionString);
-                options.ClusterConfiguration.Globals.RegisterStreamProvider<SQSStreamProvider>("SQSProvider2", streamConnectionString);
 
                 var storageConnectionString = new Dictionary<string, string>
                 {
@@ -64,9 +57,38 @@ namespace AWSUtils.Tests.Streaming
                 };
                 options.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("PubSubStore", storageConnectionString2);
             });
+            builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+            builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
         }
 
+        private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder
+                    .AddSqsStreams("SQSProvider", options =>
+                    {
+                        options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+                    })
+                    .AddSqsStreams("SQSProvider2", options =>
+                     {
+                         options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+                     });
+            }
+        }
 
+        private class MyClientBuilderConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder
+                    .AddSqsStreams("SQSProvider", options =>
+                    {
+                        options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+                    });
+            }
+        }
+        
         public SQSStreamTests()
         {
             runner = new SingleStreamTestRunner(this.InternalClient, SQS_STREAM_PROVIDER_NAME);

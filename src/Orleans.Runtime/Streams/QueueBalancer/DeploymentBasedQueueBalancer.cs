@@ -80,8 +80,7 @@ namespace Orleans.Streams
 
         public override Task Initialize(string strProviderName,
             IStreamQueueMapper queueMapper,
-            TimeSpan siloMaturityPeriod,
-            IProviderConfiguration providerConfig)
+            TimeSpan siloMaturityPeriod)
         {
             if (queueMapper == null)
             {

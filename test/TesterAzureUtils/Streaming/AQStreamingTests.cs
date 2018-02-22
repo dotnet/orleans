@@ -1,6 +1,9 @@
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
@@ -30,11 +33,22 @@ namespace Tester.AzureUtils.Streaming
 
                 legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
                 legacy.ClientConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
-
-                legacy.ClusterConfiguration.AddAzureQueueStreamProviderV2(AzureQueueStreamProviderName);
-                legacy.ClientConfiguration.AddAzureQueueStreamProviderV2(AzureQueueStreamProviderName);
             });
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+            builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
+        }
+
+        private class MyClientBuilderConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder
+                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName,
+                        options =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        });
+            }
         }
 
         private class SiloBuilderConfigurator : ISiloBuilderConfigurator
@@ -49,11 +63,16 @@ namespace Tester.AzureUtils.Streaming
                         options.DeleteStateOnClear = true;
                     }))
                     .AddAzureTableGrainStorage("PubSubStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
-                     {
-                         options.ServiceId = silo.Value.ServiceId.ToString();
-                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                         options.DeleteStateOnClear = true;
-                     }));
+                        {
+                            options.ServiceId = silo.Value.ServiceId.ToString();
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.DeleteStateOnClear = true;
+                        }))
+                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName,
+                        options =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        });
             }
         }
 

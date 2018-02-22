@@ -56,11 +56,7 @@ namespace UnitTests.Streaming.Reliability
 
                 legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
 
-                legacy.ClusterConfiguration.AddAzureQueueStreamProvider(AZURE_QUEUE_STREAM_PROVIDER_NAME);
-                legacy.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
-                
                 legacy.ClientConfiguration.AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
-                legacy.ClientConfiguration.AddAzureQueueStreamProvider(AZURE_QUEUE_STREAM_PROVIDER_NAME);
             });
 
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
@@ -74,7 +70,12 @@ namespace UnitTests.Streaming.Reliability
                 clientBuilder.UseAzureStorageClustering(gatewayOptions =>
                 {
                     gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                });
+                })
+                .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AZURE_QUEUE_STREAM_PROVIDER_NAME,
+                    options =>
+                    {
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    });
             }
         }
 
@@ -98,7 +99,17 @@ namespace UnitTests.Streaming.Reliability
                     options.ServiceId = silo.Value.ServiceId.ToString();
                     options.DeleteStateOnClear = true;
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                }));
+                }))
+                .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AZURE_QUEUE_STREAM_PROVIDER_NAME,
+                    options =>
+                    {
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    })
+                .AddAzureQueueStreams<AzureQueueDataAdapterV2>("AzureQueueProvider2",
+                    options =>
+                    {
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    });
             }
         }
 

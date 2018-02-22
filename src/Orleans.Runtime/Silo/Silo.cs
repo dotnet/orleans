@@ -80,7 +80,7 @@ namespace Orleans.Runtime
         private readonly object lockable = new object();
         private readonly GrainFactory grainFactory;
         private readonly IGrainRuntime grainRuntime;
-        private readonly ILifecycleObserver siloLifecycle;
+        private readonly SiloLifecycle siloLifecycle;
 
         private readonly ILoggerFactory loggerFactory;
         /// <summary>

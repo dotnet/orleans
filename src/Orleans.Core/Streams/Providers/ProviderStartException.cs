@@ -1,16 +1,9 @@
 using System;
-using System.Threading.Tasks;
 using System.Runtime.Serialization;
-using Orleans.Providers;
 using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
-    public interface IStreamProviderImpl : IStreamProvider, IProvider
-    {
-        Task Start();
-    }
-
     /// <summary>
     /// Exception thrown whenever a provider has failed to be started.
     /// </summary>

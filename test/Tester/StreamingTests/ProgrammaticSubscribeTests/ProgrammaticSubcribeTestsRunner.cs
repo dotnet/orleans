@@ -1,8 +1,5 @@
 using Orleans;
-using Orleans.Providers;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.Streams;
 using Orleans.TestingHost;
 using System;
 using System.Collections.Generic;
@@ -11,7 +8,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Streams.Core;
-using Orleans.Streams.PubSub;
 using TestExtensions;
 using Xunit;
 using UnitTests.GrainInterfaces;

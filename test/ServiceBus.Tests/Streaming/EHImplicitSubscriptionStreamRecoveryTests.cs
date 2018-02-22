@@ -16,6 +16,9 @@ using UnitTests.Grains;
 using Xunit;
 using Microsoft.WindowsAzure.Storage.Table;
 using Microsoft.Extensions.Logging.Abstractions;
+using Orleans.Hosting;
+using Orleans;
+using Microsoft.Extensions.Configuration;
 
 namespace ServiceBus.Tests.StreamingTests
 {
@@ -28,18 +31,6 @@ namespace ServiceBus.Tests.StreamingTests
         private const string EHConsumerGroup = "orleansnightly";
         private const string EHCheckpointTable = "ehcheckpoint";
         private static readonly string CheckpointNamespace = Guid.NewGuid().ToString();
-
-        private static readonly Lazy<EventHubSettings> EventHubConfig = new Lazy<EventHubSettings>(() =>
-            new EventHubSettings(
-                TestDefaultConfiguration.EventHubConnectionString,
-                EHConsumerGroup, EHPath));
-
-        private static readonly EventHubCheckpointerSettings CheckpointerSettings =
-            new EventHubCheckpointerSettings(TestDefaultConfiguration.DataConnectionString,
-                EHCheckpointTable, CheckpointNamespace, TimeSpan.FromSeconds(1));
-
-        private static readonly EventHubStreamProviderSettings ProviderSettings =
-            new EventHubStreamProviderSettings(StreamProviderName);
 
         private readonly ImplicitSubscritionRecoverableStreamTestRunner runner;
 
@@ -54,34 +45,52 @@ namespace ServiceBus.Tests.StreamingTests
                 {
                     // register stream provider
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
-                    legacy.ClusterConfiguration.Globals.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
-                    legacy.ClientConfiguration.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
                 });
+                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+                builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
             }
 
             public override void Dispose()
             {
                 base.Dispose();
-                var dataManager = new AzureTableDataManager<TableEntity>(CheckpointerSettings.TableName, CheckpointerSettings.DataConnectionString, NullLoggerFactory.Instance);
+                var dataManager = new AzureTableDataManager<TableEntity>(EHCheckpointTable, TestDefaultConfiguration.DataConnectionString, NullLoggerFactory.Instance);
                 dataManager.InitTableAsync().Wait();
                 dataManager.ClearTableAsync().Wait();
             }
 
-            private static Dictionary<string, string> BuildProviderSettings()
+            private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                var settings = new Dictionary<string, string>();
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder
+                        .AddEventHubStreams(StreamProviderName,
+                        options =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                            options.ConsumerGroup = EHConsumerGroup;
+                            options.Path = EHPath;
+                            options.BalancerType = StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer;
+                            options.PubSubType = StreamPubSubType.ImplicitOnly;
+                            options.CheckpointConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.CheckpointTableName = EHCheckpointTable;
+                            options.CheckpointNamespace = CheckpointNamespace;
+                            options.CheckpointPersistInterval = TimeSpan.FromSeconds(1);
+                        });
+                }
+            }
 
-                // get initial settings from configs
-                ProviderSettings.WriteProperties(settings);
-                EventHubConfig.Value.WriteProperties(settings);
-                CheckpointerSettings.WriteProperties(settings);
-
-                // add queue balancer setting
-                settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.AssemblyQualifiedName);
-
-                // add pub/sub settting
-                settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
-                return settings;
+            private class MyClientBuilderConfigurator : IClientBuilderConfigurator
+            {
+                public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+                {
+                    clientBuilder.AddEventHubStreams(StreamProviderName, options =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                            options.ConsumerGroup = EHConsumerGroup;
+                            options.Path = EHPath;
+                            options.PubSubType = StreamPubSubType.ImplicitOnly;
+                        });
+                }
             }
         }
 
