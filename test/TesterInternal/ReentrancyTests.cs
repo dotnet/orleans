@@ -2,15 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
-using Orleans;
-using Orleans.Concurrency;
-using Orleans.Providers;
+using Orleans.Hosting;
 using Orleans.Providers.Streams.SimpleMessageStream;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
-
-using Tester;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
@@ -29,12 +25,12 @@ namespace UnitTests
             {
                 builder.ConfigureLegacyConfiguration(legacy =>
                 {
-                    legacy.ClusterConfiguration.Globals.RegisterStreamProvider<SimpleMessageStreamProvider>("sms");
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
                     legacy.ClusterConfiguration.Globals.AllowCallChainReentrancy = true;
                 });
+                builder.AddSiloBuilderConfigurator<ReentrancyTestsSiloBuilderConfigurator>();
             }
         }
 
@@ -370,13 +366,13 @@ namespace UnitTests
             {
                 builder.ConfigureLegacyConfiguration(legacy =>
                 {
-                    legacy.ClusterConfiguration.Globals.RegisterStreamProvider<SimpleMessageStreamProvider>("sms");
                     legacy.ClusterConfiguration.Globals.AllowCallChainReentrancy = false;
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
                     this.ClusterConfiguration = legacy.ClusterConfiguration;
                 });
+                builder.AddSiloBuilderConfigurator<ReentrancyTestsSiloBuilderConfigurator>();
             }
         }
 
@@ -527,6 +523,14 @@ namespace UnitTests
             }
 
             this.fixture.Logger.Info("Reentrancy UnorderedNonReentrantGrain Test finished OK.");
+        }
+    }
+
+    internal class ReentrancyTestsSiloBuilderConfigurator : ISiloBuilderConfigurator
+    {
+        public void Configure(ISiloHostBuilder hostBuilder)
+        {
+            hostBuilder.AddSimpleMessageStreamProvider("sms");
         }
     }
 }
