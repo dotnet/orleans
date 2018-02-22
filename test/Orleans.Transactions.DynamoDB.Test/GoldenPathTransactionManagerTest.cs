@@ -43,7 +43,7 @@ namespace Orleans.Transactions.DynamoDB.Tests
             {
                 // TODO: Find better way for test isolation.
                 TableName = $"TransactionLog{((uint)Guid.NewGuid().GetHashCode()) % 100000}",
-                ConnectionString = $"Service={AWSTestConstants.Service}"
+                Service = AWSTestConstants.Service
             });
             DynamoDBTransactionLogStorage storage = new DynamoDBTransactionLogStorage(environment.SerializationManager, dynamoConfig, environment.Client.ServiceProvider.GetRequiredService<ILoggerFactory>());
             await storage.Initialize();

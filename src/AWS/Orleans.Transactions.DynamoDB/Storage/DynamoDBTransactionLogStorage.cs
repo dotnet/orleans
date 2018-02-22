@@ -57,12 +57,8 @@ namespace Orleans.Transactions.DynamoDB
 
         public async Task Initialize()
         {
-            if (string.IsNullOrWhiteSpace(this.options.ConnectionString))
-            {
-                throw new ArgumentNullException(nameof(this.options.ConnectionString));
-            }
-
-            storage = new DynamoDBStorage(this.options.ConnectionString, loggerFactory);
+            storage = new DynamoDBStorage(this.loggerFactory, this.options.Service, this.options.AccessKey, this.options.SecretKey,
+                this.options.ReadCapacityUnits, this.options.WriteCapacityUnits);
             await storage.InitializeTable(this.options.TableName,
                 new List<KeySchemaElement>
                 {
