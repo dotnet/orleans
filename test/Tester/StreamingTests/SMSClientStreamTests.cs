@@ -30,6 +30,10 @@ namespace Tester.StreamingTests
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             builder.Options.InitialSilosCount = 1;
+            builder.ConfigureLegacyConfiguration(legacy =>
+            {
+                legacy.ClusterConfiguration.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
+            });
             builder.AddClientBuilderConfigurator<ClientConfiguretor>();
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
         }

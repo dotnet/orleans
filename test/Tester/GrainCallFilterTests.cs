@@ -27,7 +27,7 @@ namespace UnitTests.General
             {
                 builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
                 builder.AddSiloBuilderConfigurator<SiloInvokerTestSiloBuilderConfigurator>();
-                builder.AddClientBuilderConfigurator<ClientConfiguretor>();
+                builder.AddClientBuilderConfigurator<ClientConfigurator>();
                 builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             }
 
@@ -38,13 +38,6 @@ namespace UnitTests.General
                     hostBuilder.AddSimpleMessageStreamProvider("SMSProvider")
                         .AddMemoryGrainStorageAsDefault()
                         .AddMemoryGrainStorage("PubSubStore");
-                }
-            }
-            public class ClientConfiguretor : IClientBuilderConfigurator
-            {
-                public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
-                {
-                    clientBuilder.AddSimpleMessageStreamProvider("SMSProvider");
                 }
             }
 
@@ -97,7 +90,8 @@ namespace UnitTests.General
                             result["orig"] = result["result"];
                             result["result"] = "intercepted!";
                         }
-                    });
+                    })
+                    .AddSimpleMessageStreamProvider("SMSProvider");
                 }
             }
         }
