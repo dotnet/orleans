@@ -33,7 +33,7 @@ namespace Orleans.Runtime.Providers
 
         public SiloProviderRuntime(
             ILocalSiloDetails siloDetails,
-            IOptions<SiloOptions> siloOptions,
+            IOptions<ClusterOptions> clusterOptions,
             IConsistentRingProvider consistentRingProvider,
             ISiloRuntimeClient runtimeClient,
             ImplicitStreamSubscriberTable implicitStreamSubscriberTable,
@@ -48,7 +48,7 @@ namespace Orleans.Runtime.Providers
             this.activationDirectory = activationDirectory;
             this.consistentRingProvider = consistentRingProvider;
             this.runtimeClient = runtimeClient;
-            this.ServiceId = siloOptions.Value.ServiceId;
+            this.ServiceId = clusterOptions.Value.ServiceId;
             this.SiloIdentity = siloDetails.SiloAddress.ToLongString();
 
             this.grainBasedPubSub = new GrainBasedPubSubRuntime(this.GrainFactory);

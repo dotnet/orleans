@@ -15,7 +15,7 @@ namespace OrleansAWSUtils.Streams
     {
         private readonly string providerName;
         private readonly SqsStreamOptions options;
-        private readonly SiloOptions siloOptions;
+        private readonly ClusterOptions clusterOptions;
         private readonly SerializationManager serializationManager;
         private readonly ILoggerFactory loggerFactory;
         private HashRingBasedStreamQueueMapper streamQueueMapper;
@@ -26,11 +26,17 @@ namespace OrleansAWSUtils.Streams
         /// </summary>
         protected Func<QueueId, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { private get; set; }
 
-        public SQSAdapterFactory(string name, SqsStreamOptions options, IServiceProvider serviceProvider, IOptions<SiloOptions> siloOptions, SerializationManager serializationManager, ILoggerFactory loggerFactory)
+        public SQSAdapterFactory(
+            string name, 
+            SqsStreamOptions options, 
+            IServiceProvider serviceProvider, 
+            IOptions<ClusterOptions> clusterOptions, 
+            SerializationManager serializationManager, 
+            ILoggerFactory loggerFactory)
         {
             this.providerName = name;
             this.options = options;
-            this.siloOptions = siloOptions.Value;
+            this.clusterOptions = clusterOptions.Value;
             this.serializationManager = serializationManager;
             this.loggerFactory = loggerFactory;
         }
@@ -51,7 +57,7 @@ namespace OrleansAWSUtils.Streams
         /// <summary>Creates the Azure Queue based adapter.</summary>
         public virtual Task<IQueueAdapter> CreateAdapter()
         {
-            var adapter = new SQSAdapter(this.serializationManager, this.streamQueueMapper, this.loggerFactory, this.options.ConnectionString, this.options.ClusterId ?? this.siloOptions.ClusterId, this.providerName);
+            var adapter = new SQSAdapter(this.serializationManager, this.streamQueueMapper, this.loggerFactory, this.options.ConnectionString, this.options.ClusterId ?? this.clusterOptions.ClusterId, this.providerName);
             return Task.FromResult<IQueueAdapter>(adapter);
         }
 

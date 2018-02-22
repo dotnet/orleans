@@ -77,7 +77,7 @@ namespace Orleans.Hosting
                     return () => initializationParams.NodeConfig;
                 });
 
-            services.Configure<SiloOptions>(options =>
+            services.Configure<ClusterOptions>(options =>
             {
                 if (string.IsNullOrWhiteSpace(options.ClusterId) && !string.IsNullOrWhiteSpace(configuration.Globals.ClusterId))
                 {

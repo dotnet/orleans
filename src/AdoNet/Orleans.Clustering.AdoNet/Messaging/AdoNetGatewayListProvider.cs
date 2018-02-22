@@ -17,15 +17,17 @@ namespace Orleans.Runtime.Membership
         private RelationalOrleansQueries orleansQueries;
         private readonly IGrainReferenceConverter grainReferenceConverter;
         private readonly TimeSpan maxStaleness;
-        public AdoNetGatewayListProvider(ILogger<AdoNetGatewayListProvider> logger, IGrainReferenceConverter grainReferenceConverter,
+        public AdoNetGatewayListProvider(
+            ILogger<AdoNetGatewayListProvider> logger, 
+            IGrainReferenceConverter grainReferenceConverter,
             IOptions<AdoNetClusteringClientOptions> options,
             IOptions<GatewayOptions> gatewayOptions,
-            IOptions<ClusterClientOptions> clusterClientOptions)
+            IOptions<ClusterOptions> clusterOptions)
         {
             this.logger = logger;
             this.grainReferenceConverter = grainReferenceConverter;
             this.options = options.Value;
-            this.clusterId = clusterClientOptions.Value.ClusterId;
+            this.clusterId = clusterOptions.Value.ClusterId;
             this.maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
         }
 

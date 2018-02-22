@@ -86,11 +86,11 @@ namespace UnitTests.StorageTests.Relational
                                 ConnectionString = Storage.Storage.ConnectionString,
                                 Invariant = storageInvariant
                             };
-                            var siloOptions = new SiloOptions()
+                            var clusterOptions = new ClusterOptions()
                             {
                                 ServiceId = Guid.NewGuid()
                             };
-                            var storageProvider = new AdoNetGrainStorage(DefaultProviderRuntime.ServiceProvider.GetService<ILogger<AdoNetGrainStorage>>(), DefaultProviderRuntime, Options.Create(options), Options.Create(siloOptions), storageInvariant + "_StorageProvider");
+                            var storageProvider = new AdoNetGrainStorage(DefaultProviderRuntime.ServiceProvider.GetService<ILogger<AdoNetGrainStorage>>(), DefaultProviderRuntime, Options.Create(options), Options.Create(clusterOptions), storageInvariant + "_StorageProvider");
                             var siloLifeCycle = new SiloLifecycle(NullLoggerFactory.Instance);
                             storageProvider.Participate(siloLifeCycle);
                             await siloLifeCycle.OnStart(CancellationToken.None);

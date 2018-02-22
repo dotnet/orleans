@@ -38,14 +38,14 @@ namespace AWSUtils.Tests.MembershipTests
                 throw new SkipException("Unable to connect to AWS DynamoDB simulator");
             var options = new DynamoDBClusteringOptions();
             LegacyDynamoDBMembershipConfigurator.ParseDataConnectionString(this.connectionString, options);
-            return new DynamoDBMembershipTable(this.loggerFactory, Options.Create(options), this.siloOptions);
+            return new DynamoDBMembershipTable(this.loggerFactory, Options.Create(options), this.clusterOptions);
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
             var options = new DynamoDBGatewayOptions();
             LegacyDynamoDBGatewayListProviderConfigurator.ParseDataConnectionString(this.connectionString, options);
-            return new DynamoDBGatewayListProvider(this.loggerFactory, Options.Create(options), this.clientOptions, this.gatewayOptions);
+            return new DynamoDBGatewayListProvider(this.loggerFactory, Options.Create(options), this.clusterOptions, this.gatewayOptions);
         }
 
         protected override Task<string> GetConnectionString()

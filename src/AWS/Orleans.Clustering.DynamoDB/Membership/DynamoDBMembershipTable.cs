@@ -27,14 +27,15 @@ namespace Orleans.Clustering.DynamoDB
         private readonly DynamoDBClusteringOptions options;
         private readonly string clusterId;
 
-        public DynamoDBMembershipTable(ILoggerFactory loggerFactory, 
+        public DynamoDBMembershipTable(
+            ILoggerFactory loggerFactory, 
             IOptions<DynamoDBClusteringOptions> membershipOptions, 
-            IOptions<SiloOptions> siloOptions)
+            IOptions<ClusterOptions> clusterOptions)
         {
             this.loggerFactory = loggerFactory;
             logger = loggerFactory.CreateLogger<DynamoDBMembershipTable>();
             this.options = membershipOptions.Value;
-            this.clusterId = siloOptions.Value.ClusterId;
+            this.clusterId = clusterOptions.Value.ClusterId;
         }
 
         public Task InitializeMembershipTable(bool tryInitTableVersion)

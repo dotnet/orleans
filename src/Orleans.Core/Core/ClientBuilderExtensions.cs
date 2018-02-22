@@ -152,34 +152,34 @@ namespace Orleans
         }
 
         /// <summary>
-        /// Configures the cluster client general options.
+        /// Configures the cluster general options.
         /// </summary>
         /// <param name="builder">The builder.</param>
         /// <param name="configureOptions">The delegate that configures the options.</param>
         /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
-        public static IClientBuilder ConfigureClusterClient(this IClientBuilder builder, Action<ClusterClientOptions> configureOptions)
+        public static IClientBuilder ConfigureCluster(this IClientBuilder builder, Action<ClusterOptions> configureOptions)
         {
             if (configureOptions != null)
             {
-                builder.ConfigureServices(services => services.Configure<ClusterClientOptions>(configureOptions));
+                builder.ConfigureServices(services => services.Configure<ClusterOptions>(configureOptions));
             }
 
             return builder;
         }
 
         /// <summary>
-        /// Configures the cluster client general options.
+        /// Configures the cluster general options.
         /// </summary>
         /// <param name="builder">The builder.</param>
         /// <param name="configureOptions">The delegate that configures the options using the options builder.</param>
         /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
-        public static IClientBuilder ConfigureClusterClient(this IClientBuilder builder, Action<OptionsBuilder<ClusterClientOptions>> configureOptions)
+        public static IClientBuilder ConfigureCluster(this IClientBuilder builder, Action<OptionsBuilder<ClusterOptions>> configureOptions)
         {
             if (configureOptions != null)
             {
                 builder.ConfigureServices(services =>
                 {
-                    configureOptions.Invoke(services.AddOptions<ClusterClientOptions>());
+                    configureOptions.Invoke(services.AddOptions<ClusterOptions>());
                 });
             }
 

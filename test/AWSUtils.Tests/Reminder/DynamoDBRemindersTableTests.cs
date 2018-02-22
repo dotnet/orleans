@@ -35,7 +35,7 @@ namespace AWSUtils.Tests.RemindersTest
             return new DynamoDBReminderTable(
                 this.ClusterFixture.Services.GetRequiredService<IGrainReferenceConverter>(),
                 this.loggerFactory,
-                this.siloOptions,
+                this.clusterOptions,
                 Options.Create(options));
         }
 

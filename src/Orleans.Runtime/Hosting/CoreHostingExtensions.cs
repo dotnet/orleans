@@ -19,22 +19,35 @@ namespace Orleans.Hosting
         /// <param name="builder">The host builder.</param>
         /// <param name="configureOptions">The delegate that configures the options.</param>
         /// <returns>The host builder.</returns>
-        public static ISiloHostBuilder ConfigureOrleans(this ISiloHostBuilder builder, Action<SiloOptions> configureOptions)
+        public static ISiloHostBuilder ConfigureOrleans(this ISiloHostBuilder builder, Action<ClusterOptions> configureOptions)
         {
-            var optionsConfigurator = configureOptions != null
-                ? ob => ob.Configure(configureOptions)
-                : default(Action<OptionsBuilder<SiloOptions>>);
-
-            return builder.ConfigureOrleans(optionsConfigurator);
+            return builder.ConfigureOrleans(null, configureOptions);
         }
 
         /// <summary>
         /// Configure the container to use Orleans, including the default silo name & services.
         /// </summary>
         /// <param name="builder">The host builder.</param>
+        /// <param name="siloName">The name to use for this silo</param>
+        /// <param name="configureOptions">The delegate that configures the options.</param>
+        /// <returns>The host builder.</returns>
+        public static ISiloHostBuilder ConfigureOrleans(this ISiloHostBuilder builder, string siloName, Action<ClusterOptions> configureOptions)
+        {
+            var optionsConfigurator = configureOptions != null
+                ? ob => ob.Configure(configureOptions)
+                : default(Action<OptionsBuilder<ClusterOptions>>);
+
+            return builder.ConfigureOrleans(siloName, optionsConfigurator);
+        }
+
+        /// <summary>
+        /// Configure the container to use Orleans, including the default silo name & services.
+        /// </summary>
+        /// <param name="builder">The host builder.</param>
+        /// <param name="siloName">The name to use for this silo</param>
         /// <param name="configureOptions">The delegate that configures the options using the options builder.</param>
         /// <returns>The host builder.</returns>
-        public static ISiloHostBuilder ConfigureOrleans(this ISiloHostBuilder builder, Action<OptionsBuilder<SiloOptions>> configureOptions = null)
+        public static ISiloHostBuilder ConfigureOrleans(this ISiloHostBuilder builder, string siloName, Action<OptionsBuilder<ClusterOptions>> configureOptions = null)
         {
             builder.ConfigureServices((context, services) =>
             {
@@ -50,9 +63,23 @@ namespace Orleans.Hosting
                     context.Properties.Add("OrleansServicesAdded", true);
                 }
 
-                configureOptions?.Invoke(services.AddOptions<SiloOptions>());
+                if (!string.IsNullOrEmpty(siloName))
+                    builder.ConfigureSiloName(siloName);
+
+                configureOptions?.Invoke(services.AddOptions<ClusterOptions>());
             });
             return builder;
+        }
+
+        /// <summary>
+        /// Configure the container to use Orleans, including the default silo name & services.
+        /// </summary>
+        /// <param name="builder">The host builder.</param>
+        /// <param name="configureOptions">The delegate that configures the options using the options builder.</param>
+        /// <returns>The host builder.</returns>
+        public static ISiloHostBuilder ConfigureOrleans(this ISiloHostBuilder builder, Action<OptionsBuilder<ClusterOptions>> configureOptions = null)
+        {
+            return builder.ConfigureOrleans(null, configureOptions);
         }
 
         /// <summary>

@@ -35,7 +35,8 @@ namespace Orleans.TestingHost
             string siloName = configuration[nameof(TestSiloSpecificOptions.SiloName)] ?? hostName;
 
             ISiloHostBuilder hostBuilder = new SiloHostBuilder()
-                .ConfigureOrleans(ob => ob.Bind(configuration).Configure(options => options.SiloName = options.SiloName ?? siloName))
+                .ConfigureOrleans(ob => ob.Bind(configuration))
+                .ConfigureSiloName(siloName)
                 .ConfigureHostConfiguration(cb =>
                 {
                     // TODO: Instead of passing the sources individually, just chain the pre-built configuration once we upgrade to Microsoft.Extensions.Configuration 2.1
@@ -86,7 +87,7 @@ namespace Orleans.TestingHost
 
             var builder = new ClientBuilder();
             builder.Properties["Configuration"] = configuration;
-            builder.ConfigureClusterClient(ob => ob.Bind(configuration));
+            builder.ConfigureCluster(ob => ob.Bind(configuration));
             ConfigureAppServices(configuration, builder);
 
             builder.ConfigureServices(services =>

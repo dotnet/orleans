@@ -51,23 +51,23 @@ namespace Tester.AzureUtils.Persistence
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddAzureTableGrainStorage("GrainStorageForTest", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                        .AddAzureTableGrainStorage("GrainStorageForTest", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
                             options.ServiceId = silo.Value.ServiceId.ToString();
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.DeleteStateOnClear = true;
                         }))
-                        .AddAzureTableGrainStorage("AzureStore1", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                        .AddAzureTableGrainStorage("AzureStore1", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
                             options.ServiceId = silo.Value.ServiceId.ToString();
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         }))
-                        .AddAzureTableGrainStorage("AzureStore2", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                        .AddAzureTableGrainStorage("AzureStore2", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
                             options.ServiceId = silo.Value.ServiceId.ToString();
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         }))
-                        .AddAzureTableGrainStorage("AzureStore3", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                        .AddAzureTableGrainStorage("AzureStore3", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
                             options.ServiceId = silo.Value.ServiceId.ToString();
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;

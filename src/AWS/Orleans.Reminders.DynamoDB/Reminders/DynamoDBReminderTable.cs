@@ -40,14 +40,16 @@ namespace Orleans.Reminders.DynamoDB
         /// </summary>
         /// <param name="grainReferenceConverter">The grain factory.</param>
         /// <param name="loggerFactory">logger factory to use</param>
-        public DynamoDBReminderTable(IGrainReferenceConverter grainReferenceConverter, 
-            ILoggerFactory loggerFactory, IOptions<SiloOptions> siloOptions, 
+        public DynamoDBReminderTable(
+            IGrainReferenceConverter grainReferenceConverter, 
+            ILoggerFactory loggerFactory, 
+            IOptions<ClusterOptions> clusterOptions, 
             IOptions<DynamoDBReminderStorageOptions> storageOptions)
         {
             this.grainReferenceConverter = grainReferenceConverter;
             this.logger = loggerFactory.CreateLogger<DynamoDBReminderTable>();
             this.loggerFactory = loggerFactory;
-            this.serviceId = siloOptions.Value.ServiceId;
+            this.serviceId = clusterOptions.Value.ServiceId;
             this.options = storageOptions.Value;
         }
 
