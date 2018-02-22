@@ -36,7 +36,8 @@ namespace Orleans.TestingHost
         /// <summary>
         /// Default conststructor which creates the decorated storage provider
         /// </summary>
-        public FaultInjectionGrainStorage(IGrainStorage realStorageProvider, string name, ILoggerFactory loggerFactory, IGrainFactory grainFactory, FaultInjectionGrainStorageOptions faultInjectionOptions)
+        public FaultInjectionGrainStorage(IGrainStorage realStorageProvider, string name, ILoggerFactory loggerFactory, 
+            IGrainFactory grainFactory, FaultInjectionGrainStorageOptions faultInjectionOptions)
         {
             this.realStorageProvider = realStorageProvider;
             this.logger = loggerFactory.CreateLogger($"{this.GetType().FullName}.{name}");

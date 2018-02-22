@@ -4,6 +4,8 @@ using System.IO;
 using System.Reflection;
 using System.Text;
 using Microsoft.Extensions.Logging;
+using Orleans;
+using Orleans.ApplicationParts;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Storage;
@@ -30,18 +32,6 @@ namespace UnitTests
         public void Dispose()
         {
             this.defaultLoggerFactory.Dispose();
-        }
-
-        [Fact, TestCategory("AssemblyLoader"), TestCategory("BVT"), TestCategory("Functional")]
-        public void AssemblyLoaderShouldDiscoverAssemblyLoaderTestAssembly()
-        {
-            logger.Info("AssemblyLoaderTests.ClientShouldDiscoverDummyStreamProviderAssembly");
-
-            var exclusionList = NewExclusionList();
-            var loader = NewAssemblyLoader(exclusionList);
-
-            var t = typeof(Orleans.Providers.IMemoryMessageBodySerializer);
-            DiscoverAssemblies(loader, exclusionList);
         }
 
         [Fact, TestCategory("AssemblyLoader"), TestCategory("Functional")]
@@ -133,7 +123,7 @@ namespace UnitTests
             var loadProvidersCriteria =
                 new AssemblyLoaderReflectionCriterion[]
                     {
-                        AssemblyLoaderCriteria.LoadTypesAssignableFrom(typeof(IGrainStorage))
+                        AssemblyLoaderCriteria.LoadTypesAssignableFrom(typeof(IProvider))
                     };
 
             return AssemblyLoader.NewAssemblyLoader(directories, excludeCriteria, loadProvidersCriteria, logger);
