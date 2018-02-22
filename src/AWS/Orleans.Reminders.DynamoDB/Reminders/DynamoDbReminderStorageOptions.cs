@@ -1,6 +1,4 @@
-using Microsoft.Extensions.Options;
 using Orleans.Reminders.DynamoDB;
-using System.Collections.Generic;
 
 namespace Orleans.Configuration
 {
@@ -17,11 +15,13 @@ namespace Orleans.Configuration
         /// <summary>
         /// AccessKey string for DynamoDB Storage
         /// </summary>
+        [Redact]
         public string AccessKey { get; set; }
 
         /// <summary>
         /// Secret key for DynamoDB storage
         /// </summary>
+        [Redact]
         public string SecretKey { get; set; }
 
         /// <summary>
@@ -44,29 +44,5 @@ namespace Orleans.Configuration
         /// Defaults to 'OrleansReminders'.
         /// </summary>
         public string TableName { get; set; } = "OrleansReminders";
-    }
-
-    /// <inheritdoc />
-    internal class DynamoDBReminderStorageOptionsFormatter : IOptionFormatter<DynamoDBReminderStorageOptions>
-    {
-        private readonly DynamoDBReminderStorageOptions options;
-
-        public DynamoDBReminderStorageOptionsFormatter(IOptions<DynamoDBReminderStorageOptions> options)
-        {
-            this.options = options.Value;
-        }
-
-        /// <inheritdoc />
-        public string Name => nameof(DynamoDBReminderStorageOptions);
-
-        /// <inheritdoc />
-        public IEnumerable<string> Format()
-        {
-            return new[]
-            {
-                OptionFormattingUtilities.Format(nameof(this.options.ServiceId),this.options.ServiceId),
-                OptionFormattingUtilities.Format(nameof(this.options.TableName),this.options.TableName)
-            };
-        }
     }
 }

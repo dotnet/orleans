@@ -44,15 +44,6 @@ namespace AWSUtils.Tests.Streaming
                     {"DataConnectionString", $"Service={AWSTestConstants.Service}"},
                     {"DeleteStateOnClear", "true"}
                 };
-                // FIXME: How to configure TestClusterBuilder with the extension methods
-                //options.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBGrainStorage>("DynamoDBStore", storageConnectionString);
-                //var storageConnectionString2 = new Dictionary<string, string>
-                //{
-                //    {"DataConnectionString", $"Service={AWSTestConstants.Service}"},
-                //    {"DeleteStateOnClear", "true"},
-                //    {"UseJsonFormat", "true"}
-                //};
-                //options.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBGrainStorage>("PubSubStore", storageConnectionString2);
             });
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
@@ -71,7 +62,17 @@ namespace AWSUtils.Tests.Streaming
                     .AddSqsStreams("SQSProvider2", options =>
                      {
                          options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
-                     });
+                     })
+                    .AddDynamoDBGrainStorage("DynamoDBStore", options =>
+                    {
+                        options.SecretKey = $"Service={AWSTestConstants.Service}";
+                        options.DeleteStateOnClear = true;
+                        options.UseJson = true;
+                    })
+                    .AddDynamoDBGrainStorage("PubSubStore", options =>
+                    {
+                        options.SecretKey = $"Service={AWSTestConstants.Service}";
+                    });
             }
         }
 

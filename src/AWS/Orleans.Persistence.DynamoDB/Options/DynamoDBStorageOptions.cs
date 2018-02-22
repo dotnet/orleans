@@ -1,8 +1,6 @@
-﻿using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using Orleans.Persistence.DynamoDB;
 using Orleans.Runtime;
-using System.Collections.Generic;
 
 namespace Orleans.Configuration
 {
@@ -16,11 +14,13 @@ namespace Orleans.Configuration
         /// <summary>
         /// AccessKey string for DynamoDB Storage
         /// </summary>
+        [Redact]
         public string AccessKey { get; set; }
 
         /// <summary>
         /// Secret key for DynamoDB storage
         /// </summary>
+        [Redact]
         public string SecretKey { get; set; }
 
         /// <summary>
@@ -68,8 +68,8 @@ namespace Orleans.Configuration
     /// </summary>
     public class DynamoDBGrainStorageOptionsValidator : IConfigurationValidator
     {
-        private readonly DynamoDBStorageOptions _options;
-        private readonly string _name;
+        private readonly DynamoDBStorageOptions options;
+        private readonly string name;
 
         /// <summary>
         /// Constructor
@@ -78,64 +78,23 @@ namespace Orleans.Configuration
         /// <param name="name">The option name to be validated.</param>
         public DynamoDBGrainStorageOptionsValidator(DynamoDBStorageOptions options, string name)
         {
-            this._options = options;
-            this._name = name;
+            this.options = options;
+            this.name = name;
         }
 
         public void ValidateConfiguration()
         {
-            if (string.IsNullOrWhiteSpace(this._options.TableName))
+            if (string.IsNullOrWhiteSpace(this.options.TableName))
                 throw new OrleansConfigurationException(
-                    $"Configuration for DynamoDBGrainStorage {_name} is invalid. {nameof(this._options.TableName)} is not valid.");
+                    $"Configuration for DynamoDBGrainStorage {this.name} is invalid. {nameof(this.options.TableName)} is not valid.");
 
-            if (this._options.ReadCapacityUnits == 0)
+            if (this.options.ReadCapacityUnits == 0)
                 throw new OrleansConfigurationException(
-                    $"Configuration for DynamoDBGrainStorage {_name} is invalid. {nameof(this._options.ReadCapacityUnits)} is not valid.");
+                    $"Configuration for DynamoDBGrainStorage {this.name} is invalid. {nameof(this.options.ReadCapacityUnits)} is not valid.");
 
-            if (this._options.WriteCapacityUnits == 0)
+            if (this.options.WriteCapacityUnits == 0)
                 throw new OrleansConfigurationException(
-                    $"Configuration for DynamoDBGrainStorage {_name} is invalid. {nameof(this._options.WriteCapacityUnits)} is not valid.");
-        }
-    }
-
-    public class DynamoDBStorageOptionsFormatterResolver : IOptionFormatterResolver<DynamoDBStorageOptions>
-    {
-        private IOptionsSnapshot<DynamoDBStorageOptions> optionsSnapshot;
-        public DynamoDBStorageOptionsFormatterResolver(IOptionsSnapshot<DynamoDBStorageOptions> optionsSnapshot)
-        {
-            this.optionsSnapshot = optionsSnapshot;
-        }
-
-        public IOptionFormatter<DynamoDBStorageOptions> Resolve(string name)
-        {
-            return new DynamoDBStorageOptionsFormatter(name, optionsSnapshot.Get(name));
-        }
-
-        private class DynamoDBStorageOptionsFormatter : IOptionFormatter<DynamoDBStorageOptions>
-        {
-            public string Name { get; }
-
-            private DynamoDBStorageOptions options;
-            public DynamoDBStorageOptionsFormatter(string name, DynamoDBStorageOptions options)
-            {
-                this.options = options;
-                this.Name = OptionFormattingUtilities.Name<DynamoDBStorageOptions>(name);
-            }
-
-            public IEnumerable<string> Format()
-            {
-                return new List<string>()
-                {
-                    OptionFormattingUtilities.Format(nameof(this.options.ServiceId),this.options.ServiceId),
-                    OptionFormattingUtilities.Format(nameof(this.options.TableName),this.options.TableName),
-                    OptionFormattingUtilities.Format(nameof(this.options.DeleteStateOnClear),this.options.DeleteStateOnClear),
-                    OptionFormattingUtilities.Format(nameof(this.options.InitStage),this.options.InitStage),
-                    OptionFormattingUtilities.Format(nameof(this.options.UseJson),this.options.UseJson),
-                    OptionFormattingUtilities.Format(nameof(this.options.UseFullAssemblyNames),this.options.UseFullAssemblyNames),
-                    OptionFormattingUtilities.Format(nameof(this.options.IndentJson),this.options.IndentJson),
-                    OptionFormattingUtilities.Format(nameof(this.options.TypeNameHandling),this.options.TypeNameHandling),
-                };
-            }
+                    $"Configuration for DynamoDBGrainStorage {this.name} is invalid. {nameof(this.options.WriteCapacityUnits)} is not valid.");
         }
     }
 }

@@ -74,7 +74,6 @@ namespace Orleans.Hosting
             Action<OptionsBuilder<DynamoDBStorageOptions>> configureOptions = null)
         {
             configureOptions?.Invoke(services.AddOptions<DynamoDBStorageOptions>(name));
-            services.TryConfigureFormatterResolver<DynamoDBStorageOptions, DynamoDBStorageOptionsFormatterResolver>();
             services.AddTransient<IConfigurationValidator>(sp => new DynamoDBGrainStorageOptionsValidator(sp.GetService<IOptionsSnapshot<DynamoDBStorageOptions>>().Get(name), name));
             services.ConfigureNamedOptionForLogging<DynamoDBStorageOptions>(name);
             services.TryAddSingleton(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
