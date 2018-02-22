@@ -1,17 +1,28 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    public class MethodInterceptionGrain : Grain, IMethodInterceptionGrain, IGrainCallFilter
+    public class OutgoingMethodInterceptionGrain : Grain, IOutgoingMethodInterceptionGrain
+    {
+        public async Task<Dictionary<string, object>> EchoViaOtherGrain(IMethodInterceptionGrain otherGrain, string message)
+        {
+            return new Dictionary<string, object>
+            {
+                ["result"] = await otherGrain.Echo(message)
+            };
+        }
+    }
+
+    public class MethodInterceptionGrain : Grain, IMethodInterceptionGrain, IIncomingGrainCallFilter
     {
         public Task<string> One()
         {
@@ -34,7 +45,7 @@ namespace UnitTests.Grains
 
         public Task<string> IncorrectResultType() => Task.FromResult("hop scotch");
 
-        async Task IGrainCallFilter.Invoke(IGrainCallContext context)
+        async Task IIncomingGrainCallFilter.Invoke(IGrainCallContext context)
         {
             var methodInfo = context.Method;
             if (methodInfo.Name == nameof(One) && methodInfo.GetParameters().Length == 0)
