@@ -13,22 +13,4 @@ namespace Orleans.Configuration
         /// </summary>
         public string ClusterId { get; set; }
     }
-
-    public class ClusterClientOptionsFormatter : IOptionFormatter<ClusterClientOptions>
-    {
-        public string Name => nameof(ClusterClientOptions);
-        private readonly ClusterClientOptions options;
-        public ClusterClientOptionsFormatter(IOptions<ClusterClientOptions> options)
-        {
-            this.options = options.Value;
-        }
-
-        public IEnumerable<string> Format()
-        {
-            return new List<string>()
-            {
-                OptionFormattingUtilities.Format(nameof(this.options.ClusterId), this.options.ClusterId)
-            };
-        }
-    }
 }

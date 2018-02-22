@@ -14,6 +14,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// Azure connection string
         /// </summary>
+        [RedactConnectionString]
         public string ConnectionString { get; set; }
 
         /// <summary>
@@ -68,48 +69,6 @@ namespace Orleans.Configuration
             {
                 throw new OrleansConfigurationException(
                     $"Configuration for AzureBlobStorageOptions {name} is invalid. {nameof(this.options.ContainerName)} is not valid", e);
-            }
-        }
-    }
-
-    public class AzureBlobStorageOptionsFormatterResolver : IOptionFormatterResolver<AzureBlobStorageOptions>
-    {
-        private IOptionsSnapshot<AzureBlobStorageOptions> optionsSnapshot;
-
-        public AzureBlobStorageOptionsFormatterResolver(IOptionsSnapshot<AzureBlobStorageOptions> optionsSnapshot)
-        {
-            this.optionsSnapshot = optionsSnapshot;
-        }
-
-        public IOptionFormatter<AzureBlobStorageOptions> Resolve(string name)
-        {
-            return new AzureBlobStorageOptionsFormatter(name, Options.Create(optionsSnapshot.Get(name)).Value);
-        }
-
-        private class AzureBlobStorageOptionsFormatter : IOptionFormatter<AzureBlobStorageOptions>
-        {
-            public string Name { get; }
-
-            private AzureBlobStorageOptions options;
-
-            public AzureBlobStorageOptionsFormatter(string name, AzureBlobStorageOptions options)
-            {
-                this.options = options;
-                this.Name = OptionFormattingUtilities.Name<AzureBlobStorageOptions>(name);
-            }
-
-            public IEnumerable<string> Format()
-            {
-                return new List<string>()
-                {
-                    OptionFormattingUtilities.Format(nameof(this.options.ConnectionString), ConfigUtilities.RedactConnectionStringInfo(this.options.ConnectionString)),
-                    OptionFormattingUtilities.Format(nameof(this.options.ContainerName),this.options.ContainerName),
-                    OptionFormattingUtilities.Format(nameof(this.options.InitStage),this.options.InitStage),
-                    OptionFormattingUtilities.Format(nameof(this.options.UseJson),this.options.UseJson),
-                    OptionFormattingUtilities.Format(nameof(this.options.UseFullAssemblyNames),this.options.UseFullAssemblyNames),
-                    OptionFormattingUtilities.Format(nameof(this.options.IndentJson),this.options.IndentJson),
-                    OptionFormattingUtilities.Format(nameof(this.options.TypeNameHandling),this.options.TypeNameHandling),
-                };
             }
         }
     }

@@ -23,23 +23,4 @@ namespace Orleans.Configuration
         public bool UseVirtualBucketsConsistentRing { get; set; } = DEFAULT_USE_VIRTUAL_RING_BUCKETS;
         public const bool DEFAULT_USE_VIRTUAL_RING_BUCKETS = true;
     }
-
-    public class ConsistentRingOptionsFormatter : IOptionFormatter<ConsistentRingOptions>
-    {
-        public string Name => nameof(ConsistentRingOptions);
-        private ConsistentRingOptions options;
-        public ConsistentRingOptionsFormatter(IOptions<ConsistentRingOptions> options)
-        {
-            this.options = options.Value;
-        }
-
-        public IEnumerable<string> Format()
-        {
-            return new List<string>()
-            {
-                OptionFormattingUtilities.Format(nameof(this.options.NumVirtualBucketsConsistentRing), this.options.NumVirtualBucketsConsistentRing),
-                OptionFormattingUtilities.Format(nameof(this.options.UseVirtualBucketsConsistentRing), this.options.UseVirtualBucketsConsistentRing),
-            };
-        }
-    }
 }

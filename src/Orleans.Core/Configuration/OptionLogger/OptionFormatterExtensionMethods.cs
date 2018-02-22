@@ -56,20 +56,6 @@ namespace Orleans.Configuration
         }
 
         /// <summary>
-        /// Configure a option formatter for option <typeparam name="TOptions"/> if none is configured
-        /// </summary>
-        /// <typeparam name="TOptions"></typeparam>
-        /// <typeparam name="TOptionFormatter"></typeparam>
-        /// <param name="services"></param>
-        /// <returns></returns>
-        public static IServiceCollection TryConfigureFormatter<TOptions>(this IServiceCollection services)
-            where TOptions : class, new()
-        {
-            services.TryAddSingleton<IOptionFormatter>(sp => sp.GetService<IOptionFormatter<TOptions>>());
-            return services;
-        }
-
-        /// <summary>
         /// Configure option formatter resolver for named option TOptions
         /// </summary>
         public static IServiceCollection ConfigureFormatterResolver<TOptions, TOptionFormatterResolver>(this IServiceCollection services)

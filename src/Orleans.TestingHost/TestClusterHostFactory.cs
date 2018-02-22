@@ -234,7 +234,7 @@ namespace Orleans.TestingHost
                 }
 
                 services.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>()
-                    .TryConfigureFormatter<StaticGatewayListProviderOptions, StaticGatewayListProviderOptionsFormatter>();
+                    .ConfigureFormatter<StaticGatewayListProviderOptions>();
             }
         }
 

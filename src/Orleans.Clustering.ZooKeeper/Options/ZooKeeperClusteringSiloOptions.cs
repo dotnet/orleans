@@ -12,6 +12,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// Connection string for ZooKeeper Storage
         /// </summary>
+        [Redact]
         public string ConnectionString { get; set; }
     }
 }

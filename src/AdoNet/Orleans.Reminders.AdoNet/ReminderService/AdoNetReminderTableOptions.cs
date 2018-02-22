@@ -17,30 +17,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets or sets the connection string.
         /// </summary>
+        [Redact]
         public string ConnectionString { get; set; }
-    }
-
-    /// <inheritdoc />
-    internal class AdoNetReminderTableOptionsFormatter : IOptionFormatter<AdoNetReminderTableOptions>
-    {
-        private readonly AdoNetReminderTableOptions options;
-
-        public AdoNetReminderTableOptionsFormatter(IOptions<AdoNetReminderTableOptions> options)
-        {
-            this.options = options.Value;
-        }
-
-        /// <inheritdoc />
-        public string Name => nameof(AdoNetReminderTableOptions);
-
-        /// <inheritdoc />
-        public IEnumerable<string> Format()
-        {
-            return new[]
-            {
-                OptionFormattingUtilities.Format(nameof(this.options.Invariant), this.options.Invariant),
-                OptionFormattingUtilities.Format(nameof(this.options.ConnectionString), ConfigUtilities.RedactConnectionStringInfo(this.options.ConnectionString))
-            };
-        }
     }
 }

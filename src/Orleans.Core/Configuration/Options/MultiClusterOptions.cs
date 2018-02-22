@@ -60,33 +60,4 @@ namespace Orleans.Configuration
         /// </summary>
         public Dictionary<string, string> GossipChannels { get; set; } = new Dictionary<string, string>();
     }
-
-    public class MultiClusterOptionsFormatter : IOptionFormatter<MultiClusterOptions>
-    {
-        public string Name => nameof(MultiClusterOptions);
-        private MultiClusterOptions options;
-        public MultiClusterOptionsFormatter(IOptions<MultiClusterOptions> options)
-        {
-            this.options = options.Value;
-        }
-
-        public IEnumerable<string> Format()
-        {
-            var formated = new List<string>()
-            {
-                OptionFormattingUtilities.Format(nameof(this.options.HasMultiClusterNetwork), this.options.HasMultiClusterNetwork),
-                OptionFormattingUtilities.Format(nameof(this.options.DefaultMultiCluster), this.options.DefaultMultiCluster != null? string.Join(";", this.options.DefaultMultiCluster) : String.Empty),
-                OptionFormattingUtilities.Format(nameof(this.options.MaxMultiClusterGateways), this.options.MaxMultiClusterGateways),
-                OptionFormattingUtilities.Format(nameof(this.options.BackgroundGossipInterval), this.options.BackgroundGossipInterval),
-                OptionFormattingUtilities.Format(nameof(this.options.UseGlobalSingleInstanceByDefault), this.options.UseGlobalSingleInstanceByDefault),
-                OptionFormattingUtilities.Format(nameof(this.options.GlobalSingleInstanceNumberRetries), this.options.GlobalSingleInstanceNumberRetries),
-                OptionFormattingUtilities.Format(nameof(this.options.GlobalSingleInstanceRetryInterval), this.options.GlobalSingleInstanceRetryInterval),
-            };
-            foreach (KeyValuePair<string, string> channel in this.options.GossipChannels)
-            {
-                formated.Add(OptionFormattingUtilities.Format($"{nameof(this.options.GossipChannels)}.{channel.Key}", channel.Value));
-            }
-            return formated;
-        }
-    }
 }

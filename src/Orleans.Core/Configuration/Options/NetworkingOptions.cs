@@ -21,24 +21,4 @@ namespace Orleans.Configuration
         /// </summary>
         public TimeSpan MaxSocketAge { get; set; } = TimeSpan.MaxValue;
     }
-
-    public class NetworkingOptionsFormatter : IOptionFormatter<NetworkingOptions>
-    {
-        public string Name => nameof(NetworkingOptions);
-
-        private NetworkingOptions options;
-        public NetworkingOptionsFormatter(IOptions<NetworkingOptions> options)
-        {
-            this.options = options.Value;
-        }
-
-        public IEnumerable<string> Format()
-        {
-            return new List<string>()
-            {
-                OptionFormattingUtilities.Format(nameof(this.options.OpenConnectionTimeout),this.options.OpenConnectionTimeout),
-                OptionFormattingUtilities.Format(nameof(this.options.MaxSocketAge), this.options.MaxSocketAge)
-            };
-        }
-    }
 }

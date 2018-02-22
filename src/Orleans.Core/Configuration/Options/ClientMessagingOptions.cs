@@ -26,28 +26,4 @@ namespace Orleans.Configuration
         /// </summary>
         public string NetworkInterfaceName { get; set; }
     }
-
-    public class ClientMessagingOptionFormatter : MessagingOptionsFormatter, IOptionFormatter<ClientMessagingOptions>
-    {
-        public string Name => nameof(ClientMessagingOptions);
-
-        private ClientMessagingOptions options;
-        public ClientMessagingOptionFormatter(IOptions<ClientMessagingOptions> messageOptions)
-            : base(messageOptions.Value)
-        {
-            options = messageOptions.Value;
-        }
-
-        public IEnumerable<string> Format()
-        {
-            List<string> format = base.FormatSharedOptions();
-            format.AddRange(new List<string>
-            {
-                OptionFormattingUtilities.Format(nameof(this.options.ClientSenderBuckets), this.options.ClientSenderBuckets),
-                OptionFormattingUtilities.Format(nameof(options.PreferredFamily), options.PreferredFamily),
-                OptionFormattingUtilities.Format(nameof(options.NetworkInterfaceName), options.NetworkInterfaceName),
-            });
-            return format;
-        }
-    }
 }

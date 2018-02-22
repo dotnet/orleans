@@ -19,23 +19,4 @@ namespace Orleans.Configuration
         /// </summary>
         public TypeInfo FallbackSerializationProvider { get; set; }
     }
-
-    public class SerializationProviderOptionsFormatter : IOptionFormatter<SerializationProviderOptions>
-    {
-        public string Name => nameof(SerializationProviderOptions);
-        private SerializationProviderOptions options;
-        public SerializationProviderOptionsFormatter(IOptions<SerializationProviderOptions> options)
-        {
-            this.options = options.Value;
-        }
-
-        public IEnumerable<string> Format()
-        {
-            return new List<string>()
-            {
-                OptionFormattingUtilities.Format(nameof(this.options.SerializationProviders), string.Join(",", this.options.SerializationProviders)),
-                OptionFormattingUtilities.Format(nameof(this.options.FallbackSerializationProvider), this.options.FallbackSerializationProvider)
-            };
-        }
-    }
 }

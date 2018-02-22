@@ -14,29 +14,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets or sets the storage connection string.
         /// </summary>
+        [RedactConnectionString]
         public string ConnectionString { get; set; }
-    }
-
-    /// <inheritdoc />
-    internal class AzureTableReminderStorageOptionsFormatter : IOptionFormatter<AzureTableReminderStorageOptions>
-    {
-        private readonly AzureTableReminderStorageOptions options;
-
-        public AzureTableReminderStorageOptionsFormatter(IOptions<AzureTableReminderStorageOptions> options)
-        {
-            this.options = options.Value;
-        }
-
-        /// <inheritdoc />
-        public string Name => nameof(AzureTableReminderStorageOptions);
-
-        /// <inheritdoc />
-        public IEnumerable<string> Format()
-        {
-            return new[]
-            {
-                OptionFormattingUtilities.Format(nameof(this.options.ConnectionString), ConfigUtilities.RedactConnectionStringInfo(this.options.ConnectionString))
-            };
-        }
     }
 }

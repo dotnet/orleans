@@ -6,6 +6,7 @@ namespace Orleans.Configuration
 {
     public class AzureTransactionLogOptions
     {
+        [RedactConnectionString]
         public string ConnectionString { get; set; }
 
         public string TableName { get; set; } = "TransactionLog";

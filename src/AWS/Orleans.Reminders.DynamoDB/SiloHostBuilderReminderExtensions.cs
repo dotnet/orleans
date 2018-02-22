@@ -63,7 +63,7 @@ namespace Orleans.Hosting
         {
             services.AddSingleton<IReminderTable, DynamoDBReminderTable>();
             services.Configure(configure);
-            services.TryConfigureFormatter<DynamoDBReminderTableOptions, DynamoDBReminderTableOptionsFormatter>();
+            services.ConfigureFormatter<DynamoDBReminderTableOptions>();
             return services;
         }
 

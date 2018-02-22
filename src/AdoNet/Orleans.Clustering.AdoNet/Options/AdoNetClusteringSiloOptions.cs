@@ -8,6 +8,7 @@
         /// <summary>
         /// Connection string for AdoNet Storage
         /// </summary>
+        [Redact]
         public string ConnectionString { get; set; }
 
         /// <summary>
