@@ -44,13 +44,7 @@ namespace UnitTests.StreamingTests
 
             builder.ConfigureLegacyConfiguration(legacy =>
             {
-
                 legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
-
-                legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
-                legacy.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData",
-                    fireAndForgetDelivery: false,
-                    optimizeForImmutableData: false);
             });
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         }
@@ -60,6 +54,8 @@ namespace UnitTests.StreamingTests
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
+                    .AddSimpleMessageStreamProvider(SmsStreamProviderName)
+                    .AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData", options => options.OptimizeForImmutableData = false)
                     .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
                     {
                         options.ServiceId = silo.Value.ServiceId.ToString();

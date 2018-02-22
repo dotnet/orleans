@@ -32,9 +32,24 @@ namespace UnitTests.General
                 {
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-                    legacy.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProvider");
-                    legacy.ClientConfiguration.AddSimpleMessageStreamProvider("SMSProvider");
                 });
+                builder.AddClientBuilderConfigurator<ClientConfiguretor>();
+                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+            }
+
+            public class SiloConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder.AddSimpleMessageStreamProvider("SMSProvider");
+                }
+            }
+            public class ClientConfiguretor : IClientBuilderConfigurator
+            {
+                public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+                {
+                    clientBuilder.AddSimpleMessageStreamProvider("SMSProvider");
+                }
             }
 
             private class SiloInvokerTestSiloBuilderConfigurator : ISiloBuilderConfigurator

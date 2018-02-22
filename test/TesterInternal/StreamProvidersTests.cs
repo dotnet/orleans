@@ -11,6 +11,8 @@ using UnitTests.StreamingTests;
 using Xunit;
 using Xunit.Abstractions;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Orleans.Hosting;
 using Orleans.Runtime.TestHooks;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -112,12 +114,17 @@ namespace UnitTests.Streaming
                 builder.ConfigureLegacyConfiguration(legacy =>
                 {
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
-
-                    legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
-                    legacy.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData",
-                        fireAndForgetDelivery: false,
-                        optimizeForImmutableData: false);
                 });
+                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+            }
+
+            public class SiloConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME)
+                        .AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData", options => options.OptimizeForImmutableData = false);
+                }
             }
         }
 

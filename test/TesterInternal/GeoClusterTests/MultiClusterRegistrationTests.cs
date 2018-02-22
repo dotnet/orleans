@@ -6,11 +6,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Orleans.TestingHost;
 using TestExtensions;
 using TestGrainInterfaces;
 using Tests.GeoClusterTests;
 using Xunit;
 using Xunit.Abstractions;
+using Orleans.Hosting;
 
 namespace UnitTests.GeoClusterTests
 {
@@ -95,7 +97,13 @@ namespace UnitTests.GeoClusterTests
         {
             return StartClustersAndClients(null, null, silos);
         }
-
+        public class SiloConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder.AddSimpleMessageStreamProvider("SMSProvider");
+            }
+        }
         private Task StartClustersAndClients(Action<ClusterConfiguration> config_customizer, Action<ClientConfiguration> clientconfig_customizer, params short[] silos)
         {
             WriteLog("Creating clusters and clients...");
@@ -111,8 +119,6 @@ namespace UnitTests.GeoClusterTests
             // configuration for cluster
             Action<ClusterConfiguration> addtracing = (ClusterConfiguration c) =>
             {
-                c.AddSimpleMessageStreamProvider("SMSProvider", fireAndForgetDelivery: false);
-
                 config_customizer?.Invoke(c);
             };
             // configuration for clients
@@ -127,7 +133,7 @@ namespace UnitTests.GeoClusterTests
                 var numsilos = silos[i];
                 var clustername = ClusterNames[i] = ((char)('A' + i)).ToString();
                 var c = Clients[i] = new ClientWrapper[numsilos];
-                NewGeoCluster(globalserviceid, clustername, silos[i], addtracing);
+                NewGeoCluster<SiloConfigurator>(globalserviceid, clustername, silos[i], addtracing);
                 // create one client per silo
                 Parallel.For(0, numsilos, paralleloptions, (j) => c[j] = this.NewClient(clustername, j, ClientWrapper.Factory, ccc));
             }

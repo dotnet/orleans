@@ -136,8 +136,12 @@ namespace Tests.GeoClusterTests
         #endregion
 
         #region Cluster Creation
-
         public void NewGeoCluster(Guid globalServiceId, string clusterId, short numSilos, Action<ClusterConfiguration> customizer = null)
+        {
+           NewGeoCluster<NoOpSiloBuilderConfigurator>(globalServiceId, clusterId, numSilos, customizer);
+        }
+        public void NewGeoCluster<TSiloBuilderConfigurator>(Guid globalServiceId, string clusterId, short numSilos, Action<ClusterConfiguration> customizer = null)
+            where TSiloBuilderConfigurator : ISiloBuilderConfigurator, new()
         {
             Action<ClusterConfiguration> extendedcustomizer = config =>
                 {
@@ -154,13 +158,17 @@ namespace Tests.GeoClusterTests
                               ChannelType = GlobalConfiguration.GossipChannelType.AzureTable,
                               ConnectionString = TestDefaultConfiguration.DataConnectionString
                           }};
-
                     customizer?.Invoke(config);
                 };
 
-            NewCluster(clusterId, numSilos, extendedcustomizer);
+            NewCluster<TSiloBuilderConfigurator>(clusterId, numSilos, extendedcustomizer);
         }
-
+        private class NoOpSiloBuilderConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+            }
+        }
 
         private class TestSiloBuilderConfigurator : ISiloBuilderConfigurator
         {
@@ -179,7 +187,14 @@ namespace Tests.GeoClusterTests
             }
         }
 
-        public void NewCluster(string clusterId, short numSilos, Action<ClusterConfiguration> customizer = null)
+        public void NewCluster(string clusterId, short numSilos,
+            Action<ClusterConfiguration> customizer = null)
+        {
+            NewCluster<NoOpSiloBuilderConfigurator>(clusterId, numSilos, customizer);
+        }
+
+        public void NewCluster<TSiloBuilderConfigurator>(string clusterId, short numSilos, Action<ClusterConfiguration> customizer = null)
+            where TSiloBuilderConfigurator : ISiloBuilderConfigurator, new()
         {
             TestCluster testCluster;
             lock (Clusters)
@@ -198,6 +213,7 @@ namespace Tests.GeoClusterTests
                     }
                 };
                 builder.AddSiloBuilderConfigurator<TestSiloBuilderConfigurator>();
+                builder.AddSiloBuilderConfigurator<TSiloBuilderConfigurator>();
                 builder.ConfigureLegacyConfiguration(legacy =>
                 {
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
