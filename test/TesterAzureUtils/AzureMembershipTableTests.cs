@@ -43,7 +43,7 @@ namespace Tester.AzureUtils
                 MaxStorageBusyRetries = 3,
                 ConnectionString = this.connectionString,
             };
-            return new AzureBasedMembershipTable(loggerFactory, Options.Create(options), this.siloOptions);
+            return new AzureBasedMembershipTable(loggerFactory, Options.Create(options), this.clusterOptions);
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)

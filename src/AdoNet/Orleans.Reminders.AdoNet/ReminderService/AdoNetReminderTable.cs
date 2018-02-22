@@ -12,10 +12,13 @@ namespace Orleans.Runtime.ReminderService
         private string serviceId;
         private RelationalOrleansQueries orleansQueries;
 
-        public AdoNetReminderTable(IGrainReferenceConverter grainReferenceConverter, IOptions<SiloOptions> siloOptions, IOptions<AdoNetReminderTableOptions> storageOptions)
+        public AdoNetReminderTable(
+            IGrainReferenceConverter grainReferenceConverter, 
+            IOptions<ClusterOptions> clusterOptions, 
+            IOptions<AdoNetReminderTableOptions> storageOptions)
         {
             this.grainReferenceConverter = grainReferenceConverter;
-            this.serviceId = siloOptions.Value.ServiceId.ToString();
+            this.serviceId = clusterOptions.Value.ServiceId.ToString();
             this.options = storageOptions.Value;
         }
 

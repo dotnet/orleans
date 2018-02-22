@@ -40,7 +40,7 @@ namespace UnitTests.RemindersTest
             };
             return new AdoNetReminderTable(
                 this.ClusterFixture.Services.GetRequiredService<IGrainReferenceConverter>(),
-                this.siloOptions,
+                this.clusterOptions,
                 Options.Create(options));
         }
 

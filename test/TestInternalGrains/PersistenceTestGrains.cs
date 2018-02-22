@@ -294,16 +294,16 @@ namespace UnitTests.Grains
 
     public class ServiceIdGrain : Grain, IServiceIdGrain
     {
-        private readonly IOptions<SiloOptions> siloOptions;
+        private readonly IOptions<ClusterOptions> clusterOptions;
 
-        public ServiceIdGrain(IOptions<SiloOptions> siloOptions)
+        public ServiceIdGrain(IOptions<ClusterOptions> clusterOptions)
         {
-            this.siloOptions = siloOptions;
+            this.clusterOptions = clusterOptions;
         }
 
         public Task<Guid> GetServiceId()
         {
-            return Task.FromResult(siloOptions.Value.ServiceId);
+            return Task.FromResult(clusterOptions.Value.ServiceId);
         }
     }
 

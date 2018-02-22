@@ -131,13 +131,19 @@ namespace Orleans.Storage
         private AdoNetGrainStorageOptions options;
         private IProviderRuntime providerRuntime;
         private string name;
-        public AdoNetGrainStorage(ILogger<AdoNetGrainStorage> logger, IProviderRuntime providerRuntime, IOptions<AdoNetGrainStorageOptions> options, IOptions<SiloOptions> siloOptions, string name)
+
+        public AdoNetGrainStorage(
+            ILogger<AdoNetGrainStorage> logger, 
+            IProviderRuntime providerRuntime, 
+            IOptions<AdoNetGrainStorageOptions> options, 
+            IOptions<ClusterOptions> clusterOptions, 
+            string name)
         {
             this.options = options.Value;
             this.providerRuntime = providerRuntime;
             this.name = name;
             this.logger = logger;
-            this.serviceId = siloOptions.Value.ServiceId.ToString();
+            this.serviceId = clusterOptions.Value.ServiceId.ToString();
         }
 
         public void Participate(ISiloLifecycle lifecycle)

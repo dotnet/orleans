@@ -16,7 +16,7 @@ namespace Orleans.Providers.Streams.AzureQueue
     {
         private readonly string providerName;
         private readonly AzureQueueStreamOptions options;
-        private readonly SiloOptions siloOptions;
+        private readonly ClusterOptions clusterOptions;
         private readonly ILoggerFactory loggerFactory;
         private readonly Func<TDataAdapter> dataAadaptorFactory;
         private HashRingBasedStreamQueueMapper streamQueueMapper;
@@ -36,13 +36,13 @@ namespace Orleans.Providers.Streams.AzureQueue
             string name, 
             AzureQueueStreamOptions options, 
             IServiceProvider serviceProvider, 
-            IOptions<SiloOptions> siloOptions, 
+            IOptions<ClusterOptions> clusterOptions, 
             SerializationManager serializationManager, 
             ILoggerFactory loggerFactory)
         {
             this.providerName = name;
             this.options = options ?? throw new ArgumentNullException(nameof(options));
-            this.siloOptions = siloOptions.Value;
+            this.clusterOptions = clusterOptions.Value;
             this.SerializationManager = serializationManager ?? throw new ArgumentNullException(nameof(serializationManager));
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
             this.dataAadaptorFactory = () => ActivatorUtilities.GetServiceOrCreateInstance<TDataAdapter>(serviceProvider);
@@ -66,7 +66,7 @@ namespace Orleans.Providers.Streams.AzureQueue
                 this.streamQueueMapper, 
                 this.loggerFactory, 
                 this.options.ConnectionString, 
-                this.options.ClusterId ?? this.siloOptions.ClusterId, 
+                this.options.ClusterId ?? this.clusterOptions.ClusterId, 
                 this.providerName, 
                 this.options.MessageVisibilityTimeout);
             return Task.FromResult<IQueueAdapter>(adapter);

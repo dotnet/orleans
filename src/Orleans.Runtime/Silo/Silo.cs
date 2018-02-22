@@ -54,6 +54,7 @@ namespace Orleans.Runtime
 
         private readonly ILocalSiloDetails siloDetails;
         private readonly SiloOptions siloOptions;
+        private readonly ClusterOptions clusterOptions;
         private readonly ISiloMessageCenter messageCenter;
         private readonly OrleansTaskScheduler scheduler;
         private readonly LocalGrainDirectory localGrainDirectory;
@@ -217,6 +218,7 @@ namespace Orleans.Runtime
 
             membershipOracle = Services.GetRequiredService<IMembershipOracle>();
             this.siloOptions = Services.GetRequiredService<IOptions<SiloOptions>>().Value;
+            this.clusterOptions = Services.GetRequiredService<IOptions<ClusterOptions>>().Value;
             var multiClusterOptions = Services.GetRequiredService<IOptions<MultiClusterOptions>>().Value;
 
             if (!multiClusterOptions.HasMultiClusterNetwork)
@@ -497,7 +499,7 @@ namespace Orleans.Runtime
                 async Task StartMultiClusterOracle()
                 {
                     logger.Info("Starting multicluster oracle with my ServiceId={0} and ClusterId={1}.",
-                        this.siloOptions.ServiceId, this.siloOptions.ClusterId);
+                        this.clusterOptions.ServiceId, this.clusterOptions.ClusterId);
 
                     this.multiClusterOracleContext = (multiClusterOracle as SystemTarget)?.SchedulingContext ??
                                                      this.fallbackScheduler.SchedulingContext;

@@ -58,7 +58,7 @@ namespace AWSUtils.Tests.Streaming
                 ConnectionString = AWSTestConstants.DefaultSQSConnectionString,
                 ClusterId = this.clusterId
             };
-            var adapterFactory = new SQSAdapterFactory(SQS_STREAM_PROVIDER_NAME, options, null, Options.Create(new SiloOptions()), null, null);
+            var adapterFactory = new SQSAdapterFactory(SQS_STREAM_PROVIDER_NAME, options, null, Options.Create(new ClusterOptions()), null, null);
             adapterFactory.Init();
             await SendAndReceiveFromQueueAdapter(adapterFactory);
         }

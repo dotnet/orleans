@@ -15,7 +15,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
     {
         private readonly string _providerName;
         private readonly PubSubStreamOptions options;
-        private readonly SiloOptions siloOptions;
+        private readonly ClusterOptions clusterOptions;
         private readonly ILoggerFactory loggerFactory;
         private readonly Func<TDataAdapter> _adaptorFactory;
         private HashRingBasedStreamQueueMapper _streamQueueMapper;
@@ -31,11 +31,17 @@ namespace Orleans.Providers.GCP.Streams.PubSub
         /// </summary>
         protected Func<QueueId, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { private get; set; }
 
-        public PubSubAdapterFactory(string name, PubSubStreamOptions options, IServiceProvider serviceProvider, IOptions<SiloOptions> siloOptions, SerializationManager serializationManager, ILoggerFactory loggerFactory)
+        public PubSubAdapterFactory(
+            string name, 
+            PubSubStreamOptions options, 
+            IServiceProvider serviceProvider, 
+            IOptions<ClusterOptions> clusterOptions, 
+            SerializationManager serializationManager, 
+            ILoggerFactory loggerFactory)
         {
             this._providerName = name;
             this.options = options;
-            this.siloOptions = siloOptions.Value;
+            this.clusterOptions = clusterOptions.Value;
             this.SerializationManager = serializationManager;
             this.loggerFactory = loggerFactory;
             this._adaptorFactory = () => ActivatorUtilities.GetServiceOrCreateInstance<TDataAdapter>(serviceProvider);
@@ -56,7 +62,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
         public virtual Task<IQueueAdapter> CreateAdapter()
         {
             var adapter = new PubSubAdapter<TDataAdapter>(_adaptorFactory(), SerializationManager, this.loggerFactory, _streamQueueMapper,
-                this.options.ProjectId, this.options.TopicId, this.options.ClusterId ?? this.siloOptions.ClusterId, this._providerName, this.options.Deadline, this.options.CustomEndpoint);
+                this.options.ProjectId, this.options.TopicId, this.options.ClusterId ?? this.clusterOptions.ClusterId, this._providerName, this.options.Deadline, this.options.CustomEndpoint);
             return Task.FromResult<IQueueAdapter>(adapter);
         }
 

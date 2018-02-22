@@ -23,10 +23,12 @@ namespace Orleans.Runtime.Membership
         private readonly ConsulClusteringSiloOptions clusteringSiloTableOptions;
         private readonly string clusterId;
 
-        public ConsulBasedMembershipTable(ILogger<ConsulBasedMembershipTable> logger,
-            IOptions<ConsulClusteringSiloOptions> membershipTableOptions, IOptions<SiloOptions> siloOptions)
+        public ConsulBasedMembershipTable(
+            ILogger<ConsulBasedMembershipTable> logger,
+            IOptions<ConsulClusteringSiloOptions> membershipTableOptions, 
+            IOptions<ClusterOptions> clusterOptions)
         {
-            this.clusterId = siloOptions.Value.ClusterId;
+            this.clusterId = clusterOptions.Value.ClusterId;
             this._logger = logger;
             this.clusteringSiloTableOptions = membershipTableOptions.Value;
             _consulClient =
