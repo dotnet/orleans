@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Microsoft.WindowsAzure.Storage.Table;
 using Orleans;
-using Orleans.AzureUtils;
+using Orleans.Configuration;
+using Orleans.Hosting;
+using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.ServiceBus.Providers;
 using Orleans.ServiceBus.Providers.Testing;
 using Orleans.Storage;
 using Orleans.Streams;
@@ -29,8 +29,6 @@ namespace ServiceBus.Tests.SlowConsumingTests
         private static readonly TimeSpan monitorPressureWindowSize = TimeSpan.FromSeconds(3);
         private static readonly TimeSpan timeout = TimeSpan.FromSeconds(30);
         private const double flowControlThredhold = 0.6;
-        public static readonly EventHubGeneratorStreamProviderSettings ProviderSettings =
-            new EventHubGeneratorStreamProviderSettings(StreamProviderName);
 
         private readonly Fixture fixture;
 
@@ -38,25 +36,27 @@ namespace ServiceBus.Tests.SlowConsumingTests
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                ProviderSettings.SlowConsumingMonitorPressureWindowSize = monitorPressureWindowSize;
-                ProviderSettings.SlowConsumingMonitorFlowControlThreshold = flowControlThredhold;
-                ProviderSettings.AveragingCachePressureMonitorFlowControlThreshold = null;
                 builder.ConfigureLegacyConfiguration(legacy => AdjustClusterConfiguration(legacy.ClusterConfiguration));
+                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             }
 
             private static void AdjustClusterConfiguration(ClusterConfiguration config)
             {
-                var settings = new Dictionary<string, string>();
-                // get initial settings from configs
-                ProviderSettings.WriteProperties(settings);
-                ProviderSettings.WriteDataGeneratingConfig(settings);
-
-                // add queue balancer setting
-                settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.AssemblyQualifiedName);
-
-                // register stream provider
-                config.Globals.RegisterStreamProvider<EHStreamProviderWithCreatedCacheList>(StreamProviderName, settings);
                 config.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
+            }
+
+            private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder.AddPersistentStreams<EventDataGeneratorStreamOptions>(StreamProviderName, EHStreamProviderWithCreatedCacheListAdapterFactory.Create, options =>
+                    {
+                        options.SlowConsumingMonitorPressureWindowSize = monitorPressureWindowSize;
+                        options.SlowConsumingMonitorFlowControlThreshold = flowControlThredhold;
+                        options.AveragingCachePressureMonitorFlowControlThreshold = null;
+                        options.BalancerType = StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer;
+                    });
+                }
             }
         }
 
@@ -83,9 +83,9 @@ namespace ServiceBus.Tests.SlowConsumingTests
 
             //configure data generator for stream and start producing
             var mgmtGrain = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
-            var randomStreamPlacementArg = new EventDataGeneratorStreamProvider.AdapterFactory.StreamRandomPlacementArg(streamId, this.seed.Next(100));
-            await mgmtGrain.SendControlCommandToProvider(typeof(EHStreamProviderWithCreatedCacheList).FullName, StreamProviderName,
-                (int)EventDataGeneratorStreamProvider.AdapterFactory.Commands.Randomly_Place_Stream_To_Queue, randomStreamPlacementArg);
+            var randomStreamPlacementArg = new EventDataGeneratorAdapterFactory.StreamRandomPlacementArg(streamId, this.seed.Next(100));
+            await mgmtGrain.SendControlCommandToProvider(typeof(PersistentStreamProvider).FullName, StreamProviderName,
+                (int)EventDataGeneratorAdapterFactory.Commands.Randomly_Place_Stream_To_Queue, randomStreamPlacementArg);
             //since there's an extreme slow consumer, so the back pressure algorithm should be triggered
             await TestingUtils.WaitUntilAsync(lastTry => AssertCacheBackPressureTriggered(true, lastTry), timeout);
 
@@ -98,8 +98,8 @@ namespace ServiceBus.Tests.SlowConsumingTests
 
             //clean up test
             await StopHealthyConsumerGrainComing(healthyConsumers);
-            await mgmtGrain.SendControlCommandToProvider(typeof(EHStreamProviderWithCreatedCacheList).FullName, StreamProviderName,
-                (int)EventDataGeneratorStreamProvider.AdapterFactory.Commands.Stop_Producing_On_Stream, streamId);
+            await mgmtGrain.SendControlCommandToProvider(typeof(PersistentStreamProvider).FullName, StreamProviderName,
+                (int)EventDataGeneratorAdapterFactory.Commands.Stop_Producing_On_Stream, streamId);
         }
 
         public static async Task<List<ISampleStreaming_ConsumerGrain>> SetUpHealthyConsumerGrain(IGrainFactory GrainFactory, Guid streamId, string streamNameSpace, string streamProvider, int grainCount)
@@ -144,8 +144,8 @@ namespace ServiceBus.Tests.SlowConsumingTests
         private async Task<bool> IsBackPressureTriggered()
         {
             IManagementGrain mgmtGrain = this.fixture.HostedCluster.GrainFactory.GetGrain<IManagementGrain>(0);
-            object[] replies = await mgmtGrain.SendControlCommandToProvider(typeof(EHStreamProviderWithCreatedCacheList).FullName,
-                             StreamProviderName, EHStreamProviderWithCreatedCacheList.AdapterFactory.IsCacheBackPressureTriggeredCommand, null);
+            object[] replies = await mgmtGrain.SendControlCommandToProvider(typeof(PersistentStreamProvider).FullName,
+                             StreamProviderName, EHStreamProviderWithCreatedCacheListAdapterFactory.IsCacheBackPressureTriggeredCommand, null);
             foreach (var re in replies)
             {
                 if ((bool)re)

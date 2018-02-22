@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans
 {

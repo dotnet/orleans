@@ -68,7 +68,7 @@ namespace Orleans.TestingHost
                 }
             });
 
-            AddDefaultApplicationParts(hostBuilder.GetApplicationPartManager());
+            hostBuilder.GetApplicationPartManager().ConfigureDefaults();
 
             var host = hostBuilder.Build();
             InitializeTestHooksSystemTarget(host);
@@ -95,7 +95,7 @@ namespace Orleans.TestingHost
                 TryConfigureFileLogging(configuration, services, hostName);
             });
 
-            AddDefaultApplicationParts(builder.GetApplicationPartManager());
+            builder.GetApplicationPartManager().ConfigureDefaults();
             return builder.Build();
         }
 
@@ -246,17 +246,6 @@ namespace Orleans.TestingHost
             {
                 var fileName = TestingUtils.CreateTraceFileName(name, configuration[nameof(TestClusterOptions.ClusterId)]);
                 services.AddLogging(loggingBuilder => loggingBuilder.AddFile(fileName));
-            }
-        }
-
-        private static void AddDefaultApplicationParts(IApplicationPartManager applicationPartsManager)
-        {
-            var hasApplicationParts = applicationPartsManager.ApplicationParts.OfType<AssemblyPart>()
-                .Any(part => !part.IsFrameworkAssembly);
-            if (!hasApplicationParts)
-            {
-                applicationPartsManager.AddFromAppDomain();
-                applicationPartsManager.AddFromApplicationBaseDirectory();
             }
         }
 

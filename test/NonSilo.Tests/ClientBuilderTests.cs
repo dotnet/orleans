@@ -38,25 +38,6 @@ namespace NonSilo.Tests
     public class ClientBuilderTests
     {
         /// <summary>
-        /// Tests that the client builder will fail if no assemblies are configured.
-        /// </summary>
-        [Fact]
-        public void ClientBuilder_AssembliesTest()
-        {
-            var builder = new ClientBuilder()
-                .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
-            Assert.Throws<OrleansConfigurationException>(() => builder.Build());
-
-            // Adding an application assembly allows the builder to build successfully.
-            builder = new ClientBuilder().ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IAccountGrain).Assembly))
-                .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
-            using (var client = builder.Build())
-            {
-                Assert.NotNull(client);
-            }
-        }
-
-        /// <summary>
         /// Tests that a client can be created without specifying configuration.
         /// </summary>
         [Fact]
@@ -64,10 +45,7 @@ namespace NonSilo.Tests
         {
             var builder = new ClientBuilder()
                 .ConfigureDefaults()
-                .ConfigureApplicationParts(
-                    parts => parts
-                        .AddFromApplicationBaseDirectory()
-                        .AddFromAppDomain()).ConfigureServices(RemoveConfigValidators)
+                .ConfigureServices(RemoveConfigValidators)
                 .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
             using (var client = builder.Build())
             {
@@ -83,10 +61,7 @@ namespace NonSilo.Tests
         {
             var builder = new ClientBuilder()
                 .ConfigureDefaults()
-                .ConfigureApplicationParts(
-                    parts => parts
-                        .AddFromApplicationBaseDirectory()
-                        .AddFromAppDomain()).ConfigureServices(RemoveConfigValidators)
+                .ConfigureServices(RemoveConfigValidators)
                 .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
             using (builder.Build())
             {
@@ -102,10 +77,7 @@ namespace NonSilo.Tests
         {
             var builder = new ClientBuilder()
                 .ConfigureDefaults()
-                .ConfigureApplicationParts(
-                    parts => parts
-                        .AddFromApplicationBaseDirectory()
-                        .AddFromAppDomain()).ConfigureServices(RemoveConfigValidators)
+                .ConfigureServices(RemoveConfigValidators)
                 .UseConfiguration(new ClientConfiguration())
                 .UseConfiguration(new ClientConfiguration());
             Assert.Throws<InvalidOperationException>(() => builder.Build());
@@ -119,10 +91,7 @@ namespace NonSilo.Tests
         {
             var builder = new ClientBuilder()
                 .ConfigureDefaults()
-                .ConfigureApplicationParts(
-                    parts => parts
-                        .AddFromApplicationBaseDirectory()
-                        .AddFromAppDomain()).ConfigureServices(RemoveConfigValidators);
+                .ConfigureServices(RemoveConfigValidators);
             Assert.Throws<ArgumentNullException>(() => builder.UseConfiguration(null));
         }
         
@@ -135,10 +104,7 @@ namespace NonSilo.Tests
         {
             var builder = new ClientBuilder()
                 .ConfigureDefaults()
-                .ConfigureApplicationParts(
-                    parts => parts
-                        .AddFromApplicationBaseDirectory()
-                        .AddFromAppDomain()).ConfigureServices(RemoveConfigValidators)
+                .ConfigureServices(RemoveConfigValidators)
                 .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
 
             Assert.Throws<ArgumentNullException>(() => builder.ConfigureServices(null));

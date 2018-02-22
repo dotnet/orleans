@@ -1,35 +1,17 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Orleans.Hosting;
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.Storage;
-using Orleans.Streams;
-using Orleans.TestingHost;
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.Threading.Tasks;
-using Orleans.TestingHost.Utils;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Hosting;
+using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
+using Orleans.Configuration;
 
 namespace Tester.StreamingTests
 {
     public class PluggableQueueBalancerTestBase : OrleansTestingBase
     {
         private static Type QueueBalancerType = typeof(LeaseBasedQueueBalancerForTest);
-        private static PersistentStreamProviderConfig CustomPersistentProviderConfig = CreateConfigWithCustomBalancerType();
-
-        public static void ConfigureCustomQueueBalancer(Dictionary<string, string> streamProviderSettings, ClusterConfiguration config)
-        {
-            CustomPersistentProviderConfig.WriteProperties(streamProviderSettings);
-        }
-
-        private static PersistentStreamProviderConfig CreateConfigWithCustomBalancerType()
-        {
-            var config = new PersistentStreamProviderConfig();
-            config.BalancerType = QueueBalancerType;
-            return config;
-        }
 
         public virtual async Task ShouldUseInjectedQueueBalancerAndBalanceCorrectly(BaseTestClusterFixture fixture, string streamProviderName, int siloCount, int totalQueueCount)
         {

@@ -1,13 +1,15 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost;
-using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.StreamingTests;
 using Xunit;
@@ -19,7 +21,7 @@ namespace Tester.AzureUtils.Streaming
     {
         private const string adapterName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
 #pragma warning disable 618
-        private readonly string adapterType = typeof(AzureQueueStreamProvider).FullName;
+        private readonly string adapterType = typeof(PersistentStreamProvider).FullName;
 #pragma warning restore 618
         private static readonly TimeSpan SILO_IMMATURE_PERIOD = TimeSpan.FromSeconds(40); // matches the config
         private static readonly TimeSpan LEEWAY = TimeSpan.FromSeconds(10);
@@ -33,17 +35,26 @@ namespace Tester.AzureUtils.Streaming
             builder.ConfigureLegacyConfiguration(legacy =>
             {
                 legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-                var persistentStreamProviderConfig = new PersistentStreamProviderConfig
-                {
-                    SiloMaturityPeriod = SILO_IMMATURE_PERIOD,
-                    BalancerType = StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer,
-                };
-
-                legacy.ClusterConfiguration.AddAzureQueueStreamProvider(adapterName, persistentStreamProviderConfig: persistentStreamProviderConfig);
                 legacy.ClientConfiguration.Gateways = legacy.ClientConfiguration.Gateways.Take(1).ToList();
             });
+            builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
         }
-        
+
+        private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder
+                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(adapterName,
+                        options => 
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.SiloMaturityPeriod = SILO_IMMATURE_PERIOD;
+                            options.BalancerType = StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer;
+                        });
+            }
+        }
+
         public DelayedQueueRebalancingTests()
         {
             this.HostedCluster.StopSilo(this.HostedCluster.Silos.ElementAt(1));

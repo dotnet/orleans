@@ -17,6 +17,7 @@ using Orleans.Configuration;
 using TestExtensions;
 using Xunit;
 using Orleans.ServiceBus.Providers.Testing;
+using Orleans.Hosting;
 
 namespace ServiceBus.Tests.EvictionStrategyTests
 {
@@ -40,7 +41,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             //an mock eh settings
             this.ehSettings = new EventHubPartitionSettings
             {
-                Hub = new EventHubSettings(),
+                Hub = new EventHubStreamOptions(),
                 Partition = "MockPartition"
             };
 

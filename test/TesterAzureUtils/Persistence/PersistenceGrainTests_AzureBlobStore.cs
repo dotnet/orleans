@@ -9,7 +9,7 @@ using Orleans.TestingHost;
 using Orleans.Runtime.Configuration;
 using TestExtensions;
 using Orleans.Hosting;
-using Orleans.Storage;
+using Orleans.Configuration;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -43,6 +43,10 @@ namespace Tester.AzureUtils.Persistence
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     });
                     hostBuilder.AddAzureBlobGrainStorage("AzureStore3", (AzureBlobStorageOptions options) =>
+                    {
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    });
+                    hostBuilder.AddAzureBlobGrainStorage("GrainStorageForTest", (AzureBlobStorageOptions options) =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     });

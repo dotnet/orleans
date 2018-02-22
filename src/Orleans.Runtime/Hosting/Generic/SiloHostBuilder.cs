@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.ApplicationParts;
 
 namespace Orleans.Hosting
 {
@@ -38,6 +40,11 @@ namespace Orleans.Hosting
             CreateHostingEnvironment();
             CreateHostBuilderContext();
             BuildAppConfiguration();
+            this.ConfigureApplicationParts(parts =>
+            {
+                // If the user has not added any application parts, add some defaults.
+                parts.ConfigureDefaults();
+            });
 
             var serviceProvider = CreateServiceProvider();
 

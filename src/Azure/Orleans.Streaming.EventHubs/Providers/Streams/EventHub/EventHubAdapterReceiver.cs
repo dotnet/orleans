@@ -11,6 +11,7 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.ServiceBus.Providers.Testing;
+using Orleans.Hosting;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -22,7 +23,7 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Eventhub settings
         /// </summary>
-        public IEventHubSettings Hub { get; set; }
+        public EventHubStreamOptions Hub { get; set; }
         /// <summary>
         /// Partition name
         /// </summary>

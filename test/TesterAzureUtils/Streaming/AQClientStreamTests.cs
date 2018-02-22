@@ -1,9 +1,14 @@
 
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using Orleans;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -35,10 +40,36 @@ namespace Tester.AzureUtils.Streaming
             builder.ConfigureLegacyConfiguration(legacy =>
             {
                 legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-                legacy.ClusterConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
                 legacy.ClusterConfiguration.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
-                legacy.ClientConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
             });
+            builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+            builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
+        }
+
+        private class MyClientBuilderConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder
+                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AQStreamProviderName,
+                        options =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        });
+            }
+        }
+
+        private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder
+                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AQStreamProviderName,
+                        options =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        });
+            }
         }
 
         public override void Dispose()

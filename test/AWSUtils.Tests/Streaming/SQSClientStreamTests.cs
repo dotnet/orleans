@@ -12,6 +12,11 @@ using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 using OrleansAWSUtils.Streams;
+using Orleans.Hosting;
+using Microsoft.Extensions.Configuration;
+using Orleans;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace AWSUtils.Tests.Streaming
 {
@@ -38,11 +43,6 @@ namespace AWSUtils.Tests.Streaming
             }
 
             var clusterId = Guid.NewGuid().ToString();
-            var streamConnectionString = new Dictionary<string, string>
-            {
-                {"DataConnectionString", StorageConnectionString},
-                {"DeploymentId", clusterId}
-            };
             builder.ConfigureLegacyConfiguration(legacy =>
             {
                 legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
@@ -52,9 +52,33 @@ namespace AWSUtils.Tests.Streaming
                 legacy.ClusterConfiguration.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
                 legacy.ClientConfiguration.DataConnectionString = StorageConnectionString;
                 legacy.ClusterConfiguration.Globals.DataConnectionString = StorageConnectionString;
-                legacy.ClusterConfiguration.Globals.RegisterStreamProvider<SQSStreamProvider>(SQSStreamProviderName, streamConnectionString);
-                legacy.ClientConfiguration.RegisterStreamProvider<SQSStreamProvider>(SQSStreamProviderName, streamConnectionString);
             });
+            builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+            builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
+        }
+
+        private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder
+                    .AddSqsStreams(SQSStreamProviderName, options => 
+                    {
+                        options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+                    });
+            }
+        }
+
+        private class MyClientBuilderConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder
+                    .AddSqsStreams(SQSStreamProviderName, options =>
+                    {
+                        options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+                    });
+            }
         }
 
         public override void Dispose()

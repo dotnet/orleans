@@ -1,9 +1,8 @@
 using System;
-using System.Collections.Generic;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.WindowsAzure.Storage.Table;
+using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
-using Orleans.ServiceBus.Providers;
 using Orleans.Storage;
 using Orleans.Streaming.EventHubs;
 using Orleans.TestingHost;
@@ -22,22 +21,7 @@ namespace ServiceBus.Tests.Streaming
         private const string EHConsumerGroup = "orleansnightly";
         private const string EHCheckpointTable = "ehcheckpoint";
         private static readonly string CheckpointNamespace = Guid.NewGuid().ToString();
-
-        private static readonly Lazy<EventHubSettings> EventHubConfig = new Lazy<EventHubSettings>(() =>
-            new EventHubSettings(
-                TestDefaultConfiguration.EventHubConnectionString,
-                EHConsumerGroup, EHPath));
-
-        private static readonly EventHubStreamProviderSettings ProviderSettings =
-            new EventHubStreamProviderSettings(StreamProviderName);
-
-        private static readonly EventHubCheckpointerSettings CheckpointerSettings =
-            new EventHubCheckpointerSettings(TestDefaultConfiguration.DataConnectionString, EHCheckpointTable,
-                CheckpointNamespace,
-                TimeSpan.FromSeconds(10));
-
-        public static readonly EventHubStreamProviderSettings ProviderSettings2 =
-            new EventHubStreamProviderSettings(StreamProviderName2);
+        private static readonly string CheckpointNamespace2 = Guid.NewGuid().ToString();
 
         public class Fixture : BaseTestClusterFixture
         {
@@ -47,33 +31,50 @@ namespace ServiceBus.Tests.Streaming
                 {
                     AdjustClusterConfiguration(legacy.ClusterConfiguration);
                 });
-            }
-
-            private static Dictionary<string, string> BuildProviderSettings(EventHubStreamProviderSettings providerSettings)
-            {
-                var settings = new Dictionary<string, string>();
-                // get initial settings from configs
-                providerSettings.WriteProperties(settings);
-                EventHubConfig.Value.WriteProperties(settings);
-                CheckpointerSettings.WriteProperties(settings);
-                return settings;
+                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             }
 
             private static void AdjustClusterConfiguration(ClusterConfiguration config)
             {
-                // register stream provider
-                config.Globals.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, BuildProviderSettings(ProviderSettings));
-                config.Globals.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName2, BuildProviderSettings(ProviderSettings2));
                 config.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
             }
 
             public override void Dispose()
             {
                 base.Dispose();
-                var dataManager = new AzureTableDataManager<TableEntity>(CheckpointerSettings.TableName, CheckpointerSettings.DataConnectionString, NullLoggerFactory.Instance);
+                var dataManager = new AzureTableDataManager<TableEntity>(EHCheckpointTable, TestDefaultConfiguration.DataConnectionString, NullLoggerFactory.Instance);
                 dataManager.InitTableAsync().Wait();
                 dataManager.ClearTableAsync().Wait();
                 TestAzureTableStorageStreamFailureHandler.DeleteAll().Wait();
+            }
+
+            private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder
+                        .AddEventHubStreams(StreamProviderName,
+                        options =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                            options.ConsumerGroup = EHConsumerGroup;
+                            options.Path = EHPath;
+                            options.CheckpointConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.CheckpointTableName = EHCheckpointTable;
+                            options.CheckpointNamespace = CheckpointNamespace;
+                            options.CheckpointPersistInterval = TimeSpan.FromSeconds(10);
+                        })
+                        .AddEventHubStreams(StreamProviderName2, options =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                            options.ConsumerGroup = EHConsumerGroup;
+                            options.Path = EHPath;
+                            options.CheckpointConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.CheckpointTableName = EHCheckpointTable;
+                            options.CheckpointNamespace = CheckpointNamespace2;
+                            options.CheckpointPersistInterval = TimeSpan.FromSeconds(10);
+                        });
+                }
             }
         }
 

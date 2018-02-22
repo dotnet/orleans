@@ -14,6 +14,8 @@ using Tester;
 using Orleans.Hosting;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Microsoft.Extensions.Configuration;
+using Orleans.Providers.Streams.AzureQueue;
 
 namespace UnitTests.StreamingTests
 {
@@ -43,16 +45,26 @@ namespace UnitTests.StreamingTests
                     fireAndForgetDelivery: false,
                     optimizeForImmutableData: false);
 
-                legacy.ClusterConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
-                legacy.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
-
                 legacy.ClientConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
-                legacy.ClientConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
             });
-            builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+            builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+            builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
         }
 
-        private class SiloBuilderConfigurator : ISiloBuilderConfigurator
+        private class MyClientBuilderConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder
+                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName,
+                        options =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        });
+            }
+        }
+
+        private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
@@ -68,7 +80,17 @@ namespace UnitTests.StreamingTests
                         options.ServiceId = silo.Value.ServiceId.ToString();
                         options.DeleteStateOnClear = true;
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                    }));
+                    }))
+                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName,
+                        options =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        })
+                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>("AzureQueueProvider2",
+                        options =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        });
             }
         }
 

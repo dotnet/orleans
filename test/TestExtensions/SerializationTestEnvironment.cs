@@ -17,14 +17,8 @@ namespace TestExtensions
         {
             if (config == null) config = this.DefaultConfig();
 
-            var builder = new ClientBuilder()
-                .ConfigureDefaults()
-                .ConfigureApplicationParts(
-                    parts => parts
-                        .AddFromApplicationBaseDirectory()
-                        .AddFromAppDomain());
+            var builder = new ClientBuilder().ConfigureDefaults();
             builder.UseConfiguration(config);
-            builder.ConfigureApplicationParts(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory());
             configureClientBuilder?.Invoke(builder);
             this.Client = builder.Build();
             this.RuntimeClient = this.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();

@@ -1,13 +1,13 @@
-﻿using Microsoft.Extensions.Options;
+﻿using System;
+using System.Collections.Generic;
+using Microsoft.Extensions.Options;
 using Microsoft.WindowsAzure.Storage;
 using Newtonsoft.Json;
 using Orleans.Persistence.AzureStorage;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using System;
-using System.Collections.Generic;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     public class AzureBlobStorageOptions
     {

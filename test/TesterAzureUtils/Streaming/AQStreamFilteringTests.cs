@@ -1,15 +1,17 @@
 using System;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Tester.StreamingTests;
 using TestExtensions;
 using UnitTests.StreamingTests;
 using Xunit;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Tester.AzureUtils.Streaming
 {
@@ -26,9 +28,21 @@ namespace Tester.AzureUtils.Streaming
                 {
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-
-                    legacy.ClusterConfiguration.AddAzureQueueStreamProvider(StreamProvider);
                 });
+                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+            }
+
+            private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder
+                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamProvider,
+                        options =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        });
+                }
             }
 
             public override void Dispose()

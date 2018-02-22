@@ -68,13 +68,20 @@ namespace Orleans
         /// <param name="formatter"></param>
         public void LogOption(IOptionFormatter formatter)
         {
-            var stringBuiler = new StringBuilder();
-            stringBuiler.AppendLine($"Configuration {formatter.Name}: ");
-            foreach (var setting in formatter.Format())
+            try
             {
-                stringBuiler.AppendLine($"{setting}");
+                var stringBuiler = new StringBuilder();
+                stringBuiler.AppendLine($"Configuration {formatter.Name}: ");
+                foreach (var setting in formatter.Format())
+                {
+                    stringBuiler.AppendLine($"{setting}");
+                }
+                this.logger.LogInformation(stringBuiler.ToString());
+            } catch(Exception ex)
+            {
+                this.logger.LogError(ex, $"An error occured while logging options {formatter.Name}", formatter.Name);
+                throw;
             }
-            this.logger.LogInformation(stringBuiler.ToString());
         }
     }
 }
