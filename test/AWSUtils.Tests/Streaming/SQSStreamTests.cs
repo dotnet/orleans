@@ -44,14 +44,6 @@ namespace AWSUtils.Tests.Streaming
                     {"DataConnectionString", $"Service={AWSTestConstants.Service}"},
                     {"DeleteStateOnClear", "true"}
                 };
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("DynamoDBStore", storageConnectionString);
-                var storageConnectionString2 = new Dictionary<string, string>
-                {
-                    {"DataConnectionString", $"Service={AWSTestConstants.Service}"},
-                    {"DeleteStateOnClear", "true"},
-                    {"UseJsonFormat", "true"}
-                };
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("PubSubStore", storageConnectionString2);
             });
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
@@ -70,7 +62,21 @@ namespace AWSUtils.Tests.Streaming
                     .AddSqsStreams("SQSProvider2", options =>
                      {
                          options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
-                     });
+                     })
+                    .AddDynamoDBGrainStorage("DynamoDBStore", options =>
+                    {
+                        options.Service = AWSTestConstants.Service;
+                        options.SecretKey = AWSTestConstants.SecretKey;
+                        options.AccessKey = AWSTestConstants.AccessKey;
+                        options.DeleteStateOnClear = true;
+                        options.UseJson = true;
+                    })
+                    .AddDynamoDBGrainStorage("PubSubStore", options =>
+                    {
+                        options.Service = AWSTestConstants.Service;
+                        options.SecretKey = AWSTestConstants.SecretKey;
+                        options.AccessKey = AWSTestConstants.AccessKey;
+                    });
             }
         }
 

@@ -1,9 +1,8 @@
-﻿using System;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Messaging;
-using Orleans.Runtime.Membership;
-using Orleans.Runtime.MembershipService;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Orleans.Clustering.DynamoDB;
 using Orleans.Configuration;
+using Orleans.Messaging;
+using System;
 
 namespace Orleans.Hosting
 {
@@ -23,7 +22,7 @@ namespace Orleans.Hosting
         /// </returns>
         public static ISiloHostBuilder UseDynamoDBClustering(
             this ISiloHostBuilder builder,
-            Action<DynamoDBClusteringSiloOptions> configureOptions)
+            Action<DynamoDBClusteringOptions> configureOptions)
         {
             return builder.ConfigureServices(
                 services =>
@@ -51,12 +50,12 @@ namespace Orleans.Hosting
         /// </returns>
         public static ISiloHostBuilder UseDynamoDBClustering(
             this ISiloHostBuilder builder,
-            Action<OptionsBuilder<DynamoDBClusteringSiloOptions>> configureOptions)
+            Action<OptionsBuilder<DynamoDBClusteringOptions>> configureOptions)
         {
             return builder.ConfigureServices(
                 services =>
                 {
-                    configureOptions?.Invoke(services.AddOptions<DynamoDBClusteringSiloOptions>());
+                    configureOptions?.Invoke(services.AddOptions<DynamoDBClusteringOptions>());
                     services.AddSingleton<IMembershipTable, DynamoDBMembershipTable>();
                 });
         }
@@ -75,7 +74,7 @@ namespace Orleans.Hosting
         /// </returns>
         public static IClientBuilder UseDynamoDBClustering(
             this IClientBuilder builder,
-            Action<DynamoDBClusteringClientOptions> configureOptions)
+            Action<DynamoDBGatewayOptions> configureOptions)
         {
             return builder.ConfigureServices(
                 services =>
@@ -103,12 +102,12 @@ namespace Orleans.Hosting
         /// </returns>
         public static IClientBuilder UseDynamoDBClustering(
             this IClientBuilder builder,
-            Action<OptionsBuilder<DynamoDBClusteringClientOptions>> configureOptions)
+            Action<OptionsBuilder<DynamoDBGatewayOptions>> configureOptions)
         {
             return builder.ConfigureServices(
                 services =>
                 {
-                    configureOptions?.Invoke(services.AddOptions<DynamoDBClusteringClientOptions>());
+                    configureOptions?.Invoke(services.AddOptions<DynamoDBGatewayOptions>());
                     services.AddSingleton<IGatewayListProvider, DynamoDBGatewayListProvider>();
                 });
         }

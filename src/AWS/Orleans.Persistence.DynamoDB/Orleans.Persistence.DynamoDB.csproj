@@ -22,6 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
     <ProjectReference Include="..\..\OrleansProviders\OrleansProviders.csproj" />
   </ItemGroup>
 
