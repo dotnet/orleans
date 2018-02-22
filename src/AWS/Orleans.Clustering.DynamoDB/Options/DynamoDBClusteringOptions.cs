@@ -7,11 +7,13 @@ namespace Orleans.Configuration
         /// <summary>
         /// AccessKey string for DynamoDB Storage
         /// </summary>
+        [Redact]
         public string AccessKey { get; set; }
 
         /// <summary>
         /// Secret key for DynamoDB storage
         /// </summary>
+        [Redact]
         public string SecretKey { get; set; }
 
         /// <summary>

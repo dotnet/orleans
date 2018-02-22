@@ -30,7 +30,7 @@ namespace UnitTests
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
                     legacy.ClusterConfiguration.Globals.AllowCallChainReentrancy = true;
                 });
-                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+                builder.AddSiloBuilderConfigurator<ReentrancyTestsSiloBuilderConfigurator>();
             }
         }
 
@@ -372,7 +372,7 @@ namespace UnitTests
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
                     this.ClusterConfiguration = legacy.ClusterConfiguration;
                 });
-                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+                builder.AddSiloBuilderConfigurator<ReentrancyTestsSiloBuilderConfigurator>();
             }
         }
 
@@ -526,7 +526,7 @@ namespace UnitTests
         }
     }
 
-    internal class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+    internal class ReentrancyTestsSiloBuilderConfigurator : ISiloBuilderConfigurator
     {
         public void Configure(ISiloHostBuilder hostBuilder)
         {
