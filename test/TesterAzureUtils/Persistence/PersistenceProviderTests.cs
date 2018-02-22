@@ -203,14 +203,11 @@ namespace Tester.AzureUtils.Persistence
         {
             const string testName = nameof(PersistenceProvider_Memory_FixedLatency_WriteRead);
             TimeSpan expectedLatency = TimeSpan.FromMilliseconds(200);
-            var lifecycle = new SiloLifecycle(NullLoggerFactory.Instance);
             MemoryGrainStorageWithLatency store = new MemoryGrainStorageWithLatency(testName, new MemoryStorageWithLatencyOptions()
             {
                 Latency = expectedLatency,
                 MockCallsOnly = true
             }, NullLoggerFactory.Instance, this.providerRuntime.ServiceProvider.GetService<IGrainFactory>());
-            store.Participate(lifecycle);
-            await lifecycle.OnStart();
 
             GrainReference reference = this.fixture.InternalGrainFactory.GetGrain(GrainId.NewId());
             var state = TestStoreGrainState.NewRandomState();

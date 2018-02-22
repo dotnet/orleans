@@ -117,7 +117,7 @@ namespace Orleans.TestingHost
 
         public void Participate(ISiloLifecycle lifecycle)
         {
-            (realStorageProvider as ILifecycleParticipant<ISiloLifecycle>).Participate(lifecycle);
+            (realStorageProvider as ILifecycleParticipant<ISiloLifecycle>)?.Participate(lifecycle);
         }
     }
 

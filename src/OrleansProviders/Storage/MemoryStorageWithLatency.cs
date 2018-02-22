@@ -39,7 +39,7 @@ namespace Orleans.Storage
     /// </code>
     /// </example>
     [DebuggerDisplay("MemoryStore:{Name},WithLatency:{latency}")]
-    public class MemoryGrainStorageWithLatency :IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
+    public class MemoryGrainStorageWithLatency :IGrainStorage
     {
         private const int NUM_STORE_GRAINS = 1;
         private MemoryGrainStorage baseGranStorage;
@@ -105,11 +105,6 @@ namespace Orleans.Storage
                 // Wrap in AggregateException so that the original error stack trace is preserved.
                 throw new AggregateException(error);
             }
-        }
-
-        public void Participate(ISiloLifecycle lifecycle)
-        {
-            baseGranStorage.Participate(lifecycle);
         }
     }
 }

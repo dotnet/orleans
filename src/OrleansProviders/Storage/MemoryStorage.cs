@@ -36,7 +36,7 @@ namespace Orleans.Storage
     /// </code>
     /// </example>
     [DebuggerDisplay("MemoryStore:{Name}")]
-    public class MemoryGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
+    public class MemoryGrainStorage : IGrainStorage, IDisposable
     {
         private MemoryGrainStorageOptions options;
         private const string STATE_STORE_NAME = "MemoryStorage";
@@ -54,14 +54,8 @@ namespace Orleans.Storage
             this.name = name;
             this.logger = loggerFactory.CreateLogger($"{this.GetType().FullName}.{name}");
             this.grainFactory = grainFactory;
-        }
 
-
-        #region IStorageProvider methods
-
-        /// <summary> Initialization function for this storage provider. </summary>
-        protected virtual Task Init(CancellationToken tk)
-        {
+            //Init
             logger.Info("Init: Name={0} NumStorageGrains={1}", name, this.options.NumStorageGrains);
 
             storageGrains = new Lazy<IMemoryStorageGrain>[this.options.NumStorageGrains];
@@ -70,16 +64,6 @@ namespace Orleans.Storage
                 int idx = i; // Capture variable to avoid modified closure error
                 storageGrains[idx] = new Lazy<IMemoryStorageGrain>(() => this.grainFactory.GetGrain<IMemoryStorageGrain>(idx));
             }
-            return Task.CompletedTask;
-        }
-
-        /// <summary> Shutdown function for this storage provider. </summary>
-        protected virtual Task Close(CancellationToken tk)
-        {
-            for (int i = 0; i < this.options.NumStorageGrains; i++)
-                storageGrains[i] = null;
-            
-            return Task.CompletedTask;
         }
 
         /// <summary> Read state data function for this storage provider. </summary>
@@ -136,8 +120,6 @@ namespace Orleans.Storage
                 throw e.AsInconsistentStateException();
             }
         }
-
-        #endregion
 
         private static IEnumerable<Tuple<string, string>> MakeKeys(string grainType, GrainReference grain)
         {
@@ -212,9 +194,10 @@ namespace Orleans.Storage
             return compareClause;
         }
 
-        public void Participate(ISiloLifecycle lifecycle)
+        public void Dispose()
         {
-            lifecycle.Subscribe(this.options.InitStage, this.Init, this.Close);
+            for (int i = 0; i < this.options.NumStorageGrains; i++)
+                storageGrains[i] = null;
         }
     }
 
