@@ -134,8 +134,7 @@ namespace Orleans.Streams
             {
                 throw new ArgumentNullException("queueMapper");
             }
-            var options = this.serviceProvider.GetServiceByName<LeaseBasedQueueBalancerOptions>(strProviderName)
-                ?? this.serviceProvider.GetService<LeaseBasedQueueBalancerOptions>();
+            var options = this.serviceProvider.GetRequiredService<IOptionsSnapshot<LeaseBasedQueueBalancerOptions>>().Get(strProviderName);
             if (options == null)
                 throw new KeyNotFoundException($"No lease base queue balancer options was configured for provider {strProviderName}, nor was a default configured.");
             this.leaseProvider = this.serviceProvider.GetRequiredService(options.LeaseProviderType) as ILeaseProvider;

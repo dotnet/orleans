@@ -38,11 +38,11 @@ namespace Tests.GeoClusterTests
 
         public class ClientWrapper : Tests.GeoClusterTests.TestingClusterHost.ClientWrapperBase
         {
-            public static readonly Func<string, int, string, Action<ClientConfiguration>, ClientWrapper> Factory =
-                (name, gwPort, clusterId, configUpdater) => new ClientWrapper(name, gwPort, clusterId, configUpdater);
+            public static readonly Func<string, int, string, Action<ClientConfiguration>, Action<IClientBuilder>, ClientWrapper> Factory =
+                (name, gwPort, clusterId, configUpdater, clientConfigurator) => new ClientWrapper(name, gwPort, clusterId, configUpdater, clientConfigurator);
 
-            public ClientWrapper(string name, int gatewayport, string clusterId, Action<ClientConfiguration> customizer)
-               : base(name, gatewayport, clusterId, customizer)
+            public ClientWrapper(string name, int gatewayport, string clusterId, Action<ClientConfiguration> customizer, Action<IClientBuilder> clientConfigurator)
+               : base(name, gatewayport, clusterId, customizer, clientConfigurator)
             {
                 systemManagement = this.GrainFactory.GetGrain<IManagementGrain>(0);
             }

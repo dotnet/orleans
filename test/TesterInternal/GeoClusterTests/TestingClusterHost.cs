@@ -308,7 +308,7 @@ namespace Tests.GeoClusterTests
             private readonly Lazy<ClientConfiguration> clientConfiguration =
                 new Lazy<ClientConfiguration>(
                     () => ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml"));
-            public ClientWrapperBase(string name, int gatewayport, string clusterId, Action<ClientConfiguration> configCustomizer)
+            public ClientWrapperBase(string name, int gatewayport, string clusterId, Action<ClientConfiguration> configCustomizer, Action<IClientBuilder> clientConfigurator)
             {
                 this.Name = name;
 
@@ -332,9 +332,10 @@ namespace Tests.GeoClusterTests
 
                 configCustomizer?.Invoke(config);
 
-                this.InternalClient = (IInternalClusterClient) new ClientBuilder()
-                    .UseConfiguration(config)
-                    .Build();
+                var internalClientBuilder = (IClientBuilder )new ClientBuilder()
+                    .UseConfiguration(config);
+                clientConfigurator?.Invoke(internalClientBuilder);
+                this.InternalClient = (IInternalClusterClient) internalClientBuilder.Build();
                 this.InternalClient.Connect().Wait();
             }
 
@@ -350,8 +351,9 @@ namespace Tests.GeoClusterTests
         public T NewClient<T>(
             string clusterId,
             int clientNumber,
-            Func<string, int, string, Action<ClientConfiguration>, T> factory,
-            Action<ClientConfiguration> customizer = null) where T : ClientWrapperBase
+            Func<string, int, string, Action<ClientConfiguration>, Action<IClientBuilder>, T> factory,
+            Action<ClientConfiguration> customizer = null,
+            Action<IClientBuilder> clientConfigurator = null) where T : ClientWrapperBase
         {
             var ci = this.Clusters[clusterId];
             var name = string.Format("Client-{0}-{1}", clusterId, clientNumber);
@@ -361,7 +363,7 @@ namespace Tests.GeoClusterTests
 
             WriteLog("Starting {0} connected to {1}", name, gatewayport);
             
-            var client = factory(name, gatewayport, clusterId, customizer);
+            var client = factory(name, gatewayport, clusterId, customizer, clientConfigurator);
 
             lock (activeClients)
             {

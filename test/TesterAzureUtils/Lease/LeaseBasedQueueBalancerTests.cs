@@ -47,12 +47,14 @@ namespace Tester.AzureUtils.Lease
                     BlobContainerName = "test-container-leasebasedqueuebalancer"
                 };
                 services.AddSingleton<AzureBlobLeaseProviderConfig>(leaseProviderConfig);
-                services.AddTransient<AzureBlobLeaseProvider>();
-                services.AddOptions<LeaseBasedQueueBalancerOptions>(StreamProviderName).Configure( options =>
-                {
-                    options.LeaseProviderType = typeof(AzureBlobLeaseProvider);
-                    options.LeaseLength = TimeSpan.FromSeconds(15);
-                });
+                services.AddTransient<AzureBlobLeaseProvider>()
+                    .ConfigureNamedOptionForLogging<LeaseBasedQueueBalancerOptions>(StreamProviderName);
+                services.AddOptions<LeaseBasedQueueBalancerOptions>(StreamProviderName).Configure(options =>
+               {
+                   options.LeaseProviderType = typeof(AzureBlobLeaseProvider);
+                   options.LeaseLength = TimeSpan.FromSeconds(15);
+               });
+                
             }
 
             public void Configure(ISiloHostBuilder hostBuilder)

@@ -18,12 +18,12 @@ namespace Tests.GeoClusterTests
         // this client is used to call into the management grain.
         public class ClientWrapper : TestingClusterHost.ClientWrapperBase
         {
-            public static readonly Func<string, int, string, Action<ClientConfiguration>, ClientWrapper> Factory =
-                (name, gwPort, clusterId, configUpdater) => new ClientWrapper(name, gwPort, clusterId, configUpdater);
+            public static readonly Func<string, int, string, Action<ClientConfiguration>, Action<IClientBuilder>, ClientWrapper> Factory =
+                (name, gwPort, clusterId, configUpdater, clientConfigurator) => new ClientWrapper(name, gwPort, clusterId, configUpdater, clientConfigurator);
 
-            public ClientWrapper(string name, int gatewayport, string clusterId, Action<ClientConfiguration> customizer)
+            public ClientWrapper(string name, int gatewayport, string clusterId, Action<ClientConfiguration> customizer, Action<IClientBuilder> clientConfigurator)
                 // use null clusterId, in this test, because we are testing non-geo clients
-                : base(name, gatewayport, null, customizer)
+                : base(name, gatewayport, null, customizer, clientConfigurator)
             {
                 this.systemManagement = this.GrainFactory.GetGrain<IManagementGrain>(0);
             }

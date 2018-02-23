@@ -121,9 +121,6 @@ namespace UnitTests.GeoClusterTests
             {
                 config_customizer?.Invoke(c);
             };
-            // configuration for clients
-            Action<ClientConfiguration> ccc = (config) =>
-               config.RegisterStreamProvider("Orleans.Providers.Streams.SimpleMessageStream.SimpleMessageStreamProvider", "SMSProvider");
 
             // Create clusters and clients
             ClusterNames = new string[silos.Length];
@@ -135,7 +132,7 @@ namespace UnitTests.GeoClusterTests
                 var c = Clients[i] = new ClientWrapper[numsilos];
                 NewGeoCluster<SiloConfigurator>(globalserviceid, clustername, silos[i], addtracing);
                 // create one client per silo
-                Parallel.For(0, numsilos, paralleloptions, (j) => c[j] = this.NewClient(clustername, j, ClientWrapper.Factory, ccc));
+                Parallel.For(0, numsilos, paralleloptions, (j) => c[j] = this.NewClient(clustername, j, ClientWrapper.Factory, null, clientBuilder => clientBuilder.AddSimpleMessageStreamProvider("SMSProvider")));
             }
 
             WriteLog("Clusters and clients are ready (elapsed = {0})", stopwatch.Elapsed);
@@ -158,10 +155,10 @@ namespace UnitTests.GeoClusterTests
         #region client wrappers
         public class ClientWrapper : ClientWrapperBase
         {
-            public static readonly Func<string, int, string, Action<ClientConfiguration>, ClientWrapper> Factory =
-                (name, gwPort, clusterId, configUpdater) => new ClientWrapper(name, gwPort, clusterId, configUpdater);
+            public static readonly Func<string, int, string, Action<ClientConfiguration>, Action<IClientBuilder>, ClientWrapper> Factory =
+                (name, gwPort, clusterId, configUpdater, clientConfigurator) => new ClientWrapper(name, gwPort, clusterId, configUpdater, clientConfigurator);
             
-            public ClientWrapper(string name, int gatewayport, string clusterId, Action<ClientConfiguration> configCustomizer) : base(name, gatewayport, clusterId, configCustomizer)
+            public ClientWrapper(string name, int gatewayport, string clusterId, Action<ClientConfiguration> configCustomizer, Action<IClientBuilder> clientConfigurator) : base(name, gatewayport, clusterId, configCustomizer, clientConfigurator)
             {
                 this.systemManagement = this.GrainFactory.GetGrain<IManagementGrain>(0);
             }
