@@ -13,16 +13,8 @@ namespace Orleans.Configuration
         /// </summary>
         public Type LeaseProviderType { get; set; }
         /// <summary>
-        /// LeaseProviderTypeName
-        /// </summary>
-        public const string LeaseProviderTypeName = nameof(LeaseProviderType);
-        /// <summary>
         /// LeaseLength
         /// </summary>
         public TimeSpan LeaseLength { get; set; } = TimeSpan.FromSeconds(60);
-        /// <summary>
-        /// LeaseLengthName
-        /// </summary>
-        public const string LeaseLengthName = nameof(LeaseLengthName);
     }
 }
