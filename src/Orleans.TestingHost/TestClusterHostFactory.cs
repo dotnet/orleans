@@ -35,7 +35,7 @@ namespace Orleans.TestingHost
             string siloName = configuration[nameof(TestSiloSpecificOptions.SiloName)] ?? hostName;
 
             ISiloHostBuilder hostBuilder = new SiloHostBuilder()
-                .ConfigureOrleans(ob => ob.Bind(configuration))
+                .Configure(ob => ob.Bind(configuration))
                 .ConfigureSiloName(siloName)
                 .ConfigureHostConfiguration(cb =>
                 {
