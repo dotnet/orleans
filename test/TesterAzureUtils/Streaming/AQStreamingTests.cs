@@ -67,7 +67,7 @@ namespace Tester.AzureUtils.Streaming
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         })
-                    .AddMemoryGrainStorageAsDefault();
+                    .AddMemoryGrainStorage("MemoryStore");
             }
         }
 
