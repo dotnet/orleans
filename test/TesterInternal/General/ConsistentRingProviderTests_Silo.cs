@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
@@ -29,10 +30,18 @@ namespace UnitTests.General
         {
             builder.ConfigureLegacyConfiguration(legacy =>
             {
-                legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
                 this.ClusterConfiguration = legacy.ClusterConfiguration;
             });
+            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+        }
+
+        private class SiloConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder.AddMemoryGrainStorage("MemoryStore")
+                    .AddMemoryGrainStorageAsDefault();
+            }
         }
 
         #region Tests

@@ -37,11 +37,19 @@ namespace UnitTests.Streaming
                     legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test2");
                     legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.ErrorInjectionStorageProvider>("ErrorInjector");
                     legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("lowercase");
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
                     legacy.ClusterConfiguration.Globals.ServiceId = ServiceId;
 
                     this.ClusterConfiguration = legacy.ClusterConfiguration;
                 });
+                builder.AddSiloBuilderConfigurator<SiloHostConfigurator>();
+            }
+
+            public class SiloHostConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder.AddMemoryGrainStorage("MemoryStore");
+                }
             }
         }
 
@@ -111,10 +119,6 @@ namespace UnitTests.Streaming
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.Options.InitialSilosCount = 4;
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
-                });
                 builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             }
 
@@ -123,7 +127,8 @@ namespace UnitTests.Streaming
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME)
-                        .AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData", options => options.OptimizeForImmutableData = false);
+                        .AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData", options => options.OptimizeForImmutableData = false)
+                        .AddMemoryGrainStorage("MemoryStore", op => op.NumStorageGrains = 1);
                 }
             }
         }

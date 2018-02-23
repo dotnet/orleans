@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
@@ -24,10 +25,18 @@ namespace UnitTests.General
         {
             builder.ConfigureLegacyConfiguration(legacy =>
             {
-                legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
                 legacy.ClusterConfiguration.ApplyToAllNodes(nodeConfig => nodeConfig.LoadSheddingEnabled = true);
             });
+            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+        }
+
+        private class SiloConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder.AddMemoryGrainStorage("MemoryStore")
+                    .AddMemoryGrainStorageAsDefault();
+            }
         }
 
         /// <summary>

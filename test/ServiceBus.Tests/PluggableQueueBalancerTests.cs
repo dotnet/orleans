@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.ServiceBus.Providers.Testing;
 using Orleans.Storage;
@@ -26,16 +27,6 @@ namespace ServiceBus.Tests
                 builder.Options.InitialSilosCount = SiloCount;
                 builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    AdjustClusterConfiguration(legacy.ClusterConfiguration);
-                });
-            }
-
-            private static void AdjustClusterConfiguration(ClusterConfiguration config)
-            {
-                // register stream provider
-                config.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
             }
 
             private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
@@ -49,7 +40,8 @@ namespace ServiceBus.Tests
                             {
                                 options.EventHubPartitionCount = TotalQueueCount;
                                 options.BalancerType = typeof(LeaseBasedQueueBalancerForTest);
-                            });
+                            })
+                         .AddMemoryGrainStorage("PubSubStore");
                 }
             }
         }

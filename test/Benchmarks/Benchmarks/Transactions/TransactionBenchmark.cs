@@ -16,13 +16,18 @@ namespace Benchmarks.Transactions
         public void Setup()
         {
             var builder = new TestClusterBuilder();
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                legacy.ClusterConfiguration.AddMemoryStorageProvider();
-            });
+            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
             this.host = builder.Build();
             this.host.Deploy();
+        }
+
+        public class SiloConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder.AddMemoryGrainStorageAsDefault();
+            }
         }
 
         public async Task RunAsync()

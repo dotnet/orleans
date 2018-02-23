@@ -31,10 +31,6 @@ namespace UnitTests.HaloTests.Streaming
 
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
-                });
                 builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
             }
 
@@ -66,7 +62,8 @@ namespace UnitTests.HaloTests.Streaming
                             options =>
                             {
                                 options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            });
+                            })
+                        .AddMemoryGrainStorage("MemoryStore", options => options.NumStorageGrains = 1);
                 }
             }
 

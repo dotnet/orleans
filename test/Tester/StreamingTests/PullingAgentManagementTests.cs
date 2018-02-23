@@ -23,10 +23,6 @@ namespace UnitTests.StreamingTests
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-                });
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             }
 
@@ -36,7 +32,8 @@ namespace UnitTests.StreamingTests
                         .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME, options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        });
+                        })
+                    .AddMemoryGrainStorage("PubSubStore");
             }
 
             protected override void CheckPreconditionsOrThrow()

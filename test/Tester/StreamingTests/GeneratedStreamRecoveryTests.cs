@@ -30,11 +30,6 @@ namespace UnitTests.StreamingTests
 
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
-                });
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             }
 
@@ -49,7 +44,9 @@ namespace UnitTests.StreamingTests
                                 options.TotalQueueCount = TotalQueueCount;
                                 options.BalancerType = StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer;
                                 options.PubSubType = StreamPubSubType.ImplicitOnly;
-                            });
+                            })
+                         .AddMemoryGrainStorageAsDefault()
+                        .AddMemoryGrainStorage("MemoryStore");
                 }
             }
         }

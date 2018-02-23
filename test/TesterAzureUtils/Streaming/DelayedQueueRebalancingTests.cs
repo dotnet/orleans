@@ -34,7 +34,6 @@ namespace Tester.AzureUtils.Streaming
             builder.Options.InitialSilosCount = 4;
             builder.ConfigureLegacyConfiguration(legacy =>
             {
-                legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
                 legacy.ClientConfiguration.Gateways = legacy.ClientConfiguration.Gateways.Take(1).ToList();
             });
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
@@ -51,7 +50,8 @@ namespace Tester.AzureUtils.Streaming
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.SiloMaturityPeriod = SILO_IMMATURE_PERIOD;
                             options.BalancerType = StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer;
-                        });
+                        })
+                        .AddMemoryGrainStorage("PubSubStore");
             }
         }
 

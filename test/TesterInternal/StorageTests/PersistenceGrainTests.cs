@@ -16,6 +16,7 @@ using Xunit.Abstractions;
 using Orleans.Runtime.Configuration;
 using TesterInternal;
 using TestExtensions;
+using Orleans.Hosting;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -41,8 +42,16 @@ namespace UnitTests.StorageTests
                         new Dictionary<string, string> {{"Config1", "1"}, {"Config2", "2"}});
                     legacy.ClusterConfiguration.Globals.RegisterStorageProvider<ErrorInjectionStorageProvider>(ErrorInjectorProviderName);
                     legacy.ClusterConfiguration.Globals.RegisterStorageProvider<MockStorageProvider>(MockStorageProviderNameLowerCase);
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
                 });
+                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+            }
+
+            private class SiloConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder.AddMemoryGrainStorage("MemoryStore");
+                }
             }
         }
 

@@ -18,11 +18,6 @@ namespace Tester.StreamingTests
             public const string StreamProvider = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-                });
                 builder.AddClientBuilderConfigurator<ClientConfiguretor>();
                 builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             }
@@ -31,7 +26,9 @@ namespace Tester.StreamingTests
             {
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
-                    hostBuilder.AddSimpleMessageStreamProvider(StreamProvider);
+                    hostBuilder.AddSimpleMessageStreamProvider(StreamProvider)
+                        .AddMemoryGrainStorage("MemoryStore")
+                        .AddMemoryGrainStorage("PubSubStore");
                 }
             }
             public class ClientConfiguretor : IClientBuilderConfigurator

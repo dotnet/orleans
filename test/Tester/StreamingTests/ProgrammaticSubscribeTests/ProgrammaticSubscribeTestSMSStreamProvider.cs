@@ -22,11 +22,6 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-                });
                 builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             }
         }
@@ -36,7 +31,9 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder.AddSimpleMessageStreamProvider(StreamProviderName);
-                hostBuilder.AddSimpleMessageStreamProvider(StreamProviderName2, options => options.PubSubType = StreamPubSubType.ExplicitGrainBasedOnly);
+                hostBuilder.AddSimpleMessageStreamProvider(StreamProviderName2, options => options.PubSubType = StreamPubSubType.ExplicitGrainBasedOnly)
+                    .AddMemoryGrainStorageAsDefault()
+                        .AddMemoryGrainStorage("PubSubStore");
             }
         }
 

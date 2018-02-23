@@ -2,16 +2,12 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Tester.StreamingTests;
 using Tester.TestStreamProviders;
@@ -39,7 +35,6 @@ namespace Tester.AzureUtils.Streaming
             TestUtils.CheckForAzureStorage();
             builder.ConfigureLegacyConfiguration(legacy =>
             {
-                legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
                 legacy.ClusterConfiguration.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
             });
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
@@ -68,7 +63,8 @@ namespace Tester.AzureUtils.Streaming
                         options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        });
+                        })
+                    .AddMemoryGrainStorage("PubSubStore");
             }
         }
 

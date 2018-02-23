@@ -62,7 +62,8 @@ namespace ServiceBus.Tests.StreamingTests
                         options.CheckpointTableName = EHCheckpointTable;
                         options.CheckpointNamespace = CheckpointNamespace;
                         options.CheckpointPersistInterval = TimeSpan.FromSeconds(10);
-                    });
+                    })
+                    .AddMemoryGrainStorage("PubSubStore");
             }
         }
 
@@ -108,7 +109,6 @@ namespace ServiceBus.Tests.StreamingTests
         private static void AdjustConfig(ClusterConfiguration config)
         {
             // register stream provider
-            config.AddMemoryStorageProvider("PubSubStore");
             config.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
         }
     }

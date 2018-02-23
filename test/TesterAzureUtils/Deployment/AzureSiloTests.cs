@@ -50,7 +50,6 @@ namespace Tester.AzureUtils.Deployment
             serviceRuntime.InstanceName = "name";
 
             var config = AzureSilo.DefaultConfiguration(serviceRuntime);
-            config.AddMemoryStorageProvider();
 
             AzureSilo orleansAzureSilo = new AzureSilo(serviceRuntime, this.loggerFactory);
             bool ok = await orleansAzureSilo.ValidateConfiguration(config);
@@ -69,7 +68,6 @@ namespace Tester.AzureUtils.Deployment
             serviceRuntime.InstanceName = "name";
 
             var config = AzureSilo.DefaultConfiguration(serviceRuntime);
-            config.AddMemoryStorageProvider();
 
             AzureSilo orleansAzureSilo = new AzureSilo(serviceRuntime, this.loggerFactory);
             bool ok = await orleansAzureSilo.ValidateConfiguration(config);
@@ -88,7 +86,6 @@ namespace Tester.AzureUtils.Deployment
             serviceRuntime.InstanceName = "name";
 
             var config = AzureSilo.DefaultConfiguration(serviceRuntime);
-            config.AddMemoryStorageProvider();
 
             AzureSilo orleansAzureSilo = new AzureSilo(serviceRuntime, this.loggerFactory);
             bool ok = await orleansAzureSilo.ValidateConfiguration(config);

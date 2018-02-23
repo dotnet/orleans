@@ -25,10 +25,6 @@ namespace Tester.StreamingTests.PlugableQueueBalancerTests
             {
                 builder.Options.InitialSilosCount = siloCount;
                 builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    AdjustClusterConfiguration(legacy.ClusterConfiguration);
-                });
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
                 builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
             }
@@ -42,10 +38,11 @@ namespace Tester.StreamingTests.PlugableQueueBalancerTests
                         {
                             options.TotalQueueCount = totalQueueCount;
                             options.BalancerType = typeof(LeaseBasedQueueBalancerForTest);
-                        });
+                        })
+                        .AddMemoryGrainStorage("PubSubStore");
                 }
             }
-
+            
             private class MyClientBuilderConfigurator : IClientBuilderConfigurator
             {
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
@@ -58,10 +55,6 @@ namespace Tester.StreamingTests.PlugableQueueBalancerTests
                 }
             }
 
-            private static void AdjustClusterConfiguration(ClusterConfiguration config)
-            {
-                config.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
-            }
         }
 
         public PluggableQueueBalancerTestsWithMemoryStreamProvider(Fixture fixture)

@@ -12,6 +12,7 @@ using Tester.StreamingTests;
 using TestExtensions;
 using UnitTests.StreamingTests;
 using Xunit;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Tester.AzureUtils.Streaming
 {
@@ -24,11 +25,6 @@ namespace Tester.AzureUtils.Streaming
             public const string StreamProvider = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-                });
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             }
 
@@ -41,7 +37,9 @@ namespace Tester.AzureUtils.Streaming
                         options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        });
+                        })
+                        .AddMemoryGrainStorage("MemoryStore")
+                        .AddMemoryGrainStorage("PubSubStore");
                 }
             }
 

@@ -42,13 +42,13 @@ namespace Tester.StreamingTests
             private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
             {
                 public void Configure(ISiloHostBuilder hostBuilder) => hostBuilder
-                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName);
+                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName)
+                     .AddMemoryGrainStorage("PubSubStore");
             }
 
             private static void AdjustConfig(ClusterConfiguration config)
             {
                 // register stream provider
-                config.AddMemoryStorageProvider("PubSubStore");
                 config.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
             }
         }

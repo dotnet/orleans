@@ -215,7 +215,6 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                     legacy.ClusterConfiguration.Globals.TypeMapRefreshInterval = refreshInterval;
                     legacy.ClusterConfiguration.Globals.DefaultVersionSelectorStrategy = VersionSelectorStrategy;
                     legacy.ClusterConfiguration.Globals.DefaultCompatibilityStrategy = CompatibilityStrategy;
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
 
                     legacy.ClientConfiguration.Gateways = legacy.ClientConfiguration.Gateways.Take(1).ToList(); // Only use primary gw
                     

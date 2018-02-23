@@ -28,28 +28,6 @@ namespace UnitTests.General
                 builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
                 builder.AddSiloBuilderConfigurator<SiloInvokerTestSiloBuilderConfigurator>();
                 builder.AddClientBuilderConfigurator<ClientConfigurator>();
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-                });
-                builder.AddClientBuilderConfigurator<ClientConfiguretor>();
-                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
-            }
-
-            public class SiloConfigurator : ISiloBuilderConfigurator
-            {
-                public void Configure(ISiloHostBuilder hostBuilder)
-                {
-                    hostBuilder.AddSimpleMessageStreamProvider("SMSProvider");
-                }
-            }
-            public class ClientConfiguretor : IClientBuilderConfigurator
-            {
-                public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
-                {
-                    clientBuilder.AddSimpleMessageStreamProvider("SMSProvider");
-                }
             }
 
             private class SiloInvokerTestSiloBuilderConfigurator : ISiloBuilderConfigurator
@@ -78,7 +56,10 @@ namespace UnitTests.General
                             }
 
                             await ctx.Invoke();
-                        });
+                        })
+                        .AddSimpleMessageStreamProvider("SMSProvider")
+                        .AddMemoryGrainStorageAsDefault()
+                        .AddMemoryGrainStorage("PubSubStore");
                 }
             }
 
@@ -101,7 +82,8 @@ namespace UnitTests.General
                             result["orig"] = result["result"];
                             result["result"] = "intercepted!";
                         }
-                    });
+                    })
+                    .AddSimpleMessageStreamProvider("SMSProvider");
                 }
             }
         }

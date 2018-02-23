@@ -14,7 +14,8 @@ namespace TestVersionGrains
     {
         public void Configure(ISiloHostBuilder hostBuilder)
         {
-            hostBuilder.ConfigureServices(this.ConfigureServices);
+            hostBuilder.ConfigureServices(this.ConfigureServices)
+                 .AddMemoryGrainStorageAsDefault();
         }
 
         private void ConfigureServices(IServiceCollection services)

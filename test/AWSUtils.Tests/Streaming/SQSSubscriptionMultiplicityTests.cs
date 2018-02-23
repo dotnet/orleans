@@ -35,7 +35,6 @@ namespace AWSUtils.Tests.Streaming
 
             builder.ConfigureLegacyConfiguration(legacy =>
             {
-                legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
 
                 legacy.ClusterConfiguration.Globals.ClusterId = clusterId;
                 legacy.ClientConfiguration.ClusterId = clusterId;
@@ -54,7 +53,8 @@ namespace AWSUtils.Tests.Streaming
                     .AddSqsStreams(SQSStreamProviderName, options =>
                     {
                         options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
-                    });
+                    })
+                    .AddMemoryGrainStorage("PubSubStore");
             }
         }
 
@@ -69,6 +69,8 @@ namespace AWSUtils.Tests.Streaming
                     });
             }
         }
+
+
 
         public SQSSubscriptionMultiplicityTests()
         {

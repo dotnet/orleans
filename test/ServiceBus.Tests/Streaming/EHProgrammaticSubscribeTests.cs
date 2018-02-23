@@ -27,16 +27,7 @@ namespace ServiceBus.Tests.Streaming
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    AdjustClusterConfiguration(legacy.ClusterConfiguration);
-                });
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
-            }
-
-            private static void AdjustClusterConfiguration(ClusterConfiguration config)
-            {
-                config.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
             }
 
             public override void Dispose()
@@ -73,7 +64,8 @@ namespace ServiceBus.Tests.Streaming
                             options.CheckpointTableName = EHCheckpointTable;
                             options.CheckpointNamespace = CheckpointNamespace2;
                             options.CheckpointPersistInterval = TimeSpan.FromSeconds(10);
-                        });
+                        })
+                        .AddMemoryGrainStorage("PubSubStore");
                 }
             }
         }
