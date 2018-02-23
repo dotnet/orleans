@@ -36,11 +36,6 @@ namespace Orleans.Runtime
             context = new RuntimeContext {Scheduler = scheduler};
         }
 
-        internal static void InitializeMainThread()
-        {
-            context = new RuntimeContext {Scheduler = null};
-        }
-
         internal static void SetExecutionContext(ISchedulingContext shedContext, TaskScheduler scheduler)
         {
             if (context == null) throw new InvalidOperationException("SetExecutionContext called on unexpected non-WorkerPool thread");

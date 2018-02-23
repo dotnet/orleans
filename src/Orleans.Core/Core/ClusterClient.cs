@@ -17,7 +17,7 @@ namespace Orleans
     /// </summary>
     internal class ClusterClient : IInternalClusterClient
     {
-        private readonly OutsideRuntimeClient runtimeClient;
+        private readonly IRuntimeClient runtimeClient;
         private readonly ClusterClientLifecycle clusterClientLifecycle;
         private readonly AsyncLock initLock = new AsyncLock();
         private LifecycleState state = LifecycleState.Created;
@@ -38,7 +38,7 @@ namespace Orleans
         /// <param name="runtimeClient">The runtime client.</param>
         /// <param name="loggerFactory">Logger factory used to create loggers</param>
         /// <param name="clientMessagingOptions">Messaging parameters</param>
-        public ClusterClient(OutsideRuntimeClient runtimeClient, ILoggerFactory loggerFactory, IOptions<ClientMessagingOptions> clientMessagingOptions)
+        public ClusterClient(IRuntimeClient runtimeClient, ILoggerFactory loggerFactory, IOptions<ClientMessagingOptions> clientMessagingOptions)
         {
             this.runtimeClient = runtimeClient;
             this.clusterClientLifecycle = new ClusterClientLifecycle(loggerFactory.CreateLogger<LifecycleSubject>());
@@ -116,7 +116,7 @@ namespace Orleans
                 }
                 
                 this.state = LifecycleState.Starting;
-                await this.runtimeClient.Start(retryFilter).ConfigureAwait(false);
+                if (this.runtimeClient is OutsideRuntimeClient orc) await orc.Start(retryFilter).ConfigureAwait(false);
                 await this.clusterClientLifecycle.OnStart().ConfigureAwait(false);
                 this.state = LifecycleState.Started;
             }
@@ -147,10 +147,12 @@ namespace Orleans
                         cts.Cancel();
                         canceled = cts.Token;
                     }
+
                     await this.clusterClientLifecycle.OnStop(canceled);
+
                     if (gracefully)
                     {
-                        Utils.SafeExecute(() => this.runtimeClient.Disconnect());
+                        Utils.SafeExecute(() => (this.runtimeClient as OutsideRuntimeClient)?.Disconnect());
                     }
 
                     Utils.SafeExecute(() => this.runtimeClient.Reset(gracefully));
@@ -263,7 +265,7 @@ namespace Orleans
         {
             if (disposing)
             {
-                Utils.SafeExecute(() => this.runtimeClient.Dispose());
+                Utils.SafeExecute(() => (this.runtimeClient as IDisposable)?.Dispose());
                 this.state = LifecycleState.Disposed;
             }
 

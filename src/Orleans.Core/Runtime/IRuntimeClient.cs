@@ -51,6 +51,8 @@ namespace Orleans.Runtime
 
         void SendRequest(GrainReference target, InvokeMethodRequest request, TaskCompletionSource<object> context, Action<Message, TaskCompletionSource<object>> callback, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null);
 
+        void SendResponse(Message request, Response response);
+
         void ReceiveResponse(Message message);
 
         void Reset(bool cleanup);

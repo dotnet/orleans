@@ -22,10 +22,10 @@ namespace Orleans.Runtime
         private readonly OrleansTaskScheduler scheduler;
         private readonly SiloMessagingOptions messagingOptions;
         private readonly ILogger logger;
+        private ILocalClient localClient;
         private Gateway gateway;
         private IDisposable refreshTimer;
-
-
+        
         public ClientObserverRegistrar(
             ILocalSiloDetails siloDetails,
             ILocalGrainDirectory dir,
@@ -41,6 +41,12 @@ namespace Orleans.Runtime
             logger = loggerFactory.CreateLogger<ClientObserverRegistrar>();
         }
 
+        internal void SetLocalClient(ILocalClient client)
+        {
+            this.localClient = client;
+            this.scheduler.QueueAction(Start, this.SchedulingContext).Ignore();
+        }
+
         internal void SetGateway(Gateway gateway)
         {
             this.gateway = gateway;
@@ -51,6 +57,7 @@ namespace Orleans.Runtime
 
         private void Start()
         {
+            if (this.refreshTimer != null) return;
             var random = new SafeRandom();
             var randomOffset = random.NextTimeSpan(this.messagingOptions.ClientRegistrationRefresh);
             this.refreshTimer = this.RegisterTimer(
@@ -109,11 +116,14 @@ namespace Orleans.Runtime
 
         private async Task OnClientRefreshTimer(object data)
         {
-            if (gateway == null) return;
             try
             {
-                ICollection<GrainId> clients = gateway.GetConnectedClients().ToList();
-                List<Task> tasks = new List<Task>();
+                var clients = new List<GrainId>();
+                if (this.gateway != null) clients.AddRange(gateway.GetConnectedClients());
+                var localClientId = this.localClient?.ClientId;
+                if (localClientId != null) clients.Add(localClientId);
+
+                var tasks = new List<Task>();
                 foreach (GrainId clientId in clients)
                 {
                     var addr = GetClientActivationAddress(clientId);
