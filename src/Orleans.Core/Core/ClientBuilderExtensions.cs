@@ -1,9 +1,12 @@
 using System;
+using System.Collections.Generic;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.ApplicationParts;
+using Orleans.CodeGeneration;
 using Orleans.Messaging;
 
 namespace Orleans
@@ -19,7 +22,7 @@ namespace Orleans
         /// <param name="builder">The host builder.</param>
         /// <param name="siloName">The silo name.</param>
         /// <returns>The silo builder.</returns>
-        public static IClientBuilder ConfigureDefaults(this IClientBuilder builder)
+        public static IClientBuilder Configure(this IClientBuilder builder)
         {
             // Configure the container to use an Orleans client.
             builder.ConfigureServices(services =>
@@ -32,6 +35,59 @@ namespace Orleans
                 }
             });
             return builder;
+        }
+        /// <summary>
+        /// Specify the environment to be used by the host.
+        /// </summary>
+        /// <param name="hostBuilder">The host builder to configure.</param>
+        /// <param name="environment">The environment to host the application in.</param>
+        /// <returns>The host builder.</returns>
+        public static IClientBuilder UseEnvironment(this IClientBuilder hostBuilder, string environment)
+        {
+            return hostBuilder.ConfigureHostConfiguration(configBuilder =>
+            {
+                configBuilder.AddInMemoryCollection(new[]
+                {
+                    new KeyValuePair<string, string>(HostDefaults.EnvironmentKey,
+                        environment  ?? throw new ArgumentNullException(nameof(environment)))
+                });
+            });
+        }
+
+        /// <summary>
+        /// Adds services to the container. This can be called multiple times and the results will be additive.
+        /// </summary>
+        /// <param name="hostBuilder">The <see cref="ISiloHostBuilder" /> to configure.</param>
+        /// <param name="configureDelegate"></param>
+        /// <returns>The same instance of the <see cref="ISiloHostBuilder"/> for chaining.</returns>
+        public static IClientBuilder ConfigureServices(this IClientBuilder hostBuilder, Action<IServiceCollection> configureDelegate)
+        {
+            return hostBuilder.ConfigureServices((context, collection) => configureDelegate(collection));
+        }
+
+        /// <summary>
+        /// Sets up the configuration for the remainder of the build process and application. This can be called multiple times and
+        /// the results will be additive. The results will be available at <see cref="HostBuilderContext.Configuration"/> for
+        /// subsequent operations, as well as in <see cref="ISiloHost.Services"/>.
+        /// </summary>
+        /// <param name="hostBuilder">The host builder to configure.</param>
+        /// <param name="configureDelegate"></param>
+        /// <returns>The same instance of the host builder for chaining.</returns>
+        public static IClientBuilder ConfigureAppConfiguration(this IClientBuilder hostBuilder, Action<IConfigurationBuilder> configureDelegate)
+        {
+            return hostBuilder.ConfigureAppConfiguration((context, builder) => configureDelegate(builder));
+        }
+
+        /// <summary>
+        /// Registers an action used to configure a particular type of options.
+        /// </summary>
+        /// <typeparam name="TOptions">The options type to be configured.</typeparam>
+        /// <param name="builder">The host builder.</param>
+        /// <param name="configureOptions">The action used to configure the options.</param>
+        /// <returns>The silo builder.</returns>
+        public static IClientBuilder Configure<TOptions>(this IClientBuilder builder, Action<TOptions> configureOptions) where TOptions : class
+        {
+            return builder.ConfigureServices(services => services.Configure(configureOptions));
         }
 
         /// <summary>
