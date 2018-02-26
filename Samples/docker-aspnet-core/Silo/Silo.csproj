@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp2.0</TargetFramework>
+    <ApplicationIcon />
+    <OutputType>Exe</OutputType>
+    <StartupObject />
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" Version="2.0.0-rc0" />
+    <PackageReference Include="Microsoft.Orleans.Core.Legacy" Version="2.0.0-rc0" />
+    <PackageReference Include="Microsoft.Orleans.OrleansCodeGenerator.Build" Version="2.0.0-rc0" />
+    <PackageReference Include="Microsoft.Orleans.Reminders.AzureStorage" Version="2.0.0-rc0" />
+    <PackageReference Include="Microsoft.Orleans.Runtime.Legacy" Version="2.0.0-rc0" />
+    <PackageReference Include="Microsoft.Orleans.Server" Version="2.0.0-rc0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GrainInterfaces\GrainInterfaces.csproj" />
+    <ProjectReference Include="..\Grains\Grains.csproj" />
+  </ItemGroup>
+
+</Project>
