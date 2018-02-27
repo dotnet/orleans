@@ -4,7 +4,6 @@ WORKDIR /app
 FROM microsoft/aspnetcore-build:2.0 AS build
 WORKDIR /src
 COPY *.sln ./
-COPY NuGet.Config ./
 COPY Silo/Silo.csproj Silo/
 RUN dotnet restore
 COPY . .
