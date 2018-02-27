@@ -27,7 +27,7 @@ namespace Orleans.TestingHost
         {
             this.builder = builder;
         }
-
+        
         /// <summary>Gets or sets the cluster configuration.</summary>
         public ClusterConfiguration ClusterConfiguration
         {
