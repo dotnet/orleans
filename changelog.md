@@ -8,7 +8,7 @@ All notable end-user facing changes are documented in this file.
 The idea is to track end-user facing changes as they occur.*
 
 
-### [2.0.0-rc1]
+### [2.0.0-rc1] (changes since 2.0.0-beta3)
 
 - Major changes
   - New provider lifecycle model to replace the old one (#3738, #3887, #3946, #3927, #4000, #4026, #4022, #4045, #4031, #4047, #4063, #4042, #4064, #4066, #4067, )
