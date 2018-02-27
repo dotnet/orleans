@@ -33,7 +33,7 @@ namespace Orleans
 
             // Configure default services and build the container.
 
-            this.Configure();
+            this.ConfigureDefaults();
             BuildHostConfiguration();
             CreateHostingEnvironment();
             CreateHostBuilderContext();

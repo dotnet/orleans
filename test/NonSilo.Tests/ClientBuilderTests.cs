@@ -44,7 +44,7 @@ namespace NonSilo.Tests
         public void ClientBuilder_NoSpecifiedConfigurationTest()
         {
             var builder = new ClientBuilder()
-                .Configure()
+                .ConfigureDefaults()
                 .ConfigureServices(RemoveConfigValidators)
                 .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
             using (var client = builder.Build())
@@ -60,7 +60,7 @@ namespace NonSilo.Tests
         public void ClientBuilder_DoubleBuildTest()
         {
             var builder = new ClientBuilder()
-                .Configure()
+                .ConfigureDefaults()
                 .ConfigureServices(RemoveConfigValidators)
                 .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
             using (builder.Build())
@@ -76,7 +76,7 @@ namespace NonSilo.Tests
         public void ClientBuilder_DoubleSpecifyConfigurationTest()
         {
             var builder = new ClientBuilder()
-                .Configure()
+                .ConfigureDefaults()
                 .ConfigureServices(RemoveConfigValidators)
                 .UseConfiguration(new ClientConfiguration())
                 .UseConfiguration(new ClientConfiguration());
@@ -90,7 +90,7 @@ namespace NonSilo.Tests
         public void ClientBuilder_NullConfigurationTest()
         {
             var builder = new ClientBuilder()
-                .Configure()
+                .ConfigureDefaults()
                 .ConfigureServices(RemoveConfigValidators);
             Assert.Throws<ArgumentNullException>(() => builder.UseConfiguration(null));
         }
@@ -103,7 +103,7 @@ namespace NonSilo.Tests
         public void ClientBuilder_ServiceProviderTest()
         {
             var builder = new ClientBuilder()
-                .Configure()
+                .ConfigureDefaults()
                 .ConfigureServices(RemoveConfigValidators)
                 .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
 
