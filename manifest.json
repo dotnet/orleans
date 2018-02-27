@@ -1,6 +1,6 @@
 {
   "homepages": [],
-  "source_base_path": "C:/GitHub/sergeybykov/orleans-2/src",
+  "source_base_path": "c:/GitHub/dotnet/orleans/src",
   "xrefmap": "xrefmap.yml",
   "files": [
     {
@@ -102,7 +102,7 @@
       "output": {
         ".html": {
           "relative_path": "Community/Who-Is-Using-Orleans.html",
-          "hash": "K8c4gGTIBwutFFfv7t32+g=="
+          "hash": "mX7PceFFgRTqWwg4jcxY2g=="
         }
       },
       "is_incremental": false,
@@ -462,7 +462,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Docker-Deployment.html",
-          "hash": "FPRn2hGggdSuuAPNSjV6zQ=="
+          "hash": "1i6tGehES7wca9+DLig0hg=="
         }
       },
       "is_incremental": false,
@@ -1105,7 +1105,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Runtime-Implementation-Details/Scheduler.html",
-          "hash": "+bpAqXiKC6vV4woPVWNfYA=="
+          "hash": "myqcVyuzOVKnzy2n8OdEeA=="
         }
       },
       "is_incremental": false,
@@ -1998,6 +1998,9 @@
       "version": ""
     },
     {
+      "log_codes": [
+        "InvalidYamlHeader"
+      ],
       "type": "index",
       "source_relative_path": "index.md",
       "output": {
@@ -2025,22 +2028,23 @@
   "incremental_info": [
     {
       "status": {
-        "can_incremental": true,
+        "can_incremental": false,
+        "details": "Cannot build incrementally because last build info is missing.",
         "incrementalPhase": "build"
       },
       "processors": {
-        "ResourceDocumentProcessor": {
-          "can_incremental": false,
-          "details": "Processor ResourceDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
-          "incrementalPhase": "build"
-        },
         "TocDocumentProcessor": {
           "can_incremental": false,
           "details": "Processor TocDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
           "incrementalPhase": "build"
         },
         "ConceptualDocumentProcessor": {
-          "can_incremental": true,
+          "can_incremental": false,
+          "incrementalPhase": "build"
+        },
+        "ResourceDocumentProcessor": {
+          "can_incremental": false,
+          "details": "Processor ResourceDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
           "incrementalPhase": "build"
         }
       }

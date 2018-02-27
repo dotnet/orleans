@@ -334,13 +334,6 @@ namespace OrleansClient
     }
 }
 </code></pre><p>We are not going into details about the grain implementation here since it is out of the scope of this article. Please check other documents related to it. Those files are essentially a minimal Orleans application and we will start from it to move forward with the remaining of this article.</p>
-<h2 id="gateway-configuration">Gateway configuration</h2>
-<p>You may have noticed that we are not using the membership provider in our client configuration. The reason for that (and I figured out after days suffering and talking with Docker folks) is because the way our <code>client -&gt; membership -&gt; gateway(s) -&gt; silo</code> works, is not <em>compatible</em> with the way <a href="https://docs.docker.com/engine/userguide/networking/get-started-overlay/">Docker overlay network</a> is designed. </p>
-<p>The way we found to workaround this <em>limitation</em>, is to manually add a gateway yourself to the client configuration like this:</p>
-<pre><code class="lang-csharp">var hostEntry = await Dns.GetHostEntryAsync(&quot;orleans-silo&quot;);
-var ip = hostEntry.AddressList[0];
-config.Gateways.Add(new IPEndPoint(ip, 10400));
-</code></pre><p>The string <code>orleans-silo</code> here, is essentially the <strong>service name</strong> used in <code>docker-compose</code>, which we will dig into more details later on (keep reading!). It will resolve to one of the containers&#39; ips inside that same service (like a Load Balancer). In a docker-compose project, a service is a group of multiple (exactly equal) instances of a give container. For example, we will have a service for our <code>OrleansSilo</code> project. Within that service, we will be able to scale the service up and down horizontally and adding each of those containers to the Orleans cluster automatically respecting Orleans Membership Protocol. More on that later.</p>
 <blockquote><p><strong>Note</strong>: In this article we are using <code>OrleansAzureUtils</code> membership provider but you can use any other already supported by Orleans.</p>
 </blockquote>
 <h1 id="dockerfile">Dockerfile</h1>
@@ -494,7 +487,7 @@ orleansdocker_orleans-silo_9     tail -f /dev/null   Up
 <blockquote><p><strong>Note</strong>: If you are using a Docker engine with the Swarm mode that already have support to <code>stack</code>, <code>deploy</code> and <code>compose</code> v3, a better approach to deploy your solution would be <code>docker stack deploy -c docker-compose.yml &lt;name&gt;</code>. Just keep in mind that it requires v3 compose file support at your Docker engine and the majority of hosted services like Azure and AWS still use v2 and older engines.</p>
 </blockquote>
 <h1 id="google-kubernetes-k8s">Google Kubernetes (K8s)</h1>
-<p>Coming soon...</p>
+<p>If you plan to use <a href="https://kubernetes.io/">Kubernetes</a> to host Orleans, there is a community-maintained clustering provider available at <a href="https://github.com/OrleansContrib/Orleans.Clustering.Kubernetes">OrleansContrib\Orleans.Clustering.Kubernetes</a> and there you can find documentation and samples on how to host Orleans in Kubernetes seamlessly using the provider.</p>
 <h1 id="bonus-topic-debugging-orleans-inside-containers">[Bonus topic] Debugging Orleans inside Containers</h1>
 <p>Well, now that you know how to run Orleans in a container from scratch, would be good to leverage one of the most important principles in Docker. Containers are immutable. And they should have (almost) the same image, dependencies, and runtime in development as in production. That ensure the good old statement <em>&quot;It work on my machine!&quot;</em> never happen again. To make that possible, you need to have a way to develop <em>inside</em> the container and that includes have a debugger attached to your application inside the container.</p>
 <p>There are multiple ways to achieve that using multiple tools. After evaluate several, by the time I wrote this article, I ended up choosing one that looks more simple and is less intrusive in the application.</p>
