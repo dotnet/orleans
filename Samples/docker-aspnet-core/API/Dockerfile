@@ -18,5 +18,4 @@ RUN dotnet publish -c Release -o /app
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app .
-COPY connection_string.txt .
 ENTRYPOINT ["dotnet", "API.dll"]
