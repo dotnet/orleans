@@ -5,6 +5,8 @@ using Orleans;
 using Orleans.Runtime.Configuration;
 using Orleans.Hosting;
 using Orleans.Hosting.Development;
+using Orleans.Configuration;
+using System.Net;
 
 namespace OrleansSiloHost
 {
@@ -36,14 +38,17 @@ namespace OrleansSiloHost
 
         private static async Task<ISiloHost> StartSilo()
         {
-            // define the cluster configuration
-            var config = ClusterConfiguration.LocalhostPrimarySilo();
-            config.AddMemoryStorageProvider();
+            var siloPort = 11111;
+            int gatewayPort = 30000;
+            var siloAddress = IPAddress.Loopback;
 
             var builder = new SiloHostBuilder()
-                .UseConfiguration(config)
+                .Configure(options => options.ClusterId = "accounting")
+                .UseDevelopmentClustering(options => options.PrimarySiloEndpoint = new IPEndPoint(siloAddress, siloPort))
+                .ConfigureEndpoints(siloAddress, siloPort, gatewayPort)
                 .ConfigureApplicationParts(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory())
                 .ConfigureLogging(logging => logging.AddConsole())
+                .AddMemoryGrainStorageAsDefault()
                 .UseInClusterTransactionManager()
                 .UseInMemoryTransactionLog()
                 .UseTransactionalState();

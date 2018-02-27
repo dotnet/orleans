@@ -5,6 +5,7 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using AccountTransfer.Interfaces;
+using System.Net;
 
 namespace OrleansClient
 {
@@ -45,9 +46,13 @@ namespace OrleansClient
             {
                 try
                 {
-                    var config = ClientConfiguration.LocalhostSilo();
+                    int gatewayPort = 30000;
+                    var siloAddress = IPAddress.Loopback;
+                    var gateway = new IPEndPoint(siloAddress, gatewayPort);
+
                     client = new ClientBuilder()
-                        .UseConfiguration(config)
+                        .ConfigureCluster(options => options.ClusterId = "accounting")
+                        .UseStaticClustering(options => options.Gateways.Add(gateway.ToGatewayUri()))
                         .ConfigureApplicationParts(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory())
                         .ConfigureLogging(logging => logging.AddConsole())
                         .Build();
