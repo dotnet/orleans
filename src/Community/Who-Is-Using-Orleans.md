@@ -53,6 +53,8 @@ Fast, native, comprehensive issue tracking for GitHub
 
 Projects, websites and applications powered by Orleans, or provide extensions to Orleans.
 
+* <a href="https://play.google.com/store/apps/details?id=com.sx.claw&hl=en" target="_blank">__Claw (Clash Of Animal Warriors)__</a>
+is a real-time multiplayer mobile game which uses Orleans for its MatchMaker software which should handle many players at the same time and respond to them as fast as possible.
 * <a href="https://www.halowaypoint.com" target="_blank">__Halo 4 - 343 Industries__</a>
 * <a href="https://github.com/OrleansContrib/OrleansTemplates" target="_blank">__Microsoft BigPark Studio__</a>
 * <a href="https://github.com/OrleansContrib" target="_blank">__Orleans-Contrib__</a>
