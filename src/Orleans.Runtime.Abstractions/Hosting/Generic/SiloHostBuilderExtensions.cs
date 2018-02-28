@@ -29,6 +29,7 @@ namespace Orleans.Hosting
                 });
             });
         }
+
         /// <summary>
         /// Adds services to the container. This can be called multiple times and the results will be additive.
         /// </summary>
