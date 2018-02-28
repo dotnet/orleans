@@ -59,13 +59,10 @@ namespace Orleans.TestingHost
                 TryConfigureTestClusterMembership(context, services);
                 TryConfigureFileLogging(configuration, services, siloName);
 
-                // TODO: make SiloHostBuilder work when not using the legacy configuration, similar to what we did with ClientBuilder.
-                // All The important information has been migrated to strongly typed options (everything should be migrated, but the minimum required set is already there).
-                var clusterConfiguration = GetOrCreateClusterConfiguration(services);
                 if (Debugger.IsAttached)
                 {
                     // Test is running inside debugger - Make timeout ~= infinite
-                    clusterConfiguration.Globals.ResponseTimeout = TimeSpan.FromMilliseconds(1000000);
+                    services.Configure<SiloMessagingOptions>(op => op.ResponseTimeout = TimeSpan.FromMilliseconds(1000000));
                 }
             });
 
@@ -133,39 +130,6 @@ namespace Orleans.TestingHost
                 options.SiloPort = siloPort;
                 options.GatewayPort = gatewayPort;
             });
-        }
-
-        private static ClusterConfiguration GetOrCreateClusterConfiguration(IServiceCollection services)
-        {
-            var clusterConfiguration = services
-                .FirstOrDefault(s => s.ServiceType == typeof(ClusterConfiguration))
-                ?.ImplementationInstance as ClusterConfiguration;
-
-            if (clusterConfiguration == null)
-            {
-                clusterConfiguration = new ClusterConfiguration
-                {
-                    Globals =
-                    {
-                        ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
-                    }
-                };
-
-                services.AddLegacyClusterConfigurationSupport(clusterConfiguration);
-            }
-            return clusterConfiguration;
-        }
-
-        private static ClientConfiguration GetOrCreateClientConfiguration(IServiceCollection services)
-        {
-            var clientConfiguration = services.TryGetClientConfiguration();
-
-            if (clientConfiguration == null)
-            {
-                clientConfiguration = new ClientConfiguration();
-                services.AddLegacyClientConfigurationSupport(clientConfiguration);
-            }
-            return clientConfiguration;
         }
 
         private static void ConfigureAppServices(IConfiguration configuration, ISiloHostBuilder hostBuilder)

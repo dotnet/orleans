@@ -13,6 +13,8 @@ using Orleans.Streams;
 using Orleans.TestingHost.Utils;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Memory;
+using Orleans.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.TestingHost
 {
@@ -200,9 +202,8 @@ namespace Orleans.TestingHost
         /// <param name="didKill">Whether recent membership changes we done by graceful Stop.</param>
         public async Task WaitForLivenessToStabilizeAsync(bool didKill = false)
         {
-            // TODO: read from the cluster
-            var globalConfiguration = new GlobalConfiguration(); //this.ClusterConfiguration.Globals
-            TimeSpan stabilizationTime = GetLivenessStabilizationTime(globalConfiguration, didKill);
+            var membershipOptions = this.ServiceProvider.GetService<IOptions<MembershipOptions>>().Value;
+            TimeSpan stabilizationTime = GetLivenessStabilizationTime(membershipOptions, didKill);
             WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is about to sleep for {0}", stabilizationTime);
             await Task.Delay(stabilizationTime);
             WriteLog("WaitForLivenessToStabilize is done sleeping");
@@ -212,21 +213,21 @@ namespace Orleans.TestingHost
         /// Get the timeout value to use to wait for the silo liveness sub-system to detect and act on any recent cluster membership changes.
         /// <seealso cref="WaitForLivenessToStabilizeAsync"/>
         /// </summary>
-        public static TimeSpan GetLivenessStabilizationTime(GlobalConfiguration global, bool didKill = false)
+        public static TimeSpan GetLivenessStabilizationTime(MembershipOptions membershipOptions, bool didKill = false)
         {
             TimeSpan stabilizationTime = TimeSpan.Zero;
             if (didKill)
             {
                 // in case of hard kill (kill and not Stop), we should give silos time to detect failures first.
-                stabilizationTime = TestingUtils.Multiply(global.ProbeTimeout, global.NumMissedProbesLimit);
+                stabilizationTime = TestingUtils.Multiply(membershipOptions.ProbeTimeout, membershipOptions.NumMissedProbesLimit);
             }
-            if (global.UseLivenessGossip)
+            if (membershipOptions.UseLivenessGossip)
             {
                 stabilizationTime += TimeSpan.FromSeconds(5);
             }
             else
             {
-                stabilizationTime += TestingUtils.Multiply(global.TableRefreshTimeout, 2);
+                stabilizationTime += TestingUtils.Multiply(membershipOptions.TableRefreshTimeout, 2);
             }
             return stabilizationTime;
         }

@@ -11,6 +11,7 @@ using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Legacy;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
 using TestExtensions;
@@ -218,7 +219,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
                     legacy.ClientConfiguration.Gateways = legacy.ClientConfiguration.Gateways.Take(1).ToList(); // Only use primary gw
                     
-                    waitDelay = TestCluster.GetLivenessStabilizationTime(legacy.ClusterConfiguration.Globals, false);
+                    waitDelay = TestClusterLegacyUtils.GetLivenessStabilizationTime(legacy.ClusterConfiguration.Globals, false);
                 });
 
                 this.cluster = builder.Build();
