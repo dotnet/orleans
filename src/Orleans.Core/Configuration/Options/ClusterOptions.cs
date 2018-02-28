@@ -8,6 +8,11 @@ namespace Orleans.Configuration
     public class ClusterOptions
     {
         /// <summary>
+        /// Default cluster id for development clusters.
+        /// </summary>
+        internal const string DevelopmentClusterId = "dev";
+
+        /// <summary>
         /// Gets or sets the cluster identity. This used to be called DeploymentId before Orleans 2.0 name.
         /// </summary>
         public string ClusterId { get; set; }

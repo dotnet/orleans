@@ -1,4 +1,5 @@
 using System;
+using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Configuration;
@@ -13,6 +14,31 @@ namespace Orleans.Hosting
     /// </summary>
     public static class CoreHostingExtensions
     {
+        /// <summary>
+        /// Configure the container to use Orleans.
+        /// </summary>
+        /// <param name="builder">The host builder.</param>
+        /// <returns>The host builder.</returns>
+        public static ISiloHostBuilder ConfigureDefaults(this ISiloHostBuilder builder)
+        {
+            return builder.ConfigureServices((context, services) =>
+            {
+                if (!context.Properties.ContainsKey("OrleansServicesAdded"))
+                {
+                    services.PostConfigure<SiloOptions>(
+                        options => options.SiloName =
+                            options.SiloName
+                            ?? context.HostingEnvironment.ApplicationName
+                            ?? $"Silo_{Guid.NewGuid().ToString("N").Substring(0, 5)}");
+
+                    services.TryAddSingleton<Silo>();
+                    DefaultSiloServices.AddDefaultServices(context, services);
+
+                    context.Properties.Add("OrleansServicesAdded", true);
+                }
+            });
+        }
+
         /// <summary>
         /// Configure the container to use Orleans, including the default silo name & services.
         /// </summary>
@@ -49,26 +75,15 @@ namespace Orleans.Hosting
         /// <returns>The host builder.</returns>
         public static ISiloHostBuilder Configure(this ISiloHostBuilder builder, string siloName, Action<OptionsBuilder<ClusterOptions>> configureOptions = null)
         {
-            builder.ConfigureServices((context, services) =>
-            {
-                if (!context.Properties.ContainsKey("OrleansServicesAdded"))
+            return builder
+                .ConfigureDefaults()
+                .ConfigureServices((context, services) =>
                 {
-                    services.PostConfigure<SiloOptions>(options => options.SiloName = options.SiloName
-                                           ?? context.HostingEnvironment.ApplicationName
-                                           ?? $"Silo_{Guid.NewGuid().ToString("N").Substring(0, 5)}");
+                    if (!string.IsNullOrEmpty(siloName))
+                        builder.ConfigureSiloName(siloName);
 
-                    services.TryAddSingleton<Silo>();
-                    DefaultSiloServices.AddDefaultServices(context, services);
-
-                    context.Properties.Add("OrleansServicesAdded", true);
-                }
-
-                if (!string.IsNullOrEmpty(siloName))
-                    builder.ConfigureSiloName(siloName);
-
-                configureOptions?.Invoke(services.AddOptions<ClusterOptions>());
-            });
-            return builder;
+                    configureOptions?.Invoke(services.AddOptions<ClusterOptions>());
+                });
         }
 
         /// <summary>
@@ -95,11 +110,62 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure silo to use Development membership
+        /// Configures a localhost silo for development and testing.
         /// </summary>
-        public static ISiloHostBuilder UseDevelopmentClustering(this ISiloHostBuilder builder, Action<DevelopmentMembershipOptions> configureOptions)
+        /// <param name="builder">The silo builder.</param>
+        /// <param name="siloPort">The silo port.</param>
+        /// <param name="gatewayPort">The gateway port.</param>
+        /// <param name="primarySiloEndpoint">
+        /// The endpoint of the primary silo, or <see langword="null"/> to use this silo as the primary.
+        /// </param>
+        /// <returns>The silo builder.</returns>
+        public static ISiloHostBuilder UseLocalhostClustering(
+            this ISiloHostBuilder builder,
+            int siloPort = EndpointOptions.DEFAULT_SILO_PORT,
+            int gatewayPort = EndpointOptions.DEFAULT_GATEWAY_PORT,
+            IPEndPoint primarySiloEndpoint = null,
+            string clusterId = ClusterOptions.DevelopmentClusterId)
         {
-            return builder.ConfigureServices(
+            builder.Configure<EndpointOptions>(options =>
+            {
+                options.AdvertisedIPAddress = IPAddress.Loopback;
+                options.SiloPort = siloPort;
+                options.GatewayPort = gatewayPort;
+            });
+
+            builder.UseDevelopmentClustering(primarySiloEndpoint ?? new IPEndPoint(IPAddress.Loopback, siloPort));
+
+            if (!string.IsNullOrWhiteSpace(clusterId))
+            {
+                builder.Configure(options => options.ClusterId = clusterId);
+            }
+
+            return builder;
+        }
+
+        /// <summary>
+        /// Configures the silo to use development-only clustering.
+        /// </summary>
+        /// <param name="primarySiloEndpoint">
+        /// The endpoint of the primary silo, or <see langword="null"/> to use this silo as the primary.
+        /// </param>
+        /// <returns>The silo builder.</returns>
+        public static ISiloHostBuilder UseDevelopmentClustering(this ISiloHostBuilder builder, IPEndPoint primarySiloEndpoint)
+        {
+            return builder.UseDevelopmentClustering(options => options.PrimarySiloEndpoint = primarySiloEndpoint);
+        }
+
+        /// <summary>
+        /// Configures the silo to use development-only clustering.
+        /// </summary>
+        public static ISiloHostBuilder UseDevelopmentClustering(
+            this ISiloHostBuilder builder,
+            Action<DevelopmentMembershipOptions> configureOptions,
+            string clusterId = ClusterOptions.DevelopmentClusterId)
+        {
+            return builder
+                .Configure(options => options.ClusterId = clusterId)
+                .ConfigureServices(
                 services =>
                 {
                     if (configureOptions != null)
@@ -114,9 +180,12 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure silo to use Development membership
+        /// Configures the silo to use development-only clustering.
         /// </summary>
-        public static ISiloHostBuilder UseDevelopmentClustering(this ISiloHostBuilder builder, Action<OptionsBuilder<DevelopmentMembershipOptions>> configureOptions)
+        public static ISiloHostBuilder UseDevelopmentClustering(
+            this ISiloHostBuilder builder,
+            Action<OptionsBuilder<DevelopmentMembershipOptions>> configureOptions,
+            string clusterId = ClusterOptions.DevelopmentClusterId)
         {
             return builder.ConfigureServices(
                 services =>

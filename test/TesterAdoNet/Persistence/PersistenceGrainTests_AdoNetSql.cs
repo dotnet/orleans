@@ -28,7 +28,7 @@ namespace Tester.AdoNet.Persistence
         public static string AdoInvariant = AdoNetInvariants.InvariantNameSqlServer;
         public static Guid ServiceId = Guid.NewGuid();
         public static string ConnectionStringKey = "AdoNetConnectionString";
-        public class Fixture : DefaultClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
