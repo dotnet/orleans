@@ -10,7 +10,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="2.0.0" />
-    <PackageReference Include="Microsoft.Orleans.Client" Version="2.0.0-rc1" />
+    <PackageReference Include="Microsoft.Orleans.Client" Version="$(OrleansPackageVersion)" />
   </ItemGroup>
 
   <ItemGroup>
