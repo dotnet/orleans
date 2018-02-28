@@ -152,7 +152,10 @@ namespace Orleans
         /// Configures the client to connect to a silo on the localhost.
         /// </summary>
         /// <param name="gatewayPort">The local silo's gateway port.</param>
-        public static IClientBuilder UseLocalhostClustering(this IClientBuilder builder, int gatewayPort = 30000, string clusterId = null)
+        public static IClientBuilder UseLocalhostClustering(
+            this IClientBuilder builder,
+            int gatewayPort = 30000,
+            string clusterId = ClusterOptions.DevelopmentClusterId)
         {
             return builder.UseStaticClustering(new IPEndPoint(IPAddress.Loopback, gatewayPort))
                 .ConfigureCluster(options =>

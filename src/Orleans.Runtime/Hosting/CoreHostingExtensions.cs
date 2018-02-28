@@ -134,11 +134,7 @@ namespace Orleans.Hosting
             });
 
             builder.UseDevelopmentClustering(primarySiloEndpoint ?? new IPEndPoint(IPAddress.Loopback, siloPort));
-
-            if (!string.IsNullOrWhiteSpace(clusterId))
-            {
-                builder.Configure(options => options.ClusterId = clusterId);
-            }
+            builder.Configure(options => options.ClusterId = clusterId);
 
             return builder;
         }
