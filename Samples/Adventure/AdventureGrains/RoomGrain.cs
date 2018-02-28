@@ -10,7 +10,7 @@ namespace AdventureGrains
     /// <summary>
     /// Orleans grain implementation class Grain1.
     /// </summary>
-    public class RoomGrain : Orleans.Grain, IRoomGrain
+    public class RoomGrain : Grain, IRoomGrain
     {
         // TODO: replace placeholder grain interface with actual grain
         // communication interface(s).
@@ -27,39 +27,39 @@ namespace AdventureGrains
         {
             players.RemoveAll(x => x.Key == player.Key);
             players.Add(player);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         Task IRoomGrain.Exit(PlayerInfo player)
         {
             players.RemoveAll(x => x.Key == player.Key);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         Task IRoomGrain.Enter(MonsterInfo monster)
         {
             monsters.RemoveAll(x => x.Id == monster.Id);
             monsters.Add(monster);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         Task IRoomGrain.Exit(MonsterInfo monster)
         {
             monsters.RemoveAll(x => x.Id == monster.Id);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         Task IRoomGrain.Drop(Thing thing)
         {
             things.RemoveAll(x => x.Id == thing.Id);
             things.Add(thing);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         Task IRoomGrain.Take(Thing thing)
         {
             things.RemoveAll(x => x.Name == thing.Name);
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         Task IRoomGrain.SetInfo(RoomInfo info)
@@ -70,7 +70,7 @@ namespace AdventureGrains
             {
                 this.exits[kv.Key] = GrainFactory.GetGrain<IRoomGrain>(kv.Value);
             }
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         Task<Thing> IRoomGrain.FindThing(string name)

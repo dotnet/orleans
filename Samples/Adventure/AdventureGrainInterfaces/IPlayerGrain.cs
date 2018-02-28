@@ -6,7 +6,7 @@ namespace AdventureGrainInterfaces
     /// <summary>
     /// A player is, well, there's really no other good name...
     /// </summary>
-    public interface IPlayerGrain : Orleans.IGrainWithGuidKey
+    public interface IPlayerGrain : IGrainWithGuidKey
     {
         // Players have names
         Task<string> Name();

@@ -1,8 +1,6 @@
+using Orleans.Concurrency;
 using System;
 using System.Collections.Generic;
-
-using Orleans;
-using Orleans.Concurrency;
 
 namespace AdventureGrainInterfaces
 {

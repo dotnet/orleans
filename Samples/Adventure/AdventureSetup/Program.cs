@@ -1,0 +1,83 @@
+using Microsoft.Extensions.Logging;
+using Orleans;
+using Orleans.Configuration;
+using Orleans.Hosting;
+using Orleans.Runtime;
+using System;
+using System.IO;
+using System.Net;
+using System.Reflection;
+using System.Threading.Tasks;
+
+namespace AdventureSetup
+{
+    class Program
+    {
+        static int Main(string [] args)
+        {
+            var path = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string mapFileName = Path.Combine (path, "AdventureMap.json");
+
+            switch (args.Length)
+            {
+                default:
+                    Console.WriteLine("*** Invalid command line arguments.");
+                    return -1;
+                case 0:
+                    break;
+                case 1:
+                    mapFileName = args[0];
+                    break;
+            }
+
+            if (!File.Exists(mapFileName))
+            {
+                Console.WriteLine("*** File not found: {0}", mapFileName);
+                return -2;
+            }
+
+            var siloPort = 11111;
+            var gatewayPort = 30000;
+            var siloAddress = IPAddress.Loopback;
+
+            var silo = new SiloHostBuilder()
+                .Configure(options => options.ClusterId = "adventure")
+                .UseDevelopmentClustering(options => options.PrimarySiloEndpoint = new IPEndPoint(siloAddress, siloPort))
+                .ConfigureEndpoints(siloAddress, siloPort, gatewayPort)
+                .ConfigureLogging(logging => logging.AddConsole())
+                .Build();
+
+            var client = new ClientBuilder()
+                .ConfigureCluster(options => options.ClusterId = "adventure")
+                .UseStaticClustering(options => options.Gateways.Add(new IPEndPoint(siloAddress, gatewayPort).ToGatewayUri()))
+                .ConfigureLogging(logging => logging.AddConsole())
+                .Build();
+
+            RunAsync(silo, client, mapFileName).Wait();
+
+            Console.ReadLine();
+
+            StopAsync(silo, client).Wait();
+
+            return 0;
+        }
+
+        static async Task RunAsync(ISiloHost silo, IClusterClient client, string mapFileName)
+        {
+            await silo.StartAsync();
+            await client.Connect();
+
+            Console.WriteLine("Map file name is '{0}'.", mapFileName);
+            Console.WriteLine("Setting up Adventure, please wait ...");
+            Adventure adventure = new Adventure(client);
+            adventure.Configure(mapFileName).Wait();
+            Console.WriteLine("Adventure setup completed.");
+        }
+
+        static async Task StopAsync(ISiloHost silo, IClusterClient client)
+        {
+            await client.Close();
+            await silo.StopAsync();
+        }
+    }
+}

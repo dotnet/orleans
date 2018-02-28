@@ -1,7 +1,9 @@
 ﻿using AdventureGrainInterfaces;
 using Orleans;
 using System;
-using Orleans.Runtime.Configuration;
+using System.Net;
+using Orleans.Runtime;
+using Microsoft.Extensions.Logging;
 
 namespace AdventureClient
 {
@@ -9,8 +11,15 @@ namespace AdventureClient
     {
         static void Main(string[] args)
         {
-            var config = ClientConfiguration.LocalhostSilo();
-            GrainClient.Initialize(config);
+            var gatewayPort = 30000;
+            var siloAddress = IPAddress.Loopback;
+
+            var client = new ClientBuilder()
+                .ConfigureCluster(options => options.ClusterId = "adventure")
+                .UseStaticClustering(options => options.Gateways.Add(new IPEndPoint(siloAddress, gatewayPort).ToGatewayUri()))
+                .Build();
+
+            client.Connect().Wait();
 
             Console.WriteLine(@"
   ___      _                 _                  
@@ -24,9 +33,9 @@ namespace AdventureClient
             Console.WriteLine("What's you name?");
             string name = Console.ReadLine();
 
-            var player = GrainClient.GrainFactory.GetGrain<IPlayerGrain>(Guid.NewGuid());
+            var player = client.GetGrain<IPlayerGrain>(Guid.NewGuid());
             player.SetName(name).Wait();
-            var room1 = GrainClient.GrainFactory.GetGrain<IRoomGrain>(0);
+            var room1 = client.GetGrain<IRoomGrain>(0);
             player.SetRoomGrain(room1).Wait();
 
             Console.WriteLine(player.Play("look").Result);

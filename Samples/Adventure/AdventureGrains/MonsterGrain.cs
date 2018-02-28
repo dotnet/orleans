@@ -24,7 +24,7 @@ namespace AdventureGrains
         Task IMonsterGrain.SetInfo(MonsterInfo info)
         {
             this.monsterInfo = info;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         Task<string> IMonsterGrain.Name()

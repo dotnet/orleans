@@ -87,7 +87,7 @@ namespace AdventureGrains
         Task IPlayerGrain.SetName(string name)
         {
             this.myInfo.Name = name;
-            return TaskDone.Done;
+            return Task.CompletedTask;
         }
 
         Task IPlayerGrain.SetRoomGrain(IRoomGrain room)

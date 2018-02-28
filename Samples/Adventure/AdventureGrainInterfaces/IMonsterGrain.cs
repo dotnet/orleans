@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace AdventureGrainInterfaces
 {
-    public interface IMonsterGrain : Orleans.IGrainWithIntegerKey
+    public interface IMonsterGrain : IGrainWithIntegerKey
     {
         // Even monsters have a name
         Task<string> Name();

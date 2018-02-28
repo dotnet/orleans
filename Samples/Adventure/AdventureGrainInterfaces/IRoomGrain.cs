@@ -1,7 +1,5 @@
-using System.Collections.Generic;
-using System.Threading.Tasks;
-
 using Orleans;
+using System.Threading.Tasks;
 
 namespace AdventureGrainInterfaces
 {
@@ -9,7 +7,7 @@ namespace AdventureGrainInterfaces
     /// A room is any location in a game, including outdoor locations and
     /// spaces that are arguably better described as moist, cold, caverns.
     /// </summary>
-    public interface IRoomGrain : Orleans.IGrainWithIntegerKey
+    public interface IRoomGrain : IGrainWithIntegerKey
     {
         // Rooms have a textual description
         Task<string> Description(PlayerInfo whoisAsking);
