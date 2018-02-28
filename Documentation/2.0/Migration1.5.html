@@ -82,7 +82,75 @@
 If you are developing a .NET Core or .NET application using Orleans, you will need to follow certain steps to set up your environment, such as installing .NET Core SDK. For more information, please refer to their <a href="https://dotnet.github.io/">documentation</a>.</p>
 <h2 id="available-options-for-configuration-code">Available options for configuration code</h2>
 <h2 id="hosting">Hosting</h2>
-<h2 id="logging">Logging</h2>
+<h3 id="configuring-and-starting-a-silo-using-the-new-silobuilder-api-and-legacy-clusterconfiguration-object">Configuring and Starting a Silo (using the new SiloBuilder API and legacy ClusterConfiguration object)</h3>
+<p>There&#39;s a number of new option classes in Orleans 2.0 that provide a new way for configuring a silo.
+To ease migration to the new API, there is a optional backward compatibility package, <code>Microsoft.Orleans.Runtime.Legacy</code>, that provides a bridge from the old 1.x configuration API to the new one. </p>
+<p>If you add <code>Microsoft.Orleans.Runtime.Legacy</code> package, a silo can still be configured programmatically via the legacy <code>ClusterConfiguration</code> object that can then be passed to <code>SiloHostBuilder</code> to build and start a silo.</p>
+<p>You still need to specify grain class assemblies via the <code>ConfigureApplicationParts</code> call.</p>
+<p>Here is an example of how a local silo can be configured in the legacy way: </p>
+<pre><code class="lang-csharp">public class Program
+{
+    public static async Task Main(string[] args)
+    {
+        try
+        {
+            var host = await StartSilo();
+            Console.WriteLine(&quot;Press Enter to terminate...&quot;);
+            Console.ReadLine();
+
+            await host.StopAsync();
+
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            return 1;
+        }
+    }
+
+    private static async Task&lt;ISiloHost&gt; StartSilo()
+    {
+        // define the cluster configuration (temporarily required in the beta version,
+        // will not be required by the final release)
+        var config = ClusterConfiguration.LocalhostPrimarySilo();
+        // add providers to the legacy configuration object.
+        config.AddMemoryStorageProvider();
+
+        var builder = new SiloHostBuilder()
+            .UseConfiguration(config)
+            // Add assemblies to scan for grains and serializers.
+            // For more info read the Application Parts section
+            .ConfigureApplicationParts(parts =&gt;
+                parts.AddApplicationPart(typeof(HelloGrain).Assembly)
+                     .WithReferences())
+            // Configure logging with any logging framework that supports Microsoft.Extensions.Logging.
+            // In this particular case it logs using the Microsoft.Extensions.Logging.Console package.
+            .ConfigureLogging(logging =&gt; logging.AddConsole());
+
+        var host = builder.Build();
+        await host.StartAsync();
+        return host;
+    }
+}
+</code></pre><h3 id="configuring-and-connecting-a-client-using-the-new-clientbuilder-api-and-legacy-clientconfiguration-object">Configuring and Connecting a Client (using the new ClientBuilder API and legacy ClientConfiguration object)</h3>
+<p>There&#39;s a number of new option classes in Orleans 2.0 that provide a new way for configuring a client.
+To ease migration to the new API, there is a optional backward compatibility package, <code>Microsoft.Orleans.Core.Legacy</code>, that provides a bridge from the old 1.x configuration API to the new one. </p>
+<p>If you added <code>Microsoft.Orleans.Core.Legacy</code> package, a client can still be configured programmatically via the legacy <code>ClientConfiguration</code> object that can then be passed to <code>ClientBuilder</code> to build and connect the client.</p>
+<p>You still need to specify grain interface assemblies via the <code>ConfigureApplicationParts</code> call.</p>
+<p>Here is an example of how a client can connect to a local silo, using legacy configuration:</p>
+<pre><code class="lang-csharp">// define the client configuration (temporarily required in the beta version,
+// will not be required by the final release)
+var config = ClientConfiguration.LocalhostSilo();
+var builder = new ClientBuilder()
+    .UseConfiguration(config)
+    // Add assemblies to scan for grains interfaces and serializers.
+    // For more info read the Application Parts section
+    .ConfigureApplicationParts(parts =&gt; parts.AddApplicationPart(typeof(IHello).Assembly))
+    .ConfigureLogging(logging =&gt; logging.AddConsole())
+var client = builder.Build();
+await client.Connect();
+</code></pre><h2 id="logging">Logging</h2>
 <p>Orleans 2.0 uses the same logging abstractions as ASP.NET Core 2.0. You can find replacement for most Orleans logging feature in ASP.NET Core logging. Orleans specific logging feature, such as <code>ILogConsumer</code> and message bulking, is still maintained in <code>Microsoft.Orleans.Logging.Legacy</code> package, so that you still have the option to use them. But how to configure your logging with Orleans changed in 2.0. Let me walk you through the process of migration.</p>
 <p>In 1.5, logging configuration is done through <code>ClientConfiguration</code> and <code>NodeConfiguration</code>. You can configure <code>DefaultTraceLevel</code>, <code>TraceFileName</code>, <code>TraceFilePattern</code>, <code>TraceLevelOverrides</code>, <code>TraceToConsole</code>, <code>BulkMessageLimit</code>, <code>LogConsumers</code>, etc through it. In 2.0, logging configuration is consistent with ASP.NET Core 2.0 logging, which means most of the configuration is done through <code>Microsoft.Extensions.Logging.ILoggingBuilder</code>. </p>
 <p>To configure <code>DefaultTraceLevel</code> and <code>TraceLevelOverrides</code>, you need to apply <a href="https://docs.microsoft.com/en-us/aspnet/core/fundamentals/logging">log filtering</a> to <code>ILoggingBuilder</code>. For example, to set trace level to &#39;Debug&#39; on orleans runtime, you can use sample below, </p>

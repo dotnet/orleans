@@ -1,6 +1,6 @@
 {
   "homepages": [],
-  "source_base_path": "c:/GitHub/dotnet/orleans/src",
+  "source_base_path": "c:/GitHub/sergeybykov/orleans-2/src",
   "xrefmap": "xrefmap.yml",
   "files": [
     {
@@ -138,7 +138,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/2.0/Configuration2.0.html",
-          "hash": "OUkkZAQX+CeDQW2CqCwnDQ=="
+          "hash": "lvHmduPGAUWI8DzAbQWLwQ=="
         }
       },
       "is_incremental": false,
@@ -150,7 +150,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/2.0/Migration1.5.html",
-          "hash": "g8HE1e1pLUrprryW/vPAUw=="
+          "hash": "HqTh+b9z7WgqaQALZHmr6w=="
         }
       },
       "is_incremental": false,
@@ -1403,7 +1403,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/toc.html",
-          "hash": "OTJ9iAKWV/4wO70RmrUQTA=="
+          "hash": "mYUVCXs9SCbv76EqR8JUgw=="
         }
       },
       "is_incremental": false,
@@ -2033,6 +2033,11 @@
         "incrementalPhase": "build"
       },
       "processors": {
+        "ResourceDocumentProcessor": {
+          "can_incremental": false,
+          "details": "Processor ResourceDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
+          "incrementalPhase": "build"
+        },
         "TocDocumentProcessor": {
           "can_incremental": false,
           "details": "Processor TocDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
@@ -2040,11 +2045,6 @@
         },
         "ConceptualDocumentProcessor": {
           "can_incremental": false,
-          "incrementalPhase": "build"
-        },
-        "ResourceDocumentProcessor": {
-          "can_incremental": false,
-          "details": "Processor ResourceDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
           "incrementalPhase": "build"
         }
       }

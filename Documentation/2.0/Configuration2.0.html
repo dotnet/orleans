@@ -79,14 +79,19 @@
 <p>For a working sample application that targets Orleans 2.0 see: <a href="https://github.com/dotnet/orleans/tree/master/Samples/HelloWorld.NetCore">https://github.com/dotnet/orleans/tree/master/Samples/HelloWorld.NetCore</a>
 The sample hosts the client and the silo in .NET Core console applications that work in different platforms, but the same can be done with .NET Framework 4.6.1+ console applications (that work only on Windows).</p>
 <h2 id="configuring-and-starting-a-silo-using-the-new-silobuilder-api">Configuring and Starting a Silo (using the new SiloBuilder API)</h2>
-<p><em>Note: Orleans 2.0.0-beta2 is still changing, and it still requires some configuration to be done on the legacy <code>ClusterConfiguration</code> object, such as for configuring providers, or the IP endpoints to listen on. By the time 2.0.0 final is released, there will no longer be a requirement to use these legacy configuration objects, althought they will be provided in some form for backwards compatibility.</em></p>
-<p>A silo is configured programmatically via via a <code>ClientConfiguration</code> object and a <code>SiloHostBuilder</code>.
-For local testing, the easiest way to go is to start by using the <code>ClusterConfiguration.LocalhostPrimarySilo()</code> helper method.
-The configuration object is then passed to a new instance of <code>SiloHostBuilder</code> class, that can be built to create a host object that can be started and stopped after that.</p>
-<p>You can create an empty console application project targeting .NET Framework 4.6.1 or higher for hosting a silo, as well as a .NET Core console application.
-Add the <code>Microsoft.Orleans.Server</code> NuGet meta-package to the project.</p>
+<p>A silo is configured programmatically via a <code>SiloHostBuilder</code> and a number of supplemental option classes.
+Option classes in Orleans follow the <a href="https://docs.microsoft.com/en-us/aspnet/core/fundamentals/configuration/options">ASP.NET Options</a> pattern, and can be loaded via files, environment variables etc. Please refer to the <a href="(https://docs.microsoft.com/en-us/aspnet/core/fundamentals/configuration/options)">Options pattern documentation</a> for more information.</p>
+<p>For local development, please refer to the below example of how to configure a silo for that case.
+It configures and starts a silo listening on `loopback&#39; address and 11111 and 30000 as silo and gateway ports respectively.</p>
+<p>Add the <code>Microsoft.Orleans.Server</code> NuGet meta-package to the project. After you get comfortable with the API, you can pick and choose which exact packages included in <code>Microsoft.Orleans.Server</code> you actually need, and reference them instead.</p>
 <pre><code class="lang-PowerShell">PM&gt; Install-Package Microsoft.Orleans.Server
-</code></pre><p>Here is an example of how a local silo can be started:</p>
+</code></pre><p>You need to configure <code>ClusterOptions</code> via <code>ISiloBuilder.Configure</code>method, specify that you want <code>DevelopmentClustering</code> as your clustering choice with this silo being the primary, and then configure silo endpoints.
+<em>We are looking to improve the local development configuration experience down to a single method call before we release a final build of 2.0.0.</em></p>
+<p><code>ConfigureApplicationParts</code> call explicitly adds the assembly with grain classes to the application setup.
+It also adds any referenced assembly due to the <code>WithReferences</code> extension.
+After these steps are completed, the silo host gets built and the silo gets started.</p>
+<p>You can create an empty console application project targeting .NET Framework 4.6.1 or higher for hosting a silo, as well as a .NET Core console application.</p>
+<p>Here is an example of how a local silo can be started:</p>
 <pre><code class="lang-csharp">public class Program
 {
     public static async Task Main(string[] args)
@@ -108,16 +113,19 @@ Add the <code>Microsoft.Orleans.Server</code> NuGet meta-package to the project.
         }
     }
 
-    private static async Task&lt;ISiloHost&gt; StartSilo()
+   private static async Task&lt;ISiloHost&gt; StartSilo()
     {
-        // define the cluster configuration (temporarily required in the beta version,
-        // will not be required by the final release)
-        var config = ClusterConfiguration.LocalhostPrimarySilo();
-        // add providers to the legacy configuration object.
-        config.AddMemoryStorageProvider();
-
+         // define the cluster configuration
+        var siloPort = 11111;
+        int gatewayPort = 30000;
+        var siloAddress = IPAddress.Loopback; 
         var builder = new SiloHostBuilder()
-            .UseConfiguration(config)
+            //configure ClusterOptions to set CluserId and ServiceId
+            .Configure(options =&gt; options.ClusterId = &quot;helloworldcluster&quot;)
+            //Configure local primary silo using DevelopmentClustering
+            .UseDevelopmentClustering(options =&gt; options.PrimarySiloEndpoint = new IPEndPoint(siloAddress, siloPort))
+            //Configure silo endpoint and gatewayport
+            .ConfigureEndpoints(siloAddress, siloPort, gatewayPort)
             // Add assemblies to scan for grains and serializers.
             // For more info read the Application Parts section
             .ConfigureApplicationParts(parts =&gt;
@@ -133,23 +141,26 @@ Add the <code>Microsoft.Orleans.Server</code> NuGet meta-package to the project.
     }
 }
 </code></pre><h2 id="configuring-and-connecting-a-client-using-the-new-clientbuilder-api">Configuring and Connecting a Client (using the new ClientBuilder API)</h2>
-<p><em>Note: Orleans 2.0.0-beta2 is still changing, and it still requires some configuration to be done on the legacy <code>ClientConfiguration</code> object, such as for configuring providers. By the time 2.0.0 final is released, there will no longer be a requirement to use these legacy configuration objects, althought they will be provided in some form for backwards compatibility.</em></p>
-<p>Client for connecting to a cluster of silos and sending requests to grains is configured programmatically via a <code>ClientConfiguration</code> object and a <code>ClientBuilder</code>.
-<code>ClientConfiguration</code> object can be instantiated and populated directly, load settings from a file, or created with several available helper methods for different deployment environments.
-For local testing, the easiest way to go is to use <code>ClientConfiguration.LocalhostSilo()</code> helper method.
-The configuration object is then passed to a new instance of <code>ClientBuilder</code> class.</p>
-<p><code>ClientBuilder</code> exposes more methods for configuring additional client features.
-After that <code>Build</code> method of the <code>ClientBuilder</code> object is called to get an implementation of <code>IClusterClient</code> interface.
-Finally, we call <code>Connect()</code> method on the returned object to connect to the cluster.</p>
-<p>You can create an empty console application project targeting .NET Framework 4.6.1 or higher for running a client or reuse the console application project you created for hosting a silo.
-Add the <code>Microsoft.Orleans.Client</code> NuGet meta-package to the project.</p>
+<p>A client for connecting to a cluster of silos and sending requests to grains is configured programmatically via a <code>ClientBuilder</code> and a number of supplemental option classes.
+Like silo options, client option classes follow the <a href="https://docs.microsoft.com/en-us/aspnet/core/fundamentals/configuration/options">ASP.NET Options</a>.</p>
+<p>For local development, please refer to the below example of how to configure a client for that case.
+It configures a client that would connect to a <code>loopback</code> silo.</p>
+<p>Add the <code>Microsoft.Orleans.Client</code> NuGet meta-package to the project. After you get comfortable with the API, you can pick and choose which exact packages included in <code>Microsoft.Orleans.Client</code> you actually need, and reference them instead.</p>
 <pre><code class="lang-PowerShell">PM&gt; Install-Package Microsoft.Orleans.Client
-</code></pre><p>Here is an example of how a client can connect to a local silo:</p>
-<pre><code class="lang-csharp">// define the client configuration (temporarily required in the beta version,
-// will not be required by the final release)
-var config = ClientConfiguration.LocalhostSilo();
-var builder = new ClientBuilder()
-    .UseConfiguration(config)
+</code></pre><p>You need to configure <code>ClientBuilder</code> with a cluster ID that matches the one you specified for local silo and specify static clustering as your clustering choice pointing it to the gateway port of the silo
+<em>We are looking to improve the local development configuration experience down to a single method call before we release a final build of 2.0.0.</em></p>
+<p><code>ConfigureApplicationParts</code> call explicitly adds the assembly with grain interfaces to the application setup.</p>
+<p>After these steps are completed, we can build the client and <code>Connect()</code> method on it to connect to the cluster.</p>
+<p>You can create an empty console application project targeting .NET Framework 4.6.1 or higher for running a client or reuse the console application project you created for hosting a silo.</p>
+<p>Here is an example of how a client can connect to a local silo:</p>
+<pre><code class="lang-csharp">//define siloAddress and gatewayPort, should be consistent with whatever used in configuring silo.
+var siloAddress = IPAddress.Loopback;
+var gatewayPort = 30000;
+client = new ClientBuilder()
+    //Configure ClusterOptions
+    .ConfigureCluster(options =&gt; options.ClusterId = &quot;helloworldcluster&quot;)
+    //Use StaticClustering in client side
+    .UseStaticClustering(options =&gt; options.Gateways = new List&lt;Uri&gt;(){ (new IPEndPoint(siloAddress, gatewayPort)).ToGatewayUri() })
     // Add assemblies to scan for grains interfaces and serializers.
     // For more info read the Application Parts section
     .ConfigureApplicationParts(parts =&gt; parts.AddApplicationPart(typeof(IHello).Assembly))
@@ -157,7 +168,12 @@ var builder = new ClientBuilder()
 var client = builder.Build();
 await client.Connect();
 </code></pre><h2 id="application-parts">Application Parts</h2>
-<p>Orleans 2.0 does not perform automatic folder scanning to discover user assemblies and types. Instead, those assemblies are provided explicitly during the configuration stage. These assemblies are refered to as Application Parts. All Grains, Grain Interfaces, and Serializers are discovered using Application Parts.</p>
+<p>Orleans 2.0 does not perform automatic folder scanning to discover user assemblies and types.
+Instead, those assemblies are provided explicitly during the configuration stage.
+These assemblies are referred to as Application Parts.
+All Grains, Grain Interfaces, and Serializers are discovered using Application Parts.
+<em>For backward compatibility, if none of the Application Parts methods is called, the runtime will scan all assemblies in the silo or client folder.
+It is recommended not to rely on this fallback behavior, and explicitly specify all necessary application assemblies instead.</em></p>
 <p>Application Parts are configured using an <code>IApplicationPartsManager</code>, which can be accessed using the <code>ConfigureApplicationParts</code> extension method on <code>IClientBuilder</code> and <code>ISiloHostBuilder</code>. The <code>ConfigureApplicationParts</code> method accepts a delegate, <code>Action&lt;IApplicationPartManager&gt;</code>.</p>
 <p>The following extension methods on <code>IApplicationPartManager</code> support common uses:</p>
 <ul>
