@@ -169,7 +169,9 @@ namespace Orleans.Hosting
             services.TryAddSingleton<VersionSelectorManager>();
             services.TryAddSingleton<CachedVersionSelectorManager>();
             // Version selector strategy
-            services.TryAddSingleton<IVersionStore, GrainVersionStore>();
+            services.TryAddSingleton<GrainVersionStore>();
+            services.AddFromExisting<IVersionStore, GrainVersionStore>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, GrainVersionStore>();
             services.AddSingletonNamedService<VersionSelectorStrategy, AllCompatibleVersions>(nameof(AllCompatibleVersions));
             services.AddSingletonNamedService<VersionSelectorStrategy, LatestVersion>(nameof(LatestVersion));
             services.AddSingletonNamedService<VersionSelectorStrategy, MinimumVersion>(nameof(MinimumVersion));
