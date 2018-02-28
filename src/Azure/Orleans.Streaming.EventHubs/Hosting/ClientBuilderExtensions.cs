@@ -1,8 +1,6 @@
-﻿
-using System;
+﻿using System;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.ServiceBus.Providers;
 
 namespace Orleans.Hosting
@@ -14,7 +12,9 @@ namespace Orleans.Hosting
         /// </summary>
         public static IClientBuilder AddEventHubStreams(this IClientBuilder builder, string name, Action<EventHubStreamOptions> configureOptions)
         {
-            return builder.ConfigureServices(services => services.AddClusterClientEventHubStreams(name, configureOptions));
+            return builder
+                .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(EventHubAdapterFactory).Assembly))
+                .ConfigureServices(services => services.AddClusterClientEventHubStreams(name, configureOptions));
         }
 
         /// <summary>
@@ -22,24 +22,26 @@ namespace Orleans.Hosting
         /// </summary>
         public static IClientBuilder AddEventHubStreams(this IClientBuilder builder, string name, Action<OptionsBuilder<EventHubStreamOptions>> configureOptions = null)
         {
-            return builder.ConfigureServices(services => services.AddClusterClientEventHubStreams(name, configureOptions));
+            return builder
+                .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(EventHubAdapterFactory).Assembly))
+                .ConfigureServices(services => services.AddClusterClientEventHubStreams(name, configureOptions));
         }
 
         /// <summary>
         /// Configure cluster client to use event hub persistent streams.
         /// </summary>
-        public static IServiceCollection AddClusterClientEventHubStreams(this IServiceCollection services, string name, Action<EventHubStreamOptions> configureOptions)
+        private static void AddClusterClientEventHubStreams(this IServiceCollection services, string name, Action<EventHubStreamOptions> configureOptions)
         {
-            return services.AddClusterClientEventHubStreams(name, ob => ob.Configure(configureOptions));
+            services.AddClusterClientEventHubStreams(name, ob => ob.Configure(configureOptions));
         }
 
         /// <summary>
         /// Configure cluster client to use event hub persistent streams.
         /// </summary>
-        public static IServiceCollection AddClusterClientEventHubStreams(this IServiceCollection services, string name,
+        private static void AddClusterClientEventHubStreams(this IServiceCollection services, string name,
             Action<OptionsBuilder<EventHubStreamOptions>> configureOptions = null)
         {
-            return services.ConfigureNamedOptionForLogging<EventHubStreamOptions>(name)
+            services.ConfigureNamedOptionForLogging<EventHubStreamOptions>(name)
                            .AddClusterClientPersistentStreams<EventHubStreamOptions>(name, EventHubAdapterFactory.Create, configureOptions);
         }
     }

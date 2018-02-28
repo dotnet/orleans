@@ -14,7 +14,9 @@ namespace Orleans.Hosting
         public static IClientBuilder AddAzureQueueStreams<TDataAdapter>(this IClientBuilder builder, string name, Action<AzureQueueStreamOptions> configureOptions)
             where TDataAdapter : IAzureQueueDataAdapter
         {
-            return builder.ConfigureServices(services => services.AddClusterClientAzureQueueStreams<TDataAdapter>(name, configureOptions));
+            return builder
+                .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(AzureQueueAdapterFactory<>).Assembly))
+                .ConfigureServices(services => services.AddClusterClientAzureQueueStreams<TDataAdapter>(name, configureOptions));
         }
 
         /// <summary>
@@ -23,26 +25,28 @@ namespace Orleans.Hosting
         public static IClientBuilder AddAzureQueueStreams<TDataAdapter>(this IClientBuilder builder, string name, Action<OptionsBuilder<AzureQueueStreamOptions>> configureOptions = null)
             where TDataAdapter : IAzureQueueDataAdapter
         {
-            return builder.ConfigureServices(services => services.AddClusterClientAzureQueueStreams<TDataAdapter>(name, configureOptions));
+            return builder
+                .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(AzureQueueAdapterFactory<>).Assembly))
+                .ConfigureServices(services => services.AddClusterClientAzureQueueStreams<TDataAdapter>(name, configureOptions));
         }
 
         /// <summary>
         /// Configure cluster client to use azure queue persistent streams.
         /// </summary>
-        public static IServiceCollection AddClusterClientAzureQueueStreams<TDataAdapter>(this IServiceCollection services, string name, Action<AzureQueueStreamOptions> configureOptions)
+        private static void AddClusterClientAzureQueueStreams<TDataAdapter>(this IServiceCollection services, string name, Action<AzureQueueStreamOptions> configureOptions)
             where TDataAdapter : IAzureQueueDataAdapter
         {
-            return services.AddClusterClientAzureQueueStreams<TDataAdapter>(name, ob => ob.Configure(configureOptions));
+            services.AddClusterClientAzureQueueStreams<TDataAdapter>(name, ob => ob.Configure(configureOptions));
         }
 
         /// <summary>
         /// Configure cluster client to use azure queue persistent streams.
         /// </summary>
-        public static IServiceCollection AddClusterClientAzureQueueStreams<TDataAdapter>(this IServiceCollection services, string name,
+        private static void AddClusterClientAzureQueueStreams<TDataAdapter>(this IServiceCollection services, string name,
             Action<OptionsBuilder<AzureQueueStreamOptions>> configureOptions = null)
             where TDataAdapter : IAzureQueueDataAdapter
         {
-            return services.ConfigureNamedOptionForLogging<AzureQueueStreamOptions>(name)
+            services.ConfigureNamedOptionForLogging<AzureQueueStreamOptions>(name)
                            .AddClusterClientPersistentStreams<AzureQueueStreamOptions>(name, AzureQueueAdapterFactory<TDataAdapter>.Create, configureOptions);
         }
     }

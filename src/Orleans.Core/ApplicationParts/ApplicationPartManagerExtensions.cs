@@ -59,7 +59,31 @@ namespace Orleans
             applicationPartManager.PopulateFeature(result);
             return result;
         }
-        
+
+        /// <summary>
+        /// Adds the provided assembly to the builder as a framework assembly.
+        /// </summary>
+        /// <param name="manager">The builder.</param>
+        /// <param name="assembly">The assembly.</param>
+        /// <returns>The builder with the additionally added assembly.</returns>
+        public static IApplicationPartManagerWithAssemblies AddFrameworkPart(this IApplicationPartManager manager, Assembly assembly)
+        {
+            if (manager == null)
+            {
+                throw new ArgumentNullException(nameof(manager));
+            }
+
+            if (assembly == null)
+            {
+                throw new ArgumentNullException(nameof(assembly));
+            }
+
+            return new ApplicationPartManagerWithAssemblies(
+                manager.AddApplicationPart(
+                    new AssemblyPart(assembly) {IsFrameworkAssembly = true}),
+                new[] {assembly});
+        }
+
         /// <summary>
         /// Adds the provided assembly to the builder.
         /// </summary>

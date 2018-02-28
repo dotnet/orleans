@@ -24,23 +24,14 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure cluster service to use azure transaction log using configure action.
-        /// </summary>
-        public static IServiceCollection UseAzureTransactionLog(this IServiceCollection services, Action<AzureTransactionLogOptions> configureOptions)
-        {
-            return services.UseAzureTransactionLog(ob => ob.Configure(configureOptions));
-        }
-
-        /// <summary>
         /// Configure cluster service to use azure transaction log using configuration builder.
         /// </summary>
-        public static IServiceCollection UseAzureTransactionLog(this IServiceCollection services,
+        private static void UseAzureTransactionLog(this IServiceCollection services,
             Action<OptionsBuilder<AzureTransactionLogOptions>> configureOptions)
         {
             configureOptions?.Invoke(services.AddOptions<AzureTransactionLogOptions>());
             services.AddTransient<IConfigurationValidator,AzureTransactionLogOptionsValidator>();
             services.AddTransient(AzureTransactionLogStorage.Create);
-            return services;
         }
     }
 }
