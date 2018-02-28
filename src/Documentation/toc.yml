@@ -22,5 +22,5 @@
   href: Runtime-Implementation-Details/toc.yml
 - name: Samples
   href: Samples-Overview/toc.yml
-- name: Orleans 2.0.0-beta
+- name: Orleans 2.0.0-rc1
   href: 2.0/toc.yml

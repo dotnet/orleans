@@ -12,11 +12,9 @@ The sample hosts the client and the silo in .NET Core console applications that 
 
 ## Configuring and Starting a Silo (using the new SiloBuilder API)
 
-*Note: Orleans 2.0.0-beta2 is still changing, and it still requires some configuration to be done on the legacy `ClusterConfiguration` object, such as for configuring providers, or the IP endpoints to listen on. By the time 2.0.0 final is released, there will no longer be a requirement to use these legacy configuration objects, althought they will be provided in some form for backwards compatibility.*
+A silo is configured programmatically via a `SiloHostBuilder` and various kinds of silo side options. Option classes in orleans is well integrated with [ASP.NET Options](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/configuration/options), which can be loaded through files, environment variables etc. Please refer to [their docs]((https://docs.microsoft.com/en-us/aspnet/core/fundamentals/configuration/options)) for more information.
 
-A silo is configured programmatically via via a `ClientConfiguration` object and a `SiloHostBuilder`.
-For local testing, the easiest way to go is to start by using the `ClusterConfiguration.LocalhostPrimarySilo()` helper method.
-The configuration object is then passed to a new instance of `SiloHostBuilder` class, that can be built to create a host object that can be started and stopped after that.
+For local development, please refer to below example to configure a silo just for development. To configure a primary silo used for development, you need to first configure `ClusterOptions` through `ISiloBuilder.Configure`method, and then configure clustering, which is `DevelopmentClustering` in the example, and then configure silo endpoint properly. After those steps, the `SiloHostBuilder` can be built to create a host object that can be started and stopped after that.
 
 You can create an empty console application project targeting .NET Framework 4.6.1 or higher for hosting a silo, as well as a .NET Core console application.
 Add the `Microsoft.Orleans.Server` NuGet meta-package to the project.
@@ -49,16 +47,19 @@ public class Program
         }
     }
 
-    private static async Task<ISiloHost> StartSilo()
+   private static async Task<ISiloHost> StartSilo()
     {
-        // define the cluster configuration (temporarily required in the beta version,
-        // will not be required by the final release)
-        var config = ClusterConfiguration.LocalhostPrimarySilo();
-        // add providers to the legacy configuration object.
-        config.AddMemoryStorageProvider();
-
+         // define the cluster configuration
+        var siloPort = 11111;
+        int gatewayPort = 30000;
+        var siloAddress = IPAddress.Loopback; 
         var builder = new SiloHostBuilder()
-            .UseConfiguration(config)
+            //configure ClusterOptions to set CluserId and ServiceId
+            .Configure(options => options.ClusterId = "helloworldcluster")
+            //Configure local primary silo using DevelopmentClustering
+            .UseDevelopmentClustering(options => options.PrimarySiloEndpoint = new IPEndPoint(siloAddress, siloPort))
+            //Configure silo endpoint and gatewayport
+            .ConfigureEndpoints(siloAddress, siloPort, gatewayPort)
             // Add assemblies to scan for grains and serializers.
             // For more info read the Application Parts section
             .ConfigureApplicationParts(parts =>
@@ -76,13 +77,9 @@ public class Program
 ```
 
 ## Configuring and Connecting a Client (using the new ClientBuilder API)
+Client for connecting to a cluster of silos and sending requests to grains is configured programmatically via a `ClientBuilder` and various kinds of client side options. Option classes in orleans is well integrated with [ASP.NET Options](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/configuration/options), which can be loaded through files, environment variables etc. Please refer to [their docs]((https://docs.microsoft.com/en-us/aspnet/core/fundamentals/configuration/options)) for more information.
 
-*Note: Orleans 2.0.0-beta2 is still changing, and it still requires some configuration to be done on the legacy `ClientConfiguration` object, such as for configuring providers. By the time 2.0.0 final is released, there will no longer be a requirement to use these legacy configuration objects, althought they will be provided in some form for backwards compatibility.*
-
-Client for connecting to a cluster of silos and sending requests to grains is configured programmatically via a `ClientConfiguration` object and a `ClientBuilder`.
-`ClientConfiguration` object can be instantiated and populated directly, load settings from a file, or created with several available helper methods for different deployment environments.
-For local testing, the easiest way to go is to use `ClientConfiguration.LocalhostSilo()` helper method.
-The configuration object is then passed to a new instance of `ClientBuilder` class.
+For local development, please refer to below example on how to configure a client which connects to a cluster which has a local primary silo.
 
 `ClientBuilder` exposes more methods for configuring additional client features.
 After that `Build` method of the `ClientBuilder` object is called to get an implementation of `IClusterClient` interface.
@@ -98,11 +95,14 @@ PM> Install-Package Microsoft.Orleans.Client
 Here is an example of how a client can connect to a local silo:
 
 ```csharp
-// define the client configuration (temporarily required in the beta version,
-// will not be required by the final release)
-var config = ClientConfiguration.LocalhostSilo();
-var builder = new ClientBuilder()
-    .UseConfiguration(config)
+//define siloAddress and gatewayPort, should be consistent with whatever used in configuring silo.
+var siloAddress = IPAddress.Loopback;
+var gatewayPort = 30000;
+client = new ClientBuilder()
+    //Configure ClusterOptions
+    .ConfigureCluster(options => options.ClusterId = "helloworldcluster")
+    //Use StaticClustering in client side
+    .UseStaticClustering(options => options.Gateways = new List<Uri>(){ (new IPEndPoint(siloAddress, gatewayPort)).ToGatewayUri() })
     // Add assemblies to scan for grains interfaces and serializers.
     // For more info read the Application Parts section
     .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IHello).Assembly))
