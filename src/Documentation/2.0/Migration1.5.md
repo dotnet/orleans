@@ -16,6 +16,88 @@ If you are developing a .NET Core or .NET application using Orleans, you will ne
 
 ## Hosting
 
+### Configuring and Starting a Silo (using the new SiloBuilder API and legacy ClusterConfiguration object)
+There's a number of new option classes in Orleans 2.0 that provide a new way for configuring a silo.
+To ease migration to the new API, there is a optional backward compatibility package, `Microsoft.Orleans.Runtime.Legacy`, that provides a bridge from the old 1.x configuration API to the new one. 
+
+If you add `Microsoft.Orleans.Runtime.Legacy` package, a silo can still be configured programmatically via the legacy `ClusterConfiguration` object that can then be passed to `SiloHostBuilder` to build and start a silo.
+
+You still need to specify grain class assemblies via the `ConfigureApplicationParts` call.
+
+Here is an example of how a local silo can be configured in the legacy way: 
+
+```csharp
+public class Program
+{
+    public static async Task Main(string[] args)
+    {
+        try
+        {
+            var host = await StartSilo();
+            Console.WriteLine("Press Enter to terminate...");
+            Console.ReadLine();
+
+            await host.StopAsync();
+
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            return 1;
+        }
+    }
+
+    private static async Task<ISiloHost> StartSilo()
+    {
+        // define the cluster configuration (temporarily required in the beta version,
+        // will not be required by the final release)
+        var config = ClusterConfiguration.LocalhostPrimarySilo();
+        // add providers to the legacy configuration object.
+        config.AddMemoryStorageProvider();
+            
+        var builder = new SiloHostBuilder()
+            .UseConfiguration(config)
+            // Add assemblies to scan for grains and serializers.
+            // For more info read the Application Parts section
+            .ConfigureApplicationParts(parts =>
+                parts.AddApplicationPart(typeof(HelloGrain).Assembly)
+                     .WithReferences())
+            // Configure logging with any logging framework that supports Microsoft.Extensions.Logging.
+            // In this particular case it logs using the Microsoft.Extensions.Logging.Console package.
+            .ConfigureLogging(logging => logging.AddConsole());
+
+        var host = builder.Build();
+        await host.StartAsync();
+        return host;
+    }
+}
+```
+
+### Configuring and Connecting a Client (using the new ClientBuilder API and legacy ClientConfiguration object)
+There's a number of new option classes in Orleans 2.0 that provide a new way for configuring a client.
+To ease migration to the new API, there is a optional backward compatibility package, `Microsoft.Orleans.Core.Legacy`, that provides a bridge from the old 1.x configuration API to the new one. 
+
+If you added `Microsoft.Orleans.Core.Legacy` package, a client can still be configured programmatically via the legacy `ClientConfiguration` object that can then be passed to `ClientBuilder` to build and connect the client.
+
+You still need to specify grain interface assemblies via the `ConfigureApplicationParts` call.
+
+Here is an example of how a client can connect to a local silo, using legacy configuration:
+
+```csharp
+// define the client configuration (temporarily required in the beta version,
+// will not be required by the final release)
+var config = ClientConfiguration.LocalhostSilo();
+var builder = new ClientBuilder()
+    .UseConfiguration(config)
+    // Add assemblies to scan for grains interfaces and serializers.
+    // For more info read the Application Parts section
+    .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IHello).Assembly))
+    .ConfigureLogging(logging => logging.AddConsole())
+var client = builder.Build();
+await client.Connect();
+```
+
 ## Logging
 Orleans 2.0 uses the same logging abstractions as ASP.NET Core 2.0. You can find replacement for most Orleans logging feature in ASP.NET Core logging. Orleans specific logging feature, such as `ILogConsumer` and message bulking, is still maintained in `Microsoft.Orleans.Logging.Legacy` package, so that you still have the option to use them. But how to configure your logging with Orleans changed in 2.0. Let me walk you through the process of migration.
 
