@@ -16,7 +16,7 @@ namespace Orleans.AdoNet.Messaging
                 {
                     var reader = new ClientConfigurationReader(configuration);
                     options.ConnectionString = reader.GetPropertyValue<string>("DataConnectionString");
-                    options.AdoInvariant = reader.GetPropertyValue<string>("AdoInvariant");
+                    options.Invariant = reader.GetPropertyValue<string>("AdoInvariant");
                 });
             services.AddSingleton<IGatewayListProvider, AdoNetGatewayListProvider>();
         }

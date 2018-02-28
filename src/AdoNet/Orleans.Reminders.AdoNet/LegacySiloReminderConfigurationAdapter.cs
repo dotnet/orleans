@@ -12,7 +12,8 @@ namespace Orleans.Hosting
         {
             var reader = new GlobalConfigurationReader(configuration);
             var connectionString = reader.GetPropertyValue<string>("DataConnectionStringForReminders");
-            services.UseAdoNetReminderService(connectionString);
+            var invariant = reader.GetPropertyValue<string>("AdoInvariantForReminders");
+            services.UseAdoNetReminderService(connectionString, invariant);
         }
     }
 }

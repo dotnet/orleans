@@ -78,10 +78,16 @@ namespace Orleans.Configuration
         /// <inheritdoc cref="IConfigurationValidator"/>
         public void ValidateConfiguration()
         {
+            if (string.IsNullOrWhiteSpace(this.options.Invariant))
+            {
+                throw new OrleansConfigurationException($"Invalid {nameof(AdoNetGrainStorageOptions)} values for {nameof(AdoNetGrainStorage)} \"{name}\". {nameof(options.Invariant)} is required.");
+            }
+
             if (string.IsNullOrWhiteSpace(this.options.ConnectionString))
             {
-                throw new OrleansConfigurationException($"Invalid {nameof(AdoNetGrainStorageOptions)} values for {nameof(AdoNetGrainStorage)} \"{name}\". ConnectionString is required.");
+                throw new OrleansConfigurationException($"Invalid {nameof(AdoNetGrainStorageOptions)} values for {nameof(AdoNetGrainStorage)} \"{name}\". {nameof(options.ConnectionString)} is required.");
             }
+
             if (options.UseXmlFormat&&options.UseJsonFormat)
             {
                 throw new OrleansConfigurationException($"Invalid {nameof(AdoNetGrainStorageOptions)} values for {nameof(AdoNetGrainStorage)} \"{name}\". {nameof(options.UseXmlFormat)} and {nameof(options.UseJsonFormat)} cannot both be set to true");

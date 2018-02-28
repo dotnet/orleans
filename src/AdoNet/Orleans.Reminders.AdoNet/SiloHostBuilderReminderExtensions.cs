@@ -38,12 +38,19 @@ namespace Orleans.Hosting
         /// <param name="connectionString">
         /// The storage connection string.
         /// </param>
+        /// <param name="invariant">
+        /// The ADO.NET invariant name.
+        /// </param>
         /// <returns>
         /// The provided <see cref="ISiloHostBuilder"/>, for chaining.
         /// </returns>
-        public static ISiloHostBuilder UseAdoNetReminderService(this ISiloHostBuilder builder, string connectionString)
+        public static ISiloHostBuilder UseAdoNetReminderService(this ISiloHostBuilder builder, string connectionString, string invariant)
         {
-            builder.UseAdoNetReminderService(options => options.ConnectionString = connectionString);
+            builder.UseAdoNetReminderService(options =>
+            {
+                options.ConnectionString = connectionString;
+                options.Invariant = invariant;
+            });
             return builder;
         }
 
@@ -59,12 +66,12 @@ namespace Orleans.Hosting
         /// <returns>
         /// The provided <see cref="ISiloHostBuilder"/>, for chaining.
         /// </returns>
-        public static IServiceCollection UseAdoNetReminderService(this IServiceCollection services, Action<AdoNetReminderTableOptions> configure)
+        private static void UseAdoNetReminderService(this IServiceCollection services, Action<AdoNetReminderTableOptions> configure)
         {
             services.AddSingleton<IReminderTable, AdoNetReminderTable>();
             services.ConfigureFormatter<AdoNetReminderTableOptions>();
+            services.AddSingleton<IConfigurationValidator, AdoNetReminderTableOptionsValidator>();
             services.Configure(configure);
-            return services;
         }
 
         /// <summary>
@@ -76,13 +83,19 @@ namespace Orleans.Hosting
         /// <param name="connectionString">
         /// The storage connection string.
         /// </param>
+        /// <param name="invariant">
+        /// The ADO.NET invariant name.
+        /// </param>
         /// <returns>
         /// The provided <see cref="ISiloHostBuilder"/>, for chaining.
         /// </returns>
-        public static IServiceCollection UseAdoNetReminderService(this IServiceCollection services, string connectionString)
+        internal static void UseAdoNetReminderService(this IServiceCollection services, string connectionString, string invariant)
         {
-            services.UseAdoNetReminderService(options => options.ConnectionString = connectionString);
-            return services;
+            services.UseAdoNetReminderService(options =>
+            {
+                options.ConnectionString = connectionString;
+                options.Invariant = invariant;
+            });
         }
     }
 }

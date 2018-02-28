@@ -14,6 +14,6 @@
         /// <summary>
         /// The invariant name of the connector for membership's database.
         /// </summary>
-        public string AdoInvariant { get; set; }
+        public string Invariant { get; set; }
     }
 }

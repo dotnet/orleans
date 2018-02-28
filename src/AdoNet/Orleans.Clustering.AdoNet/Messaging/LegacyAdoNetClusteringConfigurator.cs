@@ -14,7 +14,7 @@ namespace Orleans.AdoNet
                 options =>
                 {
                     var reader = new GlobalConfigurationReader(configuration);
-                    options.AdoInvariant = reader.GetPropertyValue<string>("AdoInvariant");
+                    options.Invariant = reader.GetPropertyValue<string>("AdoInvariant");
                     options.ConnectionString = reader.GetPropertyValue<string>("DataConnectionString");
                 });
             services.AddSingleton<IMembershipTable, AdoNetClusteringTable>();

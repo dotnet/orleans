@@ -34,7 +34,7 @@ namespace UnitTests.MembershipTests
         {
             var options = new AdoNetClusteringSiloOptions()
             {
-                AdoInvariant = GetAdoInvariant(),
+                Invariant = GetAdoInvariant(),
                 ConnectionString = this.connectionString,
             };
             return new AdoNetClusteringTable(this.GrainReferenceConverter, this.clusterOptions, Options.Create(options), loggerFactory.CreateLogger<AdoNetClusteringTable>());
@@ -45,7 +45,7 @@ namespace UnitTests.MembershipTests
             var options = new AdoNetClusteringClientOptions()
             {
                 ConnectionString = this.connectionString,
-                AdoInvariant = GetAdoInvariant()
+                Invariant = GetAdoInvariant()
             };
             return new AdoNetGatewayListProvider(loggerFactory.CreateLogger<AdoNetGatewayListProvider>(), this.GrainReferenceConverter, Options.Create(options), this.gatewayOptions, this.clusterOptions);
         }
