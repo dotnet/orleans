@@ -14,13 +14,15 @@ If you are developing a .NET Core or .NET application using Orleans, you will ne
 
 ## Available options for configuration code
 
-##Hosting
+## Hosting
 
 ### Configuring and Starting a Silo (using the new SiloBuilder API and legacy ClusterConfiguration object)
-There's a lot of new option classe in orleans 2.0, which represent the new way of how user should configure their silo. So we understand it might be painful for some users to migrate immediately to the new way. That's why we still maintian the legacy way of configuring silo, in `Microsoft.Orleans.Runtime.Legacy` package, as a tool to help users migrate to 2.0. 
+There's a number of new option classes in Orleans 2.0 that provide a new way for configuring a silo.
+To ease migration to the new API, there is a optional backward compatibility package, `Microsoft.Orleans.Runtime.Legacy`, that provides a bridge from the old 1.x configuration API to the new one. 
 
-If you added `Microsoft.Orleans.Runtime.Legacy` as a dependency, a silo can still be configured programmatically via the legacy `ClusterConfiguration` object and a `SiloHostBuilder`.
-You can configure your `ClusterConfiguration` object the same as before, and the configuration object is then passed to a new instance of `SiloHostBuilder` class, that can be built to create a host object that can be started and stopped after that.
+If you add `Microsoft.Orleans.Runtime.Legacy` package, a silo can still be configured programmatically via the legacy `ClusterConfiguration` object that can then be passed to `SiloHostBuilder` to build and start a silo.
+
+You still need to specify grain class assemblies via the `ConfigureApplicationParts` call.
 
 Here is an example of how a local silo can be configured in the legacy way: 
 
@@ -73,12 +75,12 @@ public class Program
 ```
 
 ### Configuring and Connecting a Client (using the new ClientBuilder API and legacy ClientConfiguration object)
-There's a lot of new option classe in orleans 2.0, which represent the new way of how user should configure their client. So we understand it might be painful for some users to migrate immediately to the new way. That's why we still maintian the legacy way of configuring client, in `Microsoft.Orleans.Core.Legacy` package, as a tool to help user migrate to 2.0.
+There's a number of new option classes in Orleans 2.0 that provide a new way for configuring a client.
+To ease migration to the new API, there is a optional backward compatibility package, `Microsoft.Orleans.Core.Legacy`, that provides a bridge from the old 1.x configuration API to the new one. 
 
-If you added `Microsoft.Orleans.Core.Legacy` as a dependency, Client can still be configured programmatically via the legacy `ClientConfiguration` object and a `ClientBuilder`.
-You can configure your `ClientConfiguration` object the same as before, and then pass it to a new instance of `ClientBuilder` class.
+If you added `Microsoft.Orleans.Core.Legacy` package, a client can still be configured programmatically via the legacy `ClientConfiguration` object that can then be passed to `ClientBuilder` to build and connect the client.
 
-After that `Build` method of the `ClientBuilder` object is called to get an implementation of `IClusterClient` interface, we call `Connect()` method on the returned object to connect to the cluster.
+You still need to specify grain interface assemblies via the `ConfigureApplicationParts` call.
 
 Here is an example of how a client can connect to a local silo, using legacy configuration:
 
