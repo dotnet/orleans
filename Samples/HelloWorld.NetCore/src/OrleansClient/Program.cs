@@ -52,7 +52,7 @@ namespace OrleansClient
                     var gatewayPort = 30000;
                     client = new ClientBuilder()
                         .ConfigureCluster(options => options.ClusterId = "helloworldcluster")
-                        .UseStaticClustering(options => options.Gateways = new List<Uri>(){ (new IPEndPoint(siloAddress, gatewayPort)).ToGatewayUri() })
+                        .UseStaticClustering(options => options.Gateways.Add((new IPEndPoint(siloAddress, gatewayPort)).ToGatewayUri()))
                         .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IHello).Assembly).WithReferences())
                         .ConfigureLogging(logging => logging.AddConsole())
                         .Build();
