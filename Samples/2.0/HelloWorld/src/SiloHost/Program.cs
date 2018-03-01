@@ -1,9 +1,11 @@
 ﻿using Orleans.Runtime.Configuration;
 using System;
+using System.Net;
 using System.Threading.Tasks;
 using HelloWorld.Grains;
 using Microsoft.Extensions.Logging;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Hosting;
 
 namespace OrleansSiloHost
@@ -37,11 +39,13 @@ namespace OrleansSiloHost
         private static async Task<ISiloHost> StartSilo()
         {
             // define the cluster configuration
-            var config = ClusterConfiguration.LocalhostPrimarySilo();
-            config.AddMemoryStorageProvider();
-
+            var siloPort = 11111;
+            int gatewayPort = 30000;
+            var siloAddress = IPAddress.Loopback; 
             var builder = new SiloHostBuilder()
-                .UseConfiguration(config)
+                .Configure(options => options.ClusterId = "helloworldcluster")
+                .UseDevelopmentClustering(options => options.PrimarySiloEndpoint = new IPEndPoint(siloAddress, siloPort))
+                .ConfigureEndpoints(siloAddress, siloPort, gatewayPort)
                 .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(HelloGrain).Assembly).WithReferences())
                 .ConfigureLogging(logging => logging.AddConsole());
 

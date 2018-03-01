@@ -3,6 +3,8 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using System;
+using System.Collections.Generic;
+using System.Net;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -33,6 +35,7 @@ namespace OrleansClient
             catch (Exception e)
             {
                 Console.WriteLine(e);
+                Console.ReadKey();
                 return 1;
             }
         }
@@ -45,9 +48,11 @@ namespace OrleansClient
             {
                 try
                 {
-                    var config = ClientConfiguration.LocalhostSilo();
+                    var siloAddress = IPAddress.Loopback;
+                    var gatewayPort = 30000;
                     client = new ClientBuilder()
-                        .UseConfiguration(config)
+                        .ConfigureCluster(options => options.ClusterId = "helloworldcluster")
+                        .UseStaticClustering(options => options.Gateways.Add((new IPEndPoint(siloAddress, gatewayPort)).ToGatewayUri()))
                         .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IHello).Assembly).WithReferences())
                         .ConfigureLogging(logging => logging.AddConsole())
                         .Build();
