@@ -61,7 +61,7 @@ namespace Orleans.Hosting
         /// <returns>
         /// The provided <see cref="ISiloHostBuilder"/>, for chaining.
         /// </returns>
-        internal static void UseAdoNetReminderService(this IServiceCollection services, Action<OptionsBuilder<AdoNetReminderTableOptions>> configureOptions)
+        public static void UseAdoNetReminderService(this IServiceCollection services, Action<OptionsBuilder<AdoNetReminderTableOptions>> configureOptions)
         {
             services.AddSingleton<IReminderTable, AdoNetReminderTable>();
             services.ConfigureFormatter<AdoNetReminderTableOptions>();
