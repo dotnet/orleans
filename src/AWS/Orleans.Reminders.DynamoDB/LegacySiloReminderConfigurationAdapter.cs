@@ -10,11 +10,11 @@ namespace Orleans.Hosting
     internal class LegacySiloReminderConfigurationAdapter : ILegacyReminderTableAdapter
     {
         /// <inheritdoc />
-        public void Configure(object configuration, IServiceCollection services)
+        public void Configure(object configuration, ISiloHostBuilder builder)
         {
             var reader = new GlobalConfigurationReader(configuration);
             var connectionString = reader.GetPropertyValue<string>("DataConnectionStringForReminders");
-            services.UseDynamoDBReminderService(options => ParseDataConnectionString(connectionString, options));
+            builder.UseDynamoDBReminderService(options => ParseDataConnectionString(connectionString, options));
         }
 
         private const string AccessKeyPropertyName = "AccessKey";
