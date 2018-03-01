@@ -37,6 +37,13 @@ namespace Orleans
         public const int ApplicationServices = 10000;
 
         /// <summary>
+        /// Service will be active after this step.
+        /// It should only be used by the memebrship oracle, no
+        /// other component should run at this stage
+        /// </summary>
+        public const int BecomeActive = Active-1;
+
+        /// <summary>
         /// Service is active.
         /// </summary>
         public const int Active = 20000;
