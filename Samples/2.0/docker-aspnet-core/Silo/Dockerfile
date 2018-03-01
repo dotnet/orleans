@@ -5,6 +5,7 @@ FROM microsoft/aspnetcore-build:2.0 AS build
 WORKDIR /src
 COPY *.sln ./
 COPY Silo/Silo.csproj Silo/
+COPY Directory.Build.props .
 RUN dotnet restore
 COPY . .
 WORKDIR /src/Silo
