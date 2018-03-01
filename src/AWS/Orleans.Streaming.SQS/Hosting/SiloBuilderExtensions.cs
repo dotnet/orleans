@@ -1,7 +1,5 @@
 using System;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using OrleansAWSUtils.Streams;
 
 namespace Orleans.Hosting
@@ -13,9 +11,7 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloHostBuilder AddSqsStreams(this ISiloHostBuilder builder, string name, Action<SqsStreamOptions> configureOptions)
         {
-            return builder
-                .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(SQSAdapterFactory).Assembly))
-                .ConfigureServices(services => services.AddSiloSqsStreams(name, configureOptions));
+            return builder.AddSqsStreams(name, ob => ob.Configure(configureOptions));
         }
 
         /// <summary>
@@ -25,27 +21,11 @@ namespace Orleans.Hosting
         {
             return builder
                 .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(SQSAdapterFactory).Assembly))
-                .ConfigureServices(services => services.AddSiloSqsStreams(name, configureOptions));
-        }
-
-        /// <summary>
-        /// Configure silo to use SQS persistent streams.
-        /// </summary>
-        private static void AddSiloSqsStreams(this IServiceCollection services, string name, Action<SqsStreamOptions> configureOptions)
-        {
-            services.AddSiloSqsStreams(name, ob => ob.Configure(configureOptions));
-        }
-
-        /// <summary>
-        /// Configure silo to use SQS persistent streams.
-        /// </summary>
-        private static void AddSiloSqsStreams(
-            this IServiceCollection services,
-            string name,
-            Action<OptionsBuilder<SqsStreamOptions>> configureOptions = null)
-        {
-            services.ConfigureNamedOptionForLogging<SqsStreamOptions>(name)
-                .AddSiloPersistentStreams<SqsStreamOptions>(name, SQSAdapterFactory.Create, configureOptions);
+                .ConfigureServices(services =>
+                {
+                    services.ConfigureNamedOptionForLogging<SqsStreamOptions>(name)
+                        .AddSiloPersistentStreams<SqsStreamOptions>(name, SQSAdapterFactory.Create, configureOptions);
+                });
         }
     }
 }

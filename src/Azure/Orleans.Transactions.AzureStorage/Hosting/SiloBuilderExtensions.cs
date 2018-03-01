@@ -20,18 +20,12 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloHostBuilder UseAzureTransactionLog(this ISiloHostBuilder builder, Action<OptionsBuilder<AzureTransactionLogOptions>> configureOptions)
         {
-            return builder.ConfigureServices(services => services.UseAzureTransactionLog(configureOptions));
-        }
-
-        /// <summary>
-        /// Configure cluster service to use azure transaction log using configuration builder.
-        /// </summary>
-        private static void UseAzureTransactionLog(this IServiceCollection services,
-            Action<OptionsBuilder<AzureTransactionLogOptions>> configureOptions)
-        {
-            configureOptions?.Invoke(services.AddOptions<AzureTransactionLogOptions>());
-            services.AddTransient<IConfigurationValidator,AzureTransactionLogOptionsValidator>();
-            services.AddTransient(AzureTransactionLogStorage.Create);
+            return builder.ConfigureServices(services =>
+            {
+                configureOptions?.Invoke(services.AddOptions<AzureTransactionLogOptions>());
+                services.AddTransient<IConfigurationValidator, AzureTransactionLogOptionsValidator>();
+                services.AddTransient(AzureTransactionLogStorage.Create);
+            });
         }
     }
 }

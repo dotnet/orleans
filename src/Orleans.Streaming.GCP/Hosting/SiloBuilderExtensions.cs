@@ -1,7 +1,5 @@
 using System;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Providers.GCP.Streams.PubSub;
 
 namespace Orleans.Hosting
@@ -17,9 +15,7 @@ namespace Orleans.Hosting
             Action<PubSubStreamOptions> configureOptions)
             where TDataAdapter : IPubSubDataAdapter
         {
-            return builder
-                .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(PubSubBatchContainer).Assembly))
-                .ConfigureServices(services => services.AddSiloPubSubStreams<TDataAdapter>(name, configureOptions));
+            return builder.AddPubSubStreams<TDataAdapter>(name, ob => ob.Configure(configureOptions));
         }
 
         /// <summary>
@@ -33,32 +29,11 @@ namespace Orleans.Hosting
         {
             return builder
                 .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(PubSubBatchContainer).Assembly))
-                .ConfigureServices(services => services.AddSiloPubSubStreams<TDataAdapter>(name, configureOptions));
-        }
-
-        /// <summary>
-        /// Configure silo to use PubSub persistent streams.
-        /// </summary>
-        private static void AddSiloPubSubStreams<TDataAdapter>(
-            this IServiceCollection services,
-            string name,
-            Action<PubSubStreamOptions> configureOptions)
-            where TDataAdapter : IPubSubDataAdapter
-        {
-            services.AddSiloPubSubStreams<TDataAdapter>(name, ob => ob.Configure(configureOptions));
-        }
-
-        /// <summary>
-        /// Configure silo to use PubSub persistent streams.
-        /// </summary>
-        private static void AddSiloPubSubStreams<TDataAdapter>(
-            this IServiceCollection services,
-            string name,
-            Action<OptionsBuilder<PubSubStreamOptions>> configureOptions = null)
-            where TDataAdapter : IPubSubDataAdapter
-        {
-            services.ConfigureNamedOptionForLogging<PubSubStreamOptions>(name)
-                .AddSiloPersistentStreams<PubSubStreamOptions>(name, PubSubAdapterFactory<TDataAdapter>.Create, configureOptions);
+                .ConfigureServices(services =>
+                {
+                    services.ConfigureNamedOptionForLogging<PubSubStreamOptions>(name)
+                        .AddSiloPersistentStreams<PubSubStreamOptions>(name, PubSubAdapterFactory<TDataAdapter>.Create, configureOptions);
+                });
         }
     }
 }
