@@ -7,9 +7,9 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.All" Version="2.0.5" />
-    <PackageReference Include="Microsoft.Orleans.Client" Version="2.0.0-rc1" />
-    <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" Version="2.0.0-rc1" />
-    <PackageReference Include="Microsoft.Orleans.OrleansCodeGenerator.Build" Version="2.0.0-rc1" />
+    <PackageReference Include="Microsoft.Orleans.Client" Version="$(OrleansPackageVersion)" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" Version="$(OrleansPackageVersion)" />
+    <PackageReference Include="Microsoft.Orleans.OrleansCodeGenerator.Build" Version="$(OrleansPackageVersion)" />
   </ItemGroup>
 
   <ItemGroup>
