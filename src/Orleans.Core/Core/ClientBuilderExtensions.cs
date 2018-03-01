@@ -1,4 +1,6 @@
 using System;
+using System.Linq;
+using System.Net;
 using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,6 +10,7 @@ using Orleans.Hosting;
 using Orleans.ApplicationParts;
 using Orleans.CodeGeneration;
 using Orleans.Messaging;
+using Orleans.Runtime;
 
 namespace Orleans
 {
@@ -143,6 +146,44 @@ namespace Orleans
         public static IClientBuilder ConfigureLogging(this IClientBuilder builder, Action<ILoggingBuilder> configureLogging)
         {
             return builder.ConfigureServices(collection => collection.AddLogging(loggingBuilder => configureLogging(loggingBuilder)));
+        }
+
+        /// <summary>
+        /// Configures the client to connect to a silo on the localhost.
+        /// </summary>
+        /// <param name="gatewayPort">The local silo's gateway port.</param>
+        public static IClientBuilder UseLocalhostClustering(
+            this IClientBuilder builder,
+            int gatewayPort = 30000,
+            string clusterId = ClusterOptions.DevelopmentClusterId)
+        {
+            return builder.UseStaticClustering(new IPEndPoint(IPAddress.Loopback, gatewayPort))
+                .ConfigureCluster(options =>
+                {
+                    if (!string.IsNullOrWhiteSpace(clusterId)) options.ClusterId = clusterId;
+                });
+        }
+
+        /// <summary>
+        /// Configures the client to connect to a silo on the localhost.
+        /// </summary>
+        /// <param name="gatewayPorts">The local silo gateway port.</param>
+        public static IClientBuilder UseLocalhostClustering(this IClientBuilder builder, params int[] gatewayPorts)
+        {
+            return builder.UseStaticClustering(gatewayPorts.Select(p => new IPEndPoint(IPAddress.Loopback, p)).ToArray())
+                .ConfigureCluster(options =>
+                {
+                    options.ClusterId = ClusterOptions.DevelopmentClusterId;
+                });
+        }
+
+        /// <summary>
+        /// Configures the client to use static clustering.
+        /// </summary>
+        /// <param name="endpoints">The gateway endpoints.</param>
+        public static IClientBuilder UseStaticClustering(this IClientBuilder builder, params IPEndPoint[] endpoints)
+        {
+            return builder.UseStaticClustering(options => options.Gateways = endpoints.Select(ep => ep.ToGatewayUri()).ToList());
         }
 
         /// <summary>

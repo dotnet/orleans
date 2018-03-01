@@ -1,30 +1,56 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Orleans;
 using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 
 namespace TestExtensions
 {
-    public class DefaultClusterFixture : BaseTestClusterFixture
+    public class DefaultClusterFixture
     {
-        public ClusterConfiguration ClusterConfiguration { get; private set; }
-
-        public ClientConfiguration ClientConfiguration { get; private set; }
-
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        static DefaultClusterFixture()
         {
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                this.ClusterConfiguration = legacy.ClusterConfiguration;
-                this.ClientConfiguration = legacy.ClientConfiguration;
-            });
-            builder.AddSiloBuilderConfigurator<SiloHostConfigurator>();
+            TestDefaultConfiguration.InitializeDefaults();
         }
 
+        public DefaultClusterFixture()
+        {
+            var builder = new TestClusterBuilder();
+            TestDefaultConfiguration.ConfigureTestCluster(builder);
+            
+            builder.AddSiloBuilderConfigurator<SiloHostConfigurator>();
+
+            var testCluster = builder.Build();
+            if (testCluster?.Primary == null)
+            {
+                testCluster?.Deploy();
+            }
+
+            this.HostedCluster = testCluster;
+            this.Logger = this.Client?.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
+        }
+        
+        public TestCluster HostedCluster { get; }
+
+        public IGrainFactory GrainFactory => this.HostedCluster?.GrainFactory;
+
+        public IClusterClient Client => this.HostedCluster?.Client;
+
+        public ILogger Logger { get; }
+
+        public virtual void Dispose()
+        {
+            this.HostedCluster?.StopAllSilos();
+        }
+        
         public class SiloHostConfigurator : ISiloBuilderConfigurator
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
-                hostBuilder.AddMemoryGrainStorageAsDefault()
+                hostBuilder
+                    .UseInMemoryReminderService()
+                    .AddMemoryGrainStorageAsDefault()
                     .AddMemoryGrainStorage("MemoryStore");
             }
         }

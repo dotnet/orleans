@@ -53,7 +53,6 @@ namespace Orleans.Runtime
         }
 
         private readonly ILocalSiloDetails siloDetails;
-        private readonly SiloOptions siloOptions;
         private readonly ClusterOptions clusterOptions;
         private readonly ISiloMessageCenter messageCenter;
         private readonly OrleansTaskScheduler scheduler;
@@ -80,7 +79,6 @@ namespace Orleans.Runtime
         private readonly List<IHealthCheckParticipant> healthCheckParticipants = new List<IHealthCheckParticipant>();
         private readonly object lockable = new object();
         private readonly GrainFactory grainFactory;
-        private readonly IGrainRuntime grainRuntime;
         private readonly SiloLifecycle siloLifecycle;
 
         private readonly ILoggerFactory loggerFactory;
@@ -193,9 +191,6 @@ namespace Orleans.Runtime
             messageCenter.RerouteHandler = dispatcher.RerouteMessage;
             messageCenter.SniffIncomingMessage = runtimeClient.SniffIncomingMessage;
 
-            // GrainRuntime can be created only here, after messageCenter was created.
-            this.grainRuntime = Services.GetRequiredService<IGrainRuntime>();
-
             // Now the router/directory service
             // This has to come after the message center //; note that it then gets injected back into the message center.;
             localGrainDirectory = Services.GetRequiredService<LocalGrainDirectory>();
@@ -217,7 +212,6 @@ namespace Orleans.Runtime
             incomingAgent = new IncomingMessageAgent(Message.Categories.Application, messageCenter, activationDirectory, scheduler, catalog.Dispatcher, messageFactory, executorService, this.loggerFactory);
 
             membershipOracle = Services.GetRequiredService<IMembershipOracle>();
-            this.siloOptions = Services.GetRequiredService<IOptions<SiloOptions>>().Value;
             this.clusterOptions = Services.GetRequiredService<IOptions<ClusterOptions>>().Value;
             var multiClusterOptions = Services.GetRequiredService<IOptions<MultiClusterOptions>>().Value;
 

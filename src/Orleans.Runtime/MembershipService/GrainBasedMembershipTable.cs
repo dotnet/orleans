@@ -30,6 +30,12 @@ namespace Orleans.Runtime.MembershipService
         private async Task<IMembershipTableGrain> GetMembershipTableGrain()
         {
             var options = this.serviceProvider.GetRequiredService<IOptions<DevelopmentMembershipOptions>>().Value;
+            if (options.PrimarySiloEndpoint == null)
+            {
+                throw new OrleansConfigurationException(
+                    $"{nameof(DevelopmentMembershipOptions)}.{nameof(options.PrimarySiloEndpoint)} must be set when using development clustering.");
+            }
+
             var siloDetails = this.serviceProvider.GetService<ILocalSiloDetails>();
             bool isPrimarySilo = siloDetails.SiloAddress.Endpoint.Equals(options.PrimarySiloEndpoint);
             if (isPrimarySilo)
