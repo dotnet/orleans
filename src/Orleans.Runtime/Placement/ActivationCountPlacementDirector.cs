@@ -48,18 +48,18 @@ namespace Orleans.Runtime.Placement
         public ActivationCountPlacementDirector(
             ILocalSiloDetails localSiloDetails,
             DeploymentLoadPublisher deploymentLoadPublisher, 
-            IOptions<GrainPlacementOptions> options, 
+            IOptions<ActivationCountBasedPlacementOptions> options, 
             ILogger<ActivationCountPlacementDirector> logger)
         {
             this.logger = logger;
             this.localAddress = localSiloDetails.SiloAddress;
 
             SelectSilo = SelectSiloPowerOfK;
-            if (options.Value.ActivationCountPlacementChooseOutOf <= 0)
+            if (options.Value.ChooseOutOf <= 0)
                 throw new ArgumentException(
-                    "GlobalConfig.ActivationCountBasedPlacementChooseOutOf is " + options.Value.ActivationCountPlacementChooseOutOf);
+                    "GlobalConfig.ActivationCountBasedPlacementChooseOutOf is " + options.Value.ChooseOutOf);
 
-            chooseHowMany = options.Value.ActivationCountPlacementChooseOutOf;
+            chooseHowMany = options.Value.ChooseOutOf;
             deploymentLoadPublisher?.SubscribeToStatisticsChangeEvents(this);
         }
 

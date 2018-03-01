@@ -214,10 +214,14 @@ namespace Orleans.Hosting
 
             LegacyProviderConfigurator<ISiloLifecycle>.ConfigureServices(configuration.Globals.ProviderConfigurations, services);
 
-            services.AddOptions<GrainPlacementOptions>().Configure<GlobalConfiguration>((options, config) =>
+            if (!string.IsNullOrWhiteSpace(configuration.Globals.DefaultPlacementStrategy))
             {
-                options.DefaultPlacementStrategy = config.DefaultPlacementStrategy;
-                options.ActivationCountPlacementChooseOutOf = config.ActivationCountBasedPlacementChooseOutOf;
+                services.AddSingleton(typeof(PlacementStrategy), MapDefaultPlacementStrategy(configuration.Globals.DefaultPlacementStrategy));
+            }
+
+            services.AddOptions<ActivationCountBasedPlacementOptions>().Configure<GlobalConfiguration>((options, config) =>
+            {
+                options.ChooseOutOf = config.ActivationCountBasedPlacementChooseOutOf;
             });
 
             services.AddOptions<StaticClusterDeploymentOptions>().Configure<ClusterConfiguration>((options, config) =>
@@ -304,6 +308,25 @@ namespace Orleans.Hosting
                 });
 
             return services;
+        }
+
+        private static Type MapDefaultPlacementStrategy(string strategy)
+        {
+            switch (strategy)
+            {
+                case nameof(RandomPlacement):
+                    return typeof(RandomPlacement);
+                case nameof(PreferLocalPlacement):
+                    return typeof(PreferLocalPlacement);
+                case nameof(SystemPlacement):
+                    return typeof(SystemPlacement);
+                case nameof(ActivationCountBasedPlacement):
+                    return typeof(ActivationCountBasedPlacement);
+                case nameof(HashBasedPlacement):
+                    return typeof(HashBasedPlacement);
+                default:
+                    return null;
+            }
         }
 
         public static ClusterConfiguration TryGetClusterConfiguration(this IServiceCollection services)
