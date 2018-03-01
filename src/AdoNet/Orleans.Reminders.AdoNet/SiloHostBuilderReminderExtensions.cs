@@ -23,10 +23,11 @@ namespace Orleans.Hosting
         /// <returns>
         /// The provided <see cref="ISiloHostBuilder"/>, for chaining.
         /// </returns>
-        public static ISiloHostBuilder UseAdoNetReminderService(this ISiloHostBuilder builder, Action<AdoNetReminderTableOptions> configure)
+        public static ISiloHostBuilder UseAdoNetReminderService(
+            this ISiloHostBuilder builder,
+            Action<AdoNetReminderTableOptions> configureOptions)
         {
-            builder.ConfigureServices(services => services.UseAdoNetReminderService(configure));
-            return builder;
+            return builder.UseAdoNetReminderService(ob => ob.Configure(configureOptions));
         }
 
         /// <summary>
@@ -35,25 +36,19 @@ namespace Orleans.Hosting
         /// <param name="builder">
         /// The builder.
         /// </param>
-        /// <param name="connectionString">
-        /// The storage connection string.
-        /// </param>
-        /// <param name="invariant">
-        /// The ADO.NET invariant name.
+        /// <param name="configure">
+        /// The delegate used to configure the reminder store.
         /// </param>
         /// <returns>
         /// The provided <see cref="ISiloHostBuilder"/>, for chaining.
         /// </returns>
-        public static ISiloHostBuilder UseAdoNetReminderService(this ISiloHostBuilder builder, string connectionString, string invariant)
+        public static ISiloHostBuilder UseAdoNetReminderService(
+            this ISiloHostBuilder builder,
+            Action<OptionsBuilder<AdoNetReminderTableOptions>> configureOptions)
         {
-            builder.UseAdoNetReminderService(options =>
-            {
-                options.ConnectionString = connectionString;
-                options.Invariant = invariant;
-            });
-            return builder;
+            return builder.ConfigureServices(services => services.UseAdoNetReminderService(configureOptions));
         }
-
+        
         /// <summary>
         /// Adds reminder storage using ADO.NET.
         /// </summary>
@@ -66,36 +61,12 @@ namespace Orleans.Hosting
         /// <returns>
         /// The provided <see cref="ISiloHostBuilder"/>, for chaining.
         /// </returns>
-        private static void UseAdoNetReminderService(this IServiceCollection services, Action<AdoNetReminderTableOptions> configure)
+        internal static void UseAdoNetReminderService(this IServiceCollection services, Action<OptionsBuilder<AdoNetReminderTableOptions>> configureOptions)
         {
             services.AddSingleton<IReminderTable, AdoNetReminderTable>();
             services.ConfigureFormatter<AdoNetReminderTableOptions>();
             services.AddSingleton<IConfigurationValidator, AdoNetReminderTableOptionsValidator>();
-            services.Configure(configure);
-        }
-
-        /// <summary>
-        /// Adds reminder storage using ADO.NET.
-        /// </summary>
-        /// <param name="services">
-        /// The service collection.
-        /// </param>
-        /// <param name="connectionString">
-        /// The storage connection string.
-        /// </param>
-        /// <param name="invariant">
-        /// The ADO.NET invariant name.
-        /// </param>
-        /// <returns>
-        /// The provided <see cref="ISiloHostBuilder"/>, for chaining.
-        /// </returns>
-        internal static void UseAdoNetReminderService(this IServiceCollection services, string connectionString, string invariant)
-        {
-            services.UseAdoNetReminderService(options =>
-            {
-                options.ConnectionString = connectionString;
-                options.Invariant = invariant;
-            });
+            services.Configure(configureOptions);
         }
     }
 }

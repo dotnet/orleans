@@ -1,5 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
-
+using Orleans.Configuration;
 using Orleans.Runtime.MembershipService;
 
 namespace Orleans.Hosting
@@ -13,7 +13,11 @@ namespace Orleans.Hosting
             var reader = new GlobalConfigurationReader(configuration);
             var connectionString = reader.GetPropertyValue<string>("DataConnectionStringForReminders");
             var invariant = reader.GetPropertyValue<string>("AdoInvariantForReminders");
-            services.UseAdoNetReminderService(connectionString, invariant);
+            services.UseAdoNetReminderService(ob => ob.Configure(options =>
+            {
+                options.ConnectionString = connectionString;
+                options.Invariant = invariant;
+            }));
         }
     }
 }
