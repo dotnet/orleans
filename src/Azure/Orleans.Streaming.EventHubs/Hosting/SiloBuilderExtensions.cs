@@ -1,7 +1,5 @@
 using System;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.ServiceBus.Providers;
 
 namespace Orleans.Hosting
@@ -11,35 +9,29 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure silo to use event hub persistent streams.
         /// </summary>
-        public static ISiloHostBuilder AddEventHubStreams(this ISiloHostBuilder builder, string name, Action<EventHubStreamOptions> configureOptions)
+        public static ISiloHostBuilder AddEventHubStreams(
+            this ISiloHostBuilder builder,
+            string name,
+            Action<EventHubStreamOptions> configureOptions)
         {
-            return builder.ConfigureServices(services => services.AddSiloEventHubStreams(name, configureOptions));
+            return builder.AddEventHubStreams(name, ob => ob.Configure(configureOptions));
         }
 
         /// <summary>
         /// Configure silo to use event hub persistent streams.
         /// </summary>
-        public static ISiloHostBuilder AddEventHubStreams(this ISiloHostBuilder builder, string name, Action<OptionsBuilder<EventHubStreamOptions>> configureOptions = null)
-        {
-            return builder.ConfigureServices(services => services.AddSiloEventHubStreams(name, configureOptions));
-        }
-
-        /// <summary>
-        /// Configure silo to use event hub persistent streams.
-        /// </summary>
-        public static IServiceCollection AddSiloEventHubStreams(this IServiceCollection services, string name, Action<EventHubStreamOptions> configureOptions)
-        {
-            return services.AddSiloEventHubStreams(name, ob => ob.Configure(configureOptions));
-        }
-
-        /// <summary>
-        /// Configure silo to use event hub persistent streams.
-        /// </summary>
-        public static IServiceCollection AddSiloEventHubStreams(this IServiceCollection services, string name,
+        public static ISiloHostBuilder AddEventHubStreams(
+            this ISiloHostBuilder builder,
+            string name,
             Action<OptionsBuilder<EventHubStreamOptions>> configureOptions = null)
         {
-            return services.ConfigureNamedOptionForLogging<EventHubStreamOptions>(name)
-                           .AddSiloPersistentStreams<EventHubStreamOptions>(name, EventHubAdapterFactory.Create, configureOptions);
+            return builder
+                .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(EventHubAdapterFactory).Assembly))
+                .ConfigureServices(services =>
+                {
+                    services.ConfigureNamedOptionForLogging<EventHubStreamOptions>(name)
+                        .AddSiloPersistentStreams<EventHubStreamOptions>(name, EventHubAdapterFactory.Create, configureOptions);
+                });
         }
     }
 }

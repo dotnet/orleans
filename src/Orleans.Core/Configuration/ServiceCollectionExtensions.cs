@@ -90,7 +90,7 @@ namespace Orleans.Configuration
         /// <param name="services">The service collection.</param>
         /// <param name="filter">The filter.</param>
         /// <returns>The service collection.</returns>
-        public static IServiceCollection AddIncomingGrainCallFilter(this IServiceCollection services, IIncomingGrainCallFilter filter)
+        internal static IServiceCollection AddIncomingGrainCallFilter(this IServiceCollection services, IIncomingGrainCallFilter filter)
         {
             return services.AddSingleton(filter);
         }
@@ -101,7 +101,7 @@ namespace Orleans.Configuration
         /// <typeparam name="TImplementation">The filter implementation type.</typeparam>
         /// <param name="services">The service collection.</param>
         /// <returns>The service collection.</returns>
-        public static IServiceCollection AddIncomingGrainCallFilter<TImplementation>(this IServiceCollection services)
+        internal static IServiceCollection AddIncomingGrainCallFilter<TImplementation>(this IServiceCollection services)
             where TImplementation : class, IIncomingGrainCallFilter
         {
             return services.AddSingleton<IIncomingGrainCallFilter, TImplementation>();
@@ -113,7 +113,7 @@ namespace Orleans.Configuration
         /// <param name="services">The service collection.</param>
         /// <param name="filter">The filter.</param>
         /// <returns>The service collection.</returns>
-        public static IServiceCollection AddIncomingGrainCallFilter(this IServiceCollection services, GrainCallFilterDelegate filter)
+        internal static IServiceCollection AddIncomingGrainCallFilter(this IServiceCollection services, GrainCallFilterDelegate filter)
         {
             return services.AddSingleton<IIncomingGrainCallFilter>(new GrainCallFilterWrapper(filter));
         }
@@ -124,7 +124,7 @@ namespace Orleans.Configuration
         /// <param name="services">The service collection.</param>
         /// <param name="filter">The filter.</param>
         /// <returns>The service collection.</returns>
-        public static IServiceCollection AddOutgoingGrainCallFilter(this IServiceCollection services, IOutgoingGrainCallFilter filter)
+        internal static IServiceCollection AddOutgoingGrainCallFilter(this IServiceCollection services, IOutgoingGrainCallFilter filter)
         {
             return services.AddSingleton(filter);
         }
@@ -135,7 +135,7 @@ namespace Orleans.Configuration
         /// <typeparam name="TImplementation">The filter implementation type.</typeparam>
         /// <param name="services">The service collection.</param>
         /// <returns>The service collection.</returns>
-        public static IServiceCollection AddOutgoingGrainCallFilter<TImplementation>(this IServiceCollection services)
+        internal static IServiceCollection AddOutgoingGrainCallFilter<TImplementation>(this IServiceCollection services)
             where TImplementation : class, IOutgoingGrainCallFilter
         {
             return services.AddSingleton<IOutgoingGrainCallFilter, TImplementation>();
@@ -147,7 +147,7 @@ namespace Orleans.Configuration
         /// <param name="services">The service collection.</param>
         /// <param name="filter">The filter.</param>
         /// <returns>The service collection.</returns>
-        public static IServiceCollection AddOutgoingGrainCallFilter(this IServiceCollection services, GrainCallFilterDelegate filter)
+        internal static IServiceCollection AddOutgoingGrainCallFilter(this IServiceCollection services, GrainCallFilterDelegate filter)
         {
             return services.AddSingleton<IOutgoingGrainCallFilter>(new GrainCallFilterWrapper(filter));
         }

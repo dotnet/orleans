@@ -32,7 +32,7 @@ namespace Orleans.Hosting
         /// </remarks>
         /// <param name="services">The service collection.</param>
         /// <returns>The provided <see cref="IServiceCollection"/>, for chaining.</returns>
-        public static IServiceCollection UseInMemoryReminderService(this IServiceCollection services)
+        internal static IServiceCollection UseInMemoryReminderService(this IServiceCollection services)
         {
             // The reminder table is a reference to a singleton IReminderTableGrain.
             services.AddSingleton<IReminderTable>(sp => sp.GetRequiredService<IGrainFactory>().GetGrain<IReminderTableGrain>(Constants.ReminderTableGrainId));
