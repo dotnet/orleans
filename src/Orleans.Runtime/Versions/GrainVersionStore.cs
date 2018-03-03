@@ -82,7 +82,7 @@ namespace Orleans.Runtime.Versions
 
         public void Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe(ServiceLifecycleStage.ApplicationServices, this.OnStart);
+            lifecycle.Subscribe<GrainVersionStore>(ServiceLifecycleStage.ApplicationServices, this.OnStart);
         }
 
         private Task OnStart(CancellationToken token)

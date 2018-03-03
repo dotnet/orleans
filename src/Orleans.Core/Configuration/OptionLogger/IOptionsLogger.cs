@@ -19,7 +19,7 @@ namespace Orleans
 
         public void Participate(IClusterClientLifecycle lifecycle)
         {
-            lifecycle.Subscribe(ClientOptionLoggerLifeCycleRing, this.OnStart);
+            lifecycle.Subscribe<ClientOptionsLogger>(ClientOptionLoggerLifeCycleRing, this.OnStart);
         }
 
         public Task OnStart(CancellationToken token)

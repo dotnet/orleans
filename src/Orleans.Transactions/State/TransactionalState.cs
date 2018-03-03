@@ -125,7 +125,7 @@ namespace Orleans.Transactions
         #region lifecycle
         public void Participate(IGrainLifecycle lifecycle)
         {
-            lifecycle.Subscribe(GrainLifecycleStage.SetupState, OnSetupState);
+            lifecycle.Subscribe<TransactionalState<TState>>(GrainLifecycleStage.SetupState, OnSetupState);
         }
         #endregion lifecycle
 

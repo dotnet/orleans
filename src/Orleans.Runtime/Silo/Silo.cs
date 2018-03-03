@@ -79,7 +79,7 @@ namespace Orleans.Runtime
         private readonly List<IHealthCheckParticipant> healthCheckParticipants = new List<IHealthCheckParticipant>();
         private readonly object lockable = new object();
         private readonly GrainFactory grainFactory;
-        private readonly SiloLifecycle siloLifecycle;
+        private readonly ISiloLifecycleSubject siloLifecycle;
 
         private readonly ILoggerFactory loggerFactory;
         /// <summary>
@@ -230,13 +230,12 @@ namespace Orleans.Runtime
             StringValueStatistic.FindOrCreate(StatisticNames.SILO_START_TIME,
                 () => LogFormatter.PrintDate(startTime)); // this will help troubleshoot production deployment when looking at MDS logs.
 
-            var fullSiloLifecycle = this.Services.GetRequiredService<SiloLifecycle>();
-            this.siloLifecycle = fullSiloLifecycle;
+            this.siloLifecycle = this.Services.GetRequiredService<ISiloLifecycleSubject>();
             // register all lifecycle participants
             IEnumerable<ILifecycleParticipant<ISiloLifecycle>> lifecycleParticipants = this.Services.GetServices<ILifecycleParticipant<ISiloLifecycle>>();
             foreach(ILifecycleParticipant<ISiloLifecycle> participant in lifecycleParticipants)
             {
-                participant?.Participate(fullSiloLifecycle);
+                participant?.Participate(this.siloLifecycle);
             }
             // register all named lifecycle participants
             IKeyedServiceCollection<string, ILifecycleParticipant<ISiloLifecycle>> namedLifecycleParticipantCollection = this.Services.GetService<IKeyedServiceCollection<string,ILifecycleParticipant<ISiloLifecycle>>>();
@@ -244,11 +243,11 @@ namespace Orleans.Runtime
                 ?.GetServices(this.Services)
                 ?.Select(s => s.GetService(this.Services)))
             {
-                participant?.Participate(fullSiloLifecycle);
+                participant?.Participate(this.siloLifecycle);
             }
 
             // add self to lifecycle
-            this.Participate(fullSiloLifecycle);
+            this.Participate(this.siloLifecycle);
 
             logger.Info(ErrorCode.SiloInitializingFinished, "-------------- Started silo {0}, ConsistentHashCode {1:X} --------------", SiloAddress.ToLongString(), SiloAddress.GetConsistentHashCode());
         }
@@ -857,9 +856,9 @@ namespace Orleans.Runtime
 
         private void Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeInitialize, (ct) => Task.Run(() => OnRuntimeInitializeStart(ct)), (ct) => Task.Run(() => OnRuntimeInitializeStop(ct)));
-            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeServices, (ct) => Task.Run(() => OnRuntimeServicesStart(ct)), (ct) => Task.Run(() => OnRuntimeServicesStop(ct)));
-            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeGrainServices, (ct) => Task.Run(() => OnRuntimeGrainServicesStart(ct)), (ct) => Task.Run(() => OnRuntimeGrainServicesStop(ct)));
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeInitialize, (ct) => Task.Run(() => OnRuntimeInitializeStart(ct)), (ct) => Task.Run(() => OnRuntimeInitializeStop(ct)));
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeServices, (ct) => Task.Run(() => OnRuntimeServicesStart(ct)), (ct) => Task.Run(() => OnRuntimeServicesStop(ct)));
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeGrainServices, (ct) => Task.Run(() => OnRuntimeGrainServicesStart(ct)), (ct) => Task.Run(() => OnRuntimeGrainServicesStop(ct)));
         }
     }
 

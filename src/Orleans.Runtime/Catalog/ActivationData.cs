@@ -190,7 +190,7 @@ namespace Orleans.Runtime
             if (null == collector) throw new ArgumentNullException(nameof(collector));
 
             logger = loggerFactory.CreateLogger<ActivationData>();
-            this.lifecycle = new GrainLifecycle(loggerFactory);
+            this.lifecycle = new GrainLifecycle(loggerFactory.CreateLogger<LifecycleSubject>());
             this.maxRequestProcessingTime = maxRequestProcessingTime;
             this.maxWarningRequestProcessingTime = maxWarningRequestProcessingTime;
             this.messagingOptions = messagingOptions.Value;

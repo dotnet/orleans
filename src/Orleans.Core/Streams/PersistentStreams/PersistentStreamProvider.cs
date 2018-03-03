@@ -165,8 +165,8 @@ namespace Orleans.Providers.Streams.Common
 
         public void Participate(ILifecycleObservable lifecycle)
         {
-            lifecycle.Subscribe(this.options.InitStage, Init);
-            lifecycle.Subscribe(this.options.StartStage, Start, Close);
+            lifecycle.Subscribe(OptionFormattingUtilities.Name<PersistentStreamProvider>(this.Name), this.options.InitStage, Init);
+            lifecycle.Subscribe(OptionFormattingUtilities.Name<PersistentStreamProvider>(this.Name), this.options.StartStage, Start, Close);
         }
 
         public static IStreamProvider Create<TOptions>(IServiceProvider services, string name)
