@@ -20,6 +20,7 @@ using Orleans.ApplicationParts;
 using Orleans.Metadata;
 using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
 using SF = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using TypeInfo = System.Reflection.TypeInfo;
 
 namespace Orleans.CodeGenerator
 {
@@ -202,7 +203,7 @@ namespace Orleans.CodeGenerator
                 var treatTypesAsSerializable = pair.Value?.TreatTypesAsSerializable ?? false;
                 foreach (var type in TypeUtils.GetDefinedTypes(assembly, this.logger))
                 {
-                    if (treatTypesAsSerializable || type.IsSerializable)
+                    if (treatTypesAsSerializable || type.IsSerializable || TypeHasKnownBase(type))
                     {
                         serializableTypes.RecordType(type, targetAssembly);
                     }
@@ -345,6 +346,19 @@ namespace Orleans.CodeGenerator
                 SourceAssemblies = knownAssemblies.Keys.ToList(),
                 Syntax = compilationUnit
             };
+        }
+
+        /// <summary>
+        /// Returns true if the provided type has a base type which is marked with <see cref="KnownBaseTypeAttribute"/>.
+        /// </summary>
+        /// <param name="type">The type.</param>
+        private static bool TypeHasKnownBase(Type type)
+        {
+            if (type == null) return false;
+            if (type.GetCustomAttribute<KnownBaseTypeAttribute>() != null) return true;
+            if (TypeHasKnownBase(type.BaseType)) return true;
+
+            return false;
         }
 
         private NamespaceDeclarationSyntax GenerateSerializers(Assembly targetAssembly, FeatureDescriptions features)

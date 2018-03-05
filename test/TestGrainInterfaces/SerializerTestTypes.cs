@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Runtime.Serialization;
+using Orleans.CodeGeneration;
 using Orleans.Serialization;
 
 namespace UnitTests.GrainInterfaces
@@ -35,5 +36,18 @@ namespace UnitTests.GrainInterfaces
     public class SubClassOverridingAutoProp : BaseClassWithAutoProp
     {
         public new string AutoProp { get => base.AutoProp.ToString(); set => base.AutoProp = int.Parse(value); }
+    }
+
+    [KnownBaseType]
+    public abstract class WellKnownBaseType { }
+
+    public class DescendantOfWellKnownBaseType : WellKnownBaseType
+    {
+        public int FavouriteNumber { get; set; }
+    }
+
+    public class NotDescendantOfWellKnownBaseType
+    {
+        public int FavouriteNumber { get; set; }
     }
 }
