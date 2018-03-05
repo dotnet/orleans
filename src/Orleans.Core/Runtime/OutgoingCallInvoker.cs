@@ -90,18 +90,6 @@ namespace Orleans.Runtime
 
             if (stage == numFilters)
             {
-                stage++;
-
-                // Grain-level invoker, if present.
-                if (this.Grain is IIncomingGrainCallFilter grainClassLevelFilter)
-                {
-                    await grainClassLevelFilter.Invoke(this);
-                    return;
-                }
-            }
-
-            if (stage == numFilters + 1)
-            {
                 // Finally call the root-level invoker.
                 stage++;
                 var resultTask = this.sendRequest(this.grainReference, this.request, this.debugContext, this.options);
