@@ -11,6 +11,6 @@
         /// <summary>
         /// The invariant name of the connector for gatewayProvider's database.
         /// </summary>
-        public string AdoInvariant { get; set; }
+        public string Invariant { get; set; }
     }
 }
