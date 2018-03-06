@@ -14,6 +14,7 @@ using Xunit;
 using Xunit.Abstractions;
 using Orleans.MultiCluster;
 using Orleans.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace Tests.GeoClusterTests
 {
@@ -183,6 +184,11 @@ namespace Tests.GeoClusterTests
                     builder.AddFilter("Orleans.Runtime.LogConsistency.ProtocolServices", LogLevel.Trace);
                     builder.AddFilter("Orleans.Storage.MemoryStorageGrain", LogLevel.Debug);
                 });
+                hostBuilder.AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
+                {
+                    options.ServiceId = silo.Value.ServiceId.ToString();
+                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                }));
                 hostBuilder.AddAzureBlobGrainStorage("PubSubStore", (AzureBlobStorageOptions options) =>
                 {
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
