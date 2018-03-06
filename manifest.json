@@ -138,7 +138,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/2.0/Configuration2.0.html",
-          "hash": "lvHmduPGAUWI8DzAbQWLwQ=="
+          "hash": "Qiu6gss8FnSww/iu2xN4uQ=="
         }
       },
       "is_incremental": false,
@@ -1033,7 +1033,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Runtime-Implementation-Details/Cluster-Management.html",
-          "hash": "cWz/ZaeG6/2j1CD6HUyanA=="
+          "hash": "Cxx4MhoZAlOo8NkSBVOqPg=="
         }
       },
       "is_incremental": false,
@@ -1998,9 +1998,6 @@
       "version": ""
     },
     {
-      "log_codes": [
-        "InvalidYamlHeader"
-      ],
       "type": "index",
       "source_relative_path": "index.md",
       "output": {
@@ -2028,8 +2025,7 @@
   "incremental_info": [
     {
       "status": {
-        "can_incremental": false,
-        "details": "Cannot build incrementally because last build info is missing.",
+        "can_incremental": true,
         "incrementalPhase": "build"
       },
       "processors": {
@@ -2044,7 +2040,7 @@
           "incrementalPhase": "build"
         },
         "ConceptualDocumentProcessor": {
-          "can_incremental": false,
+          "can_incremental": true,
           "incrementalPhase": "build"
         }
       }
