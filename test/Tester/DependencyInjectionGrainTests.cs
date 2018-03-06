@@ -15,7 +15,7 @@ using Orleans.TestingHost.Utils;
 
 namespace UnitTests.General
 {
-    [TestCategory("DI")]
+    [TestCategory("DI"), TestCategory("BVT")]
     public class DependencyInjectionGrainTests : OrleansTestingBase, IClassFixture<DependencyInjectionGrainTests.Fixture>
     {
         private readonly Fixture fixture;
@@ -34,6 +34,8 @@ namespace UnitTests.General
                 {
                     hostBuilder.ConfigureServices(services =>
                     {
+                        services.AddSingleton<IReducer<string, Reducer1Action>>(x => new Reducer1());
+                        services.AddSingleton<IReducer<int, Reducer2Action>>(x => new Reducer2());
                         services.AddSingleton<IInjectedService, InjectedService>();
                         services.AddScoped<IInjectedScopedService, InjectedScopedService>();
 
@@ -54,14 +56,14 @@ namespace UnitTests.General
             this.fixture = fixture;
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact]
         public async Task CanGetGrainWithInjectedDependencies()
         {
             IDIGrainWithInjectedServices grain = this.fixture.GrainFactory.GetGrain<IDIGrainWithInjectedServices>(GetRandomGrainId());
             long ignored = await grain.GetLongValue();
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact]
         public async Task CanGetGrainWithInjectedGrainFactory()
         {
             // please don't inject your implemetation of IGrainFactory to DI container in Startup Class, 
@@ -70,7 +72,7 @@ namespace UnitTests.General
             long ignored = await grain.GetGrainFactoryId();
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact]
         public async Task CanResolveSingletonDependencies()
         {
             var grain1 = this.fixture.GrainFactory.GetGrain<IDIGrainWithInjectedServices>(GetRandomGrainId());
@@ -85,7 +87,7 @@ namespace UnitTests.General
             await grain2.DoDeactivate();
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact]
         public async Task CanResolveScopedDependencies()
         {
             var grain1 = this.fixture.GrainFactory.GetGrain<IDIGrainWithInjectedServices>(GetRandomGrainId());
@@ -100,7 +102,7 @@ namespace UnitTests.General
             await grain2.DoDeactivate();
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact]
         public async Task CanResolveScopedGrainActivationContext()
         {
             long id1 = GetRandomGrainId();
@@ -116,7 +118,7 @@ namespace UnitTests.General
             await grain2.DoDeactivate();
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact]
         public async Task ScopedDependenciesAreThreadSafe()
         {
             const int parallelCalls = 10;
@@ -137,7 +139,7 @@ namespace UnitTests.General
             await grain1.DoDeactivate();
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact]
         public async Task CanResolveSameDependenciesViaServiceProvider()
         {
             var grain1 = this.fixture.GrainFactory.GetGrain<IDIGrainWithInjectedServices>(GetRandomGrainId());
@@ -150,7 +152,7 @@ namespace UnitTests.General
             await grain2.DoDeactivate();
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact]
         public async Task CanResolveSingletonGrainFactory()
         {
             var grain1 = this.fixture.GrainFactory.GetGrain<IDIGrainWithInjectedServices>(GetRandomGrainId());
@@ -162,13 +164,22 @@ namespace UnitTests.General
                 await grain2.GetGrainFactoryId());
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact]
         public async Task CannotGetExplictlyRegisteredGrain()
         {
             ISimpleDIGrain grain = this.fixture.GrainFactory.GetGrain<ISimpleDIGrain>(GetRandomGrainId(), grainClassNamePrefix: "UnitTests.Grains.ExplicitlyRegistered");
             var exception = await Assert.ThrowsAsync<OrleansException>(() => grain.GetLongValue());
             Assert.Contains("Error creating activation for", exception.Message);
             Assert.Contains(nameof(ExplicitlyRegisteredSimpleDIGrain), exception.Message);
+        }
+
+        [Fact]
+        public async Task CanUseGenericArgumentsInConstructor()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<IReducerGameGrain<string, Reducer1Action>>("reducer1");
+            Assert.NotNull(await grain.Go("378", new Reducer1Action()));
+            var grain2 = this.fixture.GrainFactory.GetGrain<IReducerGameGrain<int, Reducer2Action>>("reducer1");
+            Assert.NotEqual(0, await grain2.Go(378, new Reducer2Action()));
         }
     }
 }
