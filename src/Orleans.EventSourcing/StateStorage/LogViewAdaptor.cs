@@ -80,7 +80,11 @@ namespace Orleans.EventSourcing.StateStorage
                     // for manual testing
                     //await Task.Delay(5000);
 
-                    await globalGrainStorage.ReadStateAsync(grainTypeName, Services.GrainReference, GlobalStateCache);
+                    var readState = new GrainStateWithMetaDataAndETag<TLogView>();
+
+                    await globalGrainStorage.ReadStateAsync(grainTypeName, Services.GrainReference, readState);
+
+                    GlobalStateCache = readState;
 
                     Services.Log(LogLevel.Debug, "read success {0}", GlobalStateCache);
 
