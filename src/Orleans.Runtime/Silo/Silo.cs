@@ -814,6 +814,14 @@ namespace Orleans.Runtime
                 await scheduler.QueueTask(reminderService.Stop, this.reminderServiceContext)
                     .WithTimeout(stopTimeout, $"Stopping ReminderService failed due to timeout {stopTimeout}");
             }
+            foreach (var grainService in grainServices)
+            {
+                await this.scheduler.QueueTask(grainService.Stop, grainService.SchedulingContext).WithTimeout(this.stopTimeout, $"Stopping GrainService failed due to timeout {initTimeout}");
+                if (this.logger.IsEnabled(LogLevel.Debug))
+                {
+                    logger.Debug(String.Format("{0} Grain Service with Id {1} stopped successfully.", grainService.GetType().FullName, grainService.GetPrimaryKeyLong(out string ignored)));
+                }
+            }
         }
 
         private void SafeExecute(Action action)
