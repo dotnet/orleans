@@ -21,7 +21,7 @@ namespace Orleans.Messaging
         public Task InitializeGatewayListProvider() => Task.CompletedTask;
         
 
-        public Task<IList<Uri>> GetGateways() => Task.FromResult(this.options.Gateways);
+        public Task<IList<Uri>> GetGateways() => Task.FromResult<IList<Uri>>(this.options.Gateways);
 
         public TimeSpan MaxStaleness
         {
