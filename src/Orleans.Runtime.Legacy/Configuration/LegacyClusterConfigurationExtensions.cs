@@ -25,10 +25,7 @@ namespace Orleans.Hosting
         public static ISiloHostBuilder UseConfiguration(this ISiloHostBuilder builder, ClusterConfiguration configuration)
         {
             if (configuration == null) throw new ArgumentNullException(nameof(configuration));
-            return builder.ConfigureServices((context, services) =>
-            {
-                services.AddLegacyClusterConfigurationSupport(configuration);
-            });
+            return builder.AddLegacyClusterConfigurationSupport(configuration);
         }
 
         /// <summary>
@@ -56,7 +53,14 @@ namespace Orleans.Hosting
             return builder.UseConfiguration(ClusterConfiguration.LocalhostPrimarySilo(siloPort, gatewayPort));
         }
 
-        public static IServiceCollection AddLegacyClusterConfigurationSupport(this IServiceCollection services, ClusterConfiguration configuration)
+        public static ISiloHostBuilder AddLegacyClusterConfigurationSupport(this ISiloHostBuilder builder, ClusterConfiguration configuration)
+        {
+            LegacyMembershipConfigurator.ConfigureServices(configuration.Globals, builder);
+            LegacyRemindersConfigurator.Configure(configuration.Globals, builder);
+            return builder.ConfigureServices(services => AddLegacyClusterConfigurationSupport(services, configuration));
+        }
+
+        private static void AddLegacyClusterConfigurationSupport(IServiceCollection services, ClusterConfiguration configuration)
         {
             if (configuration == null) throw new ArgumentNullException(nameof(configuration));
 
@@ -178,9 +182,7 @@ namespace Orleans.Hosting
                 var nodeConfig = configuration.GetOrCreateNodeConfigurationForSilo(siloOptions.Value.SiloName);
                 options.ExcludedGrainTypes.AddRange(nodeConfig.ExcludedGrainTypes);
             });
-
-            LegacyMembershipConfigurator.ConfigureServices(configuration.Globals, services);
-
+            
             services.AddOptions<SchedulingOptions>()
                 .Configure<GlobalConfiguration>((options, config) =>
                 {
@@ -272,7 +274,6 @@ namespace Orleans.Hosting
                 {
                     options.IsRunningAsUnitTest = config.IsRunningAsUnitTest;
                 });
-            LegacyRemindersConfigurator.Configure(configuration.Globals, services);
             
             services.AddOptions<GrainVersioningOptions>()
                 .Configure<GlobalConfiguration>((options, config) =>
@@ -306,8 +307,6 @@ namespace Orleans.Hosting
                     options.CacheTTLExtensionFactor = config.CacheTTLExtensionFactor;
                     options.LazyDeregistrationDelay = config.DirectoryLazyDeregistrationDelay;
                 });
-
-            return services;
         }
 
         private static Type MapDefaultPlacementStrategy(string strategy)

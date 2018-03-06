@@ -11,16 +11,14 @@ namespace Orleans.Runtime.MembershipService
     /// <inheritdoc />
     public class LegacyAzureTableMembershipConfigurator : ILegacyMembershipConfigurator
     {
-        public void Configure(object configuration, IServiceCollection services)
+        public void Configure(object configuration, ISiloHostBuilder builder)
         {
-            services.Configure((Action<AzureStorageClusteringOptions>)(options =>
-                {
-                    var reader = new GlobalConfigurationReader(configuration);
-                    options.MaxStorageBusyRetries = reader.GetPropertyValue<int>("MaxStorageBusyRetries");
-                    options.ConnectionString = reader.GetPropertyValue<string>("DataConnectionString");
-                }));
-            services.AddSingleton<IMembershipTable, AzureBasedMembershipTable>();
-            IServiceCollection temp = services;
+            builder.UseAzureStorageClustering(options =>
+            {
+                var reader = new GlobalConfigurationReader(configuration);
+                options.MaxStorageBusyRetries = reader.GetPropertyValue<int>("MaxStorageBusyRetries");
+                options.ConnectionString = reader.GetPropertyValue<string>("DataConnectionString");
+            });
         }
     }
 }
