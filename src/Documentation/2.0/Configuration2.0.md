@@ -7,7 +7,7 @@ title: Configuration of Orleans 2.0
 
 Some of the biggest changes in Orleans 2.0 were made in the area of configuration of silos and clients. The goals were to make the API more fluid and intuitive by aligning the developers experience with how ASP.NET Core is configured.
 
-For a working sample application that targets Orleans 2.0 see: https://github.com/dotnet/orleans/tree/master/Samples/HelloWorld.NetCore
+For a working sample application that targets Orleans 2.0 see: https://github.com/dotnet/orleans/tree/master/Samples/2.0/HelloWorld
 The sample hosts the client and the silo in .NET Core console applications that work in different platforms, but the same can be done with .NET Framework 4.6.1+ console applications (that work only on Windows).
 
 ## Configuring and Starting a Silo (using the new SiloBuilder API)
