@@ -80,6 +80,7 @@ namespace Orleans.Runtime
         private readonly object lockable = new object();
         private readonly GrainFactory grainFactory;
         private readonly SiloLifecycle siloLifecycle;
+        private List<GrainService> grainServices;
 
         private readonly ILoggerFactory loggerFactory;
         /// <summary>
@@ -568,10 +569,19 @@ namespace Orleans.Runtime
                     this.logger.Debug("Reminder service started successfully.");
                 }
             }
+            foreach (var grainService in grainServices)
+            {
+                await this.scheduler.QueueTask(grainService.Start, grainService.SchedulingContext).WithTimeout(this.initTimeout, $"Starting GrainService failed due to timeout {initTimeout}");
+                if (this.logger.IsEnabled(LogLevel.Debug))
+                {
+                    logger.Debug(String.Format("{0} Grain Service with Id {1} started successfully.", grainService.GetType().FullName, grainService.GetPrimaryKeyLong(out string ignored)));
+                }
+            }
         }
 
         private async Task CreateGrainServices(GrainServiceOptions grainServiceOptions)
         {
+            this.grainServices = new List<GrainService>();
             foreach (KeyValuePair<string, short> serviceConfig in grainServiceOptions.GrainServices)
             {
                 // Construct the Grain Service
@@ -593,11 +603,7 @@ namespace Orleans.Runtime
                 RegisterSystemTarget(grainService);
 
                 await this.scheduler.QueueTask(() => grainService.Init(Services), grainService.SchedulingContext).WithTimeout(this.initTimeout, $"GrainService Initializing failed due to timeout {initTimeout}");
-                await this.scheduler.QueueTask(grainService.Start, grainService.SchedulingContext).WithTimeout(this.initTimeout, $"Starting GrainService failed due to timeout {initTimeout}");
-                if (this.logger.IsEnabled(LogLevel.Debug))
-                {
-                    logger.Debug(String.Format("{0} Grain Service with Id {1} started successfully.", serviceConfig.Key, serviceConfig.Value));
-                }
+                grainServices.Add(grainService);
             }
         }
 
