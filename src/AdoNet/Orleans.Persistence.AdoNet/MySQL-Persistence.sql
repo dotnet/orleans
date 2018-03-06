@@ -138,6 +138,7 @@ BEGIN
     COMMIT;
 END$$
 
+DELIMITER $$
 CREATE PROCEDURE WriteToStorage
 (
     in _GrainIdHash INT,
