@@ -155,7 +155,7 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloHostBuilder UseDevelopmentClustering(
             this ISiloHostBuilder builder,
-            Action<DevelopmentClusteringOptions> configureOptions,
+            Action<DevelopmentClusterMembershipOptions> configureOptions,
             string clusterId = ClusterOptions.DevelopmentClusterId)
         {
             return builder
@@ -179,13 +179,13 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloHostBuilder UseDevelopmentClustering(
             this ISiloHostBuilder builder,
-            Action<OptionsBuilder<DevelopmentClusteringOptions>> configureOptions,
+            Action<OptionsBuilder<DevelopmentClusterMembershipOptions>> configureOptions,
             string clusterId = ClusterOptions.DevelopmentClusterId)
         {
             return builder.ConfigureServices(
                 services =>
                 {
-                    configureOptions?.Invoke(services.AddOptions<DevelopmentClusteringOptions>());
+                    configureOptions?.Invoke(services.AddOptions<DevelopmentClusterMembershipOptions>());
                     services
                         .AddSingleton<GrainBasedMembershipTable>()
                         .AddFromExisting<IMembershipTable, GrainBasedMembershipTable>();

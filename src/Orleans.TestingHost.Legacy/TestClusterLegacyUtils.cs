@@ -12,7 +12,7 @@ namespace Orleans.TestingHost.Legacy
         /// </summary>
         public static TimeSpan GetLivenessStabilizationTime(GlobalConfiguration config, bool didKill = false)
         {
-            var clusteringOptions = new ClusteringOptions()
+            var clusterMembershipOptions = new ClusterMembershipOptions()
             {
                 NumMissedTableIAmAliveLimit = config.NumMissedTableIAmAliveLimit,
                 LivenessEnabled = config.LivenessEnabled,
@@ -28,7 +28,7 @@ namespace Orleans.TestingHost.Legacy
                 NumProbedSilos = config.NumProbedSilos,
                 NumVotesForDeathDeclaration = config.NumVotesForDeathDeclaration,
             };
-            return TestCluster.GetLivenessStabilizationTime(clusteringOptions, didKill);
+            return TestCluster.GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
         }
     }
 }

@@ -132,11 +132,11 @@ namespace Orleans.Runtime
             IOptions<SiloStatisticsOptions> statisticsOptions = services.GetRequiredService<IOptions<SiloStatisticsOptions>>();
             StatisticsCollector.Initialize(statisticsOptions.Value.CollectionLevel);
 
-            IOptions<ClusteringOptions> clusteringOptions = services.GetRequiredService<IOptions<ClusteringOptions>>();
-            initTimeout = clusteringOptions.Value.MaxJoinAttemptTime;
+            IOptions<ClusterMembershipOptions> clusterMembershipOptions = services.GetRequiredService<IOptions<ClusterMembershipOptions>>();
+            initTimeout = clusterMembershipOptions.Value.MaxJoinAttemptTime;
             if (Debugger.IsAttached)
             {
-                initTimeout = StandardExtensions.Max(TimeSpan.FromMinutes(10), clusteringOptions.Value.MaxJoinAttemptTime);
+                initTimeout = StandardExtensions.Max(TimeSpan.FromMinutes(10), clusterMembershipOptions.Value.MaxJoinAttemptTime);
                 stopTimeout = initTimeout;
             }
 

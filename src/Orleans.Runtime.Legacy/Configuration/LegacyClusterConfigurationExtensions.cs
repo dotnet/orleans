@@ -252,7 +252,7 @@ namespace Orleans.Hosting
                 options.NumVirtualBucketsConsistentRing = config.NumVirtualBucketsConsistentRing;
             });
 
-            services.AddOptions<ClusteringOptions>()
+            services.AddOptions<ClusterMembershipOptions>()
                 .Configure<GlobalConfiguration>((options, config) =>
                 {
                     options.NumMissedTableIAmAliveLimit = config.NumMissedTableIAmAliveLimit;

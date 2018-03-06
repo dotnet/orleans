@@ -100,7 +100,7 @@ namespace Orleans.Runtime.GrainDirectory
             Factory<GrainDirectoryPartition> grainDirectoryPartitionFactory,
             RegistrarManager registrarManager,
             ExecutorService executorService,
-            IOptions<DevelopmentClusteringOptions> developmentClusteringOptions,
+            IOptions<DevelopmentClusterMembershipOptions> developmentClusterMembershipOptions,
             IOptions<MultiClusterOptions> multiClusterOptions,
             IOptions<GrainDirectoryOptions> grainDirectoryOptions,
             ILoggerFactory loggerFactory)
@@ -138,7 +138,7 @@ namespace Orleans.Runtime.GrainDirectory
                     loggerFactory);
             GsiActivationMaintainer = new GlobalSingleInstanceActivationMaintainer(this, this.Logger, grainFactory, multiClusterOracle, executorService, siloDetails, multiClusterOptions, loggerFactory);
 
-            var primarySiloEndPoint = developmentClusteringOptions.Value.PrimarySiloEndpoint;
+            var primarySiloEndPoint = developmentClusterMembershipOptions.Value.PrimarySiloEndpoint;
             if (primarySiloEndPoint != null)
             {
                 this.seed = this.MyAddress.Endpoint.Equals(primarySiloEndPoint) ? this.MyAddress : SiloAddress.New(primarySiloEndPoint, 0);

@@ -73,7 +73,7 @@ namespace Tester.ClientConnectionTests
         private async Task<bool> WaitForClusterSize(int expectedSize)
         {
             var mgmtGrain = this.Client.GetGrain<IManagementGrain>(0);
-            var timeout = TestCluster.GetLivenessStabilizationTime(new Orleans.Configuration.ClusteringOptions());
+            var timeout = TestCluster.GetLivenessStabilizationTime(new Orleans.Configuration.ClusterMembershipOptions());
             var stopWatch = Stopwatch.StartNew();
             do
             {
