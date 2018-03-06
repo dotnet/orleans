@@ -3,6 +3,7 @@ using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
@@ -504,17 +505,57 @@ namespace Orleans.Storage
         private static string ExtractBaseClass(string typeName)
         {
             var genericPosition = typeName.IndexOf("`", StringComparison.OrdinalIgnoreCase);
-            if(genericPosition != -1)
+            if (genericPosition != -1)
             {
                 //The following relies the generic argument list to be in form as described
                 //at https://msdn.microsoft.com/en-us/library/w3f99sx1.aspx.
                 var split = typeName.Split(BaseClassExtractionSplitDelimeters, StringSplitOptions.RemoveEmptyEntries);
-                return split[0] + string.Format($"[{string.Join(",", split.Skip(1).Where(i => i.Length > 1 && i[0] != ',').Select(i => string.Format($"[{i.Substring(0, i.IndexOf(',', i.IndexOf(',') + 1))}]")))}]");
+                var stripped = new Queue<string>(split.Where(i => i.Length > 1 && i[0] != ',').Select(WithoutAssemblyVersion));
+
+                return ReformatClassName(stripped);
             }
 
             return typeName;
-        }
 
+            string WithoutAssemblyVersion(string input)
+            {
+                var asmNameIndex = input.IndexOf(',');
+                if (asmNameIndex >= 0)
+                {
+                    var asmVersionIndex = input.IndexOf(',', asmNameIndex + 1);
+                    if (asmVersionIndex >= 0) return input.Substring(0, asmVersionIndex);
+                    return input.Substring(0, asmNameIndex);
+                }
+
+                return input;
+            }
+
+            string ReformatClassName(Queue<string> segments)
+            {
+                var simpleTypeName = segments.Dequeue();
+                var arity = GetGenericArity(simpleTypeName);
+                if (arity <= 0) return simpleTypeName;
+
+                var args = new List<string>(arity);
+                for (var i = 0; i < arity; i++)
+                {
+                    args.Add(ReformatClassName(segments));
+                }
+
+                return $"{simpleTypeName}[{string.Join(",", args.Select(arg => $"[{arg}]"))}]";
+            }
+
+            int GetGenericArity(string input)
+            {
+                var arityIndex = input.IndexOf("`", StringComparison.OrdinalIgnoreCase);
+                if (arityIndex != -1)
+                {
+                    return int.Parse(input.Substring(arityIndex + 1));
+                }
+
+                return 0;
+            }
+        }
 
         private ICollection<IStorageDeserializer> ConfigureDeserializers(AdoNetGrainStorageOptions options, IProviderRuntime providerRuntime)
         {
