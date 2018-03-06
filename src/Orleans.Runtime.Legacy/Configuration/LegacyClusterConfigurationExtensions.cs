@@ -7,7 +7,6 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
-using Orleans.Runtime.Scheduler;
 using Orleans.Providers;
 using System.Collections.Generic;
 
@@ -253,7 +252,7 @@ namespace Orleans.Hosting
                 options.NumVirtualBucketsConsistentRing = config.NumVirtualBucketsConsistentRing;
             });
 
-            services.AddOptions<MembershipOptions>()
+            services.AddOptions<ClusteringOptions>()
                 .Configure<GlobalConfiguration>((options, config) =>
                 {
                     options.NumMissedTableIAmAliveLimit = config.NumMissedTableIAmAliveLimit;

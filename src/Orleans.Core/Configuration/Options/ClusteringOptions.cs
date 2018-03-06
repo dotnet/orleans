@@ -8,7 +8,7 @@ namespace Orleans.Configuration
     /// <summary>
     /// Settings for cluster membership.
     /// </summary>
-    public class MembershipOptions
+    public class ClusteringOptions
     {
         /// <summary>
         /// The number of missed "I am alive" updates  in the table from a silo that causes warning to be logged. Does not impact the liveness protocol.

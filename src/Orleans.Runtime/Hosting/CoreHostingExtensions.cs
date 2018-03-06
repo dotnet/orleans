@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Configuration;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
 
 namespace Orleans.Hosting
@@ -156,7 +155,7 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloHostBuilder UseDevelopmentClustering(
             this ISiloHostBuilder builder,
-            Action<DevelopmentMembershipOptions> configureOptions,
+            Action<DevelopmentClusteringOptions> configureOptions,
             string clusterId = ClusterOptions.DevelopmentClusterId)
         {
             return builder
@@ -180,13 +179,13 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloHostBuilder UseDevelopmentClustering(
             this ISiloHostBuilder builder,
-            Action<OptionsBuilder<DevelopmentMembershipOptions>> configureOptions,
+            Action<OptionsBuilder<DevelopmentClusteringOptions>> configureOptions,
             string clusterId = ClusterOptions.DevelopmentClusterId)
         {
             return builder.ConfigureServices(
                 services =>
                 {
-                    configureOptions?.Invoke(services.AddOptions<DevelopmentMembershipOptions>());
+                    configureOptions?.Invoke(services.AddOptions<DevelopmentClusteringOptions>());
                     services
                         .AddSingleton<GrainBasedMembershipTable>()
                         .AddFromExisting<IMembershipTable, GrainBasedMembershipTable>();
