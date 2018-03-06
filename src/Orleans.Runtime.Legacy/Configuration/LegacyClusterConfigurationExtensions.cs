@@ -52,7 +52,9 @@ namespace Orleans.Hosting
         /// <returns>The silo builder.</returns>
         public static ISiloHostBuilder ConfigureLocalHostPrimarySilo(this ISiloHostBuilder builder, int siloPort = 22222, int gatewayPort = 40000)
         {
-            builder.ConfigureSiloName(Silo.PrimarySiloName);
+            string siloName = Silo.PrimarySiloName;
+            builder.Configure<SiloOptions>(options => options.SiloName = siloName);
+            ISiloHostBuilder temp = builder;
             return builder.UseConfiguration(ClusterConfiguration.LocalhostPrimarySilo(siloPort, gatewayPort));
         }
 

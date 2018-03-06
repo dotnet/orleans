@@ -65,7 +65,7 @@ namespace NonSilo.Tests
         [Fact]
         public void SiloHostBuilder_NoSpecifiedConfigurationTest()
         {
-            var builder = new SiloHostBuilder().Configure()
+            var builder = new SiloHostBuilder().ConfigureDefaults()
                 .UseConfiguration(new ClusterConfiguration())
                 .ConfigureServices(RemoveConfigValidators)
                 .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
@@ -81,7 +81,7 @@ namespace NonSilo.Tests
         [Fact]
         public void SiloHostBuilder_DoubleBuildTest()
         {
-            var builder = new SiloHostBuilder().Configure()
+            var builder = new SiloHostBuilder().ConfigureDefaults()
                 .UseConfiguration(new ClusterConfiguration())
                 .ConfigureServices(RemoveConfigValidators)
                 .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
@@ -97,7 +97,7 @@ namespace NonSilo.Tests
         [Fact]
         public void SiloHostBuilder_DoubleSpecifyConfigurationTest()
         {
-            var builder = new SiloHostBuilder().Configure()
+            var builder = new SiloHostBuilder().ConfigureDefaults()
                 .ConfigureServices(RemoveConfigValidators)
                 .UseConfiguration(new ClusterConfiguration())
                 .UseConfiguration(new ClusterConfiguration());
@@ -110,7 +110,7 @@ namespace NonSilo.Tests
         [Fact]
         public void SiloHostBuilder_NullConfigurationTest()
         {
-            var builder = new SiloHostBuilder().Configure()
+            var builder = new SiloHostBuilder().ConfigureDefaults()
                 .ConfigureServices(RemoveConfigValidators);
             Assert.Throws<ArgumentNullException>(() => builder.UseConfiguration(null));
         }
@@ -121,7 +121,7 @@ namespace NonSilo.Tests
         [Fact]
         public void SiloHostBuilder_ServiceProviderTest()
         {
-            var builder = new SiloHostBuilder().Configure()
+            var builder = new SiloHostBuilder().ConfigureDefaults()
                 .UseConfiguration(new ClusterConfiguration())
                 .ConfigureServices(RemoveConfigValidators)
                 .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());

@@ -8,6 +8,7 @@ using Orleans.Logging;
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime.Startup;
 
@@ -101,8 +102,10 @@ namespace Orleans.Runtime.Host
             try
             {
                 if (!this.ConfigLoaded) LoadOrleansConfig();
-                var builder = new SiloHostBuilder()
-                    .ConfigureSiloName(this.Name)
+                string siloName = this.Name;
+                SiloHostBuilder tempQualifier = new SiloHostBuilder();
+                tempQualifier.Configure<SiloOptions>(options => options.SiloName = siloName);
+                var builder = tempQualifier
                     .UseConfiguration(this.Config);
 
                 if (!string.IsNullOrWhiteSpace(this.Config.Defaults.StartupTypeName))
