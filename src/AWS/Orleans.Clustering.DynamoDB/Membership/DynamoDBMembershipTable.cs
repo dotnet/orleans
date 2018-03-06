@@ -29,12 +29,12 @@ namespace Orleans.Clustering.DynamoDB
 
         public DynamoDBMembershipTable(
             ILoggerFactory loggerFactory, 
-            IOptions<DynamoDBClusteringOptions> membershipOptions, 
+            IOptions<DynamoDBClusteringOptions> clusteringOptions, 
             IOptions<ClusterOptions> clusterOptions)
         {
             this.loggerFactory = loggerFactory;
             logger = loggerFactory.CreateLogger<DynamoDBMembershipTable>();
-            this.options = membershipOptions.Value;
+            this.options = clusteringOptions.Value;
             this.clusterId = clusterOptions.Value.ClusterId;
         }
 
