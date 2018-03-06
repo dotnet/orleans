@@ -53,7 +53,7 @@ namespace Orleans.CodeGeneration
     /// <summary>
     /// Indicates that this type and all subtypes are to be considered as [Serializable].
     /// </summary>
-    [AttributeUsage(AttributeTargets.Class)]
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface)]
     public sealed class KnownBaseTypeAttribute : Attribute
     {
     }

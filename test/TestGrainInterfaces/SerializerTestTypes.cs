@@ -39,9 +39,17 @@ namespace UnitTests.GrainInterfaces
     }
 
     [KnownBaseType]
-    public abstract class WellKnownBaseType { }
+    public abstract class WellKnownBaseClass { }
 
-    public class DescendantOfWellKnownBaseType : WellKnownBaseType
+    public class DescendantOfWellKnownBaseClass : WellKnownBaseClass
+    {
+        public int FavouriteNumber { get; set; }
+    }
+
+    [KnownBaseType]
+    public interface IWellKnownBase { }
+
+    public class ImplementsWellKnownInterface : IWellKnownBase
     {
         public int FavouriteNumber { get; set; }
     }

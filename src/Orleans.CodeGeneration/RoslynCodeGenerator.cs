@@ -20,7 +20,6 @@ using Orleans.ApplicationParts;
 using Orleans.Metadata;
 using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
 using SF = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
-using TypeInfo = System.Reflection.TypeInfo;
 
 namespace Orleans.CodeGenerator
 {
@@ -357,6 +356,11 @@ namespace Orleans.CodeGenerator
             if (type == null) return false;
             if (type.GetCustomAttribute<KnownBaseTypeAttribute>() != null) return true;
             if (TypeHasKnownBase(type.BaseType)) return true;
+            var interfaces = type.GetInterfaces();
+            foreach (var iface in interfaces)
+            {
+                if (TypeHasKnownBase(iface)) return true;
+            }
 
             return false;
         }
