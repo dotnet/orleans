@@ -154,14 +154,9 @@ namespace Orleans
         /// <param name="gatewayPort">The local silo's gateway port.</param>
         public static IClientBuilder UseLocalhostClustering(
             this IClientBuilder builder,
-            int gatewayPort = 30000,
-            string clusterId = ClusterOptions.DevelopmentClusterId)
+            int gatewayPort = 30000)
         {
-            return builder.UseStaticClustering(new IPEndPoint(IPAddress.Loopback, gatewayPort))
-                .ConfigureCluster(options =>
-                {
-                    if (!string.IsNullOrWhiteSpace(clusterId)) options.ClusterId = clusterId;
-                });
+            return builder.UseStaticClustering(new IPEndPoint(IPAddress.Loopback, gatewayPort));
         }
 
         /// <summary>
@@ -170,11 +165,7 @@ namespace Orleans
         /// <param name="gatewayPorts">The local silo gateway port.</param>
         public static IClientBuilder UseLocalhostClustering(this IClientBuilder builder, params int[] gatewayPorts)
         {
-            return builder.UseStaticClustering(gatewayPorts.Select(p => new IPEndPoint(IPAddress.Loopback, p)).ToArray())
-                .ConfigureCluster(options =>
-                {
-                    options.ClusterId = ClusterOptions.DevelopmentClusterId;
-                });
+            return builder.UseStaticClustering(gatewayPorts.Select(p => new IPEndPoint(IPAddress.Loopback, p)).ToArray());
         }
 
         /// <summary>

@@ -8,14 +8,14 @@ namespace Orleans.Configuration
     public class ClusterOptions
     {
         /// <summary>
-        /// Default cluster id for development clusters.
+        /// Default <see cref="ClusterId"/> value.
         /// </summary>
-        internal const string DevelopmentClusterId = "dev";
+        internal const string DefaultClusterId = "default";
 
         /// <summary>
         /// Gets or sets the cluster identity. This used to be called DeploymentId before Orleans 2.0 name.
         /// </summary>
-        public string ClusterId { get; set; }
+        public string ClusterId { get; set; } = DefaultClusterId;
 
         /// <summary>
         /// Gets or sets a unique identifier for this service, which should survive deployment and redeployment, where as <see cref="ClusterId"/> might not.

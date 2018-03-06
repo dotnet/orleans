@@ -122,8 +122,7 @@ namespace Orleans.Hosting
             this ISiloHostBuilder builder,
             int siloPort = EndpointOptions.DEFAULT_SILO_PORT,
             int gatewayPort = EndpointOptions.DEFAULT_GATEWAY_PORT,
-            IPEndPoint primarySiloEndpoint = null,
-            string clusterId = ClusterOptions.DevelopmentClusterId)
+            IPEndPoint primarySiloEndpoint = null)
         {
             builder.Configure<EndpointOptions>(options =>
             {
@@ -133,7 +132,6 @@ namespace Orleans.Hosting
             });
 
             builder.UseDevelopmentClustering(primarySiloEndpoint ?? new IPEndPoint(IPAddress.Loopback, siloPort));
-            builder.Configure(options => options.ClusterId = clusterId);
 
             return builder;
         }
@@ -155,23 +153,21 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloHostBuilder UseDevelopmentClustering(
             this ISiloHostBuilder builder,
-            Action<DevelopmentClusterMembershipOptions> configureOptions,
-            string clusterId = ClusterOptions.DevelopmentClusterId)
+            Action<DevelopmentClusterMembershipOptions> configureOptions)
         {
             return builder
-                .Configure(options => options.ClusterId = clusterId)
                 .ConfigureServices(
-                services =>
-                {
-                    if (configureOptions != null)
+                    services =>
                     {
-                        services.Configure(configureOptions);
-                    }
+                        if (configureOptions != null)
+                        {
+                            services.Configure(configureOptions);
+                        }
 
-                    services
-                        .AddSingleton<GrainBasedMembershipTable>()
-                        .AddFromExisting<IMembershipTable, GrainBasedMembershipTable>();
-                });
+                        services
+                            .AddSingleton<GrainBasedMembershipTable>()
+                            .AddFromExisting<IMembershipTable, GrainBasedMembershipTable>();
+                    });
         }
 
         /// <summary>
@@ -179,8 +175,7 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloHostBuilder UseDevelopmentClustering(
             this ISiloHostBuilder builder,
-            Action<OptionsBuilder<DevelopmentClusterMembershipOptions>> configureOptions,
-            string clusterId = ClusterOptions.DevelopmentClusterId)
+            Action<OptionsBuilder<DevelopmentClusterMembershipOptions>> configureOptions)
         {
             return builder.ConfigureServices(
                 services =>
