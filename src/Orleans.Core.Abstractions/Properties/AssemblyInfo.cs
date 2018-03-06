@@ -15,3 +15,4 @@
 
 // Legacy provider support
 [assembly: InternalsVisibleTo("Orleans.Core.Legacy")]
+[assembly: InternalsVisibleTo("Orleans.Runtime.Legacy")]
