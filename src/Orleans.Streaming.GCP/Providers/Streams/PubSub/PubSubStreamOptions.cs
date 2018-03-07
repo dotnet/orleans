@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 
 namespace Orleans.Configuration
 {
-    public class PubSubStreamOptions : PersistentStreamOptions
+    public class PubSubOptions
     {
         public string ProjectId { get; set; }
 
@@ -13,12 +13,6 @@ namespace Orleans.Configuration
         public string ClusterId { get; set; }
 
         public string CustomEndpoint { get; set; }
-
-        public int CacheSize { get; set; } = CACHE_SIZE_DEFAULT;
-        public const int CACHE_SIZE_DEFAULT = 4096;
-
-        public int NumSubscriptions { get; set; } = NUMBER_SUBSCRIPTIONS_DEFAULT;
-        public const int NUMBER_SUBSCRIPTIONS_DEFAULT = 8;
 
         private TimeSpan? deadline;
         public TimeSpan? Deadline

@@ -7,7 +7,7 @@ using Orleans.Concurrency;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Configuration;
-using RunState = Orleans.Configuration.PersistentStreamOptions.RunState;
+using RunState = Orleans.Configuration.StreamInitializationOptions.RunState;
 
 namespace Orleans.Streams
 {
@@ -20,7 +20,7 @@ namespace Orleans.Streams
         private readonly IStreamProviderRuntime providerRuntime;
         private readonly IStreamPubSub pubSub;
 
-        private readonly PersistentStreamOptions options;
+        private readonly StreamPullingAgentOptions options;
         private readonly AsyncSerialExecutor nonReentrancyGuarantor; // for non-reentrant execution of queue change notifications.
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
@@ -41,7 +41,7 @@ namespace Orleans.Streams
             IStreamPubSub streamPubSub,
             IQueueAdapterFactory adapterFactory,
             IStreamQueueBalancer streamQueueBalancer,
-            PersistentStreamOptions options,
+            StreamPullingAgentOptions options,
             ILoggerFactory loggerFactory)
             : base(id, runtime.ExecutingSiloAddress, loggerFactory)
         {
@@ -88,7 +88,7 @@ namespace Orleans.Streams
 
             // Remove cast once we cleanup
             queueAdapter = qAdapter.Value;
-            await this.queueBalancer.Initialize(this.streamProviderName, this.adapterFactory.GetStreamQueueMapper(), this.options.SiloMaturityPeriod);
+            await this.queueBalancer.Initialize(this.streamProviderName, this.adapterFactory.GetStreamQueueMapper());
             queueBalancer.SubscribeToQueueDistributionChangeEvents(this);
 
             List<QueueId> myQueues = queueBalancer.GetMyQueues().ToList();

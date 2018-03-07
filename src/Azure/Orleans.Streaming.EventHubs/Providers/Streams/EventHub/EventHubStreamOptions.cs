@@ -6,7 +6,7 @@ namespace Orleans.Configuration
     /// <summary>
     /// EventHub settings for a specific hub
     /// </summary>
-    public class EventHubStreamOptions : RecoverableStreamOptions
+    public class EventHubOptions
     {
         /// <summary>
         /// EventHub connection string.
@@ -21,6 +21,10 @@ namespace Orleans.Configuration
         /// Hub path.
         /// </summary>
         public string Path { get; set; }
+    }
+
+    public class EventHubReceiverOptions
+    { 
         /// <summary>
         /// Optional parameter that configures the receiver prefetch count.
         /// </summary>
@@ -30,6 +34,27 @@ namespace Orleans.Configuration
         /// </summary>
         public bool StartFromNow { get; set; } = DEFAULT_START_FROM_NOW;
         public const bool DEFAULT_START_FROM_NOW = true;
+    }
+
+    public class EventHubStreamCacheOptions
+    {
+        /// <summary>
+        /// Minimum time message will stay in cache before it is available for time based purge.
+        /// </summary>
+        public TimeSpan DataMinTimeInCache { get; set; } = DefaultDataMinTimeInCache;
+        /// <summary>
+        /// Drfault DataMinTimeInCache
+        /// </summary>
+        public static readonly TimeSpan DefaultDataMinTimeInCache = TimeSpan.FromMinutes(5);
+
+        /// <summary>
+        /// Difference in time between the newest and oldest messages in the cache.  Any messages older than this will be purged from the cache.
+        /// </summary>
+        public TimeSpan DataMaxAgeInCache { get; set; } = DefaultDataMaxAgeInCache;
+        /// <summary>
+        /// Default DataMaxAgeInCache
+        /// </summary>
+        public static readonly TimeSpan DefaultDataMaxAgeInCache = TimeSpan.FromMinutes(30);
 
         /// <summary>
         /// SlowConsumingPressureMonitorConfig
@@ -48,25 +73,5 @@ namespace Orleans.Configuration
         public double? AveragingCachePressureMonitorFlowControlThreshold { get; set; } = DEFAULT_AVERAGING_CACHE_PRESSURE_MONITORING_THRESHOLD;
         public const double AVERAGING_CACHE_PRESSURE_MONITORING_OFF = 1.0;
         public const double DEFAULT_AVERAGING_CACHE_PRESSURE_MONITORING_THRESHOLD = 1.0 / 3.0;
-
-        /// <summary>
-        /// Azure table storage connections string.
-        /// </summary>
-        [RedactConnectionString]
-        public string CheckpointConnectionString { get; set; }
-        /// <summary>
-        /// Azure table name.
-        /// </summary>
-        public string CheckpointTableName { get; set; }
-        /// <summary>
-        /// Interval to write checkpoints.  Prevents spamming storage.
-        /// </summary>
-        public TimeSpan CheckpointPersistInterval { get; set; } = DEFAULT_CHECKPOINT_PERSIST_INTERVAL;
-        public static readonly TimeSpan DEFAULT_CHECKPOINT_PERSIST_INTERVAL = TimeSpan.FromMinutes(1);
-
-        /// <summary>
-        /// Unique namespace for checkpoint data.  Is similar to consumer group.
-        /// </summary>
-        public string CheckpointNamespace { get; set; }
     }
 }

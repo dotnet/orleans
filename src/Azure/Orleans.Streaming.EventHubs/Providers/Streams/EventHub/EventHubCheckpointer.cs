@@ -4,9 +4,27 @@ using Microsoft.Extensions.Logging;
 using Orleans.Streams;
 using Orleans.Streaming.EventHubs;
 using Orleans.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.ServiceBus.Providers
 {
+    public class EventHubCheckpointerFactory : IStreamQueueCheckpointerFactory
+    {
+        private IServiceProvider services;
+        private string providerName;
+        public EventHubCheckpointerFactory(string providerName, IServiceProvider services)
+        {
+            this.services = services;
+            this.providerName = providerName;
+        }
+
+        public Task<IStreamQueueCheckpointer<string>> Create(string partition)
+        {
+            var options = services.GetOptionsByName<EventHubCheckpointerOptions>(providerName);
+            return EventHubCheckpointer.Create(options, providerName, partition, services.GetService<ILoggerFactory>());
+        }
+    }
+
     /// <summary>
     /// This class stores EventHub partition checkpointer information (a partition offset) in azure table storage.
     /// </summary>
@@ -32,14 +50,14 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="partition"></param>
         /// <param name="loggerFactory"></param>
         /// <returns></returns>
-        public static async Task<IStreamQueueCheckpointer<string>> Create(EventHubStreamOptions options, string streamProviderName, string partition, ILoggerFactory loggerFactory)
+        public static async Task<IStreamQueueCheckpointer<string>> Create(EventHubCheckpointerOptions options, string streamProviderName, string partition, ILoggerFactory loggerFactory)
         {
             var checkpointer = new EventHubCheckpointer(options, streamProviderName, partition, loggerFactory);
             await checkpointer.Initialize();
             return checkpointer;
         }
 
-        private EventHubCheckpointer(EventHubStreamOptions options, string streamProviderName, string partition, ILoggerFactory loggerFactory)
+        private EventHubCheckpointer(EventHubCheckpointerOptions options, string streamProviderName, string partition, ILoggerFactory loggerFactory)
         {
             if (options == null)
             {

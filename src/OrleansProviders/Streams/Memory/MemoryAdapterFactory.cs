@@ -22,7 +22,9 @@ namespace Orleans.Providers
     public class MemoryAdapterFactory<TSerializer> : IQueueAdapterFactory, IQueueAdapter, IQueueAdapterCache
         where TSerializer : class, IMemoryMessageBodySerializer
     {
-        private readonly MemoryStreamOptions options;
+        private readonly MemoryStreamCacheOptions cacheOptions;
+        private readonly StreamStatisticOptions statisticOptions;
+        private readonly HashRingStreamQueueMapperOptions queueMapperOptions;
         private readonly IGrainFactory grainFactory;
         private readonly ITelemetryProducer telemetryProducer;
         private readonly ILoggerFactory loggerFactory;
@@ -75,10 +77,13 @@ namespace Orleans.Providers
         /// </summary>
         protected Func<ReceiverMonitorDimensions, ITelemetryProducer, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory;
 
-        public MemoryAdapterFactory(string providerName, MemoryStreamOptions options, IServiceProvider serviceProvider, IGrainFactory grainFactory, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
+        public MemoryAdapterFactory(string providerName, MemoryStreamCacheOptions cacheOptions, StreamStatisticOptions statisticOptions, HashRingStreamQueueMapperOptions queueMapperOptions,
+            IServiceProvider serviceProvider, IGrainFactory grainFactory, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
         {
             this.Name = providerName;
-            this.options = options ?? throw new ArgumentNullException(nameof(options));
+            this.queueMapperOptions = queueMapperOptions ?? throw new ArgumentNullException(nameof(queueMapperOptions));
+            this.cacheOptions = cacheOptions ?? throw new ArgumentNullException(nameof(cacheOptions));
+            this.statisticOptions = statisticOptions ?? throw new ArgumentException(nameof(statisticOptions));
             this.grainFactory = grainFactory ?? throw new ArgumentNullException(nameof(grainFactory));
             this.telemetryProducer = telemetryProducer ?? throw new ArgumentNullException(nameof(telemetryProducer));
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
@@ -101,8 +106,8 @@ namespace Orleans.Providers
                 this.BlockPoolMonitorFactory = (dimensions, telemetryProducer) => new DefaultBlockPoolMonitor(dimensions, telemetryProducer);
             if (this.ReceiverMonitorFactory == null)
                 this.ReceiverMonitorFactory = (dimensions, telemetryProducer) => new DefaultQueueAdapterReceiverMonitor(dimensions, telemetryProducer);
-            this.purgePredicate = new TimePurgePredicate(this.options.DataMinTimeInCache, this.options.DataMaxAgeInCache);
-            this.streamQueueMapper = new HashRingBasedStreamQueueMapper(this.options.TotalQueueCount, this.Name);
+            this.purgePredicate = new TimePurgePredicate(this.cacheOptions.DataMinTimeInCache, this.cacheOptions.DataMaxAgeInCache);
+            this.streamQueueMapper = new HashRingBasedStreamQueueMapper(this.queueMapperOptions, this.Name);
         }
 
         private void CreateBufferPoolIfNotCreatedYet()
@@ -113,7 +118,7 @@ namespace Orleans.Providers
                 this.blockPoolMonitorDimensions = new BlockPoolMonitorDimensions($"BlockPool-{Guid.NewGuid()}");
                 var oneMb = 1 << 20;
                 var objectPoolMonitor = new ObjectPoolMonitorBridge(this.BlockPoolMonitorFactory(blockPoolMonitorDimensions, this.telemetryProducer), oneMb);
-                this.bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(oneMb), objectPoolMonitor, this.options.StatisticMonitorWriteInterval);
+                this.bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(oneMb), objectPoolMonitor, this.statisticOptions.StatisticMonitorWriteInterval);
             }
         }
 
@@ -195,7 +200,7 @@ namespace Orleans.Providers
             CreateBufferPoolIfNotCreatedYet();
             var logger = this.loggerFactory.CreateLogger($"{typeof(MemoryPooledCache<TSerializer>).FullName}.{this.Name}.{queueId}");
             var monitor = this.CacheMonitorFactory(new CacheMonitorDimensions(queueId.ToString(), this.blockPoolMonitorDimensions.BlockPoolId), this.telemetryProducer);
-            return new MemoryPooledCache<TSerializer>(bufferPool, purgePredicate, logger, this.serializer, monitor, this.options.StatisticMonitorWriteInterval);
+            return new MemoryPooledCache<TSerializer>(bufferPool, purgePredicate, logger, this.serializer, monitor, this.statisticOptions.StatisticMonitorWriteInterval);
         }
 
         /// <summary>
@@ -248,8 +253,10 @@ namespace Orleans.Providers
 
         public static MemoryAdapterFactory<TSerializer> Create(IServiceProvider services, string name)
         {
-            IOptionsSnapshot<MemoryStreamOptions> optionsSnapshot = services.GetRequiredService<IOptionsSnapshot<MemoryStreamOptions>>();
-            var factory = ActivatorUtilities.CreateInstance<MemoryAdapterFactory<TSerializer>>(services, name, optionsSnapshot.Get(name));
+            var cachePurgeOptions = services.GetOptionsByName<MemoryStreamCacheOptions>(name);
+            var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
+            var queueMapperOptions = services.GetOptionsByName<HashRingStreamQueueMapperOptions>(name);
+            var factory = ActivatorUtilities.CreateInstance<MemoryAdapterFactory<TSerializer>>(services, name, cachePurgeOptions, statisticOptions, queueMapperOptions);
             factory.Init();
             return factory;
         }

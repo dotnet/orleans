@@ -1,11 +1,15 @@
-﻿using System;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
+using Orleans.Streams;
+using System;
 
 namespace Orleans.Configuration
 {
     /// <summary>
     /// Common stream provider settings shared by EventHubStreamProvider, MemoryStreamProvider and GeneratorStreamProvider
     /// </summary>
-    public class RecoverableStreamOptions : PersistentStreamOptions
+   /* public class RecoverableStreamOptions : PersistentStreamOptions
     {
         /// <summary>
         /// Minimum time message will stay in cache before it is available for time based purge.
@@ -26,6 +30,19 @@ namespace Orleans.Configuration
         public static readonly TimeSpan DefaultDataMaxAgeInCache = TimeSpan.FromMinutes(30);
 
 
+        /// <summary>
+        /// Statistic monitor write interval
+        /// Statistics generation is triggered by activity.  Interval will be ignored when streams are inactive.
+        /// </summary>
+        public TimeSpan StatisticMonitorWriteInterval { get; set; } = DefaultStatisticMonitorWriteInterval;
+        /// <summary>
+        /// Default statistic monitor write interval
+        /// </summary>
+        public static TimeSpan DefaultStatisticMonitorWriteInterval = TimeSpan.FromMinutes(5);
+    }*/
+
+    public class StreamStatisticOptions
+    {
         /// <summary>
         /// Statistic monitor write interval
         /// Statistics generation is triggered by activity.  Interval will be ignored when streams are inactive.

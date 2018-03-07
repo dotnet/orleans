@@ -9,59 +9,27 @@ using Orleans.Streams;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Configure silo to use persistent streams.
+    /// </summary>
     public static class ClientStreamExtensions
     {
-        /// <summary>
-        /// Configure silo to use persistent streams.
-        /// </summary>
-        public static IClientBuilder AddPersistentStreams<TOptions>(
+        public static IClientBuilder AddPersistentStreams(
             this IClientBuilder builder,
             string name,
-            Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory,
-            Action<TOptions> configureOptions)
-            where TOptions : PersistentStreamOptions, new()
+            Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory)
         {
-            return builder.ConfigureServices(services => services.AddClusterClientPersistentStreams<TOptions>(name, adapterFactory, configureOptions));
+            return builder.ConfigureServices(services => services.AddClusterClientPersistentStreams(name, adapterFactory));
         }
-
         /// <summary>
         /// Configure silo to use persistent streams.
         /// </summary>
-        public static IClientBuilder AddPersistentStreams<TOptions>(
-            this IClientBuilder builder,
-            string name,
-            Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory,
-            Action<OptionsBuilder<TOptions>> configureOptions = null)
-            where TOptions : PersistentStreamOptions, new()
-        {
-            return builder.ConfigureServices(services => services.AddClusterClientPersistentStreams<TOptions>(name, adapterFactory, configureOptions));
-        }
-
-        /// <summary>
-        /// Configure silo to use persistent streams.
-        /// </summary>
-        public static void AddClusterClientPersistentStreams<TOptions>(
+        private static void AddClusterClientPersistentStreams(
             this IServiceCollection services,
             string name,
-            Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory,
-            Action<TOptions> configureOptions)
-            where TOptions : PersistentStreamOptions, new()
+            Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory)
         {
-            services.AddClusterClientPersistentStreams<TOptions>(name, adapterFactory, ob => ob.Configure(configureOptions));
-        }
-
-        /// <summary>
-        /// Configure silo to use persistent streams.
-        /// </summary>
-        public static void AddClusterClientPersistentStreams<TOptions>(
-            this IServiceCollection services,
-            string name,
-            Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory,
-            Action<OptionsBuilder<TOptions>> configureOptions = null)
-            where TOptions : PersistentStreamOptions, new()
-        {
-            configureOptions?.Invoke(services.AddOptions<TOptions>(name));
-            services.AddSingletonNamedService<IStreamProvider>(name, PersistentStreamProvider.Create<TOptions>)
+            services.AddSingletonNamedService<IStreamProvider>(name, PersistentStreamProvider.Create)
                 .AddSingletonNamedService<ILifecycleParticipant<IClusterClientLifecycle>>(name,
                     (s, n) => ((PersistentStreamProvider) s.GetRequiredServiceByName<IStreamProvider>(n)).ParticipateIn<IClusterClientLifecycle>())
                 .AddSingletonNamedService<IQueueAdapterFactory>(name, adapterFactory);

@@ -5,7 +5,7 @@ namespace Orleans.Configuration
     /// This configuration class is used to configure the GeneratorStreamProvider.
     /// It tells the stream provider how many queues to create, and which generator to use to generate event streams.
     /// </summary>
-    public class GeneratedStreamOptions : RecoverableStreamOptions
+    public class GeneratedStreamOptions
     {
         /// <summary>
         /// Total number of queues

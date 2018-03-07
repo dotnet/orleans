@@ -9,32 +9,10 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure silo to use memory streams.
         /// </summary>
-        public static ISiloHostBuilder AddMemoryStreams<TSerializer>(
-            this ISiloHostBuilder builder,
-            string name,
-            Action<MemoryStreamOptions> configureOptions)
-            where TSerializer : class, IMemoryMessageBodySerializer
+        public static SiloMemoryStreamConfigurator<TSerializer> AddMemoryStream<TSerializer>(this ISiloHostBuilder builder, string name)
+             where TSerializer : class, IMemoryMessageBodySerializer
         {
-            return builder.AddMemoryStreams<TSerializer>(name, ob => ob.Configure(configureOptions));
-        }
-
-        /// <summary>
-        /// Configure silo to use memory streams.
-        /// </summary>
-        public static ISiloHostBuilder AddMemoryStreams<TSerializer>(
-            this ISiloHostBuilder builder,
-            string name,
-            Action<OptionsBuilder<MemoryStreamOptions>> configureOptions = null)
-            where TSerializer : class, IMemoryMessageBodySerializer
-        {
-            return builder
-                .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(MemoryAdapterFactory<>).Assembly))
-                .ConfigureServices(services =>
-                {
-                    services
-                        .ConfigureNamedOptionForLogging<MemoryStreamOptions>(name)
-                        .AddSiloPersistentStreams<MemoryStreamOptions>(name, MemoryAdapterFactory<TSerializer>.Create, configureOptions);
-                });
+            return new SiloMemoryStreamConfigurator<TSerializer>(name, builder);
         }
     }
 }

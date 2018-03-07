@@ -17,11 +17,9 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="strProviderName"></param>
         /// <param name="queueMapper"></param>
-        /// <param name="siloMaturityPeriod"></param>
         /// <returns></returns>
         Task Initialize(string strProviderName,
-            IStreamQueueMapper queueMapper,
-            TimeSpan siloMaturityPeriod);
+            IStreamQueueMapper queueMapper);
 
         /// <summary>
         /// Retrieves the latest queue distribution for this balancer.

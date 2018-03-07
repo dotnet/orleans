@@ -18,8 +18,4 @@
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" />
   </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Streams\" />
-  </ItemGroup>
 </Project>

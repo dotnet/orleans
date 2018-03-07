@@ -32,7 +32,6 @@ namespace Orleans.Providers.Streams.Common
     /// <typeparam name="TAdapterFactory"></typeparam>
     public class PersistentStreamProvider : IStreamProvider, IInternalStreamProvider, IControllable, IStreamSubscriptionManagerRetriever, ILifecycleParticipant<ILifecycleObservable>
     {
-        private readonly PersistentStreamOptions options;
         private readonly ILogger logger;
         private readonly IStreamProviderRuntime runtime;
         private readonly SerializationManager serializationManager;
@@ -42,20 +41,21 @@ namespace Orleans.Providers.Streams.Common
         private IQueueAdapter           queueAdapter;
         private IPersistentStreamPullingManager pullingAgentManager;
         private IStreamSubscriptionManager streamSubscriptionManager;
-
+        private readonly StreamPubSubOptions pubsubOptions;
+        private readonly StreamInitializationOptions lifeCycleOptions;
         public string Name { get; private set; }
         public bool IsRewindable { get { return queueAdapter.IsRewindable; } }
 
-        public PersistentStreamProvider(string name, PersistentStreamOptions options, IProviderRuntime runtime, SerializationManager serializationManager, ILogger<PersistentStreamProvider> logger)
+        public PersistentStreamProvider(string name, StreamPubSubOptions pubsubOptions, StreamInitializationOptions lifeCycleOptions, IProviderRuntime runtime, SerializationManager serializationManager, ILogger<PersistentStreamProvider> logger)
         {
             if (String.IsNullOrEmpty(name)) throw new ArgumentNullException(nameof(name));
-            if (options == null) throw new ArgumentNullException(nameof(options));
             if (runtime == null) throw new ArgumentNullException(nameof(runtime));
             if (serializationManager == null) throw new ArgumentNullException(nameof(serializationManager));
             if (logger == null) throw new ArgumentNullException(nameof(logger));
 
+            this.pubsubOptions = pubsubOptions;
             this.Name = name;
-            this.options = options;
+            this.lifeCycleOptions = lifeCycleOptions;
             this.runtime = runtime.ServiceProvider.GetRequiredService<IStreamProviderRuntime>();
             this.runtimeClient = runtime.ServiceProvider.GetRequiredService<IRuntimeClient>();
             this.serializationManager = serializationManager;
@@ -68,8 +68,8 @@ namespace Orleans.Providers.Streams.Common
             this.adapterFactory = this.runtime.ServiceProvider.GetRequiredServiceByName<IQueueAdapterFactory>(this.Name);
             this.queueAdapter = await adapterFactory.CreateAdapter();
 
-            if (this.options.PubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit 
-                || this.options.PubSubType == StreamPubSubType.ExplicitGrainBasedOnly)
+            if (this.pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit 
+                || this.pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedOnly)
             {
                 this.streamSubscriptionManager = this.runtime.ServiceProvider
                     .GetService<IStreamSubscriptionManagerAdmin>().GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
@@ -86,10 +86,10 @@ namespace Orleans.Providers.Streams.Common
                 var siloRuntime = this.runtime as ISiloSideStreamProviderRuntime;
                 if (siloRuntime != null)
                 {
-                    this.pullingAgentManager = await siloRuntime.InitializePullingAgents(this.Name, this.adapterFactory, this.queueAdapter, this.options);
+                    this.pullingAgentManager = await siloRuntime.InitializePullingAgents(this.Name, this.adapterFactory, this.queueAdapter);
 
                     // TODO: No support yet for DeliveryDisabled, only Stopped and Started
-                    if (this.options.StartupState == PersistentStreamOptions.RunState.AgentsStarted)
+                    if (this.lifeCycleOptions.StartupState == StreamInitializationOptions.RunState.AgentsStarted)
                         await pullingAgentManager.StartAgents();
                 }
             }
@@ -135,7 +135,7 @@ namespace Orleans.Providers.Streams.Common
 
         private IInternalAsyncObservable<T> GetConsumerInterfaceImpl<T>(IAsyncStream<T> stream)
         {
-            return new StreamConsumer<T>((StreamImpl<T>)stream, Name, this.runtime, this.runtime.PubSub(this.options.PubSubType), this.logger, IsRewindable);
+            return new StreamConsumer<T>((StreamImpl<T>)stream, Name, this.runtime, this.runtime.PubSub(this.pubsubOptions.PubSubType), this.logger, IsRewindable);
         }
 
         public Task<object> ExecuteCommand(int command, object arg)
@@ -165,15 +165,15 @@ namespace Orleans.Providers.Streams.Common
 
         public void Participate(ILifecycleObservable lifecycle)
         {
-            lifecycle.Subscribe(OptionFormattingUtilities.Name<PersistentStreamProvider>(this.Name), this.options.InitStage, Init);
-            lifecycle.Subscribe(OptionFormattingUtilities.Name<PersistentStreamProvider>(this.Name), this.options.StartStage, Start, Close);
+            lifecycle.Subscribe(OptionFormattingUtilities.Name<PersistentStreamProvider>(this.Name), this.lifeCycleOptions.InitStage, Init);
+            lifecycle.Subscribe(OptionFormattingUtilities.Name<PersistentStreamProvider>(this.Name), this.lifeCycleOptions.StartStage, Start, Close);
         }
 
-        public static IStreamProvider Create<TOptions>(IServiceProvider services, string name)
-            where TOptions : PersistentStreamOptions, new()
+        public static IStreamProvider Create(IServiceProvider services, string name)
         {
-            IOptionsSnapshot<TOptions> optionsSnapshot = services.GetRequiredService<IOptionsSnapshot<TOptions>>();
-            return ActivatorUtilities.CreateInstance<PersistentStreamProvider>(services, name, optionsSnapshot.Get(name));
+            var pubsubOptions = services.GetRequiredService<IOptionsSnapshot<StreamPubSubOptions>>().Get(name);
+            var initOptions = services.GetRequiredService<IOptionsSnapshot<StreamInitializationOptions>>().Get(name);
+            return ActivatorUtilities.CreateInstance<PersistentStreamProvider>(services, name, pubsubOptions, initOptions);
         }
     }
 }

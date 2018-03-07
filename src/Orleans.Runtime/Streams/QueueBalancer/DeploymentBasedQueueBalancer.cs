@@ -9,27 +9,11 @@ using Orleans.Runtime.Configuration;
 using Orleans.Providers;
 using Orleans.Hosting;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Streams
 {
-    public class StaticClusterConfigDeploymentBalancer : DeploymentBasedQueueBalancer
-    {
-        public StaticClusterConfigDeploymentBalancer(
-            ISiloStatusOracle siloStatusOracle,
-            IOptions<StaticClusterDeploymentOptions> options)
-            : base(siloStatusOracle, options.Value, true)
-        { }
-    }
-
-    public class DynamicClusterConfigDeploymentBalancer : DeploymentBasedQueueBalancer
-    {
-        public DynamicClusterConfigDeploymentBalancer(
-            ISiloStatusOracle siloStatusOracle,
-            IOptions<StaticClusterDeploymentOptions> options)
-            : base(siloStatusOracle, options.Value, false)
-        { }
-    }
-
     /// <summary>
     /// DeploymentBasedQueueBalancer is a stream queue balancer that uses deployment information to
     /// help balance queue distribution.
@@ -44,13 +28,13 @@ namespace Orleans.Streams
         private readonly IDeploymentConfiguration deploymentConfig;
         private ReadOnlyCollection<QueueId> allQueues;
         private readonly ConcurrentDictionary<SiloAddress, bool> immatureSilos;
-        private readonly bool isFixed;
+        private readonly DeploymentBasedQueueBalancerOptions options;
         private bool isStarting;
 
         public DeploymentBasedQueueBalancer(
             ISiloStatusOracle siloStatusOracle,
             IDeploymentConfiguration deploymentConfig,
-            bool isFixed)
+            DeploymentBasedQueueBalancerOptions options)
         {
             if (siloStatusOracle == null)
             {
@@ -64,7 +48,7 @@ namespace Orleans.Streams
             this.siloStatusOracle = siloStatusOracle;
             this.deploymentConfig = deploymentConfig;
             immatureSilos = new ConcurrentDictionary<SiloAddress, bool>();
-            this.isFixed = isFixed;
+            this.options = options;
             isStarting = true;
 
             // register for notification of changes to silo status for any silo in the cluster
@@ -78,16 +62,20 @@ namespace Orleans.Streams
             }
         }
 
+        public static IStreamQueueBalancer Create(IServiceProvider services, string name)
+        {
+            var options = services.GetService<IOptionsSnapshot<DeploymentBasedQueueBalancerOptions>>().Get(name);
+            return ActivatorUtilities.CreateInstance<DeploymentBasedQueueBalancer>(services, options);
+        }
+
         public override Task Initialize(string strProviderName,
-            IStreamQueueMapper queueMapper,
-            TimeSpan siloMaturityPeriod)
+            IStreamQueueMapper queueMapper)
         {
             if (queueMapper == null)
             {
                 throw new ArgumentNullException("queueMapper");
             }
             this.allQueues = new ReadOnlyCollection<QueueId>(queueMapper.GetAllQueues().ToList());
-            this.siloMaturityPeriod = siloMaturityPeriod;
             NotifyAfterStart().Ignore();
             return Task.CompletedTask;
         }
@@ -150,7 +138,7 @@ namespace Orleans.Streams
         public override IEnumerable<QueueId> GetMyQueues()
         {
             BestFitBalancer<string, QueueId> balancer = GetBalancer();
-            bool useIdealDistribution = isFixed || isStarting;
+            bool useIdealDistribution = this.options.IsFixed || isStarting;
             Dictionary<string, List<QueueId>> distribution = useIdealDistribution
                 ? balancer.IdealDistribution
                 : balancer.GetDistribution(GetActiveSilos(siloStatusOracle, immatureSilos));
