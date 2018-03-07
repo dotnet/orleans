@@ -30,6 +30,7 @@ using Orleans.Versions;
 using Orleans.ApplicationParts;
 using Orleans.Configuration;
 using Orleans.Serialization;
+using static Orleans.Hosting.GrainServicesSiloBuilderExtensions;
 
 namespace Orleans.Runtime
 {
@@ -462,9 +463,8 @@ namespace Orleans.Runtime
             }
 
             // Load and init grain services before silo becomes active.
-            GrainServiceOptions grainServiceOptions = Services.GetRequiredService<IOptions<GrainServiceOptions>>().Value;
             await StartAsyncTaskWithPerfAnalysis("Init grain services",
-                () => CreateGrainServices(grainServiceOptions), stopWatch);
+                () => CreateGrainServices(), stopWatch);
 
             this.membershipOracleContext = (this.membershipOracle as SystemTarget)?.SchedulingContext ??
                                        this.fallbackScheduler.SchedulingContext;
@@ -557,35 +557,23 @@ namespace Orleans.Runtime
             if (logger.IsEnabled(LogLevel.Debug)) { logger.Debug("Silo.Start complete: System status = {0}", this.SystemStatus); }
         }
 
-        private async Task CreateGrainServices(GrainServiceOptions grainServiceOptions)
+        private async Task CreateGrainServices()
         {
-            foreach (KeyValuePair<string, short> serviceConfig in grainServiceOptions.GrainServices)
+            var grainServices = this.Services.GetServices<IGrainService>();
+            foreach(var grainService in grainServices)
             {
-                // Construct the Grain Service
-                var serviceType = System.Type.GetType(serviceConfig.Key);
-                if (serviceType == null)
-                {
-                    throw new Exception(String.Format("Cannot find Grain Service type {0} of with Service Id {1}", serviceConfig.Key, serviceConfig.Value));
-                }
-                
-                var grainServiceInterfaceType = serviceType.GetInterfaces().FirstOrDefault(x => x.GetInterfaces().Contains(typeof(IGrainService)));
-                if (grainServiceInterfaceType == null)
-                {
-                    throw new Exception(String.Format("Cannot find an interface on {0} which implements IGrainService", serviceConfig.Value));
-                }
-
-                var typeCode = GrainInterfaceUtils.GetGrainClassTypeCode(grainServiceInterfaceType);
-                var grainId = (IGrainIdentity)GrainId.GetGrainServiceGrainId(serviceConfig.Value, typeCode);
-                var grainService = (GrainService)ActivatorUtilities.CreateInstance(this.Services, serviceType, grainId);
-                RegisterSystemTarget(grainService);
-
-                await this.scheduler.QueueTask(() => grainService.Init(Services), grainService.SchedulingContext).WithTimeout(this.initTimeout, $"GrainService Initializing failed due to timeout {initTimeout}");
-                await this.scheduler.QueueTask(grainService.Start, grainService.SchedulingContext).WithTimeout(this.initTimeout, $"Starting GrainService failed due to timeout {initTimeout}");
-                if (this.logger.IsEnabled(LogLevel.Debug))
-                {
-                    logger.Debug(String.Format("{0} Grain Service with Id {1} started successfully.", serviceConfig.Key, serviceConfig.Value));
-                }
+                await RegisterGrainService(grainService);
             }
+        }
+        
+        private async Task RegisterGrainService(IGrainService service)
+        {
+            var grainService = (GrainService)service;
+            RegisterSystemTarget(grainService);
+
+            await this.scheduler.QueueTask(() => grainService.Init(Services), grainService.SchedulingContext).WithTimeout(this.initTimeout, $"GrainService Initializing failed due to timeout {initTimeout}");
+            await this.scheduler.QueueTask(grainService.Start, grainService.SchedulingContext).WithTimeout(this.initTimeout, $"Starting GrainService failed due to timeout {initTimeout}");
+            logger.Info($"Grain Service {service.GetType().FullName} started successfully.");
         }
 
         private void ConfigureThreadPoolAndServicePointSettings()

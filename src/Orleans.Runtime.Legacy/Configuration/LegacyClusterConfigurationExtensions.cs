@@ -9,6 +9,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
 using Orleans.Providers;
 using System.Collections.Generic;
+using Orleans.Services;
 
 namespace Orleans.Hosting
 {
@@ -231,20 +232,17 @@ namespace Orleans.Hosting
             });
 
             // add grain service configs as keyed services
-            short id = 0;
             foreach (IGrainServiceConfiguration grainServiceConfiguration in configuration.Globals.GrainServiceConfigurations.GrainServices.Values)
             {
-                services.AddSingletonKeyedService<long, IGrainServiceConfiguration>(id++, (sp, k) => grainServiceConfiguration);
+                var type = Type.GetType(grainServiceConfiguration.ServiceType);
+                services.AddSingletonKeyedService(type, (sp, k) => grainServiceConfiguration);
             }
+
             // populate grain service options
-            id = 0;
-            services.AddOptions<GrainServiceOptions>().Configure<GlobalConfiguration>((options, config) =>
+            foreach(IGrainServiceConfiguration grainServiceConfiguration in configuration.Globals.GrainServiceConfigurations.GrainServices.Values)
             {
-                foreach(IGrainServiceConfiguration grainServiceConfiguration in config.GrainServiceConfigurations.GrainServices.Values)
-                {
-                    options.GrainServices.Add(new KeyValuePair<string, short>(grainServiceConfiguration.ServiceType, id++));
-                }
-            });
+                services.AddSingleton<IGrainService>(sp => GrainServicesSiloBuilderExtensions.ConstructGrainService(Type.GetType(grainServiceConfiguration.ServiceType), sp));
+            }
 
             services.AddOptions<ConsistentRingOptions>().Configure<GlobalConfiguration>((options, config) =>
             {

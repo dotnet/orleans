@@ -1,28 +1,28 @@
-using System;
+﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Core;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Services;
 
 namespace Tester
 {
-    public class CustomGrainServiceClient : GrainServiceClient<ICustomGrainService>, ICustomGrainServiceClient
+    public class TestGrainServiceClient : GrainServiceClient<ITestGrainService>, ITestGrainServiceClient
     {
-        public CustomGrainServiceClient(IServiceProvider serviceProvider) : base(serviceProvider)
+        public TestGrainServiceClient(IServiceProvider serviceProvider) : base(serviceProvider)
         {
         }
 
         public Task<string> GetHelloWorldUsingCustomService()
         {
             return GrainService.GetHelloWorldUsingCustomService(CallingGrainReference);
-        }
-
-        public Task<string> GetServiceConfigProperty(string propertyName)
-        {
-            return GrainService.GetServiceConfigProperty(propertyName);
         }
 
         public Task<bool> HasStarted()
@@ -39,16 +39,22 @@ namespace Tester
         {
             return GrainService.HasInit();
         }
+
+        public Task<string> GetServiceConfigProperty()
+        {
+            return GrainService.GetServiceConfigProperty();
+        }
     }
 
-    public class CustomGrainService : GrainService, ICustomGrainService
+    public class TestGrainService : GrainService, ITestGrainService
     {
         private readonly IGrainIdentity id;
-        private IGrainServiceConfiguration config;
+        private TestGrainServiceOptions config;
 
-        public CustomGrainService(IGrainIdentity id, Silo silo, ILoggerFactory loggerFactory) : base(id, silo, loggerFactory)
+        public TestGrainService(IGrainIdentity id, Silo silo, ILoggerFactory loggerFactory, IOptions<TestGrainServiceOptions> options) : base(id, silo, loggerFactory)
         {
             this.id = id;
+            this.config = options.Value;
         }
 
         private bool started = false;
@@ -58,8 +64,6 @@ namespace Tester
         public async override Task Init(IServiceProvider serviceProvider)
         {
             await base.Init(serviceProvider);
-            long configKey = this.id.GetPrimaryKeyLong(out string ignore);
-            this.config = serviceProvider.GetRequiredServiceByKey<long,IGrainServiceConfiguration>(configKey);
             init = true;
         }
 
@@ -71,12 +75,7 @@ namespace Tester
 
         public Task<string> GetHelloWorldUsingCustomService(GrainReference reference)
         {
-            return Task.FromResult("Hello World from Grain Service");
-        }
-
-        public Task<string> GetServiceConfigProperty(string propertyName)
-        {
-            return Task.FromResult(this.config.Properties[propertyName]);
+            return Task.FromResult("Hello World from Test Grain Service");
         }
 
         protected override Task StartInBackground()
@@ -99,5 +98,26 @@ namespace Tester
         {
             return Task.FromResult(init);
         }
+
+        public Task<string> GetServiceConfigProperty()
+        {
+            return Task.FromResult(config.ConfigProperty);
+        }
+    }
+
+    public static class TestGrainServicesSiloBuilderExtensions
+    {
+        public static ISiloHostBuilder AddTestGrainService(this ISiloHostBuilder builder, string configProperty)
+        {
+            return builder.AddGrainService<TestGrainService>()
+                .ConfigureServices(services => services
+                    .AddSingleton<ITestGrainServiceClient, TestGrainServiceClient>()
+                    .AddOptions<TestGrainServiceOptions>().Configure( o => o.ConfigProperty = configProperty));
+        }
+    }
+
+    public class TestGrainServiceOptions
+    {
+        public string ConfigProperty { get; set; }
     }
 }
