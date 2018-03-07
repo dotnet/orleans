@@ -7,7 +7,6 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
-using Orleans.Runtime.Scheduler;
 using Orleans.Providers;
 using System.Collections.Generic;
 
@@ -54,7 +53,6 @@ namespace Orleans.Hosting
         {
             string siloName = Silo.PrimarySiloName;
             builder.Configure<SiloOptions>(options => options.SiloName = siloName);
-            ISiloHostBuilder temp = builder;
             return builder.UseConfiguration(ClusterConfiguration.LocalhostPrimarySilo(siloPort, gatewayPort));
         }
 

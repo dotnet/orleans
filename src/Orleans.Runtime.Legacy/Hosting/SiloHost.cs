@@ -102,10 +102,8 @@ namespace Orleans.Runtime.Host
             try
             {
                 if (!this.ConfigLoaded) LoadOrleansConfig();
-                string siloName = this.Name;
-                SiloHostBuilder tempQualifier = new SiloHostBuilder();
-                tempQualifier.Configure<SiloOptions>(options => options.SiloName = siloName);
-                var builder = tempQualifier
+                var builder = new SiloHostBuilder()
+                    .Configure<SiloOptions>(options => options.SiloName = this.Name)
                     .UseConfiguration(this.Config);
 
                 if (!string.IsNullOrWhiteSpace(this.Config.Defaults.StartupTypeName))
