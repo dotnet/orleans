@@ -39,10 +39,7 @@ namespace Orleans.TestingHost
         {
             public override void Configure(ISiloHostBuilder hostBuilder)
             {
-                hostBuilder.ConfigureServices((context, services) =>
-                {
-                    services.AddLegacyClusterConfigurationSupport(this.ClusterConfiguration);
-                });
+                hostBuilder.AddLegacyClusterConfigurationSupport(this.ClusterConfiguration);
             }
         }
 

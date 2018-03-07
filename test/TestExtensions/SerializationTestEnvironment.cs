@@ -64,7 +64,7 @@ namespace TestExtensions
 
         internal IInternalGrainFactory InternalGrainFactory => this.RuntimeClient.InternalGrainFactory;
 
-        internal IServiceProvider Services => this.RuntimeClient.ServiceProvider;
+        internal IServiceProvider Services => this.Client.ServiceProvider;
 
         public SerializationManager SerializationManager => this.RuntimeClient.ServiceProvider.GetRequiredService<SerializationManager>();
         

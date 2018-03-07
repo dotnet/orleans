@@ -172,7 +172,7 @@ namespace Orleans.TestingHost
             {
                 var primarySiloEndPoint = new IPEndPoint(IPAddress.Loopback, int.Parse(context.Configuration[nameof(TestSiloSpecificOptions.PrimarySiloPort)]));
 
-                services.Configure<DevelopmentMembershipOptions>(options => options.PrimarySiloEndpoint = primarySiloEndPoint);
+                services.Configure<DevelopmentClusterMembershipOptions>(options => options.PrimarySiloEndpoint = primarySiloEndPoint);
                 services
                     .AddSingleton<GrainBasedMembershipTable>()
                     .AddFromExisting<IMembershipTable, GrainBasedMembershipTable>();

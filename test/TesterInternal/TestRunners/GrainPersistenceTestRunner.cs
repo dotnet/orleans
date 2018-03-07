@@ -1,14 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.TestingHost;
-using Tester;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Xunit.Abstractions;
@@ -17,7 +14,7 @@ namespace TestExtensions.Runners
 {
     public class GrainPersistenceTestsRunner : OrleansTestingBase
     {
-        private Guid serviceID;
+        private readonly Guid serviceId;
         private readonly ITestOutputHelper output;
         protected TestCluster HostedCluster { get; private set; }
         protected readonly ILogger logger;
@@ -27,7 +24,7 @@ namespace TestExtensions.Runners
             this.logger = fixture.Logger;
             HostedCluster = fixture.HostedCluster;
             GrainFactory = fixture.GrainFactory;
-            this.serviceID = serviceId;
+            this.serviceId = serviceId;
         }
 
         public IGrainFactory GrainFactory { get; }
@@ -50,6 +47,7 @@ namespace TestExtensions.Runners
             val = await grain.GetValue();
             Assert.Equal(2, val);  // "Value after Delete + New Write"
         }
+
         [Fact]
         public async Task Grain_GrainStorage_Read()
         {
@@ -60,6 +58,7 @@ namespace TestExtensions.Runners
 
             Assert.Equal(0, val);  // "Initial value"
         }
+
         [Fact]
         public async Task Grain_GuidKey_GrainStorage_Read_Write()
         {
@@ -82,6 +81,7 @@ namespace TestExtensions.Runners
 
             Assert.Equal(2, val);  // "Value after Re-Read"
         }
+
         [Fact]
         public async Task Grain_LongKey_GrainStorage_Read_Write()
         {
@@ -104,6 +104,7 @@ namespace TestExtensions.Runners
 
             Assert.Equal(2, val);  // "Value after Re-Read"
         }
+
         [Fact]
         public async Task Grain_LongKeyExtended_GrainStorage_Read_Write()
         {
@@ -134,6 +135,7 @@ namespace TestExtensions.Runners
             string extKeyValue = await grain.GetExtendedKeyValue();
             Assert.Equal(extKey, extKeyValue);  // "Extended Key"
         }
+
         [Fact]
         public async Task Grain_GuidKeyExtended_GrainStorage_Read_Write()
         {
@@ -164,6 +166,7 @@ namespace TestExtensions.Runners
             string extKeyValue = await grain.GetExtendedKeyValue();
             Assert.Equal(extKey, extKeyValue);  // "Extended Key"
         }
+
         [Fact]
         public async Task Grain_Generic_GrainStorage_Read_Write()
         {
@@ -187,6 +190,31 @@ namespace TestExtensions.Runners
 
             Assert.Equal(2, val);  // "Value after Re-Read"
         }
+
+        [Fact]
+        public async Task Grain_NestedGeneric_GrainStorage_Read_Write()
+        {
+            long id = random.Next();
+
+            IGrainStorageGenericGrain<List<int>> grain = this.GrainFactory.GetGrain<IGrainStorageGenericGrain<List<int>>>(id);
+
+            var val = await grain.GetValue();
+
+            Assert.Null(val);  // "Initial value"
+
+            await grain.DoWrite(new List<int> { 1 });
+            val = await grain.GetValue();
+            Assert.Equal(new List<int> { 1 }, val);  // "Value after Write-1"
+
+            await grain.DoWrite(new List<int> { 1, 2 });
+            val = await grain.GetValue();
+            Assert.Equal(new List<int> { 1, 2 }, val);  // "Value after Write-2"
+
+            val = await grain.DoRead();
+
+            Assert.Equal(new List<int> { 1, 2 }, val);  // "Value after Re-Read"
+        }
+
         [Fact]
         public async Task Grain_Generic_GrainStorage_DiffTypes()
         {
@@ -255,9 +283,9 @@ namespace TestExtensions.Runners
         [Fact]
         public async Task Grain_GrainStorage_SiloRestart()
         {
-            var initialServiceId = serviceID;
+            var initialServiceId = this.serviceId;
 
-            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.Options.ClusterId, serviceID);
+            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.Options.ClusterId, this.serviceId);
 
             Guid id = Guid.NewGuid();
             IGrainStorageTestGrain grain = this.GrainFactory.GetGrain<IGrainStorageTestGrain>(id);

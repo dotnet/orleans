@@ -29,11 +29,11 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task<IMembershipTableGrain> GetMembershipTableGrain()
         {
-            var options = this.serviceProvider.GetRequiredService<IOptions<DevelopmentMembershipOptions>>().Value;
+            var options = this.serviceProvider.GetRequiredService<IOptions<DevelopmentClusterMembershipOptions>>().Value;
             if (options.PrimarySiloEndpoint == null)
             {
                 throw new OrleansConfigurationException(
-                    $"{nameof(DevelopmentMembershipOptions)}.{nameof(options.PrimarySiloEndpoint)} must be set when using development clustering.");
+                    $"{nameof(DevelopmentClusterMembershipOptions)}.{nameof(options.PrimarySiloEndpoint)} must be set when using development clustering.");
             }
 
             var siloDetails = this.serviceProvider.GetService<ILocalSiloDetails>();
