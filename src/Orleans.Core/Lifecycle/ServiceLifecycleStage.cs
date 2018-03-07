@@ -38,8 +38,9 @@ namespace Orleans
 
         /// <summary>
         /// Service will be active after this step.
-        /// It should only be used by the memebrship oracle, no
-        /// other component should run at this stage
+        /// It should only be used by the memebrship oracle 
+        /// and the gateway, no other component should run
+        /// at this stage
         /// </summary>
         public const int BecomeActive = Active-1;
 
