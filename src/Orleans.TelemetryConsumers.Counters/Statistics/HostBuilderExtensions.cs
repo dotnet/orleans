@@ -28,7 +28,10 @@ namespace Orleans.Statistics
         /// </summary>
         public static IClientBuilder UsePerfCounterEnvironmentStatistics(this IClientBuilder builder)
         {
-            return builder.ConfigureServices(services => services.AddSingleton<IHostEnvironmentStatistics, PerfCounterEnvironmentStatistics>());
+            return builder.ConfigureServices(services => 
+                services
+                    .AddSingleton<IHostEnvironmentStatistics, PerfCounterEnvironmentStatistics>()
+                    .AddFromExisting<ILifecycleParticipant<IClusterClientLifecycle>, PerfCounterEnvironmentStatistics>());
         }
     }
 }
