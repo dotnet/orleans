@@ -241,7 +241,7 @@ namespace Orleans.Hosting
             // populate grain service options
             foreach(IGrainServiceConfiguration grainServiceConfiguration in configuration.Globals.GrainServiceConfigurations.GrainServices.Values)
             {
-                services.AddSingleton<IGrainService>(sp => GrainServicesSiloBuilderExtensions.ConstructGrainService(Type.GetType(grainServiceConfiguration.ServiceType), sp));
+                services.AddGrainService(Type.GetType(grainServiceConfiguration.ServiceType));
             }
 
             services.AddOptions<ConsistentRingOptions>().Configure<GlobalConfiguration>((options, config) =>
