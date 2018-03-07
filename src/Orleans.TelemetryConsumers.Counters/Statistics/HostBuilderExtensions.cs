@@ -1,7 +1,9 @@
 #define LOG_MEMORY_PERF_COUNTERS
 
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.Runtime;
 
 namespace Orleans.Statistics
 {
@@ -12,7 +14,10 @@ namespace Orleans.Statistics
         /// </summary>
         public static ISiloHostBuilder UsePerfCounterEnvironmentStatistics(this ISiloHostBuilder builder)
         {
-            return builder.ConfigureServices(services => services.AddSingleton<IHostEnvironmentStatistics, PerfCounterEnvironmentStatistics>());
+            return builder.ConfigureServices(services =>
+                services
+                    .AddSingleton<IHostEnvironmentStatistics, PerfCounterEnvironmentStatistics>()
+                    .AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, PerfCounterEnvironmentStatistics>());
         }
     }
 
