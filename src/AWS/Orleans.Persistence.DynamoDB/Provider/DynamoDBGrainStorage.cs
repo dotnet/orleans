@@ -61,7 +61,7 @@ namespace Orleans.Storage
 
         public void Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe(this.options.InitStage, Init, Close);
+            lifecycle.Subscribe(OptionFormattingUtilities.Name<DynamoDBGrainStorage>(this.name), this.options.InitStage, Init, Close);
         }
 
         /// <summary> Initialization function for this storage provider. </summary>

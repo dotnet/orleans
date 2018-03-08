@@ -487,7 +487,7 @@ namespace Orleans.Storage
 
         public void Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe(this.options.InitStage, Init, Close);
+            lifecycle.Subscribe(OptionFormattingUtilities.Name<AzureTableGrainStorage>(this.name), this.options.InitStage, Init, Close);
         }
     }
 
