@@ -83,6 +83,7 @@
     <ConsulVersion>0.7.2.3</ConsulVersion>
     <GoogleCloudPubSubV1Version>1.0.0-beta13</GoogleCloudPubSubV1Version>
     <GoogleProtobufVersion>3.4.0</GoogleProtobufVersion>
+    <ProtobufNetVersion>2.3.7</ProtobufNetVersion>
     <MySqlDataVersion>6.9.9</MySqlDataVersion>
     <NewRelicAgentApiVersion>5.10.59.0</NewRelicAgentApiVersion>
     <NewtonsoftJsonVersion>10.0.3</NewtonsoftJsonVersion>
