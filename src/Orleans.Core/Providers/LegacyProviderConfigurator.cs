@@ -95,7 +95,7 @@ namespace Orleans.Providers
             public virtual void Participate(TLifecycle lifecycle)
             {
                 this.initStage = this.config.GetIntProperty(LegacyProviderConfigurator.InitStageName, this.defaultInitStage);
-                lifecycle.Subscribe($"LegacyProvider-{typeof(TService).FullName}-{config.Type}-{config.Name}", this.initStage, this.Init, this.ProviderClose);
+                lifecycle.Subscribe(this.initStage, this.Init, this.ProviderClose);
 
             }
 

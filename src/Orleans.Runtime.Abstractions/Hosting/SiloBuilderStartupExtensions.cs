@@ -110,7 +110,7 @@ namespace Orleans.Hosting
             /// <inheritdoc />
             public void Participate(ISiloLifecycle lifecycle)
             {
-                lifecycle.Subscribe<StartupTask>(
+                lifecycle.Subscribe(
                     this.stage,
                     cancellation => this.startupTask(this.serviceProvider, cancellation));
             }

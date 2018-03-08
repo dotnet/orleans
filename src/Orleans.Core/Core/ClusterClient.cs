@@ -41,7 +41,7 @@ namespace Orleans
         public ClusterClient(OutsideRuntimeClient runtimeClient, ILoggerFactory loggerFactory, IOptions<ClientMessagingOptions> clientMessagingOptions)
         {
             this.runtimeClient = runtimeClient;
-            this.clusterClientLifecycle = new ClusterClientLifecycle(loggerFactory.CreateLogger<LifecycleSubject>());
+            this.clusterClientLifecycle = new ClusterClientLifecycle(loggerFactory);
 
             //set PropagateActivityId flag from node cofnig
             RequestContext.PropagateActivityId = clientMessagingOptions.Value.PropagateActivityId;

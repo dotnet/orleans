@@ -54,11 +54,11 @@ namespace Orleans.LogConsistency
         public override void Participate(IGrainLifecycle lifecycle)
         {
             base.Participate(lifecycle);
-            lifecycle.Subscribe<ClientOptionsLogger>(GrainLifecycleStage.SetupState, OnSetupState);
+            lifecycle.Subscribe(GrainLifecycleStage.SetupState, OnSetupState);
             if(this is ILogConsistencyProtocolParticipant)
             {
-                lifecycle.Subscribe<LogConsistentGrain<TView>>(GrainLifecycleStage.Activate - 1, PreActivate);
-                lifecycle.Subscribe<LogConsistentGrain<TView>>(GrainLifecycleStage.Activate + 1, PostActivate);
+                lifecycle.Subscribe(GrainLifecycleStage.Activate - 1, PreActivate);
+                lifecycle.Subscribe(GrainLifecycleStage.Activate + 1, PostActivate);
             }
         }
 
