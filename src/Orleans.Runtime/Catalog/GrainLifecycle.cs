@@ -3,9 +3,9 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
-    internal class GrainLifecycle : LifecycleSubject, IGrainLifecycle
+    internal class GrainLifecycle : LifecycleObservable, IGrainLifecycle
     {
-        public GrainLifecycle(ILogger<LifecycleSubject> logger) : base(logger)
+        public GrainLifecycle(ILoggerFactory loggerFactory) : base(loggerFactory)
         {
         }
     }

@@ -3,9 +3,9 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans
 {
-    internal class ClusterClientLifecycle : LifecycleSubject, IClusterClientLifecycle
+    internal class ClusterClientLifecycle : LifecycleObservable, IClusterClientLifecycle
     {
-        public ClusterClientLifecycle(ILogger<LifecycleSubject> logger) : base(logger)
+        public ClusterClientLifecycle(ILoggerFactory loggerFactory) : base(loggerFactory)
         {
         }
     }

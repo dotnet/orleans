@@ -77,7 +77,7 @@ namespace Orleans.Runtime
         private readonly List<IHealthCheckParticipant> healthCheckParticipants = new List<IHealthCheckParticipant>();
         private readonly object lockable = new object();
         private readonly GrainFactory grainFactory;
-        private readonly ISiloLifecycleSubject siloLifecycle;
+        private readonly SiloLifecycle siloLifecycle;
         private List<GrainService> grainServices = new List<GrainService>();
 
         private readonly ILoggerFactory loggerFactory;
@@ -229,12 +229,13 @@ namespace Orleans.Runtime
             StringValueStatistic.FindOrCreate(StatisticNames.SILO_START_TIME,
                 () => LogFormatter.PrintDate(startTime)); // this will help troubleshoot production deployment when looking at MDS logs.
 
-            this.siloLifecycle = this.Services.GetRequiredService<ISiloLifecycleSubject>();
+            var fullSiloLifecycle = this.Services.GetRequiredService<SiloLifecycle>();
+            this.siloLifecycle = fullSiloLifecycle;
             // register all lifecycle participants
             IEnumerable<ILifecycleParticipant<ISiloLifecycle>> lifecycleParticipants = this.Services.GetServices<ILifecycleParticipant<ISiloLifecycle>>();
             foreach(ILifecycleParticipant<ISiloLifecycle> participant in lifecycleParticipants)
             {
-                participant?.Participate(this.siloLifecycle);
+                participant?.Participate(fullSiloLifecycle);
             }
             // register all named lifecycle participants
             IKeyedServiceCollection<string, ILifecycleParticipant<ISiloLifecycle>> namedLifecycleParticipantCollection = this.Services.GetService<IKeyedServiceCollection<string,ILifecycleParticipant<ISiloLifecycle>>>();
@@ -242,11 +243,11 @@ namespace Orleans.Runtime
                 ?.GetServices(this.Services)
                 ?.Select(s => s.GetService(this.Services)))
             {
-                participant?.Participate(this.siloLifecycle);
+                participant?.Participate(fullSiloLifecycle);
             }
 
             // add self to lifecycle
-            this.Participate(this.siloLifecycle);
+            this.Participate(fullSiloLifecycle);
 
             logger.Info(ErrorCode.SiloInitializingFinished, "-------------- Started silo {0}, ConsistentHashCode {1:X} --------------", SiloAddress.ToLongString(), SiloAddress.GetConsistentHashCode());
         }
@@ -878,11 +879,11 @@ namespace Orleans.Runtime
 
         private void Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeInitialize, (ct) => Task.Run(() => OnRuntimeInitializeStart(ct)), (ct) => Task.Run(() => OnRuntimeInitializeStop(ct)));
-            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeServices, (ct) => Task.Run(() => OnRuntimeServicesStart(ct)), (ct) => Task.Run(() => OnRuntimeServicesStop(ct)));
-            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeGrainServices, (ct) => Task.Run(() => OnRuntimeGrainServicesStart(ct)));
-            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.BecomeActive, (ct) => Task.Run(() => OnBecomeActiveStart(ct)), (ct) => Task.Run(() => OnBecomeActiveStop(ct)));
-            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.Active, (ct) => Task.Run(() => OnActiveStart(ct)), (ct) => Task.Run(() => OnActiveStop(ct)));
+            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeInitialize, (ct) => Task.Run(() => OnRuntimeInitializeStart(ct)), (ct) => Task.Run(() => OnRuntimeInitializeStop(ct)));
+            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeServices, (ct) => Task.Run(() => OnRuntimeServicesStart(ct)), (ct) => Task.Run(() => OnRuntimeServicesStop(ct)));
+            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeGrainServices, (ct) => Task.Run(() => OnRuntimeGrainServicesStart(ct)));
+            lifecycle.Subscribe(ServiceLifecycleStage.BecomeActive, (ct) => Task.Run(() => OnBecomeActiveStart(ct)), (ct) => Task.Run(() => OnBecomeActiveStop(ct)));
+            lifecycle.Subscribe(ServiceLifecycleStage.Active, (ct) => Task.Run(() => OnActiveStart(ct)), (ct) => Task.Run(() => OnActiveStop(ct)));
         }
     }
 

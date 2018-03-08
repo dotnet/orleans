@@ -167,7 +167,7 @@ namespace AWSUtils.Tests.StorageTests
         private async Task<DynamoDBGrainStorage> InitDynamoDBGrainStorage(DynamoDBStorageOptions options)
         {
             DynamoDBGrainStorage store = ActivatorUtilities.CreateInstance<DynamoDBGrainStorage>(this.providerRuntime.ServiceProvider, options);
-            ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(this.providerRuntime.ServiceProvider);
+            SiloLifecycle lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycle>(this.providerRuntime.ServiceProvider);
             store.Participate(lifecycle);
             await lifecycle.OnStart();
             return store;
