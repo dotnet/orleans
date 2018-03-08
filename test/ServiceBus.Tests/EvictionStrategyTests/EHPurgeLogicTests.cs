@@ -41,8 +41,9 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             //an mock eh settings
             this.ehSettings = new EventHubPartitionSettings
             {
-                Hub = new EventHubStreamOptions(),
-                Partition = "MockPartition"
+                Hub = new EventHubOptions(),
+                Partition = "MockPartition",
+                ReceiverOptions = new EventHubReceiverOptions()
             };
 
             //set up cache pressure monitor and purge predicate

@@ -57,19 +57,23 @@ namespace ServiceBus.Tests.StreamingTests
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddEventHubStreams(StreamProviderName,
-                        options =>
-                        {
-                            options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
-                            options.ConsumerGroup = EHConsumerGroup;
-                            options.Path = EHPath;
-                            options.BalancerType = StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer;
-                            options.PubSubType = StreamPubSubType.ImplicitOnly;
-                            options.CheckpointConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            options.CheckpointTableName = EHCheckpointTable;
-                            options.CheckpointNamespace = CheckpointNamespace;
-                            options.CheckpointPersistInterval = TimeSpan.FromSeconds(1);
-                        })
+                        .AddEventHubStreams(StreamProviderName)
+                        .ConfigureEventHub(ob => ob.Configure(options =>
+                          {
+                              options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                              options.ConsumerGroup = EHConsumerGroup;
+                              options.Path = EHPath;
+                          }))
+                        .UseEventHubCheckpointer(ob => ob.Configure(options =>
+                          {
+                              options.CheckpointConnectionString = TestDefaultConfiguration.DataConnectionString;
+                              options.CheckpointTableName = EHCheckpointTable;
+                              options.CheckpointNamespace = CheckpointNamespace;
+                              options.CheckpointPersistInterval = TimeSpan.FromSeconds(1);
+                          }))
+                        .UseDynamicClusterConfigDeploymentBalancer()
+                        .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                    hostBuilder
                         .AddMemoryGrainStorageAsDefault();
                 }
             }
@@ -78,13 +82,14 @@ namespace ServiceBus.Tests.StreamingTests
             {
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
                 {
-                    clientBuilder.AddEventHubStreams(StreamProviderName, options =>
+                    clientBuilder.AddEventHubStreams(StreamProviderName)
+                        .ConfigureEventHub(ob=>ob.Configure( options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
                             options.ConsumerGroup = EHConsumerGroup;
                             options.Path = EHPath;
-                            options.PubSubType = StreamPubSubType.ImplicitOnly;
-                        });
+                        }))
+                        .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
                 }
             }
         }

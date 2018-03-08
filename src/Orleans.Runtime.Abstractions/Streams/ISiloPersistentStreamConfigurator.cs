@@ -48,19 +48,4 @@ namespace Orleans.Streams
             return configurator.ConfigureComponent<TOptions, IStreamQueueBalancer>(configureOptions, factory);
         }
     }
-
-    public interface IClusterClientPersistentStreamConfigurator
-    {
-        IClusterClientPersistentStreamConfigurator Configure<TOptions>(Action<OptionsBuilder<TOptions>> configureOptions)
-        where TOptions : class, new();
-    }
-
-    public static class ClusterClientPersistentStreamConfiguratorExtensions
-    {
-        public static IClusterClientPersistentStreamConfigurator ConfigureInitialization(this IClusterClientPersistentStreamConfigurator configurator, Action<OptionsBuilder<StreamInitializationOptions>> configureOptions)
-        {
-            configurator.Configure<StreamInitializationOptions>(configureOptions);
-            return configurator;
-        }
-    }
 }

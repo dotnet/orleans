@@ -53,12 +53,12 @@ namespace AWSUtils.Tests.Streaming
         [SkippableFact]
         public async Task SendAndReceiveFromSQS()
         {
-            var options = new SqsStreamOptions
+            var options = new SqsOptions
             {
                 ConnectionString = AWSTestConstants.DefaultSQSConnectionString,
                 ClusterId = this.clusterId
             };
-            var adapterFactory = new SQSAdapterFactory(SQS_STREAM_PROVIDER_NAME, options, null, Options.Create(new ClusterOptions()), null, null);
+            var adapterFactory = new SQSAdapterFactory(SQS_STREAM_PROVIDER_NAME, options, new HashRingStreamQueueMapperOptions(), new SimpleQueueCacheOptions(), null, Options.Create(new ClusterOptions()), null, null);
             adapterFactory.Init();
             await SendAndReceiveFromQueueAdapter(adapterFactory);
         }

@@ -41,9 +41,8 @@ namespace Tester.StreamingTests
 
             private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder) => hostBuilder
-                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName)
-                     .AddMemoryGrainStorage("PubSubStore");
+                public void Configure(ISiloHostBuilder hostBuilder)=> hostBuilder.AddMemoryGrainStorage("PubSubStore")
+                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName);
             }
 
             private static void AdjustConfig(ClusterConfiguration config)

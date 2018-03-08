@@ -61,11 +61,11 @@ namespace Tester.AzureUtils.Lease
             {
                 hostBuilder
                     .ConfigureServices(ConfigureServices)
-                    .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, options =>
-                     {
-                         options.TotalQueueCount = totalQueueCount;
-                         options.BalancerType = StreamQueueBalancerType.ClusterConfigDeploymentLeaseBasedBalancer;
-                     })
+                    .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName)
+                    .ConfigureQueueMapper(totalQueueCount)
+                    .UseClusterConfigDeploymentLeaseBasedBalancer();
+
+                hostBuilder
                     .AddMemoryGrainStorage("PubSubStore");
             }
         }

@@ -12,7 +12,7 @@ namespace Orleans.Streams
 
         public HashRingBasedStreamQueueMapper(HashRingStreamQueueMapperOptions options, string queueNamePrefix)
         {
-            numQueues = options.NumQueues;
+            numQueues = options.TotalQueueCount;
             var queueIds = new List<QueueId>(numQueues);
             if (numQueues == 1)
             {

@@ -112,7 +112,7 @@ namespace Orleans.ServiceBus.Providers
             this.SerializationManager = serializationManager ?? throw new ArgumentNullException(nameof(serializationManager));
             this.telemetryProducer = telemetryProducer ?? throw new ArgumentNullException(nameof(telemetryProducer));
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
-            this.checkpointerFactory = checkpointerFactory;
+            this.checkpointerFactory = checkpointerFactory ?? throw new ArgumentNullException(nameof(checkpointerFactory));
         }
 
         public virtual void Init()
@@ -296,8 +296,6 @@ namespace Orleans.ServiceBus.Providers
             var cacheOptions = services.GetOptionsByName<EventHubStreamCacheOptions>(name);
             var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
             var checkpointerFactory = services.GetServiceByName<IStreamQueueCheckpointerFactory>(name);
-            if (checkpointerFactory == null)
-                checkpointerFactory = new EventHubCheckpointerFactory(name, services);
             var factory = ActivatorUtilities.CreateInstance<EventHubAdapterFactory>(services, name, ehOptions, receiverOptions, cacheOptions, statisticOptions, checkpointerFactory);
             factory.Init();
             return factory;

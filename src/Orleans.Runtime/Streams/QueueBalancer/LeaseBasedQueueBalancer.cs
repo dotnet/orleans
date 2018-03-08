@@ -115,10 +115,10 @@ namespace Orleans.Streams
             this.logger = loggerFactory.CreateLogger<LeaseBasedQueueBalancer>();
         }
 
-        public static IStreamQueueBalancer Create(IServiceProvider services, string name)
+        public static IStreamQueueBalancer Create(IServiceProvider services, string name, IDeploymentConfiguration deploymentConfiguration)
         {
             var options = services.GetService<IOptionsSnapshot<LeaseBasedQueueBalancerOptions>>().Get(name);
-            return ActivatorUtilities.CreateInstance<LeaseBasedQueueBalancer>(services, options);
+            return ActivatorUtilities.CreateInstance<LeaseBasedQueueBalancer>(services, options, deploymentConfiguration);
         }
         /// <inheritdoc/>
         public override Task Initialize(string strProviderName, IStreamQueueMapper queueMapper)

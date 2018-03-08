@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Configuration;
 using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
@@ -49,7 +50,9 @@ namespace Tester.TestStreamProviders.Controllable
 
         public IStreamQueueMapper GetStreamQueueMapper()
         {
-            return new HashRingBasedStreamQueueMapper(0, Name);
+            var options = new HashRingStreamQueueMapperOptions();
+            options.TotalQueueCount = 0;
+            return new HashRingBasedStreamQueueMapper(options, Name);
         }
 
         public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)

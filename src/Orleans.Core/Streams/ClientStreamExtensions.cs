@@ -14,12 +14,13 @@ namespace Orleans.Hosting
     /// </summary>
     public static class ClientStreamExtensions
     {
-        public static IClientBuilder AddPersistentStreams(
+        public static IClusterClientPersistentStreamConfigurator AddPersistentStreams(
             this IClientBuilder builder,
             string name,
             Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory)
         {
-            return builder.ConfigureServices(services => services.AddClusterClientPersistentStreams(name, adapterFactory));
+            builder.ConfigureServices(services => services.AddClusterClientPersistentStreams(name, adapterFactory));
+            return new ClusterClientPersistentStreamConfigurator(name, builder);
         }
         /// <summary>
         /// Configure silo to use persistent streams.

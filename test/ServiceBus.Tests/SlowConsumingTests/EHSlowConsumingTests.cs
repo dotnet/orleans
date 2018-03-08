@@ -44,13 +44,15 @@ namespace ServiceBus.Tests.SlowConsumingTests
             {
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
-                    hostBuilder.AddPersistentStreams<EventDataGeneratorStreamOptions>(StreamProviderName, EHStreamProviderWithCreatedCacheListAdapterFactory.Create, options =>
-                    {
-                        options.SlowConsumingMonitorPressureWindowSize = monitorPressureWindowSize;
-                        options.SlowConsumingMonitorFlowControlThreshold = flowControlThredhold;
-                        options.AveragingCachePressureMonitorFlowControlThreshold = null;
-                        options.BalancerType = StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer;
-                    })
+                    hostBuilder.AddPersistentStreams(StreamProviderName, EHStreamProviderWithCreatedCacheListAdapterFactory.Create)
+                        .Configure<EventHubStreamCacheOptions>(ob => ob.Configure(options =>
+                   {
+                       options.SlowConsumingMonitorPressureWindowSize = monitorPressureWindowSize;
+                       options.SlowConsumingMonitorFlowControlThreshold = flowControlThredhold;
+                       options.AveragingCachePressureMonitorFlowControlThreshold = null;
+                   }))
+                   .UseDynamicClusterConfigDeploymentBalancer();
+                    hostBuilder
                     .AddMemoryGrainStorage("PubSubStore");
                 }
             }

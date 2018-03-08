@@ -31,7 +31,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="logger"></param>
         /// <param name="monitor"></param>
         public AveragingCachePressureMonitor(ILogger logger, ICacheMonitor monitor=null)
-            :this(EventHubStreamOptions.DEFAULT_AVERAGING_CACHE_PRESSURE_MONITORING_THRESHOLD, logger, monitor)
+            :this(EventHubStreamCacheOptions.DEFAULT_AVERAGING_CACHE_PRESSURE_MONITORING_THRESHOLD, logger, monitor)
         { }
 
         /// <summary>

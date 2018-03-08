@@ -40,15 +40,11 @@ namespace UnitTests.StreamingTests
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddPersistentStreams<GeneratedStreamOptions>(StreamProviderName,
-                            GeneratorAdapterFactory.Create, options =>
-                            {
-                                options.TotalQueueCount = TotalQueueCount;
-                                options.BalancerType = StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer;
-                                options.PubSubType = StreamPubSubType.ImplicitOnly;
-                            })
-                        .ConfigureServices(services => services
-                            .ConfigureNamedOptionForLogging<GeneratedStreamOptions>(StreamProviderName));
+                        .AddPersistentStreams(StreamProviderName,
+                            GeneratorAdapterFactory.Create)
+                        .Configure<HashRingStreamQueueMapperOptions>(ob=>ob.Configure(options=>options.TotalQueueCount = TotalQueueCount))
+                        .UseDynamicClusterConfigDeploymentBalancer()
+                        .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
                 }
             }
         }

@@ -49,19 +49,25 @@ namespace ServiceBus.Tests.StreamingTests
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddEventHubStreams(StreamProviderName,
+                        .AddMemoryGrainStorage("PubSubStorage")
+                        .AddEventHubStreams(StreamProviderName)
+                        .ConfigureEventHub(ob => ob.Configure(
                         options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
                             options.ConsumerGroup = EHConsumerGroup;
                             options.Path = EHPath;
-                            options.BalancerType = StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer;
+                          
+                        }))
+                        .UseEventHubCheckpointer(ob=>ob.Configure(options=>
+                        {
                             options.CheckpointConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.CheckpointTableName = EHCheckpointTable;
                             options.CheckpointNamespace = CheckpointNamespace;
                             options.CheckpointPersistInterval = TimeSpan.FromSeconds(1);
-                        })
-                        .AddMemoryGrainStorage("PubSubStorage");
+                        }))
+                        .UseDynamicClusterConfigDeploymentBalancer();
+                        
                 }
             }
         }

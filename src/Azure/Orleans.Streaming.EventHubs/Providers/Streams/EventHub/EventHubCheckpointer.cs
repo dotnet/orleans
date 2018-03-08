@@ -10,18 +10,25 @@ namespace Orleans.ServiceBus.Providers
 {
     public class EventHubCheckpointerFactory : IStreamQueueCheckpointerFactory
     {
-        private IServiceProvider services;
+        private ILoggerFactory loggerFactory;
         private string providerName;
-        public EventHubCheckpointerFactory(string providerName, IServiceProvider services)
+        private EventHubCheckpointerOptions options;
+        public EventHubCheckpointerFactory(string providerName, EventHubCheckpointerOptions options, ILoggerFactory loggerFactory)
         {
-            this.services = services;
+            this.options = options;
+            this.loggerFactory = loggerFactory;
             this.providerName = providerName;
         }
 
         public Task<IStreamQueueCheckpointer<string>> Create(string partition)
         {
+            return EventHubCheckpointer.Create(options, providerName, partition, loggerFactory);
+        }
+
+        public static IStreamQueueCheckpointerFactory CreateFactory(IServiceProvider services, string providerName)
+        {
             var options = services.GetOptionsByName<EventHubCheckpointerOptions>(providerName);
-            return EventHubCheckpointer.Create(options, providerName, partition, services.GetService<ILoggerFactory>());
+            return ActivatorUtilities.CreateInstance<EventHubCheckpointerFactory>(services, providerName, options);
         }
     }
 

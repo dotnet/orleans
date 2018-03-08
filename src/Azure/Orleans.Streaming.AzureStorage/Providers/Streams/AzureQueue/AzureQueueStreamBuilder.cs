@@ -14,13 +14,13 @@ namespace Orleans.Streaming
         {
             this.siloBuilder
                 .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(AzureQueueAdapterFactory<>).Assembly))
-                .AddPersistentStreams(name, AzureQueueAdapterFactory<TDataAdapter>.Create)
                 .ConfigureServices(services =>
                 {
                     services.ConfigureNamedOptionForLogging<AzureQueueOptions>(name)
                         .ConfigureNamedOptionForLogging<SimpleQueueCacheOptions>(name)
                         .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name);
-                });
+                })
+                .AddPersistentStreams(name, AzureQueueAdapterFactory<TDataAdapter>.Create);
         }
 
         public SiloAzureQueueStreamConfigurator<TDataAdapter> ConfigureAzureQueue(Action<OptionsBuilder<AzureQueueOptions>> configureOptions)
@@ -36,7 +36,7 @@ namespace Orleans.Streaming
 
         public SiloAzureQueueStreamConfigurator<TDataAdapter> ConfigureQueueMapper(int numOfQueues = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
         {
-            this.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.NumQueues = numOfQueues));
+            this.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfQueues));
             return this;
         }
     }
@@ -48,9 +48,10 @@ namespace Orleans.Streaming
             : base(name, builder)
         {
             this.clientBuilder.ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(AzureQueueAdapterFactory<>).Assembly))
-                 .AddPersistentStreams(name, AzureQueueAdapterFactory<TDataAdapter>.Create)
-                .ConfigureServices(services =>
-                    services.ConfigureNamedOptionForLogging<AzureQueueOptions>(name));
+                 .ConfigureServices(services =>
+                    services.ConfigureNamedOptionForLogging<AzureQueueOptions>(name))
+                 .AddPersistentStreams(name, AzureQueueAdapterFactory<TDataAdapter>.Create);
+               
         }
 
         public ClusterClientAzureQueueStreamConfigurator<TDataAdapter> ConfigureAzureQueue(Action<OptionsBuilder<AzureQueueOptions>> configureOptions)

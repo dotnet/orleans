@@ -18,9 +18,10 @@ namespace Orleans.Providers
         {
             this.siloBuilder
                 .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(MemoryAdapterFactory<>).Assembly))
-                .AddPersistentStreams(name, MemoryAdapterFactory<TSerializer>.Create)
                 .ConfigureServices(services => services.ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name)
-                                .ConfigureNamedOptionForLogging<MemoryStreamCacheOptions>(name));
+                                .ConfigureNamedOptionForLogging<MemoryStreamCacheOptions>(name))
+                .AddPersistentStreams(name, MemoryAdapterFactory<TSerializer>.Create);
+                
         }
 
         public SiloMemoryStreamConfigurator<TSerializer> ConfigureCache(Action<OptionsBuilder<MemoryStreamCacheOptions>> configureOptions)
@@ -31,7 +32,7 @@ namespace Orleans.Providers
 
         public SiloMemoryStreamConfigurator<TSerializer> ConfigureQueueMapper(int numOfQueues = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
         {
-            this.Configure<HashRingStreamQueueMapperOptions>(ob=>ob.Configure(options => options.NumQueues = numOfQueues));
+            this.Configure<HashRingStreamQueueMapperOptions>(ob=>ob.Configure(options => options.TotalQueueCount = numOfQueues));
             return this;
         }
     }

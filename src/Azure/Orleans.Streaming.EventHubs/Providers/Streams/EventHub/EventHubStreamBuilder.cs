@@ -14,10 +14,10 @@ namespace Orleans.Streams
             : base(name, builder)
         {
             this.siloBuilder.ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(EventHubAdapterFactory).Assembly))
-                .AddPersistentStreams(this.name, EventHubAdapterFactory.Create)
                 .ConfigureServices(services => services.ConfigureNamedOptionForLogging<EventHubOptions>(name)
                     .ConfigureNamedOptionForLogging<EventHubReceiverOptions>(name)
-                    .ConfigureNamedOptionForLogging<EventHubStreamCacheOptions>(name));
+                    .ConfigureNamedOptionForLogging<EventHubStreamCacheOptions>(name))
+                .AddPersistentStreams(this.name, EventHubAdapterFactory.Create);
         }
 
         public SiloEventHubStreamConfigurator ConfigureCheckpointer<TOptions>(Action<OptionsBuilder<TOptions>> configureOptions, Func<IServiceProvider, string, IStreamQueueCheckpointerFactory> checkpointerFactoryBuilder)
@@ -52,8 +52,8 @@ namespace Orleans.Streams
            : base(name, builder)
         {
             this.clientBuilder.ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(EventHubAdapterFactory).Assembly))
-                .AddPersistentStreams(this.name, EventHubAdapterFactory.Create)
-                .ConfigureServices(services => services.ConfigureNamedOptionForLogging<EventHubOptions>(name));
+                .ConfigureServices(services => services.ConfigureNamedOptionForLogging<EventHubOptions>(name))
+                .AddPersistentStreams(this.name, EventHubAdapterFactory.Create);
         }
 
         public ClusterClientEventHubStreamConfigurator ConfigureEventHub(Action<OptionsBuilder<EventHubOptions>> configureOptions)

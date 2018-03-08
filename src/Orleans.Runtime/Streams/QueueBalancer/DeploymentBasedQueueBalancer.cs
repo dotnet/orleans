@@ -23,7 +23,6 @@ namespace Orleans.Streams
     /// </summary>
     public class DeploymentBasedQueueBalancer : QueueBalancerBase, ISiloStatusListener, IStreamQueueBalancer
     {
-        private TimeSpan siloMaturityPeriod;
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IDeploymentConfiguration deploymentConfig;
         private ReadOnlyCollection<QueueId> allQueues;
@@ -49,6 +48,7 @@ namespace Orleans.Streams
             this.deploymentConfig = deploymentConfig;
             immatureSilos = new ConcurrentDictionary<SiloAddress, bool>();
             this.options = options;
+
             isStarting = true;
 
             // register for notification of changes to silo status for any silo in the cluster
@@ -62,10 +62,10 @@ namespace Orleans.Streams
             }
         }
 
-        public static IStreamQueueBalancer Create(IServiceProvider services, string name)
+        public static IStreamQueueBalancer Create(IServiceProvider services, string name, IDeploymentConfiguration deploymentConfiguration)
         {
             var options = services.GetService<IOptionsSnapshot<DeploymentBasedQueueBalancerOptions>>().Get(name);
-            return ActivatorUtilities.CreateInstance<DeploymentBasedQueueBalancer>(services, options);
+            return ActivatorUtilities.CreateInstance<DeploymentBasedQueueBalancer>(services, options, deploymentConfiguration);
         }
 
         public override Task Initialize(string strProviderName,
@@ -82,7 +82,7 @@ namespace Orleans.Streams
         
         private async Task NotifyAfterStart()
         {
-            await Task.Delay(siloMaturityPeriod);
+            await Task.Delay(this.options.SiloMaturityPeriod);
             isStarting = false;
             await NotifyListeners();
         }
@@ -131,7 +131,7 @@ namespace Orleans.Streams
         private async Task RecordImmatureSilo(SiloAddress updatedSilo)
         {
             immatureSilos[updatedSilo] = true;      // record as immature
-            await Task.Delay(siloMaturityPeriod);
+            await Task.Delay(this.options.SiloMaturityPeriod);
             immatureSilos[updatedSilo] = false;     // record as mature
         }
 

@@ -38,15 +38,16 @@ namespace UnitTests.StreamingTests
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddPersistentStreams<GeneratedStreamOptions>(StreamProviderName,
-                            GeneratorAdapterFactory.Create, options =>
+                         .AddMemoryGrainStorageAsDefault()
+                        .AddMemoryGrainStorage("MemoryStore")
+                        .AddPersistentStreams(StreamProviderName,
+                            GeneratorAdapterFactory.Create)
+                        .Configure<HashRingStreamQueueMapperOptions>(ob=>ob.Configure(options =>
                             {
                                 options.TotalQueueCount = TotalQueueCount;
-                                options.BalancerType = StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer;
-                                options.PubSubType = StreamPubSubType.ImplicitOnly;
-                            })
-                         .AddMemoryGrainStorageAsDefault()
-                        .AddMemoryGrainStorage("MemoryStore");
+                            }))
+                        .UseDynamicClusterConfigDeploymentBalancer()
+                        .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
                 }
             }
         }

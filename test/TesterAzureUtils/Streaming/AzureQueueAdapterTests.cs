@@ -51,13 +51,15 @@ namespace Tester.AzureUtils.Streaming
         [SkippableFact, TestCategory("Functional"), TestCategory("Halo")]
         public async Task SendAndReceiveFromAzureQueue()
         {
-            var options = new AzureQueueStreamOptions
+            var options = new AzureQueueOptions
             {
                 ConnectionString = TestDefaultConfiguration.DataConnectionString,
                 ClusterId = this.clusterId,
                 MessageVisibilityTimeout = TimeSpan.FromSeconds(30)
             };
-            var adapterFactory = new AzureQueueAdapterFactory<AzureQueueDataAdapterV2>(AZURE_QUEUE_STREAM_PROVIDER_NAME, options, this.fixture.Services, this.fixture.Services.GetService<IOptions<ClusterOptions>>(), this.fixture.Services.GetRequiredService<SerializationManager>(), loggerFactory);
+            var adapterFactory = new AzureQueueAdapterFactory<AzureQueueDataAdapterV2>(AZURE_QUEUE_STREAM_PROVIDER_NAME, options,
+                new HashRingStreamQueueMapperOptions(), new SimpleQueueCacheOptions(), this.fixture.Services, this.fixture.Services.GetService<IOptions<ClusterOptions>>(), 
+                this.fixture.Services.GetRequiredService<SerializationManager>(), loggerFactory);
             adapterFactory.Init();
             await SendAndReceiveFromQueueAdapter(adapterFactory);
         }

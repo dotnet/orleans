@@ -2,40 +2,44 @@
 using Orleans.Runtime.Host;
 using System;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
-namespace Orleans.Streams.Azure
+namespace Orleans.Streams
 {
-    public class DynamicAzureDeploymentBalancer : DeploymentBasedQueueBalancer
+    public static class SiloPersistentStreamConfiguratorExtension
     {
-        public DynamicAzureDeploymentBalancer(
-            ISiloStatusOracle siloStatusOracle,
-            IServiceProvider serviceProvider,
-            ILoggerFactory loggerFactory)
-            : base(siloStatusOracle, new ServiceRuntimeWrapper(loggerFactory), false)
-        { }
-    }
+        public static ISiloPersistentStreamConfigurator UseDynamicAzureDeploymentBalancer(this ISiloPersistentStreamConfigurator configurator, 
+            TimeSpan? siloMaturityPeriod = null)
+        {
+            return configurator.ConfigureStreamQueueBalancer<DeploymentBasedQueueBalancerOptions>(options => options.Configure(op =>
+            {
+                op.IsFixed = false;
+                if (siloMaturityPeriod.HasValue)
+                    op.SiloMaturityPeriod = siloMaturityPeriod.Value;
+            }), (s,n) => DeploymentBasedQueueBalancer.Create(s,n,new ServiceRuntimeWrapper(s.GetService<ILoggerFactory>())));
+        }
 
-    public class StaticAzureDeploymentBalancer : DeploymentBasedQueueBalancer
-    {
-        public StaticAzureDeploymentBalancer(
-            ISiloStatusOracle siloStatusOracle,
-            IServiceProvider serviceProvider,
-            ILoggerFactory loggerFactory)
-            : base(siloStatusOracle, new ServiceRuntimeWrapper(loggerFactory), true)
-        { }
-    }
+        public static ISiloPersistentStreamConfigurator UseStaticAzureDeploymentBalancer(this ISiloPersistentStreamConfigurator configurator,
+           TimeSpan? siloMaturityPeriod = null)
+        {
+            return configurator.ConfigureStreamQueueBalancer<DeploymentBasedQueueBalancerOptions>(options => options.Configure(op =>
+            {
+                op.IsFixed = true;
+                if (siloMaturityPeriod.HasValue)
+                    op.SiloMaturityPeriod = siloMaturityPeriod.Value;
+            }), (s, n) => DeploymentBasedQueueBalancer.Create(s, n, new ServiceRuntimeWrapper(s.GetService<ILoggerFactory>())));
+        }
 
-    /// <summary>
-    ///  Stream queue balancer that uses Azure deployment information for load balancing. 
-    /// Requires silo running in Azure.
-    /// This balancer supports queue balancing in cluster auto-scale scenario, unexpected server failure scenario, and try to support ideal distribution 
-    /// </summary>
-    public class AzureDeploymentLeaseBasedBalancer : LeaseBasedQueueBalancer
-    {
-        public AzureDeploymentLeaseBasedBalancer(ISiloStatusOracle siloStatusOracle,
-            IServiceProvider serviceProvider, ILoggerFactory loggerFactory)
-            : base(serviceProvider, siloStatusOracle, new ServiceRuntimeWrapper(loggerFactory),
-                  loggerFactory)
-        { }
+        /// <summary>
+        ///  Stream queue balancer that uses Azure deployment information for load balancing. 
+        /// Requires silo running in Azure.
+        /// This balancer supports queue balancing in cluster auto-scale scenario, unexpected server failure scenario, and try to support ideal distribution 
+        /// </summary>
+        public static ISiloPersistentStreamConfigurator UseAzureDeploymentLeaseBasedBalancer(this ISiloPersistentStreamConfigurator configurator,
+           Action<OptionsBuilder<LeaseBasedQueueBalancerOptions>> configureOptions = null)
+        {
+            return configurator.ConfigureStreamQueueBalancer<LeaseBasedQueueBalancerOptions>(configureOptions, (s,n)=>LeaseBasedQueueBalancer.Create(s,n, new ServiceRuntimeWrapper(s.GetService<ILoggerFactory>())));
+        }
     }
 }

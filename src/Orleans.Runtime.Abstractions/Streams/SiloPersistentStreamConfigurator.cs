@@ -11,36 +11,6 @@ using System.Text;
 
 namespace Orleans.Streams
 {
-    public class ClusterClientPersistentStreamConfigurator : IClusterClientPersistentStreamConfigurator
-    {
-        protected readonly string name;
-        protected readonly IClientBuilder clientBuilder;
-        public ClusterClientPersistentStreamConfigurator(string name, IClientBuilder clientBuilder)
-        {
-            this.name = name;
-            this.clientBuilder = clientBuilder;
-            //wire stream provider into lifecycle 
-            this.clientBuilder.ConfigureServices(services => this.AddPersistentStream(services));
-        }
-
-        private void AddPersistentStream(IServiceCollection services)
-        {
-            //wire the stream provider into life cycle
-            services.AddSingletonNamedService<IStreamProvider>(name, PersistentStreamProvider.Create)
-                           .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => ((PersistentStreamProvider)s.GetRequiredServiceByName<IStreamProvider>(n)).ParticipateIn<ISiloLifecycle>())
-                           .AddSingletonNamedService(name, (s, n) => s.GetServiceByName<IStreamProvider>(n) as IControllable)
-                           .ConfigureNamedOptionForLogging<StreamInitializationOptions>(name);
-        }
-
-        public IClusterClientPersistentStreamConfigurator Configure<TOptions>(Action<OptionsBuilder<TOptions>> configureOptions) where TOptions : class, new()
-        {
-            clientBuilder.ConfigureServices(services =>
-            {
-                configureOptions?.Invoke(services.AddOptions<TOptions>(this.name));
-            });
-            return this;
-        }
-    }
     public class SiloPersistentStreamConfigurator : ISiloPersistentStreamConfigurator
     {
         protected readonly string name;

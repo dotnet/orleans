@@ -12,18 +12,21 @@ using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 using TestExtensions;
 using Xunit;
+using Orleans;
 
 namespace ServiceBus.Tests.TestStreamProviders.EventHub
 {
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class StreamPerPartitionEventHubStreamAdapterFactory : EventHubAdapterFactory
     {
-        public StreamPerPartitionEventHubStreamAdapterFactory(string name, EventHubStreamOptions options, IServiceProvider serviceProvider, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
-            : base(name, options, serviceProvider, serializationManager, telemetryProducer, loggerFactory)
+        public StreamPerPartitionEventHubStreamAdapterFactory(string name, EventHubOptions ehOptions, EventHubReceiverOptions receiverOptions,
+            EventHubStreamCacheOptions cacheOptions, StreamStatisticOptions statisticOptions, IStreamQueueCheckpointerFactory checkpointerFactory,
+            IServiceProvider serviceProvider, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
+            : base(name, ehOptions, receiverOptions, cacheOptions, statisticOptions, checkpointerFactory, serviceProvider, serializationManager, telemetryProducer, loggerFactory)
         {
         }
 
-        protected override IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamOptions options)
+        protected override IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamCacheOptions options)
         {
             return new CustomCacheFactory(this.Name, options, SerializationManager);
         }
@@ -58,11 +61,11 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
         private class CustomCacheFactory : IEventHubQueueCacheFactory
         {
             private readonly string name;
-            private readonly EventHubStreamOptions options;
+            private readonly EventHubStreamCacheOptions options;
             private readonly SerializationManager serializationManager;
             private readonly TimePurgePredicate timePurgePredicate;
 
-            public CustomCacheFactory(string name, EventHubStreamOptions options, SerializationManager serializationManager)
+            public CustomCacheFactory(string name, EventHubStreamCacheOptions options, SerializationManager serializationManager)
             {
                 this.name = name;
                 this.options = options;
@@ -82,8 +85,12 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
 
         public static new StreamPerPartitionEventHubStreamAdapterFactory Create(IServiceProvider services, string name)
         {
-            IOptionsSnapshot<EventHubStreamOptions> streamOptionsSnapshot = services.GetRequiredService<IOptionsSnapshot<EventHubStreamOptions>>();
-            var factory = ActivatorUtilities.CreateInstance<StreamPerPartitionEventHubStreamAdapterFactory>(services, name, streamOptionsSnapshot.Get(name));
+            var ehOptions = services.GetOptionsByName<EventHubOptions>(name);
+            var receiverOptions = services.GetOptionsByName<EventHubReceiverOptions>(name);
+            var cacheOptions = services.GetOptionsByName<EventHubStreamCacheOptions>(name);
+            var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
+            var checkpointerFactory = services.GetServiceByName<IStreamQueueCheckpointerFactory>(name);
+            var factory = ActivatorUtilities.CreateInstance<StreamPerPartitionEventHubStreamAdapterFactory>(services, name, ehOptions, receiverOptions, cacheOptions, statisticOptions, checkpointerFactory);
             factory.Init();
             return factory;
         }

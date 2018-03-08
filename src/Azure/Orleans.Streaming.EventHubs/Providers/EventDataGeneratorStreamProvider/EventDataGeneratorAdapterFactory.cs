@@ -22,15 +22,16 @@ namespace Orleans.ServiceBus.Providers.Testing
     {
         private EventDataGeneratorStreamOptions ehGeneratorOptions;
 
-        public EventDataGeneratorAdapterFactory(string name, EventDataGeneratorStreamOptions options, IServiceProvider serviceProvider, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
-            : base(name, options, serviceProvider, serializationManager, telemetryProducer, loggerFactory)
+        public EventDataGeneratorAdapterFactory(string name, EventDataGeneratorStreamOptions options,
+            EventHubOptions ehOptions, EventHubReceiverOptions receiverOptions, EventHubStreamCacheOptions cacheOptions, StreamStatisticOptions statisticOptions,
+            IServiceProvider serviceProvider, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
+            : base(name, ehOptions, receiverOptions, cacheOptions, statisticOptions, NoOpCheckpointerFactory.Instance, serviceProvider, serializationManager, telemetryProducer, loggerFactory)
         {
             this.ehGeneratorOptions = options;
         }
 
         public override void Init()
         {
-            this.CheckpointerFactory = partition => Task.FromResult<IStreamQueueCheckpointer<string>>(NoOpCheckpointer.Instance);
             this.EventHubReceiverFactory = this.EHGeneratorReceiverFactory;
             base.Init();
         }
@@ -169,11 +170,16 @@ namespace Orleans.ServiceBus.Providers.Testing
             return Task.FromResult((object)true);
         }
         #endregion
-
+        
         public new static EventDataGeneratorAdapterFactory Create(IServiceProvider services, string name)
         {
-            IOptionsSnapshot<EventDataGeneratorStreamOptions> streamOptionsSnapshot = services.GetRequiredService<IOptionsSnapshot<EventDataGeneratorStreamOptions>>();
-            var factory = ActivatorUtilities.CreateInstance<EventDataGeneratorAdapterFactory>(services, name, streamOptionsSnapshot.Get(name));
+            var generatorOptions= services.GetOptionsByName<EventDataGeneratorStreamOptions>(name);
+            var ehOptions = services.GetOptionsByName<EventHubOptions>(name);
+            var receiverOptions = services.GetOptionsByName<EventHubReceiverOptions>(name);
+            var cacheOptions = services.GetOptionsByName<EventHubStreamCacheOptions>(name);
+            var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
+            var factory = ActivatorUtilities.CreateInstance<EventDataGeneratorAdapterFactory>(services, name, generatorOptions, ehOptions, receiverOptions, cacheOptions, 
+                statisticOptions);
             factory.Init();
             return factory;
         }

@@ -44,14 +44,15 @@ namespace Tester.AzureUtils.Streaming
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
-                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(adapterName,
-                        options => 
+                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(adapterName)
+                    .ConfigureAzureQueue(ob => ob.Configure(
+                        options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            options.SiloMaturityPeriod = SILO_IMMATURE_PERIOD;
-                            options.BalancerType = StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer;
-                        })
-                        .AddMemoryGrainStorage("PubSubStore");
+                        }))
+                        .UseDynamicClusterConfigDeploymentBalancer(SILO_IMMATURE_PERIOD);
+
+                hostBuilder.AddMemoryGrainStorage("PubSubStore");
             }
         }
 

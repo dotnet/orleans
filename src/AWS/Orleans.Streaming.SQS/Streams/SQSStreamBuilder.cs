@@ -14,16 +14,16 @@ namespace Orleans.Streams
         {
             this.siloBuilder
                 .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(SQSAdapterFactory).Assembly))
-                .AddPersistentStreams(name, SQSAdapterFactory.Create)
                 .ConfigureServices(services =>
                 {
                     services.ConfigureNamedOptionForLogging<SqsOptions>(name)
                         .ConfigureNamedOptionForLogging<SimpleQueueCacheOptions>(name)
                         .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name);
-                });
+                })
+                .AddPersistentStreams(name, SQSAdapterFactory.Create);
         }
 
-        public SiloSqsStreamConfigurator ConfigureAzureQueue(Action<OptionsBuilder<SqsOptions>> configureOptions)
+        public SiloSqsStreamConfigurator ConfigureSqs(Action<OptionsBuilder<SqsOptions>> configureOptions)
         {
             this.Configure<SqsOptions>(configureOptions);
             return this;
@@ -36,7 +36,7 @@ namespace Orleans.Streams
 
         public SiloSqsStreamConfigurator ConfigureQueueMapper(int numOfQueues = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
         {
-            this.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.NumQueues = numOfQueues));
+            this.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfQueues));
             return this;
         }
     }
@@ -48,14 +48,14 @@ namespace Orleans.Streams
         {
             this.clientBuilder
                 .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(SQSAdapterFactory).Assembly))
-                .AddPersistentStreams(name, SQSAdapterFactory.Create)
                 .ConfigureServices(services =>
                 {
                     services.ConfigureNamedOptionForLogging<SqsOptions>(name);
-                });
+                })
+                .AddPersistentStreams(name, SQSAdapterFactory.Create);
         }
 
-        public ClusterClientSqsStreamConfigurator ConfigureAzureQueue(Action<OptionsBuilder<SqsOptions>> configureOptions)
+        public ClusterClientSqsStreamConfigurator ConfigureSqs(Action<OptionsBuilder<SqsOptions>> configureOptions)
         {
             this.Configure<SqsOptions>(configureOptions);
             return this;

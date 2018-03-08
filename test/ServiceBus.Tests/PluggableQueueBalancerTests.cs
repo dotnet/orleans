@@ -8,7 +8,9 @@ using Orleans.Storage;
 using Orleans.TestingHost;
 using Tester.StreamingTests;
 using TestExtensions;
+using Orleans.Streams;
 using Xunit;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ServiceBus.Tests
 {
@@ -34,14 +36,15 @@ namespace ServiceBus.Tests
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddPersistentStreams<EventDataGeneratorStreamOptions>(StreamProviderName,
-                            EventDataGeneratorAdapterFactory.Create,
+                        .AddMemoryGrainStorage("PubSubStore")
+                        .AddPersistentStreams(StreamProviderName,
+                            EventDataGeneratorAdapterFactory.Create)
+                        .Configure<EventDataGeneratorStreamOptions>(ob => ob.Configure(
                             options =>
                             {
                                 options.EventHubPartitionCount = TotalQueueCount;
-                                options.BalancerType = typeof(LeaseBasedQueueBalancerForTest);
-                            })
-                         .AddMemoryGrainStorage("PubSubStore");
+                            }))
+                         .ConfigureStreamQueueBalancer((s, n) => ActivatorUtilities.CreateInstance<LeaseBasedQueueBalancerForTest>(s));
                 }
             }
         }

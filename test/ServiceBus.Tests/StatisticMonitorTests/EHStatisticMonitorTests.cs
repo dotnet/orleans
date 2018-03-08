@@ -43,11 +43,10 @@ namespace ServiceBus.Tests.MonitorTests
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddPersistentStreams<EventDataGeneratorStreamOptions>(StreamProviderName, EHStreamProviderForMonitorTestsAdapterFactory.Create, options =>
-                        {
-                            options.StatisticMonitorWriteInterval = monitorWriteInterval;
-                            options.BalancerType = StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer;
-                        })
+                        .AddPersistentStreams(StreamProviderName, EHStreamProviderForMonitorTestsAdapterFactory.Create)
+                        .Configure<StreamStatisticOptions>(ob => ob.Configure(options => options.StatisticMonitorWriteInterval = monitorWriteInterval))
+                        .UseDynamicClusterConfigDeploymentBalancer();
+                    hostBuilder
                         .ConfigureServices(services =>
                         {
                             services.AddTransientNamedService<Func<IStreamIdentity, IStreamDataGenerator<EventData>>>(StreamProviderName, (s, n) => SimpleStreamEventDataGenerator.CreateFactory(s));

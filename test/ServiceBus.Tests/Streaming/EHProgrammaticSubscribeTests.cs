@@ -4,6 +4,7 @@ using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 using Orleans.Storage;
+using Orleans.Streams;
 using Orleans.Streaming.EventHubs;
 using Orleans.TestingHost;
 using Tester.StreamingTests;
@@ -44,28 +45,40 @@ namespace ServiceBus.Tests.Streaming
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddEventHubStreams(StreamProviderName,
-                        options =>
+                        .AddEventHubStreams(StreamProviderName)
+                        .ConfigureEventHub(ob=>ob.Configure(options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
                             options.ConsumerGroup = EHConsumerGroup;
                             options.Path = EHPath;
+                        }))
+                        .UseEventHubCheckpointer(ob=>ob.Configure(options =>
+                        {
+                            
                             options.CheckpointConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.CheckpointTableName = EHCheckpointTable;
                             options.CheckpointNamespace = CheckpointNamespace;
                             options.CheckpointPersistInterval = TimeSpan.FromSeconds(10);
-                        })
-                        .AddEventHubStreams(StreamProviderName2, options =>
+                        }));
+
+                    hostBuilder
+                        .AddEventHubStreams(StreamProviderName2)
+                        .ConfigureEventHub(ob => ob.Configure(options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
                             options.ConsumerGroup = EHConsumerGroup;
                             options.Path = EHPath;
+                          
+                        }))
+                        .UseEventHubCheckpointer(ob => ob.Configure(options => {
                             options.CheckpointConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.CheckpointTableName = EHCheckpointTable;
                             options.CheckpointNamespace = CheckpointNamespace2;
                             options.CheckpointPersistInterval = TimeSpan.FromSeconds(10);
-                        })
-                        .AddMemoryGrainStorage("PubSubStore");
+                        }));
+
+                    hostBuilder
+                          .AddMemoryGrainStorage("PubSubStore");
                 }
             }
         }

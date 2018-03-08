@@ -15,16 +15,16 @@ namespace Orleans.Streams
         {
             this.siloBuilder
                 .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(PubSubAdapterFactory<>).Assembly))
-                .AddPersistentStreams(name, PubSubAdapterFactory<TDataAdapter>.Create)
                 .ConfigureServices(services =>
                 {
                     services.ConfigureNamedOptionForLogging<PubSubOptions>(name)
                         .ConfigureNamedOptionForLogging<SimpleQueueCacheOptions>(name)
                         .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name);
-                });
+                })
+                .AddPersistentStreams(name, PubSubAdapterFactory<TDataAdapter>.Create);
         }
 
-        public SiloPubSubStreamConfigurator<TDataAdapter> ConfigureAzureQueue(Action<OptionsBuilder<PubSubOptions>> configureOptions)
+        public SiloPubSubStreamConfigurator<TDataAdapter> ConfigurePubSub(Action<OptionsBuilder<PubSubOptions>> configureOptions)
         {
             this.Configure<PubSubOptions>(configureOptions);
             return this;
@@ -37,7 +37,7 @@ namespace Orleans.Streams
 
         public SiloPubSubStreamConfigurator<TDataAdapter> ConfigureQueueMapper(int numOfQueues = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
         {
-            this.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.NumQueues = numOfQueues));
+            this.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfQueues));
             return this;
         }
     }
@@ -50,11 +50,11 @@ namespace Orleans.Streams
         {
             this.clientBuilder
                 .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(PubSubAdapterFactory<>).Assembly))
-                .AddPersistentStreams(name, PubSubAdapterFactory<TDataAdapter>.Create)
-                .ConfigureServices(services => services.ConfigureNamedOptionForLogging<PubSubOptions>(name));
+                .ConfigureServices(services => services.ConfigureNamedOptionForLogging<PubSubOptions>(name))
+                .AddPersistentStreams(name, PubSubAdapterFactory<TDataAdapter>.Create);
         }
 
-        public ClusterClientPubSubStreamConfigurator<TDataAdapter> ConfigureAzureQueue(Action<OptionsBuilder<PubSubOptions>> configureOptions)
+        public ClusterClientPubSubStreamConfigurator<TDataAdapter> ConfigurePubSub(Action<OptionsBuilder<PubSubOptions>> configureOptions)
         {
             this.Configure<PubSubOptions>(configureOptions);
             return this;

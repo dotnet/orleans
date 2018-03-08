@@ -25,7 +25,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             if (deploymentId != null)
             {
                 // TODO: Do not assume defaults !? - jbragg
-                var queueMapper = new HashRingBasedStreamQueueMapper(AzureQueueStreamOptions.DEFAULT_NUM_QUEUES, providerName);
+                var queueMapper = new HashRingBasedStreamQueueMapper(new HashRingStreamQueueMapperOptions(), providerName);
                 List<QueueId> allQueues = queueMapper.GetAllQueues().ToList();
 
                 var deleteTasks = new List<Task>();
@@ -51,7 +51,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             if (deploymentId != null)
             {
                 // TODO: Do not assume defaults !? - jbragg
-                var queueMapper = new HashRingBasedStreamQueueMapper(AzureQueueStreamOptions.DEFAULT_NUM_QUEUES, providerName);
+                var queueMapper = new HashRingBasedStreamQueueMapper(new HashRingStreamQueueMapperOptions(), providerName);
                 List<QueueId> allQueues = queueMapper.GetAllQueues().ToList();
 
                 var deleteTasks = new List<Task>();

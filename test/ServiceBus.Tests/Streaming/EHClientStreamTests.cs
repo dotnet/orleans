@@ -16,6 +16,8 @@ using Tester.StreamingTests;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
+using Orleans.Streams;
+using Orleans.ServiceBus.Providers;
 
 namespace ServiceBus.Tests.StreamingTests
 {
@@ -52,17 +54,21 @@ namespace ServiceBus.Tests.StreamingTests
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
-                    .AddPersistentStreams<EventHubStreamOptions>(StreamProviderName, TestEventHubStreamAdapterFactory.Create,
-                    options =>
+                    .AddPersistentStreams(StreamProviderName, TestEventHubStreamAdapterFactory.Create)
+                    .Configure<EventHubOptions>(ob => ob.Configure(options =>
+                      {
+                          options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                          options.ConsumerGroup = EHConsumerGroup;
+                          options.Path = EHPath;
+                      }))
+                    .ConfigureComponent<EventHubCheckpointerOptions, IStreamQueueCheckpointerFactory>(ob => ob.Configure(options =>
                     {
-                        options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
-                        options.ConsumerGroup = EHConsumerGroup;
-                        options.Path = EHPath;
                         options.CheckpointConnectionString = TestDefaultConfiguration.DataConnectionString;
                         options.CheckpointTableName = EHCheckpointTable;
                         options.CheckpointNamespace = CheckpointNamespace;
                         options.CheckpointPersistInterval = TimeSpan.FromSeconds(10);
-                    })
+                    }), EventHubCheckpointerFactory.CreateFactory);
+                hostBuilder
                     .AddMemoryGrainStorage("PubSubStore");
             }
         }
@@ -72,13 +78,14 @@ namespace ServiceBus.Tests.StreamingTests
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddPersistentStreams<EventHubStreamOptions>(StreamProviderName, TestEventHubStreamAdapterFactory.Create,
+                    .AddPersistentStreams(StreamProviderName, TestEventHubStreamAdapterFactory.Create)
+                    .Configure<EventHubOptions>(ob=>ob.Configure(
                     options =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
                         options.ConsumerGroup = EHConsumerGroup;
                         options.Path = EHPath;
-                    });
+                    }));
             }
         }
 

@@ -36,11 +36,12 @@ namespace Tester.AzureUtils.Streaming
             {
                 clientBuilder
                     .AddSimpleMessageStreamProvider(SmsStreamProviderName)
-                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName,
+                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName)
+                    .ConfigureAzureQueue(ob=>ob.Configure(
                         options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        });
+                        }));
             }
         }
 
@@ -62,12 +63,13 @@ namespace Tester.AzureUtils.Streaming
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.DeleteStateOnClear = true;
                         }))
-                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName,
+                    .AddMemoryGrainStorage("MemoryStore")
+                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName)
+                    .ConfigureAzureQueue(ob => ob.Configure(
                         options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        })
-                    .AddMemoryGrainStorage("MemoryStore");
+                        }));
             }
         }
 
