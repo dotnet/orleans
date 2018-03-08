@@ -14,7 +14,7 @@ namespace Orleans.Runtime
 
         public void Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe(ServiceLifecycleStage.First, this.OnStart);
+            lifecycle.Subscribe<SiloOptionsLogger>(ServiceLifecycleStage.First, this.OnStart);
         }
 
         public Task OnStart(CancellationToken token)

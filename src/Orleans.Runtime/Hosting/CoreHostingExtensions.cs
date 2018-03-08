@@ -39,76 +39,6 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure the container to use Orleans, including the default silo name & services.
-        /// </summary>
-        /// <param name="builder">The host builder.</param>
-        /// <param name="configureOptions">The delegate that configures the options.</param>
-        /// <returns>The host builder.</returns>
-        public static ISiloHostBuilder Configure(this ISiloHostBuilder builder, Action<ClusterOptions> configureOptions)
-        {
-            return builder.Configure(null, configureOptions);
-        }
-
-        /// <summary>
-        /// Configure the container to use Orleans, including the default silo name & services.
-        /// </summary>
-        /// <param name="builder">The host builder.</param>
-        /// <param name="siloName">The name to use for this silo</param>
-        /// <param name="configureOptions">The delegate that configures the options.</param>
-        /// <returns>The host builder.</returns>
-        public static ISiloHostBuilder Configure(this ISiloHostBuilder builder, string siloName, Action<ClusterOptions> configureOptions)
-        {
-            var optionsConfigurator = configureOptions != null
-                ? ob => ob.Configure(configureOptions)
-                : default(Action<OptionsBuilder<ClusterOptions>>);
-
-            return builder.Configure(siloName, optionsConfigurator);
-        }
-
-        /// <summary>
-        /// Configure the container to use Orleans, including the default silo name & services.
-        /// </summary>
-        /// <param name="builder">The host builder.</param>
-        /// <param name="siloName">The name to use for this silo</param>
-        /// <param name="configureOptions">The delegate that configures the options using the options builder.</param>
-        /// <returns>The host builder.</returns>
-        public static ISiloHostBuilder Configure(this ISiloHostBuilder builder, string siloName, Action<OptionsBuilder<ClusterOptions>> configureOptions = null)
-        {
-            return builder
-                .ConfigureDefaults()
-                .ConfigureServices((context, services) =>
-                {
-                    if (!string.IsNullOrEmpty(siloName))
-                        builder.ConfigureSiloName(siloName);
-
-                    configureOptions?.Invoke(services.AddOptions<ClusterOptions>());
-                });
-        }
-
-        /// <summary>
-        /// Configure the container to use Orleans, including the default silo name & services.
-        /// </summary>
-        /// <param name="builder">The host builder.</param>
-        /// <param name="configureOptions">The delegate that configures the options using the options builder.</param>
-        /// <returns>The host builder.</returns>
-        public static ISiloHostBuilder Configure(this ISiloHostBuilder builder, Action<OptionsBuilder<ClusterOptions>> configureOptions = null)
-        {
-            return builder.Configure(null, configureOptions);
-        }
-
-        /// <summary>
-        /// Configures the name of this silo.
-        /// </summary>
-        /// <param name="builder">The host builder.</param>
-        /// <param name="siloName">The silo name.</param>
-        /// <returns>The silo builder.</returns>
-        public static ISiloHostBuilder ConfigureSiloName(this ISiloHostBuilder builder, string siloName)
-        {
-            builder.Configure<SiloOptions>(options => options.SiloName = siloName);
-            return builder;
-        }
-
-        /// <summary>
         /// Configures a localhost silo for development and testing.
         /// </summary>
         /// <param name="builder">The silo builder.</param>
@@ -133,7 +63,7 @@ namespace Orleans.Hosting
             });
 
             builder.UseDevelopmentClustering(primarySiloEndpoint ?? new IPEndPoint(IPAddress.Loopback, siloPort));
-            builder.Configure(options => options.ClusterId = clusterId);
+            builder.Configure<ClusterOptions>(options => options.ClusterId = clusterId);
 
             return builder;
         }
@@ -159,7 +89,7 @@ namespace Orleans.Hosting
             string clusterId = ClusterOptions.DevelopmentClusterId)
         {
             return builder
-                .Configure(options => options.ClusterId = clusterId)
+                .Configure<ClusterOptions>(options => options.ClusterId = clusterId)
                 .ConfigureServices(
                 services =>
                 {

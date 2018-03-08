@@ -18,15 +18,15 @@ namespace Orleans
     /// - OnStop stops states in reverse order starting from highest started stage.
     /// - OnStop stops all stages regardless of errors even if canceled canceled.
     /// </summary>
-    public class LifecycleObservable : ILifecycleObservable, ILifecycleObserver
+    public class LifecycleSubject : ILifecycleSubject
     {
         private readonly ConcurrentDictionary<object, OrderedObserver> subscribers;
         private readonly ILogger logger;
         private int? highStage = null;
 
-        public LifecycleObservable(ILoggerFactory loggerFactory)
+        public LifecycleSubject(ILogger<LifecycleSubject> logger)
         {
-            this.logger = loggerFactory?.CreateLogger(GetType().FullName);
+            this.logger = logger;
             this.subscribers = new ConcurrentDictionary<object, OrderedObserver>();
         }
 
@@ -83,7 +83,7 @@ namespace Orleans
             }
         }
 
-        public IDisposable Subscribe(int stage, ILifecycleObserver observer)
+        public IDisposable Subscribe(string observerName, int stage, ILifecycleObserver observer)
         {
             if (observer == null) throw new ArgumentNullException(nameof(observer));
             if (this.highStage.HasValue) throw new InvalidOperationException("Lifecycle has already been started.");

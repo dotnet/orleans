@@ -8,18 +8,38 @@ namespace Orleans
     {
         private static Func<CancellationToken, Task> NoOp => ct => Task.CompletedTask;
 
-        public static IDisposable Subscribe(this ILifecycleObservable observable, int stage, Func<CancellationToken, Task> onStart, Func<CancellationToken, Task> onStop)
+        public static IDisposable Subscribe(this ILifecycleObservable observable, string observerName, int stage, Func<CancellationToken, Task> onStart, Func<CancellationToken, Task> onStop)
         {
             if (observable == null) throw new ArgumentNullException(nameof(observable));
             if (onStart == null) throw new ArgumentNullException(nameof(onStart));
             if (onStop == null) throw new ArgumentNullException(nameof(onStop));
 
-            return observable.Subscribe(stage, new Observer(onStart, onStop));
+            return observable.Subscribe(observerName, stage, new Observer(onStart, onStop));
         }
 
-        public static IDisposable Subscribe(this ILifecycleObservable observable, int stage, Func<CancellationToken, Task> onStart)
+        public static IDisposable Subscribe(this ILifecycleObservable observable, string observerName, int stage, Func<CancellationToken, Task> onStart)
         {
-            return observable.Subscribe(stage, new Observer(onStart, NoOp));
+            return observable.Subscribe(observerName, stage, onStart, NoOp);
+        }
+
+        public static IDisposable Subscribe<TObserver>(this ILifecycleObservable observable, int stage, ILifecycleObserver observer)
+        {
+            return observable.Subscribe(typeof(TObserver).FullName, stage, observer);
+        }
+
+        public static IDisposable Subscribe<TObserver>(this ILifecycleObservable observable, int stage, Func<CancellationToken, Task> onStart, Func<CancellationToken, Task> onStop)
+        {
+            return observable.Subscribe(typeof(TObserver).FullName, stage, onStart, onStop);
+        }
+
+        public static IDisposable Subscribe<TObserver>(this ILifecycleObservable observable, int stage, Func<CancellationToken, Task> onStart)
+        {
+            return observable.Subscribe<TObserver>(stage, onStart, NoOp);
+        }
+
+        public static IDisposable Subscribe(this ILifecycleObservable observable, int stage, ILifecycleObserver observer)
+        {
+            return observable.Subscribe(observer.GetType().FullName, stage, observer);
         }
 
         public static Task OnStart(this ILifecycleObserver observer)
