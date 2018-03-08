@@ -70,7 +70,8 @@ namespace Orleans.Runtime.MembershipService
                     {
                         options.PrimarySiloEndpoint = config.SeedNodes?.FirstOrDefault();
                     }
-                });
+                },
+                config.ClusterId);
             }
         }
     }
