@@ -12,7 +12,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// The IP address used for clustering.
         /// </summary>
-        public IPAddress AdvertisedIPAddress { get; set; } = ConfigUtilities.ResolveIPAddress(null, null, AddressFamily.InterNetwork).Result;
+        public IPAddress AdvertisedIPAddress { get; set; }
 
         /// <summary>
         /// The port this silo uses for silo-to-silo communication.
