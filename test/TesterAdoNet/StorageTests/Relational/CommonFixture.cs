@@ -91,7 +91,7 @@ namespace UnitTests.StorageTests.Relational
                                 ServiceId = Guid.NewGuid()
                             };
                             var storageProvider = new AdoNetGrainStorage(DefaultProviderRuntime.ServiceProvider.GetService<ILogger<AdoNetGrainStorage>>(), DefaultProviderRuntime, Options.Create(options), Options.Create(clusterOptions), storageInvariant + "_StorageProvider");
-                            ISiloLifecycleSubject siloLifeCycle = new SiloLifecycleSubject(new LifecycleSubject(NullLoggerFactory.Instance.CreateLogger<LifecycleSubject>()), NullLoggerFactory.Instance.CreateLogger<SiloLifecycleSubject>());
+                            var siloLifeCycle = new SiloLifecycle(NullLoggerFactory.Instance);
                             storageProvider.Participate(siloLifeCycle);
                             await siloLifeCycle.OnStart(CancellationToken.None);
 
