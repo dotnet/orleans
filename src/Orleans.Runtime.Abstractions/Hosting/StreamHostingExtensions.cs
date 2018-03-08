@@ -79,7 +79,7 @@ namespace Orleans.Hosting
         /// Configure silo to use simple message stream provider
         /// </summary>
         public static IServiceCollection AddSiloSimpleMessageStreamProvider(this IServiceCollection services, string name,
-            Action<SimpleMessageStreamProviderOptions> configureOptions = null)
+            Action<SimpleMessageStreamProviderOptions> configureOptions )
         {
             return services.AddSiloSimpleMessageStreamProvider(name, ob => ob.Configure(configureOptions));
         }
