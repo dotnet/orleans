@@ -568,11 +568,7 @@ namespace Orleans.Runtime
             }
             foreach (var grainService in grainServices)
             {
-                await this.scheduler.QueueTask(grainService.Start, grainService.SchedulingContext).WithTimeout(this.initTimeout, $"Starting GrainService failed due to timeout {initTimeout}");
-                if (this.logger.IsEnabled(LogLevel.Debug))
-                {
-                    logger.Debug(String.Format("{0} Grain Service with Id {1} started successfully.", grainService.GetType().FullName, grainService.GetPrimaryKeyLong(out string ignored)));
-                }
+                await StartGrainService(grainService);
             }
         }
 
