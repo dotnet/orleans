@@ -34,7 +34,7 @@ namespace Tester.StorageFacet.Implementations
 
         public void Participate(IGrainLifecycle lifecycle)
         {
-            lifecycle.Subscribe(GrainLifecycleStage.SetupState, LoadState);
+            lifecycle.Subscribe(OptionFormattingUtilities.Name<TableExampleStorage<TState>>(this.Name), GrainLifecycleStage.SetupState, LoadState);
         }
 
         public void Configure(IExampleStorageConfig cfg)

@@ -258,7 +258,7 @@ namespace Orleans.Statistics
 
         public void Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeInitialize, this);
+            lifecycle.Subscribe<PerfCounterEnvironmentStatistics>(ServiceLifecycleStage.RuntimeInitialize, this);
         }
 
         public void Participate(IClusterClientLifecycle lifecycle)

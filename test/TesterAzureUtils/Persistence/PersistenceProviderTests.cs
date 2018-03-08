@@ -271,7 +271,7 @@ namespace Tester.AzureUtils.Persistence
         private async Task<AzureTableGrainStorage> InitAzureTableGrainStorage(AzureTableStorageOptions options)
         {
             AzureTableGrainStorage store = ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(this.providerRuntime.ServiceProvider, options, "TestStorage");
-            SiloLifecycle lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycle>(this.providerRuntime.ServiceProvider);
+            ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(this.providerRuntime.ServiceProvider, new LifecycleSubject(null));
             store.Participate(lifecycle);
             await lifecycle.OnStart();
             return store;
