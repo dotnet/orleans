@@ -168,6 +168,8 @@ namespace NonSilo.Tests
         {
             var validators = services.Where(descriptor => descriptor.ServiceType == typeof(IConfigurationValidator)).ToList();
             foreach (var validator in validators) services.Remove(validator);
+            // Configure endpoints because validator is set just before Build()
+            services.Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback);
         }
 
         private class MyService
