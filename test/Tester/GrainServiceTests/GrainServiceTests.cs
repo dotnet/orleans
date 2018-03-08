@@ -7,6 +7,7 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Orleans.Hosting;
+using Orleans.Services;
 
 namespace Tester
 {
@@ -17,21 +18,26 @@ namespace Tester
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.Options.InitialSilosCount = 1;
-                builder.AddSiloBuilderConfigurator<GrainSiloBuilderConfigurator>();
+                builder.AddSiloBuilderConfigurator<GrainServiceSiloBuilderConfigurator>();
+
+                // register LegacyGrainService the legacy way
                 builder.ConfigureLegacyConfiguration(legacy =>
                 {
-                    legacy.ClusterConfiguration.Globals.RegisterGrainService("CustomGrainService",
-                        "Tester.CustomGrainService, Tester",
+                    legacy.ClusterConfiguration.Globals.RegisterGrainService("LegacyGrainService",
+                        "Tester.LegacyGrainService, Tester",
                         new Dictionary<string, string> {{"test-property", "xyz"}});
                 });
             }
 
-            private class GrainSiloBuilderConfigurator : ISiloBuilderConfigurator
+            private class GrainServiceSiloBuilderConfigurator : ISiloBuilderConfigurator
             {
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder.ConfigureServices(services =>
-                        services.AddSingleton<ICustomGrainServiceClient, CustomGrainServiceClient>());
+                        // register client for LegacyGrainService the legacy way
+                        services.AddSingleton<ILegacyGrainServiceClient, LegacyGrainServiceClient>())
+                    // register TestGrainService the modern way
+                    .AddTestGrainService("abc");
                 }
             }
         }
@@ -44,13 +50,48 @@ namespace Tester
         public IGrainFactory GrainFactory { get; set; }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainServices")]
+        public async Task SimpleInvokeGrainService_Legacy()
+        {
+            IGrainServiceTestGrain grain = this.GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
+            var grainId = await grain.GetHelloWorldUsingCustomService_Legacy();
+            Assert.Equal("Hello World from Legacy Grain Service", grainId);
+            var prop = await grain.GetServiceConfigProperty_Legacy("test-property");
+            Assert.Equal("xyz", prop);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainServices")]
+        public async Task GrainServiceWasStarted_Legacy()
+        {
+            IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
+            var prop = await grain.CallHasStarted_Legacy();
+            Assert.True(prop);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainServices")]
+        public async Task GrainServiceWasStartedInBackground_Legacy()
+        {
+            IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
+            var prop = await grain.CallHasStartedInBackground_Legacy();
+            Assert.True(prop);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainServices")]
+        public async Task GrainServiceWasInit_Legacy()
+        {
+            IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
+            var prop = await grain.CallHasInit_Legacy();
+            Assert.True(prop);
+        }
+
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainServices")]
         public async Task SimpleInvokeGrainService()
         {
             IGrainServiceTestGrain grain = this.GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
             var grainId = await grain.GetHelloWorldUsingCustomService();
-            Assert.Equal("Hello World from Grain Service", grainId);
-            var prop = await grain.GetServiceConfigProperty("test-property");
-            Assert.Equal("xyz", prop);
+            Assert.Equal("Hello World from Test Grain Service", grainId);
+            var prop = await grain.GetServiceConfigProperty();
+            Assert.Equal("abc", prop);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainServices")]
