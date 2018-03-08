@@ -60,6 +60,27 @@ namespace NonSilo.Tests
     public class SiloHostBuilderTests
     {
         /// <summary>
+        /// Tests that a silo cannot be created without specifying a ClusterId.
+        /// </summary>
+        [Fact]
+        public void SiloHostBuilder_NoClusterIdTest()
+        {
+            Assert.Throws<OrleansConfigurationException>(() => new SiloHostBuilder()
+                .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
+                .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>())
+                .Build());
+
+            var builder = new SiloHostBuilder()
+                .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
+                .Configure<ClusterOptions>(options => options.ClusterId = "test")
+                .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
+            using (var silo = builder.Build())
+            {
+                Assert.NotNull(silo);
+            }
+        }
+
+        /// <summary>
         /// Tests that a silo can be created without specifying configuration.
         /// </summary>
         [Fact]
