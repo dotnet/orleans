@@ -1,10 +1,6 @@
 ﻿using Orleans.Configuration;
 using Orleans.Runtime.Configuration;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Orleans.TestingHost.Legacy
 {
@@ -16,7 +12,7 @@ namespace Orleans.TestingHost.Legacy
         /// </summary>
         public static TimeSpan GetLivenessStabilizationTime(GlobalConfiguration config, bool didKill = false)
         {
-            var membershipOptions = new MembershipOptions()
+            var clusterMembershipOptions = new ClusterMembershipOptions()
             {
                 NumMissedTableIAmAliveLimit = config.NumMissedTableIAmAliveLimit,
                 LivenessEnabled = config.LivenessEnabled,
@@ -32,7 +28,7 @@ namespace Orleans.TestingHost.Legacy
                 NumProbedSilos = config.NumProbedSilos,
                 NumVotesForDeathDeclaration = config.NumVotesForDeathDeclaration,
             };
-            return TestCluster.GetLivenessStabilizationTime(membershipOptions, didKill);
+            return TestCluster.GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
         }
     }
 }

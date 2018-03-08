@@ -7,7 +7,6 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
-using Orleans.Runtime.Scheduler;
 using Orleans.Providers;
 using System.Collections.Generic;
 
@@ -25,10 +24,7 @@ namespace Orleans.Hosting
         public static ISiloHostBuilder UseConfiguration(this ISiloHostBuilder builder, ClusterConfiguration configuration)
         {
             if (configuration == null) throw new ArgumentNullException(nameof(configuration));
-            return builder.ConfigureServices((context, services) =>
-            {
-                services.AddLegacyClusterConfigurationSupport(configuration);
-            });
+            return builder.AddLegacyClusterConfigurationSupport(configuration);
         }
 
         /// <summary>
@@ -52,11 +48,19 @@ namespace Orleans.Hosting
         /// <returns>The silo builder.</returns>
         public static ISiloHostBuilder ConfigureLocalHostPrimarySilo(this ISiloHostBuilder builder, int siloPort = 22222, int gatewayPort = 40000)
         {
-            builder.ConfigureSiloName(Silo.PrimarySiloName);
+            string siloName = Silo.PrimarySiloName;
+            builder.Configure<SiloOptions>(options => options.SiloName = siloName);
             return builder.UseConfiguration(ClusterConfiguration.LocalhostPrimarySilo(siloPort, gatewayPort));
         }
 
-        public static IServiceCollection AddLegacyClusterConfigurationSupport(this IServiceCollection services, ClusterConfiguration configuration)
+        public static ISiloHostBuilder AddLegacyClusterConfigurationSupport(this ISiloHostBuilder builder, ClusterConfiguration configuration)
+        {
+            LegacyMembershipConfigurator.ConfigureServices(configuration.Globals, builder);
+            LegacyRemindersConfigurator.Configure(configuration.Globals, builder);
+            return builder.ConfigureServices(services => AddLegacyClusterConfigurationSupport(services, configuration));
+        }
+
+        private static void AddLegacyClusterConfigurationSupport(IServiceCollection services, ClusterConfiguration configuration)
         {
             if (configuration == null) throw new ArgumentNullException(nameof(configuration));
 
@@ -178,9 +182,7 @@ namespace Orleans.Hosting
                 var nodeConfig = configuration.GetOrCreateNodeConfigurationForSilo(siloOptions.Value.SiloName);
                 options.ExcludedGrainTypes.AddRange(nodeConfig.ExcludedGrainTypes);
             });
-
-            LegacyMembershipConfigurator.ConfigureServices(configuration.Globals, services);
-
+            
             services.AddOptions<SchedulingOptions>()
                 .Configure<GlobalConfiguration>((options, config) =>
                 {
@@ -251,7 +253,7 @@ namespace Orleans.Hosting
                 options.NumVirtualBucketsConsistentRing = config.NumVirtualBucketsConsistentRing;
             });
 
-            services.AddOptions<MembershipOptions>()
+            services.AddOptions<ClusterMembershipOptions>()
                 .Configure<GlobalConfiguration>((options, config) =>
                 {
                     options.NumMissedTableIAmAliveLimit = config.NumMissedTableIAmAliveLimit;
@@ -272,7 +274,6 @@ namespace Orleans.Hosting
                 {
                     options.IsRunningAsUnitTest = config.IsRunningAsUnitTest;
                 });
-            LegacyRemindersConfigurator.Configure(configuration.Globals, services);
             
             services.AddOptions<GrainVersioningOptions>()
                 .Configure<GlobalConfiguration>((options, config) =>
@@ -306,8 +307,6 @@ namespace Orleans.Hosting
                     options.CacheTTLExtensionFactor = config.CacheTTLExtensionFactor;
                     options.LazyDeregistrationDelay = config.DirectoryLazyDeregistrationDelay;
                 });
-
-            return services;
         }
 
         private static Type MapDefaultPlacementStrategy(string strategy)

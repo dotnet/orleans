@@ -34,9 +34,9 @@ namespace Orleans.TestingHost
 
             string siloName = configuration[nameof(TestSiloSpecificOptions.SiloName)] ?? hostName;
 
-            ISiloHostBuilder hostBuilder = new SiloHostBuilder()
-                .Configure(ob => ob.Bind(configuration))
-                .ConfigureSiloName(siloName)
+            var hostBuilder = new SiloHostBuilder()
+                .Configure<ClusterOptions>(configuration)
+                .Configure<SiloOptions>(options => options.SiloName = siloName)
                 .ConfigureHostConfiguration(cb =>
                 {
                     // TODO: Instead of passing the sources individually, just chain the pre-built configuration once we upgrade to Microsoft.Extensions.Configuration 2.1
@@ -84,7 +84,7 @@ namespace Orleans.TestingHost
 
             var builder = new ClientBuilder();
             builder.Properties["Configuration"] = configuration;
-            builder.ConfigureCluster(ob => ob.Bind(configuration));
+            builder.Configure<ClusterOptions>(configuration);
             ConfigureAppServices(configuration, builder);
 
             builder.ConfigureServices(services =>
@@ -172,7 +172,7 @@ namespace Orleans.TestingHost
             {
                 var primarySiloEndPoint = new IPEndPoint(IPAddress.Loopback, int.Parse(context.Configuration[nameof(TestSiloSpecificOptions.PrimarySiloPort)]));
 
-                services.Configure<DevelopmentMembershipOptions>(options => options.PrimarySiloEndpoint = primarySiloEndPoint);
+                services.Configure<DevelopmentClusterMembershipOptions>(options => options.PrimarySiloEndpoint = primarySiloEndPoint);
                 services
                     .AddSingleton<GrainBasedMembershipTable>()
                     .AddFromExisting<IMembershipTable, GrainBasedMembershipTable>();

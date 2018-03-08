@@ -26,12 +26,12 @@ namespace Orleans.Runtime.MembershipService
 
         public AzureBasedMembershipTable(
             ILoggerFactory loggerFactory, 
-            IOptions<AzureStorageClusteringOptions> membershipOptions, 
+            IOptions<AzureStorageClusteringOptions> clusteringOptions, 
             IOptions<ClusterOptions> clusterOptions)
         {
             this.loggerFactory = loggerFactory;
             logger = loggerFactory.CreateLogger<AzureBasedMembershipTable>();
-            this.options = membershipOptions.Value;
+            this.options = clusteringOptions.Value;
             this.clusterId = clusterOptions.Value.ClusterId;
         }
 

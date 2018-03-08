@@ -3,6 +3,7 @@ using Orleans.Configuration;
 using Orleans.Runtime.MembershipService;
 using System;
 using System.Linq;
+using Orleans.Hosting;
 
 namespace Orleans.Clustering.DynamoDB
 {
@@ -15,16 +16,15 @@ namespace Orleans.Clustering.DynamoDB
         private const string ReadCapacityUnitsPropertyName = "ReadCapacityUnits";
         private const string WriteCapacityUnitsPropertyName = "WriteCapacityUnits";
 
-        public void Configure(object configuration, IServiceCollection services)
+        public void Configure(object configuration, ISiloHostBuilder builder)
         {
             var reader = new GlobalConfigurationReader(configuration);
 
-            services.Configure<DynamoDBClusteringOptions>(options =>
+            builder.UseDynamoDBClustering(options =>
             {
                 var cs = reader.GetPropertyValue<string>("DataConnectionString");
                 ParseDataConnectionString(cs, options);
             });
-            services.AddSingleton<IMembershipTable, DynamoDBMembershipTable>();
         }
 
         /// <summary>
