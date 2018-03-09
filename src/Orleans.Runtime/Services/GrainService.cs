@@ -81,8 +81,15 @@ namespace Orleans.Runtime
             return Task.CompletedTask;
         }
 
-        /// <summary>Deferred part of initialization that executes after the service is already started (to speed up startup)</summary>
-        protected abstract Task StartInBackground();
+        /// <summary>
+        /// Deferred part of initialization that executes after the service is already started (to speed up startup).
+        /// Sets Status to Started.
+        /// </summary>
+        protected virtual Task StartInBackground()
+        {
+            Status = GrainServiceStatus.Started;
+            return Task.CompletedTask;
+        }
 
         /// <summary>Invoked when service is being stopped</summary>
         public virtual Task Stop()
