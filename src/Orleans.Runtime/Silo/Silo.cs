@@ -719,12 +719,6 @@ namespace Orleans.Runtime
 
         private Task OnRuntimeServicesStop(CancellationToken cancellationToken)
         {
-            if (!cancellationToken.IsCancellationRequested)
-            {
-                // Deactivate all grains
-                SafeExecute(() => catalog.DeactivateAllActivations().WaitWithThrow(stopTimeout));
-            }
-
             // Start rejecting all silo to silo application messages
             SafeExecute(messageCenter.BlockApplicationMessages);
 
@@ -781,6 +775,8 @@ namespace Orleans.Runtime
                     // Write "ShutDown" state in the table + broadcast gossip msgs to re-read the table to everyone
                     await scheduler.QueueTask(this.membershipOracle.ShutDown, this.membershipOracleContext)
                         .WithTimeout(stopTimeout, $"MembershipOracle Shutting down failed due to timeout {stopTimeout}");
+                    // Deactivate all grains
+                    SafeExecute(() => catalog.DeactivateAllActivations().WaitWithThrow(stopTimeout));
                 }
                 else
                 {
