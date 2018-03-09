@@ -11,6 +11,10 @@
     <RootNamespace>OrleansBondUtils</RootNamespace>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DocumentationFile>bin\Debug\netstandard2.0\Orleans.Serialization.Bond.xml</DocumentationFile>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Bond.Core.CSharp" Version="$(BondCoreCSharpVersion)" />
   </ItemGroup>

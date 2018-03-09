@@ -12,6 +12,10 @@
     <DefineConstants>$(DefineConstants);CLUSTERING_ADONET</DefineConstants>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DocumentationFile>bin\Debug\netstandard2.0\Orleans.Clustering.AdoNet.xml</DocumentationFile>
+  </PropertyGroup>
+
   <ItemGroup>
     <Compile Include="..\Shared\Storage\AdoNetFormatProvider.cs" Link="Storage\AdoNetFormatProvider.cs" />
     <Compile Include="..\Shared\Storage\AdoNetInvariants.cs" Link="Storage\AdoNetInvariants.cs" />

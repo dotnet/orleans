@@ -19,6 +19,10 @@
     <OutDir Condition="'$(OutDir)' == ''">bin\$(Configuration)\$(TargetFramework)\Orleans\</OutDir>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DocumentationFile>bin\Debug\net461\Orleans.PowerShell.xml</DocumentationFile>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.PowerShell.5.ReferenceAssemblies" Version="$(MicrosoftPowerShell5ReferenceAssembliesVersion)" />
   </ItemGroup>

@@ -12,6 +12,10 @@
     <RootNamespace>Orleans.TelemetryConsumers.NewRelic</RootNamespace>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DocumentationFile>bin\Debug\net461\Orleans.TelemetryConsumers.NewRelic.xml</DocumentationFile>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="NewRelic.Agent.Api" Version="$(NewRelicAgentApiVersion)" />
   </ItemGroup>

@@ -11,6 +11,10 @@
     <RootNamespace>OrleansConsulUtils</RootNamespace>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DocumentationFile>bin\Debug\netstandard2.0\Orleans.Clustering.Consul.xml</DocumentationFile>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Consul" Version="$(ConsulVersion)" />
   </ItemGroup>

@@ -12,6 +12,10 @@
     <DefineConstants>$(DefineConstants);STREAMING_SQS</DefineConstants>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DocumentationFile>bin\Debug\netstandard2.0\Orleans.Streaming.SQS.xml</DocumentationFile>
+  </PropertyGroup>
+
   <ItemGroup>
     <Compile Include="..\Shared\AWSUtils.cs" Link="AWSUtils.cs" />
   </ItemGroup>

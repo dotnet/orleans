@@ -11,6 +11,10 @@
     <RootNamespace>OrleansZooKeeperUtils</RootNamespace>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DocumentationFile>bin\Debug\netstandard2.0\Orleans.Clustering.ZooKeeper.xml</DocumentationFile>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="ZooKeeperNetEx" Version="$(ZooKeeperNetExVersion)" />
   </ItemGroup>
