@@ -9,19 +9,19 @@ namespace Orleans.Hosting
     {
 
         /// <summary>
-        /// Configure cluster client to use SQS persistent streams.
+        /// Configure cluster client to use SQS persistent streams. This will return a configurator which allows further configuration
         /// </summary>
-        public static ClusterClientSqsStreamConfigurator AddSqsStreams(this IClientBuilder builder, string name)
+        public static ClusterClientSqsStreamConfigurator ConfigureSqsStreams(this IClientBuilder builder, string name)
         {
             return new ClusterClientSqsStreamConfigurator(name, builder);
         }
 
         /// <summary>
-        /// Configure cluster client to use SQS persistent streams.
+        /// Configure cluster client to use SQS persistent streams with default settings
         /// </summary>
         public static IClientBuilder AddSqsStreams(this IClientBuilder builder, string name, Action<SqsOptions> configureOptions)
         {
-            var ignore = new ClusterClientSqsStreamConfigurator(name, builder)
+            builder.ConfigureSqsStreams(name)
                 .ConfigureSqs(ob=>ob.Configure(configureOptions));
             return builder;
         }

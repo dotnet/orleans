@@ -61,7 +61,7 @@ namespace Tester.AzureUtils.Lease
             {
                 hostBuilder
                     .ConfigureServices(ConfigureServices)
-                    .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName)
+                    .ConfigureMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName)
                     .ConfigureQueueMapper(totalQueueCount)
                     .UseClusterConfigDeploymentLeaseBasedBalancer();
 

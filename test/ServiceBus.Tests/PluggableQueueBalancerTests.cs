@@ -37,7 +37,7 @@ namespace ServiceBus.Tests
                 {
                     hostBuilder
                         .AddMemoryGrainStorage("PubSubStore")
-                        .AddPersistentStreams(StreamProviderName,
+                        .ConfigurePersistentStreams(StreamProviderName,
                             EventDataGeneratorAdapterFactory.Create)
                         .Configure<EventDataGeneratorStreamOptions>(ob => ob.Configure(
                             options =>

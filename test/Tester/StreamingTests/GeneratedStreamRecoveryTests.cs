@@ -40,7 +40,7 @@ namespace UnitTests.StreamingTests
                     hostBuilder
                          .AddMemoryGrainStorageAsDefault()
                         .AddMemoryGrainStorage("MemoryStore")
-                        .AddPersistentStreams(StreamProviderName,
+                        .ConfigurePersistentStreams(StreamProviderName,
                             GeneratorAdapterFactory.Create)
                         .Configure<HashRingStreamQueueMapperOptions>(ob=>ob.Configure(options =>
                             {

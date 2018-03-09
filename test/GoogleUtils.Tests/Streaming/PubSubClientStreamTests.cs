@@ -51,14 +51,13 @@ namespace GoogleUtils.Tests.Streaming
             {
                 hostBuilder
                     .AddMemoryGrainStorage("PubSubStore")
-                    .AddPubSubStreams<PubSubDataAdapter>(PROVIDER_NAME)
-                    .ConfigurePubSub(ob=>ob.Configure(options =>
+                    .AddPubSubStreams<PubSubDataAdapter>(PROVIDER_NAME, options =>
                     {
                         options.ProjectId = GoogleTestUtils.ProjectId;
                         options.TopicId = GoogleTestUtils.TopicId;
                         options.ClusterId = GoogleTestUtils.DeploymentId.ToString();
                         options.Deadline = TimeSpan.FromSeconds(600);
-                    }));
+                    });
             }
         }
 
@@ -67,14 +66,13 @@ namespace GoogleUtils.Tests.Streaming
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddPubSubStreams<PubSubDataAdapter>(PROVIDER_NAME)
-                    .ConfigurePubSub(ob=>ob.Configure(options =>
+                    .AddPubSubStreams<PubSubDataAdapter>(PROVIDER_NAME, options =>
                     {
                         options.ProjectId = GoogleTestUtils.ProjectId;
                         options.TopicId = GoogleTestUtils.TopicId;
                         options.ClusterId = GoogleTestUtils.DeploymentId.ToString();
                         options.Deadline = TimeSpan.FromSeconds(600);
-                    }));
+                    });
             }
         }
 

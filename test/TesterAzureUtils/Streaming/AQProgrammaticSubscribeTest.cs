@@ -29,8 +29,7 @@ namespace Tester.AzureUtils.Streaming
                 {
                     hostBuilder
                         .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamProviderName2, ob=>ob.Configure(options => options.ConnectionString = TestDefaultConfiguration.DataConnectionString))
-                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamProviderName)
-                        .ConfigureAzureQueue(ob => ob.Configure(
+                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamProviderName, ob => ob.Configure(
                             options =>
                             {
                                 options.ConnectionString = TestDefaultConfiguration.DataConnectionString;

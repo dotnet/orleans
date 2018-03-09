@@ -43,7 +43,7 @@ namespace ServiceBus.Tests.MonitorTests
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddPersistentStreams(StreamProviderName, EHStreamProviderForMonitorTestsAdapterFactory.Create)
+                        .ConfigurePersistentStreams(StreamProviderName, EHStreamProviderForMonitorTestsAdapterFactory.Create)
                         .ConfigureComponent<IStreamQueueCheckpointerFactory>((s, n) => NoOpCheckpointerFactory.Instance)
                         .Configure<StreamStatisticOptions>(ob => ob.Configure(options => options.StatisticMonitorWriteInterval = monitorWriteInterval))
                         .UseDynamicClusterConfigDeploymentBalancer();

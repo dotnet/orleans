@@ -8,9 +8,9 @@ namespace Orleans.Hosting
     public static class SiloBuilderExtensions
     {
         /// <summary>
-        /// Configure silo to use SQS persistent streams.
+        /// Configure silo to use SQS persistent streams. This returns a configurator which allows further configuration
         /// </summary>
-        public static SiloSqsStreamConfigurator AddSqsStreams(this ISiloHostBuilder builder, string name)
+        public static SiloSqsStreamConfigurator ConfigureSqsStreams(this ISiloHostBuilder builder, string name)
         {
             return new SiloSqsStreamConfigurator(name, builder);
         }
@@ -20,7 +20,7 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloHostBuilder AddSqsStreams(this ISiloHostBuilder builder, string name, Action<SqsOptions> configureOptions)
         {
-            var ignore = new SiloSqsStreamConfigurator(name, builder)
+            builder.ConfigureSqsStreams(name)
                 .ConfigureSqs(ob => ob.Configure(configureOptions));
             return builder;
         }

@@ -50,7 +50,7 @@ namespace ServiceBus.Tests.StreamingTests
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     })
-                    .AddEventHubStreams(StreamProviderName)
+                    .ConfigureEventHubStreams(StreamProviderName)
                     .ConfigureEventHub(ob=>ob.Configure(
                     options =>
                     {
@@ -75,7 +75,7 @@ namespace ServiceBus.Tests.StreamingTests
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddEventHubStreams(StreamProviderName)
+                    .ConfigureEventHubStreams(StreamProviderName)
                     .ConfigureEventHub(ob => ob.Configure(
                     options =>
                     {

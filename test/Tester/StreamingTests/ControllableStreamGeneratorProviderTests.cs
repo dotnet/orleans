@@ -40,7 +40,7 @@ namespace UnitTests.StreamingTests
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddPersistentStreams(StreamProviderName,
+                        .ConfigurePersistentStreams(StreamProviderName,
                             GeneratorAdapterFactory.Create)
                         .Configure<HashRingStreamQueueMapperOptions>(ob=>ob.Configure(options=>options.TotalQueueCount = TotalQueueCount))
                         .UseDynamicClusterConfigDeploymentBalancer()

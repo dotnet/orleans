@@ -50,7 +50,7 @@ namespace ServiceBus.Tests.StreamingTests
                 {
                     hostBuilder
                         .AddMemoryGrainStorage("PubSubStorage")
-                        .AddEventHubStreams(StreamProviderName)
+                        .ConfigureEventHubStreams(StreamProviderName)
                         .ConfigureEventHub(ob => ob.Configure(
                         options =>
                         {

@@ -36,7 +36,7 @@ namespace Tester.AzureUtils.Streaming
             {
                 clientBuilder
                     .AddSimpleMessageStreamProvider(SmsStreamProviderName)
-                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName)
+                    .ConfigureAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName)
                     .ConfigureAzureQueue(ob=>ob.Configure(
                         options =>
                         {
@@ -64,8 +64,7 @@ namespace Tester.AzureUtils.Streaming
                             options.DeleteStateOnClear = true;
                         }))
                     .AddMemoryGrainStorage("MemoryStore")
-                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName)
-                    .ConfigureAzureQueue(ob => ob.Configure(
+                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName, ob => ob.Configure(
                         options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;

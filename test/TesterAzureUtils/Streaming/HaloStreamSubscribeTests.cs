@@ -54,14 +54,14 @@ namespace UnitTests.HaloTests.Streaming
                             options.DeleteStateOnClear = true;
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         }))
-                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName)
+                        .ConfigureAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName)
                         .ConfigureAzureQueue(ob => ob.Configure(
                             options =>
                             {
                                 options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             }));
                     hostBuilder
-                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>("AzureQueueProvider2")
+                        .ConfigureAzureQueueStreams<AzureQueueDataAdapterV2>("AzureQueueProvider2")
                         .ConfigureAzureQueue(ob => ob.Configure(
                             options =>
                             {
