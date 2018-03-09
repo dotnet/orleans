@@ -67,7 +67,7 @@ namespace NonSilo.Tests
         {
             var builder = new SiloHostBuilder().Configure()
                 .UseConfiguration(new ClusterConfiguration())
-                .ConfigureServices(RemoveConfigValidators)
+                .ConfigureServices(RemoveConfigValidatorsAndSetAddress)
                 .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
             using (var silo = builder.Build())
             {
@@ -83,7 +83,7 @@ namespace NonSilo.Tests
         {
             var builder = new SiloHostBuilder().Configure()
                 .UseConfiguration(new ClusterConfiguration())
-                .ConfigureServices(RemoveConfigValidators)
+                .ConfigureServices(RemoveConfigValidatorsAndSetAddress)
                 .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
             using (builder.Build())
             {
@@ -98,7 +98,7 @@ namespace NonSilo.Tests
         public void SiloHostBuilder_DoubleSpecifyConfigurationTest()
         {
             var builder = new SiloHostBuilder().Configure()
-                .ConfigureServices(RemoveConfigValidators)
+                .ConfigureServices(RemoveConfigValidatorsAndSetAddress)
                 .UseConfiguration(new ClusterConfiguration())
                 .UseConfiguration(new ClusterConfiguration());
             Assert.Throws<InvalidOperationException>(() => builder.Build());
@@ -111,7 +111,7 @@ namespace NonSilo.Tests
         public void SiloHostBuilder_NullConfigurationTest()
         {
             var builder = new SiloHostBuilder().Configure()
-                .ConfigureServices(RemoveConfigValidators);
+                .ConfigureServices(RemoveConfigValidatorsAndSetAddress);
             Assert.Throws<ArgumentNullException>(() => builder.UseConfiguration(null));
         }
 
@@ -123,7 +123,7 @@ namespace NonSilo.Tests
         {
             var builder = new SiloHostBuilder().Configure()
                 .UseConfiguration(new ClusterConfiguration())
-                .ConfigureServices(RemoveConfigValidators)
+                .ConfigureServices(RemoveConfigValidatorsAndSetAddress)
                 .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
 
             Assert.Throws<ArgumentNullException>(() => builder.ConfigureServices(null));
@@ -164,7 +164,7 @@ namespace NonSilo.Tests
             }
         }
 
-        private static void RemoveConfigValidators(IServiceCollection services)
+        private static void RemoveConfigValidatorsAndSetAddress(IServiceCollection services)
         {
             var validators = services.Where(descriptor => descriptor.ServiceType == typeof(IConfigurationValidator)).ToList();
             foreach (var validator in validators) services.Remove(validator);
