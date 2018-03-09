@@ -149,7 +149,7 @@ namespace Orleans.Storage
 
         public void Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe(this.options.InitStage, Init, Close);
+            lifecycle.Subscribe(OptionFormattingUtilities.Name<AdoNetGrainStorage>(this.name), this.options.InitStage, Init, Close);
         }
         /// <summary>Clear state data function for this storage provider.</summary>
         /// <see cref="IStorageProvider.ClearStateAsync(string, GrainReference, IGrainState)"/>.

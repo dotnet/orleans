@@ -213,7 +213,7 @@ namespace AWSUtils.Tests.StorageTests
             options.Service = AWSTestConstants.Service;
 
             DynamoDBGrainStorage store = ActivatorUtilities.CreateInstance<DynamoDBGrainStorage>(runtime.ServiceProvider, options);
-            SiloLifecycle lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycle>(runtime.ServiceProvider);
+            ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(runtime.ServiceProvider, new LifecycleSubject(null));
             store.Participate(lifecycle);
             await lifecycle.OnStart();
             return store;
