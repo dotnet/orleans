@@ -14,13 +14,12 @@ namespace Orleans.Providers
           where TSerializer : class, IMemoryMessageBodySerializer
     {
         public SiloMemoryStreamConfigurator(string name, ISiloHostBuilder builder)
-            :base(name, builder)
+            :base(name, builder, MemoryAdapterFactory<TSerializer>.Create)
         {
             this.siloBuilder
                 .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(MemoryAdapterFactory<>).Assembly))
                 .ConfigureServices(services => services.ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name)
-                                .ConfigureNamedOptionForLogging<MemoryStreamCacheOptions>(name))
-                .AddPersistentStreams(name, MemoryAdapterFactory<TSerializer>.Create);
+                                .ConfigureNamedOptionForLogging<MemoryStreamCacheOptions>(name));
                 
         }
 
@@ -41,11 +40,10 @@ namespace Orleans.Providers
           where TSerializer : class, IMemoryMessageBodySerializer
     {
         public ClusterClientMemoryStreamConfigurator(string name, IClientBuilder builder)
-         : base(name, builder)
+         : base(name, builder, MemoryAdapterFactory<TSerializer>.Create)
         {
             this.clientBuilder
-                .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(MemoryAdapterFactory<>).Assembly))
-                .AddPersistentStreams(name, MemoryAdapterFactory<TSerializer>.Create);
+                .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(MemoryAdapterFactory<>).Assembly));
         }
     }
 }

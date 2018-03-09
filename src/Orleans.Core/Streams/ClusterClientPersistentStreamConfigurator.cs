@@ -34,10 +34,12 @@ namespace Orleans.Streams
     {
         protected readonly string name;
         protected readonly IClientBuilder clientBuilder;
-        public ClusterClientPersistentStreamConfigurator(string name, IClientBuilder clientBuilder)
+        private Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory;
+        public ClusterClientPersistentStreamConfigurator(string name, IClientBuilder clientBuilder, Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory)
         {
             this.name = name;
             this.clientBuilder = clientBuilder;
+            this.adapterFactory = adapterFactory;
             //wire stream provider into lifecycle 
             this.clientBuilder.ConfigureServices(services => this.AddPersistentStream(services));
         }
@@ -46,8 +48,9 @@ namespace Orleans.Streams
         {
             //wire the stream provider into life cycle
             services.AddSingletonNamedService<IStreamProvider>(name, PersistentStreamProvider.Create)
-                           .AddSingletonNamedService<ILifecycleParticipant<IClusterClientLifecycle>>(name, (s, n) => ((PersistentStreamProvider)s.GetRequiredServiceByName<IStreamProvider>(n)).ParticipateIn<IClusterClientLifecycle>())
-                           .AddSingletonNamedService(name, (s, n) => s.GetServiceByName<IStreamProvider>(n) as IControllable)
+                           .AddSingletonNamedService<ILifecycleParticipant<IClusterClientLifecycle>>(name, 
+                           (s, n) => ((PersistentStreamProvider)s.GetRequiredServiceByName<IStreamProvider>(n)).ParticipateIn<IClusterClientLifecycle>())
+                           .AddSingletonNamedService<IQueueAdapterFactory>(name, adapterFactory)
                            .ConfigureNamedOptionForLogging<StreamInitializationOptions>(name);
         }
 

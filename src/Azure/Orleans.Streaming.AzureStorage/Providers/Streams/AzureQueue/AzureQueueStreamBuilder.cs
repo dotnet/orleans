@@ -3,6 +3,8 @@ using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Streams;
 using System;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans;
 
 namespace Orleans.Streaming
 {
@@ -10,17 +12,18 @@ namespace Orleans.Streaming
         where TDataAdapter : IAzureQueueDataAdapter
     {
         public SiloAzureQueueStreamConfigurator(string name, ISiloHostBuilder builder)
-            : base(name, builder)
+            : base(name, builder, AzureQueueAdapterFactory<TDataAdapter>.Create)
         {
             this.siloBuilder
                 .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(AzureQueueAdapterFactory<>).Assembly))
                 .ConfigureServices(services =>
                 {
                     services.ConfigureNamedOptionForLogging<AzureQueueOptions>(name)
+                            .AddTransient<IConfigurationValidator>(sp => new AzureQueueOptionsValidator(sp.GetOptionsByName<AzureQueueOptions>(name), name))
                         .ConfigureNamedOptionForLogging<SimpleQueueCacheOptions>(name)
+                        .AddTransient<IConfigurationValidator>(sp => new SimpleQueueCacheOptionsValidator(sp.GetOptionsByName<SimpleQueueCacheOptions>(name), name))
                         .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name);
-                })
-                .AddPersistentStreams(name, AzureQueueAdapterFactory<TDataAdapter>.Create);
+                });
         }
 
         public SiloAzureQueueStreamConfigurator<TDataAdapter> ConfigureAzureQueue(Action<OptionsBuilder<AzureQueueOptions>> configureOptions)
@@ -45,12 +48,12 @@ namespace Orleans.Streaming
           where TDataAdapter : IAzureQueueDataAdapter
     {
         public ClusterClientAzureQueueStreamConfigurator(string name, IClientBuilder builder)
-            : base(name, builder)
+            : base(name, builder, AzureQueueAdapterFactory<TDataAdapter>.Create)
         {
             this.clientBuilder.ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(AzureQueueAdapterFactory<>).Assembly))
                  .ConfigureServices(services =>
-                    services.ConfigureNamedOptionForLogging<AzureQueueOptions>(name))
-                 .AddPersistentStreams(name, AzureQueueAdapterFactory<TDataAdapter>.Create);
+                    services.ConfigureNamedOptionForLogging<AzureQueueOptions>(name)
+                    .AddTransient<IConfigurationValidator>(sp => new AzureQueueOptionsValidator(sp.GetOptionsByName<AzureQueueOptions>(name), name)));
                
         }
 

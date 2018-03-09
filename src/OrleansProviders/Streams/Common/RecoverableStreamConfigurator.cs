@@ -25,8 +25,8 @@ namespace Orleans.Streams
 
     public class SiloRecoverableStreamConfigurator : SiloPersistentStreamConfigurator, ISiloRecoverableStreamConfigurator
     {
-        public SiloRecoverableStreamConfigurator(string name, ISiloHostBuilder builder)
-            : base(name, builder)
+        public SiloRecoverableStreamConfigurator(string name, ISiloHostBuilder builder, Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory)
+            : base(name, builder, adapterFactory)
         {
             this.siloBuilder.ConfigureServices(services => services.ConfigureNamedOptionForLogging<StreamStatisticOptions>(name));
         }

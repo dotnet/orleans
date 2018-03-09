@@ -8,9 +8,9 @@ namespace Orleans.Streams
 {
     public static class SiloEventHubStreamBuilderExtensions
     {
-        public static SiloEventHubStreamConfigurator UseEventHubCheckpointer(this SiloEventHubStreamConfigurator builder, Action<OptionsBuilder<EventHubCheckpointerOptions>> configureOptions)
+        public static SiloEventHubStreamConfigurator UseEventHubCheckpointer(this SiloEventHubStreamConfigurator builder, Action<OptionsBuilder<AzureTableStreamCheckpointerOptions>> configureOptions)
         {
-            return builder.ConfigureCheckpointer<EventHubCheckpointerOptions>(configureOptions, EventHubCheckpointerFactory.CreateFactory);
+            return builder.ConfigureCheckpointer<AzureTableStreamCheckpointerOptions>(configureOptions, EventHubCheckpointerFactory.CreateFactory);
         }
     }
 }

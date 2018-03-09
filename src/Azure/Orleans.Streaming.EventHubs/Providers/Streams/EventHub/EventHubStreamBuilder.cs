@@ -1,4 +1,5 @@
-﻿using Orleans.Configuration;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.ServiceBus.Providers;
 using System;
@@ -11,13 +12,14 @@ namespace Orleans.Streams
     public class SiloEventHubStreamConfigurator : SiloRecoverableStreamConfigurator
     {
         public SiloEventHubStreamConfigurator(string name, ISiloHostBuilder builder)
-            : base(name, builder)
+            : base(name, builder, EventHubAdapterFactory.Create)
         {
             this.siloBuilder.ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(EventHubAdapterFactory).Assembly))
                 .ConfigureServices(services => services.ConfigureNamedOptionForLogging<EventHubOptions>(name)
                     .ConfigureNamedOptionForLogging<EventHubReceiverOptions>(name)
-                    .ConfigureNamedOptionForLogging<EventHubStreamCacheOptions>(name))
-                .AddPersistentStreams(this.name, EventHubAdapterFactory.Create);
+                    .ConfigureNamedOptionForLogging<EventHubStreamCacheOptions>(name)
+                    .AddTransient<IConfigurationValidator>(sp => new EventHubOptionsValidator(sp.GetOptionsByName<EventHubOptions>(name), name))
+                    .AddTransient<IConfigurationValidator>(sp => new StreamCheckpointerConfigurationValidator(sp, name)));
         }
 
         public SiloEventHubStreamConfigurator ConfigureCheckpointer<TOptions>(Action<OptionsBuilder<TOptions>> configureOptions, Func<IServiceProvider, string, IStreamQueueCheckpointerFactory> checkpointerFactoryBuilder)
@@ -49,11 +51,11 @@ namespace Orleans.Streams
     public class ClusterClientEventHubStreamConfigurator : ClusterClientPersistentStreamConfigurator
     {
         public ClusterClientEventHubStreamConfigurator(string name, IClientBuilder builder)
-           : base(name, builder)
+           : base(name, builder, EventHubAdapterFactory.Create)
         {
             this.clientBuilder.ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(EventHubAdapterFactory).Assembly))
-                .ConfigureServices(services => services.ConfigureNamedOptionForLogging<EventHubOptions>(name))
-                .AddPersistentStreams(this.name, EventHubAdapterFactory.Create);
+                .ConfigureServices(services => services.ConfigureNamedOptionForLogging<EventHubOptions>(name)
+                .AddTransient<IConfigurationValidator>(sp => new EventHubOptionsValidator(sp.GetOptionsByName<EventHubOptions>(name), name)));
         }
 
         public ClusterClientEventHubStreamConfigurator ConfigureEventHub(Action<OptionsBuilder<EventHubOptions>> configureOptions)

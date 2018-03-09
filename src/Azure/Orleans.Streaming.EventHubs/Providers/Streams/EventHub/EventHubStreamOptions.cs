@@ -1,4 +1,6 @@
 ﻿
+using Orleans.Runtime;
+using Orleans.Streams;
 using System;
 
 namespace Orleans.Configuration
@@ -21,6 +23,43 @@ namespace Orleans.Configuration
         /// Hub path.
         /// </summary>
         public string Path { get; set; }
+    }
+
+    public class EventHubOptionsValidator : IConfigurationValidator
+    {
+        private readonly EventHubOptions options;
+        private readonly string name;
+        public EventHubOptionsValidator(EventHubOptions options, string name)
+        {
+            this.options = options;
+            this.name = name;
+        }
+        public void ValidateConfiguration()
+        {
+            if (String.IsNullOrEmpty(options.ConnectionString))
+                throw new OrleansConfigurationException($"{nameof(EventHubOptions)} on stream provider {this.name} is invalid. {nameof(EventHubOptions.ConnectionString)} is invalid");
+            if (String.IsNullOrEmpty(options.ConsumerGroup))
+                throw new OrleansConfigurationException($"{nameof(EventHubOptions)} on stream provider {this.name} is invalid. {nameof(EventHubOptions.ConsumerGroup)} is invalid");
+            if (String.IsNullOrEmpty(options.Path))
+                throw new OrleansConfigurationException($"{nameof(EventHubOptions)} on stream provider {this.name} is invalid. {nameof(EventHubOptions.Path)} is invalid");
+        }
+    }
+
+    public class StreamCheckpointerConfigurationValidator : IConfigurationValidator
+    {
+        private readonly IServiceProvider services;
+        private string name;
+        public StreamCheckpointerConfigurationValidator(IServiceProvider services, string name)
+        {
+            this.services = services;
+            this.name = name;
+        }
+        public void ValidateConfiguration()
+        {
+            var checkpointerFactory = services.GetServiceByName<IStreamQueueCheckpointerFactory>(this.name);
+            if(checkpointerFactory == null)
+                throw new OrleansConfigurationException($"No IStreamQueueCheckpointer is configured with PersistentStreamProvider {this.name}. Please configure one.");
+        }
     }
 
     public class EventHubReceiverOptions

@@ -51,6 +51,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
                        options.SlowConsumingMonitorFlowControlThreshold = flowControlThredhold;
                        options.AveragingCachePressureMonitorFlowControlThreshold = null;
                    }))
+                   .ConfigureComponent<IStreamQueueCheckpointerFactory>((s,n)=>NoOpCheckpointerFactory.Instance)
                    .UseDynamicClusterConfigDeploymentBalancer();
                     hostBuilder
                     .AddMemoryGrainStorage("PubSubStore");

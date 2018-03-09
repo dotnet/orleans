@@ -20,9 +20,9 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
     public class StreamPerPartitionEventHubStreamAdapterFactory : EventHubAdapterFactory
     {
         public StreamPerPartitionEventHubStreamAdapterFactory(string name, EventHubOptions ehOptions, EventHubReceiverOptions receiverOptions,
-            EventHubStreamCacheOptions cacheOptions, StreamStatisticOptions statisticOptions, IStreamQueueCheckpointerFactory checkpointerFactory,
+            EventHubStreamCacheOptions cacheOptions, StreamStatisticOptions statisticOptions, 
             IServiceProvider serviceProvider, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
-            : base(name, ehOptions, receiverOptions, cacheOptions, statisticOptions, checkpointerFactory, serviceProvider, serializationManager, telemetryProducer, loggerFactory)
+            : base(name, ehOptions, receiverOptions, cacheOptions, statisticOptions, serviceProvider, serializationManager, telemetryProducer, loggerFactory)
         {
         }
 
@@ -89,8 +89,7 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
             var receiverOptions = services.GetOptionsByName<EventHubReceiverOptions>(name);
             var cacheOptions = services.GetOptionsByName<EventHubStreamCacheOptions>(name);
             var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
-            var checkpointerFactory = services.GetServiceByName<IStreamQueueCheckpointerFactory>(name);
-            var factory = ActivatorUtilities.CreateInstance<StreamPerPartitionEventHubStreamAdapterFactory>(services, name, ehOptions, receiverOptions, cacheOptions, statisticOptions, checkpointerFactory);
+            var factory = ActivatorUtilities.CreateInstance<StreamPerPartitionEventHubStreamAdapterFactory>(services, name, ehOptions, receiverOptions, cacheOptions, statisticOptions);
             factory.Init();
             return factory;
         }

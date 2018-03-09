@@ -26,8 +26,6 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="loggerFactory"></param>
         public SimpleQueueAdapterCache(SimpleQueueCacheOptions options, string providerName, ILoggerFactory loggerFactory)
         {
-            if (cacheSize <= 0)
-                throw new ArgumentOutOfRangeException("cacheSize", "CacheSize must be a positive number.");
             this.cacheSize = options.CacheSize;
             this.loggerFactory = loggerFactory;
             this.providerName = providerName;

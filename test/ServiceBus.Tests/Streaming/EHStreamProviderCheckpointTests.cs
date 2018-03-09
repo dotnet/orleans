@@ -60,10 +60,10 @@ namespace ServiceBus.Tests.StreamingTests
                      
                     }))
                     .UseEventHubCheckpointer(ob=>ob.Configure(options => {
-                        options.CheckpointConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        options.CheckpointTableName = EHCheckpointTable;
-                        options.CheckpointNamespace = CheckpointNamespace;
-                        options.CheckpointPersistInterval = TimeSpan.FromSeconds(1);
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.TableName = EHCheckpointTable;
+                        options.Namespace = CheckpointNamespace;
+                        options.PersistInterval = TimeSpan.FromSeconds(1);
                     }))
                     .UseDynamicClusterConfigDeploymentBalancer()
                     .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);

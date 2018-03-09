@@ -25,7 +25,7 @@ namespace Orleans.ServiceBus.Providers.Testing
         public EventDataGeneratorAdapterFactory(string name, EventDataGeneratorStreamOptions options,
             EventHubOptions ehOptions, EventHubReceiverOptions receiverOptions, EventHubStreamCacheOptions cacheOptions, StreamStatisticOptions statisticOptions,
             IServiceProvider serviceProvider, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
-            : base(name, ehOptions, receiverOptions, cacheOptions, statisticOptions, NoOpCheckpointerFactory.Instance, serviceProvider, serializationManager, telemetryProducer, loggerFactory)
+            : base(name, ehOptions, receiverOptions, cacheOptions, statisticOptions, serviceProvider, serializationManager, telemetryProducer, loggerFactory)
         {
             this.ehGeneratorOptions = options;
         }

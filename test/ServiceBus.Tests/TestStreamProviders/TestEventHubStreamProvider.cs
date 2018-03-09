@@ -10,14 +10,15 @@ using Orleans.ServiceBus.Providers;
 using Tester.TestStreamProviders;
 using Orleans;
 using Orleans.Streams;
+using Orleans.ServiceBus.Providers.Testing;
 
 namespace ServiceBus.Tests.TestStreamProviders.EventHub
 {
     public class TestEventHubStreamAdapterFactory : EventHubAdapterFactory
     {
         public TestEventHubStreamAdapterFactory(string name, EventHubOptions ehOptions, EventHubReceiverOptions receiverOptions, EventHubStreamCacheOptions cacheOptions, StreamStatisticOptions statisticOptions,
-            IStreamQueueCheckpointerFactory checkpointerFactory, IServiceProvider serviceProvider, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
-            : base(name, ehOptions, receiverOptions, cacheOptions, statisticOptions, checkpointerFactory, serviceProvider, serializationManager, telemetryProducer, loggerFactory)
+            IServiceProvider serviceProvider, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
+            : base(name, ehOptions, receiverOptions, cacheOptions, statisticOptions, serviceProvider, serializationManager, telemetryProducer, loggerFactory)
         {
             StreamFailureHandlerFactory = qid => TestAzureTableStorageStreamFailureHandler.Create(this.serviceProvider.GetRequiredService<SerializationManager>());
         }
@@ -28,8 +29,7 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
             var receiverOptions = services.GetOptionsByName<EventHubReceiverOptions>(name);
             var cacheOptions = services.GetOptionsByName<EventHubStreamCacheOptions>(name);
             var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
-            var checkpointerFactory = services.GetServiceByName<IStreamQueueCheckpointerFactory>(name);
-            var factory = ActivatorUtilities.CreateInstance<TestEventHubStreamAdapterFactory>(services, name, ehOptions, receiverOptions, cacheOptions, statisticOptions, checkpointerFactory);
+            var factory = ActivatorUtilities.CreateInstance<TestEventHubStreamAdapterFactory>(services, name, ehOptions, receiverOptions, cacheOptions, statisticOptions);
             factory.Init();
             return factory;
         }

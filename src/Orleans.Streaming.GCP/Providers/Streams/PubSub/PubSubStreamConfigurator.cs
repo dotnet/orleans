@@ -11,7 +11,7 @@ namespace Orleans.Streams
          where TDataAdapter : IPubSubDataAdapter
     {
         public SiloPubSubStreamConfigurator(string name, ISiloHostBuilder builder)
-            : base(name, builder)
+            : base(name, builder, PubSubAdapterFactory<TDataAdapter>.Create)
         {
             this.siloBuilder
                 .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(PubSubAdapterFactory<>).Assembly))
@@ -20,8 +20,7 @@ namespace Orleans.Streams
                     services.ConfigureNamedOptionForLogging<PubSubOptions>(name)
                         .ConfigureNamedOptionForLogging<SimpleQueueCacheOptions>(name)
                         .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name);
-                })
-                .AddPersistentStreams(name, PubSubAdapterFactory<TDataAdapter>.Create);
+                });
         }
 
         public SiloPubSubStreamConfigurator<TDataAdapter> ConfigurePubSub(Action<OptionsBuilder<PubSubOptions>> configureOptions)
@@ -46,12 +45,11 @@ namespace Orleans.Streams
         where TDataAdapter : IPubSubDataAdapter
     {
         public ClusterClientPubSubStreamConfigurator(string name, IClientBuilder builder)
-            : base(name, builder)
+            : base(name, builder, PubSubAdapterFactory<TDataAdapter>.Create)
         {
             this.clientBuilder
                 .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(PubSubAdapterFactory<>).Assembly))
-                .ConfigureServices(services => services.ConfigureNamedOptionForLogging<PubSubOptions>(name))
-                .AddPersistentStreams(name, PubSubAdapterFactory<TDataAdapter>.Create);
+                .ConfigureServices(services => services.ConfigureNamedOptionForLogging<PubSubOptions>(name));
         }
 
         public ClusterClientPubSubStreamConfigurator<TDataAdapter> ConfigurePubSub(Action<OptionsBuilder<PubSubOptions>> configureOptions)

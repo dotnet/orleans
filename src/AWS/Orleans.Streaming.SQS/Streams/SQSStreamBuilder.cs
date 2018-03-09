@@ -10,7 +10,7 @@ namespace Orleans.Streams
     public class SiloSqsStreamConfigurator: SiloPersistentStreamConfigurator
     {
         public SiloSqsStreamConfigurator(string name, ISiloHostBuilder builder)
-            : base(name, builder)
+            : base(name, builder, SQSAdapterFactory.Create)
         {
             this.siloBuilder
                 .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(SQSAdapterFactory).Assembly))
@@ -19,8 +19,7 @@ namespace Orleans.Streams
                     services.ConfigureNamedOptionForLogging<SqsOptions>(name)
                         .ConfigureNamedOptionForLogging<SimpleQueueCacheOptions>(name)
                         .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name);
-                })
-                .AddPersistentStreams(name, SQSAdapterFactory.Create);
+                });
         }
 
         public SiloSqsStreamConfigurator ConfigureSqs(Action<OptionsBuilder<SqsOptions>> configureOptions)
@@ -44,15 +43,14 @@ namespace Orleans.Streams
     public class ClusterClientSqsStreamConfigurator : ClusterClientPersistentStreamConfigurator
     {
         public ClusterClientSqsStreamConfigurator(string name, IClientBuilder builder)
-            : base(name, builder)
+            : base(name, builder, SQSAdapterFactory.Create)
         {
             this.clientBuilder
                 .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(SQSAdapterFactory).Assembly))
                 .ConfigureServices(services =>
                 {
                     services.ConfigureNamedOptionForLogging<SqsOptions>(name);
-                })
-                .AddPersistentStreams(name, SQSAdapterFactory.Create);
+                });
         }
 
         public ClusterClientSqsStreamConfigurator ConfigureSqs(Action<OptionsBuilder<SqsOptions>> configureOptions)

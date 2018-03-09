@@ -15,10 +15,12 @@ namespace Orleans.Streams
     {
         protected readonly string name;
         protected readonly ISiloHostBuilder siloBuilder;
-        public SiloPersistentStreamConfigurator(string name, ISiloHostBuilder siloBuilder)
+        private Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory;
+        public SiloPersistentStreamConfigurator(string name, ISiloHostBuilder siloBuilder, Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory)
         {
             this.name = name;
             this.siloBuilder = siloBuilder;
+            this.adapterFactory = adapterFactory;
             //wire stream provider into lifecycle 
             this.siloBuilder.ConfigureServices(services => this.AddPersistentStream(services));
         }
@@ -28,6 +30,7 @@ namespace Orleans.Streams
             //wire the stream provider into life cycle
             services.AddSingletonNamedService<IStreamProvider>(name, PersistentStreamProvider.Create)
                            .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => ((PersistentStreamProvider)s.GetRequiredServiceByName<IStreamProvider>(n)).ParticipateIn<ISiloLifecycle>())
+                           .AddSingletonNamedService<IQueueAdapterFactory>(name, adapterFactory)
                            .AddSingletonNamedService(name, (s, n) => s.GetServiceByName<IStreamProvider>(n) as IControllable)
                            .ConfigureNamedOptionForLogging<StreamPullingAgentOptions>(name)
                            .ConfigureNamedOptionForLogging<StreamPubSubOptions>(name)

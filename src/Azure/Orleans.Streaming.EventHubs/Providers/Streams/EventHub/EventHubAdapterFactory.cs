@@ -11,7 +11,6 @@ using Orleans.Serialization;
 using Orleans.Streams;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Hosting;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -101,7 +100,7 @@ namespace Orleans.ServiceBus.Providers
         internal IEventHubQueueMapper EventHubQueueMapper { get { return this.streamQueueMapper; } }
 
         public EventHubAdapterFactory(string name, EventHubOptions ehOptions, EventHubReceiverOptions receiverOptions, EventHubStreamCacheOptions cacheOptions, StreamStatisticOptions statisticOptions,
-            IStreamQueueCheckpointerFactory checkpointerFactory, IServiceProvider serviceProvider, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
+            IServiceProvider serviceProvider, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
         {
             this.Name = name;
             this.statisticOptions = statisticOptions ?? throw new ArgumentNullException(nameof(statisticOptions));
@@ -112,7 +111,6 @@ namespace Orleans.ServiceBus.Providers
             this.SerializationManager = serializationManager ?? throw new ArgumentNullException(nameof(serializationManager));
             this.telemetryProducer = telemetryProducer ?? throw new ArgumentNullException(nameof(telemetryProducer));
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
-            this.checkpointerFactory = checkpointerFactory ?? throw new ArgumentNullException(nameof(checkpointerFactory));
         }
 
         public virtual void Init()
@@ -146,6 +144,11 @@ namespace Orleans.ServiceBus.Providers
             this.logger = this.loggerFactory.CreateLogger($"{this.GetType().FullName}.{this.ehOptions.Path}");
         }
 
+        //should only need checkpointer on silo side, so move its init logic when it is used
+        private void InitCheckpointerFactory()
+        {
+            this.checkpointerFactory = this.serviceProvider.GetRequiredServiceByName<IStreamQueueCheckpointerFactory>(this.Name);
+        }
         /// <summary>
         /// Create queue adapter.
         /// </summary>
@@ -272,7 +275,8 @@ namespace Orleans.ServiceBus.Providers
                 EventHubPartition = config.Partition,
                 EventHubPath = config.Hub.Path,
             };
-
+            if (this.checkpointerFactory == null)
+                InitCheckpointerFactory();
             return new EventHubAdapterReceiver(config, this.CacheFactory, this.checkpointerFactory.Create, this.loggerFactory, this.ReceiverMonitorFactory(receiverMonitorDimensions, this.loggerFactory, this.telemetryProducer), 
                 this.serviceProvider.GetRequiredService<IOptions<LoadSheddingOptions>>().Value,
                 this.telemetryProducer,
@@ -295,8 +299,7 @@ namespace Orleans.ServiceBus.Providers
             var receiverOptions = services.GetOptionsByName<EventHubReceiverOptions>(name);
             var cacheOptions = services.GetOptionsByName<EventHubStreamCacheOptions>(name);
             var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
-            var checkpointerFactory = services.GetServiceByName<IStreamQueueCheckpointerFactory>(name);
-            var factory = ActivatorUtilities.CreateInstance<EventHubAdapterFactory>(services, name, ehOptions, receiverOptions, cacheOptions, statisticOptions, checkpointerFactory);
+            var factory = ActivatorUtilities.CreateInstance<EventHubAdapterFactory>(services, name, ehOptions, receiverOptions, cacheOptions, statisticOptions);
             factory.Init();
             return factory;
         }

@@ -55,10 +55,10 @@ namespace ServiceBus.Tests.Streaming
                         .UseEventHubCheckpointer(ob=>ob.Configure(options =>
                         {
                             
-                            options.CheckpointConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            options.CheckpointTableName = EHCheckpointTable;
-                            options.CheckpointNamespace = CheckpointNamespace;
-                            options.CheckpointPersistInterval = TimeSpan.FromSeconds(10);
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.TableName = EHCheckpointTable;
+                            options.Namespace = CheckpointNamespace;
+                            options.PersistInterval = TimeSpan.FromSeconds(10);
                         }));
 
                     hostBuilder
@@ -71,10 +71,10 @@ namespace ServiceBus.Tests.Streaming
                           
                         }))
                         .UseEventHubCheckpointer(ob => ob.Configure(options => {
-                            options.CheckpointConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            options.CheckpointTableName = EHCheckpointTable;
-                            options.CheckpointNamespace = CheckpointNamespace2;
-                            options.CheckpointPersistInterval = TimeSpan.FromSeconds(10);
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.TableName = EHCheckpointTable;
+                            options.Namespace = CheckpointNamespace2;
+                            options.PersistInterval = TimeSpan.FromSeconds(10);
                         }));
 
                     hostBuilder

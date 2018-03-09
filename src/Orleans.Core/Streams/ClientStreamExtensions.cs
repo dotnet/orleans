@@ -19,21 +19,7 @@ namespace Orleans.Hosting
             string name,
             Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory)
         {
-            builder.ConfigureServices(services => services.AddClusterClientPersistentStreams(name, adapterFactory));
-            return new ClusterClientPersistentStreamConfigurator(name, builder);
-        }
-        /// <summary>
-        /// Configure silo to use persistent streams.
-        /// </summary>
-        private static void AddClusterClientPersistentStreams(
-            this IServiceCollection services,
-            string name,
-            Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory)
-        {
-            services.AddSingletonNamedService<IStreamProvider>(name, PersistentStreamProvider.Create)
-                .AddSingletonNamedService<ILifecycleParticipant<IClusterClientLifecycle>>(name,
-                    (s, n) => ((PersistentStreamProvider) s.GetRequiredServiceByName<IStreamProvider>(n)).ParticipateIn<IClusterClientLifecycle>())
-                .AddSingletonNamedService<IQueueAdapterFactory>(name, adapterFactory);
+            return new ClusterClientPersistentStreamConfigurator(name, builder, adapterFactory);
         }
 
         /// <summary>
