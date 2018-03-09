@@ -1,6 +1,4 @@
 
-using System.Collections.Generic;
-using Microsoft.Extensions.Options;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
 

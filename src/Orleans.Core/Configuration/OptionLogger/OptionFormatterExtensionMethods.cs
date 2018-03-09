@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using System.Linq;
+
 namespace Orleans.Configuration
 {
     /// <summary>

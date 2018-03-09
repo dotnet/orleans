@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 
 namespace Orleans.Runtime
 {
@@ -54,13 +53,6 @@ namespace Orleans.Runtime
 
         internal const long ReminderTableGrainId = 12345;
 
-        public static readonly TimeSpan DEFAULT_OPENCONNECTION_TIMEOUT = TimeSpan.FromSeconds(5);
-
-        /// <summary>
-        /// The default timeout before a request is assumed to have failed.
-        /// </summary>
-        public static readonly TimeSpan DEFAULT_RESPONSE_TIMEOUT = Debugger.IsAttached ? TimeSpan.FromMinutes(30) : TimeSpan.FromSeconds(30);
-
         /// <summary>
         /// Minimum period for registering a reminder ... we want to enforce a lower bound
         /// </summary>
@@ -71,8 +63,6 @@ namespace Orleans.Runtime
         public static readonly TimeSpan RefreshReminderList = TimeSpan.FromMinutes(5);
 
         public const int LARGE_OBJECT_HEAP_THRESHOLD = 85000;
-
-        public const bool DEFAULT_PROPAGATE_E2E_ACTIVITY_ID = false;
 
         public const int DEFAULT_LOGGER_BULK_MESSAGE_LIMIT = 5;
 

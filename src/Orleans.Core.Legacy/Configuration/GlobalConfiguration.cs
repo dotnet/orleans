@@ -505,10 +505,6 @@ namespace Orleans.Runtime.Configuration
 
         internal bool RunsInAzure { get { return this.UseAzureSystemStore && !string.IsNullOrWhiteSpace(this.ClusterId); } }
 
-        private const int DEFAULT_MAX_MULTICLUSTER_GATEWAYS = 10;
-        private const bool DEFAULT_USE_GLOBAL_SINGLE_INSTANCE = true;
-        private static readonly TimeSpan DEFAULT_BACKGROUND_GOSSIP_INTERVAL = TimeSpan.FromSeconds(30);
-        private const int DEFAULT_GLOBAL_SINGLE_INSTANCE_NUMBER_RETRIES = 10;
         private const int DEFAULT_LIVENESS_EXPECTED_CLUSTER_SIZE = 20;
         public static bool ENFORCE_MINIMUM_REQUIREMENT_FOR_AGE_LIMIT = true;
         public static readonly string DEFAULT_MULTICLUSTER_REGISTRATION_STRATEGY = typeof(GlobalSingleInstanceRegistration).Name;
@@ -535,11 +531,11 @@ namespace Orleans.Runtime.Configuration
             this.ValidateInitialConnectivity = ClusterMembershipOptions.DEFAULT_VALIDATE_INITIAL_CONNECTIVITY;
             this.MaxJoinAttemptTime = ClusterMembershipOptions.DEFAULT_LIVENESS_MAX_JOIN_ATTEMPT_TIME;
             this.TypeMapRefreshInterval = TypeManagementOptions.DEFAULT_REFRESH_CLUSTER_INTERFACEMAP_TIME;
-            this.MaxMultiClusterGateways = DEFAULT_MAX_MULTICLUSTER_GATEWAYS;
-            this.BackgroundGossipInterval = DEFAULT_BACKGROUND_GOSSIP_INTERVAL;
-            this.UseGlobalSingleInstanceByDefault = DEFAULT_USE_GLOBAL_SINGLE_INSTANCE;
+            this.MaxMultiClusterGateways = MultiClusterOptions.DEFAULT_MAX_MULTICLUSTER_GATEWAYS;
+            this.BackgroundGossipInterval = MultiClusterOptions.DEFAULT_BACKGROUND_GOSSIP_INTERVAL;
+            this.UseGlobalSingleInstanceByDefault = MultiClusterOptions.DEFAULT_USE_GLOBAL_SINGLE_INSTANCE;
             this.GlobalSingleInstanceRetryInterval = MultiClusterOptions.DEFAULT_GLOBAL_SINGLE_INSTANCE_RETRY_INTERVAL;
-            this.GlobalSingleInstanceNumberRetries = DEFAULT_GLOBAL_SINGLE_INSTANCE_NUMBER_RETRIES;
+            this.GlobalSingleInstanceNumberRetries = MultiClusterOptions.DEFAULT_GLOBAL_SINGLE_INSTANCE_NUMBER_RETRIES;
             this.ExpectedClusterSizeConfigValue = new ConfigValue<int>(DEFAULT_LIVENESS_EXPECTED_CLUSTER_SIZE, true);
             this.ServiceId = Guid.Empty;
             this.ClusterId = "";
