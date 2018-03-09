@@ -15,14 +15,14 @@ namespace Orleans.Hosting
         /// <param name="advertisedIP">The IP address to be advertised in membership tables</param>
         /// <param name="siloPort">The port this silo uses for silo-to-silo communication.</param>
         /// <param name="gatewayPort">The port this silo uses for client-to-silo (gateway) communication. Specify 0 to disable gateway functionality.</param>
-        /// <param name="listenOnAllHostAddresses">Set to true to listen on all IP addresses of the host instead of just the advertiseIP.</param>
+        /// <param name="listenOnAnyHostAddress">Set to true to listen on all IP addresses of the host instead of just the advertiseIP.</param>
         /// <returns></returns>
         public static ISiloHostBuilder ConfigureEndpoints(
             this ISiloHostBuilder builder,
             IPAddress advertisedIP,
             int siloPort,
             int gatewayPort,
-            bool listenOnAllHostAddresses = false)
+            bool listenOnAnyHostAddress = false)
         {
             builder.Configure<EndpointOptions>(options =>
             {
@@ -30,7 +30,7 @@ namespace Orleans.Hosting
                 options.GatewayPort = gatewayPort;
                 options.SiloPort = siloPort;
 
-                if (listenOnAllHostAddresses)
+                if (listenOnAnyHostAddress)
                 {
                     options.SiloListeningEndpoint = new IPEndPoint(IPAddress.Any, siloPort);
                     options.GatewayListeningEndpoint = new IPEndPoint(IPAddress.Any, gatewayPort);
@@ -47,7 +47,7 @@ namespace Orleans.Hosting
         /// <param name="siloPort">The port this silo uses for silo-to-silo communication.</param>
         /// <param name="gatewayPort">The port this silo uses for client-to-silo (gateway) communication. Specify 0 to disable gateway functionality.</param>
         /// <param name="addressFamily">Address family to listen on.  Default IPv4 address family.</param>
-        /// <param name="listenOnAllHostAddresses">Set to true to listen on all IP addresses of the host instead of just the advertiseIP.</param>
+        /// <param name="listenOnAnyHostAddress">Set to true to listen on all IP addresses of the host instead of just the advertiseIP.</param>
         /// <returns></returns>
         public static ISiloHostBuilder ConfigureEndpoints(
             this ISiloHostBuilder builder, 
@@ -55,10 +55,10 @@ namespace Orleans.Hosting
             int siloPort, 
             int gatewayPort,
             AddressFamily addressFamily = AddressFamily.InterNetwork,
-            bool listenOnAllHostAddresses = false)
+            bool listenOnAnyHostAddress = false)
         {
             var ip = ConfigUtilities.ResolveIPAddress(hostname, null, addressFamily).Result;
-            return builder.ConfigureEndpoints(ip, siloPort, gatewayPort, listenOnAllHostAddresses);
+            return builder.ConfigureEndpoints(ip, siloPort, gatewayPort, listenOnAnyHostAddress);
         }
 
         /// <summary>
@@ -68,16 +68,16 @@ namespace Orleans.Hosting
         /// <param name="siloPort">The port this silo uses for silo-to-silo communication.</param>
         /// <param name="gatewayPort">The port this silo uses for client-to-silo (gateway) communication. Specify 0 to disable gateway functionality.</param>
         /// <param name="addressFamily">Address family to listen on.  Default IPv4 address family.</param>
-        /// <param name="listenOnAllHostAddresses">Set to true to listen on all IP addresses of the host instead of just the advertiseIP.</param>
+        /// <param name="listenOnAnyHostAddress">Set to true to listen on all IP addresses of the host instead of just the advertiseIP.</param>
         /// <returns></returns>
         public static ISiloHostBuilder ConfigureEndpoints(
             this ISiloHostBuilder builder,
             int siloPort,
             int gatewayPort,
             AddressFamily addressFamily = AddressFamily.InterNetwork,
-            bool listenOnAllHostAddresses = false)
+            bool listenOnAnyHostAddress = false)
         {
-            return builder.ConfigureEndpoints(null, siloPort, gatewayPort, addressFamily, listenOnAllHostAddresses);
+            return builder.ConfigureEndpoints(null, siloPort, gatewayPort, addressFamily, listenOnAnyHostAddress);
         }
 
         internal static IPEndPoint GetPublicSiloEndpoint(this EndpointOptions options)

@@ -341,31 +341,38 @@ namespace Orleans.Runtime.Configuration
         internal static async Task<IPAddress> ResolveIPAddress(string addrOrHost, byte[] subnet, AddressFamily family)
         {
             var loopback = family == AddressFamily.InterNetwork ? IPAddress.Loopback : IPAddress.IPv6Loopback;
+            IList<IPAddress> nodeIps;
 
-            // IF the address is an empty string, default to the local machine
+            // if the address is an empty string, just enumerate all ip addresses available
+            // on this node
             if (string.IsNullOrEmpty(addrOrHost))
             {
-                addrOrHost = Dns.GetHostName();
+                nodeIps = NetworkInterface.GetAllNetworkInterfaces()
+                            .SelectMany(iface => iface.GetIPProperties().UnicastAddresses)
+                            .Select(addr => addr.Address)
+                            .ToList();
             }
-
-            // Fix StreamFilteringTests_SMS tests
-            if (addrOrHost.Equals("loopback", StringComparison.OrdinalIgnoreCase))
+            else
             {
-                return loopback;
-            }
+                // Fix StreamFilteringTests_SMS tests
+                if (addrOrHost.Equals("loopback", StringComparison.OrdinalIgnoreCase))
+                {
+                    return loopback;
+                }
 
-            // check if addrOrHost is a valid IP address including loopback (127.0.0.0/8, ::1) and any (0.0.0.0/0, ::) addresses
-            IPAddress address;
-            if (IPAddress.TryParse(addrOrHost, out address))
-            {
-                return address;
+                // check if addrOrHost is a valid IP address including loopback (127.0.0.0/8, ::1) and any (0.0.0.0/0, ::) addresses
+                IPAddress address;
+                if (IPAddress.TryParse(addrOrHost, out address))
+                {
+                    return address;
+                }
+
+                // Get IP address from DNS. If addrOrHost is localhost will 
+                // return loopback IPv4 address (or IPv4 and IPv6 addresses if OS is supported IPv6)
+                nodeIps = await Dns.GetHostAddressesAsync(addrOrHost);
             }
 
             var candidates = new List<IPAddress>();
-
-            // Get IP address from DNS. If addrOrHost is localhost will 
-            // return loopback IPv4 address (or IPv4 and IPv6 addresses if OS is supported IPv6)
-            var nodeIps = await Dns.GetHostAddressesAsync(addrOrHost);
             foreach (var nodeIp in nodeIps.Where(x => x.AddressFamily == family))
             {
                 // If the subnet does not match - we can't resolve this address.
