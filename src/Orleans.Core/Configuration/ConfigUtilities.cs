@@ -1,3 +1,4 @@
+using Orleans.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -81,7 +82,7 @@ namespace Orleans.Runtime.Configuration
         internal static bool TryParsePropagateActivityId(XmlElement root, string nodeName, out bool propagateActivityId)
         {
             //set default value to make compiler happy, progateActivityId is only used when this method return true
-            propagateActivityId = Constants.DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
+            propagateActivityId = MessagingOptions.DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
             if (root.HasAttribute("PropagateActivityId"))
             {
                 propagateActivityId = ParseBool(root.GetAttribute("PropagateActivityId"),

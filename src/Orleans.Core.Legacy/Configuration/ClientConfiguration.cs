@@ -175,10 +175,10 @@ namespace Orleans.Runtime.Configuration
             : base(false)
         {
             SourceFile = null;
-            PreferedGatewayIndex = -1;
+            PreferedGatewayIndex = GatewayOptions.DEFAULT_PREFERED_GATEWAY_INDEX;
             Gateways = new List<IPEndPoint>();
             GatewayProvider = GatewayProviderType.None;
-            PreferredFamily = AddressFamily.InterNetwork;
+            PreferredFamily = ClientMessagingOptions.DEFAULT_PREFERRED_FAMILY;
             NetInterface = null;
             Port = 0;
             DNSHostName = Dns.GetHostName();
@@ -187,7 +187,7 @@ namespace Orleans.Runtime.Configuration
             // Assume the ado invariant is for sql server storage if not explicitly specified
             AdoInvariant = Constants.INVARIANT_NAME_SQL_SERVER;
             
-            PropagateActivityId = Constants.DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
+            PropagateActivityId = MessagingOptions.DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
 
             GatewayListRefreshPeriod = GatewayOptions.DEFAULT_GATEWAY_LIST_REFRESH_PERIOD;
             StatisticsProviderName = null;
