@@ -774,8 +774,14 @@ namespace Orleans.Runtime
                     // Write "ShutDown" state in the table + broadcast gossip msgs to re-read the table to everyone
                     await scheduler.QueueTask(this.membershipOracle.ShutDown, this.membershipOracleContext)
                         .WithTimeout(stopTimeout, $"MembershipOracle Shutting down failed due to timeout {stopTimeout}");
+                    // Awful, but some components queue a task when receiving silo status notification,
+                    // add a delay here to give them a chance to execute this task
+                    await Task.Delay(1000);
                     // Deactivate all grains
                     SafeExecute(() => catalog.DeactivateAllActivations().WaitWithThrow(stopTimeout));
+                    // Awful again, but since we don't track the forwarding of the activation pending messages
+                    // add a small delay here so silo has some time to send them
+                    await Task.Delay(1000);
                 }
                 else
                 {
