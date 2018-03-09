@@ -11,8 +11,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.CodeGeneration;
-using Orleans.Core;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Counters;
 using Orleans.Runtime.GrainDirectory;
@@ -80,7 +78,7 @@ namespace Orleans.Runtime
         private readonly object lockable = new object();
         private readonly GrainFactory grainFactory;
         private readonly SiloLifecycle siloLifecycle;
-        private List<GrainService> grainServices;
+        private List<GrainService> grainServices = new List<GrainService>();
 
         private readonly ILoggerFactory loggerFactory;
         /// <summary>
@@ -463,9 +461,8 @@ namespace Orleans.Runtime
             }
 
             // Load and init grain services before silo becomes active.
-            GrainServiceOptions grainServiceOptions = Services.GetRequiredService<IOptions<GrainServiceOptions>>().Value;
             await StartAsyncTaskWithPerfAnalysis("Init grain services",
-                () => CreateGrainServices(grainServiceOptions), stopWatch);
+                () => CreateGrainServices(), stopWatch);
 
             this.membershipOracleContext = (this.membershipOracle as SystemTarget)?.SchedulingContext ??
                                        this.fallbackScheduler.SchedulingContext;
@@ -571,40 +568,36 @@ namespace Orleans.Runtime
             }
             foreach (var grainService in grainServices)
             {
-                await this.scheduler.QueueTask(grainService.Start, grainService.SchedulingContext).WithTimeout(this.initTimeout, $"Starting GrainService failed due to timeout {initTimeout}");
-                if (this.logger.IsEnabled(LogLevel.Debug))
-                {
-                    logger.Debug(String.Format("{0} Grain Service with Id {1} started successfully.", grainService.GetType().FullName, grainService.GetPrimaryKeyLong(out string ignored)));
-                }
+                await StartGrainService(grainService);
             }
         }
 
-        private async Task CreateGrainServices(GrainServiceOptions grainServiceOptions)
+        private async Task CreateGrainServices()
         {
-            this.grainServices = new List<GrainService>();
-            foreach (KeyValuePair<string, short> serviceConfig in grainServiceOptions.GrainServices)
+            var grainServices = this.Services.GetServices<IGrainService>();
+            foreach (var grainService in grainServices)
             {
-                // Construct the Grain Service
-                var serviceType = System.Type.GetType(serviceConfig.Key);
-                if (serviceType == null)
-                {
-                    throw new Exception(String.Format("Cannot find Grain Service type {0} of with Service Id {1}", serviceConfig.Key, serviceConfig.Value));
-                }
-                
-                var grainServiceInterfaceType = serviceType.GetInterfaces().FirstOrDefault(x => x.GetInterfaces().Contains(typeof(IGrainService)));
-                if (grainServiceInterfaceType == null)
-                {
-                    throw new Exception(String.Format("Cannot find an interface on {0} which implements IGrainService", serviceConfig.Value));
-                }
+                await RegisterGrainService(grainService);
 
-                var typeCode = GrainInterfaceUtils.GetGrainClassTypeCode(grainServiceInterfaceType);
-                var grainId = (IGrainIdentity)GrainId.GetGrainServiceGrainId(serviceConfig.Value, typeCode);
-                var grainService = (GrainService)ActivatorUtilities.CreateInstance(this.Services, serviceType, grainId);
-                RegisterSystemTarget(grainService);
-
-                await this.scheduler.QueueTask(() => grainService.Init(Services), grainService.SchedulingContext).WithTimeout(this.initTimeout, $"GrainService Initializing failed due to timeout {initTimeout}");
-                grainServices.Add(grainService);
             }
+        }
+
+        private async Task RegisterGrainService(IGrainService service)
+        {
+            var grainService = (GrainService)service;
+            RegisterSystemTarget(grainService);
+            grainServices.Add(grainService);
+
+            await this.scheduler.QueueTask(() => grainService.Init(Services), grainService.SchedulingContext).WithTimeout(this.initTimeout, $"GrainService Initializing failed due to timeout {initTimeout}");
+            logger.Info($"Grain Service {service.GetType().FullName} registered successfully.");
+        }
+
+        private async Task StartGrainService(IGrainService service)
+        {
+            var grainService = (GrainService)service;
+
+            await this.scheduler.QueueTask(grainService.Start, grainService.SchedulingContext).WithTimeout(this.initTimeout, $"Starting GrainService failed due to timeout {initTimeout}");
+            logger.Info($"Grain Service {service.GetType().FullName} started successfully.");
         }
 
         private void ConfigureThreadPoolAndServicePointSettings()

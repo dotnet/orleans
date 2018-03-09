@@ -34,7 +34,7 @@ namespace Orleans.Hosting
 
             // Automatically configure Orleans if it wasn't configured before. 
             // This will not happen once we use the generic host builder from Microsoft.Extensions.Hosting
-            this.Configure();
+            this.ConfigureDefaults();
 
             BuildHostConfiguration();
             CreateHostingEnvironment();

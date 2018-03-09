@@ -43,7 +43,7 @@ namespace UnitTests.General
         /// Test placement behaviour for newly added silos. The grain placement strategy should favor them
         /// until they reach a similar load as the other silos.
         /// </summary>
-        [Fact, TestCategory("Functional")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4008"), TestCategory("Functional")]
         public async Task ElasticityTest_CatchingUp()
         {
 
@@ -97,7 +97,7 @@ namespace UnitTests.General
         /// This evaluates the how the placement strategy behaves once silos are stopped: The strategy should
         /// balance the activations from the stopped silo evenly among the remaining silos.
         /// </summary>
-        [Fact, TestCategory("Functional")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4008"), TestCategory("Functional")]
         public async Task ElasticityTest_StoppingSilos()
         {
             List<SiloHandle> runtimes = await this.HostedCluster.StartAdditionalSilos(2);
@@ -138,7 +138,7 @@ namespace UnitTests.General
         /// <summary>
         /// Do not place activation in case all silos are above 110 CPU utilization.
         /// </summary>
-        [Fact, TestCategory("Functional")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4008"), TestCategory("Functional")]
         public async Task ElasticityTest_AllSilosCPUTooHigh()
         {
             var taintedGrainPrimary = await GetGrainAtSilo(this.HostedCluster.Primary.SiloAddress);

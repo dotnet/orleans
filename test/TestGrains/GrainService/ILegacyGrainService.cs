@@ -4,20 +4,20 @@ using Orleans.Services;
 
 namespace Tester
 {
-    public interface ICustomGrainServiceClient : IGrainServiceClient<ICustomGrainService>
+    public interface ILegacyGrainService : IGrainService
     {
-        Task<string> GetHelloWorldUsingCustomService();
+        Task<string> GetHelloWorldUsingCustomService(GrainReference reference);
         Task<string> GetServiceConfigProperty(string propertyName);
+
         Task<bool> HasStarted();
         Task<bool> HasStartedInBackground();
         Task<bool> HasInit();
     }
 
-    public interface ICustomGrainService : IGrainService
+    public interface ILegacyGrainServiceClient : IGrainServiceClient<ILegacyGrainService>
     {
-        Task<string> GetHelloWorldUsingCustomService(GrainReference reference);
+        Task<string> GetHelloWorldUsingCustomService();
         Task<string> GetServiceConfigProperty(string propertyName);
-
         Task<bool> HasStarted();
         Task<bool> HasStartedInBackground();
         Task<bool> HasInit();
