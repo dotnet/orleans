@@ -4,7 +4,7 @@ using Orleans.Streams;
 
 namespace Orleans.Configuration
 {
-    public class StreamInitializationOptions
+    public class StreamLifecycleOptions
     {
         [Serializable]
         public enum RunState
@@ -31,7 +31,6 @@ namespace Orleans.Configuration
         public const StreamPubSubType DEFAULT_STREAM_PUBSUB_TYPE = StreamPubSubType.ExplicitGrainBasedAndImplicit;
     }
 
-    //maybe QueueOptions? 
     public class StreamPullingAgentOptions
     {
         public TimeSpan GetQueueMsgsTimerPeriod { get; set; } = DEFAULT_GET_QUEUE_MESSAGES_TIMER_PERIOD;

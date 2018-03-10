@@ -31,15 +31,15 @@ namespace Orleans.Streaming
             this.Configure<AzureQueueOptions>(configureOptions);
             return this;
         }
-        public SiloAzureQueueStreamConfigurator<TDataAdapter> ConfigureCacheSize(int cacheSize = SimpleQueueCacheOptions.DEFAULT_CACHE_SIZE)
+        public SiloAzureQueueStreamConfigurator<TDataAdapter> ConfigureCache(int cacheSize = SimpleQueueCacheOptions.DEFAULT_CACHE_SIZE)
         {
             this.Configure<SimpleQueueCacheOptions>(ob => ob.Configure(options => options.CacheSize = cacheSize));
             return this;
         }
 
-        public SiloAzureQueueStreamConfigurator<TDataAdapter> ConfigureQueueMapper(int numOfQueues = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
+        public SiloAzureQueueStreamConfigurator<TDataAdapter> ConfigurePartitioning(int numOfPartition = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
         {
-            this.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfQueues));
+            this.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfPartition));
             return this;
         }
     }
@@ -60,6 +60,12 @@ namespace Orleans.Streaming
         public ClusterClientAzureQueueStreamConfigurator<TDataAdapter> ConfigureAzureQueue(Action<OptionsBuilder<AzureQueueOptions>> configureOptions)
         {
             this.Configure<AzureQueueOptions>(configureOptions);
+            return this;
+        }
+
+        public ClusterClientAzureQueueStreamConfigurator<TDataAdapter> ConfigurePartitioning(int numOfPartition = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
+        {
+            this.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfPartition));
             return this;
         }
     }

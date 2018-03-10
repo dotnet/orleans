@@ -16,9 +16,14 @@ namespace Orleans.Streams
 
     public static class SiloRecoverableStreamConfiguratorExtensions
     {
-        public static ISiloRecoverableStreamConfigurator ConfigureStreamStatistics(this ISiloRecoverableStreamConfigurator configurator, Action<OptionsBuilder<StreamStatisticOptions>> configureOptions)
+        public static ISiloRecoverableStreamConfigurator ConfigureStatistics(this ISiloRecoverableStreamConfigurator configurator, Action<OptionsBuilder<StreamStatisticOptions>> configureOptions)
         {
             configurator.Configure<StreamStatisticOptions>(configureOptions);
+            return configurator;
+        }
+        public static ISiloRecoverableStreamConfigurator ConfigureCacheEviction(this ISiloRecoverableStreamConfigurator configurator, Action<OptionsBuilder<StreamCacheEvictionOptions>> configureOptions)
+        {
+            configurator.Configure<StreamCacheEvictionOptions>(configureOptions);
             return configurator;
         }
     }
@@ -28,7 +33,8 @@ namespace Orleans.Streams
         public SiloRecoverableStreamConfigurator(string name, ISiloHostBuilder builder, Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory)
             : base(name, builder, adapterFactory)
         {
-            this.siloBuilder.ConfigureServices(services => services.ConfigureNamedOptionForLogging<StreamStatisticOptions>(name));
+            this.siloBuilder.ConfigureServices(services => services.ConfigureNamedOptionForLogging<StreamStatisticOptions>(name)
+            .ConfigureNamedOptionForLogging<StreamCacheEvictionOptions>(name));
         }
     }
 }

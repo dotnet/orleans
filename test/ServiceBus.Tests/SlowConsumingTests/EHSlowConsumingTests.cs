@@ -45,7 +45,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder.ConfigurePersistentStreams(StreamProviderName, EHStreamProviderWithCreatedCacheListAdapterFactory.Create)
-                        .Configure<EventHubStreamCacheOptions>(ob => ob.Configure(options =>
+                        .Configure<EventHubStreamCachePressureOptions>(ob => ob.Configure(options =>
                    {
                        options.SlowConsumingMonitorPressureWindowSize = monitorPressureWindowSize;
                        options.SlowConsumingMonitorFlowControlThreshold = flowControlThredhold;

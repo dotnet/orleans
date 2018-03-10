@@ -14,7 +14,7 @@ namespace Orleans.ServiceBus.Providers
     /// </summary>
     public class EventHubQueueCacheFactory : IEventHubQueueCacheFactory
     {
-        private readonly EventHubStreamCacheOptions cacheOptions;
+        private readonly EventHubStreamCachePressureOptions cacheOptions;
         private readonly StreamStatisticOptions statisticOptions;
         private readonly SerializationManager serializationManager;
         private IObjectPool<FixedSizeBuffer> bufferPool;
@@ -41,7 +41,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="sharedDimensions">shared dimensions between cache monitor and block pool monitor</param>
         /// <param name="cacheMonitorFactory"></param>
         /// <param name="blockPoolMonitorFactory"></param>
-        public EventHubQueueCacheFactory(EventHubStreamCacheOptions cacheOptions,
+        public EventHubQueueCacheFactory(EventHubStreamCachePressureOptions cacheOptions, StreamCacheEvictionOptions evictionOptions, 
             StreamStatisticOptions statisticOptions,
             SerializationManager serializationManager, EventHubMonitorAggregationDimensions sharedDimensions,
             ILoggerFactory loggerFactory,
@@ -51,7 +51,7 @@ namespace Orleans.ServiceBus.Providers
             this.cacheOptions = cacheOptions;
             this.statisticOptions = statisticOptions;
             this.serializationManager = serializationManager;
-            this.timePurge = new TimePurgePredicate(this.cacheOptions.DataMinTimeInCache, this.cacheOptions.DataMaxAgeInCache);
+            this.timePurge = new TimePurgePredicate(evictionOptions.DataMinTimeInCache, evictionOptions.DataMaxAgeInCache);
             this.sharedDimensions = sharedDimensions;
             this.CacheMonitorFactory = cacheMonitorFactory == null?(dimensions, logger, telemetryProducer) => new DefaultEventHubCacheMonitor(dimensions, telemetryProducer) : cacheMonitorFactory;
             this.BlockPoolMonitorFactory = blockPoolMonitorFactory == null? (dimensions, logger, telemetryProducer) => new DefaultEventHubBlockPoolMonitor(dimensions, telemetryProducer) : blockPoolMonitorFactory;
@@ -96,7 +96,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="cache"></param>
         /// <param name="providerSettings"></param>
         /// <param name="cacheLogger"></param>
-        protected virtual void AddCachePressureMonitors(IEventHubQueueCache cache, EventHubStreamCacheOptions providerOptions,
+        protected virtual void AddCachePressureMonitors(IEventHubQueueCache cache, EventHubStreamCachePressureOptions providerOptions,
             ILogger cacheLogger)
         {
             if (providerOptions.AveragingCachePressureMonitorFlowControlThreshold.HasValue)

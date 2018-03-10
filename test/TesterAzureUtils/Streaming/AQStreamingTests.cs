@@ -21,7 +21,7 @@ namespace Tester.AzureUtils.Streaming
     {
         public const string AzureQueueStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         public const string SmsStreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
-
+        private const int partitionCount = 8;
         private readonly SingleStreamTestRunner runner;
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
@@ -36,12 +36,13 @@ namespace Tester.AzureUtils.Streaming
             {
                 clientBuilder
                     .AddSimpleMessageStreamProvider(SmsStreamProviderName)
-                    .ConfigureAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName)
+                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName)
                     .ConfigureAzureQueue(ob=>ob.Configure(
                         options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        }));
+                        }))
+                    .ConfigurePartitioning(partitionCount);
             }
         }
 
@@ -64,11 +65,13 @@ namespace Tester.AzureUtils.Streaming
                             options.DeleteStateOnClear = true;
                         }))
                     .AddMemoryGrainStorage("MemoryStore")
-                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName, ob => ob.Configure(
+                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName)
+                    .ConfigureAzureQueue(ob => ob.Configure(
                         options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        }));
+                        }))
+                    .ConfigurePartitioning(partitionCount);
             }
         }
 

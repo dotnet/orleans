@@ -20,26 +20,28 @@ namespace ServiceBus.Tests.TestStreamProviders
     public class EHStreamProviderWithCreatedCacheListAdapterFactory : EventDataGeneratorAdapterFactory
     {
         private readonly ConcurrentBag<QueueCacheForTesting> createdCaches = new ConcurrentBag<QueueCacheForTesting>();
-        private readonly EventHubStreamCacheOptions cacheOptions;
+        private readonly EventHubStreamCachePressureOptions cacheOptions;
         private readonly StreamStatisticOptions staticticOptions;
         private readonly EventHubOptions ehOptions;
+        private readonly StreamCacheEvictionOptions evictionOptions;
         public EHStreamProviderWithCreatedCacheListAdapterFactory(string name, EventDataGeneratorStreamOptions options, EventHubOptions ehOptions, EventHubReceiverOptions receiverOptions,
-            EventHubStreamCacheOptions cacheOptions, StreamStatisticOptions statisticOptions, 
+            EventHubStreamCachePressureOptions cacheOptions, StreamCacheEvictionOptions evictionOptions, StreamStatisticOptions statisticOptions, 
             IServiceProvider serviceProvider, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
-            : base(name, options, ehOptions, receiverOptions, cacheOptions, statisticOptions, serviceProvider, serializationManager, telemetryProducer, loggerFactory)
+            : base(name, options, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, serviceProvider, serializationManager, telemetryProducer, loggerFactory)
 
         {
             this.createdCaches = new ConcurrentBag<QueueCacheForTesting>();
             this.cacheOptions = cacheOptions;
             this.staticticOptions = statisticOptions;
             this.ehOptions = ehOptions;
+            this.evictionOptions = evictionOptions;
         }
 
-        protected override IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamCacheOptions options)
+        protected override IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamCachePressureOptions options)
         {
             var eventHubPath = this.ehOptions.Path;
             var sharedDimensions = new EventHubMonitorAggregationDimensions(eventHubPath);
-            return new CacheFactoryForTesting(this.Name, this.cacheOptions, this.staticticOptions, this.SerializationManager, this.createdCaches, sharedDimensions, this.serviceProvider.GetRequiredService<ILoggerFactory>());
+            return new CacheFactoryForTesting(this.Name, this.cacheOptions, this.evictionOptions,this.staticticOptions, this.SerializationManager, this.createdCaches, sharedDimensions, this.serviceProvider.GetRequiredService<ILoggerFactory>());
         }
 
         private class CacheFactoryForTesting : EventHubQueueCacheFactory
@@ -47,12 +49,12 @@ namespace ServiceBus.Tests.TestStreamProviders
             private readonly ConcurrentBag<QueueCacheForTesting> caches; 
             private readonly string name;
 
-            public CacheFactoryForTesting(string name, EventHubStreamCacheOptions cacheOptions, StreamStatisticOptions statisticOptions,
+            public CacheFactoryForTesting(string name, EventHubStreamCachePressureOptions cacheOptions, StreamCacheEvictionOptions evictionOptions, StreamStatisticOptions statisticOptions,
                 SerializationManager serializationManager, ConcurrentBag<QueueCacheForTesting> caches, EventHubMonitorAggregationDimensions sharedDimensions,
                 ILoggerFactory loggerFactory,
                 Func<EventHubCacheMonitorDimensions, ILoggerFactory, ITelemetryProducer, ICacheMonitor> cacheMonitorFactory = null,
                 Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, ITelemetryProducer, IBlockPoolMonitor> blockPoolMonitorFactory = null)
-                : base(cacheOptions, statisticOptions, serializationManager, sharedDimensions, loggerFactory, cacheMonitorFactory, blockPoolMonitorFactory)
+                : base(cacheOptions, evictionOptions, statisticOptions, serializationManager, sharedDimensions, loggerFactory, cacheMonitorFactory, blockPoolMonitorFactory)
             {
                 this.name = name;
                 this.caches = caches;
@@ -118,10 +120,11 @@ namespace ServiceBus.Tests.TestStreamProviders
             var generatorOptions = services.GetOptionsByName<EventDataGeneratorStreamOptions>(name);
             var ehOptions = services.GetOptionsByName<EventHubOptions>(name);
             var receiverOptions = services.GetOptionsByName<EventHubReceiverOptions>(name);
-            var cacheOptions = services.GetOptionsByName<EventHubStreamCacheOptions>(name);
+            var cacheOptions = services.GetOptionsByName<EventHubStreamCachePressureOptions>(name);
+            var evictionOptions = services.GetOptionsByName<StreamCacheEvictionOptions>(name);
             var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
-            var factory = ActivatorUtilities.CreateInstance<EHStreamProviderWithCreatedCacheListAdapterFactory>(services, name, generatorOptions, ehOptions, receiverOptions, cacheOptions,
-                statisticOptions);
+            var factory = ActivatorUtilities.CreateInstance<EHStreamProviderWithCreatedCacheListAdapterFactory>(services, name, generatorOptions, ehOptions, receiverOptions, 
+                cacheOptions, evictionOptions, statisticOptions);
             factory.Init();
             return factory;
         }

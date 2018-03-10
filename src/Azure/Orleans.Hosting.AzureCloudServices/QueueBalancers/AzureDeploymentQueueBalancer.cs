@@ -12,7 +12,7 @@ namespace Orleans.Streams
         public static ISiloPersistentStreamConfigurator UseDynamicAzureDeploymentBalancer(this ISiloPersistentStreamConfigurator configurator, 
             TimeSpan? siloMaturityPeriod = null)
         {
-            return configurator.ConfigureStreamQueueBalancer<DeploymentBasedQueueBalancerOptions>(options => options.Configure(op =>
+            return configurator.ConfigurePartitionBalancing<DeploymentBasedQueueBalancerOptions>(options => options.Configure(op =>
             {
                 op.IsFixed = false;
                 if (siloMaturityPeriod.HasValue)
@@ -23,7 +23,7 @@ namespace Orleans.Streams
         public static ISiloPersistentStreamConfigurator UseStaticAzureDeploymentBalancer(this ISiloPersistentStreamConfigurator configurator,
            TimeSpan? siloMaturityPeriod = null)
         {
-            return configurator.ConfigureStreamQueueBalancer<DeploymentBasedQueueBalancerOptions>(options => options.Configure(op =>
+            return configurator.ConfigurePartitionBalancing<DeploymentBasedQueueBalancerOptions>(options => options.Configure(op =>
             {
                 op.IsFixed = true;
                 if (siloMaturityPeriod.HasValue)
@@ -39,7 +39,7 @@ namespace Orleans.Streams
         public static ISiloPersistentStreamConfigurator UseAzureDeploymentLeaseBasedBalancer(this ISiloPersistentStreamConfigurator configurator,
            Action<OptionsBuilder<LeaseBasedQueueBalancerOptions>> configureOptions = null)
         {
-            return configurator.ConfigureStreamQueueBalancer<LeaseBasedQueueBalancerOptions>(configureOptions, (s,n)=>LeaseBasedQueueBalancer.Create(s,n, new ServiceRuntimeWrapper(s.GetService<ILoggerFactory>())));
+            return configurator.ConfigurePartitionBalancing<LeaseBasedQueueBalancerOptions>(configureOptions, (s,n)=>LeaseBasedQueueBalancer.Create(s,n, new ServiceRuntimeWrapper(s.GetService<ILoggerFactory>())));
         }
     }
 }

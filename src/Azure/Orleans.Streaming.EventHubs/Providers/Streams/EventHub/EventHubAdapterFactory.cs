@@ -35,9 +35,10 @@ namespace Orleans.ServiceBus.Providers
         /// Stream provider settings
         /// </summary>
         private EventHubOptions ehOptions;
-        private EventHubStreamCacheOptions cacheOptions;
+        private EventHubStreamCachePressureOptions cacheOptions;
         private EventHubReceiverOptions receiverOptions;
         private StreamStatisticOptions statisticOptions;
+        private StreamCacheEvictionOptions cacheEvictionOptions;
         private IEventHubQueueMapper streamQueueMapper;
         private string[] partitionIds;
         private ConcurrentDictionary<QueueId, EventHubAdapterReceiver> receivers;
@@ -99,10 +100,12 @@ namespace Orleans.ServiceBus.Providers
         internal ConcurrentDictionary<QueueId, EventHubAdapterReceiver> EventHubReceivers { get { return this.receivers; } }
         internal IEventHubQueueMapper EventHubQueueMapper { get { return this.streamQueueMapper; } }
 
-        public EventHubAdapterFactory(string name, EventHubOptions ehOptions, EventHubReceiverOptions receiverOptions, EventHubStreamCacheOptions cacheOptions, StreamStatisticOptions statisticOptions,
+        public EventHubAdapterFactory(string name, EventHubOptions ehOptions, EventHubReceiverOptions receiverOptions, EventHubStreamCachePressureOptions cacheOptions, 
+            StreamCacheEvictionOptions cacheEvictionOptions, StreamStatisticOptions statisticOptions,
             IServiceProvider serviceProvider, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
         {
             this.Name = name;
+            this.cacheEvictionOptions = cacheEvictionOptions ?? throw new ArgumentNullException(nameof(cacheEvictionOptions));
             this.statisticOptions = statisticOptions ?? throw new ArgumentNullException(nameof(statisticOptions));
             this.ehOptions = ehOptions ?? throw new ArgumentNullException(nameof(ehOptions));
             this.cacheOptions = cacheOptions?? throw new ArgumentNullException(nameof(cacheOptions));
@@ -254,11 +257,11 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         /// <param name="providerSettings"></param>
         /// <returns></returns>
-        protected virtual IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamCacheOptions eventHubCacheOptions)
+        protected virtual IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamCachePressureOptions eventHubCacheOptions)
         {
             var eventHubPath = this.ehOptions.Path;
             var sharedDimensions = new EventHubMonitorAggregationDimensions(eventHubPath);
-            return new EventHubQueueCacheFactory(eventHubCacheOptions, statisticOptions, this.SerializationManager, sharedDimensions, this.loggerFactory);
+            return new EventHubQueueCacheFactory(eventHubCacheOptions, cacheEvictionOptions, statisticOptions, this.SerializationManager, sharedDimensions, this.loggerFactory);
         }
 
         private EventHubAdapterReceiver MakeReceiver(QueueId queueId)
@@ -297,9 +300,10 @@ namespace Orleans.ServiceBus.Providers
         {
             var ehOptions = services.GetOptionsByName<EventHubOptions>(name);
             var receiverOptions = services.GetOptionsByName<EventHubReceiverOptions>(name);
-            var cacheOptions = services.GetOptionsByName<EventHubStreamCacheOptions>(name);
+            var cacheOptions = services.GetOptionsByName<EventHubStreamCachePressureOptions>(name);
             var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
-            var factory = ActivatorUtilities.CreateInstance<EventHubAdapterFactory>(services, name, ehOptions, receiverOptions, cacheOptions, statisticOptions);
+            var evictionOptions = services.GetOptionsByName<StreamCacheEvictionOptions>(name);
+            var factory = ActivatorUtilities.CreateInstance<EventHubAdapterFactory>(services, name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions);
             factory.Init();
             return factory;
         }

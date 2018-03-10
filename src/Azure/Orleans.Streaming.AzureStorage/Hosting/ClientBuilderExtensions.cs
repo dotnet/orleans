@@ -10,11 +10,23 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure cluster client to use azure queue persistent streams. Returns ClusterClientAzureQueueStreamConfigurator for further configuration
         /// </summary>
-        public static ClusterClientAzureQueueStreamConfigurator<TDataAdapter> ConfigureAzureQueueStreams<TDataAdapter>(this IClientBuilder builder,
+        public static ClusterClientAzureQueueStreamConfigurator<TDataAdapter> AddAzureQueueStreams<TDataAdapter>(this IClientBuilder builder,
             string name)
             where TDataAdapter : IAzureQueueDataAdapter
         {
             return new ClusterClientAzureQueueStreamConfigurator<TDataAdapter>(name, builder);
+        }
+
+        /// <summary>
+        /// Configure cluster client to use azure queue persistent streams. Returns ClusterClientAzureQueueStreamConfigurator for further configuration
+        /// </summary>
+        public static IClientBuilder AddAzureQueueStreams<TDataAdapter>(this IClientBuilder builder,
+            string name,
+            Action<ClusterClientAzureQueueStreamConfigurator<TDataAdapter>> configure)
+            where TDataAdapter : IAzureQueueDataAdapter
+        {
+            configure?.Invoke(builder.AddAzureQueueStreams<TDataAdapter>(name));
+            return builder;
         }
 
         /// <summary>
@@ -24,7 +36,7 @@ namespace Orleans.Hosting
             string name, Action<OptionsBuilder<AzureQueueOptions>> configureOptions)
             where TDataAdapter : IAzureQueueDataAdapter
         {
-            builder.ConfigureAzureQueueStreams<TDataAdapter>(name)
+            builder.AddAzureQueueStreams<TDataAdapter>(name)
                  .ConfigureAzureQueue(configureOptions);
             return builder;
         }

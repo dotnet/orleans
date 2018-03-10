@@ -75,26 +75,8 @@ namespace Orleans.Configuration
         public const bool DEFAULT_START_FROM_NOW = true;
     }
 
-    public class EventHubStreamCacheOptions
+    public class EventHubStreamCachePressureOptions
     {
-        /// <summary>
-        /// Minimum time message will stay in cache before it is available for time based purge.
-        /// </summary>
-        public TimeSpan DataMinTimeInCache { get; set; } = DefaultDataMinTimeInCache;
-        /// <summary>
-        /// Drfault DataMinTimeInCache
-        /// </summary>
-        public static readonly TimeSpan DefaultDataMinTimeInCache = TimeSpan.FromMinutes(5);
-
-        /// <summary>
-        /// Difference in time between the newest and oldest messages in the cache.  Any messages older than this will be purged from the cache.
-        /// </summary>
-        public TimeSpan DataMaxAgeInCache { get; set; } = DefaultDataMaxAgeInCache;
-        /// <summary>
-        /// Default DataMaxAgeInCache
-        /// </summary>
-        public static readonly TimeSpan DefaultDataMaxAgeInCache = TimeSpan.FromMinutes(30);
-
         /// <summary>
         /// SlowConsumingPressureMonitorConfig
         /// </summary>

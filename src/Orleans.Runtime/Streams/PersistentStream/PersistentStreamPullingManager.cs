@@ -7,7 +7,7 @@ using Orleans.Concurrency;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Configuration;
-using RunState = Orleans.Configuration.StreamInitializationOptions.RunState;
+using RunState = Orleans.Configuration.StreamLifecycleOptions.RunState;
 
 namespace Orleans.Streams
 {

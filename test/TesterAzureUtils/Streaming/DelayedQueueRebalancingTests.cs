@@ -44,7 +44,7 @@ namespace Tester.AzureUtils.Streaming
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
-                    .ConfigureAzureQueueStreams<AzureQueueDataAdapterV2>(adapterName)
+                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(adapterName)
                     .ConfigureAzureQueue(ob => ob.Configure(
                         options =>
                         {

@@ -22,7 +22,7 @@ namespace Orleans.Providers
     public class MemoryAdapterFactory<TSerializer> : IQueueAdapterFactory, IQueueAdapter, IQueueAdapterCache
         where TSerializer : class, IMemoryMessageBodySerializer
     {
-        private readonly MemoryStreamCacheOptions cacheOptions;
+        private readonly StreamCacheEvictionOptions cacheOptions;
         private readonly StreamStatisticOptions statisticOptions;
         private readonly HashRingStreamQueueMapperOptions queueMapperOptions;
         private readonly IGrainFactory grainFactory;
@@ -77,7 +77,7 @@ namespace Orleans.Providers
         /// </summary>
         protected Func<ReceiverMonitorDimensions, ITelemetryProducer, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory;
 
-        public MemoryAdapterFactory(string providerName, MemoryStreamCacheOptions cacheOptions, StreamStatisticOptions statisticOptions, HashRingStreamQueueMapperOptions queueMapperOptions,
+        public MemoryAdapterFactory(string providerName, StreamCacheEvictionOptions cacheOptions, StreamStatisticOptions statisticOptions, HashRingStreamQueueMapperOptions queueMapperOptions,
             IServiceProvider serviceProvider, IGrainFactory grainFactory, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
         {
             this.Name = providerName;
@@ -253,7 +253,7 @@ namespace Orleans.Providers
 
         public static MemoryAdapterFactory<TSerializer> Create(IServiceProvider services, string name)
         {
-            var cachePurgeOptions = services.GetOptionsByName<MemoryStreamCacheOptions>(name);
+            var cachePurgeOptions = services.GetOptionsByName<StreamCacheEvictionOptions>(name);
             var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
             var queueMapperOptions = services.GetOptionsByName<HashRingStreamQueueMapperOptions>(name);
             var factory = ActivatorUtilities.CreateInstance<MemoryAdapterFactory<TSerializer>>(services, name, cachePurgeOptions, statisticOptions, queueMapperOptions);

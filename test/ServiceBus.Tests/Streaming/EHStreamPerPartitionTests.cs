@@ -53,7 +53,8 @@ namespace ServiceBus.Tests.StreamingTests
                               options.Path = EHPath;
                           }))
                         .UseStaticClusterConfigDeploymentBalancer()
-                        .ConfigureComponent<AzureTableStreamCheckpointerOptions, IStreamQueueCheckpointerFactory>(ob => ob.Configure(
+                        .ConfigureComponent<AzureTableStreamCheckpointerOptions, IStreamQueueCheckpointerFactory>(EventHubCheckpointerFactory.CreateFactory,
+                        ob => ob.Configure(
                         options =>
                         {
 
@@ -61,7 +62,7 @@ namespace ServiceBus.Tests.StreamingTests
                             options.TableName = EHCheckpointTable;
                             options.Namespace = CheckpointNamespace;
                             options.PersistInterval = TimeSpan.FromSeconds(1);
-                        }), EventHubCheckpointerFactory.CreateFactory);
+                        }));
 
                     hostBuilder
                         .AddMemoryGrainStorage("PubSubStore");

@@ -18,18 +18,11 @@ namespace Orleans.Providers
         {
             this.siloBuilder
                 .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(MemoryAdapterFactory<>).Assembly))
-                .ConfigureServices(services => services.ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name)
-                                .ConfigureNamedOptionForLogging<MemoryStreamCacheOptions>(name));
+                .ConfigureServices(services => services.ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name));
                 
         }
 
-        public SiloMemoryStreamConfigurator<TSerializer> ConfigureCache(Action<OptionsBuilder<MemoryStreamCacheOptions>> configureOptions)
-        {
-            this.Configure<MemoryStreamCacheOptions>(configureOptions);
-            return this;
-        }
-
-        public SiloMemoryStreamConfigurator<TSerializer> ConfigureQueueMapper(int numOfQueues = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
+        public SiloMemoryStreamConfigurator<TSerializer> ConfigurePartitioning(int numOfQueues = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
         {
             this.Configure<HashRingStreamQueueMapperOptions>(ob=>ob.Configure(options => options.TotalQueueCount = numOfQueues));
             return this;
@@ -44,6 +37,12 @@ namespace Orleans.Providers
         {
             this.clientBuilder
                 .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(MemoryAdapterFactory<>).Assembly));
+        }
+
+        public ClusterClientMemoryStreamConfigurator<TSerializer> ConfigurePartitioning(int numOfQueues = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
+        {
+            this.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfQueues));
+            return this;
         }
     }
 }

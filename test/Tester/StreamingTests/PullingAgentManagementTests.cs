@@ -31,7 +31,7 @@ namespace UnitTests.StreamingTests
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                    .ConfigureAzureQueueStreams<AzureQueueDataAdapterV2>(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME)
+                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME)
                     .ConfigureAzureQueue(ob => ob.Configure(options =>
                        {
                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
@@ -64,21 +64,21 @@ namespace UnitTests.StreamingTests
         {
             var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);;
 
-            await ValidateAgentsState(StreamInitializationOptions.RunState.AgentsStarted);
+            await ValidateAgentsState(StreamLifecycleOptions.RunState.AgentsStarted);
 
             await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.StartAgents);
-            await ValidateAgentsState(StreamInitializationOptions.RunState.AgentsStarted);
+            await ValidateAgentsState(StreamLifecycleOptions.RunState.AgentsStarted);
 
             await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.StopAgents);
-            await ValidateAgentsState(StreamInitializationOptions.RunState.AgentsStopped);
+            await ValidateAgentsState(StreamLifecycleOptions.RunState.AgentsStopped);
 
 
             await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.StartAgents);
-            await ValidateAgentsState(StreamInitializationOptions.RunState.AgentsStarted);
+            await ValidateAgentsState(StreamLifecycleOptions.RunState.AgentsStarted);
 
         }
 
-        private async Task ValidateAgentsState(StreamInitializationOptions.RunState expectedState)
+        private async Task ValidateAgentsState(StreamLifecycleOptions.RunState expectedState)
         {
             var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
 
@@ -86,7 +86,7 @@ namespace UnitTests.StreamingTests
             Assert.Equal(2, states.Length);
             foreach (var state in states)
             {
-                StreamInitializationOptions.RunState providerState;
+                StreamLifecycleOptions.RunState providerState;
                 Enum.TryParse(state.ToString(), out providerState);
                 Assert.Equal(expectedState, providerState);
             }
@@ -94,7 +94,7 @@ namespace UnitTests.StreamingTests
             var numAgents = await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents);
             Assert.Equal(2, numAgents.Length);
             int totalNumAgents = numAgents.Select(Convert.ToInt32).Sum();
-            if (expectedState == StreamInitializationOptions.RunState.AgentsStarted)
+            if (expectedState == StreamLifecycleOptions.RunState.AgentsStarted)
             {
                 Assert.Equal(HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES, totalNumAgents);
             }

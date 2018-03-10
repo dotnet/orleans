@@ -61,13 +61,13 @@ namespace ServiceBus.Tests.StreamingTests
                           options.ConsumerGroup = EHConsumerGroup;
                           options.Path = EHPath;
                       }))
-                    .ConfigureComponent<AzureTableStreamCheckpointerOptions, IStreamQueueCheckpointerFactory>(ob => ob.Configure(options =>
+                    .ConfigureComponent<AzureTableStreamCheckpointerOptions, IStreamQueueCheckpointerFactory>(EventHubCheckpointerFactory.CreateFactory, ob => ob.Configure(options =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         options.TableName = EHCheckpointTable;
                         options.Namespace = CheckpointNamespace;
                         options.PersistInterval = TimeSpan.FromSeconds(10);
-                    }), EventHubCheckpointerFactory.CreateFactory);
+                    }));
                 hostBuilder
                     .AddMemoryGrainStorage("PubSubStore");
             }

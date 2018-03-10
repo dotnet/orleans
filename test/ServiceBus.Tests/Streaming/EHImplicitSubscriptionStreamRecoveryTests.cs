@@ -57,7 +57,7 @@ namespace ServiceBus.Tests.StreamingTests
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .ConfigureEventHubStreams(StreamProviderName)
+                        .AddEventHubStreams(StreamProviderName)
                         .ConfigureEventHub(ob => ob.Configure(options =>
                           {
                               options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
@@ -82,7 +82,7 @@ namespace ServiceBus.Tests.StreamingTests
             {
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
                 {
-                    clientBuilder.ConfigureEventHubStreams(StreamProviderName)
+                    clientBuilder.AddEventHubStreams(StreamProviderName)
                         .ConfigureEventHub(ob=>ob.Configure( options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;

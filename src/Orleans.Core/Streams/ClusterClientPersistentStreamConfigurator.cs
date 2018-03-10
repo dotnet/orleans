@@ -17,9 +17,9 @@ namespace Orleans.Streams
 
     public static class ClusterClientPersistentStreamConfiguratorExtensions
     {
-        public static IClusterClientPersistentStreamConfigurator ConfigureInitialization(this IClusterClientPersistentStreamConfigurator configurator, Action<OptionsBuilder<StreamInitializationOptions>> configureOptions)
+        public static IClusterClientPersistentStreamConfigurator ConfigureLifecycle(this IClusterClientPersistentStreamConfigurator configurator, Action<OptionsBuilder<StreamLifecycleOptions>> configureOptions)
         {
-            configurator.Configure<StreamInitializationOptions>(configureOptions);
+            configurator.Configure<StreamLifecycleOptions>(configureOptions);
             return configurator;
         }
 
@@ -51,7 +51,7 @@ namespace Orleans.Streams
                            .AddSingletonNamedService<ILifecycleParticipant<IClusterClientLifecycle>>(name, 
                            (s, n) => ((PersistentStreamProvider)s.GetRequiredServiceByName<IStreamProvider>(n)).ParticipateIn<IClusterClientLifecycle>())
                            .AddSingletonNamedService<IQueueAdapterFactory>(name, adapterFactory)
-                           .ConfigureNamedOptionForLogging<StreamInitializationOptions>(name);
+                           .ConfigureNamedOptionForLogging<StreamLifecycleOptions>(name);
         }
 
         public IClusterClientPersistentStreamConfigurator Configure<TOptions>(Action<OptionsBuilder<TOptions>> configureOptions) where TOptions : class, new()

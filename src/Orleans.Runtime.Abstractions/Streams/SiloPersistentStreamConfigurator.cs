@@ -34,7 +34,7 @@ namespace Orleans.Streams
                            .AddSingletonNamedService(name, (s, n) => s.GetServiceByName<IStreamProvider>(n) as IControllable)
                            .ConfigureNamedOptionForLogging<StreamPullingAgentOptions>(name)
                            .ConfigureNamedOptionForLogging<StreamPubSubOptions>(name)
-                           .ConfigureNamedOptionForLogging<StreamInitializationOptions>(name);
+                           .ConfigureNamedOptionForLogging<StreamLifecycleOptions>(name);
         }
 
         public ISiloPersistentStreamConfigurator Configure<TOptions>(Action<OptionsBuilder<TOptions>> configureOptions)
@@ -47,7 +47,7 @@ namespace Orleans.Streams
             return this;
         }
 
-        public ISiloPersistentStreamConfigurator ConfigureComponent<TOptions, TComponent>(Action<OptionsBuilder<TOptions>> configureOptions, Func<IServiceProvider, string, TComponent> factory)
+        public ISiloPersistentStreamConfigurator ConfigureComponent<TOptions, TComponent>(Func<IServiceProvider, string, TComponent> factory, Action<OptionsBuilder<TOptions>> configureOptions = null)
             where TOptions : class, new()
             where TComponent: class
         {

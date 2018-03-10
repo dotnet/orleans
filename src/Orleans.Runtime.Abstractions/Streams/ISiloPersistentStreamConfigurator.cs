@@ -10,7 +10,7 @@ namespace Orleans.Streams
         ISiloPersistentStreamConfigurator Configure<TOptions>(Action<OptionsBuilder<TOptions>> configureOptions)
           where TOptions : class, new();
 
-        ISiloPersistentStreamConfigurator ConfigureComponent<TOptions, TComponent>(Action<OptionsBuilder<TOptions>> configureOptions, Func<IServiceProvider, string, TComponent> factory)
+        ISiloPersistentStreamConfigurator ConfigureComponent<TOptions, TComponent>(Func<IServiceProvider, string, TComponent> factory, Action<OptionsBuilder<TOptions>> configureOptions = null)
             where TOptions : class, new()
             where TComponent : class;
 
@@ -25,27 +25,27 @@ namespace Orleans.Streams
             configurator.Configure<StreamPubSubOptions>(ob => ob.Configure(options => options.PubSubType = pubsubType));
             return configurator;
         }
-        public static ISiloPersistentStreamConfigurator ConfigurePullingAgent(this ISiloPersistentStreamConfigurator configurator, Action<OptionsBuilder<StreamPullingAgentOptions>> configureOptions)
+        public static ISiloPersistentStreamConfigurator ConfigurePullingAgent(this ISiloPersistentStreamConfigurator configurator, Action<OptionsBuilder<StreamPullingAgentOptions>> configureOptions = null)
         {
             configurator.Configure<StreamPullingAgentOptions>(configureOptions);
             return configurator;
         }
-        public static ISiloPersistentStreamConfigurator ConfigureInitialization(this ISiloPersistentStreamConfigurator configurator, Action<OptionsBuilder<StreamInitializationOptions>> configureOptions)
+        public static ISiloPersistentStreamConfigurator ConfigureLifecycle(this ISiloPersistentStreamConfigurator configurator, Action<OptionsBuilder<StreamLifecycleOptions>> configureOptions)
         {
-            configurator.Configure<StreamInitializationOptions>(configureOptions);
+            configurator.Configure<StreamLifecycleOptions>(configureOptions);
             return configurator;
         }
 
-        public static ISiloPersistentStreamConfigurator ConfigureStreamQueueBalancer(this ISiloPersistentStreamConfigurator configurator, Func<IServiceProvider, string, IStreamQueueBalancer> factory)
+        public static ISiloPersistentStreamConfigurator ConfigurePartitionBalancing(this ISiloPersistentStreamConfigurator configurator, Func<IServiceProvider, string, IStreamQueueBalancer> factory)
         {
             return configurator.ConfigureComponent<IStreamQueueBalancer>(factory);
         }
 
-        public static ISiloPersistentStreamConfigurator ConfigureStreamQueueBalancer<TOptions>(this ISiloPersistentStreamConfigurator configurator,
+        public static ISiloPersistentStreamConfigurator ConfigurePartitionBalancing<TOptions>(this ISiloPersistentStreamConfigurator configurator,
             Action<OptionsBuilder<TOptions>> configureOptions, Func<IServiceProvider, string, IStreamQueueBalancer> factory)
             where TOptions : class, new()
         {
-            return configurator.ConfigureComponent<TOptions, IStreamQueueBalancer>(configureOptions, factory);
+            return configurator.ConfigureComponent<TOptions, IStreamQueueBalancer>(factory, configureOptions);
         }
     }
 }

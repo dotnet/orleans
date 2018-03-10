@@ -37,9 +37,9 @@ namespace Tester.StreamingTests.PlugableQueueBalancerTests
                 {
                     hostBuilder
                         .AddMemoryGrainStorage("PubSubStore")
-                        .ConfigureMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName)
-                        .ConfigureQueueMapper(totalQueueCount)
-                        .ConfigureStreamQueueBalancer((s, n) => ActivatorUtilities.CreateInstance<LeaseBasedQueueBalancerForTest>(s));
+                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName)
+                        .ConfigurePartitioning(totalQueueCount)
+                        .ConfigurePartitionBalancing((s, n) => ActivatorUtilities.CreateInstance<LeaseBasedQueueBalancerForTest>(s));
                         
                 }
             }

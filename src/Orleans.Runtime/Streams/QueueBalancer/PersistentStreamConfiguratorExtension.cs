@@ -13,13 +13,13 @@ namespace Orleans.Streams
     {
         public static ISiloPersistentStreamConfigurator UseConsistentRingQueueBalancer(this ISiloPersistentStreamConfigurator configurator)
         {
-            return configurator.ConfigureStreamQueueBalancer(ConsistentRingQueueBalancer.Create);
+            return configurator.ConfigurePartitionBalancing(ConsistentRingQueueBalancer.Create);
         }
 
         public static ISiloPersistentStreamConfigurator UseStaticClusterConfigDeploymentBalancer(this ISiloPersistentStreamConfigurator configurator, 
             TimeSpan? siloMaturityPeriod = null)
         {
-            return configurator.ConfigureStreamQueueBalancer<DeploymentBasedQueueBalancerOptions>(options => options.Configure(op =>
+            return configurator.ConfigurePartitionBalancing<DeploymentBasedQueueBalancerOptions>(options => options.Configure(op =>
             {
                 op.IsFixed = true;
                 if (siloMaturityPeriod.HasValue)
@@ -30,7 +30,7 @@ namespace Orleans.Streams
         public static ISiloPersistentStreamConfigurator UseDynamicClusterConfigDeploymentBalancer(this ISiloPersistentStreamConfigurator configurator,
            TimeSpan? siloMaturityPeriod = null)
         {
-            return configurator.ConfigureStreamQueueBalancer<DeploymentBasedQueueBalancerOptions>(options => options.Configure(op =>
+            return configurator.ConfigurePartitionBalancing<DeploymentBasedQueueBalancerOptions>(options => options.Configure(op =>
             {
                 op.IsFixed = false;
                 if (siloMaturityPeriod.HasValue)
@@ -41,7 +41,7 @@ namespace Orleans.Streams
         public static ISiloPersistentStreamConfigurator UseClusterConfigDeploymentLeaseBasedBalancer(this ISiloPersistentStreamConfigurator configurator, 
             Action<OptionsBuilder<LeaseBasedQueueBalancerOptions>> configureOptions = null)
         {
-            return configurator.ConfigureStreamQueueBalancer<LeaseBasedQueueBalancerOptions>(configureOptions, (s, n) => LeaseBasedQueueBalancer.Create(s, n, s.GetService<IOptions<StaticClusterDeploymentOptions>>().Value));
+            return configurator.ConfigurePartitionBalancing<LeaseBasedQueueBalancerOptions>(configureOptions, (s, n) => LeaseBasedQueueBalancer.Create(s, n, s.GetService<IOptions<StaticClusterDeploymentOptions>>().Value));
         }
     }
 }
