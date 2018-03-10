@@ -10,6 +10,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
+    
     internal class PersistentStreamPullingAgent : SystemTarget, IPersistentStreamPullingAgent
     {
         private static readonly IBackoffProvider DeliveryBackoffProvider = new ExponentialBackoff(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(1));
@@ -21,7 +22,7 @@ namespace Orleans.Streams
         private readonly IStreamPubSub pubSub;
         private readonly Dictionary<StreamId, StreamConsumerCollection> pubSubCache;
         private readonly SafeRandom safeRandom;
-        private readonly PersistentStreamOptions options;
+        private readonly StreamPullingAgentOptions options;
         private readonly ILogger logger;
         private readonly CounterStatistic numReadMessagesCounter;
         private readonly CounterStatistic numSentMessagesCounter;
@@ -46,7 +47,7 @@ namespace Orleans.Streams
             ILoggerFactory loggerFactory,
             IStreamPubSub streamPubSub,
             QueueId queueId,
-            PersistentStreamOptions options)
+            StreamPullingAgentOptions options)
             : base(id, runtime.ExecutingSiloAddress, true, loggerFactory)
         {
             if (runtime == null) throw new ArgumentNullException("runtime", "PersistentStreamPullingAgent: runtime reference should not be null");

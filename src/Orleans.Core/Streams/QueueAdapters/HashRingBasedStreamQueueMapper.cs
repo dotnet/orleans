@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Orleans.Configuration;
 using Orleans.Runtime;
 
 namespace Orleans.Streams
@@ -9,11 +10,11 @@ namespace Orleans.Streams
         private readonly int numQueues;
         private readonly HashRing<QueueId> hashRing;
 
-        public HashRingBasedStreamQueueMapper(int nQueues, string queueNamePrefix)
+        public HashRingBasedStreamQueueMapper(HashRingStreamQueueMapperOptions options, string queueNamePrefix)
         {
-            numQueues = nQueues;
+            numQueues = options.TotalQueueCount;
             var queueIds = new List<QueueId>(numQueues);
-            if (nQueues == 1)
+            if (numQueues == 1)
             {
                 uint uniformHashCode = 0;
                 queueIds.Add(QueueId.GetQueueId(queueNamePrefix, 0, uniformHashCode));

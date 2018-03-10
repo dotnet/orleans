@@ -1,37 +1,43 @@
 ﻿using System;
 using Orleans.Configuration;
 using Orleans.ServiceBus.Providers;
+using Orleans.Streams;
 
 namespace Orleans.Hosting
 {
     public static class ClientBuilderExtensions
     {
         /// <summary>
-        /// Configure cluster client to use event hub persistent streams.
+        /// Configure cluster client to use event hub persistent streams. This return a configurator which allows further configuration
         /// </summary>
-        public static IClientBuilder AddEventHubStreams(
+        public static ClusterClientEventHubStreamConfigurator AddEventHubStreams(
             this IClientBuilder builder,
-            string name,
-            Action<EventHubStreamOptions> configureOptions)
+            string name)
         {
-            return builder.AddEventHubStreams(name, ob => ob.Configure(configureOptions));
+            return new ClusterClientEventHubStreamConfigurator(name, builder);
         }
 
         /// <summary>
         /// Configure cluster client to use event hub persistent streams.
         /// </summary>
         public static IClientBuilder AddEventHubStreams(
-            this IClientBuilder builder,
-            string name,
-            Action<OptionsBuilder<EventHubStreamOptions>> configureOptions = null)
+           this IClientBuilder builder,
+           string name,
+           Action<ClusterClientEventHubStreamConfigurator> configure)
         {
-            return builder
-                .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(EventHubAdapterFactory).Assembly))
-                .ConfigureServices(services =>
-                {
-                    services.ConfigureNamedOptionForLogging<EventHubStreamOptions>(name)
-                        .AddClusterClientPersistentStreams<EventHubStreamOptions>(name, EventHubAdapterFactory.Create, configureOptions);
-                });
+            configure?.Invoke(builder.AddEventHubStreams(name));
+            return builder;
+        }
+
+        /// <summary>
+        /// Configure cluster client to use event hub persistent streams with default settings.
+        /// </summary>
+        public static IClientBuilder AddEventHubStreams(
+            this IClientBuilder builder,
+            string name, Action<EventHubOptions> configureEventHub)
+        {
+            builder.AddEventHubStreams(name).ConfigureEventHub(ob => ob.Configure(configureEventHub));
+            return builder;
         }
     }
 }

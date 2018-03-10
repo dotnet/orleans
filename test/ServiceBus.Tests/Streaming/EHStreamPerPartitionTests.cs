@@ -18,6 +18,7 @@ using ServiceBus.Tests.TestStreamProviders.EventHub;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
+using Orleans.ServiceBus.Providers;
 
 namespace ServiceBus.Tests.StreamingTests
 {
@@ -44,18 +45,26 @@ namespace ServiceBus.Tests.StreamingTests
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddPersistentStreams<EventHubStreamOptions>(StreamProviderName, StreamPerPartitionEventHubStreamAdapterFactory.Create,
+                        .AddPersistentStreams(StreamProviderName, StreamPerPartitionEventHubStreamAdapterFactory.Create)
+                        .Configure<EventHubOptions>(ob => ob.Configure(options =>
+                          {
+                              options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                              options.ConsumerGroup = EHConsumerGroup;
+                              options.Path = EHPath;
+                          }))
+                        .UseStaticClusterConfigDeploymentBalancer()
+                        .ConfigureComponent<AzureTableStreamCheckpointerOptions, IStreamQueueCheckpointerFactory>(EventHubCheckpointerFactory.CreateFactory,
+                        ob => ob.Configure(
                         options =>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
-                            options.ConsumerGroup = EHConsumerGroup;
-                            options.Path = EHPath;
-                            options.BalancerType = StreamQueueBalancerType.StaticClusterConfigDeploymentBalancer;
-                            options.CheckpointConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            options.CheckpointTableName = EHCheckpointTable;
-                            options.CheckpointNamespace = CheckpointNamespace;
-                            options.CheckpointPersistInterval = TimeSpan.FromSeconds(1);
-                        })
+
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.TableName = EHCheckpointTable;
+                            options.Namespace = CheckpointNamespace;
+                            options.PersistInterval = TimeSpan.FromSeconds(1);
+                        }));
+
+                    hostBuilder
                         .AddMemoryGrainStorage("PubSubStore");
                 }
             }
@@ -65,13 +74,14 @@ namespace ServiceBus.Tests.StreamingTests
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
                 {
                     clientBuilder
-                        .AddPersistentStreams<EventHubStreamOptions>(StreamProviderName, StreamPerPartitionEventHubStreamAdapterFactory.Create,
+                        .AddPersistentStreams(StreamProviderName, StreamPerPartitionEventHubStreamAdapterFactory.Create)
+                        .Configure<EventHubOptions>(ob=>ob.Configure(
                         options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
                             options.ConsumerGroup = EHConsumerGroup;
                             options.Path = EHPath;
-                        });
+                        }));
                 }
             }
 

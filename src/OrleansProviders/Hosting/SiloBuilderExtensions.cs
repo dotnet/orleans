@@ -1,40 +1,30 @@
 using System;
 using Orleans.Configuration;
 using Orleans.Providers;
+using Orleans.Streams;
 
 namespace Orleans.Hosting
 {
     public static class SiloBuilderExtensions
     {
         /// <summary>
-        /// Configure silo to use memory streams.
+        /// Configure silo to use memory streams. This return a configurator which allows further configuration.
         /// </summary>
-        public static ISiloHostBuilder AddMemoryStreams<TSerializer>(
-            this ISiloHostBuilder builder,
-            string name,
-            Action<MemoryStreamOptions> configureOptions)
-            where TSerializer : class, IMemoryMessageBodySerializer
+        public static SiloMemoryStreamConfigurator<TSerializer> AddMemoryStreams<TSerializer>(this ISiloHostBuilder builder, string name)
+             where TSerializer : class, IMemoryMessageBodySerializer
         {
-            return builder.AddMemoryStreams<TSerializer>(name, ob => ob.Configure(configureOptions));
+            return new SiloMemoryStreamConfigurator<TSerializer>(name, builder);
         }
 
         /// <summary>
         /// Configure silo to use memory streams.
         /// </summary>
-        public static ISiloHostBuilder AddMemoryStreams<TSerializer>(
-            this ISiloHostBuilder builder,
-            string name,
-            Action<OptionsBuilder<MemoryStreamOptions>> configureOptions = null)
-            where TSerializer : class, IMemoryMessageBodySerializer
+        public static ISiloHostBuilder AddMemoryStreams<TSerializer>(this ISiloHostBuilder builder, string name,
+            Action<SiloMemoryStreamConfigurator<TSerializer>> configure)
+             where TSerializer : class, IMemoryMessageBodySerializer
         {
-            return builder
-                .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(MemoryAdapterFactory<>).Assembly))
-                .ConfigureServices(services =>
-                {
-                    services
-                        .ConfigureNamedOptionForLogging<MemoryStreamOptions>(name)
-                        .AddSiloPersistentStreams<MemoryStreamOptions>(name, MemoryAdapterFactory<TSerializer>.Create, configureOptions);
-                });
+            configure?.Invoke(builder.AddMemoryStreams<TSerializer>(name));
+            return builder;
         }
     }
 }

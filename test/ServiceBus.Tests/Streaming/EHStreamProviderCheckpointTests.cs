@@ -50,19 +50,23 @@ namespace ServiceBus.Tests.StreamingTests
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     })
-                    .AddEventHubStreams(StreamProviderName,
+                    .AddEventHubStreams(StreamProviderName)
+                    .ConfigureEventHub(ob=>ob.Configure(
                     options =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
                         options.ConsumerGroup = EHConsumerGroup;
                         options.Path = EHPath;
-                        options.BalancerType = StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer;
-                        options.PubSubType = StreamPubSubType.ImplicitOnly;
-                        options.CheckpointConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        options.CheckpointTableName = EHCheckpointTable;
-                        options.CheckpointNamespace = CheckpointNamespace;
-                        options.CheckpointPersistInterval = TimeSpan.FromSeconds(1);
-                    });
+                     
+                    }))
+                    .UseEventHubCheckpointer(ob=>ob.Configure(options => {
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.TableName = EHCheckpointTable;
+                        options.Namespace = CheckpointNamespace;
+                        options.PersistInterval = TimeSpan.FromSeconds(1);
+                    }))
+                    .UseDynamicClusterConfigDeploymentBalancer()
+                    .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
             }
         }
 
@@ -71,14 +75,15 @@ namespace ServiceBus.Tests.StreamingTests
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddEventHubStreams(StreamProviderName, 
+                    .AddEventHubStreams(StreamProviderName)
+                    .ConfigureEventHub(ob => ob.Configure(
                     options =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
                         options.ConsumerGroup = EHConsumerGroup;
                         options.Path = EHPath;
-                        options.PubSubType = StreamPubSubType.ImplicitOnly;
-                    });
+                    }))
+                    .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
             }
         }
 

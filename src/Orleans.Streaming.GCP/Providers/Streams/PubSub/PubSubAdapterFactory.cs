@@ -14,7 +14,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
         where TDataAdapter : IPubSubDataAdapter
     {
         private readonly string _providerName;
-        private readonly PubSubStreamOptions options;
+        private readonly PubSubOptions options;
         private readonly ClusterOptions clusterOptions;
         private readonly ILoggerFactory loggerFactory;
         private readonly Func<TDataAdapter> _adaptorFactory;
@@ -33,7 +33,9 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
         public PubSubAdapterFactory(
             string name, 
-            PubSubStreamOptions options, 
+            PubSubOptions options, 
+            HashRingStreamQueueMapperOptions queueMapperOptions,
+            SimpleQueueCacheOptions cacheOptions,
             IServiceProvider serviceProvider, 
             IOptions<ClusterOptions> clusterOptions, 
             SerializationManager serializationManager, 
@@ -45,12 +47,12 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             this.SerializationManager = serializationManager;
             this.loggerFactory = loggerFactory;
             this._adaptorFactory = () => ActivatorUtilities.GetServiceOrCreateInstance<TDataAdapter>(serviceProvider);
+            this._streamQueueMapper = new HashRingBasedStreamQueueMapper(queueMapperOptions, this._providerName);
+            this._adapterCache = new SimpleQueueAdapterCache(cacheOptions, this._providerName, loggerFactory);
         }
 
         public virtual void Init()
         {
-            this._streamQueueMapper = new HashRingBasedStreamQueueMapper(this.options.NumSubscriptions, this._providerName);
-            this._adapterCache = new SimpleQueueAdapterCache(this.options.CacheSize, this._providerName, loggerFactory);
             if (StreamFailureHandlerFactory == null)
             {
                 StreamFailureHandlerFactory =
@@ -74,8 +76,10 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
         public static PubSubAdapterFactory<TDataAdapter> Create(IServiceProvider services, string name)
         {
-            IOptionsSnapshot<PubSubStreamOptions> streamOptionsSnapshot = services.GetRequiredService<IOptionsSnapshot<PubSubStreamOptions>>();
-            var factory = ActivatorUtilities.CreateInstance<PubSubAdapterFactory<TDataAdapter>>(services, name, streamOptionsSnapshot.Get(name));
+            var pubsubOptions = services.GetOptionsByName<PubSubOptions>(name);
+            var cacheOptions = services.GetOptionsByName<SimpleQueueCacheOptions>(name);
+            var queueMapperOptions = services.GetOptionsByName<HashRingStreamQueueMapperOptions>(name);
+            var factory = ActivatorUtilities.CreateInstance<PubSubAdapterFactory<TDataAdapter>>(services, name, pubsubOptions, queueMapperOptions, cacheOptions);
             factory.Init();
             return factory;
         }

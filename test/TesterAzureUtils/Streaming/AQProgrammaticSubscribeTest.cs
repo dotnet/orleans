@@ -28,16 +28,13 @@ namespace Tester.AzureUtils.Streaming
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamProviderName,
+                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamProviderName2, ob=>ob.Configure(options => options.ConnectionString = TestDefaultConfiguration.DataConnectionString))
+                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamProviderName, ob => ob.Configure(
                             options =>
                             {
                                 options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            })
-                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamProviderName2,
-                            options =>
-                            {
-                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            })
+                            }));
+                    hostBuilder
                         .AddMemoryGrainStorageAsDefault()
                         .AddMemoryGrainStorage("PubSubStore");
                 }

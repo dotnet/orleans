@@ -20,7 +20,7 @@ namespace Orleans.Streams
         /// <inheritdoc/>
         public abstract IEnumerable<QueueId> GetMyQueues();
         /// <inheritdoc/>
-        public abstract Task Initialize(string strProviderName, IStreamQueueMapper queueMapper, TimeSpan siloMaturityPeriod);
+        public abstract Task Initialize(string strProviderName, IStreamQueueMapper queueMapper);
         /// <inheritdoc/>
         public virtual bool SubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
         {

@@ -1,4 +1,6 @@
 ﻿
+using Orleans.Runtime;
+using Orleans.Streams;
 using System;
 
 namespace Orleans.Configuration
@@ -6,19 +8,30 @@ namespace Orleans.Configuration
     /// <summary>
     /// Azure queue stream provider options.
     /// </summary>
-    public class AzureQueueStreamOptions : PersistentStreamOptions
+    public class AzureQueueOptions
     {
         [RedactConnectionString]
         public string ConnectionString { get; set; }
 
+        //TODO: should this be here ? I guess it should be because it determine the queue name?
         public string ClusterId { get; set; }
 
-        public TimeSpan? MessageVisibilityTimeout { get; set; }
+        public TimeSpan? MessageVisibilityTimeout { get; set; }   
+    }
 
-        public int CacheSize { get; set; } = DEFAULT_CACHE_SIZE;
-        public const int DEFAULT_CACHE_SIZE = 4096;
-
-        public int NumQueues { get; set; } = DEFAULT_NUM_QUEUES;
-        public const int DEFAULT_NUM_QUEUES = 8; // keep as power of 2.
+    public class AzureQueueOptionsValidator : IConfigurationValidator
+    {
+        private readonly AzureQueueOptions options;
+        private readonly string name;
+        public AzureQueueOptionsValidator(AzureQueueOptions options, string name)
+        {
+            this.options = options;
+            this.name = name;
+        }
+        public void ValidateConfiguration()
+        {
+            if (String.IsNullOrEmpty(options.ConnectionString))
+                throw new OrleansConfigurationException($"{nameof(AzureQueueOptions)} on stream provider {this.name} is invalid. {nameof(AzureQueueOptions.ConnectionString)} is invalid");
+        }
     }
 }

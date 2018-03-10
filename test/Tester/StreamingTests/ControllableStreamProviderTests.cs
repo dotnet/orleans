@@ -31,12 +31,10 @@ namespace UnitTests.StreamingTests
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddPersistentStreams<PersistentStreamOptions>(StreamProviderName,
-                            ControllableTestAdapterFactory.Create, options =>
-                            {
-                                options.BalancerType = StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer;
-                                options.PubSubType = StreamPubSubType.ImplicitOnly;
-                            });
+                        .AddPersistentStreams(StreamProviderName,
+                            ControllableTestAdapterFactory.Create)
+                         .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly)
+                         .UseDynamicClusterConfigDeploymentBalancer();
                 }
             }
         }

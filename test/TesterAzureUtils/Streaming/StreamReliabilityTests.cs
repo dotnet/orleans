@@ -63,11 +63,11 @@ namespace UnitTests.Streaming.Reliability
                 {
                     gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                 })
-                .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AZURE_QUEUE_STREAM_PROVIDER_NAME,
+                .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AZURE_QUEUE_STREAM_PROVIDER_NAME, ob=>ob.Configure(
                     options =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                    })
+                    }))
                 .AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME);
             }
         }
@@ -95,16 +95,16 @@ namespace UnitTests.Streaming.Reliability
                     options.DeleteStateOnClear = true;
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                 }))
-                .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AZURE_QUEUE_STREAM_PROVIDER_NAME,
+                .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AZURE_QUEUE_STREAM_PROVIDER_NAME, ob=>ob.Configure(
                     options =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                    })
-                .AddAzureQueueStreams<AzureQueueDataAdapterV2>("AzureQueueProvider2",
+                    }))
+                .AddAzureQueueStreams<AzureQueueDataAdapterV2>("AzureQueueProvider2", ob=>ob.Configure(
                     options =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                    });
+                    }));
             }
         }
 

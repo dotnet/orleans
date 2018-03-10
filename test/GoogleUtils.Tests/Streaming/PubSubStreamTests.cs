@@ -36,16 +36,17 @@ namespace GoogleUtils.Tests.Streaming
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
+                    .AddMemoryGrainStorage("MemoryStore", op => op.NumStorageGrains = 1)
+                    .AddMemoryGrainStorage("PubSubStorage")
                     .AddSimpleMessageStreamProvider("SMSProvider")
-                    .AddPubSubStreams<PubSubDataAdapter>(PUBSUB_STREAM_PROVIDER_NAME, options =>
+                    .AddPubSubStreams<PubSubDataAdapter>(PUBSUB_STREAM_PROVIDER_NAME)
+                    .ConfigurePubSub(ob=>ob.Configure(options =>
                     {
                         options.ProjectId = GoogleTestUtils.ProjectId;
                         options.TopicId = GoogleTestUtils.TopicId;
                         options.ClusterId = GoogleTestUtils.DeploymentId.ToString();
                         options.Deadline = TimeSpan.FromSeconds(600);
-                    })
-                    .AddMemoryGrainStorage("MemoryStore", op => op.NumStorageGrains = 1)
-                    .AddMemoryGrainStorage("PubSubStorage");
+                    }));
             }
         }
 
@@ -55,13 +56,14 @@ namespace GoogleUtils.Tests.Streaming
             {
                 clientBuilder
                     .AddSimpleMessageStreamProvider("SMSProvider")
-                    .AddPubSubStreams<PubSubDataAdapter>(PUBSUB_STREAM_PROVIDER_NAME, options =>
+                    .AddPubSubStreams<PubSubDataAdapter>(PUBSUB_STREAM_PROVIDER_NAME)
+                    .ConfigurePubSub(ob=>ob.Configure(options =>
                     {
                         options.ProjectId = GoogleTestUtils.ProjectId;
                         options.TopicId = GoogleTestUtils.TopicId;
                         options.ClusterId = GoogleTestUtils.DeploymentId.ToString();
                         options.Deadline = TimeSpan.FromSeconds(600);
-                    });
+                    }));
             }
         }
 

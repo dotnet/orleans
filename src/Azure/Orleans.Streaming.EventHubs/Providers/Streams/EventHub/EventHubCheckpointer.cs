@@ -4,9 +4,34 @@ using Microsoft.Extensions.Logging;
 using Orleans.Streams;
 using Orleans.Streaming.EventHubs;
 using Orleans.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.ServiceBus.Providers
 {
+    public class EventHubCheckpointerFactory : IStreamQueueCheckpointerFactory
+    {
+        private ILoggerFactory loggerFactory;
+        private string providerName;
+        private AzureTableStreamCheckpointerOptions options;
+        public EventHubCheckpointerFactory(string providerName, AzureTableStreamCheckpointerOptions options, ILoggerFactory loggerFactory)
+        {
+            this.options = options;
+            this.loggerFactory = loggerFactory;
+            this.providerName = providerName;
+        }
+
+        public Task<IStreamQueueCheckpointer<string>> Create(string partition)
+        {
+            return EventHubCheckpointer.Create(options, providerName, partition, loggerFactory);
+        }
+
+        public static IStreamQueueCheckpointerFactory CreateFactory(IServiceProvider services, string providerName)
+        {
+            var options = services.GetOptionsByName<AzureTableStreamCheckpointerOptions>(providerName);
+            return ActivatorUtilities.CreateInstance<EventHubCheckpointerFactory>(services, providerName, options);
+        }
+    }
+
     /// <summary>
     /// This class stores EventHub partition checkpointer information (a partition offset) in azure table storage.
     /// </summary>
@@ -32,14 +57,14 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="partition"></param>
         /// <param name="loggerFactory"></param>
         /// <returns></returns>
-        public static async Task<IStreamQueueCheckpointer<string>> Create(EventHubStreamOptions options, string streamProviderName, string partition, ILoggerFactory loggerFactory)
+        public static async Task<IStreamQueueCheckpointer<string>> Create(AzureTableStreamCheckpointerOptions options, string streamProviderName, string partition, ILoggerFactory loggerFactory)
         {
             var checkpointer = new EventHubCheckpointer(options, streamProviderName, partition, loggerFactory);
             await checkpointer.Initialize();
             return checkpointer;
         }
 
-        private EventHubCheckpointer(EventHubStreamOptions options, string streamProviderName, string partition, ILoggerFactory loggerFactory)
+        private EventHubCheckpointer(AzureTableStreamCheckpointerOptions options, string streamProviderName, string partition, ILoggerFactory loggerFactory)
         {
             if (options == null)
             {
@@ -53,9 +78,9 @@ namespace Orleans.ServiceBus.Providers
             {
                 throw new ArgumentNullException(nameof(partition));
             }
-            persistInterval = options.CheckpointPersistInterval;
-            dataManager = new AzureTableDataManager<EventHubPartitionCheckpointEntity>(options.CheckpointTableName, options.CheckpointConnectionString, loggerFactory);
-            entity = EventHubPartitionCheckpointEntity.Create(streamProviderName, options.CheckpointNamespace, partition);
+            persistInterval = options.PersistInterval;
+            dataManager = new AzureTableDataManager<EventHubPartitionCheckpointEntity>(options.TableName, options.ConnectionString, loggerFactory);
+            entity = EventHubPartitionCheckpointEntity.Create(streamProviderName, options.Namespace, partition);
         }
 
         private Task Initialize()

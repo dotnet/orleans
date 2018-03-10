@@ -39,6 +39,7 @@ namespace UnitTests.HaloTests.Streaming
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
+                        .AddMemoryGrainStorage("MemoryStore", options => options.NumStorageGrains = 1)
                         .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
                             options.ServiceId = silo.Value.ServiceId.ToString();
@@ -53,17 +54,19 @@ namespace UnitTests.HaloTests.Streaming
                             options.DeleteStateOnClear = true;
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         }))
-                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName,
+                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName)
+                        .ConfigureAzureQueue(ob => ob.Configure(
                             options =>
                             {
                                 options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            })
-                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>("AzureQueueProvider2",
+                            }));
+                    hostBuilder
+                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>("AzureQueueProvider2")
+                        .ConfigureAzureQueue(ob => ob.Configure(
                             options =>
                             {
                                 options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            })
-                        .AddMemoryGrainStorage("MemoryStore", options => options.NumStorageGrains = 1);
+                            }));
                 }
             }
 

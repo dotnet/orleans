@@ -1,20 +1,20 @@
 using System;
 using Orleans.Configuration;
 using Orleans.ServiceBus.Providers;
+using Orleans.Streams;
 
 namespace Orleans.Hosting
 {
     public static class SiloBuilderExtensions
     {
         /// <summary>
-        /// Configure silo to use event hub persistent streams.
+        /// Configure silo to use event hub persistent streams. This returns a configurator which allows further configuration.
         /// </summary>
-        public static ISiloHostBuilder AddEventHubStreams(
+        public static SiloEventHubStreamConfigurator AddEventHubStreams(
             this ISiloHostBuilder builder,
-            string name,
-            Action<EventHubStreamOptions> configureOptions)
+            string name)
         {
-            return builder.AddEventHubStreams(name, ob => ob.Configure(configureOptions));
+            return new SiloEventHubStreamConfigurator(name, builder);
         }
 
         /// <summary>
@@ -23,15 +23,23 @@ namespace Orleans.Hosting
         public static ISiloHostBuilder AddEventHubStreams(
             this ISiloHostBuilder builder,
             string name,
-            Action<OptionsBuilder<EventHubStreamOptions>> configureOptions = null)
+            Action<SiloEventHubStreamConfigurator> configure)
         {
-            return builder
-                .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(EventHubAdapterFactory).Assembly))
-                .ConfigureServices(services =>
-                {
-                    services.ConfigureNamedOptionForLogging<EventHubStreamOptions>(name)
-                        .AddSiloPersistentStreams<EventHubStreamOptions>(name, EventHubAdapterFactory.Create, configureOptions);
-                });
+            configure?.Invoke(builder.AddEventHubStreams(name));
+            return builder;
+        }
+
+        /// <summary>
+        /// Configure silo to use event hub persistent streams with default check pointer and other settings
+        /// </summary>
+        public static ISiloHostBuilder AddEventHubStreams(
+            this ISiloHostBuilder builder,
+            string name, Action<EventHubOptions> configureEventHub, Action<AzureTableStreamCheckpointerOptions> configureDefaultCheckpointer)
+        {
+            builder.AddEventHubStreams(name)
+                .ConfigureEventHub(ob => ob.Configure(configureEventHub))
+                .UseEventHubCheckpointer(ob => ob.Configure(configureDefaultCheckpointer));
+            return builder;
         }
     }
 }

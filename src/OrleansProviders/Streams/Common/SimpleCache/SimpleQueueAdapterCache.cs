@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 using Orleans.Streams;
 using System;
 
@@ -23,11 +24,9 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="cacheSize"></param>
         /// <param name="providerName"></param>
         /// <param name="loggerFactory"></param>
-        public SimpleQueueAdapterCache(int cacheSize, string providerName, ILoggerFactory loggerFactory)
+        public SimpleQueueAdapterCache(SimpleQueueCacheOptions options, string providerName, ILoggerFactory loggerFactory)
         {
-            if (cacheSize <= 0)
-                throw new ArgumentOutOfRangeException("cacheSize", "CacheSize must be a positive number.");
-            this.cacheSize = cacheSize;
+            this.cacheSize = options.CacheSize;
             this.loggerFactory = loggerFactory;
             this.providerName = providerName;
         }

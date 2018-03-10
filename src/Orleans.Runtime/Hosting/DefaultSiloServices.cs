@@ -82,10 +82,7 @@ namespace Orleans.Hosting
 
             services.TryAddSingleton<ExecutorService>();
             // queue balancer contructing related
-            services.TryAddTransient<StaticClusterConfigDeploymentBalancer>();
-            services.TryAddTransient<DynamicClusterConfigDeploymentBalancer>();
-            services.TryAddTransient<ClusterConfigDeploymentLeaseBasedBalancer>();
-            services.TryAddTransient<ConsistentRingQueueBalancer>();
+            services.TryAddTransient<IStreamQueueBalancer, ConsistentRingQueueBalancer>();
             services.TryAddSingleton<IStreamSubscriptionHandleFactory, StreamSubscriptionHandlerFactory>();
 
             services.TryAddSingleton<FallbackSystemTarget>();

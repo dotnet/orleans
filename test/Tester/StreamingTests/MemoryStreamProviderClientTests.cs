@@ -22,7 +22,7 @@ namespace Tester.StreamingTests
         {
             public const string StreamProviderName = "MemoryStreamProvider";
             public const string StreamNamespace = "StreamNamespace";
-
+            private const int partitionCount = 8;
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.ConfigureLegacyConfiguration(legacy =>
@@ -36,14 +36,15 @@ namespace Tester.StreamingTests
             private class MyClientBuilderConfigurator : IClientBuilderConfigurator
             {
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder
-                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName);
+                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName)
+                    .ConfigurePartitioning(partitionCount);
             }
 
             private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder) => hostBuilder
+                public void Configure(ISiloHostBuilder hostBuilder)=> hostBuilder.AddMemoryGrainStorage("PubSubStore")
                         .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName)
-                     .AddMemoryGrainStorage("PubSubStore");
+                    .ConfigurePartitioning(partitionCount);
             }
 
             private static void AdjustConfig(ClusterConfiguration config)

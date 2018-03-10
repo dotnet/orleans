@@ -62,18 +62,6 @@ namespace Orleans.Streams
     }
 
     /// <summary>
-    /// Stream queue balancer that uses the cluster configuration to determine deployment information for load balancing.  
-    /// This balancer supports queue balancing in cluster auto-scale scenario, unexpected server failure scenario, and try to support ideal distribution 
-    /// </summary>
-    public class ClusterConfigDeploymentLeaseBasedBalancer : LeaseBasedQueueBalancer
-    {
-        public ClusterConfigDeploymentLeaseBasedBalancer(IServiceProvider serviceProvider, ISiloStatusOracle siloStatusOracle,
-            IOptions<StaticClusterDeploymentOptions> options, ILoggerFactory loggerFactory)
-            : base(serviceProvider, siloStatusOracle, options.Value, loggerFactory)
-        { }
-    }
-
-    /// <summary>
     /// LeaseBasedQueueBalancer. This balancer supports queue balancing in cluster auto-scale scenario, unexpected server failure scenario, and try to support ideal distribution 
     /// as much as possible. 
     /// </summary>
@@ -98,9 +86,7 @@ namespace Orleans.Streams
         private readonly ISiloStatusOracle siloStatusOracle;
         private ReadOnlyCollection<QueueId> allQueues;
         private List<AcquiredQueue> myQueues;
-        private TimeSpan siloMaturityPeriod;
         private bool isStarting;
-        private TimeSpan leaseLength;
         private AsyncTaskSafeTimer renewLeaseTimer;
         private AsyncTaskSafeTimer tryAcquireMaximumLeaseTimer;
         private IResourceSelector<QueueId> queueSelector;
@@ -109,6 +95,7 @@ namespace Orleans.Streams
         private IServiceProvider serviceProvider;
         private ILogger logger;
         private ILoggerFactory loggerFactory;
+        private readonly LeaseBasedQueueBalancerOptions options;
         /// <summary>
         /// Constructor
         /// </summary>
@@ -116,7 +103,7 @@ namespace Orleans.Streams
         /// <param name="siloStatusOracle"></param>
         /// <param name="deploymentConfig"></param>
         /// <param name="loggerFactory"></param>
-        public LeaseBasedQueueBalancer(IServiceProvider serviceProvider, ISiloStatusOracle siloStatusOracle, IDeploymentConfiguration deploymentConfig, ILoggerFactory loggerFactory)
+        public LeaseBasedQueueBalancer(LeaseBasedQueueBalancerOptions options, IServiceProvider serviceProvider, ISiloStatusOracle siloStatusOracle, IDeploymentConfiguration deploymentConfig, ILoggerFactory loggerFactory)
         {
             this.serviceProvider = serviceProvider;
             this.deploymentConfig = deploymentConfig;
@@ -124,11 +111,17 @@ namespace Orleans.Streams
             this.myQueues = new List<AcquiredQueue>();
             this.isStarting = true;
             this.loggerFactory = loggerFactory;
+            this.options = options;
             this.logger = loggerFactory.CreateLogger<LeaseBasedQueueBalancer>();
         }
 
+        public static IStreamQueueBalancer Create(IServiceProvider services, string name, IDeploymentConfiguration deploymentConfiguration)
+        {
+            var options = services.GetService<IOptionsSnapshot<LeaseBasedQueueBalancerOptions>>().Get(name);
+            return ActivatorUtilities.CreateInstance<LeaseBasedQueueBalancer>(services, options, deploymentConfiguration);
+        }
         /// <inheritdoc/>
-        public override Task Initialize(string strProviderName, IStreamQueueMapper queueMapper, TimeSpan siloMaturityPeriod)
+        public override Task Initialize(string strProviderName, IStreamQueueMapper queueMapper)
         {
             if (queueMapper == null)
             {
@@ -138,15 +131,13 @@ namespace Orleans.Streams
             if (options == null)
                 throw new KeyNotFoundException($"No lease base queue balancer options was configured for provider {strProviderName}, nor was a default configured.");
             this.leaseProvider = this.serviceProvider.GetRequiredService(options.LeaseProviderType) as ILeaseProvider;
-            this.leaseLength = options.LeaseLength;
             this.allQueues = new ReadOnlyCollection<QueueId>(queueMapper.GetAllQueues().ToList());
-            this.siloMaturityPeriod = siloMaturityPeriod;
             NotifyAfterStart().Ignore();
             //make lease renew frequency to be every half of lease time, to avoid renew failing due to timing issues, race condition or clock difference. 
             var timerLogger = this.loggerFactory.CreateLogger<AsyncTaskSafeTimer>();
-            this.renewLeaseTimer = new AsyncTaskSafeTimer(timerLogger, this.MaintainAndBalanceQueues, null, this.siloMaturityPeriod, this.leaseLength.Divide(2));
+            this.renewLeaseTimer = new AsyncTaskSafeTimer(timerLogger, this.MaintainAndBalanceQueues, null, this.options.SiloMaturityPeriod, this.options.LeaseLength.Divide(2));
             //try to acquire maximum leases every leaseLength 
-            this.tryAcquireMaximumLeaseTimer = new AsyncTaskSafeTimer(timerLogger, this.AcquireLeaseToMeetMaxResponsibilty, null, this.siloMaturityPeriod, this.leaseLength);
+            this.tryAcquireMaximumLeaseTimer = new AsyncTaskSafeTimer(timerLogger, this.AcquireLeaseToMeetMaxResponsibilty, null, this.options.SiloMaturityPeriod, this.options.SiloMaturityPeriod);
             //Selector default to round robin selector now, but we can make a further change to make selector configurable if needed.  Selector algorithm could 
             //be affecting queue balancing stablization time in cluster initializing and auto-scaling
             this.queueSelector = new RoundRobinSelector<QueueId>(this.allQueues);
@@ -214,7 +205,7 @@ namespace Orleans.Streams
                 var expectedQueues = this.queueSelector.NextSelection(leasesToAquire, this.myQueues.Select(queue=>queue.QueueId).ToList()).ToList();
                 var leaseRequests = expectedQueues.Select(queue => new LeaseRequest() {
                     ResourceKey = queue.ToString(),
-                    Duration = this.leaseLength
+                    Duration = this.options.LeaseLength
                 });
                 var results = await this.leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
                 //add successfully acquired queue to myQueues list
@@ -279,7 +270,7 @@ namespace Orleans.Streams
 
         private async Task NotifyAfterStart()
         {
-            await Task.Delay(siloMaturityPeriod);
+            await Task.Delay(this.options.SiloMaturityPeriod);
             this.isStarting = false;
             await NotifyListeners();
         }

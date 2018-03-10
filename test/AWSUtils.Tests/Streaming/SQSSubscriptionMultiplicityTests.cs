@@ -50,11 +50,11 @@ namespace AWSUtils.Tests.Streaming
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
+                    .AddMemoryGrainStorage("PubSubStore")
                     .AddSqsStreams(SQSStreamProviderName, options =>
                     {
                         options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
-                    })
-                    .AddMemoryGrainStorage("PubSubStore");
+                    });
             }
         }
 

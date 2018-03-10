@@ -53,8 +53,7 @@ namespace Orleans.Streams
         Task<IPersistentStreamPullingManager> InitializePullingAgents(
             string streamProviderName,
             IQueueAdapterFactory adapterFactory,
-            IQueueAdapter queueAdapter,
-            PersistentStreamOptions config);
+            IQueueAdapter queueAdapter);
     }
 
     public enum StreamPubSubType

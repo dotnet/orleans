@@ -20,8 +20,7 @@ namespace Tester.StreamingTests
         }
 
         public async Task Initialize(string strProviderName,
-            IStreamQueueMapper queueMapper,
-            TimeSpan siloMaturityPeriod)
+            IStreamQueueMapper queueMapper)
         {
             this.leaseManagerGrain = this.grainFactory.GetGrain<ILeaseManagerGrain>(strProviderName);
             await this.leaseManagerGrain.SetQueuesAsLeases(queueMapper.GetAllQueues());

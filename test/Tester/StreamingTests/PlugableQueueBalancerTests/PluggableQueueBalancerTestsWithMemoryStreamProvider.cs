@@ -8,6 +8,8 @@ using Orleans.TestingHost;
 using System.Threading.Tasks;
 using TestExtensions;
 using Xunit;
+using Orleans.Streams;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Tester.StreamingTests.PlugableQueueBalancerTests
 {
@@ -34,12 +36,11 @@ namespace Tester.StreamingTests.PlugableQueueBalancerTests
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, options =>
-                        {
-                            options.TotalQueueCount = totalQueueCount;
-                            options.BalancerType = typeof(LeaseBasedQueueBalancerForTest);
-                        })
-                        .AddMemoryGrainStorage("PubSubStore");
+                        .AddMemoryGrainStorage("PubSubStore")
+                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName)
+                        .ConfigurePartitioning(totalQueueCount)
+                        .ConfigurePartitionBalancing((s, n) => ActivatorUtilities.CreateInstance<LeaseBasedQueueBalancerForTest>(s));
+                        
                 }
             }
             
@@ -48,10 +49,7 @@ namespace Tester.StreamingTests.PlugableQueueBalancerTests
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
                 {
                     clientBuilder
-                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, options =>
-                        {
-                            options.TotalQueueCount = totalQueueCount;
-                        });
+                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName);
                 }
             }
 

@@ -16,5 +16,8 @@ namespace Orleans.Configuration
         /// LeaseLength
         /// </summary>
         public TimeSpan LeaseLength { get; set; } = TimeSpan.FromSeconds(60);
+
+        public TimeSpan SiloMaturityPeriod { get; set; } = DEFAULT_SILO_MATURITY_PERIOD;
+        public static readonly TimeSpan DEFAULT_SILO_MATURITY_PERIOD = TimeSpan.FromMinutes(2);
     }
 }

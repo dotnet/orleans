@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-
 namespace Orleans.Runtime
 {
     public interface IKeyedService<TKey, out TService> : IEquatable<TKey>

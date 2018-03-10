@@ -46,11 +46,11 @@ namespace Tester.AzureUtils.Streaming
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AQStreamProviderName,
+                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AQStreamProviderName, ob=>ob.Configure(
                         options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        });
+                        }));
             }
         }
 
@@ -59,11 +59,11 @@ namespace Tester.AzureUtils.Streaming
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
-                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AQStreamProviderName,
+                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AQStreamProviderName, ob=>ob.Configure(
                         options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        })
+                        }))
                     .AddMemoryGrainStorage("PubSubStore");
             }
         }
