@@ -39,6 +39,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="options"></param>
         /// <param name="serializationManager"></param>
         /// <param name="sharedDimensions">shared dimensions between cache monitor and block pool monitor</param>
+        /// <param name="loggerFactory"></param>
         /// <param name="cacheMonitorFactory"></param>
         /// <param name="blockPoolMonitorFactory"></param>
         public EventHubQueueCacheFactory(EventHubStreamCachePressureOptions cacheOptions, StreamCacheEvictionOptions evictionOptions, 
@@ -94,7 +95,7 @@ namespace Orleans.ServiceBus.Providers
         /// User can override this function to provide more customization on cache pressure monitors
         /// </summary>
         /// <param name="cache"></param>
-        /// <param name="providerSettings"></param>
+        /// <param name="providerOptions"></param>
         /// <param name="cacheLogger"></param>
         protected virtual void AddCachePressureMonitors(IEventHubQueueCache cache, EventHubStreamCachePressureOptions providerOptions,
             ILogger cacheLogger)

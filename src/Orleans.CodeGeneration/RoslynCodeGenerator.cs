@@ -47,7 +47,7 @@ namespace Orleans.CodeGenerator
         /// <summary>
         /// Initializes a new instance of the <see cref="RoslynCodeGenerator"/> class.
         /// </summary>
-        /// <param name="serializerFeature">Serializer metadata for the target environment.</param>
+        /// <param name="partManager"></param>
         /// <param name="loggerFactory">The logger factory.</param>
         public RoslynCodeGenerator(IApplicationPartManager partManager, ILoggerFactory loggerFactory)
         {
@@ -392,11 +392,11 @@ namespace Orleans.CodeGenerator
         }
 
         /// <summary>
-        /// Adds serialization type descriptions from <paramref name="types"/> to <paramref name="serializationTypes"/>.
+        /// Adds serialization type descriptions from <paramref name="targetAssembly"/> to <paramref name="serializationTypes"/>.
         /// </summary>
         /// <param name="serializationTypes">The serialization type descriptions.</param>
         /// <param name="targetAssembly">The target assembly for generated code.</param>
-        /// <param name="types">The types.</param>
+        /// <param name="assemblies"></param>
         private void AddSerializationTypes(SerializationTypeDescriptions serializationTypes, Assembly targetAssembly, List<Assembly> assemblies)
         {
             // Only types which exist in assemblies referenced by the target assembly can be referenced.
@@ -515,7 +515,6 @@ namespace Orleans.CodeGenerator
         /// <param name="emitDebugSymbols">
         /// Whether or not to emit debug symbols for the generated assembly.
         /// </param>
-        /// <param name="logger"> logger to use </param>
         /// <returns>
         /// The raw assembly.
         /// </returns>

@@ -25,7 +25,6 @@ namespace Orleans.TestingHost
     /// <summary>
     /// Fault injection decorator for storage providers.  This allows users to inject storage exceptions to test error handling scenarios.
     /// </summary>
-    /// <typeparam name="TStorage"></typeparam>
     public class FaultInjectionGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly IGrainStorage realStorageProvider;
@@ -127,13 +126,10 @@ namespace Orleans.TestingHost
     /// </summary>
     public class FaultInjectionGrainStorageFactory
     {
-        /// <summary>
-        /// Create FaultInjectionGrainStorage
-        /// </summary>
-        /// <typeparam name="TGrainStorage"></typeparam>
+        /// <summary>Create FaultInjectionGrainStorage</summary>
         /// <param name="services"></param>
         /// <param name="name"></param>
-        /// <param name="tGrainStorageFactory"></param>
+        /// <param name="injectedGrainStorageFactory"></param>
         /// <returns></returns>
         public static IGrainStorage Create(IServiceProvider services, string name, Func<IServiceProvider, string, IGrainStorage> injectedGrainStorageFactory)
         {

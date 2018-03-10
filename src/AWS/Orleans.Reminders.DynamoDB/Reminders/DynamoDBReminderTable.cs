@@ -35,11 +35,11 @@ namespace Orleans.Reminders.DynamoDB
 
         private DynamoDBStorage storage;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="DynamoDBReminderTable"/> class.
-        /// </summary>
+        /// <summary>Initializes a new instance of the <see cref="DynamoDBReminderTable"/> class.</summary>
         /// <param name="grainReferenceConverter">The grain factory.</param>
         /// <param name="loggerFactory">logger factory to use</param>
+        /// <param name="clusterOptions"></param>
+        /// <param name="storageOptions"></param>
         public DynamoDBReminderTable(
             IGrainReferenceConverter grainReferenceConverter, 
             ILoggerFactory loggerFactory, 
@@ -53,11 +53,7 @@ namespace Orleans.Reminders.DynamoDB
             this.options = storageOptions.Value;
         }
 
-        /// <summary>
-        /// Initialize current instance with specific global configuration and logger
-        /// </summary>
-        /// <param name="config"> Global configuration to initialize with </param>
-        /// <returns></returns>
+        /// <summary>Initialize current instance with specific global configuration and logger</summary>
         public Task Init()
         {
             this.storage = new DynamoDBStorage(this.loggerFactory, this.options.Service, this.options.AccessKey, this.options.SecretKey,

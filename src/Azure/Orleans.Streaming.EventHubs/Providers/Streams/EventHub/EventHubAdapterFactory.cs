@@ -255,7 +255,6 @@ namespace Orleans.ServiceBus.Providers
         /// User can override this function to return their own implementation of IEventHubQueueCacheFactory,
         /// and other customization of IEventHubQueueCacheFactory if they may.
         /// </summary>
-        /// <param name="providerSettings"></param>
         /// <returns></returns>
         protected virtual IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamCachePressureOptions eventHubCacheOptions)
         {

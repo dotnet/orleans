@@ -64,7 +64,7 @@ namespace Orleans.Tests.SqlUtils
         }
 
         /// <summary>
-        /// If the underlying <see cref="DbCommand"/> the storage supports cancellation or not.
+        /// If the underlying storage supports cancellation or not.
         /// </summary>
         /// <param name="storage">The storage used.</param>
         /// <returns><em>TRUE</em> if cancellation is supported. <em>FALSE</em> otherwise.</returns>
@@ -75,7 +75,7 @@ namespace Orleans.Tests.SqlUtils
 
 
         /// <summary>
-        /// If the <see cref="DbCommand"/> that would be used supports cancellation or not.
+        /// If the provider supports cancellation or not.
         /// </summary>
         /// <param name="adoNetProvider">The ADO.NET provider invariant string.</param>
         /// <returns><em>TRUE</em> if cancellation is supported. <em>FALSE</em> otherwise.</returns>
@@ -86,7 +86,7 @@ namespace Orleans.Tests.SqlUtils
 
 
         /// <summary>
-        /// If the underlying <see cref="DbCommand"/> the storage supports streaming natively.
+        /// If the underlying storage supports streaming natively.
         /// </summary>
         /// <param name="storage">The storage used.</param>
         /// <returns><em>TRUE</em> if streaming is supported natively. <em>FALSE</em> otherwise.</returns>
@@ -97,7 +97,7 @@ namespace Orleans.Tests.SqlUtils
 
 
         /// <summary>
-        /// If the underlying <see cref="DbCommand"/> the storage supports streaming natively.
+        /// If the provider supports streaming natively.
         /// </summary>
         /// <param name="adoNetProvider">The ADO.NET provider invariant string.</param>
         /// <returns><em>TRUE</em> if streaming is supported natively. <em>FALSE</em> otherwise.</returns>
@@ -120,7 +120,7 @@ namespace Orleans.Tests.SqlUtils
 
 
         /// <summary>
-        /// If the <see cref="DbCommand"/> that would be used supports cancellation or not.
+        /// If the provider supports cancellation or not.
         /// </summary>
         /// <param name="adoNetProvider">The ADO.NET provider invariant string.</param>
         /// <returns></returns>

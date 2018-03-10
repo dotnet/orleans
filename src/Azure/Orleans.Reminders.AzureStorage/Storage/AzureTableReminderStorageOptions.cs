@@ -1,14 +1,6 @@
-using System.Collections.Generic;
-
-using Microsoft.Extensions.Options;
-
-using Orleans.Runtime.Configuration;
-
 namespace Orleans.Configuration
 {
-    /// <summary>
-    /// Options for <see cref="AzureBasedReminderTable"/>.
-    /// </summary>
+    /// <summary>Options for Azure Table based reminder table.</summary>
     public class AzureTableReminderStorageOptions
     {
         /// <summary>

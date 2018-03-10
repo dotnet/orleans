@@ -65,7 +65,6 @@ namespace Orleans.Storage
         }
 
         /// <summary> Initialization function for this storage provider. </summary>
-        /// <see cref="IProvider.Init"/>
         public async Task Init(CancellationToken ct)
         {
             var stopWatch = Stopwatch.StartNew();
@@ -108,11 +107,10 @@ namespace Orleans.Storage
         }
 
         /// <summary> Shutdown this storage provider. </summary>
-        /// <see cref="IProvider.Close"/>
         public Task Close(CancellationToken ct) => Task.CompletedTask;
 
         /// <summary> Read state data function for this storage provider. </summary>
-        /// <see cref="IStorageProvider.ReadStateAsync"/>
+        /// <see cref="IGrainStorage.ReadStateAsync"/>
         public async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             if (this.storage == null) throw new ArgumentException("GrainState-Table property not initialized");
@@ -153,7 +151,7 @@ namespace Orleans.Storage
         }
 
         /// <summary> Write state data function for this storage provider. </summary>
-        /// <see cref="IStorageProvider.WriteStateAsync"/>
+        /// <see cref="IGrainStorage.WriteStateAsync"/>
         public async Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             if (this.storage == null) throw new ArgumentException("GrainState-Table property not initialized");
@@ -242,7 +240,7 @@ namespace Orleans.Storage
         /// for this grain will be deleted / removed, otherwise the table row will be
         /// cleared by overwriting with default / null values.
         /// </remarks>
-        /// <see cref="IStorageProvider.ClearStateAsync"/>
+        /// <see cref="IGrainStorage.ClearStateAsync"/>
         public async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             if (this.storage == null) throw new ArgumentException("GrainState-Table property not initialized");

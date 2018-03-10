@@ -3,7 +3,6 @@ using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
@@ -17,12 +16,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Hosting;
 
 namespace Orleans.Storage
 {
     /// <summary>
-    /// Logging codes used by <see cref="AdoNetStorageProvider"/>.
+    /// Logging codes used by <see cref="AdoNetGrainStorage"/>.
     /// </summary>
     /// <remarks> These are taken from <em>Orleans.Providers.ProviderErrorCode</em> and <em>Orleans.Providers.AzureProviderErrorCode</em>.</remarks>
     internal enum RelationalStorageProviderCodes
@@ -152,7 +150,7 @@ namespace Orleans.Storage
             lifecycle.Subscribe(OptionFormattingUtilities.Name<AdoNetGrainStorage>(this.name), this.options.InitStage, Init, Close);
         }
         /// <summary>Clear state data function for this storage provider.</summary>
-        /// <see cref="IStorageProvider.ClearStateAsync(string, GrainReference, IGrainState)"/>.
+        /// <see cref="IGrainStorage.ClearStateAsync(string, GrainReference, IGrainState)"/>.
         public async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             //It assumed these parameters are always valid. If not, an exception will be thrown,
@@ -205,7 +203,7 @@ namespace Orleans.Storage
 
 
         /// <summary> Read state data function for this storage provider.</summary>
-        /// <see cref="IStorageProvider.ReadStateAsync(string, GrainReference, IGrainState)"/>.
+        /// <see cref="IGrainStorage.ReadStateAsync(string, GrainReference, IGrainState)"/>.
         public async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             //It assumed these parameters are always valid. If not, an exception will be thrown, even if not as clear
@@ -330,7 +328,7 @@ namespace Orleans.Storage
 
 
         /// <summary> Write state data function for this storage provider.</summary>
-        /// <see cref="IStorageProvider.WriteStateAsync"/>
+        /// <see cref="IGrainStorage.WriteStateAsync"/>
         public async Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             //It assumed these parameters are always valid. If not, an exception will be thrown, even if not as clear
