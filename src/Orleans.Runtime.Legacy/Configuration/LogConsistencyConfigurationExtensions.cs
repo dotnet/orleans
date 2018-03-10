@@ -10,7 +10,7 @@ namespace Orleans.Runtime.Configuration
     public static class LogConsistencyConfigurationExtensions
     {
         /// <summary>
-        /// Adds a log consistency provider of type <see cref="Orleans.EventSourcing.LogStorage.LogConsistencyProvider"/>
+        /// Adds a log consistency provider"/>
         /// </summary>
         /// <param name="config">The cluster configuration object to add provider to.</param>
         /// <param name="providerName">The provider name.</param>
@@ -24,7 +24,7 @@ namespace Orleans.Runtime.Configuration
         }
 
         /// <summary>
-        /// Adds a log consistency provider of type <see cref="Orleans.EventSourcing.StateStorage.LogConsistencyProvider"/>
+        /// Adds a log consistency provider./>
         /// </summary>
         /// <param name="config">The cluster configuration object to add provider to.</param>
         /// <param name="providerName">The provider name.</param>
@@ -38,7 +38,7 @@ namespace Orleans.Runtime.Configuration
         }
 
         /// <summary>
-        /// Adds a log consistency provider of type <see cref="Orleans.EventSourcing.CustomStorage.LogConsistencyProvider"/>
+        /// Adds a log consistency provider."/>
         /// </summary>
         /// <param name="config">The cluster configuration object to add provider to.</param>
         /// <param name="providerName">The provider name.</param>

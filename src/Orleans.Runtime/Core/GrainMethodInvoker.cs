@@ -25,7 +25,6 @@ namespace Orleans.Runtime
         /// <param name="rootInvoker">The generated invoker.</param>
         /// <param name="filters">The invocation interceptors.</param>
         /// <param name="interfaceToImplementationMapping">The implementation map.</param>
-        /// <param name="invokeInterceptor">The deprecated silo-wide interceptor.</param>
         public GrainMethodInvoker(
             IAddressable grain,
             InvokeMethodRequest request,

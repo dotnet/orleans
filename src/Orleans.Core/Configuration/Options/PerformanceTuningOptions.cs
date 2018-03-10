@@ -6,9 +6,9 @@ namespace Orleans.Configuration
     /// </summary>
     public class PerformanceTuningOptions
     {
-        #region ServicePointManager related settings
+#region ServicePointManager related settings
         /// <summary>
-        /// <see cref="ServicePointManager"/> related settings
+        /// ServicePointManager related settings
         /// </summary>
         public int DefaultConnectionLimit { get; set; } = DEFAULT_MIN_DOT_NET_CONNECTION_LIMIT;
         public static readonly int DEFAULT_MIN_DOT_NET_CONNECTION_LIMIT = DEFAULT_MIN_DOT_NET_THREAD_POOL_SIZE;

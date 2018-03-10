@@ -20,14 +20,15 @@ namespace Orleans.Runtime
         private int stage;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="GrainMethodInvoker"/> class.
+        /// Initializes a new instance of the <see cref="OutgoingCallInvoker"/> class.
         /// </summary>
         /// <param name="grain">The grain reference.</param>
         /// <param name="request">The request.</param>
-        /// <param name="rootInvoker">The generated invoker.</param>
+        /// <param name="options"></param>
+        /// <param name="debugContext"></param>
+        /// <param name="sendRequest"></param>
         /// <param name="filters">The invocation interceptors.</param>
-        /// <param name="interfaceToImplementationMapping">The implementation map.</param>
-        /// <param name="invokeInterceptor">The deprecated silo-wide interceptor.</param>
+        /// <param name="mapping">The implementation map.</param>
         public OutgoingCallInvoker(
             GrainReference grain,
             InvokeMethodRequest request,

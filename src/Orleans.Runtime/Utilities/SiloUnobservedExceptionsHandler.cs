@@ -19,7 +19,6 @@ namespace Orleans.Runtime
         /// <summary>
         /// Configure silo with unobserved exception handler
         /// </summary>
-        /// <param name="services"></param>
         public static ISiloHostBuilder UseSiloUnobservedExceptionsHandler(this ISiloHostBuilder siloBuilder)
         {
             siloBuilder.ConfigureServices(services => services.TryAddSingleton<SiloUnobservedExceptionsHandler>());

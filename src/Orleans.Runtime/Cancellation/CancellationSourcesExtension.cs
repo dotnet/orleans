@@ -48,6 +48,7 @@ namespace Orleans.Runtime
         /// <param name="loggerFactory">logger factory configured in current cluster</param>
         /// <param name="logger">caller's logger</param>
         /// <param name="siloRuntimeClient"></param>
+        /// <param name="cancellationTokenRuntime"></param>
         internal static void RegisterCancellationTokens(
             IAddressable target,
             InvokeMethodRequest request,

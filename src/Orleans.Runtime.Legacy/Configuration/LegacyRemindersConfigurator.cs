@@ -19,7 +19,7 @@ namespace Orleans.Runtime.MembershipService
         /// Configures reminders using legacy configuration.
         /// </summary>
         /// <param name="configuration">The configuration.</param>
-        /// <param name="services">The service collection.</param>
+        /// <param name="builder"></param>
         internal static void Configure(GlobalConfiguration configuration, ISiloHostBuilder builder)
         {
             var serviceType = configuration.ReminderServiceType;

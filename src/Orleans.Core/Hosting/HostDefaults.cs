@@ -17,11 +17,5 @@ namespace Orleans.Hosting
         /// The configuration key used to set <see cref="IHostingEnvironment.EnvironmentName"/>.
         /// </summary>
         public static readonly string EnvironmentKey = "environment";
-
-        /// <summary>
-        /// The configuration key used to set <see cref="IHostingEnvironment.ContentRootPath"/>
-        /// and <see cref="IHostingEnvironment.ContentRootFileProvider"/>.
-        /// </summary>
-        public static readonly string ContentRootKey = "contentRoot";
     }
 }

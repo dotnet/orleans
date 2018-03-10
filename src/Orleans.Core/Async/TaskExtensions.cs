@@ -196,6 +196,7 @@ namespace Orleans
         /// </summary>
         /// <param name="taskToComplete">The task we will timeout after timeSpan</param>
         /// <param name="timeout">Amount of time to wait before timing out</param>
+        /// <param name="exceptionMessage">Text to put into the timeout exception message</param>
         /// <exception cref="TimeoutException">If we time out we will get this exception</exception>
         /// <returns>The completed task</returns>
         public static async Task WithTimeout(this Task taskToComplete, TimeSpan timeout, string exceptionMessage = null)
@@ -229,6 +230,8 @@ namespace Orleans
         /// </summary>
         /// <param name="taskToComplete">The task we will timeout after timeSpan</param>
         /// <param name="timeSpan">Amount of time to wait before timing out</param>
+        /// <param name="exceptionMessage">Text to put into the timeout exception message</param>
+        /// <exception cref="TimeoutException">If we time out we will get this exception</exception>
         /// <exception cref="TimeoutException">If we time out we will get this exception</exception>
         /// <returns>The value of the completed task</returns>
         public static async Task<T> WithTimeout<T>(this Task<T> taskToComplete, TimeSpan timeSpan, string exceptionMessage = null)

@@ -35,7 +35,7 @@ namespace Orleans
         /// <summary>
         /// Sets up the configuration for the remainder of the build process and application. This can be called multiple times and
         /// the results will be additive. The results will be available at <see cref="HostBuilderContext.Configuration"/> for
-        /// subsequent operations, as well as in <see cref="ISiloHost.Services"/>.
+        /// subsequent operations./>.
         /// </summary>
         /// <param name="configureDelegate">The delegate for configuring the <see cref="IConfigurationBuilder"/> that will be used
         /// to construct the <see cref="IConfiguration"/> for the application.</param>

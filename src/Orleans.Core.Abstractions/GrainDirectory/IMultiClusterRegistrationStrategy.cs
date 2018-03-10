@@ -11,7 +11,7 @@ namespace Orleans.GrainDirectory
         /// <summary>
         /// Determines which remote clusters have instances.
         /// </summary>
-        /// <param name="mcConfig">The multi-cluster configuration</param>
+        /// <param name="clusters">List of all clusters</param>
         /// <param name="myClusterId">The cluster id of this cluster</param>
         /// <returns></returns>
         IEnumerable<string> GetRemoteInstances(IReadOnlyList<string> clusters, string myClusterId);
