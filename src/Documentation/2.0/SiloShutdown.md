@@ -1,3 +1,8 @@
+---
+layout: page
+title: Shutting down Orleans
+---
+
 This document explains how to gracefully shutdown an Orleans silo before application exit, first as a Console app, and then as a Docker container app.
 
 # Graceful shutdown - Console app
@@ -5,7 +10,7 @@ The following code shows how to gracefully shutdown an orleans silo console app 
 
 Normally when that event handler returns, the application will exit immediately, causing a catastrophic Orleans silo crash and loss of data. But in the sample code below, we set `a.Cancel = true;` to prevent the application closing before the Orleans silo has completed its graceful shutdown.
 
-```
+```csharp
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -81,7 +86,7 @@ Of course, there are many other ways of achieving the same goal.
 Below is shown a way, popular online, and misleading, that DOES NOT work properly. It does not work because it sets up a race condition between two methods trying to exit first: the `Console.CancelKeyPress` event handler method, and the `static void Main(string[] args)` method. 
 When the event handler method finishes first, which happens at least half the time, the application will hang instead of exiting smoothly.
 
-```
+```csharp
 class Program {
 
     static readonly ManualResetEvent _siloStarted = new ManualResetEvent(false);
