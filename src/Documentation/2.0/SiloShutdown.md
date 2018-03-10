@@ -98,6 +98,7 @@ class Program {
             /// Wait for the silo to completely shutdown before exiting. 
             _siloStopped.WaitOne();
             /// Now race to finish ... who will finish first?
+            /// If I finish first, the application will hang! :(
         };
 
         silo = CreateSilo();
