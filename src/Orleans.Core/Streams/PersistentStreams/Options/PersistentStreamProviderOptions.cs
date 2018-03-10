@@ -14,7 +14,7 @@ namespace Orleans.Configuration
             AgentsStarted,
             AgentsStopped,
         }
-        //TODO: why is this configurable? 
+
         public RunState StartupState = DEFAULT_STARTUP_STATE;
         public const RunState DEFAULT_STARTUP_STATE = RunState.AgentsStarted;
 

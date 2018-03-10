@@ -44,7 +44,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
             {
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
-                    hostBuilder.ConfigurePersistentStreams(StreamProviderName, EHStreamProviderWithCreatedCacheListAdapterFactory.Create)
+                    hostBuilder.AddPersistentStreams(StreamProviderName, EHStreamProviderWithCreatedCacheListAdapterFactory.Create)
                         .Configure<EventHubStreamCachePressureOptions>(ob => ob.Configure(options =>
                    {
                        options.SlowConsumingMonitorPressureWindowSize = monitorPressureWindowSize;

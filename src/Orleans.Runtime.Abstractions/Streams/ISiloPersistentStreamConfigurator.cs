@@ -42,7 +42,7 @@ namespace Orleans.Streams
         }
 
         public static ISiloPersistentStreamConfigurator ConfigurePartitionBalancing<TOptions>(this ISiloPersistentStreamConfigurator configurator,
-            Action<OptionsBuilder<TOptions>> configureOptions, Func<IServiceProvider, string, IStreamQueueBalancer> factory)
+            Func<IServiceProvider, string, IStreamQueueBalancer> factory, Action<OptionsBuilder<TOptions>> configureOptions)
             where TOptions : class, new()
         {
             return configurator.ConfigureComponent<TOptions, IStreamQueueBalancer>(factory, configureOptions);

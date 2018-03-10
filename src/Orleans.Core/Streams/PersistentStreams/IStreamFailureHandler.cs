@@ -3,12 +3,6 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
-    public interface IStreamFailureHandlerFactory
-    {
-        Task<IStreamFailureHandler> Create(string queueId);
-    }
-
-
     public interface IStreamFailureHandler
     {
         bool ShouldFaultSubsriptionOnError { get; }

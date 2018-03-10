@@ -51,7 +51,8 @@ namespace Orleans.Streams
                            .AddSingletonNamedService<ILifecycleParticipant<IClusterClientLifecycle>>(name, 
                            (s, n) => ((PersistentStreamProvider)s.GetRequiredServiceByName<IStreamProvider>(n)).ParticipateIn<IClusterClientLifecycle>())
                            .AddSingletonNamedService<IQueueAdapterFactory>(name, adapterFactory)
-                           .ConfigureNamedOptionForLogging<StreamLifecycleOptions>(name);
+                           .ConfigureNamedOptionForLogging<StreamLifecycleOptions>(name)
+                           .ConfigureNamedOptionForLogging<StreamPubSubOptions>(name);
         }
 
         public IClusterClientPersistentStreamConfigurator Configure<TOptions>(Action<OptionsBuilder<TOptions>> configureOptions) where TOptions : class, new()

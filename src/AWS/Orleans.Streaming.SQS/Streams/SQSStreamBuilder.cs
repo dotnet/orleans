@@ -49,7 +49,8 @@ namespace Orleans.Streams
                 .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(SQSAdapterFactory).Assembly))
                 .ConfigureServices(services =>
                 {
-                    services.ConfigureNamedOptionForLogging<SqsOptions>(name);
+                    services.ConfigureNamedOptionForLogging<SqsOptions>(name)
+                    .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name);
                 });
         }
 

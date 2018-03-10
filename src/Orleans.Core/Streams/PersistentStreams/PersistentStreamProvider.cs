@@ -50,16 +50,13 @@ namespace Orleans.Providers.Streams.Common
         {
             if (String.IsNullOrEmpty(name)) throw new ArgumentNullException(nameof(name));
             if (runtime == null) throw new ArgumentNullException(nameof(runtime));
-            if (serializationManager == null) throw new ArgumentNullException(nameof(serializationManager));
-            if (logger == null) throw new ArgumentNullException(nameof(logger));
-
-            this.pubsubOptions = pubsubOptions;
+            this.pubsubOptions = pubsubOptions ?? throw new ArgumentNullException(nameof(pubsubOptions));
             this.Name = name;
-            this.lifeCycleOptions = lifeCycleOptions;
+            this.lifeCycleOptions = lifeCycleOptions ?? throw new ArgumentNullException(nameof(lifeCycleOptions));
             this.runtime = runtime.ServiceProvider.GetRequiredService<IStreamProviderRuntime>();
             this.runtimeClient = runtime.ServiceProvider.GetRequiredService<IRuntimeClient>();
-            this.serializationManager = serializationManager;
-            this.logger = logger;
+            this.serializationManager = serializationManager ?? throw new ArgumentNullException(nameof(serializationManager));
+            this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         private async Task Init(CancellationToken token) 

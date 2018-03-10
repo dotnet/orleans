@@ -49,7 +49,7 @@ namespace ServiceBus.Tests.StreamingTests
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddMemoryGrainStorage("PubSubStorage")
+                        .AddMemoryGrainStorage("PubSubStore")
                         .AddEventHubStreams(StreamProviderName)
                         .ConfigureEventHub(ob => ob.Configure(
                         options =>

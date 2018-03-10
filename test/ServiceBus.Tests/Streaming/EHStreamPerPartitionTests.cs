@@ -45,7 +45,7 @@ namespace ServiceBus.Tests.StreamingTests
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .ConfigurePersistentStreams(StreamProviderName, StreamPerPartitionEventHubStreamAdapterFactory.Create)
+                        .AddPersistentStreams(StreamProviderName, StreamPerPartitionEventHubStreamAdapterFactory.Create)
                         .Configure<EventHubOptions>(ob => ob.Configure(options =>
                           {
                               options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
@@ -74,7 +74,7 @@ namespace ServiceBus.Tests.StreamingTests
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
                 {
                     clientBuilder
-                        .ConfigurePersistentStreams(StreamProviderName, StreamPerPartitionEventHubStreamAdapterFactory.Create)
+                        .AddPersistentStreams(StreamProviderName, StreamPerPartitionEventHubStreamAdapterFactory.Create)
                         .Configure<EventHubOptions>(ob=>ob.Configure(
                         options =>
                         {

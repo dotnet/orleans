@@ -18,7 +18,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure cluster client to use azure queue persistent streams. Returns ClusterClientAzureQueueStreamConfigurator for further configuration
+        /// Configure cluster client to use azure queue persistent streams. 
         /// </summary>
         public static IClientBuilder AddAzureQueueStreams<TDataAdapter>(this IClientBuilder builder,
             string name,

@@ -27,7 +27,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure cluster client to use SQS persistent streams with default settings
+        /// Configure cluster client to use SQS persistent streams.
         /// </summary>
         public static IClientBuilder AddSqsStreams(this IClientBuilder builder, string name, Action<ClusterClientSqsStreamConfigurator> configure)
         {

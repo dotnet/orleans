@@ -53,7 +53,8 @@ namespace Orleans.Streaming
             this.clientBuilder.ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(AzureQueueAdapterFactory<>).Assembly))
                  .ConfigureServices(services =>
                     services.ConfigureNamedOptionForLogging<AzureQueueOptions>(name)
-                    .AddTransient<IConfigurationValidator>(sp => new AzureQueueOptionsValidator(sp.GetOptionsByName<AzureQueueOptions>(name), name)));
+                    .AddTransient<IConfigurationValidator>(sp => new AzureQueueOptionsValidator(sp.GetOptionsByName<AzureQueueOptions>(name), name))
+                    .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name));
                
         }
 

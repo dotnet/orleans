@@ -43,7 +43,7 @@ namespace UnitTests.StreamingTests
                 {
                     hostBuilder
                         .ConfigureServices(services => services.AddSingletonNamedService<IStreamGeneratorConfig>(StreamProviderName, (s, n) => GeneratorConfig))
-                        .ConfigurePersistentStreams(StreamProviderName, GeneratorAdapterFactory.Create)
+                        .AddPersistentStreams(StreamProviderName, GeneratorAdapterFactory.Create)
                         .Configure<HashRingStreamQueueMapperOptions>(ob=>ob.Configure(options => options.TotalQueueCount = TotalQueueCount))
                         .UseDynamicClusterConfigDeploymentBalancer()
                         .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);

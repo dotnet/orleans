@@ -14,7 +14,7 @@ namespace Orleans.Hosting
     /// </summary>
     public static class ClientStreamExtensions
     {
-        public static IClusterClientPersistentStreamConfigurator ConfigurePersistentStreams(
+        public static ClusterClientPersistentStreamConfigurator AddPersistentStreams(
             this IClientBuilder builder,
             string name,
             Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory)

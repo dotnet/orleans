@@ -15,7 +15,7 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure silo to use persistent streams.
         /// </summary>
-        public static ISiloPersistentStreamConfigurator ConfigurePersistentStreams(this ISiloHostBuilder builder, string name, Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory)
+        public static ISiloPersistentStreamConfigurator AddPersistentStreams(this ISiloHostBuilder builder, string name, Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory)
         {
             return new SiloPersistentStreamConfigurator(name, builder, adapterFactory);
         }

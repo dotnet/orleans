@@ -7,8 +7,7 @@ namespace Orleans.Streams
     {
         Task<IStreamQueueCheckpointer<string>> Create(string partition);
     }
-
-    //why is checkpointer has a type param while the checkpointer factory in EventHubAdapterFactory is hard coded to be string type?
+    
     public interface IStreamQueueCheckpointer<TCheckpoint>
     {
         bool CheckpointExists { get; }

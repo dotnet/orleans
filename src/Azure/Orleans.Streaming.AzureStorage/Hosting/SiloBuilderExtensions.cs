@@ -17,7 +17,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure silo to use azure queue persistent streams. This return a configurator which allows further configuration
+        /// Configure silo to use azure queue persistent streams. 
         /// </summary>
         public static ISiloHostBuilder AddAzureQueueStreams<TDataAdapter>(this ISiloHostBuilder builder, string name,
             Action<SiloAzureQueueStreamConfigurator<TDataAdapter>> configure)
