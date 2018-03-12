@@ -11,17 +11,18 @@ namespace Orleans.Providers.Streams.Common
     public class SimpleQueueAdapterCache : IQueueAdapterCache
     {
         /// <summary>
-        /// Cache size propery name for configuration
+        /// Cache size property name for configuration
         /// </summary>
         public const string CacheSizePropertyName = "CacheSize";
 
         private readonly int cacheSize;
         private readonly string providerName;
         private readonly ILoggerFactory loggerFactory;
+
         /// <summary>
         /// Adapter for simple queue caches
         /// </summary>
-        /// <param name="cacheSize"></param>
+        /// <param name="options"></param>
         /// <param name="providerName"></param>
         /// <param name="loggerFactory"></param>
         public SimpleQueueAdapterCache(SimpleQueueCacheOptions options, string providerName, ILoggerFactory loggerFactory)
@@ -41,7 +42,7 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <summary>
-        /// Parce the size property from configuration
+        /// Parse the size property from configuration
         /// </summary>
         /// <param name="config"></param>
         /// <param name="defaultSize"></param>
