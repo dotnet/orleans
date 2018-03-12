@@ -10,7 +10,7 @@ The idea is to track end-user facing changes as they occur.*
 ### [2.0.0-rc2] (changes since 2.0.0-rc1)
 
 - Major changes
-  - A new "facade" API for easier configuration pf various aspects of stream providers: Persistent stream configurators (#4164)
+  - A new "facade" API for easier configuration of various aspects of stream providers: Persistent stream configurators (#4164)
 
 - Breaking changes
   - Align IClientBuilder APIs with ISiloHostBuilder (#4079)
