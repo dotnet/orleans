@@ -326,6 +326,7 @@ namespace Tests.GeoClusterTests
                     Assert.True(false, "Error loading client configuration file");
                 }
 
+                config.ClusterId = clusterId;
                 config.GatewayProvider = Orleans.Runtime.Configuration.ClientConfiguration.GatewayProviderType.Config;
                 config.Gateways.Clear();
                 config.Gateways.Add(new IPEndPoint(IPAddress.Loopback, gatewayport));
