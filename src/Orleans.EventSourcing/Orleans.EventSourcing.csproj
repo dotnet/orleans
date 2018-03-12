@@ -11,10 +11,6 @@
     <RootNamespace>OrleansEventSourcing</RootNamespace>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <DocumentationFile>bin\Debug\netstandard2.0\Orleans.EventSourcing.xml</DocumentationFile>
-  </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="Microsoft.CSharp" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Dynamic.Runtime" Version="$(SystemRuntimeVersion)" />

@@ -4,9 +4,6 @@
     <RootNamespace>OrleansCodeGenerator</RootNamespace>
     <PackageId>Microsoft.Orleans.OrleansCodeGenerator</PackageId>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <DocumentationFile>bin\Debug\netstandard2.0\Orleans.CodeGeneration.xml</DocumentationFile>
-  </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="$(MicrosoftCodeAnalysisCSharpVersion)" />

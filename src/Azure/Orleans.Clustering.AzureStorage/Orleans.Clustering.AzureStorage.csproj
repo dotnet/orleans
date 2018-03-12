@@ -13,10 +13,6 @@
     <DefineConstants>$(DefineConstants);ORLEANS_CLUSTERING</DefineConstants>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <DocumentationFile>bin\Debug\netstandard2.0\Orleans.Clustering.AzureStorage.xml</DocumentationFile>
-  </PropertyGroup>
-
   <ItemGroup>
     <Compile Include="..\Shared\Storage\AzureStorageUtils.cs" Link="Storage\AzureStorageUtils.cs" />
     <Compile Include="..\Shared\Storage\AzureTableDataManager.cs" Link="Storage\AzureTableDataManager.cs" />

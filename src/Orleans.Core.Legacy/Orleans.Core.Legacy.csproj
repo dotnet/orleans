@@ -11,10 +11,6 @@
     <RootNamespace>Orleans.Core.Legacy</RootNamespace>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <DocumentationFile>bin\Debug\netstandard2.0\Orleans.Core.Legacy.xml</DocumentationFile>
-  </PropertyGroup>
-
   <ItemGroup>
     <None Include="Configuration\OrleansConfiguration.xsd">
       <Pack>true</Pack>

@@ -11,10 +11,6 @@
     <OrleansBuildTimeCodeGen Condition="'$(Bootstrap)' != 'true'">true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <DocumentationFile>bin\Debug\netstandard2.0\Orleans.Core.xml</DocumentationFile>
-  </PropertyGroup>
-
   <ItemGroup>
     <Content Update="Configuration\OrleansConfiguration.xsd">
       <SubType>Designer</SubType>

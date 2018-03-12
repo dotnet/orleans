@@ -13,10 +13,6 @@
     <AssemblyName>OrleansManager</AssemblyName>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <DocumentationFile>bin\Debug\net461\win\OrleansManager.xml</DocumentationFile>
-  </PropertyGroup>
-
   <ItemGroup>
     <None Include="..\SDK\ClientConfiguration.xml">
       <Link>ClientConfiguration.xml</Link>

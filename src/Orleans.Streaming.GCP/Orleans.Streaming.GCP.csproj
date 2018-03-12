@@ -11,10 +11,6 @@
     <RootNamespace>Orleans.Providers.GCP</RootNamespace>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <DocumentationFile>bin\Debug\netstandard2.0\Orleans.Streaming.GCP.xml</DocumentationFile>
-  </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="Google.Cloud.PubSub.V1" Version="$(GoogleCloudPubSubV1Version)" />
   </ItemGroup>

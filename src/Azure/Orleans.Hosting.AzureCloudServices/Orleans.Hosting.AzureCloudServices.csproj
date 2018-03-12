@@ -13,10 +13,6 @@
     <DefineConstants>$(DefineConstants);ORLEANS_HOSTING_CLOUDSERVICES</DefineConstants>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <DocumentationFile>bin\Debug\netstandard2.0\Orleans.Hosting.AzureCloudServices.xml</DocumentationFile>
-  </PropertyGroup>
-
   <ItemGroup>
     <Compile Include="..\Shared\Storage\AzureTableDefaultPolicies.cs" Link="Storage\AzureTableDefaultPolicies.cs" />
   </ItemGroup>
