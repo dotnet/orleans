@@ -351,6 +351,7 @@ namespace Orleans.Runtime.Configuration
                 nodeIps = NetworkInterface.GetAllNetworkInterfaces()
                             .SelectMany(iface => iface.GetIPProperties().UnicastAddresses)
                             .Select(addr => addr.Address)
+                            .Where(addr => addr.AddressFamily == family && !IPAddress.IsLoopback(addr))
                             .ToList();
             }
             else
