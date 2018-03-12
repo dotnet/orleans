@@ -45,9 +45,8 @@ namespace Orleans.CodeGenerator
         /// <param name="grainType">
         /// The grain interface type.
         /// </param>
-        /// <param name="onEncounteredType">
-        /// The callback which is invoked when a type is encountered.
-        /// </param>
+        /// <param name="generatedTypeName">Name of the generated type.</param>
+        /// <param name="onEncounteredType">The callback which is invoked when a type is encountered.</param>
         /// <returns>
         /// The generated class.
         /// </returns>

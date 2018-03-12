@@ -51,6 +51,7 @@ namespace Orleans.Clustering.ServiceFabric
         /// <param name="fabricServiceSiloResolver">The service resolver which this instance will use.</param>
         /// <param name="logger">The logger.</param>
         /// <param name="unknownSiloMonitor">The unknown silo monitor.</param>
+        /// <param name="multiClusterOptions">Multi-cluster configuration parameters.</param>
         public FabricMembershipOracle(
             ILocalSiloDetails localSiloDetails,
             IFabricServiceSiloResolver fabricServiceSiloResolver,

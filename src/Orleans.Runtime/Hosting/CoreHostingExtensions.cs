@@ -47,6 +47,7 @@ namespace Orleans.Hosting
         /// <param name="primarySiloEndpoint">
         /// The endpoint of the primary silo, or <see langword="null"/> to use this silo as the primary.
         /// </param>
+        /// <param name="clusterId">Cluster ID</param>
         /// <returns>The silo builder.</returns>
         public static ISiloHostBuilder UseLocalhostClustering(
             this ISiloHostBuilder builder,
@@ -71,6 +72,7 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configures the silo to use development-only clustering.
         /// </summary>
+        /// <param name="builder"></param>
         /// <param name="primarySiloEndpoint">
         /// The endpoint of the primary silo, or <see langword="null"/> to use this silo as the primary.
         /// </param>

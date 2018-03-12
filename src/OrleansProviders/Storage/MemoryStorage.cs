@@ -67,7 +67,7 @@ namespace Orleans.Storage
         }
 
         /// <summary> Read state data function for this storage provider. </summary>
-        /// <see cref="IStorageProvider.ReadStateAsync"/>
+        /// <see cref="IGrainStorage.ReadStateAsync"/>
         public virtual async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             IList<Tuple<string, string>> keys = MakeKeys(grainType, grainReference).ToList();
@@ -85,7 +85,7 @@ namespace Orleans.Storage
         }
 
         /// <summary> Write state data function for this storage provider. </summary>
-        /// <see cref="IStorageProvider.WriteStateAsync"/>
+        /// <see cref="IGrainStorage.WriteStateAsync"/>
         public virtual async Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             IList<Tuple<string, string>> keys = MakeKeys(grainType, grainReference).ToList();
@@ -103,7 +103,7 @@ namespace Orleans.Storage
         }
 
         /// <summary> Delete / Clear state data function for this storage provider. </summary>
-        /// <see cref="IStorageProvider.ClearStateAsync"/>
+        /// <see cref="IGrainStorage.ClearStateAsync"/>
         public virtual async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             IList<Tuple<string, string>> keys = MakeKeys(grainType, grainReference).ToList();

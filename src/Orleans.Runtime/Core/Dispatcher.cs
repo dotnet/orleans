@@ -803,6 +803,7 @@ namespace Orleans.Runtime
         /// Directly send a message to the transport without processing
         /// </summary>
         /// <param name="message"></param>
+        /// <param name="sendingActivation"></param>
         public void TransportMessage(Message message, ActivationData sendingActivation = null)
         {
             MarkSameCallChainMessageAsInterleaving(sendingActivation, message);

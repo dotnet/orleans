@@ -52,7 +52,7 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Factory function that creates and initializes the checkpointer
         /// </summary>
-        /// <param name="settings"></param>
+        /// <param name="options"></param>
         /// <param name="streamProviderName"></param>
         /// <param name="partition"></param>
         /// <param name="loggerFactory"></param>

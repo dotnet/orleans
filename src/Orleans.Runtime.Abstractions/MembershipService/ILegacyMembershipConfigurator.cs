@@ -29,7 +29,7 @@ namespace Orleans.Runtime.MembershipService
         /// Configures the provided <paramref name="builder"/> using <paramref name="configuration"/>.
         /// </summary>
         /// <param name="configuration">The legacy GlobalConfiguration object.</param>
-        /// <param name="services">The silo builder.</param>
+        /// <param name="builder">The silo host builder.</param>
         void Configure(object configuration, ISiloHostBuilder builder);
     }
 

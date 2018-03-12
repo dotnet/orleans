@@ -70,7 +70,7 @@ namespace Orleans
         /// <summary>
         /// Sets up the configuration for the remainder of the build process and application. This can be called multiple times and
         /// the results will be additive. The results will be available at <see cref="HostBuilderContext.Configuration"/> for
-        /// subsequent operations, as well as in <see cref="IClusterClient.Services"/>.
+        /// subsequent operations./>.
         /// </summary>
         /// <param name="hostBuilder">The host builder to configure.</param>
         /// <param name="configureDelegate"></param>
@@ -163,7 +163,9 @@ namespace Orleans
         /// <summary>
         /// Configures the client to connect to a silo on the localhost.
         /// </summary>
+        /// <param name="builder"></param>
         /// <param name="gatewayPort">The local silo's gateway port.</param>
+        /// <param name="clusterId">Cluster ID to use</param>
         public static IClientBuilder UseLocalhostClustering(
             this IClientBuilder builder,
             int gatewayPort = 30000,
@@ -179,6 +181,7 @@ namespace Orleans
         /// <summary>
         /// Configures the client to connect to a silo on the localhost.
         /// </summary>
+        /// <param name="builder"></param>
         /// <param name="gatewayPorts">The local silo gateway port.</param>
         public static IClientBuilder UseLocalhostClustering(this IClientBuilder builder, params int[] gatewayPorts)
         {
@@ -192,6 +195,7 @@ namespace Orleans
         /// <summary>
         /// Configures the client to use static clustering.
         /// </summary>
+        /// <param name="builder"></param>
         /// <param name="endpoints">The gateway endpoints.</param>
         public static IClientBuilder UseStaticClustering(this IClientBuilder builder, params IPEndPoint[] endpoints)
         {

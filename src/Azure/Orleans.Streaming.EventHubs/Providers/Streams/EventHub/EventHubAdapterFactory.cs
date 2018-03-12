@@ -255,13 +255,12 @@ namespace Orleans.ServiceBus.Providers
         /// User can override this function to return their own implementation of IEventHubQueueCacheFactory,
         /// and other customization of IEventHubQueueCacheFactory if they may.
         /// </summary>
-        /// <param name="providerSettings"></param>
         /// <returns></returns>
         protected virtual IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamCachePressureOptions eventHubCacheOptions)
         {
             var eventHubPath = this.ehOptions.Path;
             var sharedDimensions = new EventHubMonitorAggregationDimensions(eventHubPath);
-            return new EventHubQueueCacheFactory(eventHubCacheOptions, cacheEvictionOptions, statisticOptions, this.SerializationManager, sharedDimensions, this.loggerFactory);
+            return new EventHubQueueCacheFactory(eventHubCacheOptions, cacheEvictionOptions, statisticOptions, this.SerializationManager, sharedDimensions);
         }
 
         private EventHubAdapterReceiver MakeReceiver(QueueId queueId)

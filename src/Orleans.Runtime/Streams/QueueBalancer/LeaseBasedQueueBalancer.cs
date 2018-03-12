@@ -99,6 +99,7 @@ namespace Orleans.Streams
         /// <summary>
         /// Constructor
         /// </summary>
+        /// <param name="options"></param>
         /// <param name="serviceProvider"></param>
         /// <param name="siloStatusOracle"></param>
         /// <param name="deploymentConfig"></param>

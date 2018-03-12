@@ -31,7 +31,6 @@ namespace Orleans.ServiceBus.Providers.Testing
         /// Constructor
         /// </summary>
         /// <param name="streamId"></param>
-        /// <param name="settings"></param>
         /// <param name="logger"></param>
         /// <param name="serializationManager"></param>
         public SimpleStreamEventDataGenerator(IStreamIdentity streamId, ILogger<SimpleStreamEventDataGenerator> logger, SerializationManager serializationManager)
@@ -105,9 +104,9 @@ namespace Orleans.ServiceBus.Providers.Testing
         /// <summary>
         /// Constructor
         /// </summary>
+        /// <param name="options"></param>
+        /// <param name="generatorFactory"></param>
         /// <param name="logger"></param>
-        /// <param name="serializationManager"></param>
-        /// <param name="settings"></param>
         public EventHubPartitionDataGenerator(EventDataGeneratorStreamOptions options, Func<IStreamIdentity, IStreamDataGenerator<EventData>> generatorFactory, ILogger logger)
         {
             this.options = options;

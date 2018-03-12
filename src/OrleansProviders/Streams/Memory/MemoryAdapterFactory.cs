@@ -94,9 +94,6 @@ namespace Orleans.Providers
         /// <summary>
         /// Factory initialization.
         /// </summary>
-        /// <param name="providerConfig"></param>
-        /// <param name="name"></param>
-        /// <param name="svcProvider"></param>
         public void Init()
         {
             this.queueGrains = new ConcurrentDictionary<QueueId, IMemoryStreamQueueGrain>();

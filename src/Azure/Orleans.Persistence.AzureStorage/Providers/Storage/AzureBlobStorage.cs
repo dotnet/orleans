@@ -53,7 +53,7 @@ namespace Orleans.Storage
         }
 
         /// <summary> Read state data function for this storage provider. </summary>
-        /// <see cref="IStorageProvider.ReadStateAsync"/>
+        /// <see cref="IGrainStorage.ReadStateAsync"/>
         public async Task ReadStateAsync(string grainType, GrainReference grainId, IGrainState grainState)
         {
             var blobName = GetBlobName(grainType, grainId);
@@ -107,7 +107,7 @@ namespace Orleans.Storage
         }
 
         /// <summary> Write state data function for this storage provider. </summary>
-        /// <see cref="IStorageProvider.WriteStateAsync"/>
+        /// <see cref="IGrainStorage.WriteStateAsync"/>
         public async Task WriteStateAsync(string grainType, GrainReference grainId, IGrainState grainState)
         {
             var blobName = GetBlobName(grainType, grainId);
@@ -135,7 +135,7 @@ namespace Orleans.Storage
         }
 
         /// <summary> Clear / Delete state data function for this storage provider. </summary>
-        /// <see cref="IStorageProvider.ClearStateAsync"/>
+        /// <see cref="IGrainStorage.ClearStateAsync"/>
         public async Task ClearStateAsync(string grainType, GrainReference grainId, IGrainState grainState)
         {
             var blobName = GetBlobName(grainType, grainId);
@@ -199,7 +199,6 @@ namespace Orleans.Storage
         }
 
         /// <summary> Initialization function for this storage provider. </summary>
-        /// <see cref="IProvider.Init"/>
         private async Task Init(CancellationToken ct)
         {
             var stopWatch = Stopwatch.StartNew();

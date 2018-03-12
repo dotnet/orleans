@@ -17,7 +17,7 @@ namespace Orleans.LogConsistency
     {
         /// <summary>
         /// Implementation of view transitions. 
-        /// Any exceptions thrown will be caught and logged as a warning by <see cref="ILogConsistencyProvider.Log"/>.
+        /// Any exceptions thrown will be caught and logged as a warning./>.
         /// </summary>
         void UpdateView(TLogView view, TLogEntry entry);
 
@@ -25,7 +25,7 @@ namespace Orleans.LogConsistency
         /// Notifies the host grain about state changes. 
         /// Called by <see cref="ILogViewAdaptor{TLogView,TLogEntry}"/> whenever the tentative or confirmed state changes.
         /// Implementations may vary as to whether and how much they batch change notifications.
-        /// Any exceptions thrown will be caught and logged as a warning  by <see cref="ILogConsistencyProvider.Log"/>.
+        /// Any exceptions thrown will be caught and logged as a warning./>.
         /// </summary>
         void OnViewChanged(bool tentative, bool confirmed);
 

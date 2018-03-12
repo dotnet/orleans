@@ -36,8 +36,8 @@ namespace Orleans
         /// Initializes a new instance of the <see cref="ClusterClient"/> class.
         /// </summary>
         /// <param name="runtimeClient">The runtime client.</param>
-        /// <param name="configuration">The client configuration.</param>
         /// <param name="loggerFactory">Logger factory used to create loggers</param>
+        /// <param name="clientMessagingOptions">Messaging parameters</param>
         public ClusterClient(OutsideRuntimeClient runtimeClient, ILoggerFactory loggerFactory, IOptions<ClientMessagingOptions> clientMessagingOptions)
         {
             this.runtimeClient = runtimeClient;

@@ -29,7 +29,6 @@ namespace Orleans.Providers.Streams.Common
     /// <summary>
     /// Persistent stream provider that uses an adapter for persistence
     /// </summary>
-    /// <typeparam name="TAdapterFactory"></typeparam>
     public class PersistentStreamProvider : IStreamProvider, IInternalStreamProvider, IControllable, IStreamSubscriptionManagerRetriever, ILifecycleParticipant<ILifecycleObservable>
     {
         private readonly ILogger logger;

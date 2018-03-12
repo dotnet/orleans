@@ -59,6 +59,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Provides a logger to be used by the provider. 
         /// </summary>
+        /// <param name="runtime">Provider runtime</param>
         /// <param name="loggerName">Name of the logger being requested.</param>
         /// <returns>Object reference to the requested logger.</returns>
         /// <seealso cref="LoggerType"/>

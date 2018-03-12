@@ -31,7 +31,7 @@ namespace Orleans
         /// <summary>
         /// Adds default application parts if no non-framework parts have been added.
         /// </summary>
-        /// <param name="applicationPartManager">The application part manager.</param>
+        /// <param name="applicationPartsManager">The application part manager.</param>
         /// <returns>The application part manager.</returns>
         public static IApplicationPartManager ConfigureDefaults(this IApplicationPartManager applicationPartsManager)
         {
@@ -235,6 +235,7 @@ namespace Orleans
         /// Adds all assemblies referencing Orleans found in the provided assembly's <see cref="DependencyContext"/>.
         /// </summary>
         /// <param name="manager">The builder.</param>
+        /// <param name="entryAssembly">Assembly to start looking for application parts from.</param>
         /// <returns>The builder with the additionally included assemblies.</returns>
         public static IApplicationPartManagerWithAssemblies AddFromDependencyContext(this IApplicationPartManager manager, Assembly entryAssembly)
         {

@@ -80,7 +80,7 @@ namespace ServiceBus.Tests.TestStreamProviders
                 ILoggerFactory loggerFactory,
                 Func<EventHubCacheMonitorDimensions, ILoggerFactory, ITelemetryProducer, ICacheMonitor> cacheMonitorFactory = null,
                 Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, ITelemetryProducer, IBlockPoolMonitor> blockPoolMonitorFactory = null)
-                : base(cacheOptions, streamCacheEviction, statisticOptions, serializationManager, sharedDimensions, loggerFactory, cacheMonitorFactory, blockPoolMonitorFactory)
+                : base(cacheOptions, streamCacheEviction, statisticOptions, serializationManager, sharedDimensions, cacheMonitorFactory, blockPoolMonitorFactory)
             {
                 this.cachePressureInjectionMonitor = cachePressureInjectionMonitor;
             }

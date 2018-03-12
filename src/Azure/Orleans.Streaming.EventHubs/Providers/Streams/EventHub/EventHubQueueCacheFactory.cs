@@ -17,34 +17,38 @@ namespace Orleans.ServiceBus.Providers
         private readonly EventHubStreamCachePressureOptions cacheOptions;
         private readonly StreamStatisticOptions statisticOptions;
         private readonly SerializationManager serializationManager;
+        private readonly TimePurgePredicate timePurge;
+        private readonly EventHubMonitorAggregationDimensions sharedDimensions;
         private IObjectPool<FixedSizeBuffer> bufferPool;
         private string bufferPoolId;
-        private readonly TimePurgePredicate timePurge;
-        private EventHubMonitorAggregationDimensions sharedDimensions;
 
         /// <summary>
         /// Create a cache monitor to report performance metrics.
-        /// Factory funciton should return an ICacheMonitor.
+        /// Factory function should return an ICacheMonitor.
         /// </summary>
         public Func<EventHubCacheMonitorDimensions, ILoggerFactory, ITelemetryProducer, ICacheMonitor> CacheMonitorFactory { set; get; }
+
         /// <summary>
         /// Create a block pool monitor to report performance metrics.
-        /// Factory funciton should return an IObjectPoolMonitor.
+        /// Factory function should return an IObjectPoolMonitor.
         /// </summary>
         public Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, ITelemetryProducer, IBlockPoolMonitor> BlockPoolMonitorFactory { set; get; }
 
         /// <summary>
         /// Constructor for EventHubQueueCacheFactory
         /// </summary>
-        /// <param name="options"></param>
+        /// <param name="cacheOptions"></param>
+        /// <param name="evictionOptions"></param>
+        /// <param name="statisticOptions"></param>
         /// <param name="serializationManager"></param>
         /// <param name="sharedDimensions">shared dimensions between cache monitor and block pool monitor</param>
         /// <param name="cacheMonitorFactory"></param>
         /// <param name="blockPoolMonitorFactory"></param>
-        public EventHubQueueCacheFactory(EventHubStreamCachePressureOptions cacheOptions, StreamCacheEvictionOptions evictionOptions, 
+        public EventHubQueueCacheFactory(
+            EventHubStreamCachePressureOptions cacheOptions,
+            StreamCacheEvictionOptions evictionOptions, 
             StreamStatisticOptions statisticOptions,
             SerializationManager serializationManager, EventHubMonitorAggregationDimensions sharedDimensions,
-            ILoggerFactory loggerFactory,
             Func<EventHubCacheMonitorDimensions, ILoggerFactory, ITelemetryProducer, ICacheMonitor> cacheMonitorFactory = null,
             Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, ITelemetryProducer, IBlockPoolMonitor> blockPoolMonitorFactory = null)
         {
@@ -53,8 +57,8 @@ namespace Orleans.ServiceBus.Providers
             this.serializationManager = serializationManager;
             this.timePurge = new TimePurgePredicate(evictionOptions.DataMinTimeInCache, evictionOptions.DataMaxAgeInCache);
             this.sharedDimensions = sharedDimensions;
-            this.CacheMonitorFactory = cacheMonitorFactory == null?(dimensions, logger, telemetryProducer) => new DefaultEventHubCacheMonitor(dimensions, telemetryProducer) : cacheMonitorFactory;
-            this.BlockPoolMonitorFactory = blockPoolMonitorFactory == null? (dimensions, logger, telemetryProducer) => new DefaultEventHubBlockPoolMonitor(dimensions, telemetryProducer) : blockPoolMonitorFactory;
+            this.CacheMonitorFactory = cacheMonitorFactory ?? ((dimensions, logger, telemetryProducer) => new DefaultEventHubCacheMonitor(dimensions, telemetryProducer));
+            this.BlockPoolMonitorFactory = blockPoolMonitorFactory ?? ((dimensions, logger, telemetryProducer) => new DefaultEventHubBlockPoolMonitor(dimensions, telemetryProducer));
         }
 
         /// <summary>
@@ -94,7 +98,7 @@ namespace Orleans.ServiceBus.Providers
         /// User can override this function to provide more customization on cache pressure monitors
         /// </summary>
         /// <param name="cache"></param>
-        /// <param name="providerSettings"></param>
+        /// <param name="providerOptions"></param>
         /// <param name="cacheLogger"></param>
         protected virtual void AddCachePressureMonitors(IEventHubQueueCache cache, EventHubStreamCachePressureOptions providerOptions,
             ILogger cacheLogger)

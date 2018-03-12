@@ -9,7 +9,7 @@ namespace Orleans.Configuration
     public static class OptionConfigureExtensionMethods
     {
         /// <summary>
-        /// configure option formatter for <typeparam name="TOptions"/>
+        /// configure option formatter for TOptions/>
         /// </summary>
         public static IServiceCollection ConfigureFormatter<TOptions, TOptionFormatter>(this IServiceCollection services)
             where TOptions : class
@@ -39,7 +39,7 @@ namespace Orleans.Configuration
         }
 
         /// <summary>
-        /// Configure a option formatter for option <typeparam name="TOptions"/> if none is configured
+        /// Configure a option formatter for option TOptions if none is configured
         /// </summary>
         /// <typeparam name="TOptions"></typeparam>
         /// <typeparam name="TOptionFormatter"></typeparam>

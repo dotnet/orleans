@@ -243,6 +243,7 @@ namespace Orleans.TestingHost
         /// Start a number of additional silo, so that they join the existing cluster.
         /// </summary>
         /// <param name="silosToStart">Number of silos to start.</param>
+        /// <param name="startAdditionalSiloOnNewPort"></param>
         /// <returns>List of SiloHandles for the newly started silos.</returns>
         public async Task<List<SiloHandle>> StartAdditionalSilos(int silosToStart, bool startAdditionalSiloOnNewPort = false)
         {
