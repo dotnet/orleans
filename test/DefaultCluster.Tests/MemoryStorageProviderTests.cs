@@ -25,6 +25,16 @@ namespace DefaultCluster.Tests.StorageTests
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        public async Task MemoryStorageProvider_NullState()
+        {
+            var grainWithState = this.GrainFactory.GetGrain<INullStateGrain>(0);
+            Assert.NotNull(await grainWithState.GetState());
+
+            await grainWithState.SetStateAndDeactivate(null);
+            await grainWithState.SetStateAndDeactivate(new NullableState { Name = "Thrall" });
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task MemoryStorageProvider_WriteReadStateTest()
         {
             var grainWithState = this.GrainFactory.GetGrain<IInitialStateGrain>(0);
