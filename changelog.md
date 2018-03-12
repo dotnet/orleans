@@ -7,7 +7,38 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [2.0.0-rc2] (changes since 2.0.0-rc1)
 
+- Major changes
+  - A new "facade" API for easier configuration pf various aspects of stream providers: Persistent stream configurators (#4164)
+
+- Breaking changes
+  - Align IClientBuilder APIs with ISiloHostBuilder (#4079)
+  - Rename MembershipOptions to ClusterMembershipOptions (#4145)
+  - Normalize cluster config & simplify binding IConfiguration to TOptions (#4136)
+
+- Non-breaking improvements
+  - Improve usability of dev cluster (#4090)
+  - Extensions should add their own application parts (#4091)
+  - Moved IStartupTask to Runtime.Abstractions package. Address #4106 (#4108)
+  - Improve configuration validators for ADO.NET configuration (#4097)
+  - In ActivationCountPlacementDirector, place locally if the cache is not populated yet (#4130)
+  - Improve usability of custom grain placement configuration (#4102)
+  - Remove legacy configuration requirement from Service Fabric hosting (#4138)
+  - Fix #4123: use List instead of IList in StaticGatewayListProviderOptions (#4147)
+  - Support treating all descendants of a base class as [Serializable] (#4133)
+  - Improve how grain services are registered (#4155)
+  - Do not call ResolveIPAddress in EndpointOptions constructor (#4171)
+  - When the silo shutdown, deactivate grain activations at an earlier stage (#4177)
+  - Improved transparancy and timing of silo lifecycle. (#4175)
+  - Set GrainService.Status to Started in the base implementation of StartInBackground(). (#4180)
+  - Validate that a ClusterId has been specified (#4160)
+
+- Non-breaking bug fixes
+  - ADO.NET: Fix formatting of generic class names in storage provider (#4140)
+  - Fix for PerfCounterEnvironmentStatistics never reports CpuUsage (#4148)
+  - Fix silo startup (#4135)
+  
 ### [2.0.0-rc1] (changes since 2.0.0-beta3)
 
 - Major changes
