@@ -23,7 +23,7 @@ namespace Tests.GeoClusterTests
 
             public ClientWrapper(string name, int gatewayport, string clusterId, Action<ClientConfiguration> customizer, Action<IClientBuilder> clientConfigurator)
                 // use null clusterId, in this test, because we are testing non-geo clients
-                : base(name, gatewayport, null, customizer, clientConfigurator)
+                : base(name, gatewayport, clusterId, customizer, clientConfigurator)
             {
                 this.systemManagement = this.GrainFactory.GetGrain<IManagementGrain>(0);
             }
