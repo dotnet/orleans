@@ -103,7 +103,7 @@ namespace ServiceBus.Tests.StreamingTests
 
         public override void Dispose()
         {
-            var dataManager = new AzureTableDataManager<TableEntity>(EHCheckpointTable, TestDefaultConfiguration.EventHubConnectionString, NullLoggerFactory.Instance);
+            var dataManager = new AzureTableDataManager<TableEntity>(EHCheckpointTable, TestDefaultConfiguration.DataConnectionString, NullLoggerFactory.Instance);
             dataManager.InitTableAsync().Wait();
             dataManager.ClearTableAsync().Wait();
             base.Dispose();
