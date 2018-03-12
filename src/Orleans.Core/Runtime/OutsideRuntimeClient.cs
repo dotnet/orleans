@@ -109,6 +109,7 @@ namespace Orleans
             this.timerLogger = loggerFactory.CreateLogger<SafeTimer>();
             this.clientMessagingOptions = clientMessagingOptions.Value;
             this.typeMapRefreshInterval = typeManagementOptions.Value.TypeMapRefreshInterval;
+            this.responseTimeout = clientMessagingOptions.Value.ResponseTimeout;
         }
 
         internal void ConsumeServices(IServiceProvider services)
@@ -145,7 +146,6 @@ namespace Orleans
 
                 clientProviderRuntime = this.ServiceProvider.GetRequiredService<ClientProviderRuntime>();
 
-                responseTimeout = Debugger.IsAttached ? MessagingOptions.DEFAULT_RESPONSE_TIMEOUT : this.clientMessagingOptions.ResponseTimeout;
                 this.localAddress = ConfigUtilities.GetLocalIPAddress(this.clientMessagingOptions.PreferredFamily, this.clientMessagingOptions.NetworkInterfaceName);
 
                 // Client init / sign-on message
