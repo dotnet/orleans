@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -37,6 +38,25 @@ namespace NonSilo.Tests
     [TestCategory("ClientBuilder")]
     public class ClientBuilderTests
     {
+        /// <summary>
+        /// Tests that a client cannot be created without specifying a ClusterId.
+        /// </summary>
+        [Fact]
+        public void ClientBuilder_NoClusterIdTest()
+        {
+            Assert.Throws<OrleansConfigurationException>(() => new ClientBuilder()
+                .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>())
+                .Build());
+
+            var builder = new ClientBuilder()
+                .Configure<ClusterOptions>(options => options.ClusterId = "test")
+                .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
+            using (var client = builder.Build())
+            {
+                Assert.NotNull(client);
+            }
+        }
+
         /// <summary>
         /// Tests that a client can be created without specifying configuration.
         /// </summary>
