@@ -108,9 +108,10 @@ await client.Connect();
 
 ## Application Parts
 
-Orleans 2.0 performs basic automatic folder scanning to discover user assemblies and types.
+Orleans 2.0 performs basic automatic folder scanning to discover user assemblies and types, unless any
+Application Parts configuration method is called.
 *It is recommended not to rely on this fallback behavior, and explicitly specify all necessary application assemblies instead.*
-You can provide explicitly theses assenblies during the configuration stage.
+You can provide explicitly theses assenblies during the configuration stage. *If you do, only theses assemblies will be scanned*.
 These assemblies are referred to as Application Parts.
 All Grains, Grain Interfaces, and Serializers are discovered using Application Parts.
 
