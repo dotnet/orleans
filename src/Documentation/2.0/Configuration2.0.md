@@ -59,22 +59,10 @@ public class Program
 
    private static async Task<ISiloHost> StartSilo()
     {
-         // define the cluster configuration
-        var siloPort = 11111;
-        int gatewayPort = 30000;
-        var siloAddress = IPAddress.Loopback; 
         var builder = new SiloHostBuilder()
-            //configure ClusterOptions to set CluserId and ServiceId
-            .Configure(options => options.ClusterId = "helloworldcluster")
-            //Configure local primary silo using DevelopmentClustering
-            .UseDevelopmentClustering(options => options.PrimarySiloEndpoint = new IPEndPoint(siloAddress, siloPort))
-            //Configure silo endpoint and gatewayport
-            .ConfigureEndpoints(siloAddress, siloPort, gatewayPort)
-            // Add assemblies to scan for grains and serializers.
-            // For more info read the Application Parts section
-            .ConfigureApplicationParts(parts =>
-                parts.AddApplicationPart(typeof(HelloGrain).Assembly)
-                     .WithReferences())
+			// Use localhost clustering for a single local silo
+            .UseLocalhostClustering()
+			.Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
             // Configure logging with any logging framework that supports Microsoft.Extensions.Logging.
             // In this particular case it logs using the Microsoft.Extensions.Logging.Console package.
             .ConfigureLogging(logging => logging.AddConsole());
@@ -110,17 +98,9 @@ You can create an empty console application project targeting .NET Framework 4.6
 Here is an example of how a client can connect to a local silo:
 
 ```csharp
-//define siloAddress and gatewayPort, should be consistent with whatever used in configuring silo.
-var siloAddress = IPAddress.Loopback;
-var gatewayPort = 30000;
 client = new ClientBuilder()
-    //Configure ClusterOptions
-    .ConfigureCluster(options => options.ClusterId = "helloworldcluster")
-    //Use StaticClustering in client side
-    .UseStaticClustering(options => options.Gateways = new List<Uri>(){ (new IPEndPoint(siloAddress, gatewayPort)).ToGatewayUri() })
-    // Add assemblies to scan for grains interfaces and serializers.
-    // For more info read the Application Parts section
-    .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IHello).Assembly))
+	// Use localhost clustering for a single local silo
+    .UseLocalhostClustering()
     .ConfigureLogging(logging => logging.AddConsole())
 var client = builder.Build();
 await client.Connect();
@@ -128,12 +108,11 @@ await client.Connect();
 
 ## Application Parts
 
-Orleans 2.0 does not perform automatic folder scanning to discover user assemblies and types.
-Instead, those assemblies are provided explicitly during the configuration stage.
+Orleans 2.0 performs basic automatic folder scanning to discover user assemblies and types.
+*It is recommended not to rely on this fallback behavior, and explicitly specify all necessary application assemblies instead.*
+You can provide explicitly theses assenblies during the configuration stage.
 These assemblies are referred to as Application Parts.
 All Grains, Grain Interfaces, and Serializers are discovered using Application Parts.
-*For backward compatibility, if none of the Application Parts methods is called, the runtime will scan all assemblies in the silo or client folder.
-It is recommended not to rely on this fallback behavior, and explicitly specify all necessary application assemblies instead.*
 
 Application Parts are configured using an `IApplicationPartsManager`, which can be accessed using the `ConfigureApplicationParts` extension method on `IClientBuilder` and `ISiloHostBuilder`. The `ConfigureApplicationParts` method accepts a delegate, `Action<IApplicationPartManager>`.
 
@@ -146,7 +125,19 @@ Assemblies added by the above methods can be supplemented using the following ex
 * `WithReferences()` adds all referenced assemblies from the added parts. This immediately loads any transitively referenced assemblies. Assembly loading errors are ignored.
 * `WithCodeGeneration()` generates support code for the added parts and adds it to the part manager. Note that this requires the `Microsoft.Orleans.OrleansCodeGenerator` package to be installed, and is commonly referred to as runtime code generation.
 
-See the client and silo configuration sections above for examples.
+For example, if the grain interface assembly contains `ISomeGrainInterface` and the grain implementation assenbly contains `SomeGrainImplementation`:
+
+``` charp
+var builder = new SiloHostBuilder()
+		[...]
+		.ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(SomeGrainImplementation).Assembly).WithReferences())
+		[...]
+		
+var builder = new ClientBuilder()
+		[...]
+		.ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(ISomeGrainInterface).Assembly).WithReferences())
+		[...]
+```
 
 Type discovery requires that the provided Application Parts include specific attributes. Adding the build-time code generation package (`Microsoft.Orleans.OrleansCodeGenerator.Build`) to each project containing Grains, Grain Interfaces, or Serializers is the recommended approach for ensuring that these attributes are present. Build-time code generation only supports C#. For F#, Visual Basic, and other .NET languages, code can be generated during configuration time via the `WithCodeGeneration()` method described above.
 
