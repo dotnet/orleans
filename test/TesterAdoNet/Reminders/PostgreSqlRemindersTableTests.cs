@@ -14,20 +14,17 @@ using Xunit;
 
 namespace UnitTests.RemindersTest
 {
-    /// <summary>
-    /// Tests for operation of Orleans Reminders Table using SQL Server
-    /// </summary>
-    [TestCategory("Reminders"), TestCategory("AdoNet")]
-    public class SqlServerRemindersTableTests : ReminderTableTestsBase
+    [TestCategory("Functional"), TestCategory("Reminders"), TestCategory("AdoNet"), TestCategory("PostgreSql")]
+    public class PostgreSqlRemindersTableTests : ReminderTableTestsBase
     {
-        public SqlServerRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
+        public PostgreSqlRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
         {
         }
 
         private static LoggerFilterOptions CreateFilters()
         {
             var filters = new LoggerFilterOptions();
-            filters.AddFilter(nameof(SqlServerRemindersTableTests), LogLevel.Trace);
+            filters.AddFilter(nameof(PostgreSqlRemindersTableTests), LogLevel.Trace);
             return filters;
         }
 
@@ -46,7 +43,7 @@ namespace UnitTests.RemindersTest
 
         protected override string GetAdoInvariant()
         {
-            return AdoNetInvariants.InvariantNameSqlServer;
+            return AdoNetInvariants.InvariantNamePostgreSql;
         }
 
         protected override async Task<string> GetConnectionString()
@@ -56,24 +53,25 @@ namespace UnitTests.RemindersTest
         }
 
         [SkippableFact]
-        public void RemindersTable_SqlServer_Init()
+        public void RemindersTable_PostgreSql_Init()
         {
         }
 
-        [SkippableFact, TestCategory("Functional")]
-        public async Task RemindersTable_SqlServer_RemindersRange()
+
+        [SkippableFact]
+        public async Task RemindersTable_PostgreSql_RemindersRange()
         {
-            await RemindersRange(iterations: 30);
+            await RemindersRange(iterations: 50);
         }
 
-        [SkippableFact, TestCategory("Functional")]
-        public async Task RemindersTable_SqlServer_RemindersParallelUpsert()
+        [SkippableFact]
+        public async Task RemindersTable_PostgreSql_RemindersParallelUpsert()
         {
             await RemindersParallelUpsert();
         }
 
-        [SkippableFact, TestCategory("Functional")]
-        public async Task RemindersTable_SqlServer_ReminderSimple()
+        [SkippableFact]
+        public async Task RemindersTable_PostgreSql_ReminderSimple()
         {
             await ReminderSimple();
         }

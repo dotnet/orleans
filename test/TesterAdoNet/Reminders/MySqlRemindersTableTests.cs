@@ -14,17 +14,19 @@ using Xunit;
 
 namespace UnitTests.RemindersTest
 {
-    [TestCategory("Reminders"), TestCategory("PostgreSql")]
-    public class PostgreSqlRemindersTableTests : ReminderTableTestsBase
+    /// <summary>
+    /// Tests for operation of Orleans Reminders Table using MySQL
+    /// </summary>
+    [TestCategory("Functional"), TestCategory("Reminders"), TestCategory("AdoNet"), TestCategory("MySql")]
+    public class MySqlRemindersTableTests : ReminderTableTestsBase
     {
-        public PostgreSqlRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
+        public MySqlRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
         {
         }
-
         private static LoggerFilterOptions CreateFilters()
         {
             var filters = new LoggerFilterOptions();
-            filters.AddFilter(nameof(PostgreSqlRemindersTableTests), LogLevel.Trace);
+            filters.AddFilter(nameof(MySqlRemindersTableTests), LogLevel.Trace);
             return filters;
         }
 
@@ -43,7 +45,7 @@ namespace UnitTests.RemindersTest
 
         protected override string GetAdoInvariant()
         {
-            return AdoNetInvariants.InvariantNamePostgreSql;
+            return AdoNetInvariants.InvariantNameMySql;
         }
 
         protected override async Task<string> GetConnectionString()
@@ -53,25 +55,25 @@ namespace UnitTests.RemindersTest
         }
 
         [SkippableFact]
-        public void RemindersTable_PostgreSql_Init()
+        public void RemindersTable_MySql_Init()
         {
         }
 
 
         [SkippableFact]
-        public async Task RemindersTable_PostgreSql_RemindersRange()
+        public async Task RemindersTable_MySql_RemindersRange()
         {
             await RemindersRange(iterations: 50);
         }
 
         [SkippableFact]
-        public async Task RemindersTable_PostgreSql_RemindersParallelUpsert()
+        public async Task RemindersTable_MySql_RemindersParallelUpsert()
         {
             await RemindersParallelUpsert();
         }
 
         [SkippableFact]
-        public async Task RemindersTable_PostgreSql_ReminderSimple()
+        public async Task RemindersTable_MySql_ReminderSimple()
         {
             await ReminderSimple();
         }

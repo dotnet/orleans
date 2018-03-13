@@ -4,24 +4,22 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Configuration.Memory;
 using Orleans;
 using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
-using Orleans.Tests.SqlUtils;
 using Orleans.TestingHost;
 using TestExtensions;
-using UnitTests.GrainInterfaces;
-using Xunit;
-using Tester;
 using UnitTests.General;
+using UnitTests.GrainInterfaces;
+using UnitTests.TimerTests;
+using Orleans.Tests.SqlUtils;
+using Xunit;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
 
-namespace UnitTests.TimerTests
+namespace Tester.AdoNet.Reminders
 {
-    [TestCategory("Functional"), TestCategory("ReminderService"), TestCategory("AdoNet"), TestCategory("SqlServer")]
+    [TestCategory("Functional"), TestCategory("Reminders"), TestCategory("AdoNet"), TestCategory("SqlServer")]
     public class ReminderTests_AdoNet_SqlServer : ReminderTests_Base, IClassFixture<ReminderTests_AdoNet_SqlServer.Fixture>
     {
         private const string TestDatabaseName = "OrleansTest";
@@ -64,13 +62,13 @@ namespace UnitTests.TimerTests
         
         // Basic tests
 
-        [Fact]
+        [SkippableFact]
         public async Task Rem_Sql_Basic_StopByRef()
         {
             await Test_Reminders_Basic_StopByRef();
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Rem_Sql_Basic_ListOps()
         {
             await Test_Reminders_Basic_ListOps();
@@ -78,13 +76,13 @@ namespace UnitTests.TimerTests
 
         // Single join tests ... multi grain, multi reminders
 
-        [Fact]
+        [SkippableFact]
         public async Task Rem_Sql_1J_MultiGrainMultiReminders()
         {
             await Test_Reminders_1J_MultiGrainMultiReminders();
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Rem_Sql_ReminderNotFound()
         {
             await Test_Reminders_ReminderNotFound();

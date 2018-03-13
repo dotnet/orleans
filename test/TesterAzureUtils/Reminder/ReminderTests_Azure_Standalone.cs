@@ -44,7 +44,7 @@ namespace Tester.AzureUtils.TimerTests
 
         #region Extra tests / experiments
 
-        [SkippableFact, TestCategory("ReminderService"), TestCategory("Performance")]
+        [SkippableFact, TestCategory("Reminders"), TestCategory("Performance")]
         public async Task Reminders_AzureTable_InsertRate()
         {
             var clusterOptions = Options.Create(new ClusterOptions { ClusterId = "TMSLocalTesting", ServiceId = this.serviceId });
@@ -57,7 +57,7 @@ namespace Tester.AzureUtils.TimerTests
             await TestTableInsertRate(table, 500);
         }
 
-        [SkippableFact, TestCategory("ReminderService")]
+        [SkippableFact, TestCategory("Reminders")]
         public async Task Reminders_AzureTable_InsertNewRowAndReadBack()
         {
             string clusterId = NewClusterId();
