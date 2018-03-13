@@ -43,7 +43,7 @@ namespace Orleans.Hosting
         public static IServiceCollection UseDynamoDBReminderService(this IServiceCollection services, Action<DynamoDBReminderStorageOptions> configure)
         {
             services.AddSingleton<IReminderTable, DynamoDBReminderTable>();
-            services.Configure(configure);
+            services.Configure<DynamoDBReminderStorageOptions>(configure);
             services.ConfigureFormatter<DynamoDBReminderStorageOptions>();
             return services;
         }

@@ -21,35 +21,40 @@ using UnitTests.General;
 
 namespace UnitTests.TimerTests
 {
-    [TestCategory("Functional"), TestCategory("ReminderService"), TestCategory("AdoNet")]
-    public class ReminderTests_AdoNet : ReminderTests_Base, IClassFixture<ReminderTests_AdoNet.Fixture>
+    [TestCategory("Functional"), TestCategory("ReminderService"), TestCategory("AdoNet"), TestCategory("SqlServer")]
+    public class ReminderTests_AdoNet_SqlServer : ReminderTests_Base, IClassFixture<ReminderTests_AdoNet_SqlServer.Fixture>
     {
+        private const string TestDatabaseName = "OrleansTest";
+        private static string AdoInvariant = AdoNetInvariants.InvariantNameSqlServer;
+        private const string ConnectionStringKey = "ReminderConnectionString";
+
         public class Fixture : BaseTestClusterFixture
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                string connectionString = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameSqlServer, "OrleansReminderTestSQL")
+                string connectionString = RelationalStorageForTesting.SetupInstance(AdoInvariant, TestDatabaseName)
                     .Result.CurrentConnectionString;
-                builder.ConfigureHostConfiguration(config =>
-                    {
-                        config.AddInMemoryCollection(new[] {new KeyValuePair<string, string>("ReminderConnectionString", connectionString),});
-                    });
+                builder.ConfigureHostConfiguration(config => config.AddInMemoryCollection(new Dictionary<string, string>
+                {
+                    [ConnectionStringKey] = connectionString
+                }));
                 builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             }
         }
 
-        public class SiloConfigurator : ISiloBuilderConfigurator {
+        public class SiloConfigurator : ISiloBuilderConfigurator
+        {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder.UseAdoNetReminderService(options =>
                 {
-                    options.ConnectionString = hostBuilder.GetConfigurationValue("ReminderConnectionString");
-                    options.Invariant = "System.Data.SqlClient";
+                    options.ConnectionString = hostBuilder.GetConfigurationValue(ConnectionStringKey);
+                    options.Invariant = AdoInvariant;
                 });
             }
         }
 
-        public ReminderTests_AdoNet(Fixture fixture) : base(fixture)
+        public ReminderTests_AdoNet_SqlServer(Fixture fixture) : base(fixture)
         {
             // ReminderTable.Clear() cannot be called from a non-Orleans thread,
             // so we must proxy the call through a grain.
