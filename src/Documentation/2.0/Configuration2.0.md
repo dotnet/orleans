@@ -25,7 +25,6 @@ PM> Install-Package Microsoft.Orleans.Server
 ```
 
 You need to configure `ClusterOptions` via `ISiloBuilder.Configure`method, specify that you want `DevelopmentClustering` as your clustering choice with this silo being the primary, and then configure silo endpoints.
-*We are looking to improve the local development configuration experience down to a single method call before we release a final build of 2.0.0.*
 
 `ConfigureApplicationParts` call explicitly adds the assembly with grain classes to the application setup.
 It also adds any referenced assembly due to the `WithReferences` extension.
@@ -111,7 +110,7 @@ await client.Connect();
 Orleans 2.0 performs basic automatic folder scanning to discover user assemblies and types, unless any
 Application Parts configuration method is called.
 *It is recommended not to rely on this fallback behavior, and explicitly specify all necessary application assemblies instead.*
-You can provide explicitly theses assenblies during the configuration stage. *If you do, only theses assemblies will be scanned*.
+You can provide explicitly these assemblies during the configuration stage. *If you do, only these assemblies will be scanned*.
 These assemblies are referred to as Application Parts.
 All Grains, Grain Interfaces, and Serializers are discovered using Application Parts.
 
