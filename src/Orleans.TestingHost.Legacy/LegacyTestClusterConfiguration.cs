@@ -71,7 +71,7 @@ namespace Orleans.TestingHost
                 nodeConfig.Port = siloConfig.SiloPort;
                 nodeConfig.SiloName = siloConfig.SiloName;
                 var address = ConfigUtilities.ResolveIPAddress(nodeConfig.HostNameOrIPAddress, nodeConfig.Subnet, nodeConfig.AddressType).GetAwaiter().GetResult();
-                nodeConfig.ProxyGatewayEndpoint = new IPEndPoint(address, siloConfig.GatewayPort);
+                nodeConfig.ProxyGatewayEndpoint = siloConfig.GatewayPort != 0 ? new IPEndPoint(address, siloConfig.GatewayPort) : null;
                 nodeConfig.IsPrimaryNode = i == 0;
             }
 
