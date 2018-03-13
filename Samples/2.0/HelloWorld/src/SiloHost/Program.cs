@@ -39,14 +39,9 @@ namespace OrleansSiloHost
         private static async Task<ISiloHost> StartSilo()
         {
             // define the cluster configuration
-            var siloPort = 11111;
-            int gatewayPort = 30000;
-            var siloAddress = IPAddress.Loopback; 
             var builder = new SiloHostBuilder()
-                .Configure(options => options.ClusterId = "helloworldcluster")
-                .UseDevelopmentClustering(options => options.PrimarySiloEndpoint = new IPEndPoint(siloAddress, siloPort))
-                .ConfigureEndpoints(siloAddress, siloPort, gatewayPort)
-                .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(HelloGrain).Assembly).WithReferences())
+                .UseLocalhostClustering()
+                .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
                 .ConfigureLogging(logging => logging.AddConsole());
 
             var host = builder.Build();
