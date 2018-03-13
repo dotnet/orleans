@@ -4,6 +4,7 @@ using System;
 using System.Net;
 using Orleans.Runtime;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 
 namespace AdventureClient
 {
@@ -11,12 +12,8 @@ namespace AdventureClient
     {
         static void Main(string[] args)
         {
-            var gatewayPort = 30000;
-            var siloAddress = IPAddress.Loopback;
-
             var client = new ClientBuilder()
-                .ConfigureCluster(options => options.ClusterId = "adventure")
-                .UseStaticClustering(options => options.Gateways.Add(new IPEndPoint(siloAddress, gatewayPort).ToGatewayUri()))
+                .UseLocalhostClustering()
                 .Build();
 
             client.Connect().Wait();
