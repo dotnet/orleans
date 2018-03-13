@@ -57,7 +57,7 @@ namespace Tester.StreamingTests
             this.fixture = fixture;
         }
 
-        [Fact(Skip = "Failes due to system target routing issues"), TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task PersistentStreamingOverSingleGatewayTest()
         {
             const int streamCount = 100;

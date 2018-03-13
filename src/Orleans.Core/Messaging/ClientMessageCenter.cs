@@ -185,7 +185,7 @@ namespace Orleans.Messaging
             bool startRequired = false;
 
             // If there's a specific gateway specified, use it
-            if (msg.TargetSilo != null)
+            if (msg.TargetSilo != null && GatewayManager.GetLiveGateways().Contains(msg.TargetSilo.ToGatewayUri()))
             {
                 Uri addr = msg.TargetSilo.ToGatewayUri();
                 lock (lockable)
