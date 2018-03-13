@@ -20,7 +20,7 @@ namespace Silo
             // TODO replace with your connection string
             const string connectionString = "YOUR_CONNECTION_STRING_HERE";
             silo = new SiloHostBuilder()
-                .Configure(options => options.ClusterId = "orleans-docker")
+                .Configure<ClusterOptions>(options => options.ClusterId = "orleans-docker")
                 .UseAzureStorageClustering(options => options.ConnectionString = connectionString)
                 .ConfigureEndpoints(siloPort: 11111, gatewayPort: 30000)
                 .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(ValueGrain).Assembly).WithReferences())

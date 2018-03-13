@@ -36,20 +36,14 @@ namespace AdventureSetup
                 return -2;
             }
 
-            var siloPort = 11111;
-            var gatewayPort = 30000;
-            var siloAddress = IPAddress.Loopback;
-
             var silo = new SiloHostBuilder()
-                .Configure(options => options.ClusterId = "adventure")
-                .UseDevelopmentClustering(options => options.PrimarySiloEndpoint = new IPEndPoint(siloAddress, siloPort))
-                .ConfigureEndpoints(siloAddress, siloPort, gatewayPort)
+                .UseLocalhostClustering()
+                .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
                 .ConfigureLogging(logging => logging.AddConsole())
                 .Build();
 
             var client = new ClientBuilder()
-                .ConfigureCluster(options => options.ClusterId = "adventure")
-                .UseStaticClustering(options => options.Gateways.Add(new IPEndPoint(siloAddress, gatewayPort).ToGatewayUri()))
+                .UseLocalhostClustering()
                 .ConfigureLogging(logging => logging.AddConsole())
                 .Build();
 

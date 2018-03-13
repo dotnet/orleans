@@ -48,12 +48,8 @@ namespace OrleansClient
             {
                 try
                 {
-                    var siloAddress = IPAddress.Loopback;
-                    var gatewayPort = 30000;
                     client = new ClientBuilder()
-                        .ConfigureCluster(options => options.ClusterId = "helloworldcluster")
-                        .UseStaticClustering(options => options.Gateways.Add((new IPEndPoint(siloAddress, gatewayPort)).ToGatewayUri()))
-                        .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IHello).Assembly).WithReferences())
+                        .UseLocalhostClustering()
                         .ConfigureLogging(logging => logging.AddConsole())
                         .Build();
 

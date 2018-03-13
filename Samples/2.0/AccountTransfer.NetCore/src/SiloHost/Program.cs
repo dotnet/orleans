@@ -38,15 +38,9 @@ namespace OrleansSiloHost
 
         private static async Task<ISiloHost> StartSilo()
         {
-            var siloPort = 11111;
-            int gatewayPort = 30000;
-            var siloAddress = IPAddress.Loopback;
-
             var builder = new SiloHostBuilder()
-                .Configure(options => options.ClusterId = "accounting")
-                .UseDevelopmentClustering(options => options.PrimarySiloEndpoint = new IPEndPoint(siloAddress, siloPort))
-                .ConfigureEndpoints(siloAddress, siloPort, gatewayPort)
-                .ConfigureApplicationParts(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory())
+                .UseLocalhostClustering()
+                .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
                 .ConfigureLogging(logging => logging.AddConsole())
                 .AddMemoryGrainStorageAsDefault()
                 .UseInClusterTransactionManager()

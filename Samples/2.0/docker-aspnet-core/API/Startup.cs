@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Hosting;
 
 namespace API
@@ -45,7 +46,7 @@ namespace API
             const string connectionString = "YOUR_CONNECTION_STRING_HERE";
             var client = new ClientBuilder()
                 .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IValueGrain).Assembly))
-                .ConfigureCluster(options => options.ClusterId = "orleans-docker")
+                .Configure<ClusterOptions>(options => options.ClusterId = "orleans-docker")
                 .UseAzureStorageClustering(options => options.ConnectionString = connectionString)
                 .Build();
             StartClientWithRetries(client).Wait();
