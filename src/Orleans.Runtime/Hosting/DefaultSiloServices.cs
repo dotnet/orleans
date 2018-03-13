@@ -47,6 +47,8 @@ namespace Orleans.Hosting
         {
             services.AddOptions();
 
+            services.AddTransient<IConfigurationValidator, EndpointOptionsValidator>();
+
             // Options logging
             services.TryAddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
             services.TryAddSingleton(typeof(IOptionFormatterResolver<>), typeof(DefaultOptionsFormatterResolver<>));
@@ -127,7 +129,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<MembershipOracle>();
             services.TryAddFromExisting<IMembershipOracle, MembershipOracle>();
             services.TryAddFromExisting<ISiloStatusOracle, MembershipOracle>();
-            services.AddTransient<IConfigurationValidator, SiloClusteringValidator>();
 
             services.TryAddSingleton<ClientObserverRegistrar>();
             services.TryAddSingleton<SiloProviderRuntime>();
@@ -261,7 +262,9 @@ namespace Orleans.Hosting
             services.ConfigureFormatter<LoadSheddingOptions>();
             services.ConfigureFormatter<EndpointOptions>();
 
-            services.AddTransient<IConfigurationValidator, EndpointOptionsValidator>();
+            // This validator needs to construct the IMembershipOracle and the IMembershipTable
+            // so move it in the end so other validator are called first
+            services.AddTransient<IConfigurationValidator, SiloClusteringValidator>();
         }
     }
 }
