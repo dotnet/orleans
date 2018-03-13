@@ -42,7 +42,7 @@ namespace Orleans.Hosting
             services.AddSingleton<IReminderTable, AdoNetReminderTable>();
             services.ConfigureFormatter<AdoNetReminderTableOptions>();
             services.AddSingleton<IConfigurationValidator, AdoNetReminderTableOptionsValidator>();
-            services.Configure(configureOptions);
+            configureOptions(services.AddOptions<AdoNetReminderTableOptions>());
             return services;
         }
     }

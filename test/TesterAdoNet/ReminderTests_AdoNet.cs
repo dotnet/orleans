@@ -1,8 +1,12 @@
 //#define USE_SQL_SERVER
 
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration.Memory;
 using Orleans;
+using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 using Orleans.Tests.SqlUtils;
 using Orleans.TestingHost;
@@ -17,26 +21,35 @@ using UnitTests.General;
 
 namespace UnitTests.TimerTests
 {
-
-
-#if USE_SQL_SERVER || DEBUG
-    public class ReminderTests_SqlServer : ReminderTests_Base, IClassFixture<ReminderTests_SqlServer.Fixture>
+    [TestCategory("Functional"), TestCategory("ReminderService"), TestCategory("AdoNet")]
+    public class ReminderTests_AdoNet : ReminderTests_Base, IClassFixture<ReminderTests_AdoNet.Fixture>
     {
         public class Fixture : BaseTestClusterFixture
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                string connectionString = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameSqlServer, "OrleansRemiderTestSQL")
-                            .Result.CurrentConnectionString;
-                builder.ConfigureLegacyConfiguration(legacy =>
+                string connectionString = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameSqlServer, "OrleansReminderTestSQL")
+                    .Result.CurrentConnectionString;
+                builder.ConfigureHostConfiguration(config =>
+                    {
+                        config.AddInMemoryCollection(new[] {new KeyValuePair<string, string>("ReminderConnectionString", connectionString),});
+                    });
+                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+            }
+        }
+
+        public class SiloConfigurator : ISiloBuilderConfigurator {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder.UseAdoNetReminderService(options =>
                 {
-                    legacy.ClusterConfiguration.Globals.DataConnectionString = connectionString;
-                    legacy.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.AdoNet;
+                    options.ConnectionString = hostBuilder.GetConfigurationValue("ReminderConnectionString");
+                    options.Invariant = "System.Data.SqlClient";
                 });
             }
         }
 
-        public ReminderTests_SqlServer(Fixture fixture) : base(fixture)
+        public ReminderTests_AdoNet(Fixture fixture) : base(fixture)
         {
             // ReminderTable.Clear() cannot be called from a non-Orleans thread,
             // so we must proxy the call through a grain.
@@ -46,13 +59,13 @@ namespace UnitTests.TimerTests
         
         // Basic tests
 
-        [Fact, TestCategory("ReminderService"), TestCategory("AdoNet")]
+        [Fact]
         public async Task Rem_Sql_Basic_StopByRef()
         {
             await Test_Reminders_Basic_StopByRef();
         }
 
-        [Fact, TestCategory("ReminderService"), TestCategory("AdoNet")]
+        [Fact]
         public async Task Rem_Sql_Basic_ListOps()
         {
             await Test_Reminders_Basic_ListOps();
@@ -60,20 +73,18 @@ namespace UnitTests.TimerTests
 
         // Single join tests ... multi grain, multi reminders
 
-        [Fact, TestCategory("ReminderService"), TestCategory("AdoNet")]
+        [Fact]
         public async Task Rem_Sql_1J_MultiGrainMultiReminders()
         {
             await Test_Reminders_1J_MultiGrainMultiReminders();
         }
 
-        [Fact, TestCategory("ReminderService"), TestCategory("AdoNet")]
+        [Fact]
         public async Task Rem_Sql_ReminderNotFound()
         {
             await Test_Reminders_ReminderNotFound();
         }
     }
-#endif
-
 }
 // ReSharper restore InconsistentNaming
 // ReSharper restore UnusedVariable
