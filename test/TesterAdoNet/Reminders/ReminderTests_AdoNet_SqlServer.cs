@@ -19,7 +19,7 @@ using Xunit;
 
 namespace Tester.AdoNet.Reminders
 {
-    [TestCategory("Functional"), TestCategory("Reminders"), TestCategory("AdoNet"), TestCategory("SqlServer")]
+    [TestCategory("Reminders"), TestCategory("AdoNet"), TestCategory("SqlServer")]
     public class ReminderTests_AdoNet_SqlServer : ReminderTests_Base, IClassFixture<ReminderTests_AdoNet_SqlServer.Fixture>
     {
         private const string TestDatabaseName = "OrleansTest";
