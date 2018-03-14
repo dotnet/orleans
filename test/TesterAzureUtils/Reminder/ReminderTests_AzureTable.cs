@@ -16,7 +16,7 @@ using UnitTests.TimerTests;
 
 namespace Tester.AzureUtils.TimerTests
 {
-    [TestCategory("ReminderService"), TestCategory("Azure")]
+    [TestCategory("Reminders"), TestCategory("Azure")]
     public class ReminderTests_AzureTable : ReminderTests_Base, IClassFixture<ReminderTests_AzureTable.Fixture>
     {
         public class Fixture : BaseAzureTestClusterFixture

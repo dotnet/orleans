@@ -15,18 +15,19 @@ using Xunit;
 namespace UnitTests.RemindersTest
 {
     /// <summary>
-    /// Tests for operation of Orleans Reminders Table using MySQL
+    /// Tests for operation of Orleans Reminders Table using SQL Server
     /// </summary>
-    [TestCategory("Reminders"), TestCategory("MySql")]
-    public class MySqlRemindersTableTests : ReminderTableTestsBase
+    [TestCategory("Functional"), TestCategory("Reminders"), TestCategory("AdoNet"), TestCategory("SqlServer")]
+    public class SqlServerRemindersTableTests : ReminderTableTestsBase
     {
-        public MySqlRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
+        public SqlServerRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
         {
         }
+
         private static LoggerFilterOptions CreateFilters()
         {
             var filters = new LoggerFilterOptions();
-            filters.AddFilter(nameof(MySqlRemindersTableTests), LogLevel.Trace);
+            filters.AddFilter(nameof(SqlServerRemindersTableTests), LogLevel.Trace);
             return filters;
         }
 
@@ -45,7 +46,7 @@ namespace UnitTests.RemindersTest
 
         protected override string GetAdoInvariant()
         {
-            return AdoNetInvariants.InvariantNameMySql;
+            return AdoNetInvariants.InvariantNameSqlServer;
         }
 
         protected override async Task<string> GetConnectionString()
@@ -55,25 +56,24 @@ namespace UnitTests.RemindersTest
         }
 
         [SkippableFact]
-        public void RemindersTable_MySql_Init()
+        public void RemindersTable_SqlServer_Init()
         {
         }
 
-
         [SkippableFact]
-        public async Task RemindersTable_MySql_RemindersRange()
+        public async Task RemindersTable_SqlServer_RemindersRange()
         {
-            await RemindersRange(iterations: 50);
+            await RemindersRange(iterations: 30);
         }
 
         [SkippableFact]
-        public async Task RemindersTable_MySql_RemindersParallelUpsert()
+        public async Task RemindersTable_SqlServer_RemindersParallelUpsert()
         {
             await RemindersParallelUpsert();
         }
 
         [SkippableFact]
-        public async Task RemindersTable_MySql_ReminderSimple()
+        public async Task RemindersTable_SqlServer_ReminderSimple()
         {
             await ReminderSimple();
         }
