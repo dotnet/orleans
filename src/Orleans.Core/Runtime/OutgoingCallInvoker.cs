@@ -8,7 +8,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Invokes a request on a grain reference.
     /// </summary>
-    internal class OutgoingCallInvoker : IGrainCallContext
+    internal class OutgoingCallInvoker : IOutgoingGrainCallContext
     {
         private readonly InvokeMethodRequest request;
         private readonly InvokeMethodOptions options;
@@ -67,6 +67,9 @@ namespace Orleans.Runtime
                 return method.InterfaceMethod;
             }
         }
+
+        /// <inheritdoc />
+        public MethodInfo InterfaceMethod => this.Method;
 
         /// <inheritdoc />
         public object[] Arguments => request.Arguments;

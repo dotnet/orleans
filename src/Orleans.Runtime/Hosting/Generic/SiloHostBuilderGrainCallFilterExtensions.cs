@@ -1,5 +1,3 @@
-using Orleans.Configuration;
-
 namespace Orleans.Hosting
 {
     /// <summary>
@@ -36,7 +34,7 @@ namespace Orleans.Hosting
         /// <param name="builder">The builder.</param>
         /// <param name="filter">The filter.</param>
         /// <returns>The builder.</returns>
-        public static ISiloHostBuilder AddIncomingGrainCallFilter(this ISiloHostBuilder builder, GrainCallFilterDelegate filter)
+        public static ISiloHostBuilder AddIncomingGrainCallFilter(this ISiloHostBuilder builder, IncomingGrainCallFilterDelegate filter)
         {
             return builder.ConfigureServices(services => services.AddIncomingGrainCallFilter(filter));
         }
@@ -70,7 +68,7 @@ namespace Orleans.Hosting
         /// <param name="builder">The builder.</param>
         /// <param name="filter">The filter.</param>
         /// <returns>The builder.</returns>
-        public static ISiloHostBuilder AddOutgoingGrainCallFilter(this ISiloHostBuilder builder, GrainCallFilterDelegate filter)
+        public static ISiloHostBuilder AddOutgoingGrainCallFilter(this ISiloHostBuilder builder, OutgoingGrainCallFilterDelegate filter)
         {
             return builder.ConfigureServices(services => services.AddOutgoingGrainCallFilter(filter));
         }

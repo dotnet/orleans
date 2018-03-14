@@ -37,7 +37,7 @@ namespace UnitTests.General
                     hostBuilder
                         .AddIncomingGrainCallFilter(context =>
                         {
-                            if (string.Equals(context.Method.Name, nameof(IGrainCallFilterTestGrain.GetRequestContext)))
+                            if (string.Equals(context.InterfaceMethod.Name, nameof(IGrainCallFilterTestGrain.GetRequestContext)))
                             {
                                 if (RequestContext.Get(GrainCallFilterTestConstants.Key) != null) throw new InvalidOperationException();
                                 RequestContext.Set(GrainCallFilterTestConstants.Key, "1");
@@ -48,7 +48,7 @@ namespace UnitTests.General
                         .AddIncomingGrainCallFilter<GrainCallFilterWithDependencies>()
                         .AddOutgoingGrainCallFilter(async ctx =>
                         {
-                            if (ctx.Method?.Name == "Echo")
+                            if (ctx.InterfaceMethod?.Name == "Echo")
                             {
                                 // Concatenate the input to itself.
                                 var orig = (string) ctx.Arguments[0];
@@ -69,14 +69,14 @@ namespace UnitTests.General
                 {
                     clientBuilder.AddOutgoingGrainCallFilter(async ctx =>
                     {
-                        if (ctx.Method?.DeclaringType == typeof(IOutgoingMethodInterceptionGrain))
+                        if (ctx.InterfaceMethod?.DeclaringType == typeof(IOutgoingMethodInterceptionGrain))
                         {
                             ctx.Arguments[1] = ((string) ctx.Arguments[1]).ToUpperInvariant();
                         }
 
                         await ctx.Invoke();
 
-                        if (ctx.Method?.DeclaringType == typeof(IOutgoingMethodInterceptionGrain))
+                        if (ctx.InterfaceMethod?.DeclaringType == typeof(IOutgoingMethodInterceptionGrain))
                         {
                             var result = (Dictionary<string, object>) ctx.Result;
                             result["orig"] = result["result"];
@@ -102,9 +102,9 @@ namespace UnitTests.General
                 this.grainFactory = grainFactory;
             }
 
-            public Task Invoke(IGrainCallContext context)
+            public Task Invoke(IIncomingGrainCallContext context)
             {
-                if (string.Equals(context.Method.Name, nameof(IGrainCallFilterTestGrain.GetRequestContext)))
+                if (string.Equals(context.ImplementationMethod.Name, nameof(IGrainCallFilterTestGrain.GetRequestContext)))
                 {
                     if (RequestContext.Get(GrainCallFilterTestConstants.Key) is string value)
                     {
