@@ -30,17 +30,6 @@ namespace Orleans.TestingHost
         /// <param name="stopGracefully">Specifies whether the silo should be stopped gracefully or abruptly.</param>
         public abstract void StopSilo(bool stopGracefully);
 
-        /// <summary>Gets the Silo test hook that uses AppDomain remoting
-        /// (NOTE: this will be removed really soon, and was migrated here temporarily. It does not respect the abstraction
-        /// as this only works with AppDomains for now, but we'll be removing TestHooks with AppDomains entirely)</summary>
-        internal AppDomainTestHooks AppDomainTestHook { get; set; }
-
-        ///// <summary> A string that represents the current SiloHandle </summary>
-        //public override string ToString()
-        //{
-        //    return $"(SiloHandle endpoint={SiloAddress.Endpoint} gatewayport={NodeConfiguration.ProxyGatewayEndpoint?.Port})";
-        //}
-
         /// <summary>Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.</summary>
         public void Dispose()
         {

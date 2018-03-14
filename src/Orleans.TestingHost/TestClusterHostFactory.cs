@@ -21,8 +21,17 @@ using Orleans.TestingHost.Utils;
 
 namespace Orleans.TestingHost
 {
-    internal class TestClusterHostFactory
+    /// <summary>
+    /// Utility for creating silos given a name and collection of configuration sources.
+    /// </summary>
+    public class TestClusterHostFactory
     {
+        /// <summary>
+        /// Creates an returns a new silo.
+        /// </summary>
+        /// <param name="hostName">The silo name if it is not already specified in the configuration.</param>
+        /// <param name="configurationSources">The configuration.</param>
+        /// <returns>A new silo.</returns>
         public static ISiloHost CreateSiloHost(string hostName, IEnumerable<IConfigurationSource> configurationSources)
         {
             var configBuilder = new ConfigurationBuilder();

@@ -9,6 +9,7 @@ using Orleans.GrainDirectory;
 using Orleans.Runtime;
 using TestGrainInterfaces;
 using Orleans.Runtime.Configuration;
+using Orleans.TestingHost;
 using Xunit;
 using Xunit.Abstractions;
 using Tester;
@@ -515,7 +516,8 @@ namespace Tests.GeoClusterTests
             int totalSoFar = 0;
             foreach (var silo in silos)
             {
-                var dir = silo.AppDomainTestHook.GetDirectoryForTypeNamesContaining("ClusterTestGrain");
+                var hooks = ((AppDomainSiloHandle)silo).AppDomainTestHook;
+                var dir = hooks.GetDirectoryForTypeNamesContaining("ClusterTestGrain");
                 foreach (var grainKeyValue in dir)
                 {
                     GrainId grainId = grainKeyValue.Key;
@@ -546,12 +548,14 @@ namespace Tests.GeoClusterTests
         {
             var grains = new Dictionary<GrainId, List<IActivationInfo>>();
 
-            int instancecount = 0;
+            int instanceCount = 0;
 
             foreach (var kvp in Clusters)
+            {
                 foreach (var silo in kvp.Value.Silos)
                 {
-                    var dir = silo.AppDomainTestHook.GetDirectoryForTypeNamesContaining("ClusterTestGrain");
+                    var hooks = ((AppDomainSiloHandle) silo).AppDomainTestHook;
+                    var dir = hooks.GetDirectoryForTypeNamesContaining("ClusterTestGrain");
 
                     foreach (var grainKeyValue in dir)
                     {
@@ -561,19 +565,19 @@ namespace Tests.GeoClusterTests
                         if (exclude != null && exclude.ContainsKey(grainId))
                             continue;
 
-                        List<IActivationInfo> acts;
-                        if (!grains.TryGetValue(grainId, out acts))
-                            grains[grainId] = acts = new List<IActivationInfo>();
+                        if (!grains.TryGetValue(grainId, out var activations))
+                            grains[grainId] = activations = new List<IActivationInfo>();
 
-                        foreach (var instinfo in grainInfo.Instances)
+                        foreach (var instanceInfo in grainInfo.Instances)
                         {
-                            acts.Add(instinfo.Value);
-                            instancecount++;
+                            activations.Add(instanceInfo.Value);
+                            instanceCount++;
                         }
                     }
                 }
+            }
 
-            WriteLog("Returning: {0} instances for {1} grains", instancecount, grains.Count());
+            WriteLog("Returning: {0} instances for {1} grains", instanceCount, grains.Count());
 
             return grains;
         }

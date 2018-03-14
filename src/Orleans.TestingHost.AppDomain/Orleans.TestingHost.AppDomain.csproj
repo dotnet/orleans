@@ -1,14 +1,18 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <PackageId>Microsoft.Orleans.TestingHost</PackageId>
-    <Title>Microsoft Orleans Testing Host Library</Title>
-    <Description>Microsoft Orleans library for hosting a silo in a testing project.</Description>
+    <PackageId>Microsoft.Orleans.TestingHost.AppDomain</PackageId>
+    <Title>Microsoft Orleans Testing Host Library AppDomain support</Title>
+    <Description>Microsoft Orleans library for hosting a silo in an AppDomain.</Description>
   </PropertyGroup>
 
   <PropertyGroup>
-    <AssemblyName>Orleans.TestingHost</AssemblyName>
-    <RootNamespace>Orleans.TestingHost</RootNamespace>
-    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <TargetFramework>net461</TargetFramework>
+    <AssemblyName>Orleans.TestingHost.AppDomain</AssemblyName>
+    <RootNamespace>Orleans.TestingHost.AppDomain</RootNamespace>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,12 +24,7 @@
     <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
     <ProjectReference Include="..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
     <ProjectReference Include="..\Orleans.Runtime\Orleans.Runtime.csproj" />
-    <ProjectReference Include="..\OrleansProviders\OrleansProviders.csproj" />
+    <ProjectReference Include="..\Orleans.TestingHost\Orleans.TestingHost.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Update="ClientConfigurationForTesting.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
 </Project>

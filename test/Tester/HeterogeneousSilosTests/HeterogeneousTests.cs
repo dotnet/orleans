@@ -46,6 +46,7 @@ namespace Tester.HeterogeneousSilosTests
             });
             builder.AddClientBuilderConfigurator<BuilderConfigurator>();
             cluster = builder.Build();
+            cluster.CreateSilo = AppDomainSiloHandle.Create;
             cluster.Deploy();
         }
 

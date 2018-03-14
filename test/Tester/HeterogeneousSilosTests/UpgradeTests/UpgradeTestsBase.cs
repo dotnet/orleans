@@ -223,6 +223,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                 });
 
                 this.cluster = builder.Build();
+                this.cluster.CreateSilo = AppDomainSiloHandle.Create;
                 await this.cluster.DeployAsync();
                 silo = this.cluster.Primary;
             }

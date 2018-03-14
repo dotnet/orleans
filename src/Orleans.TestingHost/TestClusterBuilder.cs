@@ -91,11 +91,11 @@ namespace Orleans.TestingHost
             {
                 buildAction(configBuilder);
             }
+
             var configuration = configBuilder.Build();
             var finalOptions = new TestClusterOptions();
             configuration.Bind(finalOptions);
             
-
             var configSources = new ReadOnlyCollection<IConfigurationSource>(configBuilder.Sources);
             var testCluster = new TestCluster(finalOptions, configSources);
             return testCluster;
@@ -116,9 +116,8 @@ namespace Orleans.TestingHost
             (int baseSiloPort, int baseGatewayPort) = GetAvailableConsecutiveServerPortsPair(this.Options.InitialSilosCount + 3);
             if (this.Options.BaseSiloPort == 0) this.Options.BaseSiloPort = baseSiloPort;
             if (this.Options.BaseGatewayPort == 0) this.Options.BaseGatewayPort = baseGatewayPort;
-
-         
         }
+
         // Returns a pairs of ports which have the specified number of consecutive ports available for use.
         internal static ValueTuple<int, int> GetAvailableConsecutiveServerPortsPair(int consecutivePortsToCheck = 5)
         {
