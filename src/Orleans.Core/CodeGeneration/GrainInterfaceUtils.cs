@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
@@ -22,6 +23,17 @@ namespace Orleans.CodeGeneration
                 : base(message)
             {
                 Violations = violations;
+            }
+
+            protected RulesViolationException(SerializationInfo info, StreamingContext context) : base(info, context)
+            {
+                this.Violations = info.GetValue(nameof(Violations), typeof(List<string>)) as List<string>;
+            }
+
+            public override void GetObjectData(SerializationInfo info, StreamingContext context)
+            {
+                base.GetObjectData(info, context);
+                info.AddValue(nameof(Violations), this.Violations);
             }
 
             public List<string> Violations { get; private set; }
