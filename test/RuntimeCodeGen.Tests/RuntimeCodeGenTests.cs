@@ -37,7 +37,7 @@ namespace UnitTests
                 ILoggerFactory codeGenLoggerFactory = new LoggerFactory();
                 codeGenLoggerFactory.AddProvider(new FileLoggerProvider("ClientCodeGeneration.log"));
                 clientBuilder.ConfigureApplicationParts(
-                    parts => parts.AddApplicationPart(typeof(IRuntimeCodeGenGrain).Assembly).WithCodeGeneration(codeGenLoggerFactory.CreateLogger("RuntimeCodeGen")));
+                    parts => parts.AddApplicationPart(typeof(IRuntimeCodeGenGrain).Assembly).WithCodeGeneration(codeGenLoggerFactory));
             }
         }
 
@@ -50,7 +50,7 @@ namespace UnitTests
                 codeGenLoggerFactory.AddProvider(new FileLoggerProvider($"{siloName}-CodeGeneration.log"));
                 hostBuilder
                     .ConfigureApplicationParts(parts =>
-                        parts.AddApplicationPart(typeof(IRuntimeCodeGenGrain).Assembly).WithCodeGeneration(codeGenLoggerFactory.CreateLogger("RuntimeCodeGen")));
+                        parts.AddApplicationPart(typeof(IRuntimeCodeGenGrain).Assembly).WithCodeGeneration(codeGenLoggerFactory));
             }
         }
 
