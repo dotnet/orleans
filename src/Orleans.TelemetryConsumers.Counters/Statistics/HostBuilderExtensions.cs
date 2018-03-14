@@ -15,10 +15,11 @@ namespace Orleans.Statistics
         public static ISiloHostBuilder UsePerfCounterEnvironmentStatistics(this ISiloHostBuilder builder)
         {
             return builder.ConfigureServices(services =>
-                services
-                    .AddSingleton<PerfCounterEnvironmentStatistics>()
-                    .AddFromExisting<IHostEnvironmentStatistics, PerfCounterEnvironmentStatistics>()
-                    .AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, PerfCounterEnvironmentStatistics>());
+            {
+                services.AddSingleton<PerfCounterEnvironmentStatistics>();
+                services.AddFromExisting<IHostEnvironmentStatistics, PerfCounterEnvironmentStatistics>();
+                services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, PerfCounterEnvironmentStatistics>();
+            });
         }
     }
 
@@ -30,10 +31,11 @@ namespace Orleans.Statistics
         public static IClientBuilder UsePerfCounterEnvironmentStatistics(this IClientBuilder builder)
         {
             return builder.ConfigureServices(services => 
-                services
-                    .AddSingleton<PerfCounterEnvironmentStatistics>()
-                    .AddFromExisting<IHostEnvironmentStatistics, PerfCounterEnvironmentStatistics>()
-                    .AddFromExisting<ILifecycleParticipant<IClusterClientLifecycle>, PerfCounterEnvironmentStatistics>());
+            {
+                services.AddSingleton<PerfCounterEnvironmentStatistics>();
+                services.AddFromExisting<IHostEnvironmentStatistics, PerfCounterEnvironmentStatistics>();
+                services.AddFromExisting<ILifecycleParticipant<IClusterClientLifecycle>, PerfCounterEnvironmentStatistics>();
+            });
         }
     }
 }
