@@ -16,7 +16,8 @@ namespace Orleans.Statistics
         {
             return builder.ConfigureServices(services =>
                 services
-                    .AddSingleton<IHostEnvironmentStatistics, PerfCounterEnvironmentStatistics>()
+                    .AddSingleton<PerfCounterEnvironmentStatistics>()
+                    .AddFromExisting<IHostEnvironmentStatistics, PerfCounterEnvironmentStatistics>()
                     .AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, PerfCounterEnvironmentStatistics>());
         }
     }
@@ -30,7 +31,8 @@ namespace Orleans.Statistics
         {
             return builder.ConfigureServices(services => 
                 services
-                    .AddSingleton<IHostEnvironmentStatistics, PerfCounterEnvironmentStatistics>()
+                    .AddSingleton<PerfCounterEnvironmentStatistics>()
+                    .AddFromExisting<IHostEnvironmentStatistics, PerfCounterEnvironmentStatistics>()
                     .AddFromExisting<ILifecycleParticipant<IClusterClientLifecycle>, PerfCounterEnvironmentStatistics>());
         }
     }
