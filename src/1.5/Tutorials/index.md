@@ -2,6 +2,10 @@
 layout: page
 title: Step by Step Tutorials
 ---
+## These tutorials are for the 1.5 release
+Orleans 2.0 is a significant overhaul from the 1.x versions.
+
+For 2.0 [Documentation](../../Documentation/Introduction.md) and [Tutorials](../../Tutorials/index.md), refer to the respective sections.
 
 # Step by Step Tutorials
 

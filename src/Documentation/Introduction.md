@@ -2,6 +2,14 @@
 layout: page
 title: Introduction
 ---
+## This documentation is for the 2.0 release
+Orleans 2.0 is a significant overhaul from the 1.x versions.
+The 2.0 release is cross-platform via [.NET Standard 2.0](https://github.com/dotnet/standard/blob/master/docs/versions/netstandard2.0.md) and [.NET Core](https://www.microsoft.com/net).
+It has a more modular and flexible structure due to heavy use of Dependency Injection, a modern configuration API, and a revamped provider model.
+
+Orleans 2.0 still supports most of the 1.x API via optional legacy packages.
+Orleans 1.5 will continue to be supported for some time, but 2.0 is where all the investments are going.
+For 1.5 [Documentation](../1.5/Documentation/Introduction.md) and [Tutorials](../1.5/Tutorials/index.md), refer to the respective sections that are snapshots of the documentation as of the 2.0 release.
 
 # Introduction
 
