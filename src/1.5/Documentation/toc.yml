@@ -5,7 +5,7 @@
   - name: Benefits
     href: Benefits.md
   - name: What's new in Orleans
-    href: What's-new-in-Orleans.md
+    href: ../../Documentation/What's-new-in-Orleans.md
   - name: Frequently Asked Questions
     href: Frequently-Asked-Questions.md
 - name: Installation
@@ -22,4 +22,3 @@
   href: Runtime-Implementation-Details/toc.yml
 - name: Samples
   href: Samples-Overview/toc.yml
-  
