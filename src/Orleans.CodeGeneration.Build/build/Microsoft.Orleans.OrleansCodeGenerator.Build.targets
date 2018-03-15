@@ -43,7 +43,7 @@
   <Target Name="GenerateOrleansCode"
           BeforeTargets="AssignTargetPaths"
           Condition="'$(CodeGeneratorEnabled)' == 'true'"
-          Inputs="@(Compile);@(ReferencePath)"
+          Inputs="@(Compile);@(ReferencePath);$(IntermediateOutputPath)$(MSBuildProjectFile).CoreCompileInputs.cache"
           Outputs="$(OutputFileName)">
     <PropertyGroup>
       <ExcludeCodeGen>$(DefineConstants);EXCLUDE_CODEGEN</ExcludeCodeGen>
