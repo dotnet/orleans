@@ -54,7 +54,7 @@
     <!-- Microsoft packages -->
     <MicrosoftBuildVersion>15.3.409</MicrosoftBuildVersion>
     <MicrosoftCodeAnalysisCSharpVersion>2.0.0</MicrosoftCodeAnalysisCSharpVersion>
-
+    <MicrosoftCSharpVersion>4.4.1</MicrosoftCSharpVersion>
     <MicrosoftExtensionsConfigurationBinderVersion>2.0.0</MicrosoftExtensionsConfigurationBinderVersion>
     <MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>2.0.0</MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>
     <MicrosoftExtensionsConfigurationJsonVersion>2.0.0</MicrosoftExtensionsConfigurationJsonVersion>
@@ -70,7 +70,7 @@
     <MicrosoftDataSQLiteVersion>2.0.0</MicrosoftDataSQLiteVersion>
     <MicrosoftPowerShell5ReferenceAssembliesVersion>1.1.0</MicrosoftPowerShell5ReferenceAssembliesVersion>
     <MicrosoftServiceFabricServicesVersion>3.0.456</MicrosoftServiceFabricServicesVersion>
-    <WindowsAzureStorageVersion>8.2.1</WindowsAzureStorageVersion>
+    <WindowsAzureStorageVersion>9.1.0</WindowsAzureStorageVersion>
 
     <FSharpCoreVersion>4.2.3</FSharpCoreVersion>
 
@@ -85,7 +85,7 @@
     <GoogleProtobufVersion>3.4.0</GoogleProtobufVersion>
     <MySqlDataVersion>6.9.9</MySqlDataVersion>
     <NewRelicAgentApiVersion>5.10.59.0</NewRelicAgentApiVersion>
-    <NewtonsoftJsonVersion>10.0.3</NewtonsoftJsonVersion>
+    <NewtonsoftJsonVersion>11.0.1</NewtonsoftJsonVersion>
     <NpgsqlVersion>3.1.9</NpgsqlVersion>
     <NSubstituteVersion>1.10.0</NSubstituteVersion>
     <ZooKeeperNetExVersion>3.4.9.4</ZooKeeperNetExVersion>
