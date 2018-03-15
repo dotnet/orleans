@@ -1,0 +1,10 @@
+- name: What's new in Orleans 2.0
+  href: New.md
+- name: Configuration
+  href: Configuration2.0.md
+- name: Migration from Orleans 1.5
+  href: Migration1.5.md
+- name: Code generation
+  href: Codegen.md
+- name: Transactions
+  href: Transactions.md

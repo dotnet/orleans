@@ -8,7 +8,9 @@
           "Tutorials/**.yml",
           "Tutorials/**.md",
           "Community/**.yml",
-          "Community/**.md"
+          "Community/**.md",
+          "1.5/**.yml",
+          "1.5/**.md"
         ]
       },
       {
@@ -26,11 +28,15 @@
       {
         "files": [
           "images/**",
+          "1.5/images/**",
           "logo.svg",
           "logo-light.svg",
           "Documentation/**/**.png",
           "Documentation/**/**.gif",
           "Tutorials/**.png",
+          "1.5/Documentation/**/**.png",
+          "1.5/Documentation/**/**.gif",
+          "1.5/Tutorials/**.png",
           "Community/**.png"
         ],
         "exclude": [
