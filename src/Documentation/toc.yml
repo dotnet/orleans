@@ -8,6 +8,8 @@
     href: What's-new-in-Orleans.md
   - name: Frequently Asked Questions
     href: Frequently-Asked-Questions.md
+- name: New in Orleans 2.0
+  href: 2.0/toc.yml
 - name: Installation
   href: Installation/toc.yml
 - name: Getting Started
@@ -22,5 +24,3 @@
   href: Runtime-Implementation-Details/toc.yml
 - name: Samples
   href: Samples-Overview/toc.yml
-- name: Orleans 2.0.0-rc2
-  href: 2.0/toc.yml
