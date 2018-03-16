@@ -13,9 +13,6 @@ namespace Orleans.Configuration
         [RedactConnectionString]
         public string ConnectionString { get; set; }
 
-        //TODO: should this be here ? I guess it should be because it determine the queue name?
-        public string ClusterId { get; set; }
-
         public TimeSpan? MessageVisibilityTimeout { get; set; }   
     }
 

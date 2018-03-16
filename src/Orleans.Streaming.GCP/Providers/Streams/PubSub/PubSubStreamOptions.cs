@@ -10,8 +10,6 @@ namespace Orleans.Configuration
 
         public string TopicId { get; set; }
 
-        public string ClusterId { get; set; }
-
         public string CustomEndpoint { get; set; }
 
         private TimeSpan? deadline;
