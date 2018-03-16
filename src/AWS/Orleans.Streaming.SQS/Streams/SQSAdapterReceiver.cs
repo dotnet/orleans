@@ -25,13 +25,13 @@ namespace OrleansAWSUtils.Streams
 
         public QueueId Id { get; private set; }
 
-        public static IQueueAdapterReceiver Create(SerializationManager serializationManager, ILoggerFactory loggerFactory, QueueId queueId, string dataConnectionString, string clusterId)
+        public static IQueueAdapterReceiver Create(SerializationManager serializationManager, ILoggerFactory loggerFactory, QueueId queueId, string dataConnectionString, string serviceId)
         {
             if (queueId == null) throw new ArgumentNullException("queueId");
             if (string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException("dataConnectionString");
-            if (string.IsNullOrEmpty(clusterId)) throw new ArgumentNullException(nameof(clusterId));
+            if (string.IsNullOrEmpty(serviceId)) throw new ArgumentNullException(nameof(serviceId));
 
-            var queue = new SQSStorage(loggerFactory, queueId.ToString(), dataConnectionString, clusterId);
+            var queue = new SQSStorage(loggerFactory, queueId.ToString(), dataConnectionString, serviceId);
             return new SQSAdapterReceiver(serializationManager, loggerFactory, queueId, queue);
         }
 

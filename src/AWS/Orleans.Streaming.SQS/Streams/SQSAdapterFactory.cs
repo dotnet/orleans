@@ -60,7 +60,7 @@ namespace OrleansAWSUtils.Streams
         /// <summary>Creates the Azure Queue based adapter.</summary>
         public virtual Task<IQueueAdapter> CreateAdapter()
         {
-            var adapter = new SQSAdapter(this.serializationManager, this.streamQueueMapper, this.loggerFactory, this.sqsOptions.ConnectionString, this.clusterOptions.ClusterId, this.providerName);
+            var adapter = new SQSAdapter(this.serializationManager, this.streamQueueMapper, this.loggerFactory, this.sqsOptions.ConnectionString, this.clusterOptions.ServiceId.ToString(), this.providerName);
             return Task.FromResult<IQueueAdapter>(adapter);
         }
 
