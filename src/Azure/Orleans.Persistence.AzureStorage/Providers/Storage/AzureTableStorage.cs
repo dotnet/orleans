@@ -49,11 +49,11 @@ namespace Orleans.Storage
         private string name;
 
         /// <summary> Default constructor </summary>
-        public AzureTableGrainStorage(string name, AzureTableStorageOptions options, ClusterOptions clusterOptions, SerializationManager serializationManager, 
+        public AzureTableGrainStorage(string name, AzureTableStorageOptions options, IOptions<ClusterOptions> clusterOptions, SerializationManager serializationManager, 
             IGrainFactory grainFactory, ITypeResolver typeResolver, ILoggerFactory loggerFactory)
         {
             this.options = options;
-            this.clusterOptions = clusterOptions;
+            this.clusterOptions = clusterOptions.Value;
             this.name = name;
             this.serializationManager = serializationManager;
             this.grainFactory = grainFactory;
