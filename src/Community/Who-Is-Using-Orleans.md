@@ -48,6 +48,9 @@ Argentinian-based electronic brokerage firm
 Nomnio IoT Platform and industry projects where reliability and performance is required
 * <a href="https://www.realartists.com/index.html" target="_blank">__Real Artists Ship 2.0__</a>
 Fast, native, comprehensive issue tracking for GitHub 
+* <a href="https://mri-inc.net/" target="_blank">__Manufacturing Resources International__</a>
+MRI designs, engineers, and fabricates BoldVu® LCD displays used in out of home advertising networks. 
+Orleans powers our IOT infrastructure to help monitor and maintain our displays
 
 ## Projects and Applications
 
