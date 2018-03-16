@@ -70,11 +70,11 @@ namespace UnitTests.HaloTests.Streaming
 
             public override void Dispose()
             {
-                var clusterId = this.HostedCluster?.Options.ClusterId;
+                var serviceId = this.HostedCluster?.Options.ServiceId;
                 base.Dispose();
-                if (clusterId != null)
+                if (serviceId != null)
                 {
-                    AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, AzureQueueStreamProviderName, clusterId, TestDefaultConfiguration.DataConnectionString).Wait();
+                    AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, AzureQueueStreamProviderName, serviceId.ToString(), TestDefaultConfiguration.DataConnectionString).Wait();
                 }
             }
         }
@@ -98,10 +98,10 @@ namespace UnitTests.HaloTests.Streaming
 
         public void Dispose()
         {
-            var clusterId = this.HostedCluster?.Options.ClusterId;
-            if (clusterId != null && _streamProvider != null && _streamProvider.Equals(AzureQueueStreamProviderName))
+            var serviceId = this.HostedCluster?.Options.ServiceId;
+            if (serviceId != null && _streamProvider != null && _streamProvider.Equals(AzureQueueStreamProviderName))
             {
-                AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(this.loggerFactory, _streamProvider, clusterId, TestDefaultConfiguration.DataConnectionString).Wait();
+                AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(this.loggerFactory, _streamProvider, serviceId.ToString(), TestDefaultConfiguration.DataConnectionString).Wait();
             }
         }
 
