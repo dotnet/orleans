@@ -12,7 +12,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
     internal class PubSubAdapter<TDataAdapter> : IQueueAdapter
         where TDataAdapter : IPubSubDataAdapter
     {
-        protected readonly string DeploymentId;
+        protected readonly string ServiceId;
         private readonly SerializationManager _serializationManager;
         protected readonly string ProjectId;
         protected readonly string TopicId;
@@ -34,21 +34,21 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             HashRingBasedStreamQueueMapper streamQueueMapper,
             string projectId,
             string topicId,
-            string deploymentId,
+            string serviceId,
             string providerName,
             TimeSpan? deadline = null, 
             string customEndpoint = "")
         {
             if (string.IsNullOrEmpty(projectId)) throw new ArgumentNullException(nameof(projectId));
             if (string.IsNullOrEmpty(topicId)) throw new ArgumentNullException(nameof(topicId));
-            if (string.IsNullOrEmpty(deploymentId)) throw new ArgumentNullException(nameof(deploymentId));
+            if (string.IsNullOrEmpty(serviceId)) throw new ArgumentNullException(nameof(serviceId));
 
             _logger = loggerFactory.CreateLogger($"{this.GetType().FullName}.{providerName}");
             this.loggerFactory = loggerFactory;
             _serializationManager = serializationManager;
             ProjectId = projectId;
             TopicId = topicId;
-            DeploymentId = deploymentId;
+            ServiceId = serviceId;
             Name = providerName;
             Deadline = deadline;
             _streamQueueMapper = streamQueueMapper;
@@ -58,7 +58,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
-            return PubSubAdapterReceiver.Create(_serializationManager, this.loggerFactory, queueId, ProjectId, TopicId, DeploymentId, _dataAdapter, Deadline, _customEndpoint);
+            return PubSubAdapterReceiver.Create(_serializationManager, this.loggerFactory, queueId, ProjectId, TopicId, ServiceId, _dataAdapter, Deadline, _customEndpoint);
         }
 
         public async Task QueueMessageBatchAsync<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
@@ -69,7 +69,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             PubSubDataManager pubSub;
             if (!Subscriptions.TryGetValue(queueId, out pubSub))
             {
-                var tmpPubSub = new PubSubDataManager(this.loggerFactory, ProjectId, TopicId, queueId.ToString(), DeploymentId, Deadline);
+                var tmpPubSub = new PubSubDataManager(this.loggerFactory, ProjectId, TopicId, queueId.ToString(), ServiceId, Deadline);
                 await tmpPubSub.Initialize();
                 pubSub = Subscriptions.GetOrAdd(queueId, tmpPubSub);
             }
