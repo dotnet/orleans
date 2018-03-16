@@ -3,8 +3,11 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -18,13 +21,13 @@ namespace TestExtensions.Runners
         private readonly ITestOutputHelper output;
         protected TestCluster HostedCluster { get; private set; }
         protected readonly ILogger logger;
-        public GrainPersistenceTestsRunner(ITestOutputHelper output, BaseTestClusterFixture fixture, Guid serviceId)
+        public GrainPersistenceTestsRunner(ITestOutputHelper output, BaseTestClusterFixture fixture)
         {
             this.output = output;
             this.logger = fixture.Logger;
             HostedCluster = fixture.HostedCluster;
             GrainFactory = fixture.GrainFactory;
-            this.serviceId = serviceId;
+            this.serviceId = fixture.GetClientServiceId();
         }
 
         public IGrainFactory GrainFactory { get; }
@@ -296,6 +299,9 @@ namespace TestExtensions.Runners
 
             await grain.DoWrite(1);
 
+            var serviceId = await this.GrainFactory.GetGrain<IServiceIdGrain>(Guid.Empty).GetServiceId();
+            Assert.Equal(initialServiceId, serviceId);  // "ServiceId same before restart."
+
             output.WriteLine("About to reset Silos");
             foreach (var silo in this.HostedCluster.GetActiveSilos().ToList())
             {
@@ -305,7 +311,7 @@ namespace TestExtensions.Runners
 
             output.WriteLine("Silos restarted");
 
-            var serviceId = await this.GrainFactory.GetGrain<IServiceIdGrain>(Guid.Empty).GetServiceId();
+            serviceId = await this.GrainFactory.GetGrain<IServiceIdGrain>(Guid.Empty).GetServiceId();
             output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.Options.ClusterId, serviceId);
             Assert.Equal(initialServiceId, serviceId);  // "ServiceId same after restart."
 

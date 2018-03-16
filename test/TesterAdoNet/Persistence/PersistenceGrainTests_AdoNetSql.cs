@@ -74,7 +74,7 @@ namespace Tester.AdoNet.Persistence
 
         private Fixture fixture;
 
-        public PersistenceGrainTests_Sql(ITestOutputHelper output, Fixture fixture) : base(output, fixture, ServiceId)
+        public PersistenceGrainTests_Sql(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
         {
             this.fixture = fixture;
             this.fixture.EnsurePreconditionsMet();

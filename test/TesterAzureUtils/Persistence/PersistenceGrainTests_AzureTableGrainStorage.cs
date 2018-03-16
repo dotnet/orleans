@@ -72,7 +72,8 @@ namespace Tester.AzureUtils.Persistence
             }
         }
 
-        public PersistenceGrainTests_AzureTableGrainStorage(ITestOutputHelper output, Fixture fixture) : base(output, fixture, ServiceId)
+        public PersistenceGrainTests_AzureTableGrainStorage(ITestOutputHelper output, Fixture fixture) : 
+            base(output, fixture)
         {
             fixture.EnsurePreconditionsMet();
         }
