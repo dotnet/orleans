@@ -32,7 +32,6 @@ namespace Orleans.Transactions.AzureStorage.Tests
                     .UseInClusterTransactionManager()
                     .AddAzureTableGrainStorage(TransactionTestConstants.TransactionStore, builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                     {
-                        options.ServiceId = silo.Value.ServiceId.ToString();
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     }))
                     .UseAzureTransactionLog(options => {

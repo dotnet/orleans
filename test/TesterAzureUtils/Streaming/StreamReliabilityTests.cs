@@ -83,7 +83,6 @@ namespace UnitTests.Streaming.Reliability
                 })
                 .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                     {
-                        options.ServiceId = silo.Value.ServiceId.ToString();
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         options.DeleteStateOnClear = true;
                     }))
@@ -91,7 +90,6 @@ namespace UnitTests.Streaming.Reliability
                 .AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME)
                 .AddAzureTableGrainStorage("PubSubStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                 {
-                    options.ServiceId = silo.Value.ServiceId.ToString();
                     options.DeleteStateOnClear = true;
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                 }))
