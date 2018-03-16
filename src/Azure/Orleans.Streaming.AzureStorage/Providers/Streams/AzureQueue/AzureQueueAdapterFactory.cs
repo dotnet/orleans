@@ -68,7 +68,7 @@ namespace Orleans.Providers.Streams.AzureQueue
                 this.streamQueueMapper, 
                 this.loggerFactory, 
                 this.options.ConnectionString, 
-                this.clusterOptions.ClusterId, 
+                this.clusterOptions.ServiceId.ToString(), 
                 this.providerName, 
                 this.options.MessageVisibilityTimeout);
             return Task.FromResult<IQueueAdapter>(adapter);
