@@ -43,6 +43,7 @@ namespace Orleans.Streams
             siloBuilder.ConfigureServices(services =>
             {
                 configureOptions?.Invoke(services.AddOptions<TOptions>(this.name));
+                services.ConfigureNamedOptionForLogging<TOptions>(this.name);
             });
             return this;
         }

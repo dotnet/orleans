@@ -32,6 +32,28 @@ namespace Orleans
         IOptionFormatter<T> Resolve(string name);
     }
 
+    public class OptionsFormatterComparer : IEqualityComparer<IOptionFormatter>
+    {
+        public static OptionsFormatterComparer Instance  = new OptionsFormatterComparer();
+        public bool Equals(IOptionFormatter x, IOptionFormatter y)
+        {
+            //if name equal and formatted strings are equal, then equal.
+            //perf wise, most formatters will fail at the first condition, which is relately cheap. 
+            //So don't switch order of the two condition
+            if (x.Name.Equals(y.Name)&& x.Format().IEnumerableEquals(y.Format()))
+            {
+                return true;
+            }
+            return false;
+
+        }
+
+        public int GetHashCode(IOptionFormatter obj)
+        {
+            var hashCode = $"{obj.Name}{obj.Format()}";
+            return hashCode.GetHashCode();
+        }
+    }
     /// <summary>
     /// Utility class for option formatting
     /// </summary>
