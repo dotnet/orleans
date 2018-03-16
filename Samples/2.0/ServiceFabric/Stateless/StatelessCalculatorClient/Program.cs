@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Clustering.ServiceFabric;
+using Orleans.Configuration;
 using Orleans.Runtime.Configuration;
 
 namespace StatelessCalculatorClient
@@ -26,7 +27,12 @@ namespace StatelessCalculatorClient
             var serviceName = new Uri("fabric:/StatelessCalculatorApp/StatelessCalculatorService");
 
             var builder = new ClientBuilder();
-            builder.UseConfiguration(new ClientConfiguration());
+
+            builder.Configure<ClusterOptions>(options =>
+            {
+                options.ServiceId = Guid.Empty;
+                options.ClusterId = "dev";
+            });
 
             // Use Service Fabric for managing cluster membership.
             builder.UseServiceFabricClustering(serviceName);
@@ -46,7 +52,7 @@ namespace StatelessCalculatorClient
                     services.AddSingleton(fabricClient);
                 });
 
-            // Creat the client and connect to the cluster.
+            // Create the client and connect to the cluster.
             var client = builder.Build();
             await client.Connect();
 

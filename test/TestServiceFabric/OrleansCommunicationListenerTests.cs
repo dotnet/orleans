@@ -69,7 +69,11 @@ namespace TestServiceFabric
 
                     builder.ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory());
                     builder.UseLocalhostClustering();
-                    builder.Configure<EndpointOptions>(options => options.ConfigureFromServiceContext(this.serviceContext));
+                    builder.Configure<EndpointOptions>(options =>
+                    {
+                        options.SiloPort = 9082;
+                        options.GatewayPort = 8888;
+                    });
                 });
             
             var result = await listener.OpenAsync(CancellationToken.None);
@@ -95,23 +99,6 @@ namespace TestServiceFabric
         }
 
         [Fact]
-        public void MissingEndpointsCauseException()
-        {
-            var endpoints = new EndpointsCollection();
-            activationContext.GetEndpoints().Returns(_ => endpoints);
-
-            // Check for the silo endpoint.
-            var exception = Assert.Throws<KeyNotFoundException>(() => new EndpointOptions().ConfigureFromServiceContext(this.serviceContext));
-            var siloEndpointName = ServiceFabricConstants.SiloEndpointName;
-            Assert.Contains(siloEndpointName, exception.Message);
-
-            // Check for the proxy endpoint.
-            endpoints.Add(CreateEndpoint(siloEndpointName, 9082));
-            exception = Assert.Throws<KeyNotFoundException>(() => new EndpointOptions().ConfigureFromServiceContext(this.serviceContext));
-            Assert.Contains(ServiceFabricConstants.GatewayEndpointName, exception.Message);
-        }
-
-        [Fact]
         public async Task AbortStopAndDisposesSilo()
         {
             var endpoints = new EndpointsCollection
@@ -132,7 +119,11 @@ namespace TestServiceFabric
                         });
 
                     builder.ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory());
-                    builder.Configure<EndpointOptions>(options => options.ConfigureFromServiceContext(this.serviceContext));
+                    builder.Configure<EndpointOptions>(options =>
+                    {
+                        options.SiloPort = 9082;
+                        options.GatewayPort = 8888;
+                    });
                     builder.UseLocalhostClustering();
                 });
 
@@ -166,7 +157,11 @@ namespace TestServiceFabric
                         });
 
                     builder.ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory());
-                    builder.Configure<EndpointOptions>(options => options.ConfigureFromServiceContext(this.serviceContext));
+                    builder.Configure<EndpointOptions>(options =>
+                    {
+                        options.SiloPort = 9082;
+                        options.GatewayPort = 8888;
+                    });
                     builder.UseLocalhostClustering();
                 });
 

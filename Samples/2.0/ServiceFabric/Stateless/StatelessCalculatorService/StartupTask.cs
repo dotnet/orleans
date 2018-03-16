@@ -1,21 +1,28 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using GrainInterfaces;
+using Microsoft.Extensions.Logging;
 using Orleans;
-using Orleans.Providers;
 using Orleans.Runtime;
 
 namespace StatelessCalculatorService
 {
-    public class BootstrapProvider : IBootstrapProvider
+    public class StartupTask : IStartupTask
     {
-        public Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
+        private readonly IGrainFactory grainFactory;
+        private readonly ILogger<StartupTask> logger;
+
+        public StartupTask(IGrainFactory grainFactory, ILogger<StartupTask> logger)
         {
-            var logger = providerRuntime.GetLogger(nameof(BootstrapProvider));
-            this.Name = name;
-            
+            this.grainFactory = grainFactory;
+            this.logger = logger;
+        }
+
+        public Task Execute(CancellationToken cancellationToken)
+        {
             // Message the grain repeatedly.
-            var grain = providerRuntime.GrainFactory.GetGrain<ICalculatorGrain>(Guid.Empty);
+            var grain = this.grainFactory.GetGrain<ICalculatorGrain>(Guid.Empty);
             Task.Factory.StartNew(
                 async () =>
                 {
@@ -33,11 +40,7 @@ namespace StatelessCalculatorService
                         }
                     }
                 }).Ignore();
-            return Task.FromResult(0);
+            return Task.CompletedTask;
         }
-
-        public Task Close() => Task.FromResult(0);
-
-        public string Name { get; set; }
     }
 }
