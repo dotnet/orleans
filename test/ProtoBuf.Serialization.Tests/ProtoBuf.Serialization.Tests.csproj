@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <RootNamespace>Orleans.ProtobufNet.Tests</RootNamespace>
-    <AssemblyName>Orleans.ProtobufNet.Tests</AssemblyName>
+    <RootNamespace>ProtoBuf.Serialization.Tests</RootNamespace>
+    <AssemblyName>ProtoBuf.Serialization.Tests</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,6 +18,7 @@
     <ProjectReference Include="..\..\src\Orleans.Core.Legacy\Orleans.Core.Legacy.csproj" />
     <ProjectReference Include="..\..\src\Orleans.Core\Orleans.Core.csproj" />
     <ProjectReference Include="..\..\src\Orleans.Serialization.ProtobufNet\Orleans.Serialization.ProtobufNet.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Serialization.Protobuf\Orleans.Serialization.Protobuf.csproj" />
     <ProjectReference Include="..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
     <ProjectReference Include="..\Tester\Tester.csproj" />
     <ProjectReference Include="..\TesterInternal\TesterInternal.csproj" />
@@ -30,7 +31,7 @@
 
   <ItemGroup>
     <None Include="App.config" />
-    <None Include="Orleans.ProtobufNet.Tests.xunit.runner.json">
+    <None Include="ProtoBuf.Serialization.Tests.xunit.runner.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

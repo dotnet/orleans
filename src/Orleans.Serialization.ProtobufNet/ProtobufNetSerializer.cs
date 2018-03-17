@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.IO;
+using Orleans.Concurrency;
 using ProtoBuf;
 
 namespace Orleans.Serialization.ProtobufNet
@@ -10,7 +11,7 @@ namespace Orleans.Serialization.ProtobufNet
     /// </summary>
     public class ProtobufNetSerializer : IExternalSerializer
     {
-        private static readonly ConcurrentDictionary<RuntimeTypeHandle, bool> IsSupported = new ConcurrentDictionary<RuntimeTypeHandle, bool>();
+        private static readonly ConcurrentDictionary<RuntimeTypeHandle, ProtobufTypeCacheItem> Cache = new ConcurrentDictionary<RuntimeTypeHandle, ProtobufTypeCacheItem>();
 
         /// <summary>
         /// Determines whether this serializer has the ability to serialize a particular type.
@@ -19,13 +20,13 @@ namespace Orleans.Serialization.ProtobufNet
         /// <returns>A value indicating whether the type can be serialized</returns>
         public bool IsSupportedType(Type itemType)
         {
-            if (IsSupported.TryGetValue(itemType.TypeHandle, out var isSupported))
+            if (Cache.TryGetValue(itemType.TypeHandle, out var cacheItem))
             {
-                return isSupported;
+                return cacheItem.IsSupported;
             }
-            isSupported = Attribute.GetCustomAttribute(itemType, typeof(ProtoContractAttribute)) != null;
-            IsSupported.AddOrUpdate(itemType.TypeHandle, isSupported, (type, val) => isSupported);
-            return isSupported;
+            cacheItem = new ProtobufTypeCacheItem(itemType);
+            Cache.AddOrUpdate(itemType.TypeHandle, cacheItem, (type, val) => cacheItem);
+            return cacheItem.IsSupported;
         }
 
         /// <inheritdoc />
@@ -35,9 +36,8 @@ namespace Orleans.Serialization.ProtobufNet
             {
                 return null;
             }
-
-            dynamic dynamicSource = source;
-            return dynamicSource.Clone();
+            var cacheItem = Cache[source.GetType().TypeHandle];
+            return cacheItem.IsImmutable ? source : ProtoBuf.Serializer.DeepClone(source);
         }
 
         /// <inheritdoc />

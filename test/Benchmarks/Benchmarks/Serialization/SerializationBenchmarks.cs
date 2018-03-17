@@ -4,6 +4,7 @@ using System.Reflection;
 using BenchmarkDotNet.Attributes;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
+using Orleans.Serialization.ProtobufNet;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -15,6 +16,7 @@ namespace Benchmarks.Serialization
         Default,
         BinaryFormatterFallbackSerializer,
         IlBasedFallbackSerializer,
+        ProtoBufNet
     }
 
     [Config(typeof(SerializationBenchmarkConfig))]
@@ -35,6 +37,9 @@ namespace Benchmarks.Serialization
                 case SerializerToUse.BinaryFormatterFallbackSerializer:
                     fallback = typeof(BinaryFormatterSerializer).GetTypeInfo();
                     break;
+                case SerializerToUse.ProtoBufNet:
+                    fallback = typeof(ProtobufNetSerializer).GetTypeInfo();
+                    break;
                 default:
                     throw new InvalidOperationException("Invalid Serializer was selected");
             }
@@ -47,7 +52,7 @@ namespace Benchmarks.Serialization
             this.serializationManager = this.environment.SerializationManager;
         }
         
-        [Params(SerializerToUse.IlBasedFallbackSerializer, SerializerToUse.Default)]
+        [Params(SerializerToUse.IlBasedFallbackSerializer, SerializerToUse.Default, SerializerToUse.ProtoBufNet)]
         public SerializerToUse Serializer { get; set; }
 
         private OuterClass.SomeConcreteClass complexClass;

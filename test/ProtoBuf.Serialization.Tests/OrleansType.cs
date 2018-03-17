@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Orleans.ProtobufNet.Tests
+namespace ProtoBuf.Serialization.Tests
 {
     [Serializable]
     public class OrleansType
