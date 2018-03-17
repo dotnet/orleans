@@ -47,7 +47,12 @@ namespace Orleans.TestingHost
         public Dictionary<string, object> Properties { get; } = new Dictionary<string, object>();
 
         public TestClusterOptions Options { get; }
-        
+
+        /// <summary>
+        /// Delegate used to create and start an individual silo.
+        /// </summary>
+        public Func<string, IList<IConfigurationSource>, SiloHandle> CreateSilo { private get; set; }
+
         public TestClusterBuilder ConfigureBuilder(Action configureDelegate)
         {
             this.configureBuilderActions.Add(configureDelegate ?? throw new ArgumentNullException(nameof(configureDelegate)));
@@ -98,6 +103,7 @@ namespace Orleans.TestingHost
             
             var configSources = new ReadOnlyCollection<IConfigurationSource>(configBuilder.Sources);
             var testCluster = new TestCluster(finalOptions, configSources);
+            if (this.CreateSilo != null) testCluster.CreateSilo = this.CreateSilo;
             return testCluster;
         }
 

@@ -219,7 +219,8 @@ namespace Tests.GeoClusterTests
                         ClusterId = clusterId,
                         BaseSiloPort = GetPortBase(myCount),
                         BaseGatewayPort = GetProxyBase(myCount)
-                    }
+                    },
+                    CreateSilo = AppDomainSiloHandle.Create
                 };
                 builder.AddSiloBuilderConfigurator<TestSiloBuilderConfigurator>();
                 builder.AddSiloBuilderConfigurator<TSiloBuilderConfigurator>();
@@ -231,7 +232,6 @@ namespace Tests.GeoClusterTests
                 });
                 builder.AddSiloBuilderConfigurator<SiloHostConfigurator>();
                 testCluster = builder.Build();
-                testCluster.CreateSilo = AppDomainSiloHandle.Create;
                 testCluster.Deploy();
 
                 Clusters[clusterId] = new ClusterInfo

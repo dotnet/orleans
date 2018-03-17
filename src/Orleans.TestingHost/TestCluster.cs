@@ -104,7 +104,7 @@ namespace Orleans.TestingHost
         /// <summary>
         /// Delegate used to create and start an individual silo.
         /// </summary>
-        public Func<string, IList<IConfigurationSource>, SiloHandle> CreateSilo { get; set; } = InProcessSiloHandle.Create;
+        public Func<string, IList<IConfigurationSource>, SiloHandle> CreateSilo { private get; set; } = InProcessSiloHandle.Create;
         
         /// <summary>
         /// Configures the test cluster plus client in-process.
