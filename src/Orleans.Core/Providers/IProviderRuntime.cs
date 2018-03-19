@@ -15,12 +15,11 @@ namespace Orleans.Providers
     public interface IProviderRuntime
     {
         /// <summary>
-        /// Provides the ServiceId this cluster is running as.
-        /// ServiceId's are intended to be long lived Id values for a particular service which will remain constant 
-        /// even if the service is started / redeployed multiple times during its operations life.
+        /// Specifies this cluster's ServiceId, which is intended to be a long lived identifier which remains constant
+        /// across deployments.
         /// </summary>
-        /// <returns>ServiceID Guid for this service.</returns>
-        Guid ServiceId { get; }
+        /// <returns>The ServiceId for this service.</returns>
+        string ServiceId { get; }
 
         /// <summary>
         /// A unique identifier for the current silo.

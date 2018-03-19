@@ -24,7 +24,7 @@ namespace Orleans.TestingHost.Tests
         public async Task CanInitialize()
         {
             var builder = new TestClusterBuilder(2);
-            builder.Options.ServiceId = Guid.NewGuid();
+            builder.Options.ServiceId = Guid.NewGuid().ToString();
             builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
             this.testCluster = builder.Build();
 

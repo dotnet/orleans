@@ -25,11 +25,10 @@ namespace Tester.AzureUtils.TimerTests
     {
         private readonly ITestOutputHelper output;
         private readonly TestEnvironmentFixture fixture;
+        private readonly string serviceId;
+        private readonly ILogger log;
+        private readonly ILoggerFactory loggerFactory;
 
-        private Guid serviceId;
-
-        private ILogger log;
-        private ILoggerFactory loggerFactory;
         public ReminderTests_Azure_Standalone(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;
@@ -37,7 +36,7 @@ namespace Tester.AzureUtils.TimerTests
             this.loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{GetType().Name}.log");
             this.log = this.loggerFactory.CreateLogger<ReminderTests_Azure_Standalone>();
 
-            this.serviceId = Guid.NewGuid();
+            this.serviceId = Guid.NewGuid().ToString();
 
             TestUtils.ConfigureClientThreadPoolSettingsForStorageTests(1000);
         }

@@ -36,7 +36,7 @@ namespace UnitTests.RemindersTest
             loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType()}.log", filters);
             this.ClusterFixture = clusterFixture;
             logger = loggerFactory.CreateLogger<ReminderTableTestsBase>();
-            var serviceId = Guid.NewGuid();
+            var serviceId = Guid.NewGuid().ToString();
             var clusterId = "test-" + serviceId;
 
             logger.Info("ClusterId={0}", clusterId);

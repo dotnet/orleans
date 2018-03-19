@@ -31,7 +31,7 @@ namespace Orleans.Reminders.DynamoDB
         private readonly IGrainReferenceConverter grainReferenceConverter;
         private readonly ILoggerFactory loggerFactory;
         private readonly DynamoDBReminderStorageOptions options;
-        private readonly Guid serviceId;
+        private readonly string serviceId;
 
         private DynamoDBStorage storage;
 
@@ -125,7 +125,7 @@ namespace Orleans.Reminders.DynamoDB
         {
             var expressionValues = new Dictionary<string, AttributeValue>
                 {
-                    { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(this.serviceId.ToString()) },
+                    { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(this.serviceId) },
                     { $":{GRAIN_REFERENCE_PROPERTY_NAME}", new AttributeValue(grainRef.ToKeyString()) }
                 };
 
@@ -154,7 +154,7 @@ namespace Orleans.Reminders.DynamoDB
         {
             var expressionValues = new Dictionary<string, AttributeValue>
                 {
-                    { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(this.serviceId.ToString()) },
+                    { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(this.serviceId) },
                     { $":Begin{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = beginHash.ToString() } },
                     { $":End{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = endHash.ToString() } }
                 };
@@ -234,7 +234,7 @@ namespace Orleans.Reminders.DynamoDB
         {
             var expressionValues = new Dictionary<string, AttributeValue>
                 {
-                    { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(this.serviceId.ToString()) }
+                    { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(this.serviceId) }
                 };
 
             try
@@ -282,7 +282,7 @@ namespace Orleans.Reminders.DynamoDB
                 {
                     { REMINDER_ID_PROPERTY_NAME, new AttributeValue(reminderId) },
                     { GRAIN_HASH_PROPERTY_NAME, new AttributeValue { N = entry.GrainRef.GetUniformHashCode().ToString() } },
-                    { SERVICE_ID_PROPERTY_NAME, new AttributeValue(this.serviceId.ToString()) },
+                    { SERVICE_ID_PROPERTY_NAME, new AttributeValue(this.serviceId) },
                     { GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue( entry.GrainRef.ToKeyString()) },
                     { PERIOD_PROPERTY_NAME, new AttributeValue(entry.Period.ToString()) },
                     { START_TIME_PROPERTY_NAME, new AttributeValue(entry.StartAt.ToString()) },
@@ -307,7 +307,7 @@ namespace Orleans.Reminders.DynamoDB
             }
         }
 
-        private static string ConstructReminderId(Guid serviceId, GrainReference grainRef, string reminderName)
+        private static string ConstructReminderId(string serviceId, GrainReference grainRef, string reminderName)
         {
             return $"{serviceId}_{grainRef.ToKeyString()}_{reminderName}";
         }

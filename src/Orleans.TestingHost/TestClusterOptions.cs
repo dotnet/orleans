@@ -7,7 +7,7 @@ namespace Orleans.TestingHost
     public class TestClusterOptions
     {
         public string ClusterId { get; set; }
-        public Guid ServiceId { get; set; }
+        public string ServiceId { get; set; }
         public int BaseSiloPort{ get; set; }
         public int BaseGatewayPort { get; set; }
         public bool UseTestClusterMembership { get; set; }
@@ -25,7 +25,7 @@ namespace Orleans.TestingHost
             var result = new Dictionary<string, string>
             {
                 [nameof(ClusterId)] = this.ClusterId,
-                [nameof(ServiceId)] = this.ServiceId.ToString(),
+                [nameof(ServiceId)] = this.ServiceId,
                 [nameof(BaseSiloPort)] = this.BaseSiloPort.ToString(),
                 [nameof(BaseGatewayPort)] = this.BaseGatewayPort.ToString(),
                 [nameof(UseTestClusterMembership)] = this.UseTestClusterMembership.ToString(),

@@ -19,7 +19,7 @@ namespace UnitTests.Streaming
     {
         public class Fixture : BaseTestClusterFixture
         {
-            public Guid ServiceId { get; set; }
+            public string ServiceId { get; set; }
 
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
@@ -68,17 +68,17 @@ namespace UnitTests.Streaming
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("ServiceId"), TestCategory("Providers")]
         public async Task ServiceId_ProviderRuntime()
         {
-            Guid thisRunServiceId = this.fixture.ServiceId;
+            var thisRunServiceId = this.fixture.ServiceId;
 
             SiloHandle siloHandle = this.HostedCluster.GetActiveSilos().First();
-            Guid serviceId = await this.fixture.Client.GetTestHooks(siloHandle).GetServiceId();
+            var serviceId = await this.fixture.Client.GetTestHooks(siloHandle).GetServiceId();
             Assert.Equal(thisRunServiceId, serviceId);  // "ServiceId active in silo"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("ServiceId")]
         public async Task ServiceId_SiloRestart()
         {
-            Guid configServiceId = this.fixture.GetClientServiceId();
+            var configServiceId = this.fixture.GetClientServiceId();
             output.WriteLine("ServiceId={0}", this.fixture.ServiceId);
 
             Assert.Equal(this.fixture.ServiceId, configServiceId);  // "ServiceId in test config"
@@ -98,7 +98,7 @@ namespace UnitTests.Streaming
 
             foreach (var siloHandle in activeSilos)
             {
-                Guid serviceId = await this.fixture.Client.GetTestHooks(siloHandle).GetServiceId();
+                var serviceId = await this.fixture.Client.GetTestHooks(siloHandle).GetServiceId();
                 Assert.Equal(this.fixture.ServiceId, serviceId); // "ServiceId active in silo"
             }
         }

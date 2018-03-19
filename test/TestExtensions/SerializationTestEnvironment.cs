@@ -23,7 +23,7 @@ namespace TestExtensions
                 .Configure<ClusterOptions>(options =>
                 {
                     options.ClusterId = nameof(SerializationTestEnvironment);
-                    options.ServiceId = Guid.NewGuid();
+                    options.ServiceId = Guid.NewGuid().ToString();
                 })
                 .UseConfiguration(config);
             configureClientBuilder?.Invoke(builder);

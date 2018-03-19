@@ -215,7 +215,7 @@ namespace Tests.GeoClusterTests
                 {
                     Options =
                     {
-                        ServiceId = serviceId,
+                        ServiceId = serviceId.ToString(),
                         ClusterId = clusterId,
                         BaseSiloPort = GetPortBase(myCount),
                         BaseGatewayPort = GetProxyBase(myCount)

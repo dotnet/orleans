@@ -59,7 +59,8 @@ namespace UnitTests.StorageTests.Relational
         /// </summary>
         public CommonFixture()
         {
-            DefaultProviderRuntime = new ClientProviderRuntime(this.InternalGrainFactory, this.Services, NullLoggerFactory.Instance);
+            var clusterOptions = this.Services.GetRequiredService<IOptions<ClusterOptions>>();
+            DefaultProviderRuntime = new ClientProviderRuntime(this.InternalGrainFactory, this.Services, NullLoggerFactory.Instance, clusterOptions);
         }
 
         /// <summary>
@@ -88,7 +89,7 @@ namespace UnitTests.StorageTests.Relational
                             };
                             var clusterOptions = new ClusterOptions()
                             {
-                                ServiceId = Guid.NewGuid()
+                                ServiceId = Guid.NewGuid().ToString()
                             };
                             var storageProvider = new AdoNetGrainStorage(DefaultProviderRuntime.ServiceProvider.GetService<ILogger<AdoNetGrainStorage>>(), DefaultProviderRuntime, Options.Create(options), Options.Create(clusterOptions), storageInvariant + "_StorageProvider");
                             ISiloLifecycleSubject siloLifeCycle = new SiloLifecycleSubject(new LifecycleSubject(NullLoggerFactory.Instance.CreateLogger<LifecycleSubject>()), NullLoggerFactory.Instance.CreateLogger<SiloLifecycleSubject>());

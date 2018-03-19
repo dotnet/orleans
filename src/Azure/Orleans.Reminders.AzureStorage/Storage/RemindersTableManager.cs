@@ -29,12 +29,12 @@ namespace Orleans.Runtime.ReminderService
             return AzureStorageUtils.SanitizeTableProperty(key);
         }
 
-        public static string ConstructPartitionKey(Guid serviceId, GrainReference grainRef)
+        public static string ConstructPartitionKey(string serviceId, GrainReference grainRef)
         {
             return ConstructPartitionKey(serviceId, grainRef.GetUniformHashCode());
         }
 
-        public static string ConstructPartitionKey(Guid serviceId, uint number)
+        public static string ConstructPartitionKey(string serviceId, uint number)
         {
             // IMPORTANT NOTE: Other code using this return data is very sensitive to format changes, 
             //       so take great care when making any changes here!!!
@@ -45,12 +45,7 @@ namespace Orleans.Runtime.ReminderService
             // string grainHash = number < 0 ? string.Format("0{0}", number.ToString("X")) : string.Format("1{0:d16}", number);
 
             var grainHash = String.Format("{0:X8}", number);
-            return String.Format("{0}_{1}", ConstructServiceIdStr(serviceId), grainHash);
-        }
-
-        public static string ConstructServiceIdStr(Guid serviceId)
-        {
-            return serviceId.ToString();
+            return String.Format("{0}_{1}", serviceId, grainHash);
         }
 
 
@@ -78,12 +73,12 @@ namespace Orleans.Runtime.ReminderService
     {
         private const string REMINDERS_TABLE_NAME = "OrleansReminders";
 
-        public Guid ServiceId { get; private set; }
-        public string DeploymentId { get; private set; }
+        public string ServiceId { get; private set; }
+        public string ClusterId { get; private set; }
 
         private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
 
-        public static async Task<RemindersTableManager> GetManager(Guid serviceId, string clusterId, string storageConnectionString, ILoggerFactory loggerFactory)
+        public static async Task<RemindersTableManager> GetManager(string serviceId, string clusterId, string storageConnectionString, ILoggerFactory loggerFactory)
         {
             var singleton = new RemindersTableManager(serviceId, clusterId, storageConnectionString, loggerFactory);
             try
@@ -107,10 +102,10 @@ namespace Orleans.Runtime.ReminderService
             return singleton;
         }
 
-        private RemindersTableManager(Guid serviceId, string clusterId, string storageConnectionString, ILoggerFactory loggerFactory)
+        private RemindersTableManager(string serviceId, string clusterId, string storageConnectionString, ILoggerFactory loggerFactory)
             : base(REMINDERS_TABLE_NAME, storageConnectionString, loggerFactory)
         {
-            DeploymentId = clusterId;
+            ClusterId = clusterId;
             ServiceId = serviceId;
         }
 
@@ -119,7 +114,7 @@ namespace Orleans.Runtime.ReminderService
             // TODO: Determine whether or not a single query could be used here while avoiding a table scan
             string sBegin = ReminderTableEntry.ConstructPartitionKey(ServiceId, begin);
             string sEnd = ReminderTableEntry.ConstructPartitionKey(ServiceId, end);
-            string serviceIdStr = ReminderTableEntry.ConstructServiceIdStr(ServiceId);
+            string serviceIdStr = ServiceId;
             string filterOnServiceIdStr = TableQuery.CombineFilters(
                     TableQuery.GenerateFilterCondition(nameof(ReminderTableEntry.PartitionKey), QueryComparisons.GreaterThan, serviceIdStr + '_'),
                     TableOperators.And,
@@ -229,7 +224,7 @@ namespace Orleans.Runtime.ReminderService
 
         internal async Task DeleteTableEntries()
         {
-            if (ServiceId.Equals(Guid.Empty) && DeploymentId == null)
+            if (ServiceId.Equals(Guid.Empty) && ClusterId == null)
             {
                 await DeleteTableAsync();
             }
@@ -240,8 +235,8 @@ namespace Orleans.Runtime.ReminderService
                 // group by grain hashcode so each query goes to different partition
                 var tasks = new List<Task>();
                 var groupedByHash = entries
-                    .Where(tuple => tuple.Item1.ServiceId.Equals(ReminderTableEntry.ConstructServiceIdStr(ServiceId)))
-                    .Where(tuple => tuple.Item1.DeploymentId.Equals(DeploymentId))  // delete only entries that belong to our DeploymentId.
+                    .Where(tuple => tuple.Item1.ServiceId.Equals(ServiceId))
+                    .Where(tuple => tuple.Item1.DeploymentId.Equals(ClusterId))  // delete only entries that belong to our DeploymentId.
                     .GroupBy(x => x.Item1.GrainRefConsistentHash).ToDictionary(g => g.Key, g => g.ToList());
 
                 foreach (var entriesPerPartition in groupedByHash.Values)

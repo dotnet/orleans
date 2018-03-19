@@ -89,9 +89,9 @@ namespace Orleans.Hosting
                     options.ClusterId = configuration.Globals.ClusterId;
                 }
 
-                if (options.ServiceId == Guid.Empty)
+                if (string.IsNullOrWhiteSpace(options.ServiceId))
                 {
-                    options.ServiceId = configuration.Globals.ServiceId;
+                    options.ServiceId = configuration.Globals.ServiceId.ToString();
                 }
             });
 

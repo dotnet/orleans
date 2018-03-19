@@ -8,7 +8,7 @@ namespace Orleans.Runtime.TestHooks
     {
         Task<SiloAddress> GetConsistentRingPrimaryTargetSilo(uint key);
         Task<string> GetConsistentRingProviderDiagnosticInfo();
-        Task<Guid> GetServiceId();
+        Task<string> GetServiceId();
         Task<ICollection<string>> GetStorageProviderNames();
         Task<ICollection<string>> GetStreamProviderNames();
         Task<ICollection<string>> GetAllSiloProviderNames();
