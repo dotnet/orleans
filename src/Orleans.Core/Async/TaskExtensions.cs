@@ -265,7 +265,7 @@ namespace Orleans
         /// <param name="taskToComplete">The task to wait for unless cancelled</param>
         /// <param name="cancellationToken">A cancellation token for cancelling the wait</param>
         /// <returns></returns>
-        public static Task<T> WithCancellation<T>(this Task<T> taskToComplete, CancellationToken cancellationToken)
+        internal static Task<T> WithCancellation<T>(this Task<T> taskToComplete, CancellationToken cancellationToken)
         {
             if (taskToComplete.IsCompleted || !cancellationToken.CanBeCanceled)
             {
