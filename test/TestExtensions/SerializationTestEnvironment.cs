@@ -20,7 +20,11 @@ namespace TestExtensions
 
             var builder = new ClientBuilder()
                 .ConfigureDefaults()
-                .Configure<ClusterOptions>(options => options.ClusterId = nameof(SerializationTestEnvironment))
+                .Configure<ClusterOptions>(options =>
+                {
+                    options.ClusterId = nameof(SerializationTestEnvironment);
+                    options.ServiceId = Guid.NewGuid();
+                })
                 .UseConfiguration(config);
             configureClientBuilder?.Invoke(builder);
             this.Client = builder.Build();
