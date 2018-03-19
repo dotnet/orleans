@@ -26,6 +26,7 @@ namespace Tester.AzureUtils.Persistence
                 builder.Options.UseTestClusterMembership = false;
                 builder.ConfigureLegacyConfiguration(legacy =>
                 {
+                    legacy.ClusterConfiguration.Globals.ServiceId = Guid.NewGuid();
                     legacy.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
 
                     legacy.ClusterConfiguration.Globals.MaxResendCount = 0;
