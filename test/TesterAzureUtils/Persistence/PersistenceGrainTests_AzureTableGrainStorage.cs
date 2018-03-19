@@ -18,7 +18,6 @@ namespace Tester.AzureUtils.Persistence
     [TestCategory("Persistence"), TestCategory("Azure")]
     public class PersistenceGrainTests_AzureTableGrainStorage : Base_PersistenceGrainTests_AzureStore, IClassFixture<PersistenceGrainTests_AzureTableGrainStorage.Fixture>
     {
-        public static Guid ServiceId = Guid.NewGuid();
         public class Fixture : BaseAzureTestClusterFixture
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -28,8 +27,6 @@ namespace Tester.AzureUtils.Persistence
                 builder.ConfigureLegacyConfiguration(legacy =>
                 {
                     legacy.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
-
-                    legacy.ClusterConfiguration.Globals.ServiceId = ServiceId;
 
                     legacy.ClusterConfiguration.Globals.MaxResendCount = 0;
 

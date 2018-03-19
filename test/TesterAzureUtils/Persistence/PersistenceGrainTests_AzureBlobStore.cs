@@ -55,14 +55,12 @@ namespace Tester.AzureUtils.Persistence
 
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                
                 builder.Options.InitialSilosCount = 4;
                 builder.Options.UseTestClusterMembership = false;
                 builder.ConfigureLegacyConfiguration(legacy =>
                 {
                     legacy.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
 
-                    legacy.ClusterConfiguration.Globals.ServiceId = Guid.NewGuid();
                     legacy.ClusterConfiguration.Globals.MaxResendCount = 0;
 
                     legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test1");
