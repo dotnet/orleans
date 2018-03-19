@@ -17,17 +17,18 @@ namespace TestExtensions.Runners
 {
     public class GrainPersistenceTestsRunner : OrleansTestingBase
     {
-        private readonly Guid serviceId;
         private readonly ITestOutputHelper output;
-        protected TestCluster HostedCluster { get; private set; }
+        private readonly BaseTestClusterFixture fixture;
         protected readonly ILogger logger;
+        protected TestCluster HostedCluster { get; private set; }
+
         public GrainPersistenceTestsRunner(ITestOutputHelper output, BaseTestClusterFixture fixture)
         {
             this.output = output;
+            this.fixture = fixture;
             this.logger = fixture.Logger;
             HostedCluster = fixture.HostedCluster;
             GrainFactory = fixture.GrainFactory;
-            this.serviceId = fixture.GetClientServiceId();
         }
 
         public IGrainFactory GrainFactory { get; }
@@ -286,9 +287,9 @@ namespace TestExtensions.Runners
         [Fact]
         public async Task Grain_GrainStorage_SiloRestart()
         {
-            var initialServiceId = this.serviceId;
+            var initialServiceId = fixture.GetClientServiceId();
 
-            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.Options.ClusterId, this.serviceId);
+            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.Options.ClusterId, initialServiceId);
 
             Guid id = Guid.NewGuid();
             IGrainStorageTestGrain grain = this.GrainFactory.GetGrain<IGrainStorageTestGrain>(id);
