@@ -7,7 +7,7 @@ using pb = global::Google.Protobuf;
 using pbc = global::Google.Protobuf.Collections;
 using pbr = global::Google.Protobuf.Reflection;
 using scg = global::System.Collections.Generic;
-namespace GoogleUtils.Tests.Serialization {
+namespace ProtoBuf.Serialization.Tests {
 
   /// <summary>Holder for reflection information generated from counter.proto</summary>
   [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
@@ -29,7 +29,7 @@ namespace GoogleUtils.Tests.Serialization {
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
           new pbr::GeneratedClrTypeInfo(null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::GoogleUtils.Tests.Serialization.Counter), global::GoogleUtils.Tests.Serialization.Counter.Parser, new[]{ "Name", "Id" }, null, null, null)
+            new pbr::GeneratedClrTypeInfo(typeof(global::ProtoBuf.Serialization.Tests.Counter), global::ProtoBuf.Serialization.Tests.Counter.Parser, new[]{ "Name", "Id" }, null, null, null)
           }));
     }
     #endregion
@@ -45,7 +45,7 @@ namespace GoogleUtils.Tests.Serialization {
     public static pb::MessageParser<Counter> Parser { get { return _parser; } }
 
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GoogleUtils.Tests.Serialization.CounterReflection.Descriptor.MessageTypes[0]; }
+      get { return global::ProtoBuf.Serialization.Tests.CounterReflection.Descriptor.MessageTypes[0]; }
     }
 
     pbr::MessageDescriptor pb::IMessage.Descriptor {

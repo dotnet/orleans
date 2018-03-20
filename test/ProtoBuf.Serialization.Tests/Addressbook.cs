@@ -7,7 +7,7 @@ using pb = global::Google.Protobuf;
 using pbc = global::Google.Protobuf.Collections;
 using pbr = global::Google.Protobuf.Reflection;
 using scg = global::System.Collections.Generic;
-namespace GoogleUtils.Tests.Serialization {
+namespace ProtoBuf.Serialization.Tests {
 
   /// <summary>Holder for reflection information generated from addressbook.proto</summary>
   [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
@@ -34,8 +34,8 @@ namespace GoogleUtils.Tests.Serialization {
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
           new pbr::GeneratedClrTypeInfo(null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::GoogleUtils.Tests.Serialization.Person), global::GoogleUtils.Tests.Serialization.Person.Parser, new[]{ "Name", "Id", "Email", "Phones" }, null, new[]{ typeof(global::GoogleUtils.Tests.Serialization.Person.Types.PhoneType) }, new pbr::GeneratedClrTypeInfo[] { new pbr::GeneratedClrTypeInfo(typeof(global::GoogleUtils.Tests.Serialization.Person.Types.PhoneNumber), global::GoogleUtils.Tests.Serialization.Person.Types.PhoneNumber.Parser, new[]{ "Number", "Type" }, null, null, null)}),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GoogleUtils.Tests.Serialization.AddressBook), global::GoogleUtils.Tests.Serialization.AddressBook.Parser, new[]{ "People", "AddressBookName" }, null, null, null)
+            new pbr::GeneratedClrTypeInfo(typeof(global::ProtoBuf.Serialization.Tests.Person), global::ProtoBuf.Serialization.Tests.Person.Parser, new[]{ "Name", "Id", "Email", "Phones" }, null, new[]{ typeof(global::ProtoBuf.Serialization.Tests.Person.Types.PhoneType) }, new pbr::GeneratedClrTypeInfo[] { new pbr::GeneratedClrTypeInfo(typeof(global::ProtoBuf.Serialization.Tests.Person.Types.PhoneNumber), global::ProtoBuf.Serialization.Tests.Person.Types.PhoneNumber.Parser, new[]{ "Number", "Type" }, null, null, null)}),
+            new pbr::GeneratedClrTypeInfo(typeof(global::ProtoBuf.Serialization.Tests.AddressBook), global::ProtoBuf.Serialization.Tests.AddressBook.Parser, new[]{ "People", "AddressBookName" }, null, null, null)
           }));
     }
     #endregion
@@ -51,7 +51,7 @@ namespace GoogleUtils.Tests.Serialization {
     public static pb::MessageParser<Person> Parser { get { return _parser; } }
 
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GoogleUtils.Tests.Serialization.AddressbookReflection.Descriptor.MessageTypes[0]; }
+      get { return global::ProtoBuf.Serialization.Tests.AddressbookReflection.Descriptor.MessageTypes[0]; }
     }
 
     pbr::MessageDescriptor pb::IMessage.Descriptor {
@@ -110,10 +110,10 @@ namespace GoogleUtils.Tests.Serialization {
 
     /// <summary>Field number for the "phones" field.</summary>
     public const int PhonesFieldNumber = 4;
-    private static readonly pb::FieldCodec<global::GoogleUtils.Tests.Serialization.Person.Types.PhoneNumber> _repeated_phones_codec
-        = pb::FieldCodec.ForMessage(34, global::GoogleUtils.Tests.Serialization.Person.Types.PhoneNumber.Parser);
-    private readonly pbc::RepeatedField<global::GoogleUtils.Tests.Serialization.Person.Types.PhoneNumber> phones_ = new pbc::RepeatedField<global::GoogleUtils.Tests.Serialization.Person.Types.PhoneNumber>();
-    public pbc::RepeatedField<global::GoogleUtils.Tests.Serialization.Person.Types.PhoneNumber> Phones {
+    private static readonly pb::FieldCodec<global::ProtoBuf.Serialization.Tests.Person.Types.PhoneNumber> _repeated_phones_codec
+        = pb::FieldCodec.ForMessage(34, global::ProtoBuf.Serialization.Tests.Person.Types.PhoneNumber.Parser);
+    private readonly pbc::RepeatedField<global::ProtoBuf.Serialization.Tests.Person.Types.PhoneNumber> phones_ = new pbc::RepeatedField<global::ProtoBuf.Serialization.Tests.Person.Types.PhoneNumber>();
+    public pbc::RepeatedField<global::ProtoBuf.Serialization.Tests.Person.Types.PhoneNumber> Phones {
       get { return phones_; }
     }
 
@@ -238,7 +238,7 @@ namespace GoogleUtils.Tests.Serialization {
         public static pb::MessageParser<PhoneNumber> Parser { get { return _parser; } }
 
         public static pbr::MessageDescriptor Descriptor {
-          get { return global::GoogleUtils.Tests.Serialization.Person.Descriptor.NestedTypes[0]; }
+          get { return global::ProtoBuf.Serialization.Tests.Person.Descriptor.NestedTypes[0]; }
         }
 
         pbr::MessageDescriptor pb::IMessage.Descriptor {
@@ -272,8 +272,8 @@ namespace GoogleUtils.Tests.Serialization {
 
         /// <summary>Field number for the "type" field.</summary>
         public const int TypeFieldNumber = 2;
-        private global::GoogleUtils.Tests.Serialization.Person.Types.PhoneType type_ = 0;
-        public global::GoogleUtils.Tests.Serialization.Person.Types.PhoneType Type {
+        private global::ProtoBuf.Serialization.Tests.Person.Types.PhoneType type_ = 0;
+        public global::ProtoBuf.Serialization.Tests.Person.Types.PhoneType Type {
           get { return type_; }
           set {
             type_ = value;
@@ -353,7 +353,7 @@ namespace GoogleUtils.Tests.Serialization {
                 break;
               }
               case 16: {
-                type_ = (global::GoogleUtils.Tests.Serialization.Person.Types.PhoneType) input.ReadEnum();
+                type_ = (global::ProtoBuf.Serialization.Tests.Person.Types.PhoneType) input.ReadEnum();
                 break;
               }
             }
@@ -376,7 +376,7 @@ namespace GoogleUtils.Tests.Serialization {
     public static pb::MessageParser<AddressBook> Parser { get { return _parser; } }
 
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GoogleUtils.Tests.Serialization.AddressbookReflection.Descriptor.MessageTypes[1]; }
+      get { return global::ProtoBuf.Serialization.Tests.AddressbookReflection.Descriptor.MessageTypes[1]; }
     }
 
     pbr::MessageDescriptor pb::IMessage.Descriptor {
@@ -400,10 +400,10 @@ namespace GoogleUtils.Tests.Serialization {
 
     /// <summary>Field number for the "people" field.</summary>
     public const int PeopleFieldNumber = 1;
-    private static readonly pb::FieldCodec<global::GoogleUtils.Tests.Serialization.Person> _repeated_people_codec
-        = pb::FieldCodec.ForMessage(10, global::GoogleUtils.Tests.Serialization.Person.Parser);
-    private readonly pbc::RepeatedField<global::GoogleUtils.Tests.Serialization.Person> people_ = new pbc::RepeatedField<global::GoogleUtils.Tests.Serialization.Person>();
-    public pbc::RepeatedField<global::GoogleUtils.Tests.Serialization.Person> People {
+    private static readonly pb::FieldCodec<global::ProtoBuf.Serialization.Tests.Person> _repeated_people_codec
+        = pb::FieldCodec.ForMessage(10, global::ProtoBuf.Serialization.Tests.Person.Parser);
+    private readonly pbc::RepeatedField<global::ProtoBuf.Serialization.Tests.Person> people_ = new pbc::RepeatedField<global::ProtoBuf.Serialization.Tests.Person>();
+    public pbc::RepeatedField<global::ProtoBuf.Serialization.Tests.Person> People {
       get { return people_; }
     }
 
