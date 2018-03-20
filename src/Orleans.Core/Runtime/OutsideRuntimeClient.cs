@@ -46,6 +46,9 @@ namespace Orleans
         private readonly Func<Message, bool> tryResendMessage;
         private readonly Action<Message> unregisterCallback;
 
+        private TimeSpan typeMapRefreshInterval;
+        private AsyncTaskSafeTimer typeMapRefreshTimer = null;
+
         // initTimeout used to be AzureTableDefaultPolicies.TableCreationTimeout, which was 3 min
         private static readonly TimeSpan initTimeout = TimeSpan.FromMinutes(1);
 
@@ -90,7 +93,10 @@ namespace Orleans
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
-        public OutsideRuntimeClient(ILoggerFactory loggerFactory, IOptions<ClientMessagingOptions> clientMessagingOptions)
+        public OutsideRuntimeClient(
+            ILoggerFactory loggerFactory, 
+            IOptions<ClientMessagingOptions> clientMessagingOptions,
+            IOptions<TypeManagementOptions> typeManagementOptions)
         {
             this.loggerFactory = loggerFactory;
             this.logger = loggerFactory.CreateLogger<OutsideRuntimeClient>();
@@ -102,6 +108,7 @@ namespace Orleans
             this.callBackDataLogger = loggerFactory.CreateLogger<CallbackData>();
             this.timerLogger = loggerFactory.CreateLogger<SafeTimer>();
             this.clientMessagingOptions = clientMessagingOptions.Value;
+            this.typeMapRefreshInterval = typeManagementOptions.Value.TypeMapRefreshInterval;
         }
 
         internal void ConsumeServices(IServiceProvider services)
@@ -243,7 +250,7 @@ namespace Orleans
                     var originalTimeout = this.GetResponseTimeout();
                     try
                     {
-                        GrainTypeResolver = await transport.GetGrainTypeResolver(this.InternalGrainFactory);
+                        await RefreshGrainTypeResolver(null);
                     }
                     finally
                     {
@@ -251,6 +258,13 @@ namespace Orleans
                     }
                 },
                 retryFilter);
+
+            this.typeMapRefreshTimer = new AsyncTaskSafeTimer(
+                this.logger, 
+                RefreshGrainTypeResolver, 
+                null,
+                this.typeMapRefreshInterval,
+                this.typeMapRefreshInterval);
 
             ClientStatistics.Start(transport, clientId);
             
@@ -271,6 +285,18 @@ namespace Orleans
                         if (!retry) throw;
                     }
                 }
+            }
+        }
+
+        private async Task RefreshGrainTypeResolver(object _)
+        {
+            try
+            {
+                GrainTypeResolver = await transport.GetGrainTypeResolver(this.InternalGrainFactory);
+            }
+            catch(Exception ex)
+            {
+                this.logger.Warn(ErrorCode.TypeManager_GetClusterGrainTypeResolverError, "Refresh the GrainTypeResolver failed. WIll be retried after", ex);
             }
         }
 
@@ -696,6 +722,14 @@ namespace Orleans
 
             Utils.SafeExecute(() =>
             {
+                if (typeMapRefreshTimer != null)
+                {
+                    typeMapRefreshTimer.Dispose();
+                    typeMapRefreshTimer = null;
+                }
+            }, logger, "Client.typeMapRefreshTimer.Dispose");
+            Utils.SafeExecute(() =>
+            {
                 if (clientProviderRuntime != null)
                 {
                     clientProviderRuntime.Reset(cleanup).WaitWithThrow(resetTimeout);
@@ -847,6 +881,15 @@ namespace Orleans
         {
             if (this.disposing) return;
             this.disposing = true;
+
+            Utils.SafeExecute(() =>
+            {
+                if (typeMapRefreshTimer != null)
+                {
+                    typeMapRefreshTimer.Dispose();
+                    typeMapRefreshTimer = null;
+                }
+            });
 
             if (listeningCts != null)
             {

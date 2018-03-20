@@ -1024,6 +1024,7 @@ namespace Orleans
 
         TypeManagerBase = Runtime + 4200,
         TypeManager_GetSiloGrainInterfaceMapError = TypeManagerBase + 1,
+        TypeManager_GetClusterGrainTypeResolverError = TypeManagerBase + 2,
 
         LogConsistencyBase = Runtime + 4300,
         LogConsistency_UserCodeException = LogConsistencyBase + 1,

@@ -3,7 +3,10 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Orleans;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -18,8 +21,16 @@ namespace Tester.HeterogeneousSilosTests
     public class HeterogeneousTests : OrleansTestingBase, IDisposable
     {
         private TestCluster cluster;
-        private TimeSpan clientRefreshDelay = TimeSpan.FromSeconds(1);
+        private static TimeSpan clientRefreshDelay = TimeSpan.FromSeconds(1);
         private readonly TimeSpan refreshInterval = TimeSpan.FromMilliseconds(200);
+
+        private class BuilderConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder.Configure<TypeManagementOptions>(options => options.TypeMapRefreshInterval = clientRefreshDelay);
+            }
+        }
 
         private void SetupAndDeployCluster(string defaultPlacementStrategy, params Type[] blackListedTypes)
         {
@@ -33,6 +44,7 @@ namespace Tester.HeterogeneousSilosTests
                 legacy.ClusterConfiguration.Globals.DefaultPlacementStrategy = defaultPlacementStrategy;
                 legacy.ClusterConfiguration.GetOrCreateNodeConfigurationForSilo(Silo.PrimarySiloName).ExcludedGrainTypes = typesName;
             });
+            builder.AddClientBuilderConfigurator<BuilderConfigurator>();
             cluster = builder.Build();
             cluster.Deploy();
         }
@@ -98,7 +110,7 @@ namespace Tester.HeterogeneousSilosTests
             }
             else
             {
-                await Task.Delay(clientRefreshDelay.Multiply(2));
+                await Task.Delay(clientRefreshDelay.Multiply(3));
             }
 
             for (var i = 0; i < 5; i++)
@@ -112,10 +124,6 @@ namespace Tester.HeterogeneousSilosTests
             cluster.StopSecondarySilos();
             await Task.Delay(delayTimeout);
 
-            var grain = this.cluster.GrainFactory.GetGrain<ITestGrain>(0);
-            var orleansException = await Assert.ThrowsAsync<OrleansException>(() => grain.SetLabel("Hello world"));
-            Assert.Contains("Cannot find an implementation class for grain interface", orleansException.Message);
-
             if (restartClient)
             {
                 // Disconnect/Reconnect the client
@@ -125,7 +133,7 @@ namespace Tester.HeterogeneousSilosTests
             }
             else
             {
-                await Task.Delay(clientRefreshDelay.Multiply(2));
+                await Task.Delay(clientRefreshDelay.Multiply(3));
             }
 
             // Should fail
