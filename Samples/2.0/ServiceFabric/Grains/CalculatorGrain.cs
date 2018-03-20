@@ -6,7 +6,7 @@ namespace Grains
 {
     public class CalculatorGrain : Grain, ICalculatorGrain
     {
-        private readonly ObserverSubscriptionManager<ICalculatorObserver> observers = new ObserverSubscriptionManager<ICalculatorObserver>();
+        private readonly GrainObserverManager<ICalculatorObserver> observers = new GrainObserverManager<ICalculatorObserver>();
         private double current;
 
         public Task<double> Add(double value)
@@ -51,7 +51,7 @@ namespace Grains
 
         public Task Subscribe(ICalculatorObserver observer)
         {
-            if (!this.observers.IsSubscribed(observer)) observers.Subscribe(observer);
+            observers.Subscribe(observer);
             return Task.FromResult(0);
         }
     }

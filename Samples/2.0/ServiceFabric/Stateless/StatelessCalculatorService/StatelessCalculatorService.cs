@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Fabric;
+using System.Fabric.Description;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Grains;
@@ -9,9 +12,10 @@ using Microsoft.ServiceFabric.Services.Communication.Runtime;
 using Microsoft.ServiceFabric.Services.Runtime;
 using Orleans.Clustering.ServiceFabric;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Hosting.ServiceFabric;
-using Orleans.Runtime.Configuration;
+using Orleans.ServiceFabric;
 
 namespace StatelessCalculatorService
 {
@@ -37,21 +41,30 @@ namespace StatelessCalculatorService
             var listener = OrleansServiceListener.CreateStateless(
                 (serviceContext, builder) =>
                 {
+                    builder.Configure<ClusterOptions>(options =>
+                    {
+                        options.ServiceId = Guid.Empty;
+                        options.ClusterId = "dev";
+                    });
+
                     // Optional: use Service Fabric for cluster membership.
                     builder.UseServiceFabricClustering(serviceContext);
                     
                     // Optional: configure logging.
                     builder.ConfigureLogging(logging => logging.AddDebug());
 
-                    var config = new ClusterConfiguration();
-                    config.Globals.RegisterBootstrapProvider<BootstrapProvider>("poke_grains");
-                    config.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain;
+                    builder.AddStartupTask<StartupTask>();
+                    builder.UseInMemoryReminderService();
 
                     // Service Fabric manages port allocations, so update the configuration using those ports.
-                    config.Defaults.ConfigureServiceFabricSiloEndpoints(serviceContext);
+                    // Gather configuration from Service Fabric.
+                    var activation = serviceContext.CodePackageActivationContext;
+                    var endpoints = activation.GetEndpoints();
 
-                    // Tell Orleans to use this configuration.
-                    builder.UseConfiguration(config);
+                    var siloEndpoint = endpoints[ServiceFabricConstants.SiloEndpointName];
+                    var gatewayEndpoint = endpoints[ServiceFabricConstants.GatewayEndpointName];
+                    var hostname = serviceContext.NodeContext.IPAddressOrFQDN;
+                    builder.ConfigureEndpoints(hostname, siloEndpoint.Port, gatewayEndpoint.Port);
 
                     // Add your application assemblies.
                     builder.ConfigureApplicationParts(parts =>
