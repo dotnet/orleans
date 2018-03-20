@@ -41,10 +41,9 @@
 
   <!-- This target is run just before Compile for an Orleans Grain Interface Project -->
   <Target Name="GenerateOrleansCode"
-          AfterTargets="ResolveReferences"
-          BeforeTargets="CoreCompile"
+          BeforeTargets="AssignTargetPaths"
           Condition="'$(CodeGeneratorEnabled)' == 'true'"
-          Inputs="@(Compile);@(ReferencePath);$(IntermediateOutputPath)$(MSBuildProjectFile).CoreCompileInputs.cache"
+          Inputs="@(Compile);@(ReferencePath)"
           Outputs="$(OutputFileName)">
     <PropertyGroup>
       <ExcludeCodeGen>$(DefineConstants);EXCLUDE_CODEGEN</ExcludeCodeGen>
