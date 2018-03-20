@@ -13,7 +13,7 @@ namespace Orleans
         /// </summary>
         /// <param name="context">The grain call context.</param>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
-        Task Invoke(IGrainCallContext context);
+        Task Invoke(IIncomingGrainCallContext context);
     }
 
     /// <inheritdoc />
@@ -30,6 +30,6 @@ namespace Orleans
         /// </summary>
         /// <param name="context">The grain call context.</param>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
-        Task Invoke(IGrainCallContext context);
+        Task Invoke(IOutgoingGrainCallContext context);
     }
 }

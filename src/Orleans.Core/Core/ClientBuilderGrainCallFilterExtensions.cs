@@ -1,4 +1,5 @@
 using Orleans.Configuration;
+using Orleans.Hosting;
 
 namespace Orleans
 {
@@ -36,7 +37,7 @@ namespace Orleans
         /// <param name="builder">The builder.</param>
         /// <param name="filter">The filter.</param>
         /// <returns>The builder.</returns>
-        public static IClientBuilder AddOutgoingGrainCallFilter(this IClientBuilder builder, GrainCallFilterDelegate filter)
+        public static IClientBuilder AddOutgoingGrainCallFilter(this IClientBuilder builder, OutgoingGrainCallFilterDelegate filter)
         {
             return builder.ConfigureServices(services => services.AddOutgoingGrainCallFilter(filter));
         }

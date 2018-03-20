@@ -9,7 +9,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Invokes a request on a grain.
     /// </summary>
-    internal class GrainMethodInvoker : IGrainCallContext, IGrainMethodInvoker
+    internal class GrainMethodInvoker : IIncomingGrainCallContext, IGrainMethodInvoker
     {
         private readonly InvokeMethodRequest request;
         private readonly IGrainMethodInvoker rootInvoker;
@@ -43,32 +43,13 @@ namespace Orleans.Runtime
         public IAddressable Grain { get; }
 
         /// <inheritdoc />
-        public MethodInfo Method
-        {
-            get
-            {
-                // Determine if the object being invoked is a grain or a grain extension.
-                Type implementationType;
-                if (this.rootInvoker is IGrainExtensionMap extensionMap
-                    && extensionMap.TryGetExtension(request.InterfaceId, out var extension))
-                {
-                    implementationType = extension.GetType();
-                }
-                else
-                {
-                    implementationType = this.Grain.GetType();
-                }
+        public MethodInfo Method => GetMethodEntry().ImplementationMethod;
 
-                // Get or create the implementation map for this object.
-                var implementationMap = interfaceToImplementationMapping.GetOrCreate(
-                    implementationType,
-                    request.InterfaceId);
+        /// <inheritdoc />
+        public MethodInfo InterfaceMethod => GetMethodEntry().InterfaceMethod;
 
-                // Get the method info for the method being invoked.
-                implementationMap.TryGetValue(request.MethodId, out var method);
-                return method.ImplementationMethod;
-            }
-        }
+        /// <inheritdoc />
+        public MethodInfo ImplementationMethod => GetMethodEntry().ImplementationMethod;
 
         /// <inheritdoc />
         public object[] Arguments => request.Arguments;
@@ -124,6 +105,29 @@ namespace Orleans.Runtime
             ValidateArguments(grain, invokeMethodRequest);
             await this.Invoke();
             return this.Result;
+        }
+
+        private InterfaceToImplementationMappingCache.Entry GetMethodEntry()
+        {
+            // Determine if the object being invoked is a grain or a grain extension.
+            Type implementationType;
+            if (this.rootInvoker is IGrainExtensionMap extensionMap && extensionMap.TryGetExtension(request.InterfaceId, out var extension))
+            {
+                implementationType = extension.GetType();
+            }
+            else
+            {
+                implementationType = this.Grain.GetType();
+            }
+
+            // Get or create the implementation map for this object.
+            var implementationMap = interfaceToImplementationMapping.GetOrCreate(
+                implementationType,
+                request.InterfaceId);
+
+            // Get the method info for the method being invoked.
+            implementationMap.TryGetValue(request.MethodId, out var method);
+            return method;
         }
 
         private void ValidateArguments(IAddressable grain, InvokeMethodRequest invokeMethodRequest)
