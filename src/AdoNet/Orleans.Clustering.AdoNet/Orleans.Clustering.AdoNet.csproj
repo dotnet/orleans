@@ -83,5 +83,9 @@
       <Pack>true</Pack>
       <PackagePath>lib\$(TargetFramework)\SQLServer\</PackagePath>
     </None>
+    <Content Include="Microsoft.Orleans.Clustering.AdoNet.targets">
+      <PackagePath>build/$(TargetFramework)/</PackagePath>
+      <Pack>true</Pack>
+    </Content>
   </ItemGroup>
 </Project>
