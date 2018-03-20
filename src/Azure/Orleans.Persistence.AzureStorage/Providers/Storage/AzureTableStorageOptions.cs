@@ -15,11 +15,6 @@ namespace Orleans.Configuration
     public class AzureTableStorageOptions
     {
         /// <summary>
-        /// Gets or sets a unique identifier for this service, which should survive deployment and redeployment.
-        /// </summary>
-        public string ServiceId { get; set; } = string.Empty;
-
-        /// <summary>
         /// Azure table connection string
         /// </summary>
         [RedactConnectionString]

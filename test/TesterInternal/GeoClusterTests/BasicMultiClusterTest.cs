@@ -45,16 +45,18 @@ namespace Tests.GeoClusterTests
         [SkippableFact, TestCategory("Functional")]
         public void CreateTwoIndependentClusters()
         {
+            var serviceId = Guid.NewGuid();
+
             using (var host = new TestingClusterHost(output))
             {
                 // create cluster A with one silo and clientA
                 var clusterA = "A";
-                host.NewCluster(clusterA, 1);
+                host.NewCluster(serviceId, clusterA, 1);
                 var clientA = host.NewClient(clusterA, 0, ClientWrapper.Factory);
 
                 // create cluster B with 5 silos and clientB
                 var clusterB = "B";
-                host.NewCluster(clusterB, 5);
+                host.NewCluster(serviceId, clusterB, 5);
                 var clientB = host.NewClient(clusterB, 0, ClientWrapper.Factory);
 
                 // call management grain in each cluster to count the silos

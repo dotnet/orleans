@@ -68,14 +68,14 @@ namespace Tester.AzureUtils.Persistence
             return providerConfig.First();
         }
 
-        public Base_PersistenceGrainTests_AzureStore(ITestOutputHelper output, BaseTestClusterFixture fixture, Guid serviceId)
+        public Base_PersistenceGrainTests_AzureStore(ITestOutputHelper output, BaseTestClusterFixture fixture)
         {
             this.output = output;
             this.logger = fixture.Logger;
             HostedCluster = fixture.HostedCluster;
             GrainFactory = fixture.GrainFactory;
             timingFactor = TestUtils.CalibrateTimings();
-            this.basicPersistenceTestsRunner = new GrainPersistenceTestsRunner(output, fixture, serviceId);
+            this.basicPersistenceTestsRunner = new GrainPersistenceTestsRunner(output, fixture);
         }
 
         public IGrainFactory GrainFactory { get; }

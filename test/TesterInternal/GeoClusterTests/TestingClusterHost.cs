@@ -162,7 +162,7 @@ namespace Tests.GeoClusterTests
                     customizer?.Invoke(config);
                 };
 
-            NewCluster<TSiloBuilderConfigurator>(clusterId, numSilos, extendedcustomizer);
+            NewCluster<TSiloBuilderConfigurator>(globalServiceId, clusterId, numSilos, extendedcustomizer);
         }
         private class NoOpSiloBuilderConfigurator : ISiloBuilderConfigurator
         {
@@ -196,13 +196,13 @@ namespace Tests.GeoClusterTests
             }
         }
 
-        public void NewCluster(string clusterId, short numSilos,
+        public void NewCluster(Guid serviceId, string clusterId, short numSilos,
             Action<ClusterConfiguration> customizer = null)
         {
-            NewCluster<NoOpSiloBuilderConfigurator>(clusterId, numSilos, customizer);
+            NewCluster<NoOpSiloBuilderConfigurator>(serviceId, clusterId, numSilos, customizer);
         }
 
-        public void NewCluster<TSiloBuilderConfigurator>(string clusterId, short numSilos, Action<ClusterConfiguration> customizer = null)
+        public void NewCluster<TSiloBuilderConfigurator>(Guid serviceId, string clusterId, short numSilos, Action<ClusterConfiguration> customizer = null)
             where TSiloBuilderConfigurator : ISiloBuilderConfigurator, new()
         {
             TestCluster testCluster;
@@ -216,6 +216,7 @@ namespace Tests.GeoClusterTests
                 {
                     Options =
                     {
+                        ServiceId = serviceId,
                         ClusterId = clusterId,
                         BaseSiloPort = GetPortBase(myCount),
                         BaseGatewayPort = GetProxyBase(myCount)

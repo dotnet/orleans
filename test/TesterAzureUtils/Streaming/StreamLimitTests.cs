@@ -53,13 +53,11 @@ namespace UnitTests.StreamingTests
                     .AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData", options => options.OptimizeForImmutableData = false)
                     .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                     {
-                        options.ServiceId = silo.Value.ServiceId.ToString();
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         options.DeleteStateOnClear = true;
                     }))
                     .AddAzureTableGrainStorage("PubSubStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                     {
-                        options.ServiceId = silo.Value.ServiceId.ToString();
                         options.DeleteStateOnClear = true;
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     }))

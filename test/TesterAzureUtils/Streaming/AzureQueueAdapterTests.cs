@@ -54,7 +54,6 @@ namespace Tester.AzureUtils.Streaming
             var options = new AzureQueueOptions
             {
                 ConnectionString = TestDefaultConfiguration.DataConnectionString,
-                ClusterId = this.clusterId,
                 MessageVisibilityTimeout = TimeSpan.FromSeconds(30)
             };
             var adapterFactory = new AzureQueueAdapterFactory<AzureQueueDataAdapterV2>(AZURE_QUEUE_STREAM_PROVIDER_NAME, options,

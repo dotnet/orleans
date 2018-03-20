@@ -34,7 +34,7 @@ namespace Orleans.TestingHost
             {
                 InitialSilosCount = initialSilosCount,
                 ClusterId = CreateClusterId(),
-                ServiceId = Guid.Empty,
+                ServiceId = Guid.NewGuid(),
                 UseTestClusterMembership = true,
                 InitializeClientOnDeploy = true,
                 ConfigureFileLogging = true,

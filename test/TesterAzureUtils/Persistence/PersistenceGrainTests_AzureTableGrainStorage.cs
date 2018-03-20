@@ -18,7 +18,6 @@ namespace Tester.AzureUtils.Persistence
     [TestCategory("Persistence"), TestCategory("Azure")]
     public class PersistenceGrainTests_AzureTableGrainStorage : Base_PersistenceGrainTests_AzureStore, IClassFixture<PersistenceGrainTests_AzureTableGrainStorage.Fixture>
     {
-        public static Guid ServiceId = Guid.NewGuid();
         public class Fixture : BaseAzureTestClusterFixture
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -27,9 +26,8 @@ namespace Tester.AzureUtils.Persistence
                 builder.Options.UseTestClusterMembership = false;
                 builder.ConfigureLegacyConfiguration(legacy =>
                 {
+                    legacy.ClusterConfiguration.Globals.ServiceId = Guid.NewGuid();
                     legacy.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
-
-                    legacy.ClusterConfiguration.Globals.ServiceId = ServiceId;
 
                     legacy.ClusterConfiguration.Globals.MaxResendCount = 0;
 
@@ -52,23 +50,19 @@ namespace Tester.AzureUtils.Persistence
                     hostBuilder
                         .AddAzureTableGrainStorage("GrainStorageForTest", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
-                            options.ServiceId = silo.Value.ServiceId.ToString();
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.DeleteStateOnClear = true;
                         }))
                         .AddAzureTableGrainStorage("AzureStore1", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
-                            options.ServiceId = silo.Value.ServiceId.ToString();
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         }))
                         .AddAzureTableGrainStorage("AzureStore2", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
-                            options.ServiceId = silo.Value.ServiceId.ToString();
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         }))
                         .AddAzureTableGrainStorage("AzureStore3", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
-                            options.ServiceId = silo.Value.ServiceId.ToString();
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         }))
                         .AddMemoryGrainStorage("MemoryStore");
@@ -76,7 +70,8 @@ namespace Tester.AzureUtils.Persistence
             }
         }
 
-        public PersistenceGrainTests_AzureTableGrainStorage(ITestOutputHelper output, Fixture fixture) : base(output, fixture, ServiceId)
+        public PersistenceGrainTests_AzureTableGrainStorage(ITestOutputHelper output, Fixture fixture) : 
+            base(output, fixture)
         {
             fixture.EnsurePreconditionsMet();
         }

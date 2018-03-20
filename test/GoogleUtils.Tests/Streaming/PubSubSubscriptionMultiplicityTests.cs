@@ -46,7 +46,6 @@ namespace GoogleUtils.Tests.Streaming
                     {
                         options.ProjectId = GoogleTestUtils.ProjectId;
                         options.TopicId = GoogleTestUtils.TopicId;
-                        options.ClusterId = GoogleTestUtils.DeploymentId.ToString();
                         options.Deadline = TimeSpan.FromSeconds(600);
                     });
             }
@@ -61,7 +60,6 @@ namespace GoogleUtils.Tests.Streaming
                     {
                         options.ProjectId = GoogleTestUtils.ProjectId;
                         options.TopicId = GoogleTestUtils.TopicId;
-                        options.ClusterId = GoogleTestUtils.DeploymentId.ToString();
                         options.Deadline = TimeSpan.FromSeconds(600);
                     });
             }

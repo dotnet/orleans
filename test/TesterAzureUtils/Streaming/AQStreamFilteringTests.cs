@@ -19,7 +19,7 @@ namespace Tester.AzureUtils.Streaming
     [TestCategory("Streaming"), TestCategory("Filters"), TestCategory("Azure")]
     public class StreamFilteringTests_AQ : StreamFilteringTestsBase, IClassFixture<StreamFilteringTests_AQ.Fixture>, IDisposable
     {
-        private readonly string clusterId;
+        private readonly string serviceId;
         public class Fixture : BaseAzureTestClusterFixture
         {
             public const string StreamProvider = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
@@ -55,7 +55,7 @@ namespace Tester.AzureUtils.Streaming
         public StreamFilteringTests_AQ(Fixture fixture) : base(fixture)
         {
             fixture.EnsurePreconditionsMet();
-            this.clusterId = fixture.HostedCluster.Options.ClusterId;
+            this.serviceId = fixture.HostedCluster.Options.ServiceId.ToString();
             streamProviderName = Fixture.StreamProvider;
         }
 
@@ -63,7 +63,7 @@ namespace Tester.AzureUtils.Streaming
         {
                 AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(NullLoggerFactory.Instance, 
                     streamProviderName,
-                    this.clusterId,
+                    this.serviceId,
                     TestDefaultConfiguration.DataConnectionString).Wait();
             }
 
