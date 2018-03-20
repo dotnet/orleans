@@ -64,17 +64,31 @@ namespace Orleans.Runtime.MultiClusterNetwork
         /// </summary>
         /// <param name="observer">An observer to receive configuration change notifications.</param>
         /// <returns>bool value indicating that subscription succeeded or not.</returns>
-        bool SubscribeToMultiClusterConfigurationEvents(GrainReference observer);
+        bool SubscribeToMultiClusterConfigurationEvents(IMultiClusterConfigurationListener observer);
 
         /// <summary>
         /// UnSubscribe from multicluster configuration change events.
         /// </summary>
         /// <returns>bool value indicating that subscription succeeded or not.</returns>
-        bool UnSubscribeFromMultiClusterConfigurationEvents(GrainReference observer);
+        bool UnSubscribeFromMultiClusterConfigurationEvents(IMultiClusterConfigurationListener observer);
 
         /// <summary>
         /// A test hook for dropping protocol messages between replicated grain instances
         /// </summary>
         Func<ILogConsistencyProtocolMessage, bool> ProtocolMessageFilterForTesting { get; set; }
     }
+
+    /// <summary>
+    /// Interface for subscribers to multi-cluster configuration changes.
+    /// </summary>
+    public interface IMultiClusterConfigurationListener
+    {
+        /// <summary>
+        /// Called when a configuration change notification is received.
+        /// </summary>
+        /// <param name="next">the next multi-cluster configuration</param>
+        /// <returns></returns>
+        void OnMultiClusterConfigurationChange(MultiClusterConfiguration next);
+    }
+
 }

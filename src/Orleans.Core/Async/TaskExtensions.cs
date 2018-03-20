@@ -258,6 +258,46 @@ namespace Orleans
             throw new TimeoutException(errorMessage);
         }
 
+        /// <summary>
+        /// For making an uncancellable task cancellable, by ignoring its result.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="taskToComplete">The task to wait for unless cancelled</param>
+        /// <param name="cancellationToken">A cancellation token for cancelling the wait</param>
+        /// <returns></returns>
+        internal static Task<T> WithCancellation<T>(this Task<T> taskToComplete, CancellationToken cancellationToken)
+        {
+            if (taskToComplete.IsCompleted || !cancellationToken.CanBeCanceled)
+            {
+                return taskToComplete;
+            }
+            else if (cancellationToken.IsCancellationRequested)
+            {
+                return TaskFromCanceled<T>();
+            }
+            else 
+            {
+                return MakeCancellable(taskToComplete, cancellationToken);
+            }
+        }
+
+        private static async Task<T> MakeCancellable<T>(Task<T> task, CancellationToken cancellationToken)
+        {
+            var tcs = new TaskCompletionSource<T>();
+            using (cancellationToken.Register(() =>
+                      tcs.TrySetCanceled(cancellationToken), useSynchronizationContext: false))
+            {
+                var firstToComplete = await Task.WhenAny(task, tcs.Task).ConfigureAwait(false);
+
+                if (firstToComplete != task)
+                {
+                    task.Ignore();
+                }
+
+                return await firstToComplete.ConfigureAwait(false);
+            }
+        }
+
         internal static Task WrapInTask(Action action)
         {
             try

@@ -14,6 +14,7 @@ using Xunit;
 using Xunit.Abstractions;
 using Orleans.MultiCluster;
 using Orleans.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace Tests.GeoClusterTests
 {
@@ -176,10 +177,18 @@ namespace Tests.GeoClusterTests
             {
                 hostBuilder.ConfigureLogging(builder =>
                 {
-                    builder.AddFilter("Runtime.Catalog", LogLevel.Debug);
-                    builder.AddFilter("Runtime.Dispatcher", LogLevel.Trace);
-                    builder.AddFilter("Orleans.GrainDirectory.LocalGrainDirectory", LogLevel.Trace);
+                    builder.AddFilter("Orleans.Runtime.Catalog", LogLevel.Debug);
+                    builder.AddFilter("Orleans.Runtime.Dispatcher", LogLevel.Trace);
+                    builder.AddFilter("Orleans.Runtime.GrainDirectory.LocalGrainDirectory", LogLevel.Trace);
+                    builder.AddFilter("Orleans.Runtime.GrainDirectory.GlobalSingleInstanceRegistrar", LogLevel.Trace);
+                    builder.AddFilter("Orleans.Runtime.LogConsistency.ProtocolServices", LogLevel.Trace);
+                    builder.AddFilter("Orleans.Storage.MemoryStorageGrain", LogLevel.Debug);
                 });
+                hostBuilder.AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
+                {
+                    options.ServiceId = silo.Value.ServiceId.ToString();
+                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                }));
                 hostBuilder.AddAzureBlobGrainStorage("PubSubStore", (AzureBlobStorageOptions options) =>
                 {
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
