@@ -42,7 +42,6 @@ namespace Orleans
         internal ClientStatisticsManager ClientStatistics;
         private GrainId clientId;
         private readonly GrainId handshakeClientId;
-        private IGrainTypeResolver grainTypeResolver;
         private ThreadTrackingStatistic incomingMessagesThreadTimeTracking;
         private readonly Func<Message, bool> tryResendMessage;
         private readonly Action<Message> unregisterCallback;
@@ -178,26 +177,39 @@ namespace Orleans
             clientProviderRuntime.StreamingInitialize(implicitSubscriberTable);
         }
 
-        private void UnhandledException(ISchedulingContext context, Exception exception)
-        {
-            logger.Error(ErrorCode.Runtime_Error_100007, "OutsideRuntimeClient caught an UnobservedException.", exception);
-            logger.Assert(ErrorCode.Runtime_Error_100008, context == null, "context should be not null only inside OrleansRuntime and not on the client.");
-        }
-
-        public async Task Start()
+        public async Task Start(Func<Exception, Task<bool>> retryFilter = null)
         {
             // Deliberately avoid capturing the current synchronization context during startup and execute on the default scheduler.
             // This helps to avoid any issues (such as deadlocks) caused by executing with the client's synchronization context/scheduler.
-            await Task.Run(this.StartInternal).ConfigureAwait(false);
+            await Task.Run(() => this.StartInternal(retryFilter)).ConfigureAwait(false);
 
             logger.Info(ErrorCode.ProxyClient_StartDone, "{0} Started OutsideRuntimeClient with Global Client ID: {1}", BARS, CurrentActivationAddress.ToString() + ", client GUID ID: " + handshakeClientId);
         }
-
+        
         // used for testing to (carefully!) allow two clients in the same process
-        private async Task StartInternal()
+        private async Task StartInternal(Func<Exception, Task<bool>> retryFilter)
         {
-            await this.gatewayListProvider.InitializeGatewayListProvider()
-                               .WithTimeout(initTimeout, $"gatewayListProvider.InitializeGatewayListProvider failed due to timeout {initTimeout}");
+            // Initialize the gateway list provider, since information from the cluster is required to successfully
+            // initialize subsequent services.
+            var initializedGatewayProvider = new[] {false};
+            await ExecuteWithRetries(async () =>
+                {
+                    if (!initializedGatewayProvider[0])
+                    {
+                        await this.gatewayListProvider.InitializeGatewayListProvider();
+                        initializedGatewayProvider[0] = true;
+                    }
+
+                    var gateways = await this.gatewayListProvider.GetGateways();
+                    if (gateways.Count == 0)
+                    {
+                        var gatewayProviderType = this.gatewayListProvider.GetType().GetParseableName();
+                        var err = $"Could not find any gateway in {gatewayProviderType}. Orleans client cannot initialize.";
+                        logger.Error(ErrorCode.GatewayManager_NoGateways, err);
+                        throw new OrleansException(err);
+                    }
+                },
+                retryFilter);
 
             var generation = -SiloAddress.AllocateNewGeneration(); // Client generations are negative
             transport = ActivatorUtilities.CreateInstance<ClientMessageCenter>(this.ServiceProvider, localAddress, generation, handshakeClientId);
@@ -225,11 +237,41 @@ namespace Orleans
                     }
                 },
                 ct).Ignore();
-            grainTypeResolver = await transport.GetGrainTypeResolver(this.InternalGrainFactory);
+
+            await ExecuteWithRetries(async () =>
+                {
+                    var originalTimeout = this.GetResponseTimeout();
+                    try
+                    {
+                        GrainTypeResolver = await transport.GetGrainTypeResolver(this.InternalGrainFactory);
+                    }
+                    finally
+                    {
+                        this.SetResponseTimeout(originalTimeout);
+                    }
+                },
+                retryFilter);
 
             ClientStatistics.Start(transport, clientId);
+            
+            await ExecuteWithRetries(StreamingInitialize, retryFilter);
 
-            await StreamingInitialize();
+            async Task ExecuteWithRetries(Func<Task> task, Func<Exception, Task<bool>> shouldRetry)
+            {
+                while (true)
+                {
+                    try
+                    {
+                        await task();
+                        return;
+                    }
+                    catch (Exception exception) when (shouldRetry != null)
+                    {
+                        var retry = await shouldRetry(exception);
+                        if (!retry) throw;
+                    }
+                }
+            }
         }
 
         private void RunClientMessagePump(CancellationToken ct)
@@ -824,10 +866,7 @@ namespace Orleans
             GC.SuppressFinalize(this);
         }
 
-        public IGrainTypeResolver GrainTypeResolver
-        {
-            get { return grainTypeResolver; }
-        }
+        public IGrainTypeResolver GrainTypeResolver { get; private set; }
 
         public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)
         {

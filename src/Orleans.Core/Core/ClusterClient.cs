@@ -104,7 +104,7 @@ namespace Orleans
         }
 
         /// <inheritdoc />
-        public async Task Connect()
+        public async Task Connect(Func<Exception, Task<bool>> retryFilter = null)
         {
             this.ThrowIfDisposedOrAlreadyInitialized();
             using (await this.initLock.LockAsync().ConfigureAwait(false))
@@ -116,8 +116,8 @@ namespace Orleans
                 }
                 
                 this.state = LifecycleState.Starting;
-                await this.runtimeClient.Start().ConfigureAwait(false);
-                await this.clusterClientLifecycle.OnStart();
+                await this.runtimeClient.Start(retryFilter).ConfigureAwait(false);
+                await this.clusterClientLifecycle.OnStart().ConfigureAwait(false);
                 this.state = LifecycleState.Started;
             }
         }
