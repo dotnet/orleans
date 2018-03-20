@@ -166,7 +166,7 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'UpdateIAmAlivetimeKey','
-    SELECT UpdateIAmAlivetime(:DEPLOYMENTID, :ADDRESS, :PORT, :GENERATION, :IAMALIVETIME) AS RESULT FROM DUAL
+    SELECT UpdateIAmAlivetime(:DeploymentId, :Address, :Port, :Generation, :IAmAliveTime) AS RESULT FROM DUAL
 ');
 /
 
@@ -174,7 +174,7 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'InsertMembershipVersionKey','
-    SELECT InsertMembershipVersion(:DEPLOYMENTID) AS RESULT FROM DUAL
+    SELECT InsertMembershipVersion(:DeploymentId) AS RESULT FROM DUAL
 ');
 /
 
@@ -182,7 +182,7 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'InsertMembershipKey','
-    SELECT INSERTMEMBERSHIP(:DEPLOYMENTID,:IAMALIVETIME,:SILONAME,:HOSTNAME,:ADDRESS,:PORT,:GENERATION,:STARTTIME,:STATUS,:PROXYPORT,:VERSION) FROM DUAL
+    SELECT INSERTMEMBERSHIP(:DeploymentId,:IAmAliveTime,:SiloName,:Hostname,:Address,:Port,:Generation,:StartTime,:Status,:ProxyPort,:Version) FROM DUAL
 ');
 /
 
@@ -190,7 +190,7 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'UpdateMembershipKey','
-    SELECT UpdateMembership(:DEPLOYMENTID, :ADDRESS, :PORT, :GENERATION, :IAMALIVETIME, :STATUS, :SUSPECTTIMES, :VERSION) AS RESULT FROM DUAL
+    SELECT UpdateMembership(:DeploymentId, :Address, :Port, :Generation, :IAmAliveTime, :Status, :SuspectTimes, :Version) AS RESULT FROM DUAL
 ');
 /
 
@@ -198,16 +198,16 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'MembershipReadRowKey','
-     SELECT v.DeploymentId, m.Address, m.Port, m.Generation, m.SiloName, m.HostName,
+    SELECT v.DeploymentId, m.Address, m.Port, m.Generation, m.SiloName, m.HostName,
        m.Status, m.ProxyPort, m.SuspectTimes, m.StartTime, m.IAmAliveTime, v.Version
     FROM
         OrleansMembershipVersionTable v
         LEFT OUTER JOIN OrleansMembershipTable m ON v.DeploymentId = m.DeploymentId
-        AND Address = :ADDRESS AND :ADDRESS IS NOT NULL
-        AND Port = :PORT AND :PORT IS NOT NULL
-        AND Generation = :GENERATION AND :GENERATION IS NOT NULL
+        AND Address = :Address AND :Address IS NOT NULL
+        AND Port = :Port AND :Port IS NOT NULL
+        AND Generation = :Generation AND :Generation IS NOT NULL
     WHERE
-        v.DeploymentId = :DEPLOYMENTID AND :DEPLOYMENTID IS NOT NULL
+        v.DeploymentId = :DeploymentId AND :DeploymentId IS NOT NULL
 ');
 /
 
@@ -221,7 +221,7 @@ VALUES
         OrleansMembershipVersionTable v
         LEFT OUTER JOIN OrleansMembershipTable m ON v.DeploymentId = m.DeploymentId
     WHERE
-        v.DeploymentId = :DEPLOYMENTID AND :DEPLOYMENTID IS NOT NULL
+        v.DeploymentId = :DeploymentId AND :DeploymentId IS NOT NULL
 ');
 /
 
@@ -244,8 +244,8 @@ VALUES
     'GatewaysQueryKey','
     SELECT Address, ProxyPort, Generation
     FROM OrleansMembershipTable
-    WHERE DeploymentId = :DEPLOYMENTID AND :DEPLOYMENTID IS NOT NULL
-      AND Status = :STATUS AND :STATUS IS NOT NULL
+    WHERE DeploymentId = :DeploymentId AND :DeploymentId IS NOT NULL
+      AND Status = :Status AND :Status IS NOT NULL
       AND ProxyPort > 0
 ');
 /
