@@ -66,13 +66,17 @@ namespace Orleans.Runtime.MembershipService
                 // Init the membership table.
                 await this.membershipTableProvider.InitializeMembershipTable(true);
 
-                // randomly delay the startup, so not all silos write to the table at once.
-                // Use random time not larger than MaxJoinAttemptTime, one minute and 0.5sec*ExpectedClusterSize;
-                var random = new SafeRandom();
-                var maxDelay = TimeSpan.FromMilliseconds(500).Multiply(this.clusterMembershipOptions.ExpectedClusterSize);
-                maxDelay = StandardExtensions.Min(maxDelay, StandardExtensions.Min(this.clusterMembershipOptions.MaxJoinAttemptTime, TimeSpan.FromMinutes(1)));
-                var randomDelay = random.NextTimeSpan(maxDelay);
-                await Task.Delay(randomDelay);
+                if (this.clusterMembershipOptions.ExpectedClusterSize > 1)
+                {
+                    // randomly delay the startup, so not all silos write to the table at once.
+                    // Use random time not larger than MaxJoinAttemptTime, one minute and 0.5sec*ExpectedClusterSize;
+                    // Skip waiting if we expect only one member for the cluster.
+                    var random = new SafeRandom();
+                    var maxDelay = TimeSpan.FromMilliseconds(500).Multiply(this.clusterMembershipOptions.ExpectedClusterSize);
+                    maxDelay = StandardExtensions.Min(maxDelay, StandardExtensions.Min(this.clusterMembershipOptions.MaxJoinAttemptTime, TimeSpan.FromMinutes(1)));
+                    var randomDelay = random.NextTimeSpan(maxDelay);
+                    await Task.Delay(randomDelay);
+                }
 
                 // first, cleanup all outdated entries of myself from the table
                 await CleanupTable();

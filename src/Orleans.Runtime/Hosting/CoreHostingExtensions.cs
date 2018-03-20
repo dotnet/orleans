@@ -65,6 +65,7 @@ namespace Orleans.Hosting
 
             builder.UseDevelopmentClustering(primarySiloEndpoint ?? new IPEndPoint(IPAddress.Loopback, siloPort));
             builder.Configure<ClusterOptions>(options => options.ClusterId = clusterId);
+            builder.Configure<ClusterMembershipOptions>(options => options.ExpectedClusterSize = 1);
 
             return builder;
         }
