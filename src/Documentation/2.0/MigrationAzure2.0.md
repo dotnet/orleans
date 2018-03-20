@@ -5,7 +5,7 @@ title: Migration from Orleans 1.5 to 2.0 when using Azure
 
 # Migration from Orleans 1.5 to 2.0 when using Azure
 
-Since the move to 2.0, the configuration of the silo has changed a lot, and now every config step is based on a Silo Builder.
+Since the move to 2.0, the configuration of the silo has changed, before we used to have a major object that handled all the configuration steps, then the developer was able to add each provider as needed, now every config step is based on a Silo Builder, similar to how it is done in ASP.NET Core with the WebHostBuilder.
 
 On 1.5.x, the configuration for Azure looked like this:
 ```csharp
@@ -14,7 +14,7 @@ On 1.5.x, the configuration for Azure looked like this:
     config.AddAzureTableStorageProvider("AzureStore", RoleEnvironment.GetConfigurationSettingValue("DataConnectionString"));
 ```
 
-The AzureSilo have a static method named DefaultConfiguration(), this method used to load every thing from the configuration file of the service. Now, you must load everything by hand, the new model is not to depend on some sort of naming convention, you can name your endpoints as you want, so the new configuration API  looks like this:
+The AzureSilo have a static method named DefaultConfiguration(), this method used to load everything from the configuration file of the service. Now, you must load everything manually, the new model is not to depend on some sort of naming convention, you can name your endpoints as you want, so the new configuration API  looks like this:
 
 ```csharp
     //Load the different settings from the services configuration file
@@ -39,3 +39,5 @@ The AzureSilo have a static method named DefaultConfiguration(), this method use
         //If Grain Storage is needed, add the service and set the name
         .AddAzureTableGrainStorage("AzureTableStore");
 ```
+
+# AzureSilo to ISiloHost
