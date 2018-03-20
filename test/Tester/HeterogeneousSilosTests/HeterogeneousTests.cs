@@ -18,6 +18,7 @@ namespace Tester.HeterogeneousSilosTests
     public class HeterogeneousTests : OrleansTestingBase, IDisposable
     {
         private TestCluster cluster;
+        private TimeSpan clientRefreshDelay = TimeSpan.FromSeconds(1);
         private readonly TimeSpan refreshInterval = TimeSpan.FromMilliseconds(200);
 
         private void SetupAndDeployCluster(string defaultPlacementStrategy, params Type[] blackListedTypes)
@@ -59,13 +60,22 @@ namespace Tester.HeterogeneousSilosTests
         [Fact]
         public async Task MergeGrainResolverTests()
         {
-            await MergeGrainResolverTestsImpl("RandomPlacement", typeof(TestGrain));
-            await MergeGrainResolverTestsImpl("PreferLocalPlacement", typeof(TestGrain));
+            await MergeGrainResolverTestsImpl("RandomPlacement", true, typeof(TestGrain));
+            await MergeGrainResolverTestsImpl("PreferLocalPlacement", true, typeof(TestGrain));
             // TODO Check ActivationCountBasedPlacement in tests
             //await MergeGrainResolverTestsImpl("ActivationCountBasedPlacement", typeof(TestGrain));
         }
 
-        private async Task MergeGrainResolverTestsImpl(string defaultPlacementStrategy, params Type[] blackListedTypes)
+        [Fact]
+        public async Task MergeGrainResolverWithClientRefreshTests()
+        {
+            await MergeGrainResolverTestsImpl("RandomPlacement", false, typeof(TestGrain));
+            await MergeGrainResolverTestsImpl("PreferLocalPlacement", false, typeof(TestGrain));
+            // TODO Check ActivationCountBasedPlacement in tests
+            //await MergeGrainResolverTestsImpl("ActivationCountBasedPlacement", typeof(TestGrain));
+        }
+
+        private async Task MergeGrainResolverTestsImpl(string defaultPlacementStrategy, bool restartClient, params Type[] blackListedTypes)
         {
             SetupAndDeployCluster(defaultPlacementStrategy, blackListedTypes);
 
@@ -79,10 +89,17 @@ namespace Tester.HeterogeneousSilosTests
             cluster.StartAdditionalSilo();
             await Task.Delay(delayTimeout);
 
-            // Disconnect/Reconnect the client
-            await cluster.Client.Close();
-            cluster.Client.Dispose();
-            cluster.InitializeClient();
+            if (restartClient)
+            {
+                // Disconnect/Reconnect the client
+                await cluster.Client.Close();
+                cluster.Client.Dispose();
+                cluster.InitializeClient();
+            }
+            else
+            {
+                await Task.Delay(clientRefreshDelay.Multiply(2));
+            }
 
             for (var i = 0; i < 5; i++)
             {
@@ -99,10 +116,17 @@ namespace Tester.HeterogeneousSilosTests
             var orleansException = await Assert.ThrowsAsync<OrleansException>(() => grain.SetLabel("Hello world"));
             Assert.Contains("Cannot find an implementation class for grain interface", orleansException.Message);
 
-            // Disconnect/Reconnect the client
-            await cluster.Client.Close();
-            cluster.Client.Dispose();
-            cluster.InitializeClient();
+            if (restartClient)
+            {
+                // Disconnect/Reconnect the client
+                await cluster.Client.Close();
+                cluster.Client.Dispose();
+                cluster.InitializeClient();
+            }
+            else
+            {
+                await Task.Delay(clientRefreshDelay.Multiply(2));
+            }
 
             // Should fail
             exception = Assert.Throws<ArgumentException>(() => this.cluster.GrainFactory.GetGrain<ITestGrain>(0));
