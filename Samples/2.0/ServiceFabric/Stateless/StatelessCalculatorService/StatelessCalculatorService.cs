@@ -57,17 +57,14 @@ namespace StatelessCalculatorService
                     builder.UseInMemoryReminderService();
 
                     // Service Fabric manages port allocations, so update the configuration using those ports.
-                    builder.Configure<EndpointOptions>(options =>
-                    {
-                        // Gather configuration from Service Fabric.
-                        var activation = serviceContext.CodePackageActivationContext;
-                        var endpoints = activation.GetEndpoints();
+                    // Gather configuration from Service Fabric.
+                    var activation = serviceContext.CodePackageActivationContext;
+                    var endpoints = activation.GetEndpoints();
 
-                        var siloEndpoint = endpoints[ServiceFabricConstants.SiloEndpointName];
-                        var gatewayEndpoint = endpoints[ServiceFabricConstants.GatewayEndpointName];
-                        var hostname = serviceContext.NodeContext.IPAddressOrFQDN;
-                        builder.ConfigureEndpoints(hostname, siloEndpoint.Port, gatewayEndpoint.Port);
-                    });
+                    var siloEndpoint = endpoints[ServiceFabricConstants.SiloEndpointName];
+                    var gatewayEndpoint = endpoints[ServiceFabricConstants.GatewayEndpointName];
+                    var hostname = serviceContext.NodeContext.IPAddressOrFQDN;
+                    builder.ConfigureEndpoints(hostname, siloEndpoint.Port, gatewayEndpoint.Port);
 
                     // Add your application assemblies.
                     builder.ConfigureApplicationParts(parts =>
