@@ -186,7 +186,6 @@ namespace Tests.GeoClusterTests
                 });
                 hostBuilder.AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                 {
-                    options.ServiceId = silo.Value.ServiceId.ToString();
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                 }));
                 hostBuilder.AddAzureBlobGrainStorage("PubSubStore", (AzureBlobStorageOptions options) =>
