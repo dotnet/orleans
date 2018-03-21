@@ -1,7 +1,5 @@
 ﻿using Orleans.Runtime;
 using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Orleans.Configuration
 {
@@ -15,17 +13,13 @@ namespace Orleans.Configuration
         /// <summary>
         /// Azure table name.
         /// </summary>
-        public string TableName { get; set; }
+        public string TableName { get; set; } = DEFAULT_TABLE_NAME;
+        public const string DEFAULT_TABLE_NAME = "Checkpoint";
         /// <summary>
         /// Interval to write checkpoints.  Prevents spamming storage.
         /// </summary>
         public TimeSpan PersistInterval { get; set; } = DEFAULT_CHECKPOINT_PERSIST_INTERVAL;
         public static readonly TimeSpan DEFAULT_CHECKPOINT_PERSIST_INTERVAL = TimeSpan.FromMinutes(1);
-
-        /// <summary>
-        /// Unique namespace for checkpoint data.  Is similar to consumer group.
-        /// </summary>
-        public string Namespace { get; set; }
     }
 
     //TOOD: how to wire this validator into DI?
@@ -44,8 +38,6 @@ namespace Orleans.Configuration
                 throw new OrleansConfigurationException($"{nameof(AzureTableStreamCheckpointerOptions)} with name {this.name} is invalid. {nameof(AzureTableStreamCheckpointerOptions.ConnectionString)} is invalid");
             if (String.IsNullOrEmpty(options.TableName))
                 throw new OrleansConfigurationException($"{nameof(AzureTableStreamCheckpointerOptions)} with name {this.name} is invalid. {nameof(AzureTableStreamCheckpointerOptions.TableName)} is invalid");
-            if (String.IsNullOrEmpty(options.Namespace))
-                throw new OrleansConfigurationException($"{nameof(AzureTableStreamCheckpointerOptions)} with name {this.name} is invalid. {nameof(AzureTableStreamCheckpointerOptions.Namespace)} is invalid");
         }
     }
 }

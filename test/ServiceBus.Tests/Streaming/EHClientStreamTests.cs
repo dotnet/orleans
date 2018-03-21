@@ -28,8 +28,6 @@ namespace ServiceBus.Tests.StreamingTests
         private const string StreamNamespace = "StreamNamespace";
         private const string EHPath = "ehorleanstest";
         private const string EHConsumerGroup = "orleansnightly";
-        private const string EHCheckpointTable = "ehcheckpoint";
-        private static readonly string CheckpointNamespace = Guid.NewGuid().ToString();
 
         private readonly ITestOutputHelper output;
         private readonly ClientStreamTestRunner runner;
@@ -64,8 +62,6 @@ namespace ServiceBus.Tests.StreamingTests
                     .ConfigureComponent<AzureTableStreamCheckpointerOptions, IStreamQueueCheckpointerFactory>(EventHubCheckpointerFactory.CreateFactory, ob => ob.Configure(options =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        options.TableName = EHCheckpointTable;
-                        options.Namespace = CheckpointNamespace;
                         options.PersistInterval = TimeSpan.FromSeconds(10);
                     }));
                 hostBuilder
@@ -87,15 +83,6 @@ namespace ServiceBus.Tests.StreamingTests
                         options.Path = EHPath;
                     }));
             }
-        }
-
-        public override void Dispose()
-        {
-            base.Dispose();
-            var dataManager = new AzureTableDataManager<TableEntity>(EHCheckpointTable, TestDefaultConfiguration.DataConnectionString, NullLoggerFactory.Instance);
-            dataManager.InitTableAsync().Wait();
-            dataManager.ClearTableAsync().Wait();
-            TestAzureTableStorageStreamFailureHandler.DeleteAll().Wait();
         }
 
         [Fact]

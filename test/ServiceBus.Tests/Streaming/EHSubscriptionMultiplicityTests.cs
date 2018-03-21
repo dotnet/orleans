@@ -23,8 +23,6 @@ namespace ServiceBus.Tests.StreamingTests
         private const string StreamNamespace = "EHSubscriptionMultiplicityTestsNamespace";
         private const string EHPath = "ehorleanstest";
         private const string EHConsumerGroup = "orleansnightly";
-        private const string EHCheckpointTable = "ehcheckpoint";
-        private static readonly string CheckpointNamespace = Guid.NewGuid().ToString();
 
         private readonly SubscriptionMultiplicityTestRunner runner;
         private readonly Fixture fixture;
@@ -34,14 +32,6 @@ namespace ServiceBus.Tests.StreamingTests
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
-            }
-
-            public override void Dispose()
-            {
-                base.Dispose();
-                var dataManager = new AzureTableDataManager<TableEntity>(EHCheckpointTable, TestDefaultConfiguration.DataConnectionString, NullLoggerFactory.Instance);
-                dataManager.InitTableAsync().Wait();
-                dataManager.ClearTableAsync().Wait();
             }
 
             private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
@@ -62,12 +52,9 @@ namespace ServiceBus.Tests.StreamingTests
                         .UseEventHubCheckpointer(ob=>ob.Configure(options=>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            options.TableName = EHCheckpointTable;
-                            options.Namespace = CheckpointNamespace;
                             options.PersistInterval = TimeSpan.FromSeconds(1);
                         }))
                         .UseDynamicClusterConfigDeploymentBalancer();
-                        
                 }
             }
         }
