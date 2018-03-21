@@ -52,7 +52,7 @@ namespace UnitTests.GeoClusterTests
                 await t;
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [SkippableFact(Skip= "https://github.com/dotnet/orleans/issues/4265"), TestCategory("Functional")]
         public async Task ThreeClusterBattery()
         {
 
