@@ -270,7 +270,6 @@ namespace UnitTests.ActivationsLifeCycleTests
             {
                 // Disable retries in this case, to make test more predictable.
                 legacy.ClusterConfiguration.Globals.MaxForwardCount = 0;
-                legacy.ClientConfiguration.Gateways.RemoveAt(1);
                 // Disable reminder service for this test: when the secondary silo starts it may
                 // not see right away the activation from the primary silo. This request should be forwarded 
                 // to the correct activation, but since we deactivate forwarding, the secondary silo will

@@ -170,6 +170,19 @@ namespace Orleans.Runtime.Messaging
 
         internal SiloAddress TryToReroute(Message msg)
         {
+            // ** Special routing rule for system target here **
+            // When a client make a request/response to/from a SystemTarget, the TargetSilo can be set to either 
+            //  - the GatewayAddress of the target silo (for example, when the client want get the cluster typemap)
+            //  - the "internal" Silo-to-Silo address, if the client want to send a message to a specific SystemTarget
+            //    activation that is on a silo on which there is no gateway available (or if the client is not
+            //    connected to that gateway)
+            // So, if the TargetGrain is a SystemTarget we always trust the value from Message.TargetSilo and forward
+            // it to this address...
+            // EXCEPT if the value is equal to the current GatewayAdress: in this case we will return
+            // null and the local dispatcher will forward the Message to a local SystemTarget activation
+            if (msg.TargetGrain.IsSystemTarget && !this.gatewayAddress.Matches(msg.TargetSilo))
+                return msg.TargetSilo;
+
             // for responses from ClientAddressableObject to ClientGrain try to use clientsReplyRoutingCache for sending replies directly back.
             if (!msg.SendingGrain.IsClient || !msg.TargetGrain.IsClient) return null;
 
@@ -242,9 +255,12 @@ namespace Orleans.Runtime.Messaging
             {
                 clientsReplyRoutingCache.RecordClientRoute(msg.SendingGrain, msg.SendingSilo);
             }
-            
+
             msg.TargetSilo = null;
-            msg.SendingSilo = gatewayAddress; // This makes sure we don't expose wrong silo addresses to the client. Client will only see silo address of the Gateway it is connected to.
+            // Override the SendingSilo only if the sending grain is not 
+            // a system target
+            if (!msg.SendingGrain.IsSystemTarget)
+                msg.SendingSilo = gatewayAddress;
             QueueRequest(client, msg);
             return true;
         }
