@@ -147,7 +147,7 @@ namespace DefaultCluster.Tests
                 }
 
             }
-            await Task.WhenAll(tasks).WithTimeout(TimeSpan.FromSeconds(15));
+            await Task.WhenAll(tasks).WithTimeout(TimeSpan.FromSeconds(20));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ErrorHandling"), TestCategory("GrainReference")]
