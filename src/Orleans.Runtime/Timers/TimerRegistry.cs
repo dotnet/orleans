@@ -18,8 +18,8 @@ namespace Orleans.Timers
 
         public IDisposable RegisterTimer(Grain grain, Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
         {
-            var timer = GrainTimer.FromTaskCallback(this.scheduler, this.timerLogger, asyncCallback, state, dueTime, period, activationData: grain.Data);
-            grain.Data.OnTimerCreated(timer);
+            var timer = GrainTimer.FromTaskCallback(this.scheduler, this.timerLogger, asyncCallback, state, dueTime, period, activationData: grain?.Data);
+            grain?.Data.OnTimerCreated(timer);
             timer.Start();
             return timer;
         }

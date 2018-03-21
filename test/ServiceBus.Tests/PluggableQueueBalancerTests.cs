@@ -1,10 +1,7 @@
 using System.Threading.Tasks;
 using Orleans.Configuration;
 using Orleans.Hosting;
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.ServiceBus.Providers.Testing;
-using Orleans.Storage;
 using Orleans.TestingHost;
 using Tester.StreamingTests;
 using TestExtensions;
@@ -44,7 +41,7 @@ namespace ServiceBus.Tests
                             {
                                 options.EventHubPartitionCount = TotalQueueCount;
                             }))
-                         .ConfigurePartitionBalancing((s, n) => ActivatorUtilities.CreateInstance<LeaseBasedQueueBalancerForTest>(s));
+                         .ConfigurePartitionBalancing((s, n) => ActivatorUtilities.CreateInstance<LeaseBasedQueueBalancerForTest>(s, n));
                 }
             }
         }

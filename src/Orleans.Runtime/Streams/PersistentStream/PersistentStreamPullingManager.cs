@@ -88,7 +88,7 @@ namespace Orleans.Streams
 
             // Remove cast once we cleanup
             queueAdapter = qAdapter.Value;
-            await this.queueBalancer.Initialize(this.streamProviderName, this.adapterFactory.GetStreamQueueMapper());
+            await this.queueBalancer.Initialize(this.adapterFactory.GetStreamQueueMapper());
             queueBalancer.SubscribeToQueueDistributionChangeEvents(this);
 
             List<QueueId> myQueues = queueBalancer.GetMyQueues().ToList();

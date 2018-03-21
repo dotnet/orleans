@@ -28,8 +28,7 @@ namespace Orleans.Streams
             ringProvider.SubscribeToRangeChangeEvents(this);
         }
 
-        public override Task Initialize(string strProviderName,
-            IStreamQueueMapper queueMapper)
+        public override Task Initialize(IStreamQueueMapper queueMapper)
         {
             if (queueMapper == null)
             {
