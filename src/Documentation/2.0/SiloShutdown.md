@@ -6,9 +6,10 @@ title: Shutting down Orleans
 This document explains how to gracefully shutdown an Orleans silo before application exit, first as a Console app, and then as a Docker container app.
 
 # Graceful shutdown - Console app
-The following code shows how to gracefully shutdown an orleans silo console app in response to the user pressing Ctrl+C, which generates the `Console.CancelkeyPress` event.
+The following code shows how to gracefully shutdown an Orleans silo console app in response to the user pressing Ctrl+C, which generates the `Console.CancelkeyPress` event.
 
-Normally when that event handler returns, the application will exit immediately, causing a catastrophic Orleans silo crash and loss of data. But in the sample code below, we set `a.Cancel = true;` to prevent the application closing before the Orleans silo has completed its graceful shutdown.
+Normally when that event handler returns, the application will exit immediately, causing a catastrophic Orleans silo crash and loss of in-memory state.
+But in the sample code below, we set `a.Cancel = true;` to prevent the application closing before the Orleans silo has completed its graceful shutdown.
 
 ```csharp
 using Microsoft.Extensions.Logging;
@@ -23,7 +24,6 @@ namespace MySiloHost {
 
     class Program {
 
-        static readonly ManualResetEvent _siloStarted = new ManualResetEvent(false);
         static readonly ManualResetEvent _siloStopped = new ManualResetEvent(false);
 
         static ISiloHost silo;
@@ -35,8 +35,7 @@ namespace MySiloHost {
             SetupApplicationShutdown();
 
             silo = CreateSilo();
-            Task.Run(StartSilo);
-            _siloStarted.WaitOne();
+            silo.StartAsync().Wait();
 
             /// Wait for the silo to completely shutdown before exiting. 
             _siloStopped.WaitOne();
@@ -51,7 +50,7 @@ namespace MySiloHost {
                 lock (syncLock) {
                     if (!siloStopping) {
                         siloStopping = true;
-                        Task.Run(StopSilo);
+                        Task.Run(StopSilo).Ignore();
                     }
                 }
                 /// Event handler execution exits immediately, leaving the silo shutdown running on a background thread,
@@ -61,17 +60,12 @@ namespace MySiloHost {
 
         static ISiloHost CreateSilo() {
             return new SiloHostBuilder()
-                .Configure(options => options.ClusterId = "mysilo")
+                .Configure(options => options.ClusterId = "MyTestCluster")
                 /// Prevent the silo from automatically stopping itself when the cancel key is pressed.
                 .Configure<ProcessExitHandlingOptions>(options => options.FastKillOnProcessExit = false)
                 .UseDevelopmentClustering(options => options.PrimarySiloEndpoint = new IPEndPoint(IPAddress.Loopback, 11111))
                 .ConfigureLogging(b => b.SetMinimumLevel(LogLevel.Debug).AddConsole())
                 .Build();
-        }
-
-        static async Task StartSilo() {
-            await silo.StartAsync();
-            _siloStarted.Set();
         }
 
         static async Task StopSilo() {
@@ -89,7 +83,6 @@ When the event handler method finishes first, which happens at least half the ti
 ```csharp
 class Program {
 
-    static readonly ManualResetEvent _siloStarted = new ManualResetEvent(false);
     static readonly ManualResetEvent _siloStopped = new ManualResetEvent(false);
 
     static ISiloHost silo;
@@ -107,17 +100,11 @@ class Program {
         };
 
         silo = CreateSilo();
-        Task.Run(StartSilo);
-        _siloStarted.WaitOne();
+        silo.StartAsync().Wait();
 
         /// Wait for the silo to completely shutdown before exiting. 
         _siloStopped.WaitOne();
         /// Now race to finish ... who will finish first?
-    }
-
-    static async Task StartSilo() {
-        await silo.StartAsync();
-        _siloStarted.Set();
     }
 
     static async Task StopSilo() {
