@@ -1,6 +1,6 @@
 {
   "homepages": [],
-  "source_base_path": "C:/GitHub/sergeybykov/orleans-2/src",
+  "source_base_path": "c:/GitHub/sergeybykov/orleans-2/src",
   "xrefmap": "xrefmap.yml",
   "files": [
     {
@@ -1907,7 +1907,7 @@
       "output": {
         ".html": {
           "relative_path": "Community/Who-Is-Using-Orleans.html",
-          "hash": "mX7PceFFgRTqWwg4jcxY2g=="
+          "hash": "fvO2Rfgx7xeCU3TeNnmnVA=="
         }
       },
       "is_incremental": false,
@@ -2339,6 +2339,18 @@
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Service-Fabric.html",
           "hash": "IxWAMGErvi8jVnIRKCh2cQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/Deployment-and-Operations/SiloShutdown.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/Deployment-and-Operations/SiloShutdown.html",
+          "hash": "GXtAuQEmNMTziZi69v7ZHQ=="
         }
       },
       "is_incremental": false,
@@ -3208,7 +3220,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/toc.html",
-          "hash": "dOl/9/KPK59IJFNlb8XKAw=="
+          "hash": "kYh8BdlAMIT2Cy3XJ/umUA=="
         }
       },
       "is_incremental": false,
