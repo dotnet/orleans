@@ -190,7 +190,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Runtime.Legacy", "s
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Runtime.Legacy.Test", "test\Orleans.Runtime.Legacy.Test\Orleans.Runtime.Legacy.Test.csproj", "{262A898E-0EED-4235-908B-322A699CDD01}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TestingHost.Legacy", "src\Orleans.TestingHost.Legacy\Orleans.TestingHost.Legacy.csproj", "{AC640F05-E013-4D80-A1A4-E577D6883D16}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TestingHost.Legacy", "test\Orleans.TestingHost.Legacy\Orleans.TestingHost.Legacy.csproj", "{AC640F05-E013-4D80-A1A4-E577D6883D16}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -1318,7 +1318,7 @@ Global
 		{4DED3E05-1EEB-4D9E-B768-9AA349DF4E6A} = {4CD3AA9E-D937-48CA-BB6C-158E12257D23}
 		{F9318C81-AD1B-4C24-8D55-476BABADEF38} = {4CD3AA9E-D937-48CA-BB6C-158E12257D23}
 		{262A898E-0EED-4235-908B-322A699CDD01} = {A6573187-FD0D-4DF7-91D1-03E07E470C0A}
-		{AC640F05-E013-4D80-A1A4-E577D6883D16} = {4CD3AA9E-D937-48CA-BB6C-158E12257D23}
+		{AC640F05-E013-4D80-A1A4-E577D6883D16} = {A6573187-FD0D-4DF7-91D1-03E07E470C0A}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7BFB3429-B5BB-4DB1-95B4-67D77A864952}
