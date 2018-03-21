@@ -10,20 +10,21 @@ namespace Orleans.Configuration
     {
         /// <summary>
         /// The ResponseTimeout attribute specifies the default timeout before a request is assumed to have failed.
+        ///<seealso cref="ResponseTimeoutWithDebugger"/>
         /// </summary>
         public TimeSpan ResponseTimeout
         {
-            get { return (DebuggerOverridesTimeout && Debugger.IsAttached) ? RESPONSE_TIMEOUT_WITH_DEBUGGER : responseTimeout; }
+            get { return Debugger.IsAttached ? RESPONSE_TIMEOUT_WITH_DEBUGGER : responseTimeout; }
             set { this.responseTimeout = value; }
         }
         public static readonly TimeSpan DEFAULT_RESPONSE_TIMEOUT = TimeSpan.FromSeconds(30);
         private TimeSpan responseTimeout = DEFAULT_RESPONSE_TIMEOUT;
 
         /// <summary>
-        /// By default, the value from<see cref="ResponseTimeout"/> will be ignored and set to 30 minutes
-        /// if the debugger is attached. Set this flag to false to always use <see cref="ResponseTimeout"/>
+        /// If a debugger is attached the value from <see cref="ResponseTimeout"/> will be ignored 
+        /// and the value from this field will be used.
         /// </summary>
-        public bool DebuggerOverridesTimeout { get; set; } = true;
+        public TimeSpan ResponseTimeoutWithDebugger { get; set; } = RESPONSE_TIMEOUT_WITH_DEBUGGER;
         public static readonly TimeSpan RESPONSE_TIMEOUT_WITH_DEBUGGER = TimeSpan.FromMinutes(30);
 
         /// <summary>
