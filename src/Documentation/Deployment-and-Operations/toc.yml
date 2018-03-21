@@ -1,5 +1,7 @@
 - name: Configuration Guide
   href: Configuration-Guide/toc.yml
+- name: Silo Shutdown
+  href: SiloShutdown.md
 - name: Monitoring
   href: Monitoring/toc.yml
 - name: Troubleshooting Deployments
