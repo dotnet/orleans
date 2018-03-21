@@ -60,6 +60,7 @@ namespace Orleans.Streams
             clientBuilder.ConfigureServices(services =>
             {
                 configureOptions?.Invoke(services.AddOptions<TOptions>(this.name));
+                services.ConfigureNamedOptionForLogging<TOptions>(this.name);
             });
             return this;
         }

@@ -24,7 +24,7 @@ namespace Orleans.Runtime.Providers
         private readonly IStreamPubSub implictPubSub;
         private readonly IStreamPubSub combinedGrainBasedAndImplicitPubSub;
         private readonly ILoggerFactory loggerFactory;
-
+        private readonly ILogger logger;
         public IGrainFactory GrainFactory => this.runtimeClient.InternalGrainFactory;
         public IServiceProvider ServiceProvider => this.runtimeClient.ServiceProvider;
 
@@ -50,7 +50,7 @@ namespace Orleans.Runtime.Providers
             this.runtimeClient = runtimeClient;
             this.ServiceId = clusterOptions.Value.ServiceId;
             this.SiloIdentity = siloDetails.SiloAddress.ToLongString();
-
+            this.logger = this.loggerFactory.CreateLogger<SiloProviderRuntime>();
             this.grainBasedPubSub = new GrainBasedPubSubRuntime(this.GrainFactory);
             var tmp = new ImplicitStreamPubSub(this.runtimeClient.InternalGrainFactory, implicitStreamSubscriberTable);
             this.implictPubSub = tmp;
@@ -121,6 +121,7 @@ namespace Orleans.Runtime.Providers
                 var balancer = this.ServiceProvider.GetServiceByName<IStreamQueueBalancer>(streamProviderName)??this.ServiceProvider.GetService<IStreamQueueBalancer>();
                 if (balancer == null)
                     throw new ArgumentOutOfRangeException("balancerType", $"Cannot create stream queue balancer for StreamProvider: {streamProviderName}.Please configure your stream provider with a queue balancer.");
+                this.logger.LogInformation($"Successfully created queue balancer of type {balancer.GetType()} for stream provider {streamProviderName}");
                 return balancer;
             }
             catch (Exception e)
