@@ -237,7 +237,7 @@ namespace Orleans.Runtime.Configuration
         /// <summary>
         /// Deployment Id. This is the same as ClusterId and has been deprecated in favor of it.
         /// </summary>
-        [Obsolete("DeploymentId is the same as ClusterId.")]
+        [Obsolete(ClientConfiguration.DEPRECATE_DEPLOYMENT_ID_MESSAGE)]
         public string DeploymentId
         {
             get => this.ClusterId;

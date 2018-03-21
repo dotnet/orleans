@@ -16,7 +16,6 @@ namespace Orleans.Logging.Legacy
         /// <param name="ipEndPoint">IP endpoint this logger is associated with</param>
         /// <param name="eventBulkingOptions">config for event bulking feature</param>
         /// <returns></returns>
-        [Obsolete(OrleansLoggingUtils.ObsoleteMessageString)]
         public static ILoggingBuilder AddLegacyOrleansLogging(
             this ILoggingBuilder builder,
             IEnumerable<ILogConsumer> logConsumers,
@@ -38,7 +37,6 @@ namespace Orleans.Logging.Legacy
         /// <param name="ipEndPoint">IP endpoint this logger is associated with</param>
         /// <param name="eventBulkingOptions">config for event bulking feature</param>
         /// <returns></returns>
-        [Obsolete(OrleansLoggingUtils.ObsoleteMessageString)]
         public static ILoggingBuilder AddLegacyOrleansLogging(
             this ILoggingBuilder builder,
             IEnumerable<ILogConsumer> logConsumers,

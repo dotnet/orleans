@@ -8,7 +8,6 @@ namespace Orleans.Runtime
     /// Interface of Orleans runtime for logging services. 
     /// </summary>
     [Serializable]
-    [Obsolete(OrleansLoggingUtils.ObsoleteMessageStringForLegacyLoggingInfrastructure)]
     public abstract class Logger
     {
         /// <summary> Current SeverityLevel set for this logger. </summary>

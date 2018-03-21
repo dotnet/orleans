@@ -9,7 +9,6 @@ using System.Text;
 
 namespace Orleans.Runtime
 {
-    [Obsolete(OrleansLoggingUtils.ObsoleteMessageStringForLegacyLoggingInfrastructure)]
     public static class LoggerExtensionMethods
     {
         /// <summary>

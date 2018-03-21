@@ -8,7 +8,6 @@ namespace Orleans.Extensions.Logging
     /// <summary>
     /// Forward trace log calls to the telemetry abstractions. This will be replaced by an ILoggerProvider in the future.
     /// </summary>
-    [Obsolete(OrleansLoggingUtils.ObsoleteMessageStringForLegacyLoggingInfrastructure)]
     public class TelemetryLogConsumer : ILogConsumer, IFlushableLogConsumer, ICloseableLogConsumer
     {
         private readonly ITelemetryProducer telemetryProducer;

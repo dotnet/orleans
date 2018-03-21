@@ -13,7 +13,6 @@ namespace Orleans.Logging.Legacy
     /// LegacyOrleansLogger supports legacy Orleans logging features, including <see cref="ILogConsumer"/>, <see cref="ICloseableLogConsumer"/>,
     /// <see cref="IFlushableLogConsumer"/>, <see cref="Severity"/>. 
     /// </summary>
-    [Obsolete(OrleansLoggingUtils.ObsoleteMessageString)]
     public class LegacyOrleansLogger : ILogger
     {
         private readonly TimeSpan flushInterval = Debugger.IsAttached ? TimeSpan.FromMilliseconds(10) : TimeSpan.FromSeconds(1);
