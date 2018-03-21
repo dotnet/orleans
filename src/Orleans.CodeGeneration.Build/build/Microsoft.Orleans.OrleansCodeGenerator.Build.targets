@@ -1,4 +1,4 @@
-<Project TreatAsLocalProperty="CodeGenDirectory;IsCore;MSBuildIsCore;TargetIsCore;TaskAssembly;OutputFileName;CoreAssembly;FullAssembly;GeneratorAssembly">
+<Project TreatAsLocalProperty="CodeGenDirectory;IsCore;MSBuildIsCore;TargetIsCore;TaskAssembly;OutputFileName;CoreAssembly;FullAssembly;GeneratorAssembly;CodeGeneratorEnabled;CodeGenCompileInputCache">
 
   <PropertyGroup Condition="'$(OrleansCodeGeneratorAssembly)' != ''">
     <!-- OrleansCodeGeneratorAssembly is used here to override the MSBuildIsCore value during Orleans.sln builds -->
@@ -35,15 +35,17 @@
     <CodeGenDirectory Condition="'$(CodeGenDirectory)' == ''">$(ProjectDir)$(IntermediateOutputPath)</CodeGenDirectory>
     <OutputFileName>$(CodeGenDirectory)$(TargetName).orleans.g.cs</OutputFileName>
     <CodeGeneratorEnabled Condition="'$(OrleansCodeGenPrecompile)'!='true' and '$(DesignTimeBuild)' != 'true'">true</CodeGeneratorEnabled>
+    <CodeGenCompileInputCache Condition="Exists('$(IntermediateOutputPath)$(MSBuildProjectFile).CoreCompileInputs.cache')">$(IntermediateOutputPath)$(MSBuildProjectFile).CoreCompileInputs.cache</CodeGenCompileInputCache>
   </PropertyGroup>
 
   <UsingTask TaskName="Orleans.CodeGeneration.GetDotNetHost" AssemblyFile="$(TaskAssembly)" Condition="'$(CodeGeneratorEnabled)' == 'true' and '$(DotNetHost)' == '' and '$(MSBuildIsCore)' == 'true'" />
 
   <!-- This target is run just before Compile for an Orleans Grain Interface Project -->
   <Target Name="GenerateOrleansCode"
+          AfterTargets="ResolveReferences"
           BeforeTargets="AssignTargetPaths"
           Condition="'$(CodeGeneratorEnabled)' == 'true'"
-          Inputs="@(Compile);@(ReferencePath)"
+          Inputs="@(Compile);@(ReferencePath);$(CodeGenCompileInputCache)"
           Outputs="$(OutputFileName)">
     <PropertyGroup>
       <ExcludeCodeGen>$(DefineConstants);EXCLUDE_CODEGEN</ExcludeCodeGen>
