@@ -2,10 +2,23 @@ using System;
 
 namespace Orleans.Configuration
 {
+    public interface IClusterSettings
+    {
+        /// <summary>
+        /// Gets or sets the cluster identity. This used to be called DeploymentId before Orleans 2.0 name.
+        /// </summary>
+        string ClusterId { get; }
+
+        /// <summary>
+        /// Gets or sets a unique identifier for this service, which should survive deployment and redeployment, where as <see cref="ClusterId"/> might not.
+        /// </summary>
+        Guid ServiceId { get; }
+    }
+
     /// <summary>
     /// Configures the Orleans cluster.
     /// </summary>
-    public class ClusterOptions
+    public class ClusterOptions : IClusterSettings
     {
         /// <summary>
         /// Default cluster id for development clusters.
