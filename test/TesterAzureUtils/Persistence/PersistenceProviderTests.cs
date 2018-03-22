@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.WindowsAzure.Storage.Table;
 using Xunit;
 using Xunit.Abstractions;
@@ -33,7 +34,8 @@ namespace Tester.AzureUtils.Persistence
         {
             this.output = output;
             this.fixture = fixture;
-            this.providerRuntime = new ClientProviderRuntime(fixture.InternalGrainFactory, fixture.Services, NullLoggerFactory.Instance);
+            var clusterOptions = fixture.Services.GetRequiredService<IOptions<ClusterOptions>>();
+            this.providerRuntime = new ClientProviderRuntime(fixture.InternalGrainFactory, fixture.Services, NullLoggerFactory.Instance, clusterOptions);
             this.providerCfgProps.Clear();
         }
 

@@ -301,7 +301,7 @@ namespace UnitTests.Grains
             this.clusterOptions = clusterOptions;
         }
 
-        public Task<Guid> GetServiceId()
+        public Task<string> GetServiceId()
         {
             return Task.FromResult(clusterOptions.Value.ServiceId);
         }

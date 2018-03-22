@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Providers;
@@ -33,7 +34,8 @@ namespace AWSUtils.Tests.StorageTests
             this.output = output;
             this.fixture = fixture;
             providerCfgProps["DataConnectionString"] = $"Service={AWSTestConstants.Service}";
-            this.providerRuntime = new ClientProviderRuntime(fixture.InternalGrainFactory, fixture.Services, NullLoggerFactory.Instance);
+            var clusterOptions = fixture.Services.GetRequiredService<IOptions<ClusterOptions>>();
+            this.providerRuntime = new ClientProviderRuntime(fixture.InternalGrainFactory, fixture.Services, NullLoggerFactory.Instance, clusterOptions);
         }
 
         [SkippableTheory, TestCategory("Functional"), TestCategory("DynamoDB")]

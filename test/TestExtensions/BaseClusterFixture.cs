@@ -68,6 +68,6 @@ namespace TestExtensions
             this.HostedCluster?.StopAllSilos();
         }
 
-        public Guid GetClientServiceId() => Client.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId;
+        public string GetClientServiceId() => Client.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId;
     }
 }

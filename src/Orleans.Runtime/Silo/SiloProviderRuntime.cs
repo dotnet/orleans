@@ -28,7 +28,7 @@ namespace Orleans.Runtime.Providers
         public IGrainFactory GrainFactory => this.runtimeClient.InternalGrainFactory;
         public IServiceProvider ServiceProvider => this.runtimeClient.ServiceProvider;
 
-        public Guid ServiceId { get; }
+        public string ServiceId { get; }
         public string SiloIdentity { get; }
 
         public SiloProviderRuntime(

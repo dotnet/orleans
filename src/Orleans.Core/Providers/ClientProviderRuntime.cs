@@ -5,27 +5,34 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace Orleans.Providers
 {
     internal class ClientProviderRuntime : IStreamProviderRuntime
     {
         private IStreamPubSub grainBasedPubSub;
-        private IStreamPubSub implictPubSub;
+        private IStreamPubSub implicitPubSub;
         private IStreamPubSub combinedGrainBasedAndImplicitPubSub;
         private StreamDirectory streamDirectory;
         private readonly Dictionary<Type, Tuple<IGrainExtension, IAddressable>> caoTable;
         private readonly AsyncLock lockable;
         private readonly IInternalGrainFactory grainFactory;
         private readonly IRuntimeClient runtimeClient;
-        private readonly ILoggerFactory loggerFactory;
         private readonly ILogger timerLogger;
-        public ClientProviderRuntime(IInternalGrainFactory grainFactory, IServiceProvider serviceProvider, ILoggerFactory loggerFactory) 
+        private readonly ClusterOptions clusterOptions;
+
+        public ClientProviderRuntime(
+            IInternalGrainFactory grainFactory,
+            IServiceProvider serviceProvider,
+            ILoggerFactory loggerFactory,
+            IOptions<ClusterOptions> clusterOptions)
         {
+            this.clusterOptions = clusterOptions.Value;
             this.grainFactory = grainFactory;
             this.ServiceProvider = serviceProvider;
             this.runtimeClient = serviceProvider.GetService<IRuntimeClient>();
-            this.loggerFactory = loggerFactory;
             caoTable = new Dictionary<Type, Tuple<IGrainExtension, IAddressable>>();
             lockable = new AsyncLock();
             //all async timer created through current class all share this logger for perf reasons
@@ -43,7 +50,7 @@ namespace Orleans.Providers
             }
             grainBasedPubSub = new GrainBasedPubSubRuntime(GrainFactory);
             var tmp = new ImplicitStreamPubSub(this.grainFactory, implicitStreamSubscriberTable);
-            implictPubSub = tmp;
+            implicitPubSub = tmp;
             combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(grainBasedPubSub, tmp);
             streamDirectory = new StreamDirectory();
         }
@@ -66,18 +73,7 @@ namespace Orleans.Providers
             }
         }
 
-        public Guid ServiceId
-        {
-            get
-            {
-                // Note: In theory nobody should be requesting ServcieId from client so might want to throw exception in this case, 
-                // but several PersistenceProvider_Azure_* test cases in PersistenceProviderTests.cs 
-                // are testing Azure provider in standalone mode which currently looks like access from "client", 
-                // so we return default value here instead of throw exception.
-                //
-                return Guid.Empty;
-            }
-        }
+        public string ServiceId => this.clusterOptions.ServiceId;
 
         public string SiloIdentity
         {
@@ -158,7 +154,7 @@ namespace Orleans.Providers
                 case StreamPubSubType.ExplicitGrainBasedOnly:
                     return grainBasedPubSub;
                 case StreamPubSubType.ImplicitOnly:
-                    return implictPubSub;
+                    return implicitPubSub;
                 default:
                     return null;
             }

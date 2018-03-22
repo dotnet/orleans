@@ -36,7 +36,7 @@ namespace Orleans.Runtime
             this.loggerFactory = loggerFactory;
         }
 
-        public Guid ServiceId { get; }
+        public string ServiceId { get; }
 
         public string SiloIdentity { get; }
 
