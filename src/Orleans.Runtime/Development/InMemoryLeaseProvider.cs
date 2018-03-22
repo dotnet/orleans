@@ -18,7 +18,7 @@ namespace Orleans.Runtime.Development
 
         public InMemoryLeaseProvider(IGrainFactory grainFactory)
         {
-            this.leaseProvider = grainFactory.GetGrain<IDevelopmentLeaseProviderGrain>(0);
+            this.leaseProvider = GetLeaseProviderGrain(grainFactory);
         }
 
         public async Task<AcquireLeaseResult[]> Acquire(string category, LeaseRequest[] leaseRequests)
@@ -26,9 +26,9 @@ namespace Orleans.Runtime.Development
             try
             {
                 return await this.leaseProvider.Acquire(category, leaseRequests);
-            } catch(Exception ex)
+            } catch (Exception ex)
             {
-                return leaseRequests.Select(request => new AcquireLeaseResult(null, ResponseCode.TransientFailure, ex)).ToArray();
+                return leaseRequests.Select(request => new AcquireLeaseResult(new AcquiredLease(request.ResourceKey), ResponseCode.TransientFailure, ex)).ToArray();
             }
         }
 
@@ -45,17 +45,27 @@ namespace Orleans.Runtime.Development
             }
             catch (Exception ex)
             {
-                return acquiredLeases.Select(request => new AcquireLeaseResult(null, ResponseCode.TransientFailure, ex)).ToArray();
+                return acquiredLeases.Select(request => new AcquireLeaseResult(new AcquiredLease(request.ResourceKey), ResponseCode.TransientFailure, ex)).ToArray();
             }
+        }
+
+        public static IDevelopmentLeaseProviderGrain GetLeaseProviderGrain(IGrainFactory grainFactory)
+        {
+            return grainFactory.GetGrain<IDevelopmentLeaseProviderGrain>(0);
         }
     }
 
     public interface IDevelopmentLeaseProviderGrain : ILeaseProvider, IGrainWithIntegerKey
     {
+        /// <summary>
+        /// Forgets about all leases.  Used to simulate loss of this grain or to force rebalance of queues
+        /// </summary>
+        /// <returns></returns>
+        Task Reset();
     }
 
     /// <summary>
-    /// Grain that stores lead information in memory.
+    /// Grain that stores lease information in memory.
     /// TODO: Consider making this a stateful grain, as a production viable implementation of lease provider that works with storage
     /// providers.
     /// </summary>
@@ -82,6 +92,12 @@ namespace Orleans.Runtime.Development
             return Task.FromResult(acquiredLeases.Select(lease => Renew(category, lease)).ToArray());
         }
 
+        public Task Reset()
+        {
+            this.leases.Clear();
+            return Task.CompletedTask;
+        }
+
         private AcquireLeaseResult Acquire(string category, LeaseRequest leaseRequest)
         {
             DateTime now = DateTime.UtcNow;
@@ -91,7 +107,7 @@ namespace Orleans.Runtime.Development
                 lease.ExpiredUtc = now + leaseRequest.Duration;
                 return new AcquireLeaseResult(new AcquiredLease(leaseRequest.ResourceKey, leaseRequest.Duration, lease.Token, now), ResponseCode.OK, null);
             }
-            return new AcquireLeaseResult(null, ResponseCode.LeaseNotAvailable, new OrleansException("Lease not available"));
+            return new AcquireLeaseResult(new AcquiredLease(leaseRequest.ResourceKey), ResponseCode.LeaseNotAvailable, new OrleansException("Lease not available"));
         }
 
         private void Release(string category, AcquiredLease acquiredLease)
@@ -109,7 +125,7 @@ namespace Orleans.Runtime.Development
             // if lease exists, and we have the right token, and lease has not expired, renew.
             if (!this.leases.TryGetValue(Tuple.Create(category, acquiredLease.ResourceKey), out Lease lease) || lease.Token != acquiredLease.Token)
             {
-                return new AcquireLeaseResult(null, ResponseCode.InvalidToken, new OrleansException("Invalid token provided, caller is not the owner."));
+                return new AcquireLeaseResult(new AcquiredLease(acquiredLease.ResourceKey), ResponseCode.InvalidToken, new OrleansException("Invalid token provided, caller is not the owner."));
             }
             // we don't care if lease has expired or not as long as owner has not changed.
             lease.ExpiredUtc = now + acquiredLease.Duration;

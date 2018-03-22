@@ -68,8 +68,7 @@ namespace Orleans.Streams
             return ActivatorUtilities.CreateInstance<DeploymentBasedQueueBalancer>(services, options, deploymentConfiguration);
         }
 
-        public override Task Initialize(string strProviderName,
-            IStreamQueueMapper queueMapper)
+        public override Task Initialize(IStreamQueueMapper queueMapper)
         {
             if (queueMapper == null)
             {
