@@ -115,8 +115,6 @@ namespace Orleans.Streams
         public static IStreamQueueBalancer Create(IServiceProvider services, string name, IDeploymentConfiguration deploymentConfiguration)
         {
             var options = services.GetRequiredService<IOptionsSnapshot<LeaseBasedQueueBalancerOptions>>().Get(name);
-            if (options == null)
-                throw new KeyNotFoundException($"No lease base queue balancer options was configured for provider {name}, nor was a default configured.");
             return ActivatorUtilities.CreateInstance<LeaseBasedQueueBalancer>(services, name, options, deploymentConfiguration);
         }
         /// <inheritdoc/>
@@ -259,7 +257,7 @@ namespace Orleans.Streams
                 activeBuckets = GetActiveSiloCount(this.siloStatusOracle);
             }
             activeBuckets = Math.Max(1, activeBuckets);
-            this.minimumResponsibility = Math.Max(1, this.allQueues.Count / activeBuckets);
+            this.minimumResponsibility = this.allQueues.Count / activeBuckets;
             //if allQueues count is divisible by active bukets, then every bucket should take the same count of queues, otherwise, there should be one bucket take 1 more queue
             if (this.allQueues.Count % activeBuckets == 0)
                 this.maximumResponsibility = this.minimumResponsibility;
