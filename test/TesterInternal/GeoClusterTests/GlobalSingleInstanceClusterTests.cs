@@ -31,7 +31,7 @@ namespace Tests.GeoClusterTests
         /// Run all tests on a small configuration (two clusters, one silo each, one client each)
         /// </summary>
         /// <returns></returns>
-        [SkippableFact, TestCategory("Functional")]
+        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/4281"), TestCategory("Functional")]
         public async Task All_Small()
         {
             await Setup_Clusters(false);
