@@ -7,15 +7,6 @@ namespace Orleans.Hosting
 {
     public static class ClientBuilderExtensions
     {
-        /// <summary>
-        /// Configure cluster client to use event hub persistent streams. This return a configurator which allows further configuration
-        /// </summary>
-        public static ClusterClientEventHubStreamConfigurator AddEventHubStreams(
-            this IClientBuilder builder,
-            string name)
-        {
-            return new ClusterClientEventHubStreamConfigurator(name, builder);
-        }
 
         /// <summary>
         /// Configure cluster client to use event hub persistent streams.
@@ -25,7 +16,8 @@ namespace Orleans.Hosting
            string name,
            Action<ClusterClientEventHubStreamConfigurator> configure)
         {
-            configure?.Invoke(builder.AddEventHubStreams(name));
+            var configurator = new ClusterClientEventHubStreamConfigurator(name,builder);
+            configure?.Invoke(configurator);
             return builder;
         }
 
@@ -36,7 +28,7 @@ namespace Orleans.Hosting
             this IClientBuilder builder,
             string name, Action<EventHubOptions> configureEventHub)
         {
-            builder.AddEventHubStreams(name).ConfigureEventHub(ob => ob.Configure(configureEventHub));
+            builder.AddEventHubStreams(name, b=>b.ConfigureEventHub(ob => ob.Configure(configureEventHub)));
             return builder;
         }
     }

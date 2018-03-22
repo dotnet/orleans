@@ -41,7 +41,7 @@ namespace ServiceBus.Tests.StreamingTests
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddEventHubStreams(StreamProviderName)
+                        .AddEventHubStreams(StreamProviderName, b=>b
                         .ConfigureEventHub(ob => ob.Configure(options =>
                           {
                               options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
@@ -54,7 +54,7 @@ namespace ServiceBus.Tests.StreamingTests
                               options.PersistInterval = TimeSpan.FromSeconds(1);
                           }))
                         .UseDynamicClusterConfigDeploymentBalancer()
-                        .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                        .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
                     hostBuilder
                         .AddMemoryGrainStorageAsDefault();
                 }
@@ -64,14 +64,14 @@ namespace ServiceBus.Tests.StreamingTests
             {
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
                 {
-                    clientBuilder.AddEventHubStreams(StreamProviderName)
-                        .ConfigureEventHub(ob=>ob.Configure( options =>
+                    clientBuilder.AddEventHubStreams(StreamProviderName, b=>
+                        b.ConfigureEventHub(ob=>ob.Configure( options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
                             options.ConsumerGroup = EHConsumerGroup;
                             options.Path = EHPath;
                         }))
-                        .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                        .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
                 }
             }
         }

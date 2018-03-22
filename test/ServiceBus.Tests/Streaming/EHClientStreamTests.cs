@@ -52,7 +52,7 @@ namespace ServiceBus.Tests.StreamingTests
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
-                    .AddPersistentStreams(StreamProviderName, TestEventHubStreamAdapterFactory.Create)
+                    .AddPersistentStreams(StreamProviderName, TestEventHubStreamAdapterFactory.Create, b=>b
                     .Configure<EventHubOptions>(ob => ob.Configure(options =>
                       {
                           options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
@@ -63,7 +63,7 @@ namespace ServiceBus.Tests.StreamingTests
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         options.PersistInterval = TimeSpan.FromSeconds(10);
-                    }));
+                    })));
                 hostBuilder
                     .AddMemoryGrainStorage("PubSubStore");
             }
@@ -74,14 +74,14 @@ namespace ServiceBus.Tests.StreamingTests
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddPersistentStreams(StreamProviderName, TestEventHubStreamAdapterFactory.Create)
-                    .Configure<EventHubOptions>(ob=>ob.Configure(
-                    options =>
-                    {
-                        options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
-                        options.ConsumerGroup = EHConsumerGroup;
-                        options.Path = EHPath;
-                    }));
+                    .AddPersistentStreams(StreamProviderName, TestEventHubStreamAdapterFactory.Create, b=>
+                        b.Configure<EventHubOptions>(ob=>ob.Configure(
+                        options =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                            options.ConsumerGroup = EHConsumerGroup;
+                            options.Path = EHPath;
+                        })));
             }
         }
 

@@ -39,13 +39,13 @@ namespace GoogleUtils.Tests.Streaming
                     .AddMemoryGrainStorage("MemoryStore", op => op.NumStorageGrains = 1)
                     .AddMemoryGrainStorage("PubSubStorage")
                     .AddSimpleMessageStreamProvider("SMSProvider")
-                    .AddPubSubStreams<PubSubDataAdapter>(PUBSUB_STREAM_PROVIDER_NAME)
-                    .ConfigurePubSub(ob=>ob.Configure(options =>
-                    {
-                        options.ProjectId = GoogleTestUtils.ProjectId;
-                        options.TopicId = GoogleTestUtils.TopicId;
-                        options.Deadline = TimeSpan.FromSeconds(600);
-                    }));
+                    .AddPubSubStreams<PubSubDataAdapter>(PUBSUB_STREAM_PROVIDER_NAME, b=>
+                        b.ConfigurePubSub(ob=>ob.Configure(options =>
+                        {
+                            options.ProjectId = GoogleTestUtils.ProjectId;
+                            options.TopicId = GoogleTestUtils.TopicId;
+                            options.Deadline = TimeSpan.FromSeconds(600);
+                        })));
             }
         }
 
@@ -55,13 +55,13 @@ namespace GoogleUtils.Tests.Streaming
             {
                 clientBuilder
                     .AddSimpleMessageStreamProvider("SMSProvider")
-                    .AddPubSubStreams<PubSubDataAdapter>(PUBSUB_STREAM_PROVIDER_NAME)
-                    .ConfigurePubSub(ob=>ob.Configure(options =>
-                    {
-                        options.ProjectId = GoogleTestUtils.ProjectId;
-                        options.TopicId = GoogleTestUtils.TopicId;
-                        options.Deadline = TimeSpan.FromSeconds(600);
-                    }));
+                    .AddPubSubStreams<PubSubDataAdapter>(PUBSUB_STREAM_PROVIDER_NAME, b=>
+                        b.ConfigurePubSub(ob=>ob.Configure(options =>
+                        {
+                            options.ProjectId = GoogleTestUtils.ProjectId;
+                            options.TopicId = GoogleTestUtils.TopicId;
+                            options.Deadline = TimeSpan.FromSeconds(600);
+                        })));
             }
         }
 

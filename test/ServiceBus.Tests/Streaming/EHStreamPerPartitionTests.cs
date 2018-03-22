@@ -42,8 +42,8 @@ namespace ServiceBus.Tests.StreamingTests
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddPersistentStreams(StreamProviderName, StreamPerPartitionEventHubStreamAdapterFactory.Create)
-                        .Configure<EventHubOptions>(ob => ob.Configure(options =>
+                        .AddPersistentStreams(StreamProviderName, StreamPerPartitionEventHubStreamAdapterFactory.Create, b=>
+                        b.Configure<EventHubOptions>(ob => ob.Configure(options =>
                           {
                               options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
                               options.ConsumerGroup = EHConsumerGroup;
@@ -51,13 +51,12 @@ namespace ServiceBus.Tests.StreamingTests
                           }))
                         .UseStaticClusterConfigDeploymentBalancer()
                         .ConfigureComponent<AzureTableStreamCheckpointerOptions, IStreamQueueCheckpointerFactory>(EventHubCheckpointerFactory.CreateFactory,
-                        ob => ob.Configure(
-                        options =>
-                        {
-
+                            ob => ob.Configure(
+                            options =>
+                            {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.PersistInterval = TimeSpan.FromSeconds(1);
-                        }));
+                        })));
 
                     hostBuilder
                         .AddMemoryGrainStorage("PubSubStore");
@@ -69,14 +68,14 @@ namespace ServiceBus.Tests.StreamingTests
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
                 {
                     clientBuilder
-                        .AddPersistentStreams(StreamProviderName, StreamPerPartitionEventHubStreamAdapterFactory.Create)
-                        .Configure<EventHubOptions>(ob=>ob.Configure(
-                        options =>
-                        {
-                            options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
-                            options.ConsumerGroup = EHConsumerGroup;
-                            options.Path = EHPath;
-                        }));
+                        .AddPersistentStreams(StreamProviderName, StreamPerPartitionEventHubStreamAdapterFactory.Create, b=>
+                            b.Configure<EventHubOptions>(ob=>ob.Configure(
+                            options =>
+                            {
+                                options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                                options.ConsumerGroup = EHConsumerGroup;
+                                options.Path = EHPath;
+                            })));
                 }
             }
         }

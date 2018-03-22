@@ -40,7 +40,7 @@ namespace ServiceBus.Tests.StreamingTests
                 {
                     hostBuilder
                         .AddMemoryGrainStorage("PubSubStore")
-                        .AddEventHubStreams(StreamProviderName)
+                        .AddEventHubStreams(StreamProviderName, b=>b
                         .ConfigureEventHub(ob => ob.Configure(
                         options =>
                         {
@@ -54,7 +54,7 @@ namespace ServiceBus.Tests.StreamingTests
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.PersistInterval = TimeSpan.FromSeconds(1);
                         }))
-                        .UseDynamicClusterConfigDeploymentBalancer();
+                        .UseDynamicClusterConfigDeploymentBalancer());
                 }
             }
         }

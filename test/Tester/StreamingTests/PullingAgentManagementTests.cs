@@ -31,11 +31,11 @@ namespace UnitTests.StreamingTests
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME)
-                    .ConfigureAzureQueue(ob => ob.Configure(options =>
-                       {
-                           options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                       }));
+                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME, b=>
+                        b.ConfigureAzureQueue(ob => ob.Configure(options =>
+                           {
+                               options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                           })));
 
                     hostBuilder.AddMemoryGrainStorage("PubSubStore");
                 }
