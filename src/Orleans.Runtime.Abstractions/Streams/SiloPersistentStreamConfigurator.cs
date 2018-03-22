@@ -8,9 +8,35 @@ using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Orleans.Storage;
 
 namespace Orleans.Streams
 {
+    public class PersistentStreamStorageConfigurationValidator : IConfigurationValidator
+    {
+        private IServiceProvider services;
+        private const string pubsubStoreName = "PubSubStore";
+        private string streamProviderName;
+        public PersistentStreamStorageConfigurationValidator(IServiceProvider services, string streamProviderName)
+        {
+            this.services = services;
+            this.streamProviderName = streamProviderName;
+        }
+
+        public void ValidateConfiguration()
+        {
+            var pubsubOptions = services.GetOptionsByName<StreamPubSubOptions>(this.streamProviderName);
+            if (pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit || pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedOnly)
+            {
+                var pubsubStore = services.GetServiceByName<IGrainStorage>(pubsubStoreName);
+                if (pubsubStore == null)
+                    throw new OrleansConfigurationException(
+                        $" Streams with pubsub type {StreamPubSubType.ExplicitGrainBasedAndImplicit} and {StreamPubSubType.ExplicitGrainBasedOnly} requires a grain storage named {pubsubStoreName} " +
+                        $"to be configured with silo. Please configure one for your stream {streamProviderName}.");
+            }
+        }
+    }
+
     public class SiloPersistentStreamConfigurator : ISiloPersistentStreamConfigurator
     {
         protected readonly string name;
@@ -32,6 +58,7 @@ namespace Orleans.Streams
                            .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => ((PersistentStreamProvider)s.GetRequiredServiceByName<IStreamProvider>(n)).ParticipateIn<ISiloLifecycle>())
                            .AddSingletonNamedService<IQueueAdapterFactory>(name, adapterFactory)
                            .AddSingletonNamedService(name, (s, n) => s.GetServiceByName<IStreamProvider>(n) as IControllable)
+                           .AddSingleton<IConfigurationValidator>(sp => new PersistentStreamStorageConfigurationValidator(sp, name))
                            .ConfigureNamedOptionForLogging<StreamPullingAgentOptions>(name)
                            .ConfigureNamedOptionForLogging<StreamPubSubOptions>(name)
                            .ConfigureNamedOptionForLogging<StreamLifecycleOptions>(name);
