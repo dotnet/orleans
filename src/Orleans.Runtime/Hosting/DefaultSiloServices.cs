@@ -38,6 +38,7 @@ using Microsoft.Extensions.Options;
 
 using Orleans.Configuration.Validators;
 using Orleans.Runtime.Configuration;
+using System.Linq;
 
 namespace Orleans.Hosting
 {
@@ -92,7 +93,6 @@ namespace Orleans.Hosting
 
             services.AddLogging();
             services.TryAddSingleton<ITimerRegistry, TimerRegistry>();
-            services.TryAddSingleton<IReminderRegistry, ReminderRegistry>();
             services.TryAddSingleton<GrainRuntime>();
             services.TryAddSingleton<IGrainRuntime, GrainRuntime>();
             services.TryAddSingleton<IGrainCancellationTokenRuntime, GrainCancellationTokenRuntime>();
@@ -142,6 +142,15 @@ namespace Orleans.Hosting
             services.TryAddSingleton<RegistrarManager>();
             services.TryAddSingleton<Factory<Grain, IMultiClusterRegistrationStrategy, ILogConsistencyProtocolServices>>(FactoryUtility.Create<Grain, IMultiClusterRegistrationStrategy, ProtocolServices>);
             services.TryAddSingleton(FactoryUtility.Create<GrainDirectoryPartition>);
+
+            // Reminders
+            services.TryAddSingleton<IReminderRegistry, ReminderRegistry>();
+            if (services.LastOrDefault()?.ServiceType == typeof(IReminderRegistry))
+            {
+                // If the user has not overridden the reminder registry, also add a configuration validator
+                // to ensure that a reminder table is configured if any grains require reminders.
+                services.AddSingleton<IConfigurationValidator, ReminderTableConfigurationValidator>();
+            }
 
             // Placement
             services.AddSingleton<IConfigurationValidator, ActivationCountBasedPlacementOptionsValidator>();
