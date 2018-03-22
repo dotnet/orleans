@@ -26,7 +26,7 @@ namespace Orleans.Streams
         public void ValidateConfiguration()
         {
             var pubsubOptions = services.GetOptionsByName<StreamPubSubOptions>(this.streamProviderName);
-            if (pubsubOptions.PubSubType != StreamPubSubType.ImplicitOnly)
+            if (pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit || pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedOnly)
             {
                 var pubsubStore = services.GetServiceByName<IGrainStorage>(pubsubStoreName);
                 if (pubsubStore == null)
