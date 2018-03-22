@@ -10,7 +10,6 @@ using Orleans.Hosting;
 using Orleans.Configuration;
 using Orleans.Streaming.EventHubs;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
@@ -29,8 +28,6 @@ namespace ServiceBus.Tests.StreamingTests
         private const string StreamProviderName = "EHStreamPerPartition";
         private const string EHPath = "ehorleanstest";
         private const string EHConsumerGroup = "orleansnightly";
-        private const string EHCheckpointTable = "ehcheckpoint";
-        private static readonly string CheckpointNamespace = Guid.NewGuid().ToString();
 
         public class Fixture : BaseTestClusterFixture
         {
@@ -59,8 +56,6 @@ namespace ServiceBus.Tests.StreamingTests
                         {
 
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            options.TableName = EHCheckpointTable;
-                            options.Namespace = CheckpointNamespace;
                             options.PersistInterval = TimeSpan.FromSeconds(1);
                         }));
 
@@ -83,14 +78,6 @@ namespace ServiceBus.Tests.StreamingTests
                             options.Path = EHPath;
                         }));
                 }
-            }
-
-            public override void Dispose()
-            {
-                base.Dispose();
-                var dataManager = new AzureTableDataManager<TableEntity>(EHCheckpointTable, TestDefaultConfiguration.DataConnectionString, NullLoggerFactory.Instance);
-                dataManager.InitTableAsync().Wait();
-                dataManager.ClearTableAsync().Wait();
             }
         }
 

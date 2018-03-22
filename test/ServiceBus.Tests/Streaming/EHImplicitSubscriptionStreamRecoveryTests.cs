@@ -1,12 +1,8 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Orleans.Streaming.EventHubs;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Tester.StreamingTests;
@@ -14,8 +10,6 @@ using TestExtensions;
 using TestGrains;
 using UnitTests.Grains;
 using Xunit;
-using Microsoft.WindowsAzure.Storage.Table;
-using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Hosting;
 using Orleans;
 using Microsoft.Extensions.Configuration;
@@ -29,8 +23,6 @@ namespace ServiceBus.Tests.StreamingTests
         private const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
         private const string EHPath = "ehorleanstest";
         private const string EHConsumerGroup = "orleansnightly";
-        private const string EHCheckpointTable = "ehcheckpoint";
-        private static readonly string CheckpointNamespace = Guid.NewGuid().ToString();
 
         private readonly ImplicitSubscritionRecoverableStreamTestRunner runner;
 
@@ -42,14 +34,6 @@ namespace ServiceBus.Tests.StreamingTests
                 builder.Options.InitialSilosCount = 1;
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
                 builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
-            }
-
-            public override void Dispose()
-            {
-                base.Dispose();
-                var dataManager = new AzureTableDataManager<TableEntity>(EHCheckpointTable, TestDefaultConfiguration.DataConnectionString, NullLoggerFactory.Instance);
-                dataManager.InitTableAsync().Wait();
-                dataManager.ClearTableAsync().Wait();
             }
 
             private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
@@ -67,8 +51,6 @@ namespace ServiceBus.Tests.StreamingTests
                         .UseEventHubCheckpointer(ob => ob.Configure(options =>
                           {
                               options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                              options.TableName = EHCheckpointTable;
-                              options.Namespace = CheckpointNamespace;
                               options.PersistInterval = TimeSpan.FromSeconds(1);
                           }))
                         .UseDynamicClusterConfigDeploymentBalancer()

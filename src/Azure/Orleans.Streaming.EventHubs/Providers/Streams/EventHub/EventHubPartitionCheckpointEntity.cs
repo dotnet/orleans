@@ -12,11 +12,11 @@ namespace Orleans.ServiceBus.Providers
             Offset = EventHubConstants.StartOfStream;
         }
 
-        public static EventHubPartitionCheckpointEntity Create(string streamProviderName, string checkpointNamespace, string partition)
+        public static EventHubPartitionCheckpointEntity Create(string streamProviderName, string serviceId, string partition)
         {
             return new EventHubPartitionCheckpointEntity
             {
-                PartitionKey = MakePartitionKey(streamProviderName, checkpointNamespace),
+                PartitionKey = MakePartitionKey(streamProviderName, serviceId),
                 RowKey = MakeRowKey(partition)
             };
         }

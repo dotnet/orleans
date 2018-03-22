@@ -5,24 +5,28 @@ using Orleans.Streams;
 using Orleans.Streaming.EventHubs;
 using Orleans.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.ServiceBus.Providers
 {
     public class EventHubCheckpointerFactory : IStreamQueueCheckpointerFactory
     {
-        private ILoggerFactory loggerFactory;
-        private string providerName;
-        private AzureTableStreamCheckpointerOptions options;
-        public EventHubCheckpointerFactory(string providerName, AzureTableStreamCheckpointerOptions options, ILoggerFactory loggerFactory)
+        private readonly ILoggerFactory loggerFactory;
+        private readonly string providerName;
+        private readonly AzureTableStreamCheckpointerOptions options;
+        private readonly ClusterOptions clusterOptions;
+
+        public EventHubCheckpointerFactory(string providerName, AzureTableStreamCheckpointerOptions options, IOptions<ClusterOptions> clusterOptions, ILoggerFactory loggerFactory)
         {
             this.options = options;
+            this.clusterOptions = clusterOptions.Value;
             this.loggerFactory = loggerFactory;
             this.providerName = providerName;
         }
 
         public Task<IStreamQueueCheckpointer<string>> Create(string partition)
         {
-            return EventHubCheckpointer.Create(options, providerName, partition, loggerFactory);
+            return EventHubCheckpointer.Create(options, providerName, partition, this.clusterOptions.ServiceId.ToString(), loggerFactory);
         }
 
         public static IStreamQueueCheckpointerFactory CreateFactory(IServiceProvider services, string providerName)
@@ -39,6 +43,7 @@ namespace Orleans.ServiceBus.Providers
     {
         private readonly AzureTableDataManager<EventHubPartitionCheckpointEntity> dataManager;
         private readonly TimeSpan persistInterval;
+        private readonly ILogger logger;
 
         private EventHubPartitionCheckpointEntity entity;
         private Task inProgressSave;
@@ -55,16 +60,17 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="options"></param>
         /// <param name="streamProviderName"></param>
         /// <param name="partition"></param>
+        /// <param name="serviceId"></param>
         /// <param name="loggerFactory"></param>
         /// <returns></returns>
-        public static async Task<IStreamQueueCheckpointer<string>> Create(AzureTableStreamCheckpointerOptions options, string streamProviderName, string partition, ILoggerFactory loggerFactory)
+        public static async Task<IStreamQueueCheckpointer<string>> Create(AzureTableStreamCheckpointerOptions options, string streamProviderName, string partition, string serviceId, ILoggerFactory loggerFactory)
         {
-            var checkpointer = new EventHubCheckpointer(options, streamProviderName, partition, loggerFactory);
+            var checkpointer = new EventHubCheckpointer(options, streamProviderName, partition, serviceId, loggerFactory);
             await checkpointer.Initialize();
             return checkpointer;
         }
 
-        private EventHubCheckpointer(AzureTableStreamCheckpointerOptions options, string streamProviderName, string partition, ILoggerFactory loggerFactory)
+        private EventHubCheckpointer(AzureTableStreamCheckpointerOptions options, string streamProviderName, string partition, string serviceId, ILoggerFactory loggerFactory)
         {
             if (options == null)
             {
@@ -78,9 +84,11 @@ namespace Orleans.ServiceBus.Providers
             {
                 throw new ArgumentNullException(nameof(partition));
             }
+            this.logger = loggerFactory.CreateLogger<EventHubCheckpointer>();
+            this.logger.LogInformation($"Creating EventHub checkpointer for partition {partition} of stream provider {streamProviderName} with serviceId {serviceId}.");
             persistInterval = options.PersistInterval;
             dataManager = new AzureTableDataManager<EventHubPartitionCheckpointEntity>(options.TableName, options.ConnectionString, loggerFactory);
-            entity = EventHubPartitionCheckpointEntity.Create(streamProviderName, options.Namespace, partition);
+            entity = EventHubPartitionCheckpointEntity.Create(streamProviderName, serviceId, partition);
         }
 
         private Task Initialize()
