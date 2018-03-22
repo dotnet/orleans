@@ -43,6 +43,7 @@ namespace Orleans.ServiceBus.Providers
     {
         private readonly AzureTableDataManager<EventHubPartitionCheckpointEntity> dataManager;
         private readonly TimeSpan persistInterval;
+        private readonly ILogger logger;
 
         private EventHubPartitionCheckpointEntity entity;
         private Task inProgressSave;
@@ -83,6 +84,8 @@ namespace Orleans.ServiceBus.Providers
             {
                 throw new ArgumentNullException(nameof(partition));
             }
+            this.logger = loggerFactory.CreateLogger<EventHubCheckpointer>();
+            this.logger.LogInformation($"Creating EventHub checkpointer for partition {partition} of stream provider {streamProviderName} with serviceId {serviceId}.");
             persistInterval = options.PersistInterval;
             dataManager = new AzureTableDataManager<EventHubPartitionCheckpointEntity>(options.TableName, options.ConnectionString, loggerFactory);
             entity = EventHubPartitionCheckpointEntity.Create(streamProviderName, serviceId, partition);
