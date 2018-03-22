@@ -68,12 +68,14 @@ namespace NonSilo.Tests
             Assert.Throws<OrleansConfigurationException>(() => new SiloHostBuilder()
                 .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
                 .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>())
+                .UseInMemoryReminderService()
                 .Build());
 
             var builder = new SiloHostBuilder()
                 .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
                 .Configure<ClusterOptions>(options => options.ClusterId = "test")
-                .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
+                .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>())
+                .UseInMemoryReminderService();
             using (var silo = builder.Build())
             {
                 Assert.NotNull(silo);
