@@ -91,7 +91,7 @@ namespace Orleans.Runtime
         public static IOptions<TOptions> GetOverridableOption<TOptions>(this IServiceProvider services, string key)
             where TOptions : class, new()
         {
-            TOptions option = services.GetRequiredServiceByName<TOptions>(key);
+            TOptions option = services.GetServiceByName<TOptions>(key);
             return option != null
                 ? Options.Create(option)
                 : services.GetRequiredService<IOptions<TOptions>>();
