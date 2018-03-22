@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Runtime
 {
@@ -84,6 +85,18 @@ namespace Orleans.Runtime
 
     public static class KeyedServiceExtensions
     {
+        /// <summary>
+        /// Gets option that can be overriden by named service.
+        /// </summary>
+        public static IOptions<TOptions> GetOverridableOption<TOptions>(this IServiceProvider services, string key)
+            where TOptions : class, new()
+        {
+            TOptions option = services.GetRequiredServiceByName<TOptions>(key);
+            return option != null
+                ? Options.Create(option)
+                : services.GetRequiredService<IOptions<TOptions>>();
+        }
+
         /// <summary>
         /// Register a transient keyed service
         /// </summary>
