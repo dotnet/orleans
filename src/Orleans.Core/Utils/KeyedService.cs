@@ -85,6 +85,24 @@ namespace Orleans.Runtime
     public static class KeyedServiceExtensions
     {
         /// <summary>
+        /// Acquire a service by key or use default.
+        /// </summary>
+        public static TService GetServiceByKeyOrDefault<TKey, TService>(this IServiceProvider services, TKey key)
+            where TService : class
+        {
+            return services.GetServiceByKey<TKey, TService>(key) ?? services.GetService<TService>();
+        }
+
+        /// <summary>
+        /// Acquire a service by name or use default.
+        /// </summary>
+        public static TService GetServiceByNameOrDefault<TService>(this IServiceProvider services, string key)
+            where TService : class
+        {
+            return services.GetServiceByKeyOrDefault<string, TService>(key);
+        }
+
+        /// <summary>
         /// Register a transient keyed service
         /// </summary>
         public static IServiceCollection AddTransientKeyedService<TKey, TService>(this IServiceCollection collection, TKey key, Func<IServiceProvider, TKey, TService> factory)

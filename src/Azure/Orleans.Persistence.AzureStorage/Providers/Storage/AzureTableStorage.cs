@@ -28,7 +28,7 @@ namespace Orleans.Storage
     public class AzureTableGrainStorage : IGrainStorage, IRestExceptionDecoder, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly AzureTableStorageOptions options;
-        private readonly ClusterOptions clusterOptions;
+        private readonly IClusterSettings clusterSettings;
         private readonly SerializationManager serializationManager;
         private readonly IGrainFactory grainFactory;
         private readonly ITypeResolver typeResolver;
@@ -49,11 +49,11 @@ namespace Orleans.Storage
         private string name;
 
         /// <summary> Default constructor </summary>
-        public AzureTableGrainStorage(string name, AzureTableStorageOptions options, IOptions<ClusterOptions> clusterOptions, SerializationManager serializationManager, 
+        public AzureTableGrainStorage(string name, AzureTableStorageOptions options, IClusterSettings clusterSettings, SerializationManager serializationManager, 
             IGrainFactory grainFactory, ITypeResolver typeResolver, ILoggerFactory loggerFactory)
         {
             this.options = options;
-            this.clusterOptions = clusterOptions.Value;
+            this.clusterSettings = clusterSettings;
             this.name = name;
             this.serializationManager = serializationManager;
             this.grainFactory = grainFactory;
@@ -380,7 +380,7 @@ namespace Orleans.Storage
 
         private string GetKeyString(GrainReference grainReference)
         {
-            var key = String.Format("{0}_{1}", this.clusterOptions.ServiceId, grainReference.ToKeyString());
+            var key = String.Format("{0}_{1}", this.clusterSettings.ServiceId, grainReference.ToKeyString());
             return AzureStorageUtils.SanitizeTableProperty(key);
         }
 
@@ -498,7 +498,8 @@ namespace Orleans.Storage
         public static IGrainStorage Create(IServiceProvider services, string name)
         {
             IOptionsSnapshot<AzureTableStorageOptions> optionsSnapshot = services.GetRequiredService<IOptionsSnapshot<AzureTableStorageOptions>>();
-            return ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(services, optionsSnapshot.Get(name), name);
+            IClusterSettings clusterSettings = services.GetServiceByNameOrDefault<IClusterSettings>(name);
+            return ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(services, name, optionsSnapshot.Get(name), clusterSettings);
         }
     }
 }
