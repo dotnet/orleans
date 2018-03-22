@@ -28,7 +28,7 @@ namespace Orleans
             return Task.CompletedTask;
         }
     }
-
+    
     /// <summary>
     /// Base class for client and silo default options loggers.
     /// </summary>
@@ -47,7 +47,9 @@ namespace Orleans
         /// </summary>
         public void LogOptions()
         {
-            this.LogOptions(services.GetServices<IOptionFormatter>());
+            //dedup duplicated log formatters
+            var logFormatters = services.GetServices<IOptionFormatter>().Distinct(OptionsFormatterComparer.Instance);
+            this.LogOptions(logFormatters);
         }
 
         /// <summary>

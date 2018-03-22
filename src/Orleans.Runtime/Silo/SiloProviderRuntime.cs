@@ -27,7 +27,7 @@ namespace Orleans.Runtime.Providers
         private readonly ILogger logger;
         public IGrainFactory GrainFactory => this.runtimeClient.InternalGrainFactory;
         public IServiceProvider ServiceProvider => this.runtimeClient.ServiceProvider;
-
+        private ILogger logger;
         public Guid ServiceId { get; }
         public string SiloIdentity { get; }
 
