@@ -39,6 +39,7 @@ namespace UnitTests.MembershipTests
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
+            builder.CreateSilo = AppDomainSiloHandle.Create;
             builder.AddClientBuilderConfigurator<BuilderConfigurator>();
             builder.AddSiloBuilderConfigurator<BuilderConfigurator>();
         }

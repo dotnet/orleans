@@ -3,6 +3,7 @@
 [assembly: InternalsVisibleTo("Orleans.Core")]
 [assembly: InternalsVisibleTo("Orleans.Runtime")]
 [assembly: InternalsVisibleTo("Orleans.TestingHost")]
+[assembly: InternalsVisibleTo("Orleans.TestingHost.AppDomain")]
 [assembly: InternalsVisibleTo("OrleansManager")]
 
 [assembly: InternalsVisibleTo("DefaultCluster.Tests")]

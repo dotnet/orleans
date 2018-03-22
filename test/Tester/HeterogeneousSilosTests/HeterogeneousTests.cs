@@ -36,7 +36,11 @@ namespace Tester.HeterogeneousSilosTests
         {
             cluster?.StopAllSilos();
             var typesName = blackListedTypes.Select(t => t.FullName).ToList();
-            var builder = new TestClusterBuilder(1);
+            var builder = new TestClusterBuilder(1)
+            {
+                CreateSilo = AppDomainSiloHandle.Create
+            };
+
             builder.ConfigureLegacyConfiguration(legacy =>
             {
                 legacy.ClusterConfiguration.Globals.AssumeHomogenousSilosForTesting = false;

@@ -29,7 +29,7 @@ namespace Tester.StreamingTests
     public class LeaseManagerGrain : Grain, ILeaseManagerGrain
     {
         //queueId is the lease id here
-        private static DateTime UnAssignedLeaseTime = DateTime.MinValue;
+        private static readonly DateTime UnAssignedLeaseTime = DateTime.MinValue;
         private Dictionary<QueueId, DateTime> queueLeaseToRenewTimeMap;
         private ISiloStatusOracle siloStatusOracle;
         private ClusterConfiguration clusterConfiguration;

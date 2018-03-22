@@ -205,7 +205,10 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             if (this.siloIdx == 0)
             {
                 // Setup configuration
-                this.builder = new TestClusterBuilder(1);
+                this.builder = new TestClusterBuilder(1)
+                {
+                    CreateSilo = AppDomainSiloHandle.Create
+                };
                 TestDefaultConfiguration.ConfigureTestCluster(this.builder);
                 builder.Options.ApplicationBaseDirectory = rootDir.FullName;
                 builder.AddSiloBuilderConfigurator<VersionGrainsSiloBuilderConfigurator>();

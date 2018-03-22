@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.TestingHost</PackageId>
     <Title>Microsoft Orleans Testing Host Library</Title>
@@ -6,7 +6,6 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <TargetFramework>net461</TargetFramework>
     <AssemblyName>Orleans.TestingHost</AssemblyName>
     <RootNamespace>Orleans.TestingHost</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>

@@ -4,54 +4,17 @@ using System.Collections.Generic;
 using System.Net;
 using System.Runtime.Serialization;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Providers;
+using Orleans.Hosting;
+using Orleans.MultiCluster;
 using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
+using Orleans.Runtime.MultiClusterNetwork;
 using Orleans.Runtime.Placement;
 using Orleans.Storage;
-using Orleans.MultiCluster;
-using Orleans.Hosting;
-using Orleans.Runtime.MultiClusterNetwork;
 
 namespace Orleans.TestingHost
 {
-    /// <summary>Allows programmatically hosting an Orleans silo in the curent app domain, exposing some marshable members via remoting.</summary>
-    public class AppDomainSiloHost : MarshalByRefObject
-    {
-        private readonly ISiloHost host;
-
-        /// <summary>Creates and initializes a silo in the current app domain.</summary>
-        /// <param name="appDomainName">Name of this silo.</param>
-        /// <param name="serializedConfigurationSources">Silo config data to be used for this silo.</param>
-        public AppDomainSiloHost(string appDomainName, string serializedConfigurationSources)
-        {
-            var deserializedSources = TestClusterHostFactory.DeserializeConfigurationSources(serializedConfigurationSources);
-            this.host = TestClusterHostFactory.CreateSiloHost(appDomainName, deserializedSources);
-            this.AppDomainTestHook = new AppDomainTestHooks(this.host);
-        }
-
-        /// <summary> SiloAddress for this silo. </summary>
-        public SiloAddress SiloAddress => this.host.Services.GetRequiredService<ILocalSiloDetails>().SiloAddress;
-
-        /// <summary> Gateway address for this silo. </summary>
-        public SiloAddress GatewayAddress => this.host.Services.GetRequiredService<ILocalSiloDetails>().GatewayAddress;
-
-        internal AppDomainTestHooks AppDomainTestHook { get; }
-        
-        /// <summary>Starts the silo</summary>
-        public void Start()
-        {
-            this.host.StartAsync().GetAwaiter().GetResult();
-        }
-
-        /// <summary>Gracefully shuts down the silo</summary>
-        public void Shutdown()
-        {
-            this.host.StopAsync().GetAwaiter().GetResult();
-        }
-    }
-
     /// <summary>
     /// Test hook functions for white box testing.
     /// NOTE: this class has to and will be removed entirely. This requires the tests that currently rely on it, to assert using different mechanisms, such as with grains.

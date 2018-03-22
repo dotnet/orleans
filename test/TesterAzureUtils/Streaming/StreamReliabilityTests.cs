@@ -48,6 +48,7 @@ namespace UnitTests.Streaming.Reliability
             TestUtils.CheckForAzureStorage();
 
             this.numExpectedSilos = 2;
+            builder.CreateSilo = AppDomainSiloHandle.Create;
             builder.Options.InitialSilosCount = (short) this.numExpectedSilos;
             builder.Options.UseTestClusterMembership = false;
 

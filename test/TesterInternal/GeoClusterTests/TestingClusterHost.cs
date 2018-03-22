@@ -219,7 +219,8 @@ namespace Tests.GeoClusterTests
                         ClusterId = clusterId,
                         BaseSiloPort = GetPortBase(myCount),
                         BaseGatewayPort = GetProxyBase(myCount)
-                    }
+                    },
+                    CreateSilo = AppDomainSiloHandle.Create
                 };
                 builder.AddSiloBuilderConfigurator<TestSiloBuilderConfigurator>();
                 builder.AddSiloBuilderConfigurator<TSiloBuilderConfigurator>();
@@ -418,11 +419,14 @@ namespace Tests.GeoClusterTests
         public void BlockAllClusterCommunication(string from, string to)
         {
             foreach (var silo in Clusters[from].Silos)
+            {
+                var hooks = ((AppDomainSiloHandle) silo).AppDomainTestHook;
                 foreach (var dest in Clusters[to].Silos)
                 {
                     WriteLog("Blocking {0}->{1}", silo, dest);
-                    silo.AppDomainTestHook.BlockSiloCommunication(dest.SiloAddress.Endpoint, 100);
+                    hooks.BlockSiloCommunication(dest.SiloAddress.Endpoint, 100);
                 }
+            }
         }
 
         public void UnblockAllClusterCommunication(string from)
@@ -430,22 +434,19 @@ namespace Tests.GeoClusterTests
             foreach (var silo in Clusters[from].Silos)
             {
                 WriteLog("Unblocking {0}", silo);
-                silo.AppDomainTestHook.UnblockSiloCommunication();
+                var hooks = ((AppDomainSiloHandle)silo).AppDomainTestHook;
+                hooks.UnblockSiloCommunication();
             }
         }
-  
-        public void SetProtocolMessageFilterForTesting(string origincluster, Func<ILogConsistencyProtocolMessage,bool> filter)
-        {
-            var silos = Clusters[origincluster].Silos;
-            foreach (var silo in silos)
-                silo.AppDomainTestHook.ProtocolMessageFilterForTesting = filter;
 
-        }
-  
-        private SiloHandle GetActiveSiloInClusterByName(string clusterId, string siloName)
+        public void SetProtocolMessageFilterForTesting(string originCluster, Func<ILogConsistencyProtocolMessage, bool> filter)
         {
-            if (Clusters[clusterId].Silos == null) return null;
-            return Clusters[clusterId].Cluster.GetActiveSilos().FirstOrDefault(s => s.Name == siloName);
+            var silos = Clusters[originCluster].Silos;
+            foreach (var silo in silos)
+            {
+                var hooks = ((AppDomainSiloHandle) silo).AppDomainTestHook;
+                hooks.ProtocolMessageFilterForTesting = filter;
+            }
         }
     }
 }

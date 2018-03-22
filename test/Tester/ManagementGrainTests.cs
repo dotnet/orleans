@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
-using Tester;
+using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
@@ -14,18 +14,31 @@ using Xunit.Abstractions;
 
 // ReSharper disable ConvertToConstant.Local
 
-namespace DefaultCluster.Tests.Management
+namespace UnitTests.Management
 {
-    public class ManagementGrainTests : HostedTestClusterEnsureDefaultStarted
+    public class ManagementGrainTests :  OrleansTestingBase, IClassFixture<ManagementGrainTests.Fixture>
     {
+        private readonly Fixture fixture;
         private readonly ITestOutputHelper output;
-        private IManagementGrain mgmtGrain;
+        private readonly IManagementGrain mgmtGrain;
         
-        public ManagementGrainTests(DefaultClusterFixture fixture, ITestOutputHelper output)
-            : base(fixture)
+        public ManagementGrainTests(Fixture fixture, ITestOutputHelper output)
         {
+            this.fixture = fixture;
             this.output = output;
-            mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
+            mgmtGrain = this.fixture.Client.GetGrain<IManagementGrain>(0);
+        }
+
+        private TestCluster HostedCluster => this.fixture.HostedCluster;
+
+        public class Fixture : BaseTestClusterFixture
+        {
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            {
+                // The ActivationCount tests rely on CounterStatistic, which is a shared static value, so isolation
+                // between silos is obtained using AppDomains.
+                builder.CreateSilo = AppDomainSiloHandle.Create;
+            }
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Management")]
@@ -92,7 +105,7 @@ namespace DefaultCluster.Tests.Management
             string grainType = typeof(TGrain).FullName;
             int initialStatisticsCount = stats.Count(s => s.GrainType == grainType);
             int initialActivationsCount = stats.Where(s => s.GrainType == grainType).Sum(s => s.ActivationCount);
-            var grain1 = this.GrainFactory.GetGrain<TGrainInterface>(random.Next());
+            var grain1 = this.fixture.Client.GetGrain<TGrainInterface>(random.Next());
             callGrainMethodAction(grain1); // Call grain method
             stats = this.GetSimpleGrainStatisticsRunner("After Invoke");
             Assert.True(stats.Count(s => s.GrainType == grainType) >= initialStatisticsCount, "Activation counter now exists for grain: " + grainType);

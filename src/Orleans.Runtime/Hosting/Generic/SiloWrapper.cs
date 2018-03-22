@@ -8,6 +8,7 @@ namespace Orleans.Hosting
     internal class SiloWrapper : ISiloHost
     {
         private readonly Silo silo;
+        private bool isDisposing;
 
         public SiloWrapper(Silo silo, IServiceProvider services)
         {
@@ -35,9 +36,14 @@ namespace Orleans.Hosting
             await this.Stopped;
         }
 
+        /// <inheritdoc />
         public void Dispose()
         {
-            (this.Services as IDisposable)?.Dispose();
+            if (!isDisposing)
+            {
+                this.isDisposing = true;
+                (this.Services as IDisposable)?.Dispose();
+            }
         }
     }
 }
