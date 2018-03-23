@@ -6,6 +6,7 @@ using Orleans.Streaming.EventHubs;
 using Orleans.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration.Overrides;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -32,7 +33,8 @@ namespace Orleans.ServiceBus.Providers
         public static IStreamQueueCheckpointerFactory CreateFactory(IServiceProvider services, string providerName)
         {
             var options = services.GetOptionsByName<AzureTableStreamCheckpointerOptions>(providerName);
-            return ActivatorUtilities.CreateInstance<EventHubCheckpointerFactory>(services, providerName, options);
+            IOptions<ClusterOptions> clusterOptions = services.GetProviderClusterOptions(providerName);
+            return ActivatorUtilities.CreateInstance<EventHubCheckpointerFactory>(services, providerName, options, clusterOptions);
         }
     }
 
