@@ -7,16 +7,6 @@ namespace Orleans.Hosting
 {
     public static class ClientBuilderExtensions
     {
-        /// <summary>
-        /// Configure cluster client to use PubSub persistent streams.
-        /// </summary>
-        public static ClusterClientPubSubStreamConfigurator<TDataAdapter> AddPubSubStreams<TDataAdapter>(
-            this IClientBuilder builder,
-            string name)
-            where TDataAdapter : IPubSubDataAdapter
-        {
-            return new ClusterClientPubSubStreamConfigurator<TDataAdapter>(name, builder);
-        }
 
 
         /// <summary>
@@ -27,8 +17,7 @@ namespace Orleans.Hosting
             string name, Action<PubSubOptions> configurePubSub)
             where TDataAdapter : IPubSubDataAdapter
         {
-            builder.AddPubSubStreams<TDataAdapter>(name)
-                .ConfigurePubSub(ob => ob.Configure(configurePubSub));
+            builder.AddPubSubStreams<TDataAdapter>(name, b=>b.ConfigurePubSub(ob => ob.Configure(configurePubSub)));
             return builder;
         }
 
@@ -40,7 +29,8 @@ namespace Orleans.Hosting
             string name, Action<ClusterClientPubSubStreamConfigurator<TDataAdapter>> configure)
             where TDataAdapter : IPubSubDataAdapter
         {
-            configure?.Invoke(builder.AddPubSubStreams<TDataAdapter>(name));
+            var configurator = new ClusterClientPubSubStreamConfigurator<TDataAdapter>(name, builder);
+            configure?.Invoke(configurator);
             return builder;
         }
     }

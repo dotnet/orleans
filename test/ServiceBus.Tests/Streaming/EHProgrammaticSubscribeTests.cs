@@ -27,7 +27,7 @@ namespace ServiceBus.Tests.Streaming
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddEventHubStreams(StreamProviderName)
+                        .AddEventHubStreams(StreamProviderName, b=>b
                         .ConfigureEventHub(ob=>ob.Configure(options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
@@ -38,10 +38,10 @@ namespace ServiceBus.Tests.Streaming
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.PersistInterval = TimeSpan.FromSeconds(10);
-                        }));
+                        })));
 
                     hostBuilder
-                        .AddEventHubStreams(StreamProviderName2)
+                        .AddEventHubStreams(StreamProviderName2, b=>b
                         .ConfigureEventHub(ob => ob.Configure(options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
@@ -52,7 +52,7 @@ namespace ServiceBus.Tests.Streaming
                         .UseEventHubCheckpointer(ob => ob.Configure(options => {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.PersistInterval = TimeSpan.FromSeconds(10);
-                        }));
+                        })));
 
                     hostBuilder
                           .AddMemoryGrainStorage("PubSubStore");

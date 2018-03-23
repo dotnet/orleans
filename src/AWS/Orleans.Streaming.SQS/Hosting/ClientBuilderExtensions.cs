@@ -6,23 +6,13 @@ using OrleansAWSUtils.Streams;
 namespace Orleans.Hosting
 {
     public static class ClientBuilderExtensions
-    {
-
-        /// <summary>
-        /// Configure cluster client to use SQS persistent streams. This will return a configurator which allows further configuration
-        /// </summary>
-        public static ClusterClientSqsStreamConfigurator AddSqsStreams(this IClientBuilder builder, string name)
-        {
-            return new ClusterClientSqsStreamConfigurator(name, builder);
-        }
-
-        /// <summary>
+    {   /// <summary>
         /// Configure cluster client to use SQS persistent streams with default settings
         /// </summary>
         public static IClientBuilder AddSqsStreams(this IClientBuilder builder, string name, Action<SqsOptions> configureOptions)
         {
-            builder.AddSqsStreams(name)
-                .ConfigureSqs(ob=>ob.Configure(configureOptions));
+            builder.AddSqsStreams(name, b=>
+                b.ConfigureSqs(ob=>ob.Configure(configureOptions)));
             return builder;
         }
 
@@ -31,7 +21,8 @@ namespace Orleans.Hosting
         /// </summary>
         public static IClientBuilder AddSqsStreams(this IClientBuilder builder, string name, Action<ClusterClientSqsStreamConfigurator> configure)
         {
-            configure?.Invoke(builder.AddSqsStreams(name));
+            var configurator = new ClusterClientSqsStreamConfigurator(name, builder);
+            configure?.Invoke(configurator);
             return builder;
         }
     }

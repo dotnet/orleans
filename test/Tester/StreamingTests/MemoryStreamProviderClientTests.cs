@@ -36,15 +36,15 @@ namespace Tester.StreamingTests
             private class MyClientBuilderConfigurator : IClientBuilderConfigurator
             {
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder
-                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName)
-                    .ConfigurePartitioning(partitionCount);
+                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, b=>b
+                    .ConfigurePartitioning(partitionCount));
             }
 
             private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
             {
                 public void Configure(ISiloHostBuilder hostBuilder)=> hostBuilder.AddMemoryGrainStorage("PubSubStore")
-                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName)
-                    .ConfigurePartitioning(partitionCount);
+                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, b=>b
+                    .ConfigurePartitioning(partitionCount));
             }
 
             private static void AdjustConfig(ClusterConfiguration config)

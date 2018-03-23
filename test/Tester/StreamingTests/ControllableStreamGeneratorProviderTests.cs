@@ -41,10 +41,10 @@ namespace UnitTests.StreamingTests
                 {
                     hostBuilder
                         .AddPersistentStreams(StreamProviderName,
-                            GeneratorAdapterFactory.Create)
+                            GeneratorAdapterFactory.Create, b => b
                         .Configure<HashRingStreamQueueMapperOptions>(ob=>ob.Configure(options=>options.TotalQueueCount = TotalQueueCount))
                         .UseDynamicClusterConfigDeploymentBalancer()
-                        .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                        .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
                 }
             }
         }

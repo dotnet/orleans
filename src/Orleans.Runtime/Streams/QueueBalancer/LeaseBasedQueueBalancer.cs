@@ -32,7 +32,7 @@ namespace Orleans.Streams
     /// Selector using round robin algorithm
     /// </summary>
     /// <typeparam name="T"></typeparam>
-    internal class RoundRobinSelector<T> : IResourceSelector<T>
+    internal class  RoundRobinSelector<T> : IResourceSelector<T>
     {
         private ReadOnlyCollection<T> resources;
         private int lastSelection;

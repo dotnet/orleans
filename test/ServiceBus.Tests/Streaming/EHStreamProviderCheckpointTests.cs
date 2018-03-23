@@ -47,7 +47,7 @@ namespace ServiceBus.Tests.StreamingTests
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     })
-                    .AddEventHubStreams(StreamProviderName)
+                    .AddEventHubStreams(StreamProviderName, b=>b
                     .ConfigureEventHub(ob=>ob.Configure(
                     options =>
                     {
@@ -61,7 +61,7 @@ namespace ServiceBus.Tests.StreamingTests
                         options.PersistInterval = TimeSpan.FromSeconds(1);
                     }))
                     .UseDynamicClusterConfigDeploymentBalancer()
-                    .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                    .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
             }
         }
 
@@ -70,7 +70,7 @@ namespace ServiceBus.Tests.StreamingTests
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddEventHubStreams(StreamProviderName)
+                    .AddEventHubStreams(StreamProviderName, b=>b
                     .ConfigureEventHub(ob => ob.Configure(
                     options =>
                     {
@@ -78,7 +78,7 @@ namespace ServiceBus.Tests.StreamingTests
                         options.ConsumerGroup = EHConsumerGroup;
                         options.Path = EHPath;
                     }))
-                    .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                    .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
             }
         }
 

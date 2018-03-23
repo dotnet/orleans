@@ -14,12 +14,16 @@ namespace Orleans.Hosting
     /// </summary>
     public static class ClientStreamExtensions
     {
-        public static ClusterClientPersistentStreamConfigurator AddPersistentStreams(
+        public static IClientBuilder AddPersistentStreams(
             this IClientBuilder builder,
             string name,
-            Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory)
+            Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory,
+            Action<IClusterClientPersistentStreamConfigurator> configureStream)
         {
-            return new ClusterClientPersistentStreamConfigurator(name, builder, adapterFactory);
+            //the constructor wire up DI with all default components of the streams , so need to be called regardless of configureStream null or not
+            var streamConfigurator = new ClusterClientPersistentStreamConfigurator(name, builder, adapterFactory);
+            configureStream?.Invoke(streamConfigurator);
+            return builder;
         }
 
         /// <summary>
