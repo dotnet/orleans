@@ -30,6 +30,17 @@ Orleans is a framework, a set of libraries, that helps you build an application.
 Orleans-based applications can be run in various hosting environments, in the Cloud or on on-premises clusters or even on a single machine.
 It is the responsibility of application developer to build, deploy, and run an Orleans-based application in their target hosting environment.
 
+### Where can I run Orleans?
+
+Orleans can run in any environment where .NET application can run.
+Prior to Orleans 2.0, it required full .NET Framework. Starting with 2.0, Orleans conforms to .NET Standard 2.0, and hence can run on .NET Core in Windows and non-Windows environments that support .NET Core.
+
+### Is Orleans built for Azure?
+
+No.
+We believe that you should be able to run Orleans anywhere you need, the way you need.
+Orleans is very flexible, and has a number of optional providers that help host it in cloud environment, such as Azure, AWS or GCP, or on on-premises clusters, with a choice of technologies to support Orleans' clustering protocol.
+
 ### What is the difference between Orleans and other actor languages and frameworks, such as Erlang or Akka?
 
 While based on the same base principles of the Actor Model, Orleans took a step forward, and introduced a notion of [Virtual Actors](Introduction.md#virtual-actors) that greatly simplifies developer's experience and is much more suitable for cloud services and high-scale systems.
