@@ -12,6 +12,7 @@ using Xunit;
 using Xunit.Abstractions;
 using System.Linq;
 using Orleans.Runtime.Configuration;
+using Orleans.Hosting;
 
 namespace UnitTests.ActivationsLifeCycleTests
 {
@@ -34,10 +35,20 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
 
             builder.ConfigureLegacyConfiguration();
+            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             testCluster = builder.Build();
             testCluster.Deploy();
         }
-        
+
+        public class SiloConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder.UseInMemoryReminderService();
+            }
+        }
+
+
         public void Dispose()
         {
             testCluster?.StopAllSilos();

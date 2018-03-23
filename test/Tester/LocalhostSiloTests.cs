@@ -22,6 +22,7 @@ namespace Tester
         {
             var silo = new SiloHostBuilder()
                 .AddMemoryGrainStorage("MemoryStore")
+                .UseInMemoryReminderService()
                 .UseLocalhostClustering()
                 .Build();
 
@@ -53,11 +54,13 @@ namespace Tester
         {
             var silo1 = new SiloHostBuilder()
                 .AddMemoryGrainStorage("MemoryStore")
+                .UseInMemoryReminderService()
                 .UseLocalhostClustering(12111, 30001)
                 .Build();
 
             var silo2 = new SiloHostBuilder()
                 .AddMemoryGrainStorage("MemoryStore")
+                .UseInMemoryReminderService()
                 .UseLocalhostClustering(12112, 30002, new IPEndPoint(IPAddress.Loopback, 12111))
                 .Build();
 
