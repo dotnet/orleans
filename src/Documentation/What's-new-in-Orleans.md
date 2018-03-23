@@ -7,7 +7,7 @@ title: What's new in Orleans
 
 ## [v2.0.0-rc2](https://github.com/dotnet/orleans/releases/tag/v2.0.0-rc2) March 12th 2018
 
-- Major changes (since 2.0.0-beta3)
+- Major changes (since 2.0.0-rc1)
   - A new "facade" API for easier configuration of various aspects of stream providers: Persistent stream configurators
 
 ## [v2.0.0-rc1](https://github.com/dotnet/orleans/releases/tag/v2.0.0-rc1) February 27th 2018
