@@ -11,6 +11,7 @@ namespace UnitTests.Grains
     internal class SampleConsumerObserver<T> : IAsyncObserver<T>
     {
         private readonly SampleStreaming_ConsumerGrain hostingGrain;
+        private StreamSequenceToken lastToken;
 
         internal SampleConsumerObserver(SampleStreaming_ConsumerGrain hostingGrain)
         {
@@ -19,8 +20,16 @@ namespace UnitTests.Grains
 
         public Task OnNextAsync(T item, StreamSequenceToken token = null)
         {
-            hostingGrain.logger.Info("OnNextAsync(item={0}, token={1})", item, token != null ? token.ToString() : "null");
-            hostingGrain.numConsumedItems++;
+            if (this.lastToken == null || token == null || token.Newer(this.lastToken))
+            {
+                this.lastToken = token;
+                hostingGrain.logger.Info("OnNextAsync({0}{1})", item, token != null ? token.ToString() : "null");
+                hostingGrain.numConsumedItems++;
+            }
+            else
+            {
+                hostingGrain.logger.Info("OnNextAsync({0}{1}) was a duplicate", item, token != null ? token.ToString() : "null");
+            }
             return Task.CompletedTask;
         }
 
@@ -168,6 +177,7 @@ namespace UnitTests.Grains
         internal int numConsumedItems;
         internal Logger logger;
         private StreamSubscriptionHandle<int> consumerHandle;
+        StreamSequenceToken lastToken = null;
 
         public override Task OnActivateAsync()
         {
@@ -202,10 +212,18 @@ namespace UnitTests.Grains
             return Task.FromResult( numConsumedItems );
         }
 
-        public Task OnNextAsync( int item, StreamSequenceToken token = null )
+        public Task OnNextAsync( int item, StreamSequenceToken token)
         {
-            logger.Info( "OnNextAsync({0}{1})", item, token != null ? token.ToString() : "null" );
-            numConsumedItems++;
+            if (this.lastToken == null || token == null || token.Newer(this.lastToken))
+            {
+                this.lastToken = token;
+                logger.Info("OnNextAsync({0}{1})", item, token != null ? token.ToString() : "null");
+                numConsumedItems++;
+            }
+            else
+            {
+                logger.Info("OnNextAsync({0}{1}) was a duplicate", item, token != null ? token.ToString() : "null");
+            }
             return Task.CompletedTask;
         }
 
