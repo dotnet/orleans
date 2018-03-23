@@ -21,9 +21,9 @@ namespace Orleans.ServiceBus.Providers
             };
         }
 
-        public static string MakePartitionKey(string streamProviderName, string checkpointNamespace)
+        public static string MakePartitionKey(string streamProviderName, string serviceId)
         {
-            string key = $"EventHubCheckpoints_{streamProviderName}_{checkpointNamespace}";
+            string key = $"EventHubCheckpoints_{streamProviderName}_{serviceId}";
             return AzureStorageUtils.SanitizeTableProperty(key);
         }
 

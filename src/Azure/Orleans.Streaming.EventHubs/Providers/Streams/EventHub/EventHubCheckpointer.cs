@@ -26,7 +26,7 @@ namespace Orleans.ServiceBus.Providers
 
         public Task<IStreamQueueCheckpointer<string>> Create(string partition)
         {
-            return EventHubCheckpointer.Create(options, providerName, partition, this.clusterOptions.ServiceId.ToString(), loggerFactory);
+            return EventHubCheckpointer.Create(options, providerName, partition, this.clusterOptions.ServiceId, loggerFactory);
         }
 
         public static IStreamQueueCheckpointerFactory CreateFactory(IServiceProvider services, string providerName)
