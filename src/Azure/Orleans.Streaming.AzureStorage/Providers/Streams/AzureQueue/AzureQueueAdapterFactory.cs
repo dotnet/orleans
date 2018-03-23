@@ -7,6 +7,7 @@ using Orleans.Serialization;
 using Orleans.Streams;
 using Orleans.Providers.Streams.Common;
 using Orleans.Configuration;
+using Orleans.Configuration.Overrides;
 
 namespace Orleans.Providers.Streams.AzureQueue
 {
@@ -101,7 +102,8 @@ namespace Orleans.Providers.Streams.AzureQueue
             var azureQueueOptions = services.GetOptionsByName<AzureQueueOptions>(name);
             var queueMapperOptions = services.GetOptionsByName<HashRingStreamQueueMapperOptions>(name);
             var cacheOptions = services.GetOptionsByName<SimpleQueueCacheOptions>(name);
-            var factory = ActivatorUtilities.CreateInstance<AzureQueueAdapterFactory<TDataAdapter>>(services, name, azureQueueOptions, queueMapperOptions, cacheOptions);
+            IOptions<ClusterOptions> clusterOptions = services.GetProviderClusterOptions(name);
+            var factory = ActivatorUtilities.CreateInstance<AzureQueueAdapterFactory<TDataAdapter>>(services, name, azureQueueOptions, queueMapperOptions, cacheOptions, clusterOptions);
             factory.Init();
             return factory;
         }

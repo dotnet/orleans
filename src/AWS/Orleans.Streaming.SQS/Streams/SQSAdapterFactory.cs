@@ -8,6 +8,7 @@ using Orleans.Streams;
 using Orleans.Serialization;
 using Orleans.Configuration;
 using Orleans;
+using Orleans.Configuration.Overrides;
 
 namespace OrleansAWSUtils.Streams
 {
@@ -91,7 +92,8 @@ namespace OrleansAWSUtils.Streams
             var sqsOptions = services.GetOptionsByName<SqsOptions>(name);
             var cacheOptions = services.GetOptionsByName<SimpleQueueCacheOptions>(name);
             var queueMapperOptions = services.GetOptionsByName<HashRingStreamQueueMapperOptions>(name);
-            var factory = ActivatorUtilities.CreateInstance<SQSAdapterFactory>(services, name, sqsOptions, cacheOptions, queueMapperOptions);
+            IOptions<ClusterOptions> clusterOptions = services.GetProviderClusterOptions(name);
+            var factory = ActivatorUtilities.CreateInstance<SQSAdapterFactory>(services, name, sqsOptions, cacheOptions, queueMapperOptions, clusterOptions);
             factory.Init();
             return factory;
         }
