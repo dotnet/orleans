@@ -1,10 +1,7 @@
-﻿using System.Threading.Tasks;
+﻿
 using Orleans.LogConsistency;
-using Orleans.Runtime;
 using Orleans.Storage;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Orleans.Providers;
+
 
 namespace Orleans.EventSourcing.LogStorage
 {
@@ -16,12 +13,8 @@ namespace Orleans.EventSourcing.LogStorage
     /// metadata (the log position, and write flags) are stored in the primary. 
     /// </para>
     /// </summary>
-    public class LogConsistencyProvider : ILogConsistencyProvider
+    public class LogConsistencyProvider : ILogViewAdaptorFactory
     {
-        private ILogger logger;
-        /// <inheritdoc/>
-        public string Name { get; private set; }
-
         /// <inheritdoc/>
         public bool UsesStorageProvider
         {
@@ -29,31 +22,6 @@ namespace Orleans.EventSourcing.LogStorage
             {
                 return true;
             }
-        }
-
-        /// <summary>
-        /// Init method
-        /// </summary>
-        /// <param name="name">Consistency provider name</param>
-        /// <param name="providerRuntime">Provider runtime</param>
-        /// <param name="config">Provider config</param>
-        public Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
-        {
-            Name = name;
-            var loggerName = $"{this.GetType().FullName}.{Name}";
-            var loggerFactory = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>();
-            this.logger = loggerFactory.CreateLogger(loggerName);
-            logger.Info("Init");
-
-            return Task.CompletedTask;
-        }
-      
-        /// <summary>
-        /// Close method
-        /// </summary>
-        public Task Close()
-        {
-            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -72,7 +40,5 @@ namespace Orleans.EventSourcing.LogStorage
         {
             return new LogViewAdaptor<TView,TEntry>(hostGrain, initialState, grainStorage, grainTypeName, services);
         }
-
     }
-
 }

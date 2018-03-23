@@ -219,7 +219,7 @@ namespace Orleans.EventSourcing
         /// Called when the underlying persistence or replication protocol is running into some sort of connection trouble.
         /// <para>Override this to monitor the health of the log-consistency protocol and/or
         /// to customize retry delays.
-        /// Any exceptions thrown are caught and logged by the <see cref="ILogConsistencyProvider"/>.</para>
+        /// Any exceptions thrown are caught and logged by the <see cref="ILogViewAdaptorFactory"/>.</para>
         /// </summary>
         /// <returns>The time to wait before retrying</returns>
         protected virtual void OnConnectionIssue(ConnectionIssue issue)
@@ -229,7 +229,7 @@ namespace Orleans.EventSourcing
         /// <summary>
         /// Called when a previously reported connection issue has been resolved.
         /// <para>Override this to monitor the health of the log-consistency protocol. 
-        /// Any exceptions thrown are caught and logged by the <see cref="ILogConsistencyProvider"/>.</para>
+        /// Any exceptions thrown are caught and logged by the <see cref="ILogViewAdaptorFactory"/>.</para>
         /// </summary>
         protected virtual void OnConnectionIssueResolved(ConnectionIssue issue)
         {

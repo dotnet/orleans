@@ -1,14 +1,14 @@
 using System;
 using System.Threading.Tasks;
 using System.Collections.Generic;
-using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
-using UnitTests.GrainInterfaces;
-using Orleans.TestingHost;
+using Microsoft.Extensions.Options;
 using Xunit;
+using Orleans.Hosting;
+using Orleans.TestingHost;
+using UnitTests.GrainInterfaces;
 using TestExtensions;
 using Tester;
-using Microsoft.Extensions.Options;
+
 using Orleans.Configuration;
 
 namespace Tests.GeoClusterTests
@@ -24,15 +24,6 @@ namespace Tests.GeoClusterTests
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.Options.InitialSilosCount = 1;
-
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.AddStateStorageBasedLogConsistencyProvider();
-                    legacy.ClusterConfiguration.AddLogStorageBasedLogConsistencyProvider();
-                    legacy.ClusterConfiguration.AddCustomStorageInterfaceBasedLogConsistencyProvider("CustomStorage");
-
-                    legacy.ClusterConfiguration.AddCustomStorageInterfaceBasedLogConsistencyProvider("CustomStoragePrimaryCluster", "A");
-                });
                 builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
             }
 
@@ -41,6 +32,10 @@ namespace Tests.GeoClusterTests
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
+                        .AddStateStorageBasedLogConsistencyProvider()
+                        .AddLogStorageBasedLogConsistencyProvider()
+                        .AddCustomStorageBasedLogConsistencyProvider("CustomStorage")
+                        .AddCustomStorageBasedLogConsistencyProvider("CustomStoragePrimaryCluster", "A")
                         .AddAzureTableGrainStorageAsDefault(builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;

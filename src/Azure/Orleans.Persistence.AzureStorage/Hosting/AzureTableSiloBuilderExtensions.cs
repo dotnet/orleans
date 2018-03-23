@@ -24,7 +24,7 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloHostBuilder AddAzureTableGrainStorage(this ISiloHostBuilder builder, string name, Action<AzureTableStorageOptions> configureOptions)
         {
-            return builder.ConfigureServices(services => services.AddAzureTableGrainStorage(name, configureOptions));
+            return builder.ConfigureServices(services => services.AddAzureTableGrainStorage(name, ob => ob.Configure(configureOptions)));
         }
 
         /// <summary>
@@ -43,34 +43,7 @@ namespace Orleans.Hosting
             return builder.ConfigureServices(services => services.AddAzureTableGrainStorage(name, configureOptions));
         }
 
-        /// <summary>
-        /// Configure silo to use azure table storage as the default grain storage.
-        /// </summary>
-        public static IServiceCollection AddAzureTableGrainStorageAsDefault(this IServiceCollection services, Action<AzureTableStorageOptions> configureOptions)
-        {
-            return services.AddAzureTableGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, ob => ob.Configure(configureOptions));
-        }
-
-        /// <summary>
-        /// Configure silo to use azure table storage for grain storage.
-        /// </summary>
-        public static IServiceCollection AddAzureTableGrainStorage(this IServiceCollection services, string name, Action<AzureTableStorageOptions> configureOptions)
-        {
-            return services.AddAzureTableGrainStorage(name, ob => ob.Configure(configureOptions));
-        }
-
-        /// <summary>
-        /// Configure silo to use azure table storage as the default grain storage.
-        /// </summary>
-        public static IServiceCollection AddAzureTableGrainStorageAsDefault(this IServiceCollection services, Action<OptionsBuilder<AzureTableStorageOptions>> configureOptions = null)
-        {
-            return services.AddAzureTableGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
-        }
-
-        /// <summary>
-        /// Configure silo to use azure table storage for grain storage.
-        /// </summary>
-        public static IServiceCollection AddAzureTableGrainStorage(this IServiceCollection services, string name,
+        internal static IServiceCollection AddAzureTableGrainStorage(this IServiceCollection services, string name,
             Action<OptionsBuilder<AzureTableStorageOptions>> configureOptions = null)
         {
             configureOptions?.Invoke(services.AddOptions<AzureTableStorageOptions>(name));
