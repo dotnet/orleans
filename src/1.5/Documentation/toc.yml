@@ -7,7 +7,7 @@
   - name: What's new in Orleans
     href: ../../Documentation/What's-new-in-Orleans.md
   - name: Frequently Asked Questions
-    href: Frequently-Asked-Questions.md
+    href: ../../Documentation/Frequently-Asked-Questions.md
 - name: Installation
   href: Installation/toc.yml
 - name: Getting Started
