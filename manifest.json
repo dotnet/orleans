@@ -1,6 +1,6 @@
 {
   "homepages": [],
-  "source_base_path": "c:/GitHub/sergeybykov/orleans-2/src",
+  "source_base_path": "C:/GitHub/sergeybykov/orleans-2/src",
   "xrefmap": "xrefmap.yml",
   "files": [
     {
@@ -497,18 +497,6 @@
         ".html": {
           "relative_path": "1.5/Documentation/Event-Sourcing/Subscribe.html",
           "hash": "cHHqVgfffXKicMaPAo0wVw=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "1.5/Documentation/Frequently-Asked-Questions.md",
-      "output": {
-        ".html": {
-          "relative_path": "1.5/Documentation/Frequently-Asked-Questions.html",
-          "hash": "wPsYeezg+2DiI0eI8Nve/Q=="
         }
       },
       "is_incremental": false,
@@ -1223,7 +1211,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/toc.html",
-          "hash": "MOXrCRmaYWLr3A9dtTpZog=="
+          "hash": "lwadD/qXyanoIGYkMUNPaw=="
         }
       },
       "is_incremental": false,
@@ -2135,7 +2123,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Core-Features/Dependency-Injection.html",
-          "hash": "dUiY3eF+17Rxh7XyZoDbzw=="
+          "hash": "rCVdCfqN8oca6MvbM4MdOA=="
         }
       },
       "is_incremental": false,
@@ -2493,7 +2481,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Frequently-Asked-Questions.html",
-          "hash": "QVazQ9eGmQC8VzbH2DYERw=="
+          "hash": "H4pYOEogN0UHPweM+LdUaA=="
         }
       },
       "is_incremental": false,
@@ -3164,7 +3152,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/What's-new-in-Orleans.html",
-          "hash": "K6tP0tvEHBoYnMyIbiCXjQ=="
+          "hash": "g6sqF7puDB1x+eH0PjBUjA=="
         }
       },
       "is_incremental": false,
@@ -3624,179 +3612,11 @@
     },
     {
       "type": "Conceptual",
-      "source_relative_path": "Tutorials/A-Service-is-a-Collection-of-Communicating-Actors.md",
-      "output": {
-        ".html": {
-          "relative_path": "Tutorials/A-Service-is-a-Collection-of-Communicating-Actors.html",
-          "hash": "nnOmvGQu8YpdEEVdxA2llQ=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Tutorials/Actor-Identity.md",
-      "output": {
-        ".html": {
-          "relative_path": "Tutorials/Actor-Identity.html",
-          "hash": "j0lLCxq4Y1Sklh3tNgphyA=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Tutorials/Cloud-Deployment.md",
-      "output": {
-        ".html": {
-          "relative_path": "Tutorials/Cloud-Deployment.html",
-          "hash": "A6gPjiM2Q9DF30o3aN264g=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Tutorials/Concurrency.md",
-      "output": {
-        ".html": {
-          "relative_path": "Tutorials/Concurrency.html",
-          "hash": "kgU4IMFcxdhdSTQeRMK+sA=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Tutorials/Custom-Storage-Providers.md",
-      "output": {
-        ".html": {
-          "relative_path": "Tutorials/Custom-Storage-Providers.html",
-          "hash": "HQljnLXYSn95My10I6G/yQ=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Tutorials/Declarative-Persistence.md",
-      "output": {
-        ".html": {
-          "relative_path": "Tutorials/Declarative-Persistence.html",
-          "hash": "thzzL4cQUw5lHKB3g/9Rpw=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Tutorials/Failure-Handling.md",
-      "output": {
-        ".html": {
-          "relative_path": "Tutorials/Failure-Handling.html",
-          "hash": "x1VxU1Ez86v5ESXfIMVdQQ=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Tutorials/Front-Ends-for-Orleans-Services.md",
-      "output": {
-        ".html": {
-          "relative_path": "Tutorials/Front-Ends-for-Orleans-Services.html",
-          "hash": "NSaKvTgjut+F/+o8fng/KQ=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Tutorials/Interaction-with-Libraries-and-Services.md",
-      "output": {
-        ".html": {
-          "relative_path": "Tutorials/Interaction-with-Libraries-and-Services.html",
-          "hash": "f9ycO1rUyevigcuW0pzn9Q=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Tutorials/Minimal-Orleans-Application.md",
-      "output": {
-        ".html": {
-          "relative_path": "Tutorials/Minimal-Orleans-Application.html",
-          "hash": "SG6LRBS411R0BJlHX0X+gA=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Tutorials/My-First-Orleans-Application.md",
-      "output": {
-        ".html": {
-          "relative_path": "Tutorials/My-First-Orleans-Application.html",
-          "hash": "zIEPqdlmx/vAjqv5bbycmw=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Tutorials/On-Premise-Deployment.md",
-      "output": {
-        ".html": {
-          "relative_path": "Tutorials/On-Premise-Deployment.html",
-          "hash": "C2qof+sa4wm3PQA9fu4zRg=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Tutorials/Running-in-a-Stand-alone-Silo.md",
-      "output": {
-        ".html": {
-          "relative_path": "Tutorials/Running-in-a-Stand-alone-Silo.html",
-          "hash": "dixmSCgnXTFV9hEWPp+G+Q=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Tutorials/Unit-Testing-Grains.md",
-      "output": {
-        ".html": {
-          "relative_path": "Tutorials/Unit-Testing-Grains.html",
-          "hash": "pjMXfdmaSfCVZzSUXhmGwQ=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
       "source_relative_path": "Tutorials/index.md",
       "output": {
         ".html": {
           "relative_path": "Tutorials/index.html",
-          "hash": "hqTJGhKCUs0sKivP8t6j9w=="
+          "hash": "GzZDfvBTV452hQ1/FYXEgQ=="
         }
       },
       "is_incremental": false,
@@ -3808,7 +3628,7 @@
       "output": {
         ".html": {
           "relative_path": "Tutorials/toc.html",
-          "hash": "y456d2TuRFG5timd5R3gjA=="
+          "hash": "NVA67keti2KININPe5AMFQ=="
         }
       },
       "is_incremental": false,
