@@ -9,7 +9,7 @@ title: Frequently Asked Questions
 
 ### Can I freely use Orleans in my project?
 
-Absolutely. The source code has been releases under the [MIT license](https://github.com/dotnet/orleans/blob/master/LICENSE). NuGet packages are published on [nuget.org](https://www.nuget.org/profiles/Orleans).
+Absolutely. The source code has been released under the [MIT license](https://github.com/dotnet/orleans/blob/master/LICENSE). NuGet packages are published on [nuget.org](https://www.nuget.org/profiles/Orleans).
 
 ### Is Orleans production ready? I heard it's a research project.
 
@@ -37,8 +37,9 @@ While based on the same base principles of the Actor Model, Orleans took a step 
 ### Microsoft has another actor model implementation - Azure Service Fabric Reliable Actors. How do I choose between the two?
 
 Reliable Actors are tightly integrated with Service Fabric to leverage its core features, such as replicated in-cluster storage.
-Orleans is not tied to any hosting platform, and can run in almost any environment.
+Orleans has a reacher feature set, is not tied to any particular hosting platform, and can run in almost any environment.
 Orleans provides an [optional integration package](https://www.nuget.org/packages/Microsoft.Orleans.Hosting.ServiceFabric/) for hosting Orleans applications in Service Fabric.
+
 In the end, it's the application developer's decision of how much they would benefit from the tight integration of Reliable Actors with the underlying platform of Service Fabric versus the flexibility to run anywhere and the feature set of Orleans.
 
 ## Design
@@ -48,13 +49,13 @@ In the end, it's the application developer's decision of how much they would ben
 The grain isolation model makes them very good at representing independent isolated contexts of state and computation.
 In most cases, grains naturally map to such application entities as users, sessions, accounts.
 Those entities are generally isolated from each other, can be accessed and updated independently, and expose a well defined set of supported operations.
-This works well with the intuitive "one entity - one grain" modelling.
+This works well with the intuitive "one entity - one grain" modeling.
 
 An application entity may be too big to be efficiently represented by a single grain if it encapsulates too much state, and as a result has to handle a high rate of requests to it.
-Even a single grain can generally handle up to a few thousand of trivial calls per second, the rule of thumb is to be wary of individual grain receiving hundreds of requests per second.
+Even though a single grain can generally handle up to a few thousand trivial calls per second, the rule of thumb is to be wary of individual grain receiving hundreds of requests per second.
 That may be a sign of the grain being too large, and decomposing it into a set of smaller grains may lead to a more stable and balanced system.
 
-An application entity may be too small to be a grain if that would cause constant interaction of other grains with it, and as a result, to too much of messaging overhead.
+An application entity may be too small to be a grain if that would cause constant interaction of other grains with it, and as a result, cause too much of a messaging overhead.
 In such cases, it may make more sense to make those closely interacting entities part of a single grain, so that they would invoke each other directly.
 
 ### How should you avoid grain hot spots?
@@ -75,11 +76,13 @@ Instead, since 1.3.0, you can consider a [multi-cluster deployment where cluster
 During normal operations the Orleans runtime guarantees that each grain will have at most one instance in the cluster.
 The only time this guarantee can be violated is when a silo crashes or gets killed without a proper shutdown.
 In that case, there is a ~30 second (based on configuration) window where a grain can potentially get temporarily instantiated in more than one silo.
+Convergence to a single instance per grain is guaranteed, and duplicate activations will be deactivated when this window closes.
 
 You can find out more about how Orleans manages the clusters at [Cluster Management](Runtime-Implementation-Details/Cluster-Management.md) page.
 
-Also you can take a look at Orleans's [paper](http://research.microsoft.com/pubs/210931/Orleans-MSR-TR-2014-41.pdf) for a more detailed information, however you don't need to understand it fully to be able to write your application code.
+Also you can take a look at Orleans' [paper](http://research.microsoft.com/pubs/210931/Orleans-MSR-TR-2014-41.pdf) for a more detailed information, however you don't need to understand it fully to be able to write your application code.
 You just need to consider the rare possibility of having two instances of an actor while writing your application.
+The persistence model guarantees that no writes to storage are blindly overwritten in such a case.
 
 ## How To
 
@@ -102,11 +105,11 @@ That being said, for the rare cases where the application indeed knows where a p
 
 You can [add silos with new grain classes](Deployment-and-Operations/Heterogeneous-Silos.md) or [new versions of existing grain classes](Grain-Versioning/Grain-versioning.md) to a running cluster.
 
-### Can I Connect to Orleans silos from the public internet?
+### Can I Connect to Orleans silos from the public Internet?
 
-Orleans is designed to be hosted as the back-end part of a service, and you expected to create a front-end in your servers which external clients connect to
-It can be an http based Web API project, a socket server, a SignalR server or anything else fits the needs of the application.
-You can connect to Orleans from the internet if you expose TCP endpoints of silos to it, but it is not a good practice from the security point of view.
+Orleans is designed to be hosted as the back-end part of a service, and you are expected to create a front-end tier to which external clients will connect.
+It can be an HTTP based Web API project, a socket server, a SignalR server or anything else fits the needs of the application.
+You can connect to Orleans from the Internet if you expose TCP endpoints of silos to it, but it is not a good practice from the security point of view.
 
 ### What happens if a silo fails before my grain call returns a response for my call?
 
@@ -129,4 +132,3 @@ Cooperative multi-tasking has a much better throughput compared to preemptive mu
 Keep in mind that grain calls should not execute any long running tasks like IO operations synchronously and should not block on other tasks to complete.
 All waiting should be done asynchronously using the `await` keyword or other asynchronous waiting mechanisms.
 Grains should return as soon as possible to let other grains execute for maximum throughput.
-
