@@ -5,6 +5,38 @@ title: What's new in Orleans
 
 # What's new in Orleans?
 
+## [v2.0.0-rc2](https://github.com/dotnet/orleans/releases/tag/v2.0.0-rc2) March 12th 2018
+
+- Major changes (since 2.0.0-beta3)
+  - A new "facade" API for easier configuration of various aspects of stream providers: Persistent stream configurators
+
+## [v2.0.0-rc1](https://github.com/dotnet/orleans/releases/tag/v2.0.0-rc1) February 27th 2018
+
+- Major changes (since 2.0.0-beta3)
+  - New provider lifecycle model to replace the old one
+  - Builder pattern and options-based configuration of components and extension
+
+## [v2.0.0-beta3](https://github.com/dotnet/orleans/releases/tag/v2.0.0-beta3) December 21st 2017
+
+## Community Virtual Meetup #15
+
+[Orleans 2.0 with the core team](https://youtu.be/d3ufDsZcW4k) 
+December 13th 2017
+[Presentation](https://github.com/dotnet/orleans/blob/gh-pages/Presentations/VM-15%20-%20Orleans%202.0.pdf)
+
+## [v2.0.0-beta2](https://github.com/dotnet/orleans/releases/tag/v2.0.0-beta2) December 12th 2017
+
+## [v1.5.3](https://github.com/dotnet/orleans/releases/tag/v1.5.3) December 8th 2017
+
+## [v2.0.0-beta1](https://github.com/dotnet/orleans/releases/tag/v2.0.0-beta1) October 26th 2017
+
+- Major new features
+  - Most packages are now targetting .NET Standard 2.0 (which mean they can be used from either .NET Framework or .NET Core 2.0) and on non-Windows platforms.
+
+## [v1.5.2](https://github.com/dotnet/orleans/releases/tag/v1.5.2) October 17th 2017
+
+## [v1.5.1](https://github.com/dotnet/orleans/releases/tag/v1.5.1) August 28th 2017
+
 ## [v1.5.0](https://github.com/dotnet/orleans/releases/tag/v1.5.0) July 6th 2017
 
 - Major new features
