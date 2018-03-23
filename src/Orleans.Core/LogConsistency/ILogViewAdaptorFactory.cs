@@ -1,24 +1,8 @@
 ﻿
-using System;
-using System.Net;
-using System.Runtime.Serialization;
-using System.Threading.Tasks;
-using System.Collections.Generic;
-using Orleans.Providers;
-using Orleans.Runtime;
-using Orleans.Core;
 using Orleans.Storage;
 
 namespace Orleans.LogConsistency
 {
-    /// <summary>
-    /// Interface to be implemented for a log consistency provider.
-    /// </summary>
-    public interface ILogConsistencyProvider : IProvider, ILogViewAdaptorFactory
-    {
-    }
-
-
     /// <summary>
     /// Interface to be implemented for a log-view adaptor factory
     /// </summary>

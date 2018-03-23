@@ -103,8 +103,8 @@ namespace Orleans.LogConsistency
             var attr = this.GetType().GetTypeInfo().GetCustomAttributes<LogConsistencyProviderAttribute>(true).FirstOrDefault();
 
             ILogViewAdaptorFactory defaultFactory = attr != null
-                ? this.ServiceProvider.GetServiceByName<ILogConsistencyProvider>(attr.ProviderName)
-                : this.ServiceProvider.GetService<ILogConsistencyProvider>();
+                ? this.ServiceProvider.GetServiceByName<ILogViewAdaptorFactory>(attr.ProviderName)
+                : this.ServiceProvider.GetService<ILogViewAdaptorFactory>();
             if (attr != null && defaultFactory == null)
             {
                 var errMsg = attr != null

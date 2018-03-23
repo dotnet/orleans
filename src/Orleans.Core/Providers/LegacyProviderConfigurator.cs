@@ -57,10 +57,10 @@ namespace Orleans.Providers
                 }
                 else if (providerGroup.Key == ProviderCategoryConfiguration.LOG_CONSISTENCY_PROVIDER_CATEGORY_NAME)
                 {
-                    services.AddSingleton<ILogConsistencyProvider>(sp => sp.GetServiceByName<ILogConsistencyProvider>(ProviderConstants.DEFAULT_LOG_CONSISTENCY_PROVIDER_NAME));
+                    services.AddSingleton<ILogViewAdaptorFactory>(sp => sp.GetServiceByName<ILogViewAdaptorFactory>(ProviderConstants.DEFAULT_LOG_CONSISTENCY_PROVIDER_NAME));
                     foreach (IProviderConfiguration providerConfig in providerGroup.SelectMany(kvp => kvp.Value.Providers.Values))
                     {
-                        RegisterProvider<ILogConsistencyProvider>(providerConfig, services, DefaultStage);
+                        RegisterProvider<ILogViewAdaptorFactory>(providerConfig, services, DefaultStage);
                     }
                 }
                 else

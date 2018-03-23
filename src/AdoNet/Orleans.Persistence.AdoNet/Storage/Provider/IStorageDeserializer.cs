@@ -15,7 +15,7 @@ namespace Orleans.Storage
         bool CanStream { get; }
 
         /// <summary>
-        /// An optional tag that a <see cref="IStorageSerializationPicker"/> or <see cref="IStorageProvider"/> provider can use to pick a deserializer.
+        /// An optional tag that a <see cref="IStorageSerializationPicker"/> or <see cref="IGrainStorage"/> provider can use to pick a deserializer.
         /// </summary>
         string Tag { get; }
 
