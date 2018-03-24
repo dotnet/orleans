@@ -235,6 +235,53 @@ namespace Orleans
         }
 
         /// <summary>
+        /// Configures the client to use dns name lookup clustering.
+        /// </summary>
+        /// <param name="builder"></param>
+        /// <param name="dnsName">The gateway destination dns name.</param>
+        /// <param name="port">The gateway port.</param>
+        public static IClientBuilder UseDnsNameLookupClustering(this IClientBuilder builder, string dnsName, int port)
+        {
+            return builder.UseDnsNameLookupClustering(options =>
+            {
+                options.DnsName = dnsName;
+                options.Port = port;
+            });
+        }
+
+        /// <summary>
+        /// Configures the client to use dns name lookup clustering.
+        /// </summary>
+        public static IClientBuilder UseDnsNameLookupClustering(this IClientBuilder builder, Action<DnsNameGatewayListProviderOptions> configureOptions)
+        {
+            return builder.ConfigureServices(
+                collection =>
+                {
+                    if (configureOptions != null)
+                    {
+                        collection.Configure(configureOptions);
+                    }
+
+                    collection.AddSingleton<IGatewayListProvider, DnsNameGatewayListProvider>()
+                        .ConfigureFormatter<DnsNameGatewayListProviderOptions>();
+                });
+        }
+
+        /// <summary>
+        /// Configures the client to use dns name lookup clustering.
+        /// </summary>
+        public static IClientBuilder UseDnsNameLookupClustering(this IClientBuilder builder, Action<OptionsBuilder<DnsNameGatewayListProviderOptions>> configureOptions)
+        {
+            return builder.ConfigureServices(
+                collection =>
+                {
+                    configureOptions?.Invoke(collection.AddOptions<DnsNameGatewayListProviderOptions>());
+                    collection.AddSingleton<IGatewayListProvider, DnsNameGatewayListProvider>()
+                        .ConfigureFormatter<DnsNameGatewayListProviderOptions>();
+                });
+        }
+
+        /// <summary>
         /// Returns the <see cref="ApplicationPartManager"/> for this builder.
         /// </summary>
         /// <param name="builder">The builder.</param>
