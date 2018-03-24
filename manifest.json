@@ -2646,7 +2646,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Installation/NuGets.html",
-          "hash": "2PsdgFElqJOO8SC9i/qX1A=="
+          "hash": "P41MRquRnp/w8p1QJxJonA=="
         }
       },
       "is_incremental": false,
@@ -2658,7 +2658,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Installation/Prerequisites.html",
-          "hash": "qmf0wUgfYZKbvjTLgli1KA=="
+          "hash": "UfFit8fhLJGb1vu5N9RUcA=="
         }
       },
       "is_incremental": false,
@@ -3152,7 +3152,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/What's-new-in-Orleans.html",
-          "hash": "g6sqF7puDB1x+eH0PjBUjA=="
+          "hash": "ex8dXdCT+YPhe2ky0bHK3A=="
         }
       },
       "is_incremental": false,
@@ -3666,11 +3666,6 @@
         "incrementalPhase": "build"
       },
       "processors": {
-        "ResourceDocumentProcessor": {
-          "can_incremental": false,
-          "details": "Processor ResourceDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
-          "incrementalPhase": "build"
-        },
         "TocDocumentProcessor": {
           "can_incremental": false,
           "details": "Processor TocDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
@@ -3678,6 +3673,11 @@
         },
         "ConceptualDocumentProcessor": {
           "can_incremental": true,
+          "incrementalPhase": "build"
+        },
+        "ResourceDocumentProcessor": {
+          "can_incremental": false,
+          "details": "Processor ResourceDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
           "incrementalPhase": "build"
         }
       }
