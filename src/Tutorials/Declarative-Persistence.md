@@ -20,10 +20,10 @@ The first thing we need to do is make the identities of our workers and managers
 In the sample, they were assigned GUIDs using `Guid.NewGuid()`, which is convenient, but doesn't let us find them in a subsequent run.
 Therefore, we'll create a set of GUIDs first, then use them as the worker identities.
 
-The modified `Main` program looks like this:
+The modified client program looks like this:
 
 ``` csharp
-static void Main(string[] args)
+private static async Task DoClientWork(IClusterClient client)
 {
      ...
     var ids = new string[] {
@@ -38,17 +38,19 @@ static void Main(string[] args)
         "2eef0ac5-540f-4421-b9a9-79d89400f7ab"
     };
 
-    var e0 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.Parse(ids[0]));
-    var e1 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.Parse(ids[1]));
-    var e2 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.Parse(ids[2]));
-    var e3 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.Parse(ids[3]));
-    var e4 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.Parse(ids[4]));
+    var e0 = client.GetGrain<IEmployee>(Guid.Parse(ids[0]));
+    var e1 = client.GetGrain<IEmployee>(Guid.Parse(ids[1]));
+    var e2 = client.GetGrain<IEmployee>(Guid.Parse(ids[2]));
+    var e3 = client.GetGrain<IEmployee>(Guid.Parse(ids[3]));
+    var e4 = client.GetGrain<IEmployee>(Guid.Parse(ids[4]));
 
-    var m0 = GrainClient.GrainFactory.GetGrain<IManager>(Guid.Parse(ids[5]));
-    var m1 = GrainClient.GrainFactory.GetGrain<IManager>(Guid.Parse(ids[6]));
-    ...
+    var m0 = client.GetGrain<IManager>(Guid.Parse(ids[5]));
+    var m1 = client.GetGrain<IManager>(Guid.Parse(ids[6]));
+     ...
 }
 ```
+> Note: If you are transitioning from Orleans 1.5, you will notice that the Client is no longer static.
+Please refer to [Migration from Orleans 1.5 to 2.0](../Documentation/2.0/Migration1.5.md) page.
 
 Next, we'll do some silo configuration, in order to configure the storage provider that will give us access to persistent storage.
 The SiloHost project includes a file _Program.cs_ which is where we find the following section:
