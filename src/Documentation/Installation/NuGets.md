@@ -370,7 +370,7 @@ Includes the telemetry consumer for NewRelic.
 ```
 PM> Install-Package Microsoft.Orleans.CounterControl
 ```
-Includes OrleansCounterControl.exe, which registers Windows performance counter categories for Orleans statistics and for deployed grain classes. Requires elevation. Can be executed in Azure as part of a role startup task. Included in Microsoft.Orleans.Server.
+Includes OrleansCounterControl.exe, which registers Windows performance counter categories for Orleans statistics and for deployed grain classes. Requires elevation. Can be executed in Azure as part of a role startup task.
 
 ## Transactions
 
