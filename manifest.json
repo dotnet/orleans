@@ -3612,6 +3612,18 @@
     },
     {
       "type": "Conceptual",
+      "source_relative_path": "Tutorials/Declarative-Persistence.md",
+      "output": {
+        ".html": {
+          "relative_path": "Tutorials/Declarative-Persistence.html",
+          "hash": "8UBM0GOk/jfSwvisqo+QKw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
       "source_relative_path": "Tutorials/index.md",
       "output": {
         ".html": {
@@ -3628,7 +3640,7 @@
       "output": {
         ".html": {
           "relative_path": "Tutorials/toc.html",
-          "hash": "NVA67keti2KININPe5AMFQ=="
+          "hash": "r/Hxx2/35r5Iox6VNTNlGQ=="
         }
       },
       "is_incremental": false,
