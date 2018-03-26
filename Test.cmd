@@ -42,6 +42,7 @@ set TESTS=^
 %CMDHOME%\test\RuntimeCodeGen.Tests,^
 %CMDHOME%\test\Orleans.Transactions.Tests,^
 %CMDHOME%\test\Orleans.Transactions.Azure.Test,^
+%CMDHOME%\test\Orleans.Transactions.DynamoDB.Test,^
 %CMDHOME%\test\Orleans.TestingHost.Tests
 
 if []==[%TEST_FILTERS%] set TEST_FILTERS=-trait Category=BVT -trait Category=SlowBVT

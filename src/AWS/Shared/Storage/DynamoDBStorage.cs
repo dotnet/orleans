@@ -18,6 +18,8 @@ namespace Orleans.Persistence.DynamoDB
 namespace Orleans.Reminders.DynamoDB
 #elif AWSUTILS_TESTS
 namespace Orleans.AWSUtils.Tests
+#elif TRANSACTIONS_DYNAMODB
+namespace Orleans.Transactions.DynamoDB
 #else
 // No default namespace intentionally to cause compile errors if something is not defined
 #endif
@@ -432,8 +434,9 @@ namespace Orleans.AWSUtils.Tests
         /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is != null and will be called for each entry that match the query and added to the results list</param>
         /// <param name="indexName">In case a secondary index is used in the keyConditionExpression</param>
         /// <param name="scanIndexForward">In case an index is used, show if the seek order is ascending (true) or descending (false)</param>
-        /// <returns>The collection containing a list of objects translated by the resolver function</returns>
-        public async Task<List<TResult>> QueryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver, string indexName = "", bool scanIndexForward = true) where TResult : class
+        /// <param name="lastEvaluatedKey">The primary key of the first item that this operation will evaluate. Use the value that was returned for LastEvaluatedKey in the previous operation</param>
+        /// <returns>The collection containing a list of objects translated by the resolver function and the LastEvaluatedKey for paged results</returns>
+        public async Task<(List<TResult> results, Dictionary<string, AttributeValue> lastEvaluatedKey)> QueryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver, string indexName = "", bool scanIndexForward = true, Dictionary<string, AttributeValue> lastEvaluatedKey = null) where TResult : class
         {
             try
             {
@@ -443,7 +446,8 @@ namespace Orleans.AWSUtils.Tests
                     ExpressionAttributeValues = keys,
                     ConsistentRead = true,
                     KeyConditionExpression = keyConditionExpression,
-                    Select = Select.ALL_ATTRIBUTES
+                    Select = Select.ALL_ATTRIBUTES,
+                    ExclusiveStartKey = lastEvaluatedKey
                 };
 
                 if (!string.IsNullOrWhiteSpace(indexName))
@@ -459,7 +463,7 @@ namespace Orleans.AWSUtils.Tests
                 {
                     resultList.Add(resolver(item));
                 }
-                return resultList;
+                return (resultList, response.LastEvaluatedKey);
             }
             catch (Exception)
             {
