@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime;
@@ -18,9 +19,13 @@ namespace Orleans.Messaging
     {
         private readonly DnsNameGatewayListProviderOptions options;
         private readonly TimeSpan maxStaleness;
+        private readonly ILoggerFactory loggerFactory;
+        private readonly ILogger logger;
 
-        public DnsNameGatewayListProvider(IOptions<DnsNameGatewayListProviderOptions> options, IOptions<GatewayOptions> gatewayOptions)
+        public DnsNameGatewayListProvider(ILoggerFactory loggerFactory, IOptions<DnsNameGatewayListProviderOptions> options, IOptions<GatewayOptions> gatewayOptions)
         {
+            this.loggerFactory = loggerFactory;
+            this.logger = loggerFactory.CreateLogger<DnsNameGatewayListProvider>();
             this.options = options.Value;
             this.maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
         }
@@ -32,12 +37,25 @@ namespace Orleans.Messaging
 
         public Task<IList<Uri>> GetGateways()
         {
-            var endpointUris = Dns.GetHostEntry(this.options.DnsName)
-                                            .AddressList
-                                            .Select(a => new IPEndPoint(a, this.options.Port).ToGatewayUri())
-                                            .ToList();
+            try
+            {
+                var endpointUris = Dns.GetHostEntry(this.options.DnsName)
+                                                .AddressList
+                                                .Select(a => new IPEndPoint(a, this.options.Port).ToGatewayUri())
+                                                .OrderBy(a => a.AbsoluteUri)
+                                                .ToList();
 
-            return Task.FromResult<IList<Uri>>(endpointUris);
+                return Task.FromResult<IList<Uri>>(endpointUris);
+            }
+            catch (System.Net.Sockets.SocketException se)
+            {
+                if (se.Message == "No such host is known")
+                {
+                    logger.Warn(ErrorCode.ProxyClient_GetGateways, $"No addresses found for silo gateways with DNS hostname: {this.options.DnsName}");
+                    return Task.FromResult<IList<Uri>>(new List<Uri>());
+                }
+                throw;
+            }
         }
 
         public TimeSpan MaxStaleness
