@@ -10,6 +10,11 @@
     <AssemblyName>Orleans.Streaming.GCP</AssemblyName>
     <RootNamespace>Orleans.Providers.GCP</RootNamespace>
   </PropertyGroup>
+  
+  <PropertyGroup>
+    <!-- Cannot release a stable version of this package that depends on a prerelease version of Google.Cloud.PubSub.V1. -->
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Google.Cloud.PubSub.V1" Version="$(GoogleCloudPubSubV1Version)" />
