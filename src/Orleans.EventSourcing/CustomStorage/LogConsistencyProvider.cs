@@ -48,7 +48,7 @@ namespace Orleans.EventSourcing.CustomStorage
         public static ILogViewAdaptorFactory Create(IServiceProvider services, string name)
         {
             IOptionsSnapshot<CustomStorageLogConsistencyOptions> optionsSnapshot = services.GetRequiredService<IOptionsSnapshot<CustomStorageLogConsistencyOptions>>();
-            return ActivatorUtilities.CreateInstance<LogConsistencyProvider>(services, name, optionsSnapshot.Get(name));
+            return ActivatorUtilities.CreateInstance<LogConsistencyProvider>(services, optionsSnapshot.Get(name));
         }
     }
 }
