@@ -106,5 +106,11 @@ namespace Orleans.Runtime.GrainDirectory
             router.HandoffManager.RemoveHandoffPartition(source);
             return Task.CompletedTask;
         }
+
+        public Task AcceptSplitPartition(List<ActivationAddress> singleActivations, List<ActivationAddress> multiActivations)
+        {
+            router.HandoffManager.AcceptExistingRegistrations(singleActivations, multiActivations);
+            return Task.CompletedTask;
+        }
     }
 }
