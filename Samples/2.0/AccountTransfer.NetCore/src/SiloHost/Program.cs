@@ -40,6 +40,11 @@ namespace OrleansSiloHost
         {
             var builder = new SiloHostBuilder()
                 .UseLocalhostClustering()
+                .Configure<ClusterOptions>(options =>
+                {
+                    options.ClusterId = "dev";
+                    options.ServiceId = "AccountTransferApp";
+                })
                 .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
                 .ConfigureLogging(logging => logging.AddConsole())
                 .AddMemoryGrainStorageAsDefault()
