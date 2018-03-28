@@ -2,20 +2,16 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Fabric;
-using System.Fabric.Description;
-using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Grains;
 using Microsoft.Extensions.Logging;
 using Microsoft.ServiceFabric.Services.Communication.Runtime;
 using Microsoft.ServiceFabric.Services.Runtime;
-using Orleans.Clustering.ServiceFabric;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Hosting.ServiceFabric;
-using Orleans.ServiceFabric;
 
 namespace StatelessCalculatorService
 {
@@ -39,31 +35,38 @@ namespace StatelessCalculatorService
             // A new Orleans silo will be both created and initialized each time the listener is opened and will be shutdown 
             // when the listener is closed.
             var listener = OrleansServiceListener.CreateStateless(
-                (serviceContext, builder) =>
+                (fabricServiceContext, builder) =>
                 {
                     builder.Configure<ClusterOptions>(options =>
                     {
-                        options.ServiceId = Guid.Empty;
-                        options.ClusterId = "dev";
+                        // The service id is unique for the entire service over its lifetime. This is used to identify persistent state
+                        // such as reminders and grain state.
+                        options.ServiceId = fabricServiceContext.ServiceName.ToString();
+
+                        // The cluster id identifies a deployed cluster. Since Service Fabric uses rolling upgrades, the cluster id
+                        // can be kept constant. This is used to identify which silos belong to a particular cluster.
+                        options.ClusterId = "development";
                     });
 
-                    // Optional: use Service Fabric for cluster membership.
-                    builder.UseServiceFabricClustering(serviceContext);
+                    // Configure clustering. Other clustering providers are available, but for the purpose of this sample we
+                    // will use Azure Storage.
+                    // TODO: Pick a clustering provider and configure it here.
+                    builder.UseAzureStorageClustering(options => options.ConnectionString = "UseDevelopmentStorage=true");
                     
                     // Optional: configure logging.
                     builder.ConfigureLogging(logging => logging.AddDebug());
 
                     builder.AddStartupTask<StartupTask>();
-                    builder.UseInMemoryReminderService();
 
                     // Service Fabric manages port allocations, so update the configuration using those ports.
                     // Gather configuration from Service Fabric.
-                    var activation = serviceContext.CodePackageActivationContext;
+                    var activation = fabricServiceContext.CodePackageActivationContext;
                     var endpoints = activation.GetEndpoints();
 
-                    var siloEndpoint = endpoints[ServiceFabricConstants.SiloEndpointName];
-                    var gatewayEndpoint = endpoints[ServiceFabricConstants.GatewayEndpointName];
-                    var hostname = serviceContext.NodeContext.IPAddressOrFQDN;
+                    // These endpoint names correspond to TCP endpoints specified in ServiceManifest.xml
+                    var siloEndpoint = endpoints["OrleansSiloEndpoint"];
+                    var gatewayEndpoint = endpoints["OrleansProxyEndpoint"];
+                    var hostname = fabricServiceContext.NodeContext.IPAddressOrFQDN;
                     builder.ConfigureEndpoints(hostname, siloEndpoint.Port, gatewayEndpoint.Port);
 
                     // Add your application assemblies.
