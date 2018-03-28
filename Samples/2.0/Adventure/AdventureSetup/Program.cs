@@ -44,6 +44,11 @@ namespace AdventureSetup
 
             var client = new ClientBuilder()
                 .UseLocalhostClustering()
+                .Configure<ClusterOptions>(options =>
+                {
+                    options.ClusterId = "dev";
+                    options.ServiceId = "AdventureApp";
+                })
                 .ConfigureLogging(logging => logging.AddConsole())
                 .Build();
 

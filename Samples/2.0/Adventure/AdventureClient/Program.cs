@@ -14,6 +14,11 @@ namespace AdventureClient
         {
             var client = new ClientBuilder()
                 .UseLocalhostClustering()
+                .Configure<ClusterOptions>(options =>
+                {
+                    options.ClusterId = "dev";
+                    options.ServiceId = "AdventureApp";
+                })
                 .Build();
 
             client.Connect().Wait();
