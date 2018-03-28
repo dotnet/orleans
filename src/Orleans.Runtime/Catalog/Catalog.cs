@@ -17,6 +17,7 @@ using Orleans.Serialization;
 using Orleans.Streams.Core;
 using Orleans.Streams;
 using System.Runtime.ExceptionServices;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -96,6 +97,8 @@ namespace Orleans.Runtime
         private readonly ILoggerFactory loggerFactory;
         private readonly IOptions<GrainCollectionOptions> collectionOptions;
         private readonly IOptions<SiloMessagingOptions> messagingOptions;
+        private readonly SingleThreadedExecutor pendingOperations;
+
         public Catalog(
             ILocalSiloDetails localSiloDetails,
             ILocalGrainDirectory grainDirectory,
@@ -172,6 +175,8 @@ namespace Orleans.Runtime
             });
             maxWarningRequestProcessingTime = this.messagingOptions.Value.ResponseTimeout.Multiply(5);
             maxRequestProcessingTime = this.messagingOptions.Value.MaxRequestProcessingTime;
+
+            this.pendingOperations = new SingleThreadedExecutor(task => this.scheduler.QueueTask(task, this.SchedulingContext), this.logger);
             grainDirectory.SetSiloRemovedCatalogCallback(this.OnSiloStatusChange);
         }
 
@@ -1412,10 +1417,10 @@ namespace Orleans.Runtime
                 this.RuntimeClient.BreakOutstandingMessagesToDeadSilo(updatedSilo);
             }
 
-            var activationsToShutdown = new List<ActivationData>();
+            var unregisteredActivations = new Queue<ActivationData>();
             try
             {
-                // scan all activations in activation directory and deactivate the ones that the removed silo is their primary partition owner.
+                // scan all activations in activation directory and find the ones that were registered on the removed silo.
                 lock (activations)
                 {
                     foreach (var activation in activations)
@@ -1430,7 +1435,7 @@ namespace Orleans.Runtime
                             {
                                 // adapted from InsideGrainClient.DeactivateOnIdle().
                                 activationData.ResetKeepAliveRequest();
-                                activationsToShutdown.Add(activationData);
+                                unregisteredActivations.Enqueue(activationData);
                             }
                         }
                         catch (Exception exc)
@@ -1440,16 +1445,61 @@ namespace Orleans.Runtime
                         }
                     }
                 }
-                logger.Info(ErrorCode.Catalog_SiloStatusChangeNotification,
-                    String.Format("Catalog is deactivating {0} activations due to a failure of silo {1}, since it is a primary directory partition to these grain ids.",
-                        activationsToShutdown.Count, updatedSilo.ToStringWithHashCode()));
             }
             finally
             {
                 // outside the lock.
-                if (activationsToShutdown.Count > 0)
+                if (unregisteredActivations.Count > 0)
                 {
-                    DeactivateActivations(activationsToShutdown).Ignore();
+                    logger.Info(ErrorCode.Catalog_SiloStatusChangeNotification,
+                        String.Format("Catalog is re-registering {0} activations due to a failure of silo {1}, since it is a primary directory partition to these grain ids.",
+                            unregisteredActivations.Count,
+                            updatedSilo.ToStringWithHashCode()));
+
+                    var duplicates = new List<ActivationData>();
+                    this.pendingOperations.QueueTask(
+                        "SalvageActivations",
+                        async () =>
+                        {
+                            var localGrainDirectory = this.serviceProvider.GetRequiredService<LocalGrainDirectory>();
+
+                            while (unregisteredActivations.Count > 0)
+                            {
+                                if (!localGrainDirectory.Running) break;
+                                if (this.LocalSiloStatus != SiloStatus.Active) break;
+
+                                var activation = unregisteredActivations.Peek();
+                                
+                                lock (activation)
+                                {
+                                    if (activation.State != ActivationState.Valid)
+                                    {
+                                        unregisteredActivations.Dequeue();
+                                        continue;
+                                    }
+                                }
+
+                                // Find the correct directory to register the activation and attempt to re-register it.
+                                var forwardAddress = localGrainDirectory.CheckIfShouldForward(activation.Grain, 0, "SalvageActivations");
+                                AddressAndTag registrationResult;
+                                if (forwardAddress == null)
+                                {
+                                    registrationResult = await localGrainDirectory.RegisterAsync(activation.Address, singleActivation: true, hopCount: 0);
+                                }
+                                else
+                                {
+                                    var remoteGrainDirectory = localGrainDirectory.GetDirectoryReference(forwardAddress);
+                                    registrationResult = await remoteGrainDirectory.RegisterAsync(activation.Address, singleActivation: true, hopCount: 0);
+                                }
+
+                                // If registration failed, enqueue the activation for deregistration.
+                                if (!registrationResult.Address.Equals(activation.Address)) duplicates.Add(activation);
+                                unregisteredActivations.Dequeue();
+                            }
+
+                            // Deactivate any duplicate activations.
+                            this.DeactivateActivations(duplicates).Ignore();
+                        });
                 }
             }
         }

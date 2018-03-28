@@ -14,7 +14,6 @@ namespace Orleans.Runtime.GrainDirectory
     internal class GrainDirectoryHandoffManager
     {
         private const int HANDOFF_CHUNK_SIZE = 500;
-        private static readonly TimeSpan RetryDelay = TimeSpan.FromMilliseconds(250);
         private readonly LocalGrainDirectory localDirectory;
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IInternalGrainFactory grainFactory;
@@ -23,8 +22,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly Dictionary<SiloAddress, Task> lastPromise;
         private readonly ILogger logger;
         private readonly Factory<GrainDirectoryPartition> createPartion;
-        private readonly Queue<Operation> pendingOperations = new Queue<Operation>();
-        private readonly AsyncLock executorLock = new AsyncLock();
+        private readonly SingleThreadedExecutor pendingOperations;
 
         internal GrainDirectoryHandoffManager(
             LocalGrainDirectory localDirectory,
@@ -41,6 +39,8 @@ namespace Orleans.Runtime.GrainDirectory
             directoryPartitionsMap = new Dictionary<SiloAddress, GrainDirectoryPartition>();
             silosHoldingMyPartition = new List<SiloAddress>();
             lastPromise = new Dictionary<SiloAddress, Task>();
+            this.pendingOperations =
+                new SingleThreadedExecutor(task => localDirectory.Scheduler.QueueTask(task, localDirectory.RemoteGrainDirectory.SchedulingContext), this.logger);
         }
 
         internal List<ActivationAddress> GetHandedOffInfo(GrainId grain)
@@ -232,7 +232,7 @@ namespace Orleans.Runtime.GrainDirectory
                     List<ActivationAddress> splitPartListSingle = splitPart.ToListOfActivations(true);
                     List<ActivationAddress> splitPartListMulti = splitPart.ToListOfActivations(false);
 
-                    EnqueueOperation(
+                    this.pendingOperations.QueueTask(
                         $"{nameof(ProcessSiloAddEvent)}({addedSilo})",
                         () => ProcessAddedSiloAsync(addedSilo, splitPartListSingle, splitPartListMulti));
                 }
@@ -312,7 +312,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         internal void AcceptExistingRegistrations(List<ActivationAddress> singleActivations, List<ActivationAddress> multiActivations)
         {
-            this.EnqueueOperation(
+            this.pendingOperations.QueueTask(
                 nameof(AcceptExistingRegistrations),
                 () => AcceptExistingRegistrationsAsync(singleActivations, multiActivations));
         }
@@ -462,7 +462,7 @@ namespace Orleans.Runtime.GrainDirectory
         private void DestroyDuplicateActivations(Dictionary<SiloAddress, List<ActivationAddress>> duplicates)
         {
             if (duplicates == null || duplicates.Count == 0) return;
-            this.EnqueueOperation(
+            this.pendingOperations.QueueTask(
                 nameof(DestroyDuplicateActivations),
                 () => DestroyDuplicateActivationsAsync(duplicates));
         }
@@ -486,68 +486,6 @@ namespace Orleans.Runtime.GrainDirectory
 
                 duplicates.Remove(pair.Key);
             }
-        }
-
-        private void EnqueueOperation(string name, Func<Task> action)
-        {
-            lock (this)
-            {
-                this.pendingOperations.Enqueue(new Operation(name, action));
-                if (this.pendingOperations.Count <= 2)
-                {
-                    this.localDirectory.Scheduler.QueueTask(this.ExecutePendingOperations, this.localDirectory.RemoteGrainDirectory.SchedulingContext);
-                }
-            }
-        }
-
-        private async Task ExecutePendingOperations()
-        {
-            using (await executorLock.LockAsync())
-            {
-                while (true)
-                {
-                    // Get the next operation, or exit if there are none.
-                    Operation op;
-                    lock (this)
-                    {
-                        if (this.pendingOperations.Count == 0) break;
-
-                        op = this.pendingOperations.Peek();
-                    }
-
-                    try
-                    {
-                        await op.Action();
-                        lock (this)
-                        {
-                            // Remove the successful operation from the queue.
-                            this.pendingOperations.Dequeue();
-                        }
-                    }
-                    catch (Exception exception)
-                    {
-                        if (this.logger.IsEnabled(LogLevel.Warning))
-                        {
-                            this.logger.LogWarning($"{op.Name} failed: {LogFormatter.PrintException(exception)}");
-                        }
-
-                        await Task.Delay(RetryDelay);
-                    }
-                }
-            }
-        }
-
-        private struct Operation
-        {
-            public Operation(string name, Func<Task> action)
-            {
-                Name = name;
-                Action = action;
-            }
-
-            public string Name { get; }
-
-            public Func<Task> Action { get; }
         }
     }
 }
