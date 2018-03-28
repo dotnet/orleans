@@ -1,7 +1,7 @@
 <Project>
 
   <PropertyGroup>
-    <OrleansPackageVersion Condition=" '$(OrleansPackageVersion)'=='' ">2.0.0-rc*</OrleansPackageVersion>
+    <OrleansPackageVersion Condition=" '$(OrleansPackageVersion)'=='' ">2.0*</OrleansPackageVersion>
   </PropertyGroup>
 
 </Project>
