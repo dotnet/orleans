@@ -56,7 +56,6 @@ public class WorkerRole : RoleEntryPoint
     public override bool OnStart()
     {
         // Do other silo initialization – for example: Azure diagnostics, etc
-
         return base.OnStart();
     }
 
@@ -73,7 +72,6 @@ public class WorkerRole : RoleEntryPoint
         config.AddAzureTableStorageProvider("AzureStore", RoleEnvironment.GetConfigurationSettingValue("DataConnectionString"));
 
         // Configure storage providers
-
         silo = new AzureSilo();
         bool ok = silo.Start(config);
 
@@ -82,7 +80,8 @@ public class WorkerRole : RoleEntryPoint
 }
 ```
 
-Now, it works as follows
+Now, the AzureSilo is replaced with the ISiloHost, and after creating the SiloHostBuilder
+
 ```csharp
 
     public class WorkerRole : RoleEntryPoint
