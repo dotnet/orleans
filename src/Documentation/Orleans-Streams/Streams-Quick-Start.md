@@ -10,17 +10,19 @@ To learn more about the details of the streaming features, read other parts of t
 
 ## Required Configurations
 
-In this guide we'll use a Simple Message based Stream which uses grain messaging to send stream data to subscribers. We will use the in-memory storage provider to store lists of subscriptions so it is not a wise choise for real production applications.
+In this guide we'll use a Simple Message based Stream which uses grain messaging to send stream data to subscribers. We will use the in-memory storage provider to store lists of subscriptions so it is not a wise choice for real production applications.
 
-``` xml
-<Globals>
-    <StorageProviders>
-      <Provider Type="Orleans.Storage.MemoryStorage" Name="Default" />
-      <Provider Type="Orleans.Storage.MemoryStorage" Name="PubSubStore" />
-    </StorageProviders>
-    <StreamProviders>
-      <Provider Type="Orleans.Providers.Streams.SimpleMessageStream.SimpleMessageStreamProvider" Name="SMSProvider"/>
-    </StreamProviders>
+On silo, where hostBuilder is an ISiloHostBuilder
+
+``` csharp
+hostBuilder.AddSimpleMessageStreamProvider("SMSProvider")
+           .AddMemoryGrainStorage("PubSubStore");
+```
+
+On cluster client, where clientBuilder is an IClientBuilder
+
+``` csharp
+clientBuilder.AddSimpleMessageStreamProvider("SMSProvider");
 ```
 
 Now we can create streams, send data using them as producers and also receive data as subscribers.
