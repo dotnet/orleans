@@ -3,7 +3,7 @@ layout: page
 title: Configuring ADO.NET Providers
 ---
 
-# AdoNet Extensions
+# Configuring ADO.NET Providers
 
 Any reliable deployment of Orleans requires using persistent storage to keep system state, specifically Orleans cluster membership table and reminders.
 One of the available options is using a SQL database via the ADO.NET providers.

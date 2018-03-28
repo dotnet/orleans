@@ -8,5 +8,5 @@
   href: Typical-Configurations.md
 - name: Configuring .NET Garbage Collection
   href: Configuring-.NET-Garbage-Collection.md
-- name: Configuring AdoNet Extensions
-  href: Configuring-AdoNet-Extensions.md
+- name: Configuring ADO.NET Providers
+  href: Configuring-AdoNet-Providers.md
