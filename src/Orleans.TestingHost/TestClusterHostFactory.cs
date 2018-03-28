@@ -46,6 +46,10 @@ namespace Orleans.TestingHost
             var hostBuilder = new SiloHostBuilder()
                 .Configure<ClusterOptions>(configuration)
                 .Configure<SiloOptions>(options => options.SiloName = siloName)
+                .Configure<ClusterMembershipOptions>(options =>
+                {
+                    options.ExpectedClusterSize = int.Parse(configuration["InitialSilosCount"]);
+                })
                 .ConfigureHostConfiguration(cb =>
                 {
                     // TODO: Instead of passing the sources individually, just chain the pre-built configuration once we upgrade to Microsoft.Extensions.Configuration 2.1
