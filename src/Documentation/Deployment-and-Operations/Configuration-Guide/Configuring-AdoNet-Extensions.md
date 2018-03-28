@@ -1,6 +1,6 @@
 ---
 layout: page
-title: AdoNet extensions
+title: Configuring ADO.NET Providers
 ---
 
 # AdoNet Extensions
