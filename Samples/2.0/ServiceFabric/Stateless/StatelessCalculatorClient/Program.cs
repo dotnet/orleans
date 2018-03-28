@@ -9,9 +9,8 @@ using GrainInterfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
-using Orleans.Clustering.ServiceFabric;
 using Orleans.Configuration;
-using Orleans.Runtime.Configuration;
+using Orleans.Hosting;
 
 namespace StatelessCalculatorClient
 {
@@ -30,27 +29,18 @@ namespace StatelessCalculatorClient
 
             builder.Configure<ClusterOptions>(options =>
             {
-                options.ServiceId = Guid.Empty;
-                options.ClusterId = "dev";
+                options.ServiceId = serviceName.ToString();
+                options.ClusterId = "development";
             });
 
-            // Use Service Fabric for managing cluster membership.
-            builder.UseServiceFabricClustering(serviceName);
+            // TODO: Pick a clustering provider and configure it here.
+            builder.UseAzureStorageClustering(options => options.ConnectionString = "UseDevelopmentStorage=true");
 
             // Add the application assemblies.
             builder.ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(ICalculatorGrain).Assembly));
 
             // Optional: configure logging.
             builder.ConfigureLogging(logging => logging.AddDebug());
-
-            builder.ConfigureServices(
-                services =>
-                {
-                    // Some deployments require a custom FabricClient, eg so that cluster endpoints and certificates can be configured.
-                    // A pre-configured FabricClient can be injected.
-                    var fabricClient = new FabricClient();
-                    services.AddSingleton(fabricClient);
-                });
 
             // Create the client and connect to the cluster.
             var client = builder.Build();
