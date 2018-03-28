@@ -20,10 +20,10 @@ The first thing we need to do is make the identities of our workers and managers
 In the sample, they were assigned GUIDs using `Guid.NewGuid()`, which is convenient, but doesn't let us find them in a subsequent run.
 Therefore, we'll create a set of GUIDs first, then use them as the worker identities.
 
-The modified `Main` program looks like this:
+The modified client program looks like this:
 
 ``` csharp
-static void Main(string[] args)
+private static async Task DoClientWork(IClusterClient client)
 {
      ...
     var ids = new string[] {
@@ -38,40 +38,42 @@ static void Main(string[] args)
         "2eef0ac5-540f-4421-b9a9-79d89400f7ab"
     };
 
-    var e0 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.Parse(ids[0]));
-    var e1 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.Parse(ids[1]));
-    var e2 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.Parse(ids[2]));
-    var e3 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.Parse(ids[3]));
-    var e4 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.Parse(ids[4]));
+    var e0 = client.GetGrain<IEmployee>(Guid.Parse(ids[0]));
+    var e1 = client.GetGrain<IEmployee>(Guid.Parse(ids[1]));
+    var e2 = client.GetGrain<IEmployee>(Guid.Parse(ids[2]));
+    var e3 = client.GetGrain<IEmployee>(Guid.Parse(ids[3]));
+    var e4 = client.GetGrain<IEmployee>(Guid.Parse(ids[4]));
 
-    var m0 = GrainClient.GrainFactory.GetGrain<IManager>(Guid.Parse(ids[5]));
-    var m1 = GrainClient.GrainFactory.GetGrain<IManager>(Guid.Parse(ids[6]));
-    ...
+    var m0 = client.GetGrain<IManager>(Guid.Parse(ids[5]));
+    var m1 = client.GetGrain<IManager>(Guid.Parse(ids[6]));
+     ...
 }
 ```
+> Note: If you are transitioning from Orleans 1.5, you will notice that the Client is no longer static.
+Please refer to [Migration from Orleans 1.5 to 2.0](../Documentation/2.0/Migration1.5.md) page.
 
 Next, we'll do some silo configuration, in order to configure the storage provider that will give us access to persistent storage.
-The silo host project includes a file _OrleansHostWrapper.cs_ which is where we find the following section:
+The SiloHost project includes a file _Program.cs_ which is where we find the following section:
 
 ```csharp
-var config = ClusterConfiguration.LocalhostPrimarySilo();
-config.AddMemoryStorageProvider();
+var builder = new SiloHostBuilder()
+                .UseLocalhostClustering()
+                .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
+                .ConfigureLogging(logging => logging.AddConsole());
 
-// Add this line to use the Azure storage emulator
-// config.AddAzureTableStorageProvider("AzureStore", "UseDevelopmentStorage=true");
-// Add this line to use an Azure storage account
-// config.AddAzureBlobStorageProvider("AzureStore", "[insert data connection string]");
-
-siloHost = new SiloHost(siloName, config);
+var host = builder.Build();
+await host.StartAsync();
+return host;
 ```
 
-If this is hosted in Azure Cloud Services, then one can use:
+If this is hosted in Azure Cloud Services, then one can use either of the following before calling `builder.Build()` to use Azure to persist grain state:
 
 ```csharp
-config.AddAzureBlobStorageProvider("AzureStore");
+// Stores grains as composition of fields
+builder.AddAzureTableGrainStorage(option => option.ConnectionString = your_connection_string);
+// Stores grains as blobs
+builder.AddAzureBlobGrainStorage(option => option.ConnectionString = your_connection_string);
 ```
-
-and it will pick up the same connection string used in `config.Globals.DataConnectionString`.
 
 The `MemoryStorage` provider is fairly uninteresting, since it doesn't actually provide any permanent storage; it's intended for debugging persistent grains while having no access to a persistent store.
 In our case, that makes it hard to demonstrate persistence, so we will rely on a real storage provider.
@@ -83,9 +85,11 @@ In the case of the latter, you will have to create a Azure storage account and e
 
 With one of those enabled, we're ready to tackle the grain code.
 
-> Note: The built-in storage provider classes `Orleans.Storage.AzureBlobStorage` and `Orleans.Storage.AzureTableStorage`
-are in the  _OrleansAzureUtils.dll_ assembly, make sure this assembly is referenced in your silo worker role project
-with _CopyLocal='True'_.
+> Note: With Orleans 2.0, a lot of functionality have been split off into smaller packages to allow more granular configuration and deployment.
+This includes the Azure storage provider.
+Please install [Orleans.Persistence.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.AzureStorage/) package if you would like to use Azure as a storage provider.
+You could find some of the other storage providers maintained by the Orleans community by [searching for Orleans.Persistence](https://www.nuget.org/packages?q=Microsoft.Orleans.Persistence).
+
 
 ## Declaring State
 
@@ -133,7 +137,7 @@ and
 public class Manager : Orleans.Grain<ManagerState>, IManager
 ```
 
-At risk of stating the obvious, the name of the storage provider attribute should match the name in the configuration file.
+At risk of stating the obvious, the name of the storage provider attribute should match the name as it was used in configuring the Silo.
 This indirection is what allows you to delay choices around where to store grain state until deployment.
 
 Given these declarative changes, the grain should no longer rely on a private fields to keep compensation level and manager.
@@ -244,4 +248,4 @@ Deactivation is the cleanest way of resetting a grain to its last know good stat
 
 Next, we'll see how we can call our grains from an MVC web application.
 
-[Handling Failure](Failure-Handling.md)
+[Handling Failure](../1.5/Tutorials/Failure-Handling.md)

@@ -1,9 +1,10 @@
-- name: Documentation
+- name: 2.0 Documentation
   href: Documentation/Introduction.md
-  homepage: Documentation/Introduction.md
-- name: Tutorials
+- name: 2.0 Tutorials
   href: Tutorials/index.md
-  homepage: Tutorials/index.md
 - name: Community
   href: Community/Contributing.md
-  homepage: Community/Contributing.md
+- name: 1.5 Documentation
+  href: 1.5/Documentation/Introduction.md
+- name: 1.5 Tutorials
+  href: 1.5/Tutorials/index.md

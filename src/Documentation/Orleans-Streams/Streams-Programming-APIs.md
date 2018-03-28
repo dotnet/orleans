@@ -189,16 +189,13 @@ Orleans streams work **uniformly across grains and Orleans clients**. That is, e
 
 To track stream subscriptions, Orleans uses a runtime component called **Streaming Pub-Sub** which serves as a rendezvous point for stream consumers and stream producers. Pub Sub tracks all stream subscriptions, persists them, and matches stream consumers with stream producers.
 
-Applications can choose where and how the Pub-Sub data is stored. The Pub-Sub component itself is implemented as grains (called `PubSubRendezvousGrain`) and it is using Orleans Declarative Persistence for those grain. `PubSubRendezvousGrain` uses storage provider named `PubSubStore`. As with any grain, you can designate an implementation for a storage provider.  For Streaming Pub-Sub you can change the implementation of the `PubSubStore` in the config file:
+Applications can choose where and how the Pub-Sub data is stored. The Pub-Sub component itself is implemented as grains (called `PubSubRendezvousGrain`) and it is using Orleans Declarative Persistence for those grains. `PubSubRendezvousGrain` uses storage provider named `PubSubStore`. As with any grain, you can designate an implementation for a storage provider.  For Streaming Pub-Sub you can change the implementation of the `PubSubStore` at silo construction time using the silo host builder:
 
-``` xml
-<OrleansConfiguration xmlns="urn:orleans">
-  <Globals>
-    <StorageProviders>
-      <Provider Type="Orleans.Storage.AzureTableStorage" Name="PubSubStore" />
-    </StorageProviders>
-  </Globals>
-</OrleansConfiguration>
+The below configures the Pub Sub to store its state in azure tables.
+
+``` csharp
+hostBuilder.AddAzureTableGrainStorage("PubSubStore", 
+    options => { options.ConnectionString = "Secret"; });
 ```
 
 That way Pub-Sub data will be durably stored in Azure Table.
@@ -207,25 +204,21 @@ In addition to the Pub-Sub, Orleans Streaming Runtime delivers events from produ
 
 ### Configuration<a name="Configuration"></a>
 
-In order to use streams you need to enable stream providers via configuration. You can read more about stream providers [here](Stream-Providers.md). Sample stream providers configuration:
-
-``` xml
-<OrleansConfiguration xmlns="urn:orleans">
-  <Globals>
-    <StreamProviders>
-      <Provider Type="Orleans.Providers.Streams.SimpleMessageStream.SimpleMessageStreamProvider" Name="SMSProvider"/>
-      <Provider Type="Orleans.Providers.Streams.AzureQueue.AzureQueueStreamProvider" Name="AzureQueueProvider"/>
-    </StreamProviders>
-  </Globals>
-</OrleansConfiguration>
-```
-
-It is also possible to register a stream provider programmatically, via calling one of the `RegisterStreamProvider` methods on the [`Orleans.Runtime.Configuration.GlobalConfiguration`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Configuration/GlobalConfiguration.cs) or [`Orleans.Runtime.Configuration.ClientConfiguration`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Configuration/ClientConfiguration.cs) classes.
+In order to use streams you need to enable stream providers via the silo host or cluster client builders. You can read more about stream providers [here](Stream-Providers.md). Sample stream provider setup:
 
 ``` csharp
-public void RegisterStreamProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
+hostBuilder.AddSimpleMessageStreamProvider("SMSProvider")
+  .AddAzureQueueStreams<AzureQueueDataAdapterV2>("AzureQueueProvider",
+    optionsBuilder => optionsBuilder.Configure( options =>
+    {
 
-public void RegisterStreamProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IStreamProvider
+      options.ConnectionString = "Secret";
+    }))
+  .AddAzureTableGrainStorage("PubSubStore", options =>
+    {
+      options.ConnectionString = "Secret";
+
+    });
 ```
 
 ## Next
