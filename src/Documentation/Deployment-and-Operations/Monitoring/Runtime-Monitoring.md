@@ -1,30 +1,40 @@
----
+s---
 layout: page
 title: Runtime Monitoring
 ---
 
 # Runtime Monitoring
 
-Orleans output its runtime statistics and metrics through `ITelemetryConsumer`. Application can register telemetry consumer with their cluster, and then orleans runtime will periotically publish statistics and metrics to the consumers. Application developpers can implement their own `ITelemetryConsumer` on top of the monitoring service they choose, or they can utilize the telemetry consumer we support. We currently support three types of telemetry consumer which are released through their own nuget: 
-- `Microsoft.Orleans.OrleansTelemetryConsumers.AI`, which would publish to [Application Insights](https://azure.microsoft.com/en-us/services/application-insights/).
-- `Microsoft.Orleans.OrleansTelemetryConsumers.Counters`, whcih would publish to Windows performance counters. The Orleans runtime continually updates a number of them. CounterControl.exe, which can be find in `Microsoft.Orleans.CounterControl` nuget, helps register the counters, and needs to run with elevated privileges. Also, the performance counters can be monitored using any of the standard monitoring tools.
-- `Microsoft.Orleans.OrleansTelemetryConsumers.NewRelic`, which would publish to [New Relic](https://newrelic.com/).
+Orleans output its runtime statistics and metrics through the `ITelemetryConsumer` interface.
+Application can register one or more telemetry consumers with for their silos and clients, to receives statistics and metrics that Orleans runtime  periotically publishes.
+These can be consumers for popular telemetry analytics solutions or custom ones for any other destination and purpose.
+Three telemetry consumer are currently included in the Orleans codebase.
 
-To configure your server and client to use telemetry consumer, server side configuration would look like this : 
+They are released as separate NuGet packages: 
+
+- `Microsoft.Orleans.OrleansTelemetryConsumers.AI` for publishing to [Application Insights](https://azure.microsoft.com/en-us/services/application-insights/).
+
+- `Microsoft.Orleans.OrleansTelemetryConsumers.Counters` for publishing to Windows performance counters.
+The Orleans runtime continually updates a number of them.
+CounterControl.exe tool, included in the [`Microsoft.Orleans.CounterControl`](https://www.nuget.org/packages/Microsoft.Orleans.CounterControl/) NuGet package, helps register necessary performance counter categories.
+It has to run with elevated privileges.
+The performance counters can be monitored using any of the standard monitoring tools.
+
+- `Microsoft.Orleans.OrleansTelemetryConsumers.NewRelic`, for publishing to [New Relic](https://newrelic.com/).
+
+To configure your silo and client to use telemetry consumers, silo configuration code looks like this: 
 ```c#
 var siloHostBuilder = new SiloHostBuilder();
 //configure the silo with AITelemetryConsumer
 siloHostBuilder.Configure<TelemetryOptions>(options => options.AddConsumer<AITelemetryConsumer>);
 ```
 
-client side configuration would look like this : 
+client configuration code look like this: 
 ```c#
 var clientBuilder = newClientBuilder();
 //configure the clientBuilder with AITelemetryConsumer
 clientBuilder.Configure<TelemetryOptions>(options => options.AddConsumer<AITelemetryConsumer>);
 ```
-
-**Watching error codes in MDS** - Orleans automatically writes different error messages into logger. This logger can be configured to output its data to various destinations. For example, the Halo team redirects all logs in production to MDS. They have written custom alerts in MDS to watch for specific error codes and count their occurrences, and alert them when those reach a certain threshold. The list of important error codes to watch is specified here:
 
 * [Silo Error Code Monitoring](Silo-Error-Code-Monitoring.md)
 
