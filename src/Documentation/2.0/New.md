@@ -13,9 +13,9 @@ The open source community has been running pre-release version of 2.0 with .NET 
 
 The most significant changes in 2.0 are as follows.
 
-* Completely move to programmatic config leveraging Dependency Injection with a fluid builder pattern API. Old API based on configuration objects and XML files is preserved for backward compatibility, but will not move forward, and will get deprecated in the future. See more details in the [Configuration](Configuration2.0.md) section.
+* Completely move to programmatic config leveraging Dependency Injection with a fluid builder pattern API. Old API based on configuration objects and XML files is preserved for backward compatibility, but will not move forward, and will get deprecated in the future. See more details in the [Configuration](../Deployment-and-Operations/Configuration-Guide/index.md) section.
 
-* Explicit programmatic specification of application assemblies that replaces automatic scanning of folders by the Orleans runtime upon silo or client initialization. Orleans will still automatically find relevant types, such as grain interfaces and classes, serializers, etc. in the specified assemblies, but it will not anymore try to load every assembly it can find in the folder. An optional helper method for loading all assemblies in the folder is provided for backward compatibility. See [Configuration](Configuration2.0.md) and [Migration](Migration1.5.md) sections for more details.
+* Explicit programmatic specification of application assemblies that replaces automatic scanning of folders by the Orleans runtime upon silo or client initialization. Orleans will still automatically find relevant types, such as grain interfaces and classes, serializers, etc. in the specified assemblies, but it will not anymore try to load every assembly it can find in the folder. An optional helper method for loading all assemblies in the folder is provided for backward compatibility. See [Configuration](../Deployment-and-Operations/Configuration-Guide/index.md) and [Migration](Migration1.5.md) sections for more details.
 
 * Overhaul of code generation. While mostly invisible for developer, code generation became much more robust in handling serialization of various possible types. Special handling is required for F# assemblies. See [Code generation](Codegen.md) section for more details.
 
