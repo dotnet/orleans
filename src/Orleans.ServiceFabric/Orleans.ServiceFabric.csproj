@@ -10,6 +10,5 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Hosting.ServiceFabric\Orleans.Hosting.ServiceFabric.csproj" />
-    <ProjectReference Include="..\Orleans.Clustering.ServiceFabric\Orleans.Clustering.ServiceFabric.csproj" />
   </ItemGroup>
 </Project>
