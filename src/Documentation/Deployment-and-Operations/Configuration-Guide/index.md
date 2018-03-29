@@ -18,4 +18,6 @@ If you want to configure a silo and a client for local development, look at the 
  
  The section on [Typical Configurations](Typical-Configurations.md) provides a summary of a few common configurations.
 
+ A list of important core options that can be configured can be found on [this section](Options-List.md).
+
 **Important**: Make sure you properly configure .NET Garbage Collection as detailed in [Configuring .NET Garbage Collection](Configuring-.NET-Garbage-Collection.md).
