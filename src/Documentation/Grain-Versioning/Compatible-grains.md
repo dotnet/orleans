@@ -3,7 +3,7 @@
 When an existing grain activation is about to process a request, the runtime will check if the version
 in the request and the actual version of the grain are compatible.
 __Orleans does not infer at runtime which policy to use__,
-The default behavior to determine if two versions are compatible is determined by `GlobalConfiguration.CompatibilityStrategy`
+The default behavior to determine if two versions are compatible is determined by `GrainVersioningOptions.CompatibilityStrategy`
 
 ## Backward compatible (default)
 

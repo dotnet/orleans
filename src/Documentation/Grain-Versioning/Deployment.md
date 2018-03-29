@@ -10,6 +10,17 @@ Recommended configuration:
 - `DefaultCompatibilityStrategy` set to `BackwardCompatible`
 - `DefaultVersionSelectorStrategy` set to `AllCompatibleVersions`
 
+```csharp
+var silo = new SiloHostBuilder()
+  [...]
+  .Configure<GrainVersioningOptions>(options => 
+  {
+    options.DefaultCompatibilityStrategy = nameof(BackwardCompatible);
+    options.DefaultVersionSelectorStrategy = nameof(AllCompatibleVersions);
+  })
+  [...]
+```
+
 When using this configuration, "old" clients will be able to talk to activations
 on both versions of silos. Newer clients and silos will only trigger new activations
 on newer silos.
@@ -26,6 +37,17 @@ cluster__. It is important that silos from both environment can talk to each oth
 Recommended configuration:
 - `DefaultCompatibilityStrategy` set to `BackwardCompatible`
 - `DefaultVersionSelectorStrategy` set to `MinimumVersion`
+
+```csharp
+var silo = new SiloHostBuilder()
+  [...]
+  .Configure<GrainVersioningOptions>(options => 
+  {
+    options.DefaultCompatibilityStrategy = nameof(BackwardCompatible);
+    options.DefaultVersionSelectorStrategy = nameof(MinimumVersion);
+  })
+  [...]
+```
 
 Suggested deployment steps:
 
