@@ -53,10 +53,12 @@ namespace OrleansClient
 
             orleansClient = builder.Build();
 
-            orleansClient.Connect(ex =>
+            orleansClient.Connect(async ex =>
             {
                 Trace.TraceInformation(ex.Message);
-                return Task.FromResult(true);
+
+                await Task.Delay(TimeSpan.FromSeconds(3));
+                return true;
             }).Wait();
 
             return result;
