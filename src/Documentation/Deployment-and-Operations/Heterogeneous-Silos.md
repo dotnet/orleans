@@ -41,10 +41,9 @@ public class C: Grain, IMyGrainInterface, IMyOtherGrainInterface
 ## Configuration
 
 No configuration is needed, you can deploy different binaries on each silo in your cluster.
-However, if necessary, you can change the interval that silos check for changes in types supported in `ClusterConfig.Globals.TypeMapRefreshInterval`.
+However, if necessary, you can change the interval that silos and clients check for changes in types supported with the property `TypeMapRefreshInterval` from `TypeManagementOptions`
 
-For testing purpose, you can use the property `ExcludedGrainTypes` in `NodeConfiguration`.
-In code based config you can find it in `ClusterConfig.Defaults.ExcludedGrainTypes`, which is a list names of the types you want to exclude.
+For testing purpose, you can use the property `ExcludedGrainTypes` in `GrainClassOptions`, which is a list names of the types you want to exclude on the silos.
 
 ## Limitations
 
