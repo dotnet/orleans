@@ -73,137 +73,60 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
+
+<div class="NOTE"><h5>Note</h5><p>If you just want to start a local silo and a local client for development purpose, look at the <a href="Local-Development-Configuration.html">Local Development Configuration page</a></p>
+</div>
 <h1 id="client-configuration">Client Configuration</h1>
-
-<p>The key parameter that has to be configured for a client is the silo’s client gateway endpoint(s) to connect to. There are two ways to do that: manually configure one or more gateway endpoints or point the client to the Azure Table used by silos’ cluster membership. In the latter case the client automatically discovers what silos with client gateways enabled are available within the deployment, and adjusts its connections to the gateways as they join or leave the cluster. This option is reliable and recommended for production deployment.</p>
-<h2 id="fixed-gateway-configuration">Fixed Gateway Configuration</h2>
-<p>A fixed set of gateways is specified in the ClientConfiguration.xml with one or more Gateway nodes:</p>
-<pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
-  &lt;Gateway Address=&quot;gateway1&quot; Port=&quot;30000&quot;/&gt;
-  &lt;Gateway Address=&quot;gateway2&quot; Port=&quot;30000&quot;/&gt;
-  &lt;Gateway Address=&quot;gateway3&quot; Port=&quot;30000&quot;/&gt;
-&lt;/ClientConfiguration&gt;
-</code></pre><p> One gateway is generally enough. Multiple gateway connections help increase throughput and reliability of the system.</p>
-<h2 id="gateway-configuration-based-on-cluster-membership">Gateway Configuration Based on Cluster Membership</h2>
-<p>To configure the client to automatically find gateways from the silo cluster membership table, you need to specify the Azure Table or SQL Server connection string and the target deployment ID.</p>
-<pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
-  &lt;SystemStore SystemStoreType=&quot;AzureTable&quot;
-               DeploymentId=&quot;target deployment ID&quot;
-               DataConnectionString=&quot;Azure storage connection string&quot;/&gt;
-&lt;/ClientConfiguration&gt;
-</code></pre><p> or</p>
-<pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
-  &lt;SystemStore SystemStoreType=&quot;SqlServer&quot;
-               DeploymentId=&quot;target deployment ID&quot;
-               DataConnectionString=&quot;SQL connection string&quot;/&gt;
-&lt;/ClientConfiguration&gt;
-</code></pre><p> or</p>
-<pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
-  &lt;SystemStore SystemStoreType=&quot;ZooKeeper&quot;
-               DeploymentId=&quot;target deployment ID&quot;
-               DataConnectionString=&quot;ZooKeeper connection string&quot;/&gt;
-&lt;/ClientConfiguration&gt;
-</code></pre><h2 id="local-silo">Local Silo</h2>
-<p>For the local development/test configuration that uses a local silo, the client gateway should be configured to &#39;localhost.&#39;</p>
-<pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
-  &lt;Gateway Address=&quot;localhost&quot; Port=&quot;30000&quot;/&gt;
-&lt;/ClientConfiguration&gt;
-</code></pre><h2 id="web-role-client-in-azure">Web Role Client in Azure</h2>
-<p>When the client is a web role running inside the same Azure deployment as the silo worker roles, all gateway address information is read from the OrleansSiloInstances table when OrleansAzureClient.Initialize() is called. The Azure storage connection string used to find the correct OrleansSiloInstances table is specified in the &quot;DataConnectionString&quot; setting defined in the service configuration for the deployment &amp; role.</p>
-<pre><code class="lang-xml">&lt;ServiceConfiguration  ...&gt;
-  &lt;Role name=&quot;WebRole&quot;&gt; ...
-    &lt;ConfigurationSettings&gt;
-      &lt;Setting name=&quot;DataConnectionString&quot; value=&quot;DefaultEndpointsProtocol=https;AccountName=MYACCOUNTNAME;AccountKey=MYACCOUNTKEY&quot; /&gt;
-    &lt;/ConfigurationSettings&gt;
-  &lt;/Role&gt;
-  ...
-&lt;/ServiceConfiguration&gt;
-</code></pre><p>Both the silo worker roles and web client roles need to be use the same Azure storage account in order to successfully discover each other successfully.</p>
-<p>When using OrleansAzureClient.Initialize() and OrleansSiloInstances table for gateway address discovery, no additional gateway address info in required in the client config file. Typically the ClientConfiguration.xml file will only contain some minimal debug / tracing configuration settings, although even that is not required.</p>
-<pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
-  &lt;Tracing DefaultTraceLevel=&quot;Info&quot; &gt;
-    &lt;TraceLevelOverride LogPrefix=&quot;Application&quot; TraceLevel=&quot;Info&quot; /&gt;
-  &lt;/Tracing&gt;
-&lt;/ClientConfiguration&gt;
-</code></pre><p>Code-based client configuration. This is a reference only example and SHOULD NOT be used AS-IS - you may need to fine-tune client parameters for your specific environment.</p>
-<pre><code class="lang-csharp">var dataConnection = &quot;DefaultEndpointsProtocol=https;AccountName=MYACCOUNTNAME;AccountKey=MYACCOUNTKEY&quot;;
-
-var config = new ClientConfiguration
-{
-    // Some top level features
-    GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable,
-    ResponseTimeout = TimeSpan.FromSeconds(30),
-    DeploymentId = RoleEnvironment.DeploymentId,
-    DataConnectionString = dataConnection,
-    PropagateActivityId = true,
-
-    // Tracing
-    DefaultTraceLevel = Severity.Info,
-    TraceToConsole = false,
-    TraceFilePattern = @&quot;Client_{0}-{1}.log&quot;,
-    //TraceFilePattern = &quot;false&quot;, // Set it to false or none to disable file tracing, effectively it sets config.Defaults.TraceFileName = null;
-
-    TraceLevelOverrides =
+<p>A client for connecting to a cluster of silos and sending requests to grains is configured programmatically via a <code>ClientBuilder</code> and a number of supplemental option classes.
+Like silo options, client option classes follow the <a href="https://docs.microsoft.com/en-us/aspnet/core/fundamentals/configuration/options">ASP.NET Options</a>.</p>
+<p>There are several key aspects of client configuration:</p>
+<ul>
+<li>Orleans clustering information</li>
+<li>Clustering provider</li>
+<li>Application parts</li>
+</ul>
+<p>Example of a client configuration:</p>
+<pre><code class="lang-csharp">var client = new ClientBuilder()
+    // Clustering information
+    .Configure&lt;ClusterOptions&gt;(options =&gt;
     {
-        Tuple.Create(&quot;ComponentName&quot;, Severity.Warning),
-    }
-};
-
-config.RegisterStreamProvider&lt;AzureQueueStreamProvider&gt;(&quot;AzureQueueStreams&quot;,
-    new Dictionary&lt;string, string&gt;
+        options.ClusterId = &quot;my-first-cluster&quot;;
+        options.ServiceId = &quot;MyAwesomeOrleansService&quot;;
+    })
+    // Clustering provider
+    .UseAzureStorageClustering(options =&gt; options.ConnectionString = connectionString)
+    // Application parts: just reference one of the grain interfaces that we use
+    .ConfigureApplicationParts(parts =&gt; parts.AddApplicationPart(typeof(IValueGrain).Assembly))
+    .Build();
+</code></pre><p>Let&#39;s breakdown the steps used in this sample:</p>
+<h2 id="orleans-clustering-information">Orleans clustering information</h2>
+<pre><code class="lang-csharp">    [...]
+    // Clustering information
+    .Configure&lt;ClusterOptions&gt;(options =&gt;
     {
-        { &quot;PubSubType&quot;, &quot;ExplicitGrainBasedAndImplicit&quot; },
-        { &quot;DeploymentId&quot;, &quot;orleans-streams&quot; }, // This will be a prefix name of your Queues - so be careful and use string that is valid for queue name
-        { &quot;NumQueues&quot;, &quot;4&quot; },
-        { &quot;GetQueueMessagesTimerPeriod&quot;, &quot;100ms&quot; },
-        { &quot;DataConnectionString&quot;, dataConnection }
-    });
-
-config.RegisterStreamProvider&lt;SimpleMessageStreamProvider&gt;(&quot;SimpleMessagingStreams&quot;,
-    new Dictionary&lt;string, string&gt;
-    {
-        { &quot;PubSubType&quot;, &quot;ExplicitGrainBasedAndImplicit&quot; }
-    });
-
-IClusterClient client = null;
-while (true)
-{
-    try
-    {
-        // Build a client and then connect it to the cluster.
-        client = new ClientBuilder()
-            .UseConfiguration(config)
-            .ConfigureServices(
-                services =&gt;
-                {
-                    // Services can be provided to the client here. These services are made
-                    // available via dependency injection.
-                    // ConfigureServices can be called multiple times for a single
-                    // ClientBuilder instance.
-                })
-            .Build();
-
-        // Connect the client to the cluster. Once connection succeeds, the client will
-        // maintain the connection, automatically reconnecting as necessary.
-        await client.Connect().ConfigureAwait(false);
-        break;
-    }
-    catch (Exception exception)
-    {
-        // If the connection attempt fails, the client instance must be disposed.
-        client?.Dispose();
-
-        // TODO: Log the exception.
-        // TODO: Add a counter to break up an infinite cycle (circuit breaker pattern).
-        await Task.Delay(TimeSpan.FromSeconds(5));
-    }
-}
-
-// Use the client.
-// Note that clients can be shared between threads and are typically long-lived.
-var user client.GetGrain&lt;IUserGrain&gt;(&quot;leeroy77jenkins@battle.net&quot;);
-Console.WriteLine(await user.GetProfile());
-</code></pre></article>
+        options.ClusterId = &quot;orleans-docker&quot;;
+        options.ServiceId = &quot;AspNetSampleApp&quot;;
+    })
+    [...]
+</code></pre><p>Here we set two things:</p>
+<ul>
+<li>the <code>ClusterId</code> to <code>&quot;my-first-cluster&quot;</code>: this is a unique ID for the Orleans cluster. All clients and silo that uses this ID will be able to directly talk to each other. Some will choose to use a different <code>ClusterId</code> for each deployments for example.</li>
+<li>the <code>ServiceId</code> to <code>&quot;AspNetSampleApp&quot;</code>: this is a unique ID for your application, that will be used by some provider (for example for persistence providers). <strong>This ID should be stable (not change) accross deployments</strong>.</li>
+</ul>
+<h2 id="clustering-provider">Clustering provider</h2>
+<pre><code class="lang-csharp">    [...]
+    // Clustering provider
+    .UseAzureStorageClustering(options =&gt; options.ConnectionString = connectionString)
+    [...]
+</code></pre><p>The client will discover all gateway available in the cluster using this provider. Several providers are available, here in this sample we use the Azure Table provider.</p>
+<p>To get more detail, look in the matching section in the <a href="Server-Configuration.html">Server Configuration page</a></p>
+<h2 id="application-parts">Application parts</h2>
+<pre><code class="lang-csharp">    [...]
+    // Application parts: just reference one of the grain interfaces that we use
+    .ConfigureApplicationParts(parts =&gt; parts.AddApplicationPart(typeof(IValueGrain).Assembly)).WithReferences())
+    [...];
+</code></pre><p>To get more detail, look in the matching section in the <a href="Server-Configuration.html">Server Configuration page</a></p>
+</article>
           </div>
           
           <div class="hidden-sm col-md-2" role="complementary">

@@ -1919,19 +1919,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/2.0/Codegen.html",
-          "hash": "+Q0bpmP7U8/3DntS2zLv2A=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Documentation/2.0/Configuration2.0.md",
-      "output": {
-        ".html": {
-          "relative_path": "Documentation/2.0/Configuration2.0.html",
-          "hash": "as8kEKR1OfGq3a2b5ZofHw=="
+          "hash": "Cz+n5C5kA6lsT4lvRviMjQ=="
         }
       },
       "is_incremental": false,
@@ -1967,7 +1955,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/2.0/New.html",
-          "hash": "AyBRDi6sIt3vwy5lF6cTxw=="
+          "hash": "Me9qF6f87OwW2oTyaqVeQw=="
         }
       },
       "is_incremental": false,
@@ -2195,7 +2183,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Configuration-Guide/Client-Configuration.html",
-          "hash": "gkBRWjZA8x5sQ3Erz8B1gg=="
+          "hash": "pa4pqobRs3pfDIG0zi1e0g=="
         }
       },
       "is_incremental": false,
@@ -2227,11 +2215,23 @@
     },
     {
       "type": "Conceptual",
+      "source_relative_path": "Documentation/Deployment-and-Operations/Configuration-Guide/Local-Development-Configuration.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/Deployment-and-Operations/Configuration-Guide/Local-Development-Configuration.html",
+          "hash": "LZ1ACIJ+Fh+kOj1skMyJQA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
       "source_relative_path": "Documentation/Deployment-and-Operations/Configuration-Guide/Server-Configuration.md",
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Configuration-Guide/Server-Configuration.html",
-          "hash": "/XtKqqqMufTGZaRS+YsjMQ=="
+          "hash": "8fD7lHRtTKjDObbpaTJD8A=="
         }
       },
       "is_incremental": false,
@@ -2243,7 +2243,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Configuration-Guide/Typical-Configurations.html",
-          "hash": "1k6LThP1ouqLRuukHTe+OA=="
+          "hash": "aCkbFzdItJiqvW+rU8pdrw=="
         }
       },
       "is_incremental": false,
@@ -2255,7 +2255,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Configuration-Guide/index.html",
-          "hash": "aobHxB6tGOOAXnB2adAODw=="
+          "hash": "DScGSJXeXGR75QwEodVqPg=="
         }
       },
       "is_incremental": false,
@@ -3220,7 +3220,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/toc.html",
-          "hash": "YSZqn8C1aga6F99xOJglxA=="
+          "hash": "+1QwZj3EM3BzwA1Ah74zew=="
         }
       },
       "is_incremental": false,
@@ -3690,11 +3690,6 @@
         "incrementalPhase": "build"
       },
       "processors": {
-        "ResourceDocumentProcessor": {
-          "can_incremental": false,
-          "details": "Processor ResourceDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
-          "incrementalPhase": "build"
-        },
         "TocDocumentProcessor": {
           "can_incremental": false,
           "details": "Processor TocDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
@@ -3702,6 +3697,11 @@
         },
         "ConceptualDocumentProcessor": {
           "can_incremental": true,
+          "incrementalPhase": "build"
+        },
+        "ResourceDocumentProcessor": {
+          "can_incremental": false,
+          "details": "Processor ResourceDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
           "incrementalPhase": "build"
         }
       }

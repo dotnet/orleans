@@ -79,7 +79,7 @@
 <ol>
 <li><p><strong>During Build</strong> - This is the recommended option and only supports C# projects. In this mode, code generation will run every time your project is compiled. A build task is injected into your project&#39;s build pipeline and the code is generated in the project&#39;s intermediate output directory. To activate this mode, add the package <code>Microsoft.Orleans.OrleansCodeGenerator.Build</code> to all projects which contain Grains, Grain interfaces, serializers, or types which require serializers. Additional diagnostics can be emitted at build-time by specifying value for <code>OrleansCodeGenLogLevel</code> in the target project&#39;s <em>csproj</em> file. For example, <code>&lt;OrleansCodeGenLogLevel&gt;Trace&lt;/OrleansCodeGenLogLevel&gt;</code>.</p>
 </li>
-<li><p><strong>During Configuration</strong> - This is the only supported option for F#, Visual Basic, and other non-C# projects. This mode generates code during the configuration phase. To access this, see the <a href="Configuration2.0.html">Configuration</a> documentation.</p>
+<li><p><strong>During Configuration</strong> - This is the only supported option for F#, Visual Basic, and other non-C# projects. This mode generates code during the configuration phase. To access this, see the <a href="../Deployment-and-Operations/Configuration-Guide/index.html">Configuration</a> documentation.</p>
 </li>
 </ol>
 <p>Both modes generate the same code, however run-time code generation can only generate code for publicly accessible types.</p>
