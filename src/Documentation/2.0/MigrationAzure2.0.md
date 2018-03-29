@@ -5,19 +5,26 @@ title: Migration from Orleans 1.5 to 2.0 when using Azure
 
 # Migration from Orleans 1.5 to 2.0 when using Azure
 
-Since the move to 2.0, the configuration of the silo has changed, before we used to have a major object that handled all the configuration steps, then the developer was able to add each provider as needed, now every config step is based on a Silo Builder, similar to how it is done in ASP.NET Core with the WebHostBuilder.
+In Orleans 2.0, the configuration of silos and clients has changed.
+In Orleans 1.5 we used to have a monolith object that handled all the configuration pieces
+Providers were added to that configuration object, too.
+In Orleans 2.0, the configuration process is organizes around `SiloHostBuilder`, similar to how it is done in ASP.NET Core with the `WebHostBuilder`.
 
-On 1.5.x, the configuration for Azure looked like this:
+In Orleans 1.5, the configuration for Azure looked like this:
 ```csharp
     var config = AzureSilo.DefaultConfiguration();
     config.AddMemoryStorageProvider();
     config.AddAzureTableStorageProvider("AzureStore", RoleEnvironment.GetConfigurationSettingValue("DataConnectionString"));
 ```
 
-The AzureSilo have a static method named DefaultConfiguration(), this method used to load everything from the configuration file of the service. Now, you must load everything manually, the new model is not to depend on some sort of naming convention, you can name your endpoints as you want, so the new configuration API  looks like this:
+The `AzureSilo` class exposes a static method named DefaultConfiguration() that was used for loading configuration XML file.
+This way of configuring a silo is deprecated but still supported via the [legacy support package](https://www.nuget.org/packages/Microsoft.Orleans.Core.Legacy/).
+
+In Orleans 2.0, configuration is completely programmatic.
+The new configuration API  looks like this:
 
 ```csharp
-    //Load the different settings from the services configuration file
+    //Load the different settings from the services configuration
     var proxyPort = RoleEnvironment.CurrentRoleInstance.InstanceEndpoints["OrleansProxyEndpoint"].IPEndpoint.Port;
     var siloEndpoint = RoleEnvironment.CurrentRoleInstance.InstanceEndpoints["OrleansSiloEndpoint"].IPEndpoint;
     var connectionString = RoleEnvironment.GetConfigurationSettingValue("DataConnectionString");
@@ -25,9 +32,14 @@ The AzureSilo have a static method named DefaultConfiguration(), this method use
 
 
     var builder = new SiloHostBuilder()
-        //Now we set the cluster ID
-        .Configure(config => config.ClusterId = deploymentId)
-        .Configure<ClusterOptions>(config => config.ServiceId = deploymentId)
+        //Set service ID and cluster ID
+        .Configure<ClusterOptions>(options => 
+            {
+                options.ClusterId = deploymentId;
+                options.ServiceIs = "my-app";
+            })
+        // Set silo name
+        .Configure<SiloOptions>(options => options.SiloName = this.Name)
         //Then, we can configure the different endpoints
         .ConfigureEndpoints(siloEndpoint.Address, siloEndpoint.Port, proxyPort)
         //Then, we set the connection string for the storage
@@ -46,7 +58,8 @@ The AzureSilo have a static method named DefaultConfiguration(), this method use
 ```
 
 # AzureSilo to ISiloHost
-Before, the AzureSilo class was available to run the silo, now everything runs on a ISiloHost. The way to create a silo before 2.0 was the following
+In Orleans 1.5, the `AzureSilo` class was the recommended way to host a silo in an Azure Worker Role.
+This is still supported via the [`Microsoft.Orleans.Hosting.AzureCloudServices` NuGet package](https://www.nuget.org/packages/Microsoft.Orleans.Hosting.AzureCloudServices/).
 
 ```csharp
 public class WorkerRole : RoleEntryPoint
@@ -80,13 +93,14 @@ public class WorkerRole : RoleEntryPoint
 }
 ```
 
-Now, the AzureSilo is replaced with the ISiloHost, and after creating the SiloHostBuilder
+Orleans 2.0 provides a more flexible and modular API for configuring and hosting a silo via `SiloHostBuilder` and `ISiloHost`.
 
 ```csharp
 
     public class WorkerRole : RoleEntryPoint
     {
         private ISiloHost host;
+        private ISiloHostBuilder builder;
         private readonly CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
         private readonly ManualResetEvent runCompleteEvent = new ManualResetEvent(false);
 
@@ -104,24 +118,27 @@ Now, the AzureSilo is replaced with the ISiloHost, and after creating the SiloHo
         }
 
         public override bool OnStart()
-            => base.OnStart();
+        {
+            //builder is the SiloHostBuilder from the first section
+            // Build silo host, so that any errors will restart the role instance
+            this.host = this.builder.Build();
+
+            base.OnStart();
+        }
 
         public override void OnStop()
         {
             this.cancellationTokenSource.Cancel();
             this.runCompleteEvent.WaitOne();
 
-            host.StopAsync().Wait();
+            this.host.StopAsync().Wait();
 
             base.OnStop();
         }
 
         private Task RunAsync(CancellationToken cancellationToken)
         {
-            //builder is the SiloHostBuilder from the first section
-            host = builder.Build();
-
-            return host.StartAsync(cancellationToken);
+            return this.host.StartAsync(cancellationToken);
         }
     }
 ```
