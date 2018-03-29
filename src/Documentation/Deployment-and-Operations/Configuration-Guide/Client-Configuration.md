@@ -11,7 +11,7 @@ title: Client Configuration
 A client for connecting to a cluster of silos and sending requests to grains is configured programmatically via a `ClientBuilder` and a number of supplemental option classes.
 Like silo options, client option classes follow the [ASP.NET Options](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/configuration/options).
 
-There are several key aspects of silo configuration:
+There are several key aspects of client configuration:
 
 * Orleans clustering information
 * Clustering provider
