@@ -47,7 +47,7 @@ namespace OrleansClient
                 .Configure<ClusterOptions>(options =>
                 {
                     options.ClusterId = clusterId;
-                    options.ServiceId = clusterId;
+                    options.ServiceId = "AzureWorkerRoleSample";
                 })
                 .UseAzureStorageClustering(config => config.ConnectionString = dataConnectionString);
 

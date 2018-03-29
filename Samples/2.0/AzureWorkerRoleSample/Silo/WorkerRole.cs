@@ -61,7 +61,7 @@ namespace Silo
                 .Configure<ClusterOptions>(options =>
                 {
                     options.ClusterId = deploymentId;
-                    options.ServiceId = deploymentId;
+                    options.ServiceId = "AzureWorkerRoleSample";
                 })
                 .ConfigureEndpoints(siloEndpoint.Address, siloEndpoint.Port, proxyPort)
                 .UseAzureStorageClustering(options => options.ConnectionString = connectionString);
