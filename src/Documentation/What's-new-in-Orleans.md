@@ -5,6 +5,12 @@ title: What's new in Orleans
 
 # What's new in Orleans?
 
+## [v2.0.0](https://github.com/dotnet/orleans/releases/tag/v2.0.0) March 28th 2018
+
+- Major changes (since 2.0.0-rc2)
+  - All included providers obtain ServiceId and ClusterId from the global ClusterOptions and do not have those properties on their own options classes (#4235, #4277, 4290)
+  - Use string for ServiceId instead of Guid (#4262)
+
 ## [v2.0.0-rc2](https://github.com/dotnet/orleans/releases/tag/v2.0.0-rc2) March 12th 2018
 
 - Major changes (since 2.0.0-rc1)
