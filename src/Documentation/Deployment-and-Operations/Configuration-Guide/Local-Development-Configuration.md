@@ -42,19 +42,19 @@ public class Program
 
             await host.StopAsync();
 
-            return 0;
+            return;
         }
         catch (Exception ex)
         {
             Console.WriteLine(ex);
-            return 1;
+            return;
         }
     }
 
    private static async Task<ISiloHost> StartSilo()
     {
         var builder = new SiloHostBuilder()
-			// Use localhost clustering for a single local silo
+	    // Use localhost clustering for a single local silo
             .UseLocalhostClustering()
             // Configure ClusterId and ServiceId
             .Configure<ClusterOptions>(options =>
@@ -63,7 +63,7 @@ public class Program
                 options.ServiceId = "MyAwesomeService";
             })
             // Configure connectivity
-			.Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
+	    .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
             // Configure logging with any logging framework that supports Microsoft.Extensions.Logging.
             // In this particular case it logs using the Microsoft.Extensions.Logging.Console package.
             .ConfigureLogging(logging => logging.AddConsole());
@@ -80,7 +80,8 @@ public class Program
 For local development, please refer to the below example of how to configure a client for that case.
 It configures a client that would connect to a `loopback` silo.
 
-Add the `Microsoft.Orleans.Client` NuGet meta-package to the project. After you get comfortable with the API, you can pick and choose which exact packages included in `Microsoft.Orleans.Client` you actually need, and reference them instead.
+Add the `Microsoft.Orleans.Client` NuGet meta-package to the project.
+After you get comfortable with the API, you can pick and choose which exact packages included in `Microsoft.Orleans.Client` you actually need, and reference them instead.
 ```PowerShell
 PM> Install-Package Microsoft.Orleans.Client
 ```
@@ -97,7 +98,7 @@ Here is an example of how a client can connect to a local silo:
 
 ```csharp
 client = new ClientBuilder()
-	// Use localhost clustering for a single local silo
+    // Use localhost clustering for a single local silo
     .UseLocalhostClustering()
     // Configure ClusterId and ServiceId
     .Configure<ClusterOptions>(options =>
