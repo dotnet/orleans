@@ -81,11 +81,11 @@
 <pre><code class="lang-csharp">IStreamProvider streamProvider = base.GetStreamProvider(&quot;SimpleStreamProvider&quot;);
 IAsyncStream&lt;T&gt; stream = streamProvider.GetStream&lt;T&gt;(Guid, &quot;MyStreamNamespace&quot;);
 </code></pre><p>Application can get a reference to the stream provider either by calling the <code>GetStreamProvider</code> method on the <code>Grain</code> class when inside a grain, or by calling <code>GrainClient.GetStreamProvider()</code> method when on the client.</p>
-<p><a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/IAsyncStream.cs"><strong><code>Orleans.Streams.IAsyncStream&lt;T&gt;</code></strong></a> is a <strong>logical, strongly-typed handle to a virtual stream</strong>. It is similar in spirit to Orleans Grain Reference. Calls to <code>GetStreamProvider</code> and <code>GetStream</code> are purely local. The arguments to <code>GetStream</code> are a GUID and an additional string that we call a stream namespace (which can be null). Together the GUID and the namespace string comprise the stream identity (similar in sprit to the arguments to <code>GrainFactory.GetGrain</code>). The combination of GUID and namespace string provide extra flexibility in determining stream identities. Just like grain 7 may exist within the Grain type <code>PlayerGrain</code> and a different grain 7 may exist within the grain type <code>ChatRoomGrain</code>, Stream 123 may exist with the stream namespace <code>PlayerEventsStream</code> and a different stream 123 may exist within the stream namespace <code>ChatRoomMessagesStream</code>.</p>
+<p><a href="https://github.com/dotnet/orleans/blob/master/src/Orleans.Core.Abstractions/Streams/Core/IAsyncStream.cs"><strong><code>Orleans.Streams.IAsyncStream&lt;T&gt;</code></strong></a> is a <strong>logical, strongly-typed handle to a virtual stream</strong>. It is similar in spirit to Orleans Grain Reference. Calls to <code>GetStreamProvider</code> and <code>GetStream</code> are purely local. The arguments to <code>GetStream</code> are a GUID and an additional string that we call a stream namespace (which can be null). Together the GUID and the namespace string comprise the stream identity (similar in sprit to the arguments to <code>GrainFactory.GetGrain</code>). The combination of GUID and namespace string provide extra flexibility in determining stream identities. Just like grain 7 may exist within the Grain type <code>PlayerGrain</code> and a different grain 7 may exist within the grain type <code>ChatRoomGrain</code>, Stream 123 may exist with the stream namespace <code>PlayerEventsStream</code> and a different stream 123 may exist within the stream namespace <code>ChatRoomMessagesStream</code>.</p>
 <h3 id="producing-and-consuminga-nameproducing-and-consuminga">Producing and Consuming<a name="Producing-and-Consuming"></a></h3>
 <p><code>IAsyncStream&lt;T&gt;</code> implements both
-<a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/IAsyncObserver.cs"><strong><code>Orleans.Streams.IAsyncObserver&lt;T&gt;</code></strong></a> and
-<a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/IAsyncObservable.cs"><strong><code>Orleans.Streams.IAsyncObservable&lt;T&gt;</code></strong></a> interfaces.
+<a href="https://github.com/dotnet/orleans/blob/master/src/Orleans.Core.Abstractions/Streams/Core/IAsyncObserver.cs"><strong><code>Orleans.Streams.IAsyncObserver&lt;T&gt;</code></strong></a> and
+<a href="https://github.com/dotnet/orleans/blob/master/src/Orleans.Core.Abstractions/Streams/Core/IAsyncObservable.cs"><strong><code>Orleans.Streams.IAsyncObservable&lt;T&gt;</code></strong></a> interfaces.
 That way an application can use the stream either to produce new events into the stream by using <code>Orleans.Streams.IAsyncObserver&lt;T&gt;</code> or to subscribe to and consume events from a stream by using <code>Orleans.Streams.IAsyncObservable&lt;T&gt;</code>.</p>
 <pre><code class="lang-csharp">public interface IAsyncObserver&lt;in T&gt;
 {
@@ -103,8 +103,8 @@ public interface IAsyncObservable&lt;T&gt;
 </code></pre><p>To subscribe to a stream, an application calls</p>
 <pre><code class="lang-csharp">StreamSubscriptionHandle&lt;T&gt; subscriptionHandle = await stream.SubscribeAsync(IAsyncObserver)
 </code></pre><p>The argument to <code>SubscribeAsync</code> can either be an object that implements the <code>IAsyncObserver</code> interface or a combination of
-lambda functions to process incoming events. More options for <code>SubscribeAsync</code> are available via <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/AsyncObservableExtensions.cs"><strong><code>AsyncObservableExtensions</code></strong></a> class.
-<code>SubscribeAsync</code> returns a <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/StreamSubscriptionHandle.cs"><strong><code>StreamSubscriptionHandle&lt;T&gt;</code></strong></a>, which is an opaque handle that can be used to unsubscribe from the stream (similar in spirit to an asynchronous version of <code>IDisposable</code>).</p>
+lambda functions to process incoming events. More options for <code>SubscribeAsync</code> are available via <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans.Core.Abstractions/Streams/Extensions/AsyncObservableExtensions.cs"><strong><code>AsyncObservableExtensions</code></strong></a> class.
+<code>SubscribeAsync</code> returns a <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans.Core.Abstractions/Streams/Core/StreamSubscriptionHandle.cs"><strong><code>StreamSubscriptionHandle&lt;T&gt;</code></strong></a>, which is an opaque handle that can be used to unsubscribe from the stream (similar in spirit to an asynchronous version of <code>IDisposable</code>).</p>
 <pre><code class="lang-csharp">await subscriptionHandle.UnsubscribeAsync()
 </code></pre><p>It is important to note that <strong>the subscription is for a grain, not for an activation</strong>. Once the grain code subscribed to the stream, this subscription surpasses the life of this activation and stays durable forever, until the grain code (potentially in a different activation) explicitly unsubscribes. This is the heart of a <strong>virtual stream abstraction</strong>: not only all the streams always exists, logically, but also that a stream subscription is durable and lives beyond a particular physical activation that issued this subscription.</p>
 <h3 id="multiplicitya-namemultiplicitya">Multiplicity<a name="Multiplicity"></a></h3>
@@ -154,7 +154,7 @@ The explicit subscription will exist until the grain unsubscribes, so if a grain
 <p>The order of events delivery between an individual producer and an individual consumer depends on a stream provider.</p>
 <p>With SMS the producer explicitly controls the order of events seen by the consumer by controlling the way he publishes them. By default (if the <code>FireAndForget</code> options for SMS provider is set to false) and if the producer awaits every <code>OnNextAsync</code> call, the events arrive in FIFO order. In SMS it is up to the producer to decide how to handle delivery failures that will be indicated by a broken <code>Task</code> returned by the <code>OnNextAsync</code> call.</p>
 <p>Azure Queue streams do not guarantee FIFO order, since the underlying Azure Queues do not guarantee order in failure cases (they do guarantee FIFO order in failure free executions). When a producer produces the event into Azure Queue, if the enqueue operation failed, it is up to the producer to attempt another enqueue and later on deal with potential duplicates messages. On the delivery side, Orleans Streaming runtime dequeues the event from the Azure Queue and attempts to deliver it for processing to consumers. Orleans Streaming runtime deletes the event from the queue only upon successful processing. If the delivery or processing failed, the event is not delete from the queue and will automatically re-appear in the queue much later. The Streaming runtime will try to deliver it again, thus potentially breaking the FIFO order. The described behaivour matches the regular semantics of Azure Queues.</p>
-<p><strong>Application Defined Order</strong>: To deal with the above ordering issues, application can optionally specify its own ordering. This is achived via a notion of <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/StreamSequenceToken.cs"><strong><code>StreamSequenceToken</code></strong></a>. <code>StreamSequenceToken</code> is an opaque <code>IComparable</code> object that can be used to order events.
+<p><strong>Application Defined Order</strong>: To deal with the above ordering issues, application can optionally specify its own ordering. This is achived via a notion of <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans.Core.Abstractions/Streams/Core/StreamSubscriptionHandle.cs"><strong><code>StreamSequenceToken</code></strong></a>. <code>StreamSequenceToken</code> is an opaque <code>IComparable</code> object that can be used to order events.
 A producer can pass an optional <code>StreamSequenceToken</code> to the <code>OnNext</code> call. This <code>StreamSequenceToken</code> will be passed all the way to the consumer and will be delivered together with the event. That way, application can reason and reconstruct it&#39;s order independently from the streaming runtime.</p>
 <h3 id="rewindable-streamsa-namerewindable-streamsa">Rewindable Streams<a name="Rewindable-Streams"></a></h3>
 <p>Some streams only allow application to subscribe to them starting at the latest point in time, while other streams allow &quot;going back in time&quot;. The latter capability is dependent on the underlying queuing technology and the particular stream provider. For example, Azure Queues only allow consuming the latest enqueued events, while EventHub allows replaying events from an arbitrary point in time (up to some expiration time). Streams that support going back in time are called <strong>Rewindable Streams</strong>.</p>
@@ -171,31 +171,21 @@ This is currently not implemented (due to priority constrains). An attempt to su
 <p>Orleans streams work <strong>uniformly across grains and Orleans clients</strong>. That is, exactly the same APIs can be used inside a grain and in an Orleans client to produce and consume events. This greatly simplifies the application logic, making special client-side APIs, such as Grain Observers, redundant.</p>
 <h3 id="fully-managed-and-reliable-streaming-pub-suba-namefully-managed-and-reliable-streaming-pub-suba">Fully Managed and Reliable Streaming Pub-Sub<a name="Fully-Managed-and-Reliable-Streaming-Pub-Sub"></a></h3>
 <p>To track stream subscriptions, Orleans uses a runtime component called <strong>Streaming Pub-Sub</strong> which serves as a rendezvous point for stream consumers and stream producers. Pub Sub tracks all stream subscriptions, persists them, and matches stream consumers with stream producers.</p>
-<p>Applications can choose where and how the Pub-Sub data is stored. The Pub-Sub component itself is implemented as grains (called <code>PubSubRendezvousGrain</code>) and it is using Orleans Declarative Persistence for those grain. <code>PubSubRendezvousGrain</code> uses storage provider named <code>PubSubStore</code>. As with any grain, you can designate an implementation for a storage provider.  For Streaming Pub-Sub you can change the implementation of the <code>PubSubStore</code> in the config file:</p>
-<pre><code class="lang-xml">&lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
-  &lt;Globals&gt;
-    &lt;StorageProviders&gt;
-      &lt;Provider Type=&quot;Orleans.Storage.AzureTableStorage&quot; Name=&quot;PubSubStore&quot; /&gt;
-    &lt;/StorageProviders&gt;
-  &lt;/Globals&gt;
-&lt;/OrleansConfiguration&gt;
+<p>Applications can choose where and how the Pub-Sub data is stored. The Pub-Sub component itself is implemented as grains (called <code>PubSubRendezvousGrain</code>) and it is using Orleans Declarative Persistence for those grains. <code>PubSubRendezvousGrain</code> uses storage provider named <code>PubSubStore</code>. As with any grain, you can designate an implementation for a storage provider.  For Streaming Pub-Sub you can change the implementation of the <code>PubSubStore</code> at silo construction time using the silo host builder:</p>
+<p>The below configures the Pub Sub to store its state in azure tables.</p>
+<pre><code class="lang-csharp">hostBuilder.AddAzureTableGrainStorage(&quot;PubSubStore&quot;, 
+    options=&gt;{ options.ConnectionString = &quot;Secret&quot;; });
 </code></pre><p>That way Pub-Sub data will be durably stored in Azure Table.
 For initial development you can use the memory storage as well.
 In addition to the Pub-Sub, Orleans Streaming Runtime delivers events from producers to consumers, manages all runtime resources allocated to actively used streams, and transparently garbage collects runtime resources from unused streams.</p>
 <h3 id="configurationa-nameconfigurationa">Configuration<a name="Configuration"></a></h3>
-<p>In order to use streams you need to enable stream providers via configuration. You can read more about stream providers <a href="Stream-Providers.html">here</a>. Sample stream providers configuration:</p>
-<pre><code class="lang-xml">&lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
-  &lt;Globals&gt;
-    &lt;StreamProviders&gt;
-      &lt;Provider Type=&quot;Orleans.Providers.Streams.SimpleMessageStream.SimpleMessageStreamProvider&quot; Name=&quot;SMSProvider&quot;/&gt;
-      &lt;Provider Type=&quot;Orleans.Providers.Streams.AzureQueue.AzureQueueStreamProvider&quot; Name=&quot;AzureQueueProvider&quot;/&gt;
-    &lt;/StreamProviders&gt;
-  &lt;/Globals&gt;
-&lt;/OrleansConfiguration&gt;
-</code></pre><p>It is also possible to register a stream provider programmatically, via calling one of the <code>RegisterStreamProvider</code> methods on the <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Configuration/GlobalConfiguration.cs"><code>Orleans.Runtime.Configuration.GlobalConfiguration</code></a> or <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Configuration/ClientConfiguration.cs"><code>Orleans.Runtime.Configuration.ClientConfiguration</code></a> classes.</p>
-<pre><code class="lang-csharp">public void RegisterStreamProvider(string providerTypeFullName, string providerName, IDictionary&lt;string, string&gt; properties = null)
-
-public void RegisterStreamProvider&lt;T&gt;(string providerName, IDictionary&lt;string, string&gt; properties = null) where T : IStreamProvider
+<p>In order to use streams you need to enable stream providers via the silo host or cluster client builders. You can read more about stream providers <a href="Stream-Providers.html">here</a>. Sample stream provider setup:</p>
+<pre><code class="lang-csharp">hostBuilder.AddSimpleMessageStreamProvider(&quot;SMSProvider&quot;)
+  .AddAzureQueueStreams&lt;AzureQueueDataAdapterV2&gt;(&quot;AzureQueueProvider&quot;,
+    optionsBuilder =&gt; optionsBuilder.Configure(
+      options=&gt;{ options.ConnectionString = &quot;Secret&quot;; }))
+  .AddAzureTableGrainStorage(&quot;PubSubStore&quot;,
+    options=&gt;{ options.ConnectionString = &quot;Secret&quot;; });
 </code></pre><h2 id="next">Next</h2>
 <p><a href="Stream-Providers.html">Orleans Stream Providers</a></p>
 </article>

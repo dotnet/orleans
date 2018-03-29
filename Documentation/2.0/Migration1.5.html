@@ -175,6 +175,20 @@ below is an example:</p>
             }, severityOverrides));
 </code></pre><p>You can use this feature if you invested in custom implementation of <code>ILogConsumer</code> and cannot convert them to implementation of <code>ILoggerProvider</code> in the short term. </p>
 <p><code>Logger GetLogger(string loggerName)</code> method on <code>Grain</code> base class and <code>IProviderRuntime</code>, and <code>Logger Log { get; }</code> method on IStorageProvider are still maintained as a deprecated feature in 2.0. You can still use it in your process of migrating off orleans legacy logging. But we recommend you to migrate off them as soon as possible.</p>
+<h2 id="provider-configuration">Provider Configuration</h2>
+<p>In Orleans 2.0, configuration of the included providers has been standardized to obtain Service ID and Cluster ID from the <code>ClusterOptions</code> configured for the silo or client.</p>
+<p>Service ID is a stable identifier of the service or application that the cluster represents.
+Service ID does not change between deployments and upgrades of clusters that implement the service over time.</p>
+<p>Unlike Service ID, Cluster ID stays the same only through the lifecycle of a cluster of silos.
+If a running cluster gets shut down, and a new cluster for the same service gets deployed, the new cluster will have a new and unique Cluster ID, but will maintain the Service ID of the old cluster.</p>
+<p>Service ID is often used as part of a key for persisting data that needs to have continuity throughout the life of the service.
+Examples are grain state, reminders, and queues of persistent streams.
+On the other hand, data within a cluster membership table only makes sense within the scope of its cluster, and hence is normally keyed off Cluster ID.</p>
+<p>Prior to 2.0, behavior of Orleans providers was sometimes inconsistent with regards to using Service ID and Cluster ID (that was also previously called Deployment ID).
+Because of this unifications and the overall change of provider configuration API, data written to storage by some providers may change location or key.
+An example of a provider that is sensitive to this change is Azure Queue stream provider.</p>
+<p>If you are migrating an existing service from 1.x to 2.0, and need to maintain backward compatibility with regards to location or keys of data persisted by the providers you are using in the service, please verify that the data will be where your service or provider expects it to be.
+If your service happen to depend on the incorrect usage of Service ID and Cluster ID by a 1.x provider, you can override <code>ClusterOptions</code> for that specific provider by calling <code>ISiloHostBuilder.AddProviderClusterOptions()</code> or <code>IClientBuilder.AddProviderClusterOptions()</code> and force it to read/write data from/to the 1.x location in storage</p>
 </article>
           </div>
           

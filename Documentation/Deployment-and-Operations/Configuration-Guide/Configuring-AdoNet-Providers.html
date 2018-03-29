@@ -5,9 +5,9 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>title: Runtime Monitoring | Microsoft Orleans Website </title>
+    <title>Configuring ADO.NET Providers | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
-    <meta name="title" content="title: Runtime Monitoring | Microsoft Orleans Website ">
+    <meta name="title" content="Configuring ADO.NET Providers | Microsoft Orleans Website ">
     <meta name="generator" content="docfx 2">
     
     <link rel="shortcut icon" href="../../../favicon.ico">
@@ -73,42 +73,48 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
+<h1 id="configuring-adonet-providers">Configuring ADO.NET Providers</h1>
 
-<p>s---
-layout: page</p>
-<h2 id="title-runtime-monitoring">title: Runtime Monitoring</h2>
-<h1 id="runtime-monitoring">Runtime Monitoring</h1>
-<p>Orleans output its runtime statistics and metrics through the <code>ITelemetryConsumer</code> interface.
-Application can register one or more telemetry consumers with for their silos and clients, to receives statistics and metrics that Orleans runtime  periotically publishes.
-These can be consumers for popular telemetry analytics solutions or custom ones for any other destination and purpose.
-Three telemetry consumer are currently included in the Orleans codebase.</p>
-<p>They are released as separate NuGet packages: </p>
-<ul>
-<li><p><code>Microsoft.Orleans.OrleansTelemetryConsumers.AI</code> for publishing to <a href="https://azure.microsoft.com/en-us/services/application-insights/">Application Insights</a>.</p>
-</li>
-<li><p><code>Microsoft.Orleans.OrleansTelemetryConsumers.Counters</code> for publishing to Windows performance counters.
-The Orleans runtime continually updates a number of them.
-CounterControl.exe tool, included in the <a href="https://www.nuget.org/packages/Microsoft.Orleans.CounterControl/"><code>Microsoft.Orleans.CounterControl</code></a> NuGet package, helps register necessary performance counter categories.
-It has to run with elevated privileges.
-The performance counters can be monitored using any of the standard monitoring tools.</p>
-</li>
-<li><p><code>Microsoft.Orleans.OrleansTelemetryConsumers.NewRelic</code>, for publishing to <a href="https://newrelic.com/">New Relic</a>.</p>
-</li>
-</ul>
-<p>To configure your silo and client to use telemetry consumers, silo configuration code looks like this: </p>
+<p>Any reliable deployment of Orleans requires using persistent storage to keep system state, specifically Orleans cluster membership table and reminders.
+One of the available options is using a SQL database via the ADO.NET providers.</p>
+<p>In order to use ADO.NET for persistence, clustering or reminders, one needs to configure the ADO.NET providers as part of the silo configuration, and, in case of clustering, also as part of the client configurations.</p>
+<p>The silo configuration code should look like this:</p>
 <pre><code class="lang-c#">var siloHostBuilder = new SiloHostBuilder();
-//configure the silo with AITelemetryConsumer
-siloHostBuilder.Configure&lt;TelemetryOptions&gt;(options =&gt; options.AddConsumer&lt;AITelemetryConsumer&gt;);
-</code></pre><p>client configuration code look like this: </p>
-<pre><code class="lang-c#">var clientBuilder = newClientBuilder();
-//configure the clientBuilder with AITelemetryConsumer
-clientBuilder.Configure&lt;TelemetryOptions&gt;(options =&gt; options.AddConsumer&lt;AITelemetryConsumer&gt;);
-</code></pre><ul>
-<li><p><a href="Silo-Error-Code-Monitoring.html">Silo Error Code Monitoring</a></p>
-</li>
-<li><p><a href="Client-Error-Code-Monitoring.html">Client Error Code Monitoring</a></p>
-</li>
-</ul>
+var invariant = &quot;System.Data.SqlClient&quot;; // for Microsoft SQL Server
+var connectionString = &quot;Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=Orleans;Integrated Security=True;Pooling=False;Max Pool Size=200;Asynchronous Processing=True;MultipleActiveResultSets=True&quot;;
+//use AdoNet for clustering 
+siloHostBuilder.UseAdoNetClustering(options =&gt;
+            {
+                options.Invariant = invariant;
+                options.ConnectionString = connectionString;
+            });
+//use AdoNet for reminder service
+siloHostBuilder.UseAdoNetReminderService(options =&gt;
+            {
+                options.Invariant = invariant;
+                options.ConnectionString = connectionString;
+            });
+//use AdoNet for Persistence
+siloHostBuilder.AddAdoNetGrainStorage(&quot;GrainStorageForTest&quot;, options =&gt;
+            {
+                options.Invariant = invariant;
+                options.ConnectionString = connectionString;
+            });
+</code></pre><p>The client configuration code should look like this:</p>
+<pre><code class="lang-c#">var siloHostBuilder = new SiloHostBuilder();
+var invariant = &quot;System.Data.SqlClient&quot;;
+var connectionString = &quot;Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=Orleans;Integrated Security=True;Pooling=False;Max Pool Size=200;Asynchronous Processing=True;MultipleActiveResultSets=True&quot;;
+//use AdoNet for clustering 
+siloHostBuilder.UseAdoNetClustering(options =&gt;
+            {
+                options.Invariant = invariant;
+                options.ConnectionString = connectionString;
+            });
+</code></pre><p>Where the <code>ConnectionString</code> is set to a valid AdoNet Server connection string. </p>
+<p>In order to use ADO.NET providers for persistence, reminders or clustering, there are scripts for creating database artifacts, to which all servers that will be hosting Orleans silos need to have access.
+Lack of access to the target database is a typical mistake we see developers making.</p>
+<p>The scripts will be copied to project directory \OrleansAdoNetContent where each supported ADO.NET extensions has its own directory, after you install or do a nuget restore on the AdoNet extension nugets. We splited AdoNet nugets into per feature nugets:
+<code>Microsoft.Orleans.Clustering.AdoNet</code> for clustering, <code>Microsoft.Orleans.Persistence.AdoNet</code> for persistence and <code>Microsoft.Orleans.Reminders.AdoNet</code> for reminders.</p>
 </article>
           </div>
           
@@ -117,7 +123,7 @@ clientBuilder.Configure&lt;TelemetryOptions&gt;(options =&gt; options.AddConsume
               <div class="contribution">
                 <ul class="nav">
                   <li>
-                    <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Deployment-and-Operations/Monitoring/Runtime-Monitoring.md/#L1" class="contribution-link">Improve this Doc</a>
+                    <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Deployment-and-Operations/Configuration-Guide/Configuring-AdoNet-Providers.md/#L1" class="contribution-link">Improve this Doc</a>
                   </li>
                 </ul>
               </div>

@@ -1,6 +1,6 @@
 {
   "homepages": [],
-  "source_base_path": "c:/GitHub/sergeybykov/orleans-2/src",
+  "source_base_path": "C:/GitHub/sergeybykov/orleans-2/src",
   "xrefmap": "xrefmap.yml",
   "files": [
     {
@@ -1943,7 +1943,19 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/2.0/Migration1.5.html",
-          "hash": "HqTh+b9z7WgqaQALZHmr6w=="
+          "hash": "nzatIyZiQWqyeNhbt65b3g=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/2.0/MigrationAzure2.0.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/2.0/MigrationAzure2.0.html",
+          "hash": "Xz1/qZBZ3O3UD4Z41p0YPw=="
         }
       },
       "is_incremental": false,
@@ -2195,7 +2207,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Configuration-Guide/Configuring-.NET-Garbage-Collection.html",
-          "hash": "nBbK0WzBbL/5PDRL1k8isA=="
+          "hash": "QUFi8C9eTT7HODYY3KpjsA=="
         }
       },
       "is_incremental": false,
@@ -2203,11 +2215,11 @@
     },
     {
       "type": "Conceptual",
-      "source_relative_path": "Documentation/Deployment-and-Operations/Configuration-Guide/Configuring-SQL-Tables.md",
+      "source_relative_path": "Documentation/Deployment-and-Operations/Configuration-Guide/Configuring-AdoNet-Providers.md",
       "output": {
         ".html": {
-          "relative_path": "Documentation/Deployment-and-Operations/Configuration-Guide/Configuring-SQL-Tables.html",
-          "hash": "4qtG3CMlT/b4ZhlARDCRAw=="
+          "relative_path": "Documentation/Deployment-and-Operations/Configuration-Guide/Configuring-AdoNet-Providers.html",
+          "hash": "ypvpXtZI4a/LxamO5N4hAg=="
         }
       },
       "is_incremental": false,
@@ -2302,7 +2314,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Monitoring/Runtime-Monitoring.html",
-          "hash": "oXLUog5F9FTxAGwFjlOxgA=="
+          "hash": "WyuPDfNBgn30ySQoUWLI8w=="
         }
       },
       "is_incremental": false,
@@ -2742,7 +2754,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Orleans-Streams/Stream-Providers.html",
-          "hash": "1J+t324JUi7dHH4SSCSNyg=="
+          "hash": "puj2hNJu37iUCG4GN9DzOQ=="
         }
       },
       "is_incremental": false,
@@ -2766,7 +2778,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Orleans-Streams/Streams-Implementation.html",
-          "hash": "r4T54+Jpk1xpYTY//HHi+A=="
+          "hash": "aqSwwTpVW833fzR7Jq7eKA=="
         }
       },
       "is_incremental": false,
@@ -2778,7 +2790,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Orleans-Streams/Streams-Programming-APIs.html",
-          "hash": "7hIOdFgFcsJvgf+WJAQYJQ=="
+          "hash": "AaBdTpb3ynWPjGMndPUjPA=="
         }
       },
       "is_incremental": false,
@@ -2790,7 +2802,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Orleans-Streams/Streams-Quick-Start.html",
-          "hash": "xCmDtz2X6sYzQmYxPoHeIw=="
+          "hash": "ritPG/DIvoKFUDVQF8V6CA=="
         }
       },
       "is_incremental": false,
@@ -3208,7 +3220,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/toc.html",
-          "hash": "kYh8BdlAMIT2Cy3XJ/umUA=="
+          "hash": "YSZqn8C1aga6F99xOJglxA=="
         }
       },
       "is_incremental": false,

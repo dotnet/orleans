@@ -78,15 +78,12 @@
 <p>This guide will show you a quick way to setup and use Orleans Streams.
 To learn more about the details of the streaming features, read other parts of this documentation.</p>
 <h2 id="required-configurations">Required Configurations</h2>
-<p>In this guide we&#39;ll use a Simple Message based Stream which uses grain messaging to send stream data to subscribers. We will use the in-memory storage provider to store lists of subscriptions so it is not a wise choise for real production applications.</p>
-<pre><code class="lang-xml">&lt;Globals&gt;
-    &lt;StorageProviders&gt;
-      &lt;Provider Type=&quot;Orleans.Storage.MemoryStorage&quot; Name=&quot;Default&quot; /&gt;
-      &lt;Provider Type=&quot;Orleans.Storage.MemoryStorage&quot; Name=&quot;PubSubStore&quot; /&gt;
-    &lt;/StorageProviders&gt;
-    &lt;StreamProviders&gt;
-      &lt;Provider Type=&quot;Orleans.Providers.Streams.SimpleMessageStream.SimpleMessageStreamProvider&quot; Name=&quot;SMSProvider&quot;/&gt;
-    &lt;/StreamProviders&gt;
+<p>In this guide we&#39;ll use a Simple Message based Stream which uses grain messaging to send stream data to subscribers. We will use the in-memory storage provider to store lists of subscriptions so it is not a wise choice for real production applications.</p>
+<p>On silo, where hostBuilder is an ISiloHostBuilder</p>
+<pre><code class="lang-csharp">hostBuilder.AddSimpleMessageStreamProvider(&quot;SMSProvider&quot;)
+           .AddMemoryGrainStorage(&quot;PubSubStore&quot;);
+</code></pre><p>On cluster client, where clientBuilder is an IClientBuilder</p>
+<pre><code class="lang-csharp">clientBuilder.AddSimpleMessageStreamProvider(&quot;SMSProvider&quot;);
 </code></pre><p>Now we can create streams, send data using them as producers and also receive data as subscribers.</p>
 <h2 id="producing-events">Producing Events</h2>
 <p>Producing events for streams is relatively easy. You should first get access to the stream provider which you defined in the config above (<code>SMSProvider</code>) and then choose a stream and push data to it.</p>
