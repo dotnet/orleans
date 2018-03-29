@@ -7,7 +7,7 @@ title: Prerequisites
 
 Orleans is a set of .NET libraries delivered via [NuGet packages](NuGets.md).
 In order to use Orleans, you need either [.NET Core](https://docs.microsoft.com/en-us/dotnet/core/index) 2.0 or higher of [Full .NET Framework](https://www.microsoft.com/net/download/Windows/run) 4.6.1 or higher.
-.NET Core enables Orleans to run on both Windows and non-Windows platforms, such as Linux and MacOC.
+.NET Core enables Orleans to run on both Windows and non-Windows platforms, such as Linux and MacOS.
 At this point, Orleans is still primarily tested on Windows.
 However, multiple customers successfully run Orleans 2.0 on non-Windows platforms as well.
 
