@@ -1,4 +1,4 @@
-# Microsoft Orleans Changelog
+## Microsoft Orleans Changelog
 
 All notable end-user facing changes are documented in this file.
 
@@ -6,6 +6,49 @@ All notable end-user facing changes are documented in this file.
 
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
+
+### [2.0.0] (changes since 2.0.0-rc2)
+
+- Major changes
+  - All included providers obtain ServiceId and ClusterId from the global ClusterOptions and do not have those properties on their own options classes (#4235, #4277, #4290)
+  - Use string for ServiceId instead of Guid (#4262)
+
+- Breaking changes
+  - WithCodeGeneration: accept ILoggerFactory instead of ILogger (#4204)
+  - Remove Service Fabric configuration helpers & update sample (#4234)
+  - Disable packaging of Orleans.Clustering.ServiceFabric (#4259)
+  - Stop packaging Microsoft.Orleans.OrleansGCPUtils (#4330)
+
+- Non-breaking improvements
+  - Add serialization methods to RulesViolationException (#4215)
+  - CodeGen: only filter out generated types where the generator is Orleans (#4249)
+  - Add simple retry functionality to IClusterClient.Connect(...) (#4161)
+  - Grain call filters: add distinction between InterfaceMethod and ImplementationMethod (#4216)
+  - Improves ADO.NET script finding by moving them to project directory (#4243)
+  - protobuf-net serializer (#4170)
+  - Improve startup time for localhost cluster. (#4245)
+  - Client typemap refresh (#4257)
+  - Conditionally include @(Compile) cache file (#4258)
+  - Enable SystemTarget routing in the Gateway (#4254)
+  - Add config option to override MessagingOptions.ResponseTimeout when the debugger is attached (#4193, #4307)
+  - Remove [Obsolete] attributes from most legacy types (#4255)
+  - Orleans.TestingHost: support for .NET Standard (#4223)
+  - Add validation for pubsubstore when using persistent streams (#4273)
+  - Clean up EH checkpointing (#4271)
+  - Improve error message when attempting to use reminders without configuring a reminder table (#4287)
+  - Ported log consistency providers from IProvider. (#4292)
+  - Remove inconsistent sub builder pattern in streaming (#4289)
+  - DynamoDB transaction log (#4056)
+
+- Non-breaking bug fixes
+  - PerfCounterEnvironmentStatistics never reports CpuUsage (#4219)
+  - Fix ADO.NET Reminder configuration & re-enable tests (#4214)
+  - Register SiloClusteringValidator later so other validator will be called before (#4211)
+  - Fixes for Multi-Cluster Support (#3974)
+  - Change SQL parameter casing for Turkish parameter binding support on ODP .Net Managed (#4246)
+  - Fix race condition (#4269)
+  - Lease based queue balancer fixes (#4267)
+  - Fixed bug in custom storage log consistency provider factory. (#4323)
 
 ### [2.0.0-rc2] (changes since 2.0.0-rc1)
 
