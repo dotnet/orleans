@@ -1,11 +1,11 @@
 ---
 layout: page
-title: List of Options
+title: List of Options Classes
 ---
 
-# List of Options
+# List of Options Classes
 
-All Options used to configure Orleans should be in the `Orleans.Configuration` namespace. A lot of them have helper methods in the `Orleans.Hosting` namespace.
+All Options classes used to configure Orleans should be in the `Orleans.Configuration` namespace. Many of them have helper methods in the `Orleans.Hosting` namespace.
 
 ## Common core options for IClientBuilder and ISiloHostBuilder
 
