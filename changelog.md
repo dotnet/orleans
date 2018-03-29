@@ -1,4 +1,4 @@
-# Microsoft Orleans Changelog
+## Microsoft Orleans Changelog
 
 All notable end-user facing changes are documented in this file.
 
@@ -10,7 +10,7 @@ The idea is to track end-user facing changes as they occur.*
 ### [2.0.0] (changes since 2.0.0-rc2)
 
 - Major changes
-  - All included providers obtain ServiceId and ClusterId from the global ClusterOptions and do not have those properties on their own options classes (#4235, #4277, 4290)
+  - All included providers obtain ServiceId and ClusterId from the global ClusterOptions and do not have those properties on their own options classes (#4235, #4277, #4290)
   - Use string for ServiceId instead of Guid (#4262)
 
 - Breaking changes
