@@ -101,6 +101,7 @@ namespace Orleans.Hosting
                         services.Configure(configureOptions);
                     }
 
+                    services.ConfigureFormatter<DevelopmentClusterMembershipOptions>();
                     services
                         .AddSingleton<GrainBasedMembershipTable>()
                         .AddFromExisting<IMembershipTable, GrainBasedMembershipTable>();
@@ -119,6 +120,7 @@ namespace Orleans.Hosting
                 services =>
                 {
                     configureOptions?.Invoke(services.AddOptions<DevelopmentClusterMembershipOptions>());
+                    services.ConfigureFormatter<DevelopmentClusterMembershipOptions>();
                     services
                         .AddSingleton<GrainBasedMembershipTable>()
                         .AddFromExisting<IMembershipTable, GrainBasedMembershipTable>();
