@@ -4,12 +4,12 @@
   items:
   - name: Benefits
     href: Benefits.md
-  - name: What's new in Orleans
-    href: What's-new-in-Orleans.md
+  - name: Orleans 2.0
+    href: Orleans-2.0.md
   - name: Frequently Asked Questions
     href: Frequently-Asked-Questions.md
-- name: New in Orleans 2.0
-  href: 2.0/toc.yml
+  - name: What's new in Orleans
+    href: What's-new-in-Orleans.md
 - name: Getting Started
   href: Getting-Started-With-Orleans/toc.yml
 - name: Core Features
@@ -18,6 +18,8 @@
   href: Deployment-and-Operations/toc.yml
 - name: Advanced Features
   href: Advanced-Concepts/toc.yml
+- name: Migration from Orleans 1.5
+  href: Migration/toc.yml
 - name: Implementation Details
   href: Runtime-Implementation-Details/toc.yml
 - name: Samples
