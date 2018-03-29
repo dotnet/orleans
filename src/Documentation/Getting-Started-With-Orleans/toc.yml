@@ -1,3 +1,5 @@
+- name: Prerequisites
+  href: Prerequisites.md
 - name: Grains
   href: Grains.md
 - name: Developing a Grain
@@ -8,3 +10,5 @@
   href: Running-the-Application.md
 - name: Debugging
   href: Debugging.md
+- name: NuGet Packages
+  href: NuGets.md
