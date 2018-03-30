@@ -1,4 +1,4 @@
-- name: Reentrant Grains
+- name: Reentrancy
   href: Reentrant-Grains.md
 - name: Request Context
   href: Request-Context.md
