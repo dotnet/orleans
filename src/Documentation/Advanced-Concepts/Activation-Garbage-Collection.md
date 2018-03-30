@@ -84,8 +84,6 @@ Grain garbage collection can be configured using the `GrainCollectionOptions` op
 ```csharp
 mySiloHostBuilder.Configure<GrainCollectionOptions>(options =>
 {
-  // Period on which silo will check all inactive grains
-  options.CollectionQuantum = TimeSpan.FromMinutes(1);
   // Set the value of CollectionAge to 10 minutes for all grain
   options.CollectionAge = TimeSpan.FromMinutes(10);
   // Override the value of CollectionAge to 5 minutes for MyGrainImplementation
