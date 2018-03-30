@@ -41,24 +41,25 @@ The Orleans framework provides a mechanism to specify & register different stora
 ``` csharp
 var silo = new SiloHostBuilder()
           .AddMemoryGrainStorage("DevStore")
-          .AddAzureTableGrainStorage("store1", options=>options.ConnectionString = "DefaultEndpointsProtocol=https;AccountName=data1;AccountKey=SOMETHING1")
-          .AddAzureBlobGrainStorage("store2", options=>options.ConnectionString = "DefaultEndpointsProtocol=https;AccountName=data2;AccountKey=SOMETHING2")
-          .Builder();
+          .AddAzureTableGrainStorage("store1", options => options.ConnectionString = "DefaultEndpointsProtocol=https;AccountName=data1;AccountKey=SOMETHING1")
+          .AddAzureBlobGrainStorage("store2", options => options.ConnectionString = "DefaultEndpointsProtocol=https;AccountName=data2;AccountKey=SOMETHING2")
+          .Builde();
 ```
 
 ## Configuring IGrainStorage
+Orleans nativaly support a range of IGrainStorage implementation, which you can use for your application to store grain state. In this section, we will go over how to configure AzureTableGrainStorage, AzureBlobGrainStorage, DynamoDBGrainStorage, MemoryGrainStorage and AdoNetGrainStorage with your cluster. Documentation on how to configure remaining IGrainStorage implementations will come later. )
 
 ### AzureTableGrainStorage
 
 ``` csharp
 var silo = new SiloHostBuilder()
-          .AddAzureTableGrainStorage("TableStore", options=>options.ConnectionString = "UseDevelopmentStorage=true")
+          .AddAzureTableGrainStorage("TableStore", options => options.ConnectionString = "UseDevelopmentStorage=true")
 ```
 
 The following settings are available to configure AzureTableGrainStorage, through `AzureTableGrainStorageOptions`:
 
 ``` csharp
- /// <summary>
+    /// <summary>
     /// Configuration for AzureTableGrainStorage
     /// </summary>
     public class AzureTableStorageOptions
@@ -101,7 +102,7 @@ The following settings are available to configure AzureTableGrainStorage, throug
 
 ``` csharp
 var silo = new SiloHostBuilder()
-          .AddAzureBlobGrainStorage("BlobStore", options=>options.ConnectionString = "UseDevelopmentStorage=true")
+          .AddAzureBlobGrainStorage("BlobStore", options => options.ConnectionString = "UseDevelopmentStorage=true")
 ```
 
 The following settings are available to configure AzureBlobGrainStorage, through `AzureBlobStorageOptions`:
@@ -140,7 +141,7 @@ The following settings are available to configure AzureBlobGrainStorage, through
 
 ``` csharp
 var silo = new SiloHostBuilder()
-          .AddDynamoDBGrainStorage("DDBStore", options=>
+          .AddDynamoDBGrainStorage("DDBStore", options =>
           {
               options.AccessKey = "MY_ACCESS_KEY";
               options.SecretKey = "MY_SECRET_KEY";
