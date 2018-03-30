@@ -34,20 +34,17 @@ To support various transactional storage patterns the grain facing interface and
 
 Example:
 
-       var config = ClusterConfiguration.LocalhostPrimarySilo();
-       config.AddAzureTableStorageProvider(”<storage_account>”);
+``` csharp
+var builder = new SiloHostBuilder()
+    [...]
+    .AddAzureTableGrainStorageAsDefault(options => options.ConnectionString = ”YOUR_STORAGE_CONNECTION_STRING”)
+    .UseInClusterTransactionManager()
+    .UseAzureTransactionLog(options => options.ConnectionString = ”YOUR_STORAGE_CONNECTION_STRING”) 
+    .UseTransactionalState();
 
-       var builder = new SiloHostBuilder()
-       .UseConfiguration(config)
-       ....
-       .UseInClusterTransactionManager()
-       .UseAzureTransactionLog(options => {
-                 options.ConnectionString = ”<storage_account>”;
-        }) 
-       .UseTransactionalState();
-
-       var host = builder.Build();
-       await host.StartAsync();
+var host = builder.Build();
+await host.StartAsync();
+```
 
 ## Programming Model
 
@@ -55,25 +52,29 @@ For a grain to support transactions, transactional operations on a grain must be
 
 Example:
 
-    public interface IATMGrain : IGrainWithIntegerKey
-    {
-        [Transaction(TransactionOption.RequiresNew)]
-        Task Transfer(Guid fromAccount, Guid toAccount, uint amountToTransfer);
-    }
+``` csharp
+public interface IATMGrain : IGrainWithIntegerKey
+{
+    [Transaction(TransactionOption.RequiresNew)]
+    Task Transfer(Guid fromAccount, Guid toAccount, uint amountToTransfer);
+}
+```
 
 The Transfer operation in the above atm grain will always start a new transaction which involves the two referenced accounts.
 
-    public interface IAccountGrain : IGrainWithGuidKey
-    {
-        [Transaction(TransactionOption.Required)]
-        Task Withdraw(uint amount);
+``` csharp
+public interface IAccountGrain : IGrainWithGuidKey
+{
+    [Transaction(TransactionOption.Required)]
+    Task Withdraw(uint amount);
 
-        [Transaction(TransactionOption.Required)]
-        Task Deposit(uint amount);
+    [Transaction(TransactionOption.Required)]
+    Task Deposit(uint amount);
 
-        [Transaction(TransactionOption.Required)]
-        Task<uint> GetBalance();
-    }
+    [Transaction(TransactionOption.Required)]
+    Task<uint> GetBalance();
+}
+```
 
 The Withdraw and Deposit operations in the above account grain can take part in transactional operations, like the Transfer operation in the ATM grain, with other transactional grains.
 
@@ -81,35 +82,37 @@ To use a transactional state within a grain, one needs only define a serializabl
 
 Example:
 
-    public class AccountGrain : Grain, IAccountGrain
+``` csharp
+public class AccountGrain : Grain, IAccountGrain
+{
+    private readonly ITransactionalState<Balance> balance;
+
+    public AccountGrain(
+        [TransactionalState("balance")] ITransactionalState<Balance> balance)
     {
-        private readonly ITransactionalState<Balance> balance;
-
-        public AccountGrain(
-            [TransactionalState("balance")] ITransactionalState<Balance> balance)
-        {
-            this.balance = balance ?? throw new ArgumentNullException(nameof(balance));
-        }
-
-        Task IAccountGrain.Deposit(uint ammount)
-        {
-            this.balance.State.Value += ammount;
-            this.balance.Save();
-            return Task.CompletedTask;
-        }
-
-        Task IAccountGrain.Withdrawal(uint ammount)
-        {
-            this.balance.State.Value -= ammount;
-            this.balance.Save();
-            return Task.CompletedTask;
-        }
-
-        Task<uint> IAccountGrain.GetBalance()
-        {
-            return Task.FromResult(this.balance.State.Value);
-        }
+        this.balance = balance ?? throw new ArgumentNullException(nameof(balance));
     }
+
+    Task IAccountGrain.Deposit(uint ammount)
+    {
+        this.balance.State.Value += ammount;
+        this.balance.Save();
+        return Task.CompletedTask;
+    }
+
+    Task IAccountGrain.Withdrawal(uint ammount)
+    {
+        this.balance.State.Value -= ammount;
+        this.balance.Save();
+        return Task.CompletedTask;
+    }
+
+    Task<uint> IAccountGrain.GetBalance()
+    {
+        return Task.FromResult(this.balance.State.Value);
+    }
+}
+```
 
 In the above example the attribute TransactionalState is used to declare that the ‘balance’ construction argument should be associated with a transactional state named “balance”.  With this declaration Orleans will wire up an ITransactionalState<Balance> instance with a state loaded from the default storage provider for the grain to use.  The state can be accessed and modified via the State property.  Any changes to the state need be recorded by calling ‘Save()’.  The transaction infrastructure will ensure that any such changes performed as part of a transaction, even among multiple grains distributed over an Orleans cluster, will either all be committed or reverted together.
 
