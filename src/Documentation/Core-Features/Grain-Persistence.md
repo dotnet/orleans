@@ -36,72 +36,184 @@ public class MyGrain<MyGrainState> ...
 }
 ```
 
-The Orleans Provider Manager framework provides a mechanism to specify & register different storage providers and storage options in the silo config file.
+The Orleans framework provides a mechanism to specify & register different storage providers and configure them using `ISiloHostBuilder`,
 
-```xml
-<OrleansConfiguration xmlns="urn:orleans">
-    <Globals>
-    <StorageProviders>
-        <Provider Type="Orleans.Storage.MemoryStorage" Name="DevStore" />
-        <Provider Type="Orleans.Storage.AzureTableStorage" Name="store1"
-            DataConnectionString="DefaultEndpointsProtocol=https;AccountName=data1;AccountKey=SOMETHING1" />
-        <Provider Type="Orleans.Storage.AzureBlobStorage" Name="store2"
-            DataConnectionString="DefaultEndpointsProtocol=https;AccountName=data2;AccountKey=SOMETHING2"  />
-    </StorageProviders>
+``` csharp
+var silo = new SiloHostBuilder()
+          .AddMemoryGrainStorage("DevStore")
+          .AddAzureTableGrainStorage("store1", options=>options.ConnectionString = "DefaultEndpointsProtocol=https;AccountName=data1;AccountKey=SOMETHING1")
+          .AddAzureBlobGrainStorage("store2", options=>options.ConnectionString = "DefaultEndpointsProtocol=https;AccountName=data2;AccountKey=SOMETHING2")
+          .Builder();
 ```
 
-## Configuring Storage Providers
+## Configuring IGrainStorage
 
-### AzureTableStorage
+### AzureTableGrainStorage
 
-```xml
-<Provider Type="Orleans.Storage.AzureTableStorage" Name="TableStore"
-    DataConnectionString="UseDevelopmentStorage=true" />
+``` csharp
+var silo = new SiloHostBuilder()
+          .AddAzureTableGrainStorage("TableStore", options=>options.ConnectionString = "UseDevelopmentStorage=true")
 ```
 
-The following attributes can be added to the `<Provider />` element to configure the provider:
+The following settings are available to configure AzureTableGrainStorage, through `AzureTableGrainStorageOptions`:
 
-* __`DataConnectionString="..."`__ (mandatory) - The Azure storage connection string to use
-* __`TableName="OrleansGrainState"`__ (optional) - The table name to use in table storage, defaults to `OrleansGrainState`
-* __`DeleteStateOnClear="false"`__ (optional) - If true, the record will be deleted when grain state is cleared, otherwise an null record will be written, defaults to `false`
-* __`UseJsonFormat="false"`__ (optional) - If true, the json serializer will be used, otherwise the Orleans binary serializer will be used, defaults to `false`
-* __`UseFullAssemblyNames="false"`__ (optional) - (if `UseJsonFormat="true"`) Serializes types with full assembly names (true) or simple (false), defaults to `false`
-* __`IndentJSON="false"`__ (optional) - (if `UseJsonFormat="true"`) Indents the serialized json, defaults to `false`
+``` csharp
+ /// <summary>
+    /// Configuration for AzureTableGrainStorage
+    /// </summary>
+    public class AzureTableStorageOptions
+    {
+        /// <summary>
+        /// Azure table connection string
+        /// </summary>
+        [RedactConnectionString]
+        public string ConnectionString { get; set; }
+
+        /// <summary>
+        /// Table name where grain stage is stored
+        /// </summary>
+        public string TableName { get; set; } = DEFAULT_TABLE_NAME;
+        public const string DEFAULT_TABLE_NAME = "OrleansGrainState";
+
+        /// <summary>
+        /// Indicates if grain data should be deleted or reset to defaults when a grain clears it's state.
+        /// </summary>
+        public bool DeleteStateOnClear { get; set; } = false;
+
+        /// <summary>
+        /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialzed prior to use.
+        /// </summary>
+        public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
+        public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
+
+        #region json serialization
+        public bool UseJson { get; set; }
+        public bool UseFullAssemblyNames { get; set; }
+        public bool IndentJson { get; set; }
+        public TypeNameHandling? TypeNameHandling { get; set; }
+        #endregion json serialization
+    }
+```
 
 > __Note:__ state should not exceed 64KB, a limit imposed by Table Storage.
 
-### AzureBlobStorage
+### AzureBlobGrainStorage
 
-```xml
-<Provider Type="Orleans.Storage.AzureTableStorage" Name="BlobStore"
-    DataConnectionString="UseDevelopmentStorage=true" />
+``` csharp
+var silo = new SiloHostBuilder()
+          .AddAzureBlobGrainStorage("BlobStore", options=>options.ConnectionString = "UseDevelopmentStorage=true")
 ```
 
-The following attributes can be added to the `<Provider />` element to configure the provider:
+The following settings are available to configure AzureBlobGrainStorage, through `AzureBlobStorageOptions`:
 
-* __`DataConnectionString="..."`__ (mandatory) - The Azure storage connection string to use
-* __`ContainerName="grainstate"`__ (optional) - The blob storage container to use, defaults to `grainstate`
-* __`UseFullAssemblyNames="false"`__ (optional) - Serializes types with full assembly names (true) or simple (false), defaults to `false`
-* __`IndentJSON="false"`__ (optional) - Indents the serialized json, defaults to `false`
+``` csharp
+  public class AzureBlobStorageOptions
+    {
+        /// <summary>
+        /// Azure connection string
+        /// </summary>
+        [RedactConnectionString]
+        public string ConnectionString { get; set; }
 
-### DynamoDBStorageProvider
+        /// <summary>
+        /// Container name where grain stage is stored
+        /// </summary>
+        public string ContainerName { get; set; } = DEFAULT_CONTAINER_NAME;
+        public const string DEFAULT_CONTAINER_NAME = "grainstate";
 
-```xml
-<Provider Type="Orleans.Storage.DynamoDBStorageProvider" Name="DDBStore"
-    DataConnectionString="Service=us-wes-1;AccessKey=MY_ACCESS_KEY;SecretKey=MY_SECRET_KEY;" />
+        /// <summary>
+        /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialzed prior to use.
+        /// </summary>
+        public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
+        public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
+
+        #region json serialization
+        public bool UseJson { get; set; }
+        public bool UseFullAssemblyNames { get; set; }
+        public bool IndentJson { get; set; }
+        public TypeNameHandling? TypeNameHandling { get; set; }
+        #endregion json serialization
+    }
 ```
 
-* __`DataConnectionString="..."`__ (mandatory) - The DynamoDB storage connection string to use. You can set `Service`,`AccessKey`, `SecretKey`, `ReadCapacityUnits` and `WriteCapacityUnits` in it.
-* __`TableName="OrleansGrainState"`__ (optional) - The table name to use in table storage, defaults to `OrleansGrainState`
-* __`DeleteStateOnClear="false"`__ (optional) - If true, the record will be deleted when grain state is cleared, otherwise an null record will be written, defaults to `false`
-* __`UseJsonFormat="false"`__ (optional) - If true, the json serializer will be used, otherwise the Orleans binary serializer will be used, defaults to `false`
-* __`UseFullAssemblyNames="false"`__ (optional) - (if `UseJsonFormat="true"`) Serializes types with full assembly names (true) or simple (false), defaults to `false`
-* __`IndentJSON="false"`__ (optional) - (if `UseJsonFormat="true"`) Indents the serialized json, defaults to `false`
+### DynamoDBGrainStorage
 
+``` csharp
+var silo = new SiloHostBuilder()
+          .AddDynamoDBGrainStorage("DDBStore", options=>
+          {
+              options.AccessKey = "MY_ACCESS_KEY";
+              options.SecretKey = "MY_SECRET_KEY";
+              options.Service = "us-wes-1";
+          })
+```
 
-### ADO.NET Storage Provider (SQL Storage Provider)
+The following settings are available to configure DynamoDBGrainStorage, through `DynamoDBStorageOptions`:
 
-The ADO .NET Storage Provider allows you to store grain state in relational databases.
+``` csharp
+  public class DynamoDBStorageOptions
+    {
+        /// <summary>
+        /// Gets or sets a unique identifier for this service, which should survive deployment and redeployment.
+        /// </summary>
+        public string ServiceId { get; set; } = string.Empty;
+
+        /// <summary>
+        /// AccessKey string for DynamoDB Storage
+        /// </summary>
+        [Redact]
+        public string AccessKey { get; set; }
+
+        /// <summary>
+        /// Secret key for DynamoDB storage
+        /// </summary>
+        [Redact]
+        public string SecretKey { get; set; }
+
+        /// <summary>
+        /// DynamoDB Service name 
+        /// </summary>
+        public string Service { get; set; }
+
+        /// <summary>
+        /// Read capacity unit for DynamoDB storage
+        /// </summary>
+        public int ReadCapacityUnits { get; set; } = DynamoDBStorage.DefaultReadCapacityUnits;
+
+        /// <summary>
+        /// Write capacity unit for DynamoDB storage
+        /// </summary>
+        public int WriteCapacityUnits { get; set; } = DynamoDBStorage.DefaultWriteCapacityUnits;
+
+        /// <summary>
+        /// DynamoDB table name.
+        /// Defaults to 'OrleansGrainState'.
+        /// </summary>
+        public string TableName { get; set; } = "OrleansGrainState";
+
+        /// <summary>
+        /// Indicates if grain data should be deleted or reset to defaults when a grain clears it's state.
+        /// </summary>
+        public bool DeleteStateOnClear { get; set; } = false;
+
+        /// <summary>
+        /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialzed prior to use.
+        /// </summary>
+        public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
+        public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
+
+        #region JSON Serialization
+        public bool UseJson { get; set; }
+        public bool UseFullAssemblyNames { get; set; }
+        public bool IndentJson { get; set; }
+        public TypeNameHandling? TypeNameHandling { get; set; }
+        #endregion
+    }
+```
+
+### ADO.NET Grain Storage
+
+The ADO .NET Grain Storage allows you to store grain state in relational databases.
 Currently following databases are supported:
 
 - SQL Server
@@ -112,152 +224,151 @@ Currently following databases are supported:
 First, install the base package:
 
 ```
-Install-Package Microsoft.Orleans.OrleansSqlUtils
+Install-Package Microsoft.Orleans.Persistence.AdoNet
 ```
-
-Under the folder where the package gets installed alongside your project, you will
-find different SQL scripts for the supported database vendors. You can also get
-them from the [OrleansSQLUtils repository](https://github.com/dotnet/orleans/tree/master/src/AdoNet/Shared).
+After you install or do a nuget restore on the AdoNet persistence nuget for your project, you will
+find different SQL scripts for the supported database vendors, which are copied to project directory \OrleansAdoNetContent where each supported ADO.NET extensions has its own directory.You can also get them from the [Orleans.Persistence.AdoNet repository](https://github.com/dotnet/orleans/tree/master/src/AdoNet/Orleans.Persistence.AdoNet).
 Create a database, and then run the appropriate script to create the tables.
 
 The next steps are to install a second NuGet package (see table below) specific to the
 database vendor you want, and to configure the storage provider either programmatically or
 via XML configuration.
 
-| Database        | Script                                                                                                                                     | NuGet Package                                                                 | AdoInvariant             | Remarks              |
-|-----------------|--------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------|--------------------------|----------------------|
-| SQL Server      | [CreateOrleansTables_SQLServer.sql](https://github.com/dotnet/orleans/blob/master/src/AdoNet/Shared/SQLServer-Main.sql)   | [System.Data.SqlClient](https://www.nuget.org/packages/System.Data.SqlClient/) | System.Data.SqlClient    |                      |
-| MySQL / MariaDB | [CreateOrleansTables_MySQL.sql](https://github.com/dotnet/orleans/blob/master/src/AdoNet/Shared/MySQL-Main.sql)            | [MySql.Data](https://www.nuget.org/packages/MySql.Data/)                      | MySql.Data.MySqlClient   |                      |
-| PostgreSQL      | [CreateOrleansTables_PostgreSQL.sql](https://github.com/dotnet/orleans/blob/master/src/AdoNet/Shared/PostgreSQL-Main.sql) | [Npgsql](https://www.nuget.org/packages/Npgsql/)                              | Npgsql                   |                      |
-| Oracle          | [CreateOrleansTables_Oracle.sql](https://github.com/dotnet/orleans/blob/master/src/AdoNet/Shared/Oracle-Main.sql)         | [ODP.net](https://www.nuget.org/packages/Oracle.ManagedDataAccess/)           | Oracle.DataAccess.Client | No .net Core support |
+| Database        | Script                                                                                                                                       | NuGet Package                                                                  | AdoInvariant             | Remarks              |
+|-----------------|----------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|--------------------------|----------------------|
+| SQL Server      | [SQLServer-Persistence.sql](https://github.com/dotnet/orleans/blob/master/src/AdoNet/Orleans.Persistence.AdoNet/SQLServer-Persistence.sql)   | [System.Data.SqlClient](https://www.nuget.org/packages/System.Data.SqlClient/) | System.Data.SqlClient    |                      |
+| MySQL / MariaDB | [MySQL-Persistence.sql](https://github.com/dotnet/orleans/blob/master/src/AdoNet/Orleans.Persistence.AdoNet/MySQL-Persistence.sql)           | [MySql.Data](https://www.nuget.org/packages/MySql.Data/)                       | MySql.Data.MySqlClient   |                      |
+| PostgreSQL      | [PostgreSQL-Persistence.sql](https://github.com/dotnet/orleans/blob/master/src/AdoNet/Orleans.Persistence.AdoNet/PostgreSQL-Persistence.sql) | [Npgsql](https://www.nuget.org/packages/Npgsql/)                               | Npgsql                   |                      |
+| Oracle          | [Oracle-Persistence.sql](https://github.com/dotnet/orleans/blob/master/src/AdoNet/Orleans.Persistence.AdoNet/Oracle-Persistence.sql)         | [ODP.net](https://www.nuget.org/packages/Oracle.ManagedDataAccess/)            | Oracle.DataAccess.Client | No .net Core support |
 
-The following is an example of how to configure an ADO .NET Storage Provider using XML configuration:
-
-```xml
-<OrleansConfiguration xmlns="urn:orleans">
-  <Globals>
-    <StorageProviders>
-      <Provider Type="Orleans.Storage.AdoNetStorageProvider"
-                Name="OrleansStorage"
-                AdoInvariant="<AdoInvariant>"
-                DataConnectionString="<ConnectionString>"
-                UseJsonFormat="true" />
-    </StorageProviders>
-  </Globals>
-</OrleansConfiguration>
-```
-
-In code, you would need something like the following:
+The following is an example of how to configure an ADO .NET Storage Provider via `ISiloHostBuilder`:
 
 ```csharp
-var properties = new Dictionary<string, string>()
-{
-    ["AdoInvariant"] = "<AdoInvariant>",
-    ["DataConnectionString"] = "<ConnectionString>",
-    ["UseJsonFormat"] = "true"
-};
-
-config.Globals.RegisterStorageProvider<AdoNetStorageProvider>("OrleansStorage", properties);
+var siloHostBuilder = new SiloHostBuilder()
+                  .AddAdoNetGrainStorage("OrleansStorage", options=>
+                  {
+                      options.Invariant = "<Invariant>";
+                      options.ConnectionString = "<ConnectionString>";
+                      options.UseJsonFormat = true;
+                  });
 ```
 
 Essentially, you only need to set the database-vendor-specific connection string and an
-`AdoInvariant` (see table above) that identifies the vendor. You may also choose the format in which the data
+`Invariant` (see table above) that identifies the vendor. You may also choose the format in which the data
 is saved, which may be either binary (default), JSON, or XML. While binary is the most compact
 option, it is opaque and you will not be able to read or work with the data. JSON is the
 recommended option.
 
-You can set the following properties:
+You can set the following properties via `AdoNetGrainStorageOptions`:
 
-| Name                 | Type    | Description                                                                                     |
-|----------------------|---------|-------------------------------------------------------------------------------------------------|
-| Name                 | String  | Arbitrary name that persistent grains will use to refer to this storage provider                |
-| Type                 | String  | Set to `Orleans.Storage.AdoNetStorageProvider`                                                  |
-| AdoInvariant         | String  | Identifies the database vendor (see above table for values; default is `System.Data.SqlClient`) |
-| DataConnectionString | String  | Vendor-specific database connection string (required)                                           |
-| UseJsonFormat        | Boolean | Use JSON format (recommended)                                                                   |
-| UseXmlFormat         | Boolean | Use XML format                                                                                  |
-| UseBinaryFormat      | Boolean | Use compact binary format (default)                                                             |
+```csharp
 
-The [StorageProviders](https://github.com/dotnet/orleans/tree/master/Samples/StorageProviders) sample
-provides some code you can use to quickly test the above, and also showcases some custom storage providers.
-Use the following command in the Package Manager Console to update all Orleans packages to the latest
-version:
+    /// <summary>
+    /// Options for AdonetGrainStorage
+    /// </summary>
+    public class AdoNetGrainStorageOptions
+    {
+        /// <summary>
+        /// Connection string for AdoNet storage.
+        /// </summary>
+        [Redact]
+        public string ConnectionString { get; set; }
 
-```
-Get-Package | where Id -like 'Microsoft.Orleans.*' | foreach { update-package $_.Id }
+        /// <summary>
+        /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialzed prior to use.
+        /// </summary>
+        public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
+        /// <summary>
+        /// Default init stage in silo lifecycle.
+        /// </summary>
+        public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
+
+        /// <summary>
+        /// The default ADO.NET invariant used for storage if none is given. 
+        /// </summary>
+        public const string DEFAULT_ADONET_INVARIANT = AdoNetInvariants.InvariantNameSqlServer;
+        /// <summary>
+        /// The invariant name for storage.
+        /// </summary>
+        public string Invariant { get; set; } = DEFAULT_ADONET_INVARIANT;
+
+        #region json serialization related settings
+        /// <summary>
+        /// Whether storage string payload should be formatted in JSON.
+        /// <remarks>If neither <see cref="UseJsonFormat"/> nor <see cref="UseXmlFormat"/> is set to true, then BinaryFormatSerializer will be configured to format storage string payload.</remarks>
+        /// </summary>
+        public bool UseJsonFormat { get; set; }
+        public bool UseFullAssemblyNames { get; set; }
+        public bool IndentJson { get; set; }
+        public TypeNameHandling? TypeNameHandling { get; set; }
+        #endregion
+        /// <summary>
+        /// Whether storage string payload should be formatted in Xml.
+        /// <remarks>If neither <see cref="UseJsonFormat"/> nor <see cref="UseXmlFormat"/> is set to true, then BinaryFormatSerializer will be configured to format storage string payload.</remarks>
+        /// </summary>
+        public bool UseXmlFormat { get; set; }
+    }
 ```
 
 The ADO.NET persistence has functionality to version data and define arbitrary (de)serializers with arbitrary application rules and streaming, but currently
 there is no method to expose them to application code. More information in [ADO.NET Persistence Rationale](#ADONETPersistenceRationale).
 
-### MemoryStorage
+### MemoryGrainStorage
 
-`MemoryStorage` is a simple storage provider that does not really use a persistent
-data store underneath. It is convenient to learn to work with Storage Providers
-quickly, but is not intended to be used in real scenarios.
+`MemoryGrainStorage` is a simple grain storage implementation which does not really use a persistent
+data store underneath. It is convenient to learn to work with Grain Storages
+quickly, but is not intended to be used in production scenarios.
 
 > __Note:__ This provider persists state to volatile memory which is erased at silo shut down. Use only for testing.
 
-To set up the memory storage provider using XML configuration:
-
-```xml
-<?xml version="1.0" encoding="utf-8"?>
-<OrleansConfiguration xmlns="urn:orleans">
-  <Globals>
-    <StorageProviders>
-      <Provider Type="Orleans.Storage.MemoryStorage"
-                Name="OrleansStorage"
-                NumStorageGrains="10" />
-    </StorageProviders>
-  </Globals>
-</OrleansConfiguration>
-```
-
-To set it up in code:
+To set up the memory storage provider via `ISiloHostBuilder`
 
 ```csharp
-siloHost.Config.Globals.RegisterStorageProvider<MemoryStorage>("OrleansStorage");
+var siloHostBuilder = new SiloHostBuilder()
+            .AddMemoryGrainStorage("OrleansStorage", options=>options.NumStorageGrains = 10);
 ```
 
-You can set the following properties:
+You can set the following properties via `MemoryGrainStorageOptions`
 
-| Name                 | Type    | Description                                                                                     |
-|----------------------|---------|-------------------------------------------------------------------------------------------------|
-| Name                 | String  | Arbitrary name that persistent grains will use to refer to this storage provider                |
-| Type                 | String  | Set to `Orleans.Storage.MemoryStorage`                                                  |
-| NumStorageGrains     | Integer | The number of grains to use to store the state, defaults to `10`                                |
+```csharp
+    /// <summary>
+    /// Options for MemoryGrainStorage
+    /// </summary>
+    public class MemoryGrainStorageOptions
+    {
+        /// <summary>
+        /// Default number of queue storage grains.
+        /// </summary>
+        public const int NumStorageGrainsDefaultValue = 10;
+        /// <summary>
+        /// Number of store grains to use.
+        /// </summary>
+        public int NumStorageGrains { get; set; } = NumStorageGrainsDefaultValue;
 
-### ShardedStorageProvider
-
-```xml
-<Provider Type="Orleans.Storage.ShardedStorageProvider" Name="ShardedStorage">
-    <Provider />
-    <Provider />
-    <Provider />
-</Provider>
+        /// <summary>
+        /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialzed prior to use.
+        /// </summary>
+        public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
+        /// <summary>
+        /// Default init stage
+        /// </summary>
+        public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
+    }
 ```
-Simple storage provider for writing grain state data shared across a number of other storage providers.
-
-A consistent hash function (default is Jenkins Hash) is used to decide which
-shard (in the order they are defined in the config file) is responsible for storing
-state data for a specified grain, then the Read / Write / Clear request
-is bridged over to the appropriate underlying provider for execution.
 
 ## Notes on Storage Providers
 
 If there is no `[StorageProvider]` attribute specified for a `Grain<T>` grain class, then a provider named `Default` will be searched for instead.
 If not found then this is treated as a missing storage provider.
 
-If there is only one provider in the silo config file, it will be considered to be the `Default` provider for this silo.
-
-A grain that uses a storage provider which is not present and defined in the silo configuration when the silo loads will fail to load, but the rest of the grains in that silo can still load and run.
+A grain that uses a storage provider which is not present and defined in silo configuration when the silo loads will fail to load, but the rest of the grains in that silo can still load and run.
 Any later calls to that grain type will fail with an `Orleans.Storage.BadProviderConfigException` error specifying that the grain type is not loaded.
 
-The storage provider instance to use for a given grain type is determined by the combination of the storage provider name defined in the `[StorageProvider]` attribute on that grain type, plus the provider type and configuration options for that provider defined in the silo config.
+The storage provider instance to use for a given grain type is determined by the combination of the storage provider name defined in the `[StorageProvider]` attribute on that grain type, plus the provider type and configuration options for that provider defined when configuring silo With ISioHostBuilder.
 
 Different grain types can use different configured storage providers, even if both are the same type: for example, two different Azure table storage provider instances, connected to different Azure storage accounts (see config file example above).
 
-All configuration details for storage providers is defined statically in the silo configuration that is read at silo startup.
+All configuration details for storage providers is defined through ISiloHostBuilder.
 There are _no_ mechanisms provided at this time to dynamically update or change the list of storage providers used by a silo.
 However, this is a prioritization / workload constraint rather than a fundamental design constraint.
 
@@ -365,20 +476,37 @@ Grains that execute error-handling / recovery code _must_ catch exceptions / fau
 
 ## Storage Provider Framework
 
-There is a service provider API for writing additional persistence providers – `IStorageProvider`.
+There is a service provider API for writing additional persistence providers – `IGrainStorage`.
 
 The Persistence Provider API covers read and write operations for GrainState data.
 
 ``` csharp
-public interface IStorageProvider
-{
-  Logger Log { get; }
-  Task Init();
-  Task Close();
+   /// <summary>
+    /// Interface to be implemented for a storage able to read and write Orleans grain state data.
+    /// </summary>
+    public interface IGrainStorage
+    {
+        /// <summary>Read data function for this storage instance.</summary>
+        /// <param name="grainType">Type of this grain [fully qualified class name]</param>
+        /// <param name="grainReference">Grain reference object for this grain.</param>
+        /// <param name="grainState">State data object to be populated for this grain.</param>
+        /// <returns>Completion promise for the Read operation on the specified grain.</returns>
+        Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState);
 
-  Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState);
-  Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState);
-}
+        /// <summary>Write data function for this storage instance.</summary>
+        /// <param name="grainType">Type of this grain [fully qualified class name]</param>
+        /// <param name="grainReference">Grain reference object for this grain.</param>
+        /// <param name="grainState">State data object to be written for this grain.</param>
+        /// <returns>Completion promise for the Write operation on the specified grain.</returns>
+        Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState);
+
+        /// <summary>Delete / Clear data function for this storage instance.</summary>
+        /// <param name="grainType">Type of this grain [fully qualified class name]</param>
+        /// <param name="grainReference">Grain reference object for this grain.</param>
+        /// <param name="grainState">Copy of last-known state data object for this grain.</param>
+        /// <returns>Completion promise for the Delete operation on the specified grain.</returns>
+        Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState);
+    }
 ```
 
 ## Storage Provider Semantics
@@ -439,13 +567,13 @@ In addition to the usual storage provider capabilities, the ADO.NET provider has
 Both `1.` and `2.` can be applied on arbitrary decision parameters, such as *grain ID*, *grain type*, *payload data*.
 
 This happen so that one chooses a format, e.g. [Simple Binary Encoding (SBE)](https://github.com/real-logic/simple-binary-encoding) and implements
-[IStorageDeserializer](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/IStorageDeserializer.cs) and [IStorageSerializer](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/IStorageSerializer.cs).
-The built-in (de)serializers have been built using this method. The [OrleansStorageDefault<format>(De)Serializer](https://github.com/dotnet/orleans/tree/master/src/OrleansSQLUtils/Storage/Provider) can be used as examples
+[IStorageDeserializer](https://github.com/dotnet/orleans/blob/master/src/AdoNet/Orleans.Persistence.AdoNet/Storage/Provider/IStorageDeserializer.cs) and [IStorageSerializer](https://github.com/dotnet/orleans/blob/master/src/AdoNet/Orleans.Persistence.AdoNet/Storage/Provider/IStorageSerializer.cs).
+The built-in (de)serializers have been built using this method. The [OrleansStorageDefault<format>(De)Serializer](https://github.com/dotnet/orleans/tree/master/src/AdoNet/Orleans.Persistence.AdoNet/Storage/Provider) can be used as examples
 on how to implement other formats.
 
-When the (de)serializers have been implemented, they need to ba added to the `StorageSerializationPicker` property in [AdoNetStorageProvider](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/AdoNetStorageProvider.cs).
-This is an implementation of [IStorageSerializationPicker](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/IStorageSerializationPicker.cs). By default
-[StorageSerializationPicker](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/StorageSerializationPicker.cs) will be used. And example of changing data storage format
-or using (de)serializers can be seen at [RelationalStorageTests](https://github.com/dotnet/orleans/blob/master/test/TesterSQLUtils/StorageTests/Relational/RelationalStorageTests.cs).
+When the (de)serializers have been implemented, they need to ba added to the `StorageSerializationPicker` property in [AdoNetGrainStorage](https://github.com/dotnet/orleans/blob/master/src/AdoNet/Orleans.Persistence.AdoNet/Storage/Provider/AdoNetGrainStorage.cs).
+This is an implementation of [IStorageSerializationPicker](https://github.com/dotnet/orleans/blob/master/src/AdoNet/Orleans.Persistence.AdoNet/Storage/Provider/IStorageSerializationPicker.cs). By default
+[StorageSerializationPicker](https://github.com/dotnet/orleans/blob/master/src/AdoNet/Orleans.Persistence.AdoNet/Storage/Provider/StorageSerializationPicker.cs) will be used. And example of changing data storage format
+or using (de)serializers can be seen at [RelationalStorageTests](https://github.com/dotnet/orleans/blob/master/test/TesterAdoNet/StorageTests/Relational/RelationalStorageTests.cs).
 
-Currently there is no method to expose this to Orleans application consumption as there is no method to access the framework created [AdoNetStorageProvider](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/AdoNetStorageProvider.cs) instance.
+Currently there is no method to expose this to Orleans application consumption as there is no method to access the framework created [AdoNetGrainStorage](https://github.com/dotnet/orleans/blob/master/src/AdoNet/Orleans.Persistence.AdoNet/Storage/Provider/AdoNetGrainStorage.cs).
