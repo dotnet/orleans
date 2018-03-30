@@ -20,7 +20,7 @@ The Orleans runtime provides two mechanisms, called timers and reminders, that e
 To start a timer, use the **Grain.RegisterTimer** method, which returns an  **IDisposable** reference:
 
 ``` csharp
-protected IDisposable RegisterTimer(
+public IDisposable RegisterTimer(
         Func<object, Task> asyncCallback, // function invoked when the timer ticks
         object state,                     // object tp pass to asyncCallback
         TimeSpan dueTime,                 // time to wait before the first timer tick
