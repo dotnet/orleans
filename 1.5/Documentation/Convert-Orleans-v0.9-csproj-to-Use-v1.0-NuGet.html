@@ -73,8 +73,12 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-<h1 id="how-to-convert-a-csproj-file-to-use-orleans-nuget-packages">How To Convert a .csproj File To Use Orleans NuGet Packages</h1>
 
+<div class="IMPORTANT"><h5>Important</h5><p><strong>You are looking at the 1.5 documentation</strong></p>
+<p>Orleans 2.0 is a significant overhaul from the 1.x versions.
+For 2.0 <a href="/Documentation/Introduction.html">Documentation</a> and <a href="/Tutorials/index.html">Tutorials</a>, refer to the respective sections.</p>
+</div>
+<h1 id="how-to-convert-a-csproj-file-to-use-orleans-nuget-packages">How To Convert a .csproj File To Use Orleans NuGet Packages</h1>
 <p>This note shows how to manually convert a Visual Studio .csproj file which was created with Orleans v0.9 Visual Studio templates from using assembly references based on the $(OrleansSDK) environment variable to using Orleans NuGet packages.</p>
 <p>These examples assume you are using the latest v1.0.3 NuGet packages from Feb-2015.</p>
 <p>For simplicity I will use &quot;v0.9&quot; to refer to the &quot;old&quot; .csproj and &quot;v1.0&quot; to refer to the &quot;new&quot; .csproj although strictly speaking &quot;v1.0 really means &quot;&gt;= v1.0.3&quot; in practice because there was significant restructuring and changes in the Orleans NuGet packages before that point.</p>

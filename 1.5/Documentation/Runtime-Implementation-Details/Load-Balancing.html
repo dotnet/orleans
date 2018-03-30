@@ -73,8 +73,12 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-<h1 id="load-balancing">Load Balancing</h1>
 
+<div class="IMPORTANT"><h5>Important</h5><p><strong>You are looking at the 1.5 documentation</strong></p>
+<p>Orleans 2.0 is a significant overhaul from the 1.x versions.
+For 2.0 <a href="/Documentation/Introduction.html">Documentation</a> and <a href="/Tutorials/index.html">Tutorials</a>, refer to the respective sections.</p>
+</div>
+<h1 id="load-balancing">Load Balancing</h1>
 <p><strong>Load balancing, in a broad sense, is one of the pillars of the Orleans runtime</strong>. Orleans runtime tries to make everything balanced, since balancing allows to maximize resource usage and avoid hotspots, which leads to better performance, as well as helps with elasticity. Load balancing in Orleans applies in multiple places. Below is a non-exhaustive list of places where the runtime performs balancing:</p>
 <ol>
 <li><p><strong>Default actor placement strategy is random</strong> - new activations are placed randomly across silos. That results in a balanced placement and prevents hotspots for most scenarios.</p>

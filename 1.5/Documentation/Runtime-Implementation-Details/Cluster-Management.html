@@ -73,8 +73,12 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-<h1 id="cluster-management-in-orleans">Cluster Management in Orleans</h1>
 
+<div class="IMPORTANT"><h5>Important</h5><p><strong>You are looking at the 1.5 documentation</strong></p>
+<p>Orleans 2.0 is a significant overhaul from the 1.x versions.
+For 2.0 <a href="/Documentation/Introduction.html">Documentation</a> and <a href="/Tutorials/index.html">Tutorials</a>, refer to the respective sections.</p>
+</div>
+<h1 id="cluster-management-in-orleans">Cluster Management in Orleans</h1>
 <p>Orleans provides cluster management via a built-in membership protocol, which we sometimes refer to as <strong>Silo Membership</strong>. The goal of this protocol is for all silos (Orleans servers) to agree on the set of currently alive silos, detect failed silos, and allow new silos to join the cluster.</p>
 <p>The protocol relies on an external service to provide an abstraction of <code>MembershipTable</code>. <code>MembershipTable</code> is a flat No-SQL like durable table that we use for 2 purposes. First, it is used as a rendezvous point for silos to find each other and Orleans clients to find silos. Second, it is used to store the current membership view  (list of alive silos) and helps coordinate the agreement on the membership view. We currently have 6 implementations of the <code>MembershipTable</code>: based on <a href="https://docs.microsoft.com/en-us/azure/storage/storage-dotnet-how-to-use-tables">Azure Table Storage</a>, SQL server, <a href="https://ZooKeeper.apache.org/">Apache ZooKeeper</a>, <a href="https://www.consul.io">Consul IO</a>, <a href="https://aws.amazon.com/dynamodb/">AWS DynamoDB</a>, and in-memory emulation for development.
 In addition to the <code>MembershipTable</code> each silo participates in fully distributed peer-to-peer membership protocol that detects failed silos and reaches agreement on a set alive silos. We start by describing the internal implementation of the Orleans&#39;s membership protocol below and later on describe the implementation of the <code>MembershipTable</code>.</p>

@@ -73,8 +73,12 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-<h1 id="journaledgrain-diagnostics">JournaledGrain Diagnostics</h1>
 
+<div class="IMPORTANT"><h5>Important</h5><p><strong>You are looking at the 1.5 documentation</strong></p>
+<p>Orleans 2.0 is a significant overhaul from the 1.x versions.
+For 2.0 <a href="/Documentation/Introduction.html">Documentation</a> and <a href="/Tutorials/index.html">Tutorials</a>, refer to the respective sections.</p>
+</div>
+<h1 id="journaledgrain-diagnostics">JournaledGrain Diagnostics</h1>
 <h2 id="monitoring-connection-errors">Monitoring Connection Errors</h2>
 <p>By design, log consistency providers are resilient under connection errors (including both connections to storage, and connections between clusters). But just tolerating errors is not enough, as applications usually need to monitor any such issues, and bring them to the attention of an operator if they are serious.</p>
 <p>JournaledGrain subclasses can override the following methods to receive notifiations when there are connection errors observed, and when those errors are resolved:</p>

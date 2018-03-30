@@ -73,8 +73,12 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-<h1 id="grain-cancellation-tokens">Grain cancellation tokens</h1>
 
+<div class="IMPORTANT"><h5>Important</h5><p><strong>You are looking at the 1.5 documentation</strong></p>
+<p>Orleans 2.0 is a significant overhaul from the 1.x versions.
+For 2.0 <a href="/Documentation/Introduction.html">Documentation</a> and <a href="/Tutorials/index.html">Tutorials</a>, refer to the respective sections.</p>
+</div>
+<h1 id="grain-cancellation-tokens">Grain cancellation tokens</h1>
 <p>The Orleans runtime provides mechanism called grain cancellation token, that enables the developer to cancel an executing grain operation. </p>
 <h2 id="description">Description</h2>
 <p><strong>GrainCancellationToken</strong> is a wrapper around standard <strong>.NET System.Threading.CancellationToken</strong>, which enables cooperative cancellation between threads, thread pool work items or Task objects, and can be passed as grain method argument. </p>

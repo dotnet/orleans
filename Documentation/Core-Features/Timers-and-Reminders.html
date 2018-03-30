@@ -82,18 +82,16 @@
 <p> Each activation may have zero or more timers associated with it. The runtime executes each timer routine within the runtime context of the activation that it is associated with.</p>
 <h2 id="usage">Usage</h2>
 <p>To start a timer, use the <strong>Grain.RegisterTimer</strong> method, which returns an  <strong>IDisposable</strong> reference:</p>
-<pre><code class="lang-csharp">protected IDisposable RegisterTimer(Func&lt;object, Task&gt; asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
-</code></pre><ul>
-<li>asyncCallback is the function to be invoked when the timer ticks.</li>
-<li>state is an object that will be passed to asyncCallback when the timer ticks.</li>
-<li>dueTime specifies a quantity of time to wait before issuing the first timer tick.</li>
-<li><p>period specifies the period of the timer.</p>
-<p>Cancel the timer by disposing it.</p>
-<p>A timer will cease to trigger if the activation is deactivated or when a fault occurs and its silo crashes.</p>
-<p>Important Considerations</p>
-</li>
-<li><p>When activation collection is enabled, the execution of a timer callback does not change the activation&#39;s state from idle to in use. This means that a timer cannot be used to postpone deactivation of otherwise idle activations.</p>
-</li>
+<pre><code class="lang-csharp">public IDisposable RegisterTimer(
+        Func&lt;object, Task&gt; asyncCallback, // function invoked when the timer ticks
+        object state,                     // object tp pass to asyncCallback
+        TimeSpan dueTime,                 // time to wait before the first timer tick
+        TimeSpan period)                  // the period of the timer
+</code></pre><p> Cancel the timer by disposing it.</p>
+<p> A timer will cease to trigger if the activation is deactivated or when a fault occurs and its silo crashes.</p>
+<p> Important Considerations</p>
+<ul>
+<li>When activation collection is enabled, the execution of a timer callback does not change the activation&#39;s state from idle to in use. This means that a timer cannot be used to postpone deactivation of otherwise idle activations.</li>
 <li>The period passed to <strong>Grain.RegisterTimer</strong> is the amount of time that passes from the moment the Task returned by <strong>asyncCallback</strong> is resolved to the moment that the next invocation of <strong>asyncCallback</strong> should occur. This not only makes it impossible for successive calls to <strong>asyncCallback</strong> to overlap but also makes it so that the length of time <strong>asyncCallback</strong> takes to complete affects the frequency at which <strong>asyncCallback</strong> is invoked. This is an important deviation from the semantics of <strong>System.Threading.Timer</strong>.</li>
 <li>Each invocation of <strong>asyncCallback</strong> is delivered to an activation on a separate turn and will never run concurrently with other turns on the same activation. Note however, <strong>asyncCallback</strong> invocations are not delivered as messages and are thus not subject to message interleaving semantics. This means that invocations of <strong>asyncCallback</strong> should be considered to behave as if running on a reentrant grain with respect to other messages to that grain.</li>
 </ul>
@@ -109,10 +107,30 @@
 </ul>
 <h2 id="configuration">Configuration</h2>
 <p>Reminders, being persistent, rely upon storage to function. You must specify which storage backing to use before the reminder subsystem will function. The reminder functionality is controlled by the SystemStore element in the server-side configuration. It works with either Azure Table or SQL Server as the store.</p>
-<pre><code class="lang-xml">&lt;SystemStore SystemStoreType=&quot;AzureTable&quot; /&gt; OR
-&lt;SystemStore SystemStoreType=&quot;SqlServer&quot; /&gt;
-</code></pre><p> If you just want a placeholder implementation of reminders to work with without needing to set up an Azure account or SQL database, then adding this element to the configuration file (under &#39;Globals&#39;) will give you a development-only implementation of the reminder system:</p>
-<pre><code class="lang-xml">&lt;ReminderService ReminderServiceType=&quot;ReminderTableGrain&quot;/&gt;
+<p>Azure Table configuration:</p>
+<pre><code class="lang-csharp">// TODO replace with your connection string
+const string connectionString = &quot;YOUR_CONNECTION_STRING_HERE&quot;;
+var silo = new SiloHostBuilder()
+    [...]
+    .UseAzureTableReminderService(options =&gt; options.ConnectionString = connectionString)
+    [...]
+</code></pre><p>SQL:</p>
+<pre><code class="lang-csharp">// TODO replace with your connection string
+const string connectionString = &quot;YOUR_CONNECTION_STRING_HERE&quot;;
+const string invariant = &quot;YOUR_INVARIANT&quot;;
+var silo = new SiloHostBuilder()
+    [...]
+    .UseAdoNetReminderService(options =&gt; 
+    {
+        options.ConnectionString = connectionString;
+        options.Invariant = invariant;
+    })
+    [...]
+</code></pre><p> If you just want a placeholder implementation of reminders to work with without needing to set up an Azure account or SQL database, then this will give you a development-only implementation of the reminder system:</p>
+<pre><code class="lang-csharp">var silo = new SiloHostBuilder()
+    [...]
+    .UseInMemoryReminderService()
+    [...]
 </code></pre><h2 id="usage-1">Usage</h2>
 <p>A grain that uses reminders must implement the <strong>IRemindable.RecieveReminder</strong> method.</p>
 <pre><code class="lang-csharp">Task IRemindable.ReceiveReminder(string reminderName, TickStatus status)

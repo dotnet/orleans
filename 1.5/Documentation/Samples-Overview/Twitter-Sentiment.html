@@ -73,8 +73,12 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-<h1 id="twitter-sentiment">Twitter Sentiment</h1>
 
+<div class="IMPORTANT"><h5>Important</h5><p><strong>You are looking at the 1.5 documentation</strong></p>
+<p>Orleans 2.0 is a significant overhaul from the 1.x versions.
+For 2.0 <a href="/Documentation/Introduction.html">Documentation</a> and <a href="/Tutorials/index.html">Tutorials</a>, refer to the respective sections.</p>
+</div>
+<h1 id="twitter-sentiment">Twitter Sentiment</h1>
 <p>The Twitter Sentiment application records Twitter sentiment by consuming the Twitter streaming API, calulates a sentiment score for each tweet (i.e. is it a positive/negative/neutral tone of lanuage), and then records that sentiment against each hashtag in the tweet using an Orleans grain to maintain a total score for each unique hashtag.</p>
 <p>The sample illustrates using Orleans to manipulate data with high volumes of input traffic, where each grain owns a row in a table (or a key in a key/value store, or a document in a document store) and all updates go through one single grain, reducing contention for individual rows, keys, or documents.</p>
 <p><img src="Twitter-Sentiment.png" alt=""></p>

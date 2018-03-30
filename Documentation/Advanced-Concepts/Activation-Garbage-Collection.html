@@ -100,94 +100,32 @@
 <pre><code class="lang-csharp">protected void DelayDeactivation(TimeSpan timeSpan)
 </code></pre><p>This call will ensure that this activation is not deactivated for at least the specified time duration. It takes priority over Activation Garbage Collection settings specified in the config, but does not cancel them.
 Therefore, this call provides an additional hook to <strong>delay the deactivation beyond what is specified in the Activation Garbage Collection settings</strong>. This call can not be used to expedite Activation Garbage Collection.</p>
-<p>A positive <c><code>timeSpan</code></c> value means “prevent GC of this activation for that time span”.</p>
-<p>A negative <c><code>timeSpan</code></c> value means “cancel the previous setting of the <code>DelayDeactivation</code> call and make this activation behave based on the regular Activation Garbage Collection settings”.</p>
+<p>A positive <code>timeSpan</code> value means “prevent GC of this activation for that time span”.</p>
+<p>A negative <code>timeSpan</code> value means “cancel the previous setting of the <code>DelayDeactivation</code> call and make this activation behave based on the regular Activation Garbage Collection settings”.</p>
 <p><strong>Scenarios:</strong></p>
-<p>1) Activation Garbage Collection settings specify age limit of 10 minutes and the grain is making a call to <code>DelayDeactivation</code>(20 min), it will cause this activation to not be collected for at least 20 min.</p>
-<p>2) Activation Garbage Collection settings specify age limit of 10 minutes and the grain is making a call to <code>DelayDeactivation</code>(5 min), the activation will be collected after 10 min, if no extra calls were made.</p>
-<p>3) Activation Garbage Collection settings specify age limit of 10 minutes and the grain is making a call to <code>DelayDeactivation</code>(5 min), and after 7 minutes there is another call on this grain, the activation will be collected after 17 min from time zero, if no extra calls were made.</p>
-<p>4) Activation Garbage Collection settings specify age limit of 10 minutes and the grain is making a call to <code>DelayDeactivation</code>(20 min), and after 7 minutes there is another call on this grain, the activation will be collected after 20 min from time zero, if no extra calls were made.</p>
+<p>1) Activation Garbage Collection settings specify age limit of 10 minutes and the grain is making a call to <code>DelayDeactivation(TimeSpan.FromMinutes(20))</code>, it will cause this activation to not be collected for at least 20 min.</p>
+<p>2) Activation Garbage Collection settings specify age limit of 10 minutes and the grain is making a call to <code>DelayDeactivation(TimeSpan.FromMinutes(5))</code>, the activation will be collected after 10 min, if no extra calls were made.</p>
+<p>3) Activation Garbage Collection settings specify age limit of 10 minutes and the grain is making a call to <code>DelayDeactivation(TimeSpan.FromMinutes(5))</code>, and after 7 minutes there is another call on this grain, the activation will be collected after 17 min from time zero, if no extra calls were made.</p>
+<p>4) Activation Garbage Collection settings specify age limit of 10 minutes and the grain is making a call to <code>DelayDeactivation(TimeSpan.FromMinutes(20))</code>, and after 7 minutes there is another call on this grain, the activation will be collected after 20 min from time zero, if no extra calls were made.</p>
 <p>Note that <code>DelayDeactivation</code> does not 100% guarantee that the grain activation will not get deactivated before the specified period of time expires. There are certain failure cases that may cause &#39;premature&#39; deactivation of grains. That means that <code>DelayDeactivation</code> <strong>cannot not be used as a means to &#39;pin&#39; a grain activation in memory forever or to a specific silo</strong>. <code>DelayDeactivation</code> is merely an optimization mechanism that can help reduce the aggregate cost of a grain getting deactivated and reactivated over time, if that matters. In most cases there should be no need to use <code>DelayDeactivation</code> at all.</p>
 <h3 id="expediting-activation-gc">Expediting Activation GC</h3>
 <p>A grain activation can also instruct the runtime to deactivate it next time it becomes idle by calling <code>this.DeactivateOnIdle()</code> method:</p>
-<pre><code class="lang-csharp">  protected void DeactivateOnIdle()
+<pre><code class="lang-csharp">protected void DeactivateOnIdle()
 </code></pre><p>A grain activation is considered idle if it is not processing any message at the moment.
-If you call <code>DeactivateOnIdle</code> while a grain is processing a message, it will get deactivated as soon as processing of the current message is finished.
-If there are any requests queued for the grain, they will be forwarded to the next activation.</p>
+If you call <code>DeactivateOnIdle</code> while a grain is processing a message, it will get deactivated as soon as processing of the current message is finished.</p>
+<p>If there are any requests queued for the grain, they will be forwarded to the next activation.</p>
 <p><code>DeactivateOnIdle</code> take priority over any Activation Garbage Collection settings specified in the config or <code>DelayDeactivation</code>.
 Note that this setting only applies to the grain activation from which it has been called and it does not apply to other grain activation of this type.</p>
 <h2 id="configuration">Configuration</h2>
-<h3 id="programmatic-configuration">Programmatic Configuration</h3>
-<p>Default Collection Age Limit (for all grain types) can be set via:</p>
-<pre><code class="lang-csharp">  void GlobalConfiguration.Application.SetDefaultCollectionAgeLimit(TimeSpan ageLimit)
-</code></pre><p>For individual grain types the limit can be set via:</p>
-<pre><code class="lang-csharp">  void GlobalConfiguration.Application.SetCollectionAgeLimit(Type type, TimeSpan ageLimit)
-</code></pre><p>The limit can also be reset for a grain type, so that the default limit would apply to it, via:</p>
-<pre><code class="lang-csharp">  void GlobalConfiguration.Application.ResetCollectionAgeLimitToDefault(Type type)
-</code></pre><h3 id="xml-configuration-deprecated">XML Configuration (deprecated)</h3>
-<p>Any length of time in the configuration XML file may use a suffix that specifies a unit of time:</p>
-<table>
-<thead>
-<tr>
-<th>Suffix</th>
-<th>Unit</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>none</td>
-<td>millisecond(s)</td>
-</tr>
-<tr>
-<td>ms</td>
-<td>millisecond(s)</td>
-</tr>
-<tr>
-<td>s</td>
-<td>second(s)</td>
-</tr>
-<tr>
-<td>m</td>
-<td>minute(s)</td>
-</tr>
-<tr>
-<td>hr</td>
-<td>hour(s)</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Specifying Default Collection Age Limit</strong></p>
-<p>The default collection age limit that applies to all grain types can be customized by adding the OrleansConfiguation/Globals/Application/Defaults/Deactivation element to the OrleansConfiguration.xml file.
-The minimal allowed age limit is 1 minute.</p>
-<p>The following example specifies that all activations that have been idle for 10 minutes or more should be considered eligible for deactivation.</p>
-<pre><code class="lang-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
-&lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
-  &lt;Globals&gt;
-    &lt;Application&gt;
-      &lt;Defaults&gt;
-        &lt;Deactivation AgeLimit=&quot;10m&quot;/&gt;
-      &lt;/Defaults&gt;
-    &lt;/Application&gt;
-  &lt;/Globals&gt;
-&lt;/OrleansConfiguration&gt;
-</code></pre><p><strong>Specifying per-Type Age Limits</strong></p>
-<p>Individual grain types may specify a collection age limit that is independent from the global default, using the OrleansConfiguation/Globals/Application/GrainType/Deactivation element. The minimal allowed age limit is 1 minute.</p>
-<p>In the following example, activations that have been idle for 10 minutes are eligible for collection, except activations that are instantiations of the MyGrainAssembly.DoNotDeactivateMeOften class, which are not considered collectable unless idle for a full 24 hours:</p>
-<pre><code class="lang-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
-&lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
-  &lt;Globals&gt;
-    &lt;Application&gt;
-      &lt;Defaults&gt;
-        &lt;Deactivation AgeLimit=&quot;10m&quot;/&gt;
-      &lt;/Defaults&gt;
-      &lt;GrainType Type=&quot;MyGrainAssembly.DoNotDeactivateMeOften&quot;&gt;
-        &lt;Deactivation AgeLimit=&quot;24hr&quot;/&gt;
-      &lt;/GrainType&gt;
-    &lt;/Application&gt;
-  &lt;/Globals&gt;
-&lt;/OrleansConfiguration&gt;
-</code></pre><p> Any number of GrainType elements may be specified.</p>
-</article>
+<p>Grain garbage collection can be configured using the <code>GrainCollectionOptions</code> options:</p>
+<pre><code class="lang-csharp">mySiloHostBuilder.Configure&lt;GrainCollectionOptions&gt;(options =&gt;
+{
+  // Set the value of CollectionAge to 10 minutes for all grain
+  options.CollectionAge = TimeSpan.FromMinutes(10);
+  // Override the value of CollectionAge to 5 minutes for MyGrainImplementation
+  options.ClassSpecificCollectionAge[typeof(MyGrainImplementation).FullTypeName] = TimeSpan.FromMinutes(5);
+})
+</code></pre></article>
           </div>
           
           <div class="hidden-sm col-md-2" role="complementary">

@@ -73,8 +73,12 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-<h1 id="request-context">Request Context</h1>
 
+<div class="IMPORTANT"><h5>Important</h5><p><strong>You are looking at the 1.5 documentation</strong></p>
+<p>Orleans 2.0 is a significant overhaul from the 1.x versions.
+For 2.0 <a href="/Documentation/Introduction.html">Documentation</a> and <a href="/Tutorials/index.html">Tutorials</a>, refer to the respective sections.</p>
+</div>
+<h1 id="request-context">Request Context</h1>
 <p>RequestContext is an Orleans feature that allows application metadata, such as a trace ID, to flow with requests. Application metadata may be added on the client; it will flow with Orleans requests to the receiving grain.</p>
 <p> The feature is implemented by a public static class, RequestContext, in the Orleans namespace. This class exposes two simple methods:</p>
 <p><strong>void Set(string key, object value)</strong> is used to store a value in the request context. The value can be any Serializable type. <strong>Object Get(string key)</strong> is used to retrieve a value from the current request context.</p>

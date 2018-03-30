@@ -73,8 +73,12 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-<h1 id="external-tasks-and-grains">External Tasks and Grains</h1>
 
+<div class="IMPORTANT"><h5>Important</h5><p><strong>You are looking at the 1.5 documentation</strong></p>
+<p>Orleans 2.0 is a significant overhaul from the 1.x versions.
+For 2.0 <a href="/Documentation/Introduction.html">Documentation</a> and <a href="/Tutorials/index.html">Tutorials</a>, refer to the respective sections.</p>
+</div>
+<h1 id="external-tasks-and-grains">External Tasks and Grains</h1>
 <p>By design, any sub-Tasks spawned from grain code (for example, by using <code>await</code> or <code>ContinueWith</code> or <code>Task.Factory.StartNew</code>) will be dispatched on the same per-activation <a href="https://msdn.microsoft.com/en-us/library/dd997402(v=vs.110).aspx">TPL Task Scheduler</a> as the parent task and therefore inherit the same single-threaded execution model as the rest of grain code. This is the main point behind single threaded execution of <a href="http://dotnet.github.io/orleans/Tutorials/Concurrency">grain turn based concurency</a>.</p>
 <p>In some cases grain code might need to “break out” of the Orleans task scheduling model and “do something special”, such as explicitly pointing a <code>Task</code> to a different task scheduler or using the .NET Thread pool. An example of such cases is when grain code has to execute a synchronous remote blocking call (such as remote IO). Doing that in the grain context will block the grain as well as one of the Orleans threads and thus should never be made. Instead, the grain code can execute this piece of blocking code on the thread pool thread and join (<code>await</code>) the completion of that execution and proceed in the grain context. We expect that escaping from the Orleans scheduler will be a very advanced and seldom required usage scenario beyond the “normal” usage patterns.</p>
 <h3 id="task-based-apis">Task based APIs:</h3>

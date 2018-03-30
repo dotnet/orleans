@@ -73,8 +73,12 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-<h1 id="stateless-worker-grains">Stateless Worker Grains</h1>
 
+<div class="IMPORTANT"><h5>Important</h5><p><strong>You are looking at the 1.5 documentation</strong></p>
+<p>Orleans 2.0 is a significant overhaul from the 1.x versions.
+For 2.0 <a href="/Documentation/Introduction.html">Documentation</a> and <a href="/Tutorials/index.html">Tutorials</a>, refer to the respective sections.</p>
+</div>
+<h1 id="stateless-worker-grains">Stateless Worker Grains</h1>
 <p>By default, the Orleans runtime creates no more than one activation of a grain within the cluster.
 This is the most intuitive expression of the Virtual Actor model with each grain corresponding to an entity with a unique type/identity.
 However, there are also cases when an application needs to perform functional stateless operations that are not tied to a particular entity in the system.

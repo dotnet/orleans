@@ -73,8 +73,12 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-<h1 id="interceptors">Interceptors</h1>
 
+<div class="IMPORTANT"><h5>Important</h5><p><strong>You are looking at the 1.5 documentation</strong></p>
+<p>Orleans 2.0 is a significant overhaul from the 1.x versions.
+For 2.0 <a href="/Documentation/Introduction.html">Documentation</a> and <a href="/Tutorials/index.html">Tutorials</a>, refer to the respective sections.</p>
+</div>
+<h1 id="interceptors">Interceptors</h1>
 <p>Grain call filters provide a means for intercepting grain calls. Filters can execute code both before and after a grain call. Multiple filters can be installed simultaneously. Filters are asynchronous and can modify <a href="Request-Context.html"><code>RequestContext</code></a>, arguments, and the return value of the method being invoked. Filters can also inspect the <code>MethodInfo</code> of the method being invoked on the grain class and can be used to throw or handle exceptions.</p>
 <p>Some example usages of grain call filters are:</p>
 <ul>

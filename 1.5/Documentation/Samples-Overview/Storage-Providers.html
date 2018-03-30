@@ -73,8 +73,12 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-<h1 id="storage-providers">Storage Providers</h1>
 
+<div class="IMPORTANT"><h5>Important</h5><p><strong>You are looking at the 1.5 documentation</strong></p>
+<p>Orleans 2.0 is a significant overhaul from the 1.x versions.
+For 2.0 <a href="/Documentation/Introduction.html">Documentation</a> and <a href="/Tutorials/index.html">Tutorials</a>, refer to the respective sections.</p>
+</div>
+<h1 id="storage-providers">Storage Providers</h1>
 <p><strong>Note</strong>: This sample requires the &quot;Official MongoDB C# Driver&quot; NuGet package from 10gen, Inc. If you want to run the sample and store data using MongoDB, you will also need to <a href="https://www.mongodb.org/">download</a> and install MongoDB.</p>
 <p>Custom storage providers allow you to extend the capabilities of Orleans to store application data in new storage services. In this sample, we have code to store data in a file system (presumably networked) and in MongoDB.</p>
 <p>While binary formatting is almost always better to use for persistent storage, this sample chooses to use JSON as the external format for one reason: it&#39;s easier to read and verify, which is a good thing in a sample. As you adopt the sample code for more realistic use, you will probably want to switch to something else than JSON as the external format.</p>

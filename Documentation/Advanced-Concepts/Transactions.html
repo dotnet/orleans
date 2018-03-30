@@ -93,30 +93,25 @@
 <h3 id="transactional-state">Transactional State</h3>
 <p>To support various transactional storage patterns the grain facing interface and supporting logic is pluggable.  We currently only support ITransactionalState.  This can be programmatically enabled on the silo host builder using UseTransactionalState.  To use a transactional state, a storage provider needs also be configured.</p>
 <p>Example:</p>
-<pre><code>   var config = ClusterConfiguration.LocalhostPrimarySilo();
-   config.AddAzureTableStorageProvider(”&lt;storage_account&gt;”);
+<pre><code class="lang-csharp">var builder = new SiloHostBuilder()
+    [...]
+    .AddAzureTableGrainStorageAsDefault(options =&gt; options.ConnectionString = ”YOUR_STORAGE_CONNECTION_STRING”)
+    .UseInClusterTransactionManager()
+    .UseAzureTransactionLog(options =&gt; options.ConnectionString = ”YOUR_STORAGE_CONNECTION_STRING”) 
+    .UseTransactionalState();
 
-   var builder = new SiloHostBuilder()
-   .UseConfiguration(config)
-   ....
-   .UseInClusterTransactionManager()
-   .UseAzureTransactionLog(options =&gt; {
-             options.ConnectionString = ”&lt;storage_account&gt;”;
-    }) 
-   .UseTransactionalState();
-
-   var host = builder.Build();
-   await host.StartAsync();
+var host = builder.Build();
+await host.StartAsync();
 </code></pre><h2 id="programming-model">Programming Model</h2>
 <p>For a grain to support transactions, transactional operations on a grain must be marked as being part of a transaction using the “Transaction” attribute.  Calls can be marked as “Required”, meaning the call can take part in a transaction among multiple other grains or as “RequiresNew” indicating that it will already start its own transaction.</p>
 <p>Example:</p>
-<pre><code>public interface IATMGrain : IGrainWithIntegerKey
+<pre><code class="lang-csharp">public interface IATMGrain : IGrainWithIntegerKey
 {
     [Transaction(TransactionOption.RequiresNew)]
     Task Transfer(Guid fromAccount, Guid toAccount, uint amountToTransfer);
 }
 </code></pre><p>The Transfer operation in the above atm grain will always start a new transaction which involves the two referenced accounts.</p>
-<pre><code>public interface IAccountGrain : IGrainWithGuidKey
+<pre><code class="lang-csharp">public interface IAccountGrain : IGrainWithGuidKey
 {
     [Transaction(TransactionOption.Required)]
     Task Withdraw(uint amount);
@@ -130,7 +125,7 @@
 </code></pre><p>The Withdraw and Deposit operations in the above account grain can take part in transactional operations, like the Transfer operation in the ATM grain, with other transactional grains.</p>
 <p>To use a transactional state within a grain, one needs only define a serializable state class to be persisted and declare the state in the grains constructor.</p>
 <p>Example:</p>
-<pre><code>public class AccountGrain : Grain, IAccountGrain
+<pre><code class="lang-csharp">public class AccountGrain : Grain, IAccountGrain
 {
     private readonly ITransactionalState&lt;Balance&gt; balance;
 

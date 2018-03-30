@@ -73,8 +73,12 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-<h1 id="stream-providers">Stream Providers</h1>
 
+<div class="IMPORTANT"><h5>Important</h5><p><strong>You are looking at the 1.5 documentation</strong></p>
+<p>Orleans 2.0 is a significant overhaul from the 1.x versions.
+For 2.0 <a href="/Documentation/Introduction.html">Documentation</a> and <a href="/Tutorials/index.html">Tutorials</a>, refer to the respective sections.</p>
+</div>
+<h1 id="stream-providers">Stream Providers</h1>
 <p>Streams can come in different shapes and forms. Some streams may deliver events over direct TCP links, while others deliver events via durable queues. Different stream types may use different batching strategies, different caching algorithms, or different back pressure procedures. We did not want to constrain streaming applications to only a small subset of those behavioral choices. Instead, <strong>Stream Providers</strong> are extensibility points to Orleans Streaming Runtime that allow users to implement any type of stream. This extensibility point is similar in spirit to <a href="https://github.com/dotnet/orleans/wiki/Custom%20Storage%20Providers">Orleans Storage Providers</a>.  Orleans currently ships with two default stream providers: <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/SimpleMessageStream/SimpleMessageStreamProvider.cs">Simple Message Stream Provider</a> and <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansAzureUtils/Providers/Streams/AzureQueue/AzureQueueStreamProvider.cs">Azure Queue Stream Provider</a>.</p>
 <h2 id="simple-message-stream-provider">Simple Message Stream Provider</h2>
 <p>Simple Message Stream Provider, also known as the SMS provider, delivers events over TCP by utilizing regular Orleans grain messaging. Since events in SMS are delivered over unreliable TCP links, SMS does <em>not</em> guarantee reliable event delivery and does not automaticaly resend failed messages for SMS streams. The producer of the SMS stream has a way to know if his event was successfully received and processed or not: by default the call to <code>stream.OnNextAsync</code> returns a <code>Task</code> that represents the processing status of the stream consumer. If this Task fails, the producer can decide to send the same event again, thus achieving reliability on ther application level. Although individual stream messages delivery is best effort, SMS streams themselves are reliable. That is, the subscriber-to-producer binding performed by Pub Sub is fully reliable.</p>
