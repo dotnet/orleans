@@ -80,7 +80,7 @@ var silo = new SiloHostBuilder()
     [...]
 ```
 
- If you just want a placeholder implementation of reminders to work with without needing to set up an Azure account or SQL database, then adding this element to the configuration file (under 'Globals') will give you a development-only implementation of the reminder system:
+ If you just want a placeholder implementation of reminders to work with without needing to set up an Azure account or SQL database, then this will give you a development-only implementation of the reminder system:
 
 ``` csharp
 var silo = new SiloHostBuilder()
