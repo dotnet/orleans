@@ -1,11 +1,11 @@
 ---
 layout: page
-title: Getting Started using Azure Web Apps
+title: Using Azure Web Apps with Azure Cloud Services
 ---
 
-# Getting Started using Azure Web Apps
+# Using Azure Web Apps with Azure Cloud Services
 
-If you would like to connect to an Azure Silo from an [Azure Web App](http://azure.microsoft.com/en-gb/services/app-service/web/) rather than a Web Role hosted within the same cloud service you can.
+If you would like to connect to an Azure Cloud Services Silo from an [Azure Web App](http://azure.microsoft.com/en-gb/services/app-service/web/) rather than a Web Role hosted within the same cloud service you can.
 
 For this to work securely you will need to assign both the Azure Web App and the Worker Role hosting the Silo to an [Azure Virtual Network](http://azure.microsoft.com/en-gb/services/virtual-network/).
 
@@ -35,16 +35,14 @@ Also make sure the Silo endpoints are configured.
 </Endpoints>
 ```
 
-Finally, you need to specify the same deployment id for Silos and the Web App Client.
-
-You can now use the `GrainClient` to make a connection from the Web App to the Silo.
+You can now connect from the Web App to the rest of the cluster.
 
 ### Potential Issues
 
 If the Web App is having difficulty connecting to the Silo:
 
 * Make sure you have at least **two roles**, or two instances of one role in your Azure Cloud Service, or the `InternalEndpoint` firewall rules may not be generated.
-* Check that both the Web App and the Silo are using the same `DeploymentId`.
+* Check that both the Web App and the Silo are using the same `ClusterId` and `ServiceId`.
 * Make sure the network security group is set up to allow internal virtual network connections. If you haven't got one you can create and assign one easily using the following `PowerShell`:
 
 ``` c
