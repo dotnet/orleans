@@ -10,8 +10,8 @@
   href: Serialization.md
 - name: Code Generation
   href: Codegen.md
-- name: Application Bootstrap within a Silo
-  href: Application-Bootstrap-within-a-Silo.md
+- name: Startup Tasks
+  href: StartupTasks.md
 - name: Interceptors
   href: Interceptors.md
 - name: Cancellation Tokens
