@@ -27,10 +27,34 @@ To get a quick overview, we show all relevant configuration parameters (includin
 </OrleansConfiguration>
 ```
 
+```csharp
+var silo = new SiloHostBuilder()
+  [...]
+  .Configure<ClusterInfo>(options =>
+  {
+    options.ClusterId = "us3";
+    options.ServiceId = "myawesomeservice";
+  })
+  .Configure<MultiClusterOptions>(options => 
+  {
+    options.HasMultiClusterNetwork = true;
+    options.DefaultMultiCluster = new[] { "us1", "eu1", "us2" };
+    options.BackgroundGossipInterval = TimeSpan.FromSeconds(30);
+    options.UseGlobalSingleInstanceByDefault = false;
+    options.GlobalSingleInstanceRetryInterval = TimeSpan.FromSeconds(30);
+    options.GlobalSingleInstanceNumberRetries = 3;
+    options.MaxMultiClusterGateways = 10;
+    options.GossipChannels.Add("AzureTable", "DefaultEndpointsProtocol=https;AccountName=usa;AccountKey=...");
+    options.GossipChannels.Add("AzureTable", "DefaultEndpointsProtocol=https;AccountName=europe;AccountKey=...")
+    [...]
+  })
+  [...]
+```
+
 As usual, all configuration settings can also be read and written programmatically, via the respective members of the `GlobalConfiguration` class.
 
 
-The `Service Id` is an arbitrary Guid for identifying this service. It must be the same for all clusters and all silos. If not specified, the default Guid (containing all zeroes) is used.
+The `Service Id` is an arbitrary ID for identifying this service. It must be the same for all clusters and all silos. 
 
 The `MultiClusterNetwork` section is optional - if not present, all multi-cluster support is disabled for this silo.
 

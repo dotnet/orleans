@@ -34,7 +34,7 @@ For example, to inject a multi-cluster configuration that consists of the three 
 
 ```csharp
    var clusterlist = "us1,eu1,us2".Split(',');
-   var mgtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);	
+   var mgtGrain = client.GetGrain<IManagementGrain>(0);	
    mgtGrain.InjectMultiClusterConfiguration(clusterlist, "my comment here"));
 ```
 
@@ -42,12 +42,20 @@ The first argument to `InjectMultiClusterConfiguration` is an enumerable of clus
 
 There is an optional third argument, a boolean called `checkForLaggingSilosFirst`, which defaults to true. It means that the system performs a best-effort check to see if there are any silos anywhere that have not caught up to the current configuration yet, and rejects the change if it finds such a silo. This helps to detect violations of the restriction that only one configuration change should be pending at a time (though it cannot guarantee it under all circumstances).
 
-####	Via Default Configuration
+#### Via Default Configuration
 
 In situations where the multi-cluster configuration is known in advance and the deployment is fresh every time (e.g.  for testing), we may want to supply a default configuration. The global configuration supports an optional attribute `DefaultMultiCluster` which takes a comma-separated list of cluster ids:
 
-```html
-   <MultiClusterNetwork ... DefaultMulticluster="us1,eu1,us2" ...>
+```csharp
+var silo = new SiloHostBuilder()
+  [...]
+  .Configure<MultiClusterOptions>(options => 
+  {
+    [...]
+    options.DefaultMultiCluster = new[] { "us1", "eu1", "us2" }; 
+    [...]
+  })
+  [...]
 ```
 
 After a silo is started with this setting, it checks to see if the current multi-cluster configuration is null, and if so, injects the given configuration with the current UTC timestamp. 
@@ -63,7 +71,7 @@ If using the Azure Table-Based Gossip Channel, operators can inject a new config
  
 |Name               | Type     | Value    |
 |-------------      |--------  |----------|
-|PartitionKey       | String   | the ServiceId GUID |
+|PartitionKey       | String   | the ServiceId |
 |RowKey             | String   | "CONFIG" |
 |Clusters           | String   | comma-separated list of cluster IDs, e.g. "us1,eu1,us2" |
 |Comment            | String   | optional comment |
