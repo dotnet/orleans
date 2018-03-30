@@ -3,6 +3,8 @@ layout: page
 title: JournaledGrain API
 ---
 
+[!include[](../../warning-banner.md)]
+
 # JournaledGrain Basics
 
 Journaled grains derive from `<JournaledGrain<StateType,EventType>`, with the following type parameters:

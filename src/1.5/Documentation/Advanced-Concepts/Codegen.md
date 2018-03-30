@@ -3,6 +3,8 @@ layout: page
 title: Code Generation
 ---
 
+[!include[](../../warning-banner.md)]
+
 # Code Generation
 
 **Efficient code generation is one of the pillars of the Orleans Runtime**. The Orleans Runtime makes use of generated code in order to ensure proper serialization of types that are used across the cluster as well as for generating boilerplate which abstracts away the implementation details of method shipping, exception propagation, and other internal runtime concepts.

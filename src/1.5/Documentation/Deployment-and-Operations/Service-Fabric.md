@@ -2,6 +2,9 @@
 layout: page
 title: Service Fabric Hosting
 ---
+
+[!include[](../../warning-banner.md)]
+
 # Service Fabric Hosting
 
 ## Overview

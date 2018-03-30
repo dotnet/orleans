@@ -3,6 +3,8 @@ layout: page
 title: Main Benefits
 ---
 
+[!include[](../warning-banner.md)]
+
 # Benefits
 
 The main benefits of Orleans are: **developer productivity**, even for non-expert programmers; and **transparent scalability by default** with no special effort from the programmer. We expand on each of these benefits below.

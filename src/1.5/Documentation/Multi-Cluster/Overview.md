@@ -3,6 +3,8 @@ layout: page
 title: Multi-Cluster Support
 ---
 
+[!include[](../../warning-banner.md)]
+
 # Multi-Cluster Support
 
 Orleans v.1.3.0 added support for federating several Orleans clusters into a loosely connected *multi-cluster* that acts like a single service. 

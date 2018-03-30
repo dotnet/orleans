@@ -3,6 +3,8 @@ layout: page
 title: PowerShell Client Module
 ---
 
+[!include[](../../warning-banner.md)]
+
 # PowerShell Client Module
 
 The Orleans PowerShell Client Module is a set of [PowerShell Cmdlets](https://technet.microsoft.com/en-us/library/dd772285.aspx) that wraps

@@ -1,3 +1,5 @@
+[!include[](../../warning-banner.md)]
+
 # Backward compatibility guidelines
 
 Writing backward compatible code can be hard and difficult to test.

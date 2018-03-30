@@ -3,6 +3,8 @@ layout: page
 title: Multi-Cluster Configuration
 ---
 
+[!include[](../../warning-banner.md)]
+
 ## Multi-Cluster Configuration
 
 The multi-cluster configuration determines which clusters are currently part of the multi-cluster. It does not change automatically, but is controlled by the operator. Thus, it is quite different from the membership mechanism used within a cluster, which automatically determines the set of silos that are part of the cluster.

@@ -3,6 +3,8 @@ layout: page
 title: Immediate vs. Delayed Confirmation
 ---
 
+[!include[](../../warning-banner.md)]
+
 # Immediate Confirmation
 
 For many applications, we want to ensure that events are confirmed immediately, so that the persisted version does not lag behind the current version in memory, and we do not risk losing the latest state if the grain should fail. We can guarantee this by following these rules:

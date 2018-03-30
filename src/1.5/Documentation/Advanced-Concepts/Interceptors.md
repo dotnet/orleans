@@ -3,6 +3,8 @@ layout: page
 title: Interceptors
 ---
 
+[!include[](../../warning-banner.md)]
+
 # Interceptors
 
 Grain call filters provide a means for intercepting grain calls. Filters can execute code both before and after a grain call. Multiple filters can be installed simultaneously. Filters are asynchronous and can modify [`RequestContext`](Request-Context.md), arguments, and the return value of the method being invoked. Filters can also inspect the `MethodInfo` of the method being invoked on the grain class and can be used to throw or handle exceptions.

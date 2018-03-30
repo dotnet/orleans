@@ -3,6 +3,8 @@ layout: page
 title: Messaging Delivery Guarantees
 ---
 
+[!include[](../../warning-banner.md)]
+
 # Messaging Delivery Guarantees
 
 Orleans messaging delivery guarantees are **at-most-once**, by default.

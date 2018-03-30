@@ -3,6 +3,8 @@ layout: page
 title: Server Configuration
 ---
 
+[!include[](../../../warning-banner.md)]
+
 # Server Configuration
 
 There are two key aspects of silo configuration:

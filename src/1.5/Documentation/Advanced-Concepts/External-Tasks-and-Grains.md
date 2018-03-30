@@ -3,6 +3,8 @@ layout: page
 title: External Tasks and Grains
 ---
 
+[!include[](../../warning-banner.md)]
+
 # External Tasks and Grains
 
 By design, any sub-Tasks spawned from grain code (for example, by using `await` or `ContinueWith` or `Task.Factory.StartNew`) will be dispatched on the same per-activation [TPL Task Scheduler](https://msdn.microsoft.com/en-us/library/dd997402(v=vs.110).aspx) as the parent task and therefore inherit the same single-threaded execution model as the rest of grain code. This is the main point behind single threaded execution of [grain turn based concurency](http://dotnet.github.io/orleans/Tutorials/Concurrency).

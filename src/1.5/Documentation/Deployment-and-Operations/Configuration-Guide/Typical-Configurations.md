@@ -3,6 +3,8 @@ layout: page
 title: Typical Configurations
 ---
 
+[!include[](../../../warning-banner.md)]
+
 # Typical Configurations
 
 Below are examples of typical configurations that can be used for development and production deployments.

@@ -3,6 +3,8 @@ layout: page
 title: Reentrant Grains
 ---
 
+[!include[](../../warning-banner.md)]
+
 # Reentrant Grains
 
 By default, the Orleans scheduler requires an activation to completely finish processing one request before invoking the next request.

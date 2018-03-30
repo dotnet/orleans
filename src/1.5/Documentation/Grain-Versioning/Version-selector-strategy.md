@@ -1,3 +1,6 @@
+
+[!include[](../../warning-banner.md)]
+
 # Version selector strategy
 
 When several versions of the same grain interface exist in the cluster, and a new

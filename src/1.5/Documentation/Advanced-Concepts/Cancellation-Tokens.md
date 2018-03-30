@@ -3,6 +3,8 @@ layout: page
 title: Grain cancellation tokens
 ---
 
+[!include[](../../warning-banner.md)]
+
 # Grain cancellation tokens
 
 The Orleans runtime provides mechanism called grain cancellation token, that enables the developer to cancel an executing grain operation. 

@@ -3,6 +3,8 @@ layout: page
 title: Orleans Configuration Guide
 ---
 
+[!include[](../../../warning-banner.md)]
+
 # Orleans Configuration Guide
 
 This Configuration Guide explains the key configuration parameters and how they should be used for most typical usage scenarios.

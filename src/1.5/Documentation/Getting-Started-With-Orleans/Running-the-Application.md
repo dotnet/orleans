@@ -3,6 +3,8 @@ layout: page
 title: Running the Application
 ---
 
+[!include[](../../warning-banner.md)]
+
 ### Orleans Application
 
 As was illustrated in the [previous topic](Developing-a-Client.md), a typical Orleans application consists of a cluster of server processes (silos) where grains live, and a set of client processes, usually web servers, that receive external requests, turn them into grain method calls, and return results back.

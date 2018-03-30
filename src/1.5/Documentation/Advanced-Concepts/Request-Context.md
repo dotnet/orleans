@@ -3,6 +3,8 @@ layout: page
 title: Request Context
 ---
 
+[!include[](../../warning-banner.md)]
+
 # Request Context
 
 RequestContext is an Orleans feature that allows application metadata, such as a trace ID, to flow with requests. Application metadata may be added on the client; it will flow with Orleans requests to the receiving grain.

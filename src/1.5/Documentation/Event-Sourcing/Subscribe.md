@@ -1,3 +1,7 @@
+
+
+[!include[](../../warning-banner.md)]
+
 # Notifications
 
 It is often convenient to have the ability to react to state changes. 

@@ -3,6 +3,8 @@ layout: page
 title: Event Sourcing
 ---
 
+[!include[](../../warning-banner.md)]
+
 # Event Sourcing
 
 Event sourcing provides a flexible way to manage and persist grain state. An event-sourced grain has many potential advantages over a standard grain. For one, it can be used with many different storage provider configurations, and supports geo-replication across multiple clusters. Moreover, it cleanly separates the grain class from definitions of the grain state (represented by a grain state object) and grain updates (represented by event objects). 

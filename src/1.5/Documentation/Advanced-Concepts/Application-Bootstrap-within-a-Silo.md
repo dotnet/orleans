@@ -3,6 +3,8 @@ layout: page
 title: Application Bootstrapping within a Silo
 ---
 
+[!include[](../../warning-banner.md)]
+
 # Application Bootstrapping within a Silo
 
 There are several scenarios where application want to run some "auto-exec" functions when a silo comes online.

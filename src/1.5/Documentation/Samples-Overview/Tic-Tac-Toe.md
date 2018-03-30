@@ -3,6 +3,8 @@ layout: page
 title:  Tic Tac Toe
 ---
 
+[!include[](../../warning-banner.md)]
+
 # Tic Tac Toe
 
 TicTacToe is based on the classic board game, also known as "noughts and crosses." Its game logic is simple, which makes it an excellent sample for showing how a turn-based game could be easily implemented in Orleans.

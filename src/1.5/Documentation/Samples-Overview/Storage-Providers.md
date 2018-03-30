@@ -3,6 +3,8 @@ layout: page
 title: Storage Providers
 ---
 
+[!include[](../../warning-banner.md)]
+
 # Storage Providers
 
 **Note**: This sample requires the "Official MongoDB C# Driver" NuGet package from 10gen, Inc. If you want to run the sample and store data using MongoDB, you will also need to [download](https://www.mongodb.org/) and install MongoDB.

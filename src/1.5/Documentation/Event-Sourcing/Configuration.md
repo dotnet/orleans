@@ -3,6 +3,8 @@ layout: page
 title: Configuration
 ---
 
+[!include[](../../warning-banner.md)]
+
 # Configuration
 
 ## Configuring Project References
