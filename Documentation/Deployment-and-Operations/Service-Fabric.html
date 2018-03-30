@@ -75,58 +75,71 @@
             <article class="content wrap" id="_content" data-uid="">
 <h1 id="service-fabric-hosting">Service Fabric Hosting</h1>
 
-<h2 id="overview">Overview</h2>
-<p>Orleans can be hosted on Service Fabric. There are currently two points of integration with Service Fabric:</p>
-<ul>
-<li><strong>Hosting</strong>: Silos can be hosted on Service Fabric inside of a Service Fabric Reliable Service. Silos should be hosted as unpartitioned, stateless services since Orleans manages distribution of grains itself using fine-grained, dynamic distribution. Other hosting options (partitioned, stateful) are currently untested and unsupported.</li>
-<li><strong>Clustering</strong> (beta): Silos and clients can leverage Service Fabric&#39;s Service Discovery mechanisms to form clusters. This option requires Service Fabric Hosting, however Service Fabric Hosting does not require Service Fabric Clustering.</li>
-</ul>
-<p>A sample which demonstrates hosting and clustering is present at <a href="https://github.com/dotnet/orleans/tree/master/Samples/ServiceFabric">Samples/ServiceFabric</a>.</p>
-<h2 id="hosting">Hosting</h2>
+<p>Orleans can be hosted on Service Fabric using the <code>Microsoft.Orleans.Hosting.ServiceFabric</code> package.
+Silos should be hosted as unpartitioned, stateless services since Orleans manages distribution of grains itself using fine-grained, dynamic distribution. Other hosting options (partitioned, stateful) are currently untested and unsupported.</p>
+<p>A sample which demonstrates hosting on Service Fabric is available at <a href="https://github.com/dotnet/orleans/tree/master/Samples/2.0/ServiceFabric">Samples/2.0/ServiceFabric</a>.</p>
 <p>Hosting support is available in the <code>Microsoft.Orleans.Hosting.ServiceFabric</code> package. It allows an Orleans Silo to run as a Service Fabric <code>ICommunicationListener</code>. The Silo lifecycle follows the typical communication listener lifecycle: it is initialized via the <code>ICommunicationListener.OpenAsync</code> method and is gracefully terminated via the <code>ICommunicationListener.CloseAsync</code> method or abruptly terminated via the <code>ICommunicationListener.Abort</code> method.</p>
-<p><code>OrleansCommunicationListener</code> provides the <code>ICommunicationListener</code> implementation. The recommended approach is to create the communication listener using <code>OrleansServiceListener.CreateStateless(Action&lt;StatelessServiceContext, ISiloHostBuilder&gt; configure)</code> in the <code>Orleans.Hosting.ServiceFabric</code> namespace. This ensures that the listener has the endpoint name required by <strong>Clustering</strong> (described below).</p>
+<p><code>OrleansCommunicationListener</code> provides the <code>ICommunicationListener</code> implementation. The recommended approach is to create the communication listener using <code>OrleansServiceListener.CreateStateless(Action&lt;StatelessServiceContext, ISiloHostBuilder&gt; configure)</code> in the <code>Orleans.Hosting.ServiceFabric</code> namespace.</p>
 <p>Each time the communication listener is opened, the <code>configure</code> delegate passed to <code>CreateStateless</code> is invoked to configure the new Silo.</p>
-<p>Hosting can be used in conjunction with the Service Fabric Clustering provider, however other clustering providers can be used instead.</p>
-<h3 id="example-configuring-service-fabric-hosting">Example: Configuring Service Fabric hosting.</h3>
-<p>The following example demonstrates a Service Fabric <code>StatelessService</code> class which hosts an Orleans silo. The full sample can be found in the <a href="https://github.com/dotnet/orleans/tree/master/Samples/ServiceFabric">Samples/ServiceFabric</a> directory of the Orleans repository.</p>
-<pre><code class="lang-csharp">internal sealed class StatelessCalculatorService : StatelessService
+<h2 id="example-configuring-service-fabric-hosting">Example: Configuring Service Fabric hosting</h2>
+<p>The following example demonstrates a Service Fabric <code>StatelessService</code> class which hosts an Orleans silo. The full sample can be found in the <a href="https://github.com/dotnet/orleans/tree/master/Samples/2.0ServiceFabric">Samples/2.0/ServiceFabric</a> directory of the Orleans repository.</p>
+<pre><code class="lang-csharp">/// &lt;summary&gt;
+/// An instance of this class is created for each service instance by the Service Fabric runtime.
+/// &lt;/summary&gt;
+internal sealed class StatelessCalculatorService : StatelessService
 {
     public StatelessCalculatorService(StatelessServiceContext context)
         : base(context)
     {
     }
 
+    /// &lt;summary&gt;
+    /// Optional override to create listeners (e.g., TCP, HTTP) for this service replica to handle
+    /// client or user requests.
+    /// &lt;/summary&gt;
+    /// &lt;returns&gt;A collection of listeners.&lt;/returns&gt;
     protected override IEnumerable&lt;ServiceInstanceListener&gt; CreateServiceInstanceListeners()
     {
-        // Listeners can be opened and closed multiple times over the lifetime of a service
-        // instance. A new Orleans silo will be both created and initialized each time the
-        // listener is opened and will be shutdown when the listener is closed.
+        // Listeners can be opened and closed multiple times over the lifetime of a service instance.
+        // A new Orleans silo will be both created and initialized each time the listener is opened
+        // and will be shutdown when the listener is closed.
         var listener = OrleansServiceListener.CreateStateless(
-            (serviceContext, builder) =&gt;
+            (fabricServiceContext, builder) =&gt;
             {
-                // Optional: use Service Fabric for cluster membership.
-                builder.UseServiceFabricClustering(serviceContext);
-
-                // Alternative: use Azure Storage for cluster membership.
-                builder.UseAzureTableMembership(options =&gt;
+                builder.Configure&lt;ClusterOptions&gt;(options =&gt;
                 {
-                    /* Configure connection string*/
+                    // The service id is unique for the entire service over its lifetime. This is
+                    // used to identify persistent state such as reminders and grain state.
+                    options.ServiceId = fabricServiceContext.ServiceName.ToString();
+
+                    // The cluster id identifies a deployed cluster. Since Service Fabric uses rolling
+                    // upgrades, the cluster id can be kept constant. This is used to identify which
+                    // silos belong to a particular cluster.
+                    options.ClusterId = &quot;development&quot;;
                 });
+
+                // Configure clustering. Other clustering providers are available, but for the purpose
+                // of this sample we will use Azure Storage.
+                // TODO: Pick a clustering provider and configure it here.
+                builder.UseAzureStorageClustering(
+                    options =&gt; options.ConnectionString = &quot;UseDevelopmentStorage=true&quot;);
 
                 // Optional: configure logging.
                 builder.ConfigureLogging(logging =&gt; logging.AddDebug());
 
-                var config = new ClusterConfiguration();
-                config.Globals.RegisterBootstrapProvider&lt;BootstrapProvider&gt;(&quot;poke_grains&quot;);
-                config.Globals.ReminderServiceType =
-                    GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain;
+                builder.AddStartupTask&lt;StartupTask&gt;();
 
-                // Service Fabric manages port allocations, so update the configuration using
-                // those ports.
-                config.Defaults.ConfigureServiceFabricSiloEndpoints(serviceContext);
+                // Service Fabric manages port allocations, so update the configuration using those
+                // ports.
+                // Gather configuration from Service Fabric.
+                var activation = fabricServiceContext.CodePackageActivationContext;
+                var endpoints = activation.GetEndpoints();
 
-                // Tell Orleans to use this configuration.
-                builder.UseConfiguration(config);
+                // These endpoint names correspond to TCP endpoints specified in ServiceManifest.xml
+                var siloEndpoint = endpoints[&quot;OrleansSiloEndpoint&quot;];
+                var gatewayEndpoint = endpoints[&quot;OrleansProxyEndpoint&quot;];
+                var hostname = fabricServiceContext.NodeContext.IPAddressOrFQDN;
+                builder.ConfigureEndpoints(hostname, siloEndpoint.Port, gatewayEndpoint.Port);
 
                 // Add your application assemblies.
                 builder.ConfigureApplicationParts(parts =&gt;
@@ -142,6 +155,12 @@
         return new[] { listener };
     }
 
+    /// &lt;summary&gt;
+    /// This is the main entry point for your service instance.
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;cancellationToken&quot;&gt;
+    /// Canceled when Service Fabric needs to shut down this service instance.
+    /// &lt;/param&gt;
     protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         while (true)
@@ -151,12 +170,7 @@
         }
     }
 }
-</code></pre><h2 id="clustering-beta">Clustering (beta)</h2>
-<p><em>Note: it is currently recommended to use a storage-backed clustering provider such as SQL, ZooKeeper, Consul, or Azure Tables in production while this feature is in beta.</em></p>
-<p>Support to use Service Fabric&#39;s Service Discovery (Naming Service) mechanism for cluster membership is available in the <code>Microsoft.Orleans.Clustering.ServiceFabric</code> package. The implementation requires that the Service Fabric <strong>Hosting</strong> support is also used and that the Silo endpoint is named &quot;Orleans&quot; in the value returned from <code>StatelessService.CreateServiceInstanceListeners()</code>. The simplest way to ensure this is to use the <code>OrleansServiceListener.CreateStateless(...)</code> method as described in the previous section.</p>
-<p>Service Fabric Clustering is enabled with the <code>ISiloHostBuilder.UseServiceFabricClustering(ServiceContext)</code> extension method on the silo and the <code>IClientBuilder.UseServiceFabricClustering(Uri)</code> extension method on the client.</p>
-<p>The current recommendation is to use a storage-backed clustering provider for production services, such as SQL, ZooKeeper, Consul, or Azure Storage. These providers (particularly SQL and Azure Storage) are sufficiently well tested for production use.</p>
-</article>
+</code></pre></article>
           </div>
           
           <div class="hidden-sm col-md-2" role="complementary">

@@ -101,9 +101,8 @@
 }
 </code></pre><h2 id="configuration">Configuration</h2>
 <p>No configuration is needed, you can deploy different binaries on each silo in your cluster.
-However, if necessary, you can change the interval that silos check for changes in types supported in <code>ClusterConfig.Globals.TypeMapRefreshInterval</code>.</p>
-<p>For testing purpose, you can use the property <code>ExcludedGrainTypes</code> in <code>NodeConfiguration</code>.
-In code based config you can find it in <code>ClusterConfig.Defaults.ExcludedGrainTypes</code>, which is a list names of the types you want to exclude.</p>
+However, if necessary, you can change the interval that silos and clients check for changes in types supported with the property <code>TypeMapRefreshInterval</code> from <code>TypeManagementOptions</code></p>
+<p>For testing purpose, you can use the property <code>ExcludedGrainTypes</code> in <code>GrainClassOptions</code>, which is a list names of the types you want to exclude on the silos.</p>
 <h2 id="limitations">Limitations</h2>
 <ul>
 <li>Connected clients will not be notified if the set of supported Grain Types changed. In the previous example:<ul>

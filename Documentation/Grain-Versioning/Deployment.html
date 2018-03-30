@@ -84,7 +84,15 @@ and to rollback.</p>
 <li><code>DefaultCompatibilityStrategy</code> set to <code>BackwardCompatible</code></li>
 <li><code>DefaultVersionSelectorStrategy</code> set to <code>AllCompatibleVersions</code></li>
 </ul>
-<p>When using this configuration, &quot;old&quot; clients will be able to talk to activations
+<pre><code class="lang-csharp">var silo = new SiloHostBuilder()
+  [...]
+  .Configure&lt;GrainVersioningOptions&gt;(options =&gt; 
+  {
+    options.DefaultCompatibilityStrategy = nameof(BackwardCompatible);
+    options.DefaultVersionSelectorStrategy = nameof(AllCompatibleVersions);
+  })
+  [...]
+</code></pre><p>When using this configuration, &quot;old&quot; clients will be able to talk to activations
 on both versions of silos. Newer clients and silos will only trigger new activations
 on newer silos.</p>
 <p><img src="rolling.gif" alt="Rolling gif"></p>
@@ -98,7 +106,15 @@ cluster</strong>. It is important that silos from both environment can talk to e
 <li><code>DefaultCompatibilityStrategy</code> set to <code>BackwardCompatible</code></li>
 <li><code>DefaultVersionSelectorStrategy</code> set to <code>MinimumVersion</code></li>
 </ul>
-<p>Suggested deployment steps:</p>
+<pre><code class="lang-csharp">var silo = new SiloHostBuilder()
+  [...]
+  .Configure&lt;GrainVersioningOptions&gt;(options =&gt; 
+  {
+    options.DefaultCompatibilityStrategy = nameof(BackwardCompatible);
+    options.DefaultVersionSelectorStrategy = nameof(MinimumVersion);
+  })
+  [...]
+</code></pre><p>Suggested deployment steps:</p>
 <ol>
 <li>&quot;V1&quot; silos and clients are deployed and are running in the Production slot.</li>
 <li>&quot;V2&quot; silos and clients begin to start in the Staging slot. They will join the

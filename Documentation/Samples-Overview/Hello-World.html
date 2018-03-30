@@ -75,14 +75,17 @@
             <article class="content wrap" id="_content" data-uid="">
 <h1 id="hello-world">Hello World</h1>
 
-<p>In this sample, a client connects with an Orleans grain instance, sends it a greeting and receives a greeting back. The client then prints that greeting and that&#39;s that. Simple enough in theory, but since there&#39;s distribution involved, there&#39;s a bit more to it.</p>
-<p>There are three projects involved -- one for declaring the communication interfaces, one for the grain implementations, and one for the client, which also hosts the Orleans silo that loads the grain when activated.</p>
-<p>There&#39;s only one communication interface, in IHello.cs:</p>
+<p>In this sample, a client connects with a grain, sends it a greeting and receives a greeting back.
+The client then prints that greeting and that&#39;s that.
+Simple enough in theory, but since there&#39;s distribution involved, there&#39;s a bit more to it.</p>
+<p>There are four projects involved -- one for declaring the grain interfaces, one for the grain implementations, and one for the client, one for the silo host</p>
+<p>There&#39;s one grain interface, in IHello.cs:</p>
 <pre><code class="lang-csharp">public interface IHello : Orleans.IGrainWithIntegerKey
 {
    Task&lt;string&gt; SayHello(string greeting);
 }
-</code></pre><p>This is simple enough, and we can see that all replies must be represented as a Task or Task<t> in communication interfaces. The implementation, found in HelloGrain.cs, is similarly trivial:<p>
+</code></pre><p>This is simple enough, and we can see that all replies must be represented as a Task or Task<t> in communication interfaces.
+The implementation, found in HelloGrain.cs, is similarly trivial:<p>
 <pre><code class="lang-csharp">public class HelloGrain : Orleans.Grain, HelloWorldInterfaces.IHello
 {
     Task&lt;string&gt; HelloWorldInterfaces.IHello.SayHello(string greeting)
@@ -90,12 +93,46 @@
         return Task.FromResult(&quot;You said: &#39;&quot; + greeting + &quot;&#39;, I say: Hello!&quot;);
     }
 }
-</code></pre><p>The class inherits from an Orleans-defined base class, and implements the communication interface defined earlier. Since there is nothing that the grain needs to wait on, the method is not declared <code>async</code> and instead returns its value using <code>Task.FromResult()</code>.</p>
-<p> The client, which orchestrates the grain code and is found in Program.cs, looks like this:</p>
-<pre><code class="lang-csharp">Orleans.GrainClient.Initialize(&quot;DevTestClientConfiguration.xml&quot;);
-var friend = GrainClient.GrainFactory.GetGrain&lt;IHello&gt;(0);
-Console.WriteLine(&quot;\n\n{0}\n\n&quot;, friend.SayHello(&quot;Good morning!&quot;).Result);
-</code></pre><p>There&#39;s other code in the method, too, but that is unrelated to the client logic, it&#39;s hosting the Orleans silo.</p>
+</code></pre><p>The class inherits from the base class <code>Grain</code>, and implements the communication interface defined earlier.
+Since there is nothing that the grain needs to wait on, the method is not declared <code>async</code> and instead returns its value using <code>Task.FromResult()</code>.</p>
+<p> The client, which orchestrates the grain code and is found in OrleansClient project, looks like this:</p>
+<pre><code class="lang-csharp">//configure the client with proper cluster options, logging and clustering
+ client = new ClientBuilder()
+   .UseLocalhostClustering()
+   .Configure&lt;ClusterOptions&gt;(options =&gt;
+   {
+       options.ClusterId = &quot;dev&quot;;
+       options.ServiceId = &quot;HelloWorldApp&quot;;
+   })
+   .ConfigureLogging(logging =&gt; logging.AddConsole())
+   .Build();
+
+//connect the client to the cluster, in this case, which only contains one silo
+await client.Connect();
+...
+// example of calling grains from the initialized client
+var friend = client.GetGrain&lt;IHello&gt;(0);
+var response = await friend.SayHello(&quot;Good morning, my friend!&quot;);
+Console.WriteLine(&quot;\n\n{0}\n\n&quot;, response);
+</code></pre><p>The silo host, which configures and starts the silo, in SiloHost project looks like this:</p>
+<pre><code class="lang-csharp"> //define the cluster configuration
+var builder = new SiloHostBuilder()
+//configure the cluster with local host clustering
+    .UseLocalhostClustering()
+    .Configure&lt;ClusterOptions&gt;(options =&gt;
+    {
+        options.ClusterId = &quot;dev&quot;;
+        options.ServiceId = &quot;HelloWorldApp&quot;;
+    })
+    .Configure&lt;EndpointOptions&gt;(options =&gt; options.AdvertisedIPAddress = IPAddress.Loopback)
+    .ConfigureLogging(logging =&gt; logging.AddConsole());
+//build the silo
+var host = builder.Build();
+//start the silo
+await host.StartAsync();
+</code></pre><p>To run the sample, start the silo program first, wait until silo successfully starts, which is normally just a couple seconds, and start the client program.
+The client prograin will connect with the silo, then calling IHello grain.
+You should see the greeting IHello grain send back printed on the console.</p>
 </t></article>
           </div>
           

@@ -104,10 +104,19 @@ public interface IVersionUpgradeTestGrain : IGrainWithIntegerKey {}
 </ul>
 <p>By default:</p>
 <ul>
-<li>All versioned grains are supposed to be backward-compatible only (see <a href="Backward-compatibility-guidelines.html">backward compatibility guidelines</a> and <a href="Compatible-grains.html">compatible grains</a>). That means that a v1 grain can make calls to a v2 grain, but a v2 grain cannot call a v1. This default behavior can be changed with <code>GlobalConfiguration.DefaultCompatibilityStrategy</code></li>
-<li>When multiple versions exist in the cluster, the new activation will be randomly placed on a compatible silo. This default behavior can be changed with <code>GlobalConfiguration.DefaultVersionSelectorStrategy</code></li>
+<li>All versioned grains are supposed to be backward-compatible only (see <a href="Backward-compatibility-guidelines.html">backward compatibility guidelines</a> and <a href="Compatible-grains.html">compatible grains</a>). That means that a v1 grain can make calls to a v2 grain, but a v2 grain cannot call a v1. </li>
+<li>When multiple versions exist in the cluster, the new activation will be randomly placed on a compatible silo. </li>
 </ul>
-</article>
+<p>You can change this default behavior via the option <code>GrainVersioningOptions</code>:</p>
+<pre><code class="lang-csharp">var silo = new SiloHostBuilder()
+  [...]
+  .Configure&lt;GrainVersioningOptions&gt;(options =&gt; 
+  {
+    options.DefaultCompatibilityStrategy = nameof(BackwardCompatible);
+    options.DefaultVersionSelectorStrategy = nameof(MinimumVersion);
+  })
+  [...]
+</code></pre></article>
           </div>
           
           <div class="hidden-sm col-md-2" role="complementary">

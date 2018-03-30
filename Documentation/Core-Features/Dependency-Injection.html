@@ -75,49 +75,37 @@
             <article class="content wrap" id="_content" data-uid="">
 <h1 id="what-is-dependency-injection">What is Dependency Injection</h1>
 
-<p>Dependency injection (DI) is a software design pattern that implements inversion of control for resolving dependencies.</p>
-<p>Orleans is using the abstraction written by the developers of <a href="https://docs.asp.net">ASP.NET Core</a>. For a detailed explanation about how it works, check out the <a href="https://docs.asp.net/en/latest/fundamentals/dependency-injection.html#dependency-injection">official documentation</a>.</p>
+<p>Dependency injection (DI) is a technique for achieving loose coupling between objects and their collaborators, or dependencies.
+Rather than directly instantiating collaborators, or using static references, the objects a class needs in order to perform its actions are provided to the class in some fashion. Most often, classes will declare their dependencies via their constructor, allowing them to follow the <a href="http://deviq.com/explicit-dependencies-principle/">Explicit Dependencies Principle</a>. This approach is known as &quot;constructor injection&quot;.</p>
 <h1 id="di-in-orleans">DI in Orleans</h1>
-<p>Dependency Injection is currently supported only on the server side within Orleans.</p>
-<p>Orleans makes it possible to inject dependencies into application <a href="../Getting-Started-With-Orleans/Grains.html">Grains</a>.</p>
-<p>However Orleans supports every container dependent injection mechanisms, one of the most commonly used method is constructor injection.</p>
-<p>Theoretically any type can be injected which was previously registered in a <a href="https://docs.asp.net/projects/api/en/latest/autoapi/Microsoft/Extensions/DependencyInjection/IServiceCollection/index.html"><code>IServiceCollection</code></a> during Silo startup.
-<em>Note</em>*:
-As Orleans is evolving, as of the current plans it will be possible to leverage dependency injection in other application classes as well, like <a href="../Orleans-Streams/Stream-Providers.html"><code>StreamProviders</code></a>. </p>
+<p>Dependency Injection is currently supported on both silo side and client side. </p>
+<p>By integrating Orleans with dependency injection, now it is possible to inject dependencies into application <a href="../Getting-Started-With-Orleans/Grains.html">Grains</a>, providers, and other extension points of orleans. </p>
+<p>Orleans uses the DI abstraction created for <a href="https://docs.asp.net">ASP.NET Core</a>.
+For a detailed explanation about how it works, check out the <a href="https://docs.microsoft.com/en-us/aspnet/core/fundamentals/dependency-injection">official documentation</a>.</p>
 <h1 id="configuring-di">Configuring DI</h1>
-<p>The DI configuration is a global configuration value and must be configured there.</p>
-<p>Orleans is using a similar approach as ASP.NET Core to configure DI. You must have a <code>Startup</code> class within your application which must contain a <code>ConfigureServices</code> method. It must return an object instance of type: <code>IServiceProvider</code>.</p>
-<p>Configuration is done by specifying the type of your <code>Startup</code> class via one of the methods described below.</p>
-<p><strong>Note</strong>:
-Previously DI configuration was specified at the cluster node level, this was changed in the recent release. </p>
-<h2 id="configuring-from-code">Configuring from Code</h2>
-<p>It is possible to tell Orleans what <code>Startup</code> type you like to use with code based configuration. There is an extension method named <code>UseStartup</code> on the <code>ClusterConfiguration</code> class which you can use to do that.</p>
-<pre><code class="lang-csharp">var configuration = new ClusterConfiguration();
-
-configuration.UseStartupType&lt;MyApplication.Configuration.MyStartup&gt;();
-</code></pre><h2 id="configuring-via-xml">Configuring via XML</h2>
-<p>To register your <code>Startup</code> class with Orleans you add a <code>Startup</code> element to the <code>Defaults</code> section and in the <code>Type</code> attribute you specify the assembly-qualified name for the type.</p>
-<pre><code class="lang-XML">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot; ?&gt;
-&lt;tns:OrleansConfiguration xmlns:tns=&quot;urn:orleans&quot;&gt;
-  &lt;tns:Defaults&gt;
-    &lt;tns:Startup Type=&quot;MyApplication.Configuration.Startup,MyApplication&quot; /&gt;
-  &lt;/tns:Defaults&gt;
-&lt;/tns:OrleansConfiguration&gt;
-</code></pre><h1 id="example">Example</h1>
-<p>Here is a complete <code>Startup</code> class example:</p>
-<pre><code class="lang-csharp">namespace MyApplication.Configuration
+<p>DI for silos and client is confiugre through <code>SiloHostBuilder</code> and <code>ClientBuilder</code> respectively.
+For example, to configure DI on the silo side with a <code>IInjectedService</code> singleton, whose declaration and implementation as below, </p>
+<pre><code class="lang-csharp">public interface IInjectedService
 {
-    public class MyStartup
-    {
-        public IServiceProvider ConfigureServices(IServiceCollection services)
-        {
-            services.AddSingleton&lt;IInjectedService, InjectedService&gt;();
+    Task&lt;long&gt; GetTicks();
+}
 
-            return services.BuildServiceProvider();
-        }
+public class InjectedService : IInjectedService
+{
+    public Task&lt;long&gt; GetTicks()
+    {
+        return Task.FromResult(DateTime.UtcNow.Ticks);
     }
 }
-</code></pre><p>This example shows how a <a href="../Getting-Started-With-Orleans/Grains.html"><code>Grain</code></a> can utilize <code>IInjectedService</code> via constructor injection and also the complete declaration and implementation of the injected service:</p>
+</code></pre><p>you register it through <code>SiloHostBuilder</code>:</p>
+<pre><code class="lang-csharp">var siloBuilder = new SiloHostBuilder();
+//configure silo DI with a IInjectedService using a Action&lt;IServiceCollection&gt; delegate.
+siloBuilder.ConfigureServices(svc=&gt;svc.AddSingleton&lt;IInjectedService,InjectedService&gt;());
+</code></pre><p>On the client side, you do the same via <code>ClientBuilder</code>:</p>
+<pre><code class="lang-csharp">var clientBuilder = new SiloHostBuilder();
+//configure silo DI with a IInjectedService using a Action&lt;IServiceCollection&gt; delegate.
+clientBuilder.ConfigureServices(svc=&gt;svc.AddSingleton&lt;IInjectedService,InjectedService&gt;());
+</code></pre><p>This example shows how a <a href="../Getting-Started-With-Orleans/Grains.html"><code>Grain</code></a> can inject <code>IInjectedService</code> via constructor injection:</p>
 <pre><code class="lang-csharp">public interface ISimpleDIGrain : IGrainWithIntegerKey
 {
     Task&lt;long&gt; GetTicksFromService();
@@ -137,53 +125,67 @@ public class SimpleDIGrain : Grain, ISimpleDIGrain
         return injectedService.GetTicks();
     }
 }
-
-public interface IInjectedService
-{
-    Task&lt;long&gt; GetTicks();
-}
-
-public class InjectedService : IInjectedService
-{
-    public Task&lt;long&gt; GetTicks()
-    {
-        return Task.FromResult(DateTime.UtcNow.Ticks);
-    }
-}
 </code></pre><h1 id="test-framework-integration">Test Framework Integration</h1>
-<p>DI truly shines when coupled with a testing framework to verify the correctness of the code that build. You can read about the components for testing in Orleans by following our <a href="../../1.5/Tutorials/Unit-Testing-Grains.html">tutorials</a>.</p>
-<p>You will need to do two things to set up DI with tests. First you will need to implement mocks of your services. This is done in our example using <a href="https://github.com/moq/">Moq</a>, a popular mocking framework for .NET. Here is an example of mocking a service.</p>
+<p>DI truly shines when coupled with a testing framework.
+You can read about the components for testing in Orleans by following our <a href="../../1.5/Tutorials/Unit-Testing-Grains.html">tutorials</a>.</p>
+<p>One popular use of DI is to mock services.
+In order to set up mocked service with your test cluster, you need to do two things.
+First, you need to implement mocks of your services.
+This is done in our example using <a href="https://github.com/moq/">Moq</a>, a popular mocking framework for .NET.
+Here is an example of mocking a service and inject the mocked service into DI.</p>
 <pre><code class="lang-csharp">public class MockServices
 {
-    public IServiceProvider ConfigureServices(IServiceCollection services)
+    public static void ConfigureMockServices(IServiceCollection services)
     {
         var mockInjectedService = new Mock&lt;IInjectedService&gt;();
 
         mockInjectedService.Setup(t =&gt; t.GetTicks()).Returns(knownDateTime);
         services.AddSingleton&lt;IInjectedService&gt;(mockInjectedService.Object);
-        return services.BuildServiceProvider();
     }
 }
-</code></pre><p>To include these services in your test silo, you will need to specify MockServices as the silo startup class. Here is an example of doing this.</p>
+</code></pre><p>Now, to include these services in your test cluster, you need to configure mocked services with <code>TestClusterBuilder</code>.
+Here is an example of how to configure DI with mocked services on both silo and client side.</p>
 <pre><code class="lang-csharp">[TestClass]
-public class IInjectedServiceTests: TestingSiloHost
+public class IInjectedServiceTests
 {
-    private static TestingSiloHost host;
+    private readonly TestCluster hostedCluster;
 
     [TestInitialize]
     public void Setup()
     {
-        if (host == null)
+        if (testCluster == null)
         {
-            host = new TestingSiloHost(
-                new TestingSiloOptions
-                {
-                    StartSecondary = false,
-                    AdjustConfig = clusterConfig =&gt;
-                    {
-                        clusterConfig.UseStartupType&lt;MockServices&gt;();
-                    }
-                });
+             var builder = new TestClusterBuilder();
+             //use ISiloBuilderConfigurator to configure ISiloHostBuilder, and add the configurator to TestClusterBuilder, 
+             //so the configuration will be applied to silos when test cluster build ISiloHostBuilder and starts the silos.
+             builder.AddSiloBuilderConfigurator&lt;MySiloBuilderConfigurator&gt;();
+             //use IClientBuilderConfigurator to configure IClientBuilder, and add the configurator to TestClusterBuilder,
+             //so the configuration would be applied when test clusetr builder IClientBuilder start the client.
+             builder.AddClientBuilderConfigurator&lt;MyClientBuilderConfigurator&gt;();
+
+            //builde the test cluster
+            var testCluster = builder.Build();
+            //deploy test cluster
+            testCluster.Deploy();
+            this.hostedCluster = testCluster;
+        }
+    }
+
+    private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+    {
+        public void Configure(ISiloHostBuilder hostBuilder)
+        {
+            //configure silo side DI with mock services
+            hostBuilder.ConfigureServices(MockServices.ConfigureMockServices);
+        }
+    }
+
+    private class MyClientBuilderConfigurator : IClientBuilderConfigurator
+    {
+        public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+        {
+            //configure client side DI with mock services
+            clientBuilder.ConfigureServices(MockServices.ConfigureMockServices);
         }
     }
 }

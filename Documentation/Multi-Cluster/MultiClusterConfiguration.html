@@ -96,13 +96,21 @@
 <p>Multi-cluster configurations can be injected on any node in any cluster, using the Orleans Management Grain.
 For example, to inject a multi-cluster configuration that consists of the three clusters { us1, eu1, us2 }, we can pass a string enumerable to the management grain:</p>
 <pre><code class="lang-csharp">   var clusterlist = &quot;us1,eu1,us2&quot;.Split(&#39;,&#39;);
-   var mgtGrain = GrainClient.GrainFactory.GetGrain&lt;IManagementGrain&gt;(0);   
+   var mgtGrain = client.GetGrain&lt;IManagementGrain&gt;(0); 
    mgtGrain.InjectMultiClusterConfiguration(clusterlist, &quot;my comment here&quot;));
 </code></pre><p>The first argument to <code>InjectMultiClusterConfiguration</code> is an enumerable of cluster ids, which is going to define the new multi-cluster configuration. The second argument is an (optional) comment string that can be used to tag configurations with arbitrary information, such as who injected them why. </p>
 <p>There is an optional third argument, a boolean called <code>checkForLaggingSilosFirst</code>, which defaults to true. It means that the system performs a best-effort check to see if there are any silos anywhere that have not caught up to the current configuration yet, and rejects the change if it finds such a silo. This helps to detect violations of the restriction that only one configuration change should be pending at a time (though it cannot guarantee it under all circumstances).</p>
 <h4 id="via-default-configuration">Via Default Configuration</h4>
 <p>In situations where the multi-cluster configuration is known in advance and the deployment is fresh every time (e.g.  for testing), we may want to supply a default configuration. The global configuration supports an optional attribute <code>DefaultMultiCluster</code> which takes a comma-separated list of cluster ids:</p>
-<pre><code class="lang-html">   &lt;MultiClusterNetwork ... DefaultMulticluster=&quot;us1,eu1,us2&quot; ...&gt;
+<pre><code class="lang-csharp">var silo = new SiloHostBuilder()
+  [...]
+  .Configure&lt;MultiClusterOptions&gt;(options =&gt; 
+  {
+    [...]
+    options.DefaultMultiCluster = new[] { &quot;us1&quot;, &quot;eu1&quot;, &quot;us2&quot; }; 
+    [...]
+  })
+  [...]
 </code></pre><p>After a silo is started with this setting, it checks to see if the current multi-cluster configuration is null, and if so, injects the given configuration with the current UTC timestamp. </p>
 <p>WARNING. Persistent multi-cluster gossip channels (e.g. based on AzureTable) retain the last injected configuration unless they are deleted explicitly. In that case, specifying a DefaultMulticluster has no effect when re-deploying a cluster because the configuration stored in the gossip channels is not null.&gt;</p>
 <h4 id="via-gossip-channel">Via Gossip Channel</h4>
@@ -120,7 +128,7 @@ For example, to inject a multi-cluster configuration that consists of the three 
 <tr>
 <td>PartitionKey</td>
 <td>String</td>
-<td>the ServiceId GUID</td>
+<td>the ServiceId</td>
 </tr>
 <tr>
 <td>RowKey</td>

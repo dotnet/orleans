@@ -109,12 +109,16 @@
 </ul>
 <h4 id="azure-table-based-gossip-channel">Azure-Table-Based Gossip Channel</h4>
 <p>We have already implemented a gossip channel based on Azure Tables. The configuration specifies standard connection strings used for Azure accounts. For example, a configuration could specify two gossip channels with separate Azure storage accounts <code>usa</code> and <code>europe</code> as follows:</p>
-<pre><code class="lang-html">&lt;MultiClusterNetwork ClusterId=&quot;...&quot;&gt;
- &lt;GossipChannel  Type=&quot;AzureTable&quot; 
-  ConnectionString=&quot;DefaultEndpointsProtocol=https;AccountName=usa;AccountKey=...&quot;/&gt;      
- &lt;GossipChannel  Type=&quot;AzureTable&quot; 
-  ConnectionString=&quot;DefaultEndpointsProtocol=https;AccountName=europe;AccountKey=...&quot;/&gt;  
-&lt;/MultiClusterNetwork&gt;    
+<pre><code class="lang-csharp">var silo = new SiloHostBuilder()
+  [...]
+  .Configure&lt;MultiClusterOptions&gt;(options =&gt; 
+  {
+    [...]
+    options.GossipChannels.Add(&quot;AzureTable&quot;, &quot;DefaultEndpointsProtocol=https;AccountName=usa;AccountKey=...&quot;);
+    options.GossipChannels.Add(&quot;AzureTable&quot;, &quot;DefaultEndpointsProtocol=https;AccountName=europe;AccountKey=...&quot;)
+    [...]
+  })
+  [...]
 </code></pre><p>Multiple different services can use the same gossip channel without interference, as long as the ServiceId guid specified by their respective configuration is distinct.</p>
 <h4 id="other-gossip-channel-implementations">Other Gossip Channel Implementations</h4>
 <p>We are working on other gossip channel providers, similar to how membership and reminders are packaged for many different storage back-ends.  </p>
