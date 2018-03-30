@@ -8,6 +8,8 @@
   href: Server-Configuration.md
 - name: Typical Configurations
   href: Typical-Configurations.md
+- name: Options Classes
+  href: Options-List.md
 - name: Configuring .NET Garbage Collection
   href: Configuring-.NET-Garbage-Collection.md
 - name: Configuring ADO.NET Providers
