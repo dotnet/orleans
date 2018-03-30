@@ -1,3 +1,6 @@
+
+[!include[](../../warning-banner.md)]
+
 # Grain versioning
 
 > [!WARNING]

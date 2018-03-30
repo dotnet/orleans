@@ -3,6 +3,8 @@ layout: page
 title: Heterogeneous silos
 ---
 
+[!include[](../../warning-banner.md)]
+
 # Heterogeneous silos
 
 ## Overview

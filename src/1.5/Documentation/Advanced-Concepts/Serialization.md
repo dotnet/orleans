@@ -3,6 +3,8 @@ layout: page
 title: Serialization and Writing Custom Serializers
 ---
 
+[!include[](../../warning-banner.md)]
+
 # Serialization and Writing Custom Serializers
 
 Orleans has an advanced and extensible serialization framework. Orleans serializes data types passed in grain request and response messages as well as grain persistent state objects. As part of this framework, Orleans automatically generates serialization code for those data types. In addition to generating a more efficient serialization/deserialization for types that are already .NET-serializable, Orleans also tries to generate serializers for types used in grain interfaces that are not .NET-serializable. The framework also includes a set of efficient built-in serializers for frequently used types: lists, dictionaries, strings, primitives, arrays, etc.

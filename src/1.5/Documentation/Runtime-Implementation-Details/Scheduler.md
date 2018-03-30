@@ -3,6 +3,8 @@ layout: page
 title: Scheduler
 ---
 
+[!include[](../../warning-banner.md)]
+
 # Scheduler
 
 Orleans Scheduler is a component within the Orleans runtime responsible for executing application code and parts of the runtime code to ensure the **single threaded execution semantics**. It implements a custom TPL Task scheduler.

@@ -3,6 +3,8 @@ layout: page
 title: Dependency Injection
 ---
 
+[!include[](../../warning-banner.md)]
+
 # What is Dependency Injection
 
 Dependency injection (DI) is a software design pattern that implements inversion of control for resolving dependencies.

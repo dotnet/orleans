@@ -3,6 +3,8 @@ layout: page
 title: Orleans Streams
 ---
 
+[!include[](../../warning-banner.md)]
+
 # Orleans Streams
 
 Orleans v.1.0.0 added support for streaming extensions to the programing model. Streaming extensions provide a set of abstractions and APIs that make thinking about and working with streams simpler and more robust. Streaming extensions allow developers to write reactive applications that operate on a sequence of events in a structured way. The extensibility model of stream providers makes the programming model compatible with and portable across a wide range of existing queuing technologies, such as [Event Hubs](http://azure.microsoft.com/en-us/services/event-hubs/), [ServiceBus](http://azure.microsoft.com/en-us/services/service-bus/), [Azure Queues](http://azure.microsoft.com/en-us/documentation/articles/storage-dotnet-how-to-use-queues/), and [Apache Kafka](http://kafka.apache.org/). There is no need to write special code or run dedicated processes to interact with such queues.

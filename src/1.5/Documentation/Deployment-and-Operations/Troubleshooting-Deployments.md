@@ -3,6 +3,8 @@ layout: page
 title: Troubleshooting Deployments
 ---
 
+[!include[](../../warning-banner.md)]
+
 # Troubleshooting Deployments
 
 This page gives some general guidelines for troubleshooting any issues that occur while deploying to Azure Cloud Services.

@@ -3,6 +3,8 @@ layout: page
 title: Getting Started using Azure Web Apps
 ---
 
+[!include[](../../warning-banner.md)]
+
 # Getting Started using Azure Web Apps
 
 If you would like to connect to an Azure Silo from an [Azure Web App](http://azure.microsoft.com/en-gb/services/app-service/web/) rather than a Web Role hosted within the same cloud service you can.

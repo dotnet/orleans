@@ -3,6 +3,8 @@ layout: page
 title: Azure Web Sample
 ---
 
+[!include[](../../warning-banner.md)]
+
 # Azure Web Sample
 
 **Important note**: Worker and web role instances are not automatically removed or disabled, even when they go unused for a long time. To avoid a nasty surprise when your Azure bill comes, make sure to delete the instances after you have finished testing the application!

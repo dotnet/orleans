@@ -3,6 +3,8 @@ layout: page
 title: Included Log-Consistency Providers
 ---
 
+[!include[](../../warning-banner.md)]
+
 # Built-In Log-Consistency Providers
 
 The `Microsoft.Orleans.EventSourcing` package includes several log-consistency providers that cover basic scenarios suitable to get started, and allow some extensibility.

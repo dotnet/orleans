@@ -3,6 +3,8 @@ layout: page
 title: Orleans Streams Programming APIs
 ---
 
+[!include[](../../warning-banner.md)]
+
 # Orleans Streams Programming APIs
 
 Applications interact with streams via APIs that are very similar to the well known [Reactive Extensions (Rx) in .NET](https://msdn.microsoft.com/en-us/data/gg577609.aspx). The main difference is that Orleans stream extensions are **asynchronous**, to make processing more efficient in Orleans' distributed and scalable compute fabric.

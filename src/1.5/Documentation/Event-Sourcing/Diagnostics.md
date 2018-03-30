@@ -3,6 +3,8 @@ layout: page
 title: JournaledGrain Diagnostics
 ---
 
+[!include[](../../warning-banner.md)]
+
 # JournaledGrain Diagnostics
 
 

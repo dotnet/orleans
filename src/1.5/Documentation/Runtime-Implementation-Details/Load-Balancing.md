@@ -3,6 +3,8 @@ layout: page
 title: Load Balancing
 ---
 
+[!include[](../../warning-banner.md)]
+
 # Load Balancing
 
 **Load balancing, in a broad sense, is one of the pillars of the Orleans runtime**. Orleans runtime tries to make everything balanced, since balancing allows to maximize resource usage and avoid hotspots, which leads to better performance, as well as helps with elasticity. Load balancing in Orleans applies in multiple places. Below is a non-exhaustive list of places where the runtime performs balancing:

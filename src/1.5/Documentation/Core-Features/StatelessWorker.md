@@ -3,6 +3,8 @@ layout: page
 title: Stateless Worker Grains
 ---
 
+[!include[](../../warning-banner.md)]
+
 # Stateless Worker Grains
 
 By default, the Orleans runtime creates no more than one activation of a grain within the cluster.

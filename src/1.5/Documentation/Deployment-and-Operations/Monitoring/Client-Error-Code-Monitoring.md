@@ -3,6 +3,8 @@ layout: page
 title: Client Error Code Monitoring
 ---
 
+[!include[](../../../warning-banner.md)]
+
 # Client Error Code Monitoring
 
 Group  | Log Type  | Log Code Values  | Threshold  | Description

@@ -3,6 +3,8 @@ layout: page
 title: Timers and Reminders
 ---
 
+[!include[](../../warning-banner.md)]
+
 # Timers and Reminders
 
 The Orleans runtime provides two mechanisms, called timers and reminders, that enable the developer to specify periodic behavior for grains.

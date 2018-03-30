@@ -3,6 +3,8 @@ layout: page
 title: Orleans Streams Extensibility
 ---
 
+[!include[](../../warning-banner.md)]
+
 # Orleans Streams Extensibility
 
 There are three ways developers can extend the currently implemented behaviour of Orleans Streaming:

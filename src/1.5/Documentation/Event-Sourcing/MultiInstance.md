@@ -3,6 +3,8 @@ layout: page
 title: Replicated Grains
 ---
 
+[!include[](../../warning-banner.md)]
+
 ## Replicated Grains
 
 Sometimes, there can be multiple instances of the same grain active, such as when operating a multi-cluster, and using the `[OneInstancePerCluster]` attribute. The JournaledGrain is designed to support replicated instances with minimal friction. It relies on *log-consistency providers* to run the necessary protocols to ensure all instances agree on the same sequence of events. In particular, it takes care of the following aspects: 

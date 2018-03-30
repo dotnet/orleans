@@ -3,6 +3,8 @@ layout: page
 title: SQL Tables
 ---
 
+[!include[](../../../warning-banner.md)]
+
 # SQL System Storage
 
 Any reliable production-style Orleans deployment requires using persistent storage to keep system state, specifically Orleans cluster status and the data used for the reminders functionality. In addition to out of the box support for Azure storage Orleans also provides an option to store this information in SQL server.

@@ -3,6 +3,8 @@ layout: page
 title: Developing a Client
 ---
 
+[!include[](../../warning-banner.md)]
+
 ### What Is Grain Client?
 
 The term "Client" or sometimes "Grain Client" is used for application code that interacts with grains but itself is not part of a grain logic.

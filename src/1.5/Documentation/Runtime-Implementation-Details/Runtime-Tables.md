@@ -3,6 +3,8 @@ layout: page
 title: Azure Runtime Tables
 ---
 
+[!include[](../../warning-banner.md)]
+
 # Azure Runtime Tables
 
 Orleans maintains a number of internal tables for different runtime mechanisms. Here we list all the tables as they are organized if Azure is used as the system store, and provide more details on their internal structure.

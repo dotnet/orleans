@@ -3,6 +3,8 @@ layout: page
 title: Orleans Streams Implementation Details
 ---
 
+[!include[](../../warning-banner.md)]
+
 # Orleans Streams Implementation Details
 
 This section provides a high level overview of Orleans Stream implementation. It describes concepts and details that are not visible on the application level. If you only plan to use streams, you do not have to read this section. However, if you plan to extend streams, please read this section before reading [Streams Extensibility section](Streams-Extensibility.md).

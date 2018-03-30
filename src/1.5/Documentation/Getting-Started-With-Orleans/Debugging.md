@@ -3,6 +3,8 @@ layout: page
 title: Debugging and Symbols
 ---
 
+[!include[](../../warning-banner.md)]
+
 ### Debugging
 
 An Orleans-based application can be easily debugged during development by attaching a debugger to the [silo host process](Running-the-Application.md#configuring-and-starting-a-silo) or to the [client process](Running-the-Application.md#configuring-and-connecting-a-client).

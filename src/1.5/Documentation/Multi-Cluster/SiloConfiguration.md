@@ -3,6 +3,8 @@ layout: page
 title: Multi-Cluster Silo Configuration
 ---
 
+[!include[](../../warning-banner.md)]
+
 ## Orleans Silo Configuration
 
 To get a quick overview, we show all relevant configuration parameters (including optional ones) in XML syntax below:
