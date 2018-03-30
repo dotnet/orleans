@@ -22,7 +22,7 @@ Stated another way, by extending `Grain<T>` a grain type is automatically opted-
 
 For the remainder of this section, we will only be considering Option #2 / `Grain<T>` because Option #1 grains will continue to run as now without any behavior changes.
 
-## Grain State Stores
+## Grain State Storage
 
 Grain classes that inherit from `Grain<T>` (where `T` is an application-specific state data type that needs to be persisted) will have their state loaded automatically from a specified storage.
 
@@ -40,30 +40,34 @@ The Orleans framework provides a mechanism to specify & register different stora
 
 ``` csharp
 var silo = new SiloHostBuilder()
-          .AddMemoryGrainStorage("DevStore")
-          .AddAzureTableGrainStorage("store1", options => options.ConnectionString = "DefaultEndpointsProtocol=https;AccountName=data1;AccountKey=SOMETHING1")
-          .AddAzureBlobGrainStorage("store2", options => options.ConnectionString = "DefaultEndpointsProtocol=https;AccountName=data2;AccountKey=SOMETHING2")
-          .Builde();
+    .AddMemoryGrainStorage("DevStore")
+    .AddAzureTableGrainStorage("store1", options => options.ConnectionString = "DefaultEndpointsProtocol=https;AccountName=data1;AccountKey=SOMETHING1")
+    .AddAzureBlobGrainStorage("store2", options => options.ConnectionString = "DefaultEndpointsProtocol=https;AccountName=data2;AccountKey=SOMETHING2")
+    .Build();
 ```
 
-## Configuring IGrainStorage
-Orleans nativaly support a range of IGrainStorage implementation, which you can use for your application to store grain state. In this section, we will go over how to configure AzureTableGrainStorage, AzureBlobGrainStorage, DynamoDBGrainStorage, MemoryGrainStorage and AdoNetGrainStorage with your cluster. Documentation on how to configure remaining IGrainStorage implementations will come later. )
+## Configuring IGrainStorage Providers
+Orleans natively supports a range of IGrainStorage implementations, which you can use for your application to store grain state.
+In this section, we will go over how to configure `AzureTableGrainStorage`, `AzureBlobGrainStorage`, `DynamoDBGrainStorage`, `MemoryGrainStorage`, and `AdoNetGrainStorage` in a silo.
+Configuration of other `IGrainStorage` providers is similar.
 
-### AzureTableGrainStorage
+### AzureTableGrainStorage Provider
 
 ``` csharp
 var silo = new SiloHostBuilder()
-          .AddAzureTableGrainStorage("TableStore", options => options.ConnectionString = "UseDevelopmentStorage=true")
+    .AddAzureTableGrainStorage("TableStore", options => options.ConnectionString = "UseDevelopmentStorage=true")
+    ...
+    .Build();
 ```
 
-The following settings are available to configure AzureTableGrainStorage, through `AzureTableGrainStorageOptions`:
+The following settings are available for configuring `AzureTableGrainStorage` providers, through `AzureTableGrainStorageOptions`:
 
 ``` csharp
     /// <summary>
     /// Configuration for AzureTableGrainStorage
     /// </summary>
-    public class AzureTableStorageOptions
-    {
+public class AzureTableStorageOptions
+{
         /// <summary>
         /// Azure table connection string
         /// </summary>
@@ -93,23 +97,25 @@ The following settings are available to configure AzureTableGrainStorage, throug
         public bool IndentJson { get; set; }
         public TypeNameHandling? TypeNameHandling { get; set; }
         #endregion json serialization
-    }
+}
 ```
 
-> __Note:__ state should not exceed 64KB, a limit imposed by Table Storage.
+> __Note:__ State size should not exceed 64KB, a limit imposed by Azure Table Storage.
 
-### AzureBlobGrainStorage
+### AzureBlobGrainStorage Provider
 
 ``` csharp
 var silo = new SiloHostBuilder()
-          .AddAzureBlobGrainStorage("BlobStore", options => options.ConnectionString = "UseDevelopmentStorage=true")
+    .AddAzureBlobGrainStorage("BlobStore", options => options.ConnectionString = "UseDevelopmentStorage=true")
+    ...
+    .Build();
 ```
 
-The following settings are available to configure AzureBlobGrainStorage, through `AzureBlobStorageOptions`:
+The following settings are available for configuring `AzureBlobGrainStorage` providers, through `AzureBlobStorageOptions`:
 
 ``` csharp
-  public class AzureBlobStorageOptions
-    {
+public class AzureBlobStorageOptions
+{
         /// <summary>
         /// Azure connection string
         /// </summary>
@@ -134,26 +140,28 @@ The following settings are available to configure AzureBlobGrainStorage, through
         public bool IndentJson { get; set; }
         public TypeNameHandling? TypeNameHandling { get; set; }
         #endregion json serialization
-    }
+}
 ```
 
-### DynamoDBGrainStorage
+### DynamoDBGrainStorage Provider
 
 ``` csharp
 var silo = new SiloHostBuilder()
-          .AddDynamoDBGrainStorage("DDBStore", options =>
-          {
-              options.AccessKey = "MY_ACCESS_KEY";
-              options.SecretKey = "MY_SECRET_KEY";
-              options.Service = "us-wes-1";
-          })
+    .AddDynamoDBGrainStorage("DDBStore", options =>
+    {
+        options.AccessKey = "MY_ACCESS_KEY";
+        options.SecretKey = "MY_SECRET_KEY";
+        options.Service = "us-wes-1";
+    })
+    ...
+    .Build();
 ```
 
-The following settings are available to configure DynamoDBGrainStorage, through `DynamoDBStorageOptions`:
+The following settings are available for configuring `DynamoDBGrainStorage` providers, through `DynamoDBStorageOptions`:
 
 ``` csharp
-  public class DynamoDBStorageOptions
-    {
+public class DynamoDBStorageOptions
+{
         /// <summary>
         /// Gets or sets a unique identifier for this service, which should survive deployment and redeployment.
         /// </summary>
@@ -212,9 +220,9 @@ The following settings are available to configure DynamoDBGrainStorage, through 
     }
 ```
 
-### ADO.NET Grain Storage
+### ADO.NET Grain Storage Provider
 
-The ADO .NET Grain Storage allows you to store grain state in relational databases.
+The ADO .NET Grain Storage provider allows you to store grain state in relational databases.
 Currently following databases are supported:
 
 - SQL Server
@@ -227,8 +235,8 @@ First, install the base package:
 ```
 Install-Package Microsoft.Orleans.Persistence.AdoNet
 ```
-After you install or do a nuget restore on the AdoNet persistence nuget for your project, you will
-find different SQL scripts for the supported database vendors, which are copied to project directory \OrleansAdoNetContent where each supported ADO.NET extensions has its own directory.You can also get them from the [Orleans.Persistence.AdoNet repository](https://github.com/dotnet/orleans/tree/master/src/AdoNet/Orleans.Persistence.AdoNet).
+After you restore on the nuget package for your project, you will
+find different SQL scripts for the supported database vendors, which are copied to project directory \OrleansAdoNetContent where each of supported ADO.NET extensions has its own directory.You can also get them from the [Orleans.Persistence.AdoNet repository](https://github.com/dotnet/orleans/tree/master/src/AdoNet/Orleans.Persistence.AdoNet).
 Create a database, and then run the appropriate script to create the tables.
 
 The next steps are to install a second NuGet package (see table below) specific to the
@@ -242,16 +250,16 @@ via XML configuration.
 | PostgreSQL      | [PostgreSQL-Persistence.sql](https://github.com/dotnet/orleans/blob/master/src/AdoNet/Orleans.Persistence.AdoNet/PostgreSQL-Persistence.sql) | [Npgsql](https://www.nuget.org/packages/Npgsql/)                               | Npgsql                   |                      |
 | Oracle          | [Oracle-Persistence.sql](https://github.com/dotnet/orleans/blob/master/src/AdoNet/Orleans.Persistence.AdoNet/Oracle-Persistence.sql)         | [ODP.net](https://www.nuget.org/packages/Oracle.ManagedDataAccess/)            | Oracle.DataAccess.Client | No .net Core support |
 
-The following is an example of how to configure an ADO .NET Storage Provider via `ISiloHostBuilder`:
+The following is an example of how to configure an ADO.NET storage provider via `ISiloHostBuilder`:
 
 ```csharp
 var siloHostBuilder = new SiloHostBuilder()
-                  .AddAdoNetGrainStorage("OrleansStorage", options=>
-                  {
-                      options.Invariant = "<Invariant>";
-                      options.ConnectionString = "<ConnectionString>";
-                      options.UseJsonFormat = true;
-                  });
+    .AddAdoNetGrainStorage("OrleansStorage", options=>
+    {
+        options.Invariant = "<Invariant>";
+        options.ConnectionString = "<ConnectionString>";
+        options.UseJsonFormat = true;
+    });
 ```
 
 Essentially, you only need to set the database-vendor-specific connection string and an
@@ -264,11 +272,11 @@ You can set the following properties via `AdoNetGrainStorageOptions`:
 
 ```csharp
 
-    /// <summary>
-    /// Options for AdonetGrainStorage
-    /// </summary>
-    public class AdoNetGrainStorageOptions
-    {
+/// <summary>
+/// Options for AdonetGrainStorage
+/// </summary>
+public class AdoNetGrainStorageOptions
+{
         /// <summary>
         /// Connection string for AdoNet storage.
         /// </summary>
@@ -308,35 +316,34 @@ You can set the following properties via `AdoNetGrainStorageOptions`:
         /// <remarks>If neither <see cref="UseJsonFormat"/> nor <see cref="UseXmlFormat"/> is set to true, then BinaryFormatSerializer will be configured to format storage string payload.</remarks>
         /// </summary>
         public bool UseXmlFormat { get; set; }
-    }
+}
 ```
 
-The ADO.NET persistence has functionality to version data and define arbitrary (de)serializers with arbitrary application rules and streaming, but currently
-there is no method to expose them to application code. More information in [ADO.NET Persistence Rationale](#ADONETPersistenceRationale).
+The ADO.NET persistence has functionality to version data and define arbitrary (de)serializers with arbitrary application rules and streaming, but currently there is no method to expose them to application code.
+More information in [ADO.NET Persistence Rationale](#ADONETPersistenceRationale).
 
 ### MemoryGrainStorage
 
-`MemoryGrainStorage` is a simple grain storage implementation which does not really use a persistent
-data store underneath. It is convenient to learn to work with Grain Storages
-quickly, but is not intended to be used in production scenarios.
+`MemoryGrainStorage` is a simple grain storage implementation which does not really use a persistent data store underneath.
+It is convenient to learn to work with Grain Storages quickly, but is not intended to be used in production scenarios.
 
 > __Note:__ This provider persists state to volatile memory which is erased at silo shut down. Use only for testing.
 
-To set up the memory storage provider via `ISiloHostBuilder`
+Here's how to set up a memory storage provider via `ISiloHostBuilder`
 
 ```csharp
 var siloHostBuilder = new SiloHostBuilder()
-            .AddMemoryGrainStorage("OrleansStorage", options=>options.NumStorageGrains = 10);
+    .AddMemoryGrainStorage("OrleansStorage", options=>options.NumStorageGrains = 10);
 ```
 
-You can set the following properties via `MemoryGrainStorageOptions`
+You can set the following configuration properties via `MemoryGrainStorageOptions`
 
 ```csharp
-    /// <summary>
-    /// Options for MemoryGrainStorage
-    /// </summary>
-    public class MemoryGrainStorageOptions
-    {
+/// <summary>
+/// Options for MemoryGrainStorage
+/// </summary>
+public class MemoryGrainStorageOptions
+{
         /// <summary>
         /// Default number of queue storage grains.
         /// </summary>
@@ -354,7 +361,7 @@ You can set the following properties via `MemoryGrainStorageOptions`
         /// Default init stage
         /// </summary>
         public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
-    }
+}
 ```
 
 ## Notes on Storage Providers
@@ -362,10 +369,8 @@ You can set the following properties via `MemoryGrainStorageOptions`
 If there is no `[StorageProvider]` attribute specified for a `Grain<T>` grain class, then a provider named `Default` will be searched for instead.
 If not found then this is treated as a missing storage provider.
 
-A grain that uses a storage provider which is not present and defined in silo configuration when the silo loads will fail to load, but the rest of the grains in that silo can still load and run.
-Any later calls to that grain type will fail with an `Orleans.Storage.BadProviderConfigException` error specifying that the grain type is not loaded.
-
-The storage provider instance to use for a given grain type is determined by the combination of the storage provider name defined in the `[StorageProvider]` attribute on that grain type, plus the provider type and configuration options for that provider defined when configuring silo With ISioHostBuilder.
+If a prorage provider referenced by a grain class is not added to silo at configuration time, grains of that type will fail to activate at run time, and calls to them will be failing an `Orleans.Storage.BadProviderConfigException` error specifying that the grain type is not loaded.
+But the rest of the grain types will not be affected.
 
 Different grain types can use different configured storage providers, even if both are the same type: for example, two different Azure table storage provider instances, connected to different Azure storage accounts (see config file example above).
 
@@ -373,9 +378,9 @@ All configuration details for storage providers is defined through ISiloHostBuil
 There are _no_ mechanisms provided at this time to dynamically update or change the list of storage providers used by a silo.
 However, this is a prioritization / workload constraint rather than a fundamental design constraint.
 
-## State Storage APIs
+## State Persitence API
 
-There are two main parts to the grain state / persistence APIs: Grain-to-Runtime and Runtime-to-Storage-Provider.
+There are two parts to the state persistence APIs: grain API and storage provider API.
 
 ## Grain State Storage API
 
