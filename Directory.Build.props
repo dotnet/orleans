@@ -105,7 +105,8 @@
 
   <!-- Versioning properties -->
   <PropertyGroup>
-    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">2.0.0</VersionPrefix>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">2.0.3</VersionPrefix>
   </PropertyGroup>
 
   <!-- For Debug builds generated a date/time dependent version suffix -->
