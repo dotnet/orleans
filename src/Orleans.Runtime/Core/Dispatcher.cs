@@ -329,7 +329,7 @@ namespace Orleans.Runtime
                    incoming.IsAlwaysInterleave
                 || targetActivation.Running == null
                 || (targetActivation.Running.IsReadOnly && incoming.IsReadOnly)
-                || (schedulingOptions.AllowCallChainReentrancy && targetActivation.ActivationId.Equals(incoming.SendingActivation))
+                || IsSelfCallChainAllowed(targetActivation, incoming)
                 || catalog.CanInterleave(targetActivation.ActivationId, incoming);
 
             return canInterleave;
@@ -350,10 +350,30 @@ namespace Orleans.Runtime
                 return;
             }
 
+            if (outgoing.Direction == Message.Directions.OneWay)
+            {
+                return;
+            }
+
             if (sendingActivation?.RunningRequestsSenders.Contains(outgoing.TargetActivation) == true)
             {
                 outgoing.IsAlwaysInterleave = true;
             }
+        }
+
+        private bool IsSelfCallChainAllowed(ActivationData targetActivation, Message incoming)
+        {
+            if (!schedulingOptions.AllowCallChainReentrancy)
+            {
+                return false;
+            }
+
+            if (incoming.Direction == Message.Directions.OneWay)
+            {
+                return false;
+            }
+
+            return targetActivation.ActivationId.Equals(incoming.SendingActivation);
         }
 
         /// <summary>

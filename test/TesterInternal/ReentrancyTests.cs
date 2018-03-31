@@ -127,6 +127,17 @@ namespace UnitTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        public async Task Callchain_Reentrancy_OneWayMessage_Disabled_2()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<INonReentrantGrain>(1);
+            await grain.SetSelf(grain);
+            var initialCounter = await grain.GetCounter();
+            var counter = await grain.GetCounterAndScheduleIncrement();
+            Assert.Equal(initialCounter, counter);
+            this.fixture.Logger.Info("Callchain_Reentrancy_OneWayMessage_Disabled_2 OK - no reentrancy.");
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void Reentrancy_Deadlock_1()
         {
             List<Task> done = new List<Task>();

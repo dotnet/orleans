@@ -39,6 +39,8 @@ namespace UnitTests.Grains
 
         private Logger logger;
 
+        private int counter;
+
         public override Task OnActivateAsync()
         {
             logger = this.GetLogger();
@@ -61,6 +63,24 @@ namespace UnitTests.Grains
             result = result + " two";
             logger.Info("Exiting Two");
             return result;
+        }
+
+        public Task<int> GetCounter()
+        {
+            return Task.FromResult(counter);
+        }
+
+        public async Task<int> GetCounterAndScheduleIncrement()
+        {
+            Self.InvokeOneWay(grain => grain.IncrementCounter());
+            await Task.Delay(300);
+            return counter;
+        }
+
+        public Task IncrementCounter()
+        {
+            counter++;
+            return Task.CompletedTask;
         }
 
         public Task SetSelf(INonReentrantGrain self)

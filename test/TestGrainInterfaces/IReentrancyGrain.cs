@@ -21,6 +21,12 @@ namespace UnitTests.GrainInterfaces
         Task<string> Two();
 
         Task SetSelf(INonReentrantGrain self);
+
+        Task<int> GetCounter();
+
+        Task IncrementCounter();
+
+        Task<int> GetCounterAndScheduleIncrement();
     }
 
     public interface IMayInterleavePredicateGrain : IGrainWithIntegerKey
