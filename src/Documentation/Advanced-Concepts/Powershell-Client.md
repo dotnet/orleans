@@ -7,7 +7,7 @@ title: PowerShell Client Module
 
 The Orleans PowerShell Client Module is a set of [PowerShell Cmdlets](https://technet.microsoft.com/en-us/library/dd772285.aspx) that wraps
 [GrainClient](https://github.com/dotnet/orleans/blob/master/src/Orleans/Core/GrainClient.cs) in a set of convenient commands making possible to interact with not just
-[ManagementGrain](https://github.com/dotnet/orleans/blob/master/src/OrleansRuntime/Core/ManagementGrain.cs) but any `IGrain` just as a regular Orleans application can by using Powershell scripts.
+[ManagementGrain](https://github.com/dotnet/orleans/blob/master/src/Orleans.Runtime/Core/ManagementGrain.cs) but any `IGrain` just as a regular Orleans application can by using Powershell scripts.
 
 These Cmdlets enable a series of scenarios from start maintenance tasks, tests, monitoring or any other kind of automation by leveraging Powershell scripts.
 
