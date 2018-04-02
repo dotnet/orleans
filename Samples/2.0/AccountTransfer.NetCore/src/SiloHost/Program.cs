@@ -7,6 +7,7 @@ using Orleans.Hosting;
 using Orleans.Hosting.Development;
 using Orleans.Configuration;
 using System.Net;
+using AccountTransfer.Grains;
 
 namespace OrleansSiloHost
 {
@@ -46,6 +47,7 @@ namespace OrleansSiloHost
                     options.ServiceId = "AccountTransferApp";
                 })
                 .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
+                .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(AccountGrain).Assembly).WithReferences())
                 .ConfigureLogging(logging => logging.AddConsole())
                 .AddMemoryGrainStorageAsDefault()
                 .UseInClusterTransactionManager()

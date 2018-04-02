@@ -53,6 +53,7 @@ namespace OrleansClient
                             options.ClusterId = "dev";
                             options.ServiceId = "HelloWorldApp";
                         })
+                        .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IHello).Assembly).WithReferences())
                         .ConfigureLogging(logging => logging.AddConsole())
                         .Build();
 

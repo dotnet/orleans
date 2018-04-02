@@ -57,6 +57,7 @@ namespace OrleansClient
                             options.ClusterId = "dev";
                             options.ServiceId = "AccountTransferApp";
                         })
+                        .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IAccountGrain).Assembly).WithReferences())
                         .ConfigureLogging(logging => logging.AddConsole())
                         .Build();
 
