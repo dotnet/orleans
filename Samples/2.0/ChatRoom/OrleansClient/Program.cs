@@ -53,6 +53,8 @@ namespace OrleansClient
                         .UseLocalhostClustering()
                         .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IChannel).Assembly).WithReferences())
 				        .ConfigureLogging(logging => logging.AddConsole())
+                        //Depends on your application requirements, you can configure your client with other stream providers, which can provide other features, 
+                        //such as persistence or recoverability. For more information, please see http://dotnet.github.io/orleans/Documentation/Orleans-Streams/Stream-Providers.html
                         .AddSimpleMessageStreamProvider(Constants.ChatRoomStreamProvider)
 				        .Build();
                     await client.Connect();
@@ -83,13 +85,13 @@ namespace OrleansClient
 
 		private static void PrintHints()
 		{
-			var menuColor = ConsoleColor.Magenta;
-			PrettyConsole.Line("Type '/j <channel>' to join specific channel", menuColor);
-		    PrettyConsole.Line("Type '/n <username>' to set your user name", menuColor);
+            var menuColor = ConsoleColor.Magenta;
+            PrettyConsole.Line("Type '/j <channel>' to join specific channel", menuColor);
+            PrettyConsole.Line("Type '/n <username>' to set your user name", menuColor);
             PrettyConsole.Line("Type '/l' to leave specific channel", menuColor);
-			PrettyConsole.Line("Type '<any text>' to send a message", menuColor);
-		    PrettyConsole.Line("Type '/h' to re-read channel history", menuColor);
-		    PrettyConsole.Line("Type '/m' to query members in the channel", menuColor);
+            PrettyConsole.Line("Type '<any text>' to send a message", menuColor);
+            PrettyConsole.Line("Type '/h' to re-read channel history", menuColor);
+            PrettyConsole.Line("Type '/m' to query members in the channel", menuColor);
             PrettyConsole.Line("Type '/exit' to exit client.", menuColor);
 		}
 
@@ -100,35 +102,35 @@ namespace OrleansClient
 
 			do
 			{
-				input = Console.ReadLine();
+                input = Console.ReadLine();
 
-				if (string.IsNullOrWhiteSpace(input)) continue;
+                if (string.IsNullOrWhiteSpace(input)) continue;
 
-				if (input.StartsWith("/j"))
-				{
-					await JoinChannel(client, input.Replace("/j", "").Trim());
-				}
-                else if (input.StartsWith("/n"))
-				{
-				    userName = input.Replace("/n", "").Trim();
-				    PrettyConsole.Line($"Your user name is set to be {userName}", ConsoleColor.DarkGreen);
+                if (input.StartsWith("/j"))
+                {
+	                await JoinChannel(client, input.Replace("/j", "").Trim());
                 }
-				else if (input.StartsWith("/l"))
-				{
-					await LeaveChannel(client);
-				}
-				else if (input.StartsWith("/h"))
-				{
-				    await ShowCurrentChannelHistory(client);
-				}
-				else if (input.StartsWith("/m"))
-				{
-				    await ShowChannelMembers(client);
-				}
+                else if (input.StartsWith("/n"))
+                {
+	                userName = input.Replace("/n", "").Trim();
+	                PrettyConsole.Line($"Your user name is set to be {userName}", ConsoleColor.DarkGreen);
+                }
+                else if (input.StartsWith("/l"))
+                {
+	                await LeaveChannel(client);
+                }
+                else if (input.StartsWith("/h"))
+                {
+	                await ShowCurrentChannelHistory(client);
+                }
+                else if (input.StartsWith("/m"))
+                {
+	                await ShowChannelMembers(client);
+                }
                 else if (!input.StartsWith("/exit"))
-				{
-					await SendMessage(client, input);
-				}
+                {
+	                await SendMessage(client, input);
+                }
 			} while (input != "/exit");
 		}
 
@@ -166,6 +168,12 @@ namespace OrleansClient
 
 		private static async Task JoinChannel(IClusterClient client, string channelName)
 		{
+		    if (joinedChannel == channelName)
+		    {
+                PrettyConsole.Line($"You already joined channel {channelName}. Double joining a channel, which is implemented as a stream, would result in double subscription to the same stream, " +
+                                   $"which would result in receiving duplicated messages. For more information, please refer to Orleans streaming documentation.");
+		        return;
+		    }
 		    PrettyConsole.Line($"Joining to channel {channelName}");
             joinedChannel = channelName;
 			var room = client.GetGrain<IChannel>(joinedChannel);
@@ -174,14 +182,14 @@ namespace OrleansClient
 		    if (streamId == Guid.Empty) return;
             var stream = client.GetStreamProvider(Constants.ChatRoomStreamProvider)
 		        .GetStream<ChatMsg>(streamId, Constants.CharRoomStreamNameSpace);
-            //sunscribe to the stream to receiver furthur messages sent to the chatroom
+            //subscribe to the stream to receiver furthur messages sent to the chatroom
 		    await stream.SubscribeAsync(new StreamObserver(client.ServiceProvider.GetService<ILoggerFactory>()
 		        .CreateLogger($"{joinedChannel} channel")));
 		}
 
 		private static async Task LeaveChannel(IClusterClient client)
 		{
-		    PrettyConsole.Line($"Leaving to channel {joinedChannel}");
+		    PrettyConsole.Line($"Leaving channel {joinedChannel}");
             var room = client.GetGrain<IChannel>(joinedChannel);
 		    var streamId = await room.Leave(userName);
             //empty stream id meaning client already leaved the channel, so return 

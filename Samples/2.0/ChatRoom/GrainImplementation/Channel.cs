@@ -27,7 +27,6 @@ namespace GrainImplementation
 
 		public async Task<Guid> Join(string nickname)
 		{
-			if (onlineMembers.Contains(nickname)) return Guid.Empty;
 			onlineMembers.Add(nickname);
 
 			await stream.OnNextAsync(new ChatMsg("System", $"{nickname} joins the chat '{this.GetPrimaryKeyString()}' ..."));
@@ -37,8 +36,6 @@ namespace GrainImplementation
 
 		public async Task<Guid> Leave(string nickname)
 		{
-			if (!onlineMembers.Contains(nickname)) return Guid.Empty;
-
 			onlineMembers.Remove(nickname);
 			await stream.OnNextAsync(new ChatMsg("System", $"{nickname} leaves the chat..."));
 
