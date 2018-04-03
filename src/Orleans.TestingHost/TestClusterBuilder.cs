@@ -34,7 +34,7 @@ namespace Orleans.TestingHost
             {
                 InitialSilosCount = initialSilosCount,
                 ClusterId = CreateClusterId(),
-                ServiceId = Guid.Empty,
+                ServiceId = Guid.NewGuid().ToString("N"),
                 UseTestClusterMembership = true,
                 InitializeClientOnDeploy = true,
                 ConfigureFileLogging = true,
@@ -47,7 +47,12 @@ namespace Orleans.TestingHost
         public Dictionary<string, object> Properties { get; } = new Dictionary<string, object>();
 
         public TestClusterOptions Options { get; }
-        
+
+        /// <summary>
+        /// Delegate used to create and start an individual silo.
+        /// </summary>
+        public Func<string, IList<IConfigurationSource>, SiloHandle> CreateSilo { private get; set; }
+
         public TestClusterBuilder ConfigureBuilder(Action configureDelegate)
         {
             this.configureBuilderActions.Add(configureDelegate ?? throw new ArgumentNullException(nameof(configureDelegate)));
@@ -91,13 +96,14 @@ namespace Orleans.TestingHost
             {
                 buildAction(configBuilder);
             }
+
             var configuration = configBuilder.Build();
             var finalOptions = new TestClusterOptions();
             configuration.Bind(finalOptions);
             
-
             var configSources = new ReadOnlyCollection<IConfigurationSource>(configBuilder.Sources);
             var testCluster = new TestCluster(finalOptions, configSources);
+            if (this.CreateSilo != null) testCluster.CreateSilo = this.CreateSilo;
             return testCluster;
         }
 
@@ -116,9 +122,8 @@ namespace Orleans.TestingHost
             (int baseSiloPort, int baseGatewayPort) = GetAvailableConsecutiveServerPortsPair(this.Options.InitialSilosCount + 3);
             if (this.Options.BaseSiloPort == 0) this.Options.BaseSiloPort = baseSiloPort;
             if (this.Options.BaseGatewayPort == 0) this.Options.BaseGatewayPort = baseGatewayPort;
-
-         
         }
+
         // Returns a pairs of ports which have the specified number of consecutive ports available for use.
         internal static ValueTuple<int, int> GetAvailableConsecutiveServerPortsPair(int consecutivePortsToCheck = 5)
         {

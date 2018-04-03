@@ -78,6 +78,10 @@
       <Pack>true</Pack>
       <PackagePath>lib\$(TargetFramework)\SQLServer\</PackagePath>
     </None>
+    <Content Include="Microsoft.Orleans.Reminders.AdoNet.targets">
+      <PackagePath>build/$(TargetFramework)/</PackagePath>
+      <Pack>true</Pack>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

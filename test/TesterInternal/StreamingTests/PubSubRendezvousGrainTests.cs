@@ -2,6 +2,7 @@
 using System;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
@@ -19,10 +20,15 @@ namespace UnitTests.StreamingTests
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.ConfigureLegacyConfiguration(legacy =>
+               builder.AddSiloBuilderConfigurator<SiloHostConfigurator>();
+            }
+
+            public class SiloHostConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
                 {
-                    legacy.ClusterConfiguration.AddFaultyMemoryStorageProvider("PubSubStore");
-                });
+                    hostBuilder.AddFaultInjectionMemoryStorage("PubSubStore");
+                }
             }
         }
 

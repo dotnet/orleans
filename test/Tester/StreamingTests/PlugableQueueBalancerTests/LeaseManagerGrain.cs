@@ -4,10 +4,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Tester.StreamingTests
@@ -29,7 +26,7 @@ namespace Tester.StreamingTests
     public class LeaseManagerGrain : Grain, ILeaseManagerGrain
     {
         //queueId is the lease id here
-        private static DateTime UnAssignedLeaseTime = DateTime.MinValue;
+        private static readonly DateTime UnAssignedLeaseTime = DateTime.MinValue;
         private Dictionary<QueueId, DateTime> queueLeaseToRenewTimeMap;
         private ISiloStatusOracle siloStatusOracle;
         private ClusterConfiguration clusterConfiguration;

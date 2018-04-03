@@ -47,10 +47,17 @@ namespace Orleans.Hosting
         {
             services.AddOptions();
 
+            services.AddTransient<IConfigurationValidator, EndpointOptionsValidator>();
+
+            // Options logging
+            services.TryAddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
+            services.TryAddSingleton(typeof(IOptionFormatterResolver<>), typeof(DefaultOptionsFormatterResolver<>));
+
             // Register system services.
             services.TryAddSingleton<ILocalSiloDetails, LocalSiloDetails>();
             services.TryAddSingleton<ISiloHost, SiloWrapper>();
-            services.TryAddSingleton<SiloLifecycle>();
+            services.TryAddTransient<ILifecycleSubject,LifecycleSubject>();
+            services.TryAddSingleton<ISiloLifecycleSubject,SiloLifecycleSubject>();
             services.TryAddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloOptionsLogger>();
             services.PostConfigure<SiloMessagingOptions>(options =>
             {
@@ -77,13 +84,11 @@ namespace Orleans.Hosting
 
             services.TryAddSingleton<ExecutorService>();
             // queue balancer contructing related
-            services.TryAddTransient<StaticClusterConfigDeploymentBalancer>();
-            services.TryAddTransient<DynamicClusterConfigDeploymentBalancer>();
-            services.TryAddTransient<ClusterConfigDeploymentLeaseBasedBalancer>();
-            services.TryAddTransient<ConsistentRingQueueBalancer>();
+            services.TryAddTransient<IStreamQueueBalancer, ConsistentRingQueueBalancer>();
             services.TryAddSingleton<IStreamSubscriptionHandleFactory, StreamSubscriptionHandlerFactory>();
 
             services.TryAddSingleton<FallbackSystemTarget>();
+            services.TryAddSingleton<LifecycleSchedulingSystemTarget>();
 
             services.AddLogging();
             services.TryAddSingleton<ITimerRegistry, TimerRegistry>();
@@ -124,7 +129,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<MembershipOracle>();
             services.TryAddFromExisting<IMembershipOracle, MembershipOracle>();
             services.TryAddFromExisting<ISiloStatusOracle, MembershipOracle>();
-            services.AddTransient<IConfigurationValidator, SiloClusteringValidator>();
 
             services.TryAddSingleton<ClientObserverRegistrar>();
             services.TryAddSingleton<SiloProviderRuntime>();
@@ -140,22 +144,20 @@ namespace Orleans.Hosting
             services.TryAddSingleton(FactoryUtility.Create<GrainDirectoryPartition>);
 
             // Placement
+            services.AddSingleton<IConfigurationValidator, ActivationCountBasedPlacementOptionsValidator>();
             services.TryAddSingleton<PlacementDirectorsManager>();
             services.TryAddSingleton<ClientObserversPlacementDirector>();
-            // Placement strategies
-            services.AddSingletonNamedService<PlacementStrategy, RandomPlacement>(nameof(RandomPlacement));
-            services.AddSingletonNamedService<PlacementStrategy, PreferLocalPlacement>(nameof(PreferLocalPlacement));
-            services.AddSingletonNamedService<PlacementStrategy, StatelessWorkerPlacement>(nameof(StatelessWorkerPlacement));
-            services.AddSingletonNamedService<PlacementStrategy, ActivationCountBasedPlacement>(nameof(ActivationCountBasedPlacement));
-            services.AddSingletonNamedService<PlacementStrategy, HashBasedPlacement>(nameof(HashBasedPlacement));
-            // Default placement stragety
-            services.TryAddSingleton<PlacementStrategy>(PlacementStrategyFactory.Create);
+
+            // Configure the default placement strategy.
+            services.TryAddSingleton<PlacementStrategy, RandomPlacement>();
+
             // Placement directors
-            services.AddSingletonKeyedService<Type, IPlacementDirector, RandomPlacementDirector>(typeof(RandomPlacement));
-            services.AddSingletonKeyedService<Type, IPlacementDirector, PreferLocalPlacementDirector>(typeof(PreferLocalPlacement));
-            services.AddSingletonKeyedService<Type, IPlacementDirector, StatelessWorkerDirector>(typeof(StatelessWorkerPlacement));
-            services.AddSingletonKeyedService<Type, IPlacementDirector, ActivationCountPlacementDirector>(typeof(ActivationCountBasedPlacement));
-            services.AddSingletonKeyedService<Type, IPlacementDirector, HashBasedPlacementDirector>(typeof(HashBasedPlacement));
+            services.AddPlacementDirector<RandomPlacement, RandomPlacementDirector>();
+            services.AddPlacementDirector<PreferLocalPlacement, PreferLocalPlacementDirector>();
+            services.AddPlacementDirector<StatelessWorkerPlacement, StatelessWorkerDirector>();
+            services.AddPlacementDirector<ActivationCountBasedPlacement, ActivationCountPlacementDirector>();
+            services.AddPlacementDirector<HashBasedPlacement, HashBasedPlacementDirector>();
+
             // Activation selectors
             services.AddSingletonKeyedService<Type, IActivationSelector, RandomPlacementDirector>(typeof(RandomPlacement));
             services.AddSingletonKeyedService<Type, IActivationSelector, StatelessWorkerDirector>(typeof(StatelessWorkerPlacement));
@@ -164,7 +166,9 @@ namespace Orleans.Hosting
             services.TryAddSingleton<VersionSelectorManager>();
             services.TryAddSingleton<CachedVersionSelectorManager>();
             // Version selector strategy
-            services.TryAddSingleton<IVersionStore, GrainVersionStore>();
+            services.TryAddSingleton<GrainVersionStore>();
+            services.AddFromExisting<IVersionStore, GrainVersionStore>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, GrainVersionStore>();
             services.AddSingletonNamedService<VersionSelectorStrategy, AllCompatibleVersions>(nameof(AllCompatibleVersions));
             services.AddSingletonNamedService<VersionSelectorStrategy, LatestVersion>(nameof(LatestVersion));
             services.AddSingletonNamedService<VersionSelectorStrategy, MinimumVersion>(nameof(MinimumVersion));
@@ -238,31 +242,29 @@ namespace Orleans.Hosting
             services.AddTransient<IConfigurationValidator, ApplicationPartValidator>();
 
             //Add default option formatter if none is configured, for options which are required to be configured 
-            services.TryConfigureFormatter<SiloOptions, SiloOptionsFormatter>();
-            services.TryConfigureFormatter<ProcessExitHandlingOptions, ProcessExitHandlingOptionsFormatter>();
-            services.TryConfigureFormatter<SchedulingOptions, SchedulingOptionsFormatter>();
-            services.TryConfigureFormatter<PerformanceTuningOptions, PerformanceTuningOptionsFormatter>();
-            services.TryConfigureFormatter<SerializationProviderOptions, SerializationProviderOptionsFormatter>();
-            services.TryConfigureFormatter<NetworkingOptions, NetworkingOptionsFormatter>();
-            services.TryConfigureFormatter<SiloMessagingOptions, SiloMessagingOptionFormatter>();
-            services.TryConfigureFormatter<TypeManagementOptions, TypeManagementOptionsFormatter>();
-            services.TryConfigureFormatter<MembershipOptions, MembershipOptionsFormatter>();
-            services.TryConfigureFormatter<GrainDirectoryOptions, GrainDirectoryOptionsFormatter>();
-            services.TryConfigureFormatter<GrainPlacementOptions, GrainPlacementOptionsFormatter>();
-            services.TryConfigureFormatter<GrainCollectionOptions, GrainCollectionOptionsFormatter>();
-            services.TryConfigureFormatter<GrainVersioningOptions, GrainVersioningOptionsFormatter>();
-            services.TryConfigureFormatter<ConsistentRingOptions, ConsistentRingOptionsFormatter>();
-            services.TryConfigureFormatter<MultiClusterOptions, MultiClusterOptionsFormatter>();
-            services.TryConfigureFormatter<SiloStatisticsOptions, SiloStatisticsOptionsFormatter>();
-            services.TryConfigureFormatter<GrainServiceOptions, GrainServiceOptionsFormatter>();
-            services.TryConfigureFormatter<TelemetryOptions, TelemetryOptionsFormatter>();
-            services.TryConfigureFormatter<LoadSheddingOptions, LoadSheddingOptionsFormatter>();
-            services.TryConfigureFormatter<EndpointOptions, EndpointOptionsFormatter>();
+            services.ConfigureFormatter<SiloOptions>();
+            services.ConfigureFormatter<ProcessExitHandlingOptions>();
+            services.ConfigureFormatter<SchedulingOptions>();
+            services.ConfigureFormatter<PerformanceTuningOptions>();
+            services.ConfigureFormatter<SerializationProviderOptions>();
+            services.ConfigureFormatter<NetworkingOptions>();
+            services.ConfigureFormatter<SiloMessagingOptions>();
+            services.ConfigureFormatter<TypeManagementOptions>();
+            services.ConfigureFormatter<ClusterMembershipOptions>();
+            services.ConfigureFormatter<GrainDirectoryOptions>();
+            services.ConfigureFormatter<ActivationCountBasedPlacementOptions>();
+            services.ConfigureFormatter<GrainCollectionOptions>();
+            services.ConfigureFormatter<GrainVersioningOptions>();
+            services.ConfigureFormatter<ConsistentRingOptions>();
+            services.ConfigureFormatter<MultiClusterOptions>();
+            services.ConfigureFormatter<SiloStatisticsOptions>();
+            services.ConfigureFormatter<TelemetryOptions>();
+            services.ConfigureFormatter<LoadSheddingOptions>();
+            services.ConfigureFormatter<EndpointOptions>();
 
-            services.AddTransient<IConfigurationValidator, EndpointOptionsValidator>();
-            
-            services.AddSingleton<StartupTaskSystemTarget>();
-
+            // This validator needs to construct the IMembershipOracle and the IMembershipTable
+            // so move it in the end so other validator are called first
+            services.AddTransient<IConfigurationValidator, SiloClusteringValidator>();
         }
     }
 }

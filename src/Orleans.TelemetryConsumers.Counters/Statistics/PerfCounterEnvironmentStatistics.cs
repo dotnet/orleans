@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace Orleans.Statistics
 {
-    internal class PerfCounterEnvironmentStatistics : IHostEnvironmentStatistics, ILifecycleParticipant<ISiloLifecycle>, ILifecycleObserver, IDisposable
+    internal class PerfCounterEnvironmentStatistics : IHostEnvironmentStatistics, ILifecycleParticipant<ISiloLifecycle>, ILifecycleParticipant<IClusterClientLifecycle>, ILifecycleObserver, IDisposable
     {
         private readonly ILogger logger;
         private const float KB = 1024f;
@@ -257,6 +257,11 @@ namespace Orleans.Statistics
         }
 
         public void Participate(ISiloLifecycle lifecycle)
+        {
+            lifecycle.Subscribe<PerfCounterEnvironmentStatistics>(ServiceLifecycleStage.RuntimeInitialize, this);
+        }
+
+        public void Participate(IClusterClientLifecycle lifecycle)
         {
             lifecycle.Subscribe(ServiceLifecycleStage.RuntimeInitialize, this);
         }

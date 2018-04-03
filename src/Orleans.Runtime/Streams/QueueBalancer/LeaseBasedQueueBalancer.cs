@@ -1,20 +1,15 @@
-using Orleans.LeaseProviders;
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.Streams;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.Providers;
-using Orleans.Hosting;
 using Microsoft.Extensions.Options;
+using Orleans.LeaseProviders;
+using Orleans.Runtime;
+using Orleans.Configuration;
+using Orleans.Timers;
 
 namespace Orleans.Streams
 {
@@ -37,13 +32,13 @@ namespace Orleans.Streams
     /// Selector using round robin algorithm
     /// </summary>
     /// <typeparam name="T"></typeparam>
-    internal class RoundRobinSelector<T> : IResourceSelector<T>
+    internal class  RoundRobinSelector<T> : IResourceSelector<T>
     {
         private ReadOnlyCollection<T> resources;
         private int lastSelection;
-        public RoundRobinSelector(ReadOnlyCollection<T> resources)
+        public RoundRobinSelector(IEnumerable<T> resources)
         {
-            this.resources = resources;
+            this.resources = new ReadOnlyCollection<T>(resources.Distinct().ToList());
             this.lastSelection = new Random().Next(this.resources.Count);
         }
 
@@ -55,10 +50,11 @@ namespace Orleans.Streams
         /// <returns></returns>
         public List<T> NextSelection(int newSelectionCount, List<T> existingSelection)
         {
-            var selection = new List<T>(newSelectionCount);
-            while (selection.Count < newSelectionCount)
+            var selection = new List<T>(Math.Min(newSelectionCount, this.resources.Count));
+            int tries = 0;
+            while (selection.Count < newSelectionCount && tries++ < this.resources.Count)
             {
-                this.lastSelection = (++this.lastSelection) % (this.resources.Count - 1);
+                this.lastSelection = (++this.lastSelection) % (this.resources.Count);
                 if(!existingSelection.Contains(this.resources[this.lastSelection]))
                     selection.Add(this.resources[this.lastSelection]);
             }
@@ -66,75 +62,6 @@ namespace Orleans.Streams
         }
     }
 
-    /// <summary>
-    /// Stream queue balancer that uses the cluster configuration to determine deployment information for load balancing.  
-    /// This balancer supports queue balancing in cluster auto-scale scenario, unexpected server failure scenario, and try to support ideal distribution 
-    /// </summary>
-    public class ClusterConfigDeploymentLeaseBasedBalancer : LeaseBasedQueueBalancer
-    {
-        public ClusterConfigDeploymentLeaseBasedBalancer(IServiceProvider serviceProvider, ISiloStatusOracle siloStatusOracle,
-            IOptions<StaticClusterDeploymentOptions> options, ILoggerFactory loggerFactory)
-            : base(serviceProvider, siloStatusOracle, options.Value, loggerFactory)
-        { }
-    }
-
-    /// <summary>
-    /// Config for LeaseBasedQueueBalancer. User need to add this config to its stream provder's IProviderConfiguration in order to use LeaseBasedQueueBalancer in the stream provider
-    /// </summary>
-    public class LeaseBasedQueueBalancerConfig
-    {
-        /// <summary>
-        /// LeaseProviderType
-        /// </summary>
-        public Type LeaseProviderType { get; set; }
-        /// <summary>
-        /// LeaseProviderTypeName
-        /// </summary>
-        public const string LeaseProviderTypeName = nameof(LeaseProviderType);
-        /// <summary>
-        /// LeaseLength
-        /// </summary>
-        public TimeSpan LeaseLength { get; set; } = TimeSpan.FromSeconds(60);
-        /// <summary>
-        /// LeaseLengthName
-        /// </summary>
-        public const string LeaseLengthName = nameof(LeaseLengthName);
-        /// <summary>
-        /// Constructor
-        /// </summary>
-        public LeaseBasedQueueBalancerConfig()
-        { }
-        /// <summary>
-        /// Constructor
-        /// </summary>
-        /// <param name="providerConfig"></param>
-        public LeaseBasedQueueBalancerConfig(IProviderConfiguration providerConfig)
-        {
-            string leaseLength;
-            if (providerConfig.Properties.TryGetValue(LeaseLengthName, out leaseLength))
-            {
-                this.LeaseLength = ConfigUtilities.ParseTimeSpan(leaseLength,
-                    "Invalid time value for the " + LeaseLengthName + " property in the provider config values.");
-            }
-
-            this.LeaseProviderType = providerConfig.GetTypeProperty(LeaseProviderTypeName, null);
-            if (this.LeaseProviderType == null)
-                throw new ArgumentOutOfRangeException(LeaseProviderTypeName, "LeaseProviderType not set");
-        }
-
-        /// <summary>
-        /// Write properties to IProviderConfiguration's property bag
-        /// </summary>
-        /// <param name="properties"></param>
-        public void WriterProperties(Dictionary<string, string> properties)
-        {
-            properties[LeaseLengthName] = ConfigUtilities.ToParseableTimeSpan(this.LeaseLength);
-            if (this.LeaseProviderType != null)
-                properties[LeaseProviderTypeName] = this.LeaseProviderType.AssemblyQualifiedName;
-            else
-                throw new ArgumentOutOfRangeException(LeaseProviderTypeName, "LeaseProviderType not set");
-        }
-    }
     /// <summary>
     /// LeaseBasedQueueBalancer. This balancer supports queue balancing in cluster auto-scale scenario, unexpected server failure scenario, and try to support ideal distribution 
     /// as much as possible. 
@@ -160,25 +87,20 @@ namespace Orleans.Streams
         private readonly ISiloStatusOracle siloStatusOracle;
         private ReadOnlyCollection<QueueId> allQueues;
         private List<AcquiredQueue> myQueues;
-        private TimeSpan siloMaturityPeriod;
         private bool isStarting;
-        private TimeSpan leaseLength;
-        private AsyncTaskSafeTimer renewLeaseTimer;
-        private AsyncTaskSafeTimer tryAcquireMaximumLeaseTimer;
+        private IDisposable renewLeaseTimer;
+        private IDisposable tryAcquireMaximumLeaseTimer;
         private IResourceSelector<QueueId> queueSelector;
-        private int minimumResponsibilty;
-        private int maximumRespobsibility;
+        private int minimumResponsibility;
+        private int maximumResponsibility;
         private IServiceProvider serviceProvider;
         private ILogger logger;
         private ILoggerFactory loggerFactory;
+        private readonly LeaseBasedQueueBalancerOptions options;
         /// <summary>
         /// Constructor
         /// </summary>
-        /// <param name="serviceProvider"></param>
-        /// <param name="siloStatusOracle"></param>
-        /// <param name="deploymentConfig"></param>
-        /// <param name="loggerFactory"></param>
-        public LeaseBasedQueueBalancer(IServiceProvider serviceProvider, ISiloStatusOracle siloStatusOracle, IDeploymentConfiguration deploymentConfig, ILoggerFactory loggerFactory)
+        public LeaseBasedQueueBalancer(string name, LeaseBasedQueueBalancerOptions options, IServiceProvider serviceProvider, ISiloStatusOracle siloStatusOracle, IDeploymentConfiguration deploymentConfig, ILoggerFactory loggerFactory)
         {
             this.serviceProvider = serviceProvider;
             this.deploymentConfig = deploymentConfig;
@@ -186,27 +108,32 @@ namespace Orleans.Streams
             this.myQueues = new List<AcquiredQueue>();
             this.isStarting = true;
             this.loggerFactory = loggerFactory;
-            this.logger = loggerFactory.CreateLogger<LeaseBasedQueueBalancer>();
+            this.options = options;
+            this.logger = loggerFactory.CreateLogger($"{typeof(LeaseBasedQueueBalancer).FullName}-{name}");
         }
 
+        public static IStreamQueueBalancer Create(IServiceProvider services, string name, IDeploymentConfiguration deploymentConfiguration)
+        {
+            var options = services.GetRequiredService<IOptionsSnapshot<LeaseBasedQueueBalancerOptions>>().Get(name);
+            return ActivatorUtilities.CreateInstance<LeaseBasedQueueBalancer>(services, name, options, deploymentConfiguration);
+        }
         /// <inheritdoc/>
-        public override Task Initialize(string strProviderName, IStreamQueueMapper queueMapper, TimeSpan siloMaturityPeriod, IProviderConfiguration providerConfig)
+        public override Task Initialize(IStreamQueueMapper queueMapper)
         {
             if (queueMapper == null)
             {
                 throw new ArgumentNullException("queueMapper");
             }
-            var balancerConfig = new LeaseBasedQueueBalancerConfig(providerConfig);
-            this.leaseProvider = this.serviceProvider.GetRequiredService(balancerConfig.LeaseProviderType) as ILeaseProvider;
-            this.leaseLength = balancerConfig.LeaseLength;
             this.allQueues = new ReadOnlyCollection<QueueId>(queueMapper.GetAllQueues().ToList());
-            this.siloMaturityPeriod = siloMaturityPeriod;
+            if (this.allQueues.Count == 0)
+                return Task.CompletedTask;
+            this.leaseProvider = this.serviceProvider.GetRequiredService(options.LeaseProviderType) as ILeaseProvider;
             NotifyAfterStart().Ignore();
             //make lease renew frequency to be every half of lease time, to avoid renew failing due to timing issues, race condition or clock difference. 
-            var timerLogger = this.loggerFactory.CreateLogger<AsyncTaskSafeTimer>();
-            this.renewLeaseTimer = new AsyncTaskSafeTimer(timerLogger, this.MaintainAndBalanceQueues, null, this.siloMaturityPeriod, this.leaseLength.Divide(2));
+            ITimerRegistry timerRegistry = this.serviceProvider.GetRequiredService<ITimerRegistry>();
+            this.renewLeaseTimer = timerRegistry.RegisterTimer(null, this.MaintainAndBalanceQueues, null, this.options.SiloMaturityPeriod, this.options.LeaseLength.Divide(2));
             //try to acquire maximum leases every leaseLength 
-            this.tryAcquireMaximumLeaseTimer = new AsyncTaskSafeTimer(timerLogger, this.AcquireLeaseToMeetMaxResponsibilty, null, this.siloMaturityPeriod, this.leaseLength);
+            this.tryAcquireMaximumLeaseTimer = timerRegistry.RegisterTimer(null, this.AcquireLeaseToMeetMaxResponsibility, null, this.options.SiloMaturityPeriod, this.options.SiloMaturityPeriod);
             //Selector default to round robin selector now, but we can make a further change to make selector configurable if needed.  Selector algorithm could 
             //be affecting queue balancing stablization time in cluster initializing and auto-scaling
             this.queueSelector = new RoundRobinSelector<QueueId>(this.allQueues);
@@ -225,12 +152,12 @@ namespace Orleans.Streams
             var oldQueues = new HashSet<QueueId>(this.myQueues.Select(queue => queue.QueueId));
             // step 1: renew existing leases 
             await this.RenewLeases();
-            // step 2: if after renewing leases, myQueues count doesn't fall in [minimumResponsibility, maximumResponsibilty] range, act accordingly
-            if (this.myQueues.Count < this.minimumResponsibilty)
+            // step 2: if after renewing leases, myQueues count doesn't fall in [minimumResponsibility, maximumResponsibility] range, act accordingly
+            if (this.myQueues.Count < this.minimumResponsibility)
             {
                 await this.AcquireLeasesToMeetMinResponsibility();
             }
-            else if (this.myQueues.Count > this.maximumRespobsibility)
+            else if (this.myQueues.Count > this.maximumResponsibility)
             {
                 await this.ReleaseLeasesToMeetResponsibility();
             }
@@ -242,24 +169,25 @@ namespace Orleans.Streams
 
         private async Task ReleaseLeasesToMeetResponsibility()
         {
-            var queueCountToRelease = this.myQueues.Count - this.maximumRespobsibility;
+            var queueCountToRelease = this.myQueues.Count - this.maximumResponsibility;
             if (queueCountToRelease <= 0)
                 return;
             var queuesToGiveUp = this.myQueues.GetRange(0, queueCountToRelease);
             await this.leaseProvider.Release(LeaseCategory, queuesToGiveUp.Select(queue => queue.AcquiredLease).ToArray());
             //remove queuesToGiveUp from myQueue list after the balancer released the leases on them
             this.myQueues.RemoveRange(0, queueCountToRelease);
-            this.logger.Info($"ReleaseLeasesToMeetResponsibility: released {queueCountToRelease} queues, current queue Count: {this.myQueues.Count}");
+            this.logger.Info($"Released leases for {queueCountToRelease} queues");
+            this.logger.LogInformation($"I now own leases for {this.myQueues.Count} of an expected {this.minimumResponsibility} to {this.maximumResponsibility} queues.");
         }
 
-        private Task AcquireLeaseToMeetMaxResponsibilty(object state)
+        private Task AcquireLeaseToMeetMaxResponsibility(object state)
         {
-            return AcquireLeasesToMeetExpectation(this.maximumRespobsibility);
+            return AcquireLeasesToMeetExpectation(this.maximumResponsibility);
         }
 
         private Task AcquireLeasesToMeetMinResponsibility()
         {
-            return AcquireLeasesToMeetExpectation(this.minimumResponsibilty);
+            return AcquireLeasesToMeetExpectation(this.minimumResponsibility);
         }
 
         private async Task AcquireLeasesToMeetExpectation(int expectedTotalLeaseCount)
@@ -267,16 +195,18 @@ namespace Orleans.Streams
             int maxAttempts = 5;
             int attempts = 0;
             int leasesToAquire = expectedTotalLeaseCount - this.myQueues.Count;
-            this.logger.Info($"AcquireLeasesToMeetExpectation : Try to acquire {leasesToAquire} queues");
-            while (attempts ++ <= maxAttempts && leasesToAquire > 0)
+            if (leasesToAquire <= 0) return;
+            while (attempts ++ < maxAttempts && leasesToAquire > 0)
             {
+                this.logger.LogDebug($"I have {this.myQueues.Count} queues.  Trying to acquire {leasesToAquire} queues to reach {expectedTotalLeaseCount}");
+                leasesToAquire = expectedTotalLeaseCount - this.myQueues.Count;
                 //select new queues to acquire
-                var expectedQueues = this.queueSelector.NextSelection(leasesToAquire, this.myQueues.Select(queue=>queue.QueueId).ToList()).ToList();
-                var leaseRequests = expectedQueues.Select(queue => new LeaseRequest() {
+                List<QueueId> expectedQueues = this.queueSelector.NextSelection(leasesToAquire, this.myQueues.Select(queue=>queue.QueueId).ToList()).ToList();
+                IEnumerable<LeaseRequest> leaseRequests = expectedQueues.Select(queue => new LeaseRequest() {
                     ResourceKey = queue.ToString(),
-                    Duration = this.leaseLength
+                    Duration = this.options.LeaseLength
                 });
-                var results = await this.leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
+                AcquireLeaseResult[] results = await this.leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
                 //add successfully acquired queue to myQueues list
                 for (int i = 0; i < results.Length; i++)
                 {
@@ -292,11 +222,13 @@ namespace Orleans.Streams
                 }
             }
 
-            this.logger.Info($"AcquireLeasesToMeetExpectation: finished. Now own {this.myQueues.Count} queues. Used attemps : {attempts}, Current minimumReponsibility : {this.minimumResponsibilty}, current maximumResponsibility : {this.maximumRespobsibility}");
+            this.logger.LogInformation($"I now own leases for {this.myQueues.Count} of an expected {this.minimumResponsibility} to {this.maximumResponsibility} queues");
         }
         
         private async Task RenewLeases()
         {
+            if (this.myQueues.Count <= 0)
+                return;
             var results = await this.leaseProvider.Renew(LeaseCategory, this.myQueues.Select(queue => queue.AcquiredLease).ToArray());
             var updatedQueues = new List<AcquiredQueue>();
             //update myQueues list with successfully renewed leases
@@ -310,7 +242,7 @@ namespace Orleans.Streams
             }
             this.myQueues.Clear();
             this.myQueues = updatedQueues;
-            this.logger.Info($"RenewLeases: finished, currently own queues : {this.myQueues.Count}, current minimumResponsibilty : {this.minimumResponsibilty}, current maximunResponsibilty : {this.maximumRespobsibility}");
+            this.logger.LogInformation($"Renewed leases for {this.myQueues.Count} queues.");
         }
 
         private void CalculateResponsibility()
@@ -324,11 +256,12 @@ namespace Orleans.Streams
             {
                 activeBuckets = GetActiveSiloCount(this.siloStatusOracle);
             }
-            this.minimumResponsibilty = this.allQueues.Count / activeBuckets;
+            activeBuckets = Math.Max(1, activeBuckets);
+            this.minimumResponsibility = this.allQueues.Count / activeBuckets;
             //if allQueues count is divisible by active bukets, then every bucket should take the same count of queues, otherwise, there should be one bucket take 1 more queue
             if (this.allQueues.Count % activeBuckets == 0)
-                this.maximumRespobsibility = this.minimumResponsibilty;
-            else this.maximumRespobsibility = this.minimumResponsibilty + 1;
+                this.maximumResponsibility = this.minimumResponsibility;
+            else this.maximumResponsibility = this.minimumResponsibility + 1;
         }
 
 
@@ -339,7 +272,7 @@ namespace Orleans.Streams
 
         private async Task NotifyAfterStart()
         {
-            await Task.Delay(siloMaturityPeriod);
+            await Task.Delay(this.options.SiloMaturityPeriod);
             this.isStarting = false;
             await NotifyListeners();
         }
@@ -367,8 +300,8 @@ namespace Orleans.Streams
             this.tryAcquireMaximumLeaseTimer?.Dispose();
             this.tryAcquireMaximumLeaseTimer = null;
             //release all owned leases
-            this.maximumRespobsibility = 0;
-            this.minimumResponsibilty = 0;
+            this.maximumResponsibility = 0;
+            this.minimumResponsibility = 0;
             this.ReleaseLeasesToMeetResponsibility().Ignore();
         }
     }

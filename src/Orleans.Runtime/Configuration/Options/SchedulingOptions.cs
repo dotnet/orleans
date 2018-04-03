@@ -69,30 +69,4 @@ namespace Orleans.Configuration
         public bool EnableWorkerThreadInjection { get; set; } = DEFAULT_ENABLE_WORKER_THREAD_INJECTION;
         public const bool DEFAULT_ENABLE_WORKER_THREAD_INJECTION = false;
     }
-
-    public class SchedulingOptionsFormatter : IOptionFormatter<SchedulingOptions>
-    {
-        public string Name => nameof(SchedulingOptions);
-
-        private SchedulingOptions options;
-        public SchedulingOptionsFormatter(IOptions<SchedulingOptions> options)
-        {
-            this.options = options.Value;
-        }
-
-        public IEnumerable<string> Format()
-        {
-            return new List<string>()
-            {
-                OptionFormattingUtilities.Format(nameof(this.options.PerformDeadlockDetection), this.options.PerformDeadlockDetection),
-                OptionFormattingUtilities.Format(nameof(this.options.AllowCallChainReentrancy), this.options.AllowCallChainReentrancy),
-                OptionFormattingUtilities.Format(nameof(this.options.DelayWarningThreshold), this.options.DelayWarningThreshold),
-                OptionFormattingUtilities.Format(nameof(this.options.ActivationSchedulingQuantum), this.options.ActivationSchedulingQuantum),
-                OptionFormattingUtilities.Format(nameof(this.options.TurnWarningLengthThreshold), this.options.TurnWarningLengthThreshold),
-                OptionFormattingUtilities.Format(nameof(this.options.MaxPendingWorkItemsSoftLimit), this.options.MaxPendingWorkItemsSoftLimit),
-                OptionFormattingUtilities.Format(nameof(this.options.MaxPendingWorkItemsHardLimit), this.options.MaxPendingWorkItemsHardLimit),
-                OptionFormattingUtilities.Format(nameof(this.options.EnableWorkerThreadInjection), this.options.EnableWorkerThreadInjection),
-            };
-        }
-    }
 }

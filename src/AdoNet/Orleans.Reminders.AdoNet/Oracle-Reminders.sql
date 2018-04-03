@@ -76,7 +76,7 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'UpsertReminderRowKey','
-    SELECT UpsertReminderRow(:SERVICEID, :GRAINHASH, :GRAINID, :REMINDERNAME, :STARTTIME, :PERIOD) AS Version FROM DUAL
+    SELECT UpsertReminderRow(:ServiceId, :GrainHash, :GrainId, :ReminderName, :StartTime, :Period) AS Version FROM DUAL
 ');
 /
 
@@ -87,8 +87,8 @@ VALUES
     SELECT GrainId, ReminderName, StartTime, Period, Version
     FROM OrleansRemindersTable
     WHERE
-        ServiceId = :SERVICEID AND :SERVICEID IS NOT NULL
-        AND GrainId = :GRAINID AND :GRAINID IS NOT NULL
+        ServiceId = :ServiceId AND :ServiceId IS NOT NULL
+        AND GrainId = :GrainId AND :GrainId IS NOT NULL
 ');
 /
 
@@ -99,9 +99,9 @@ VALUES
     SELECT GrainId, ReminderName, StartTime, Period, Version
     FROM OrleansRemindersTable
     WHERE
-        ServiceId = :SERVICEID AND :SERVICEID IS NOT NULL
-        AND GrainId = :GRAINID AND :GRAINID IS NOT NULL
-        AND ReminderName = :REMINDERNAME AND :REMINDERNAME IS NOT NULL
+        ServiceId = :ServiceId AND :ServiceId IS NOT NULL
+        AND GrainId = :GrainId AND :GrainId IS NOT NULL
+        AND ReminderName = :ReminderName AND :ReminderName IS NOT NULL
 ');
 /
 
@@ -112,9 +112,9 @@ VALUES
     SELECT GrainId, ReminderName, StartTime, Period, Version
     FROM OrleansRemindersTable
     WHERE
-        ServiceId = :SERVICEID AND :SERVICEID IS NOT NULL
-        AND GrainHash > :BEGINHASH AND :BEGINHASH IS NOT NULL
-        AND GrainHash <= :ENDHASH AND :ENDHASH IS NOT NULL
+        ServiceId = :ServiceId AND :ServiceId IS NOT NULL
+        AND GrainHash > :BeginHash AND :BeginHash IS NOT NULL
+        AND GrainHash <= :EndHash AND :EndHash IS NOT NULL
 ');
 /
 
@@ -125,9 +125,9 @@ VALUES
     SELECT GrainId, ReminderName, StartTime, Period,Version
     FROM OrleansRemindersTable
     WHERE
-        ServiceId = :SERVICEID AND :SERVICEID IS NOT NULL
-        AND ((GrainHash > :BEGINHASH AND :BEGINHASH IS NOT NULL)
-        OR (GrainHash <= :ENDHASH AND :ENDHASH IS NOT NULL))
+        ServiceId = :ServiceId AND :ServiceId IS NOT NULL
+        AND ((GrainHash > :BeginHash AND :BeginHash IS NOT NULL)
+        OR (GrainHash <= :EndHash AND :EndHash IS NOT NULL))
 ');
 /
 
@@ -135,7 +135,7 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'DeleteReminderRowKey','
-    SELECT DeleteReminderRow(:SERVICEID, :GRAINID, :REMINDERNAME, :VERSION) AS RESULT FROM DUAL
+    SELECT DeleteReminderRow(:ServiceId, :GrainId, :ReminderName, :Version) AS RESULT FROM DUAL
 ');
 /
 

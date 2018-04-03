@@ -11,6 +11,7 @@ using Orleans.Streams;
 using TestExtensions;
 using UnitTests.Grains.ProgrammaticSubscribe;
 using Xunit.Abstractions;
+using Orleans.Hosting;
 
 namespace Tester.StreamingTests.ProgrammaticSubscribeTests
 {
@@ -23,11 +24,16 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            builder.ConfigureLegacyConfiguration(legacy =>
+            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+        }
+
+        public class SiloConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
             {
-                legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
-                legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-            });
+                hostBuilder.AddAzureBlobGrainStorageAsDefault()
+                    .AddMemoryGrainStorage("PubSubStore");
+            }
         }
 
         public ProgrammaticSubscribeTestsWithDynamicProviderConfiguration(ITestOutputHelper output)

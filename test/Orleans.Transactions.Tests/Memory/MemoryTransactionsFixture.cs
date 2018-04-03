@@ -10,10 +10,6 @@ namespace Orleans.Transactions.Tests
     {
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                legacy.ClusterConfiguration.AddMemoryStorageProvider(TransactionTestConstants.TransactionStore);
-            });
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         }
 
@@ -22,6 +18,7 @@ namespace Orleans.Transactions.Tests
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
+                    .AddMemoryGrainStorage(TransactionTestConstants.TransactionStore)
                     .UseInClusterTransactionManager()
                     .UseInMemoryTransactionLog()
                     .UseTransactionalState();

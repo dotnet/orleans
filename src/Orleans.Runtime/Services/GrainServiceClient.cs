@@ -38,7 +38,7 @@ namespace Orleans.Runtime.Services
         {
             get
             {
-                // Currently we only support a single GrainService per Silo, hence we pass Zero here instead of partitioning.
+                // Currently we only support a single GrainService per Silo, hence we pass zero here instead of partitioning.
                 var grainId = GrainId.GetGrainServiceGrainId(0, grainTypeCode);
 
                 var destination = MapGrainReferenceToSiloRing(CallingGrainReference);

@@ -9,7 +9,6 @@
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Orleans.Hosting.ServiceFabric\Orleans.Hosting.ServiceFabric.csproj" />
-    <ProjectReference Include="..\Orleans.Clustering.ServiceFabric\Orleans.Clustering.ServiceFabric.csproj" />
+    <PackageReference Include="Microsoft.Orleans.Hosting.ServiceFabric" Version="2.0.0" />
   </ItemGroup>
 </Project>

@@ -1,17 +1,35 @@
+using System;
 using System.Threading.Tasks;
 
 namespace Orleans
 {
     /// <summary>
-    /// Interface for grain call filters.
+    /// Interface for incoming grain call filters.
     /// </summary>
-    public interface IGrainCallFilter
+    public interface IIncomingGrainCallFilter
     {
         /// <summary>
         /// Invokes this filter.
         /// </summary>
         /// <param name="context">The grain call context.</param>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
-        Task Invoke(IGrainCallContext context);
+        Task Invoke(IIncomingGrainCallContext context);
+    }
+
+    /// <inheritdoc />
+    [Obsolete("Use " + nameof(IIncomingGrainCallFilter))]
+    public interface IGrainCallFilter : IIncomingGrainCallFilter { }
+
+    /// <summary>
+    /// Interface for outgoing grain call filters.
+    /// </summary>
+    public interface IOutgoingGrainCallFilter
+    {
+        /// <summary>
+        /// Invokes this filter.
+        /// </summary>
+        /// <param name="context">The grain call context.</param>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        Task Invoke(IOutgoingGrainCallContext context);
     }
 }

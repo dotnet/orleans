@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
@@ -30,25 +29,5 @@ namespace Orleans.Configuration
         /// </summary>
         public StatisticsLevel CollectionLevel { get; set; } = DEFAULT_COLLECTION_LEVEL;
         public static readonly StatisticsLevel DEFAULT_COLLECTION_LEVEL = StatisticsLevel.Info;
-    }
-
-    public abstract class StatisticsOptionsFormatter
-    {
-        private readonly StatisticsOptions options;
-
-        protected StatisticsOptionsFormatter(StatisticsOptions options)
-        {
-            this.options = options;
-        }
-
-        protected List<string> FormatSharedOptions()
-        {
-            return new List<string>()
-            {
-                OptionFormattingUtilities.Format(nameof(this.options.PerfCountersWriteInterval), this.options.PerfCountersWriteInterval),
-                OptionFormattingUtilities.Format(nameof(this.options.LogWriteInterval), this.options.LogWriteInterval),
-                OptionFormattingUtilities.Format(nameof(this.options.CollectionLevel), this.options.CollectionLevel),
-            };
-        }
     }
 }

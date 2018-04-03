@@ -11,6 +11,7 @@ using UnitTests.TestHelper;
 using Xunit;
 using Xunit.Abstractions;
 using System.Linq;
+using Orleans.Runtime.Configuration;
 
 namespace UnitTests.ActivationsLifeCycleTests
 {
@@ -191,6 +192,14 @@ namespace UnitTests.ActivationsLifeCycleTests
                 legacy.ClusterConfiguration.Globals.MaxForwardCount = forwardCount;
                 // For this test we only want to talk to the primary
                 legacy.ClientConfiguration.Gateways.RemoveAt(1);
+                if (forwardCount == 0)
+                {
+                    // Disable reminder service for this test: when the secondary silo starts it may
+                    // not see right away the activation from the primary silo. This request should be forwarded 
+                    // to the correct activation, but since we deactivate forwarding, the secondary silo will
+                    // fail to start...
+                    legacy.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
+                }
             });
             Initialize(builder);
 
@@ -261,7 +270,11 @@ namespace UnitTests.ActivationsLifeCycleTests
             {
                 // Disable retries in this case, to make test more predictable.
                 legacy.ClusterConfiguration.Globals.MaxForwardCount = 0;
-                legacy.ClientConfiguration.Gateways.RemoveAt(1);
+                // Disable reminder service for this test: when the secondary silo starts it may
+                // not see right away the activation from the primary silo. This request should be forwarded 
+                // to the correct activation, but since we deactivate forwarding, the secondary silo will
+                // fail to start...
+                legacy.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
             });
             Initialize(builder);
             for (int i = 0; i < 10; i++)
@@ -301,6 +314,11 @@ namespace UnitTests.ActivationsLifeCycleTests
                 // Disable retries in this case, to make test more predictable.
                 legacy.ClusterConfiguration.Globals.MaxForwardCount = 0;
                 legacy.ClientConfiguration.Gateways.RemoveAt(1);
+                // Disable reminder service for this test: when the secondary silo starts it may
+                // not see right away the activation from the primary silo. This request should be forwarded 
+                // to the correct activation, but since we deactivate forwarding, the secondary silo will
+                // fail to start...
+                legacy.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
             });
 
             Initialize(builder);

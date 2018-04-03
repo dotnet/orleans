@@ -38,11 +38,5 @@ namespace Orleans.Providers.Streams.Generator
         /// Stream generator type
         /// </summary>
         Type StreamGeneratorType { get; }
-
-        /// <summary>
-        /// Populates generator configuration from provider configuration
-        /// </summary>
-        /// <param name="providerConfiguration"></param>
-        void PopulateFromProviderConfig(IProviderConfiguration providerConfiguration);
     }
 }

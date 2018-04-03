@@ -11,8 +11,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.CodeGeneration;
-using Orleans.Core;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Counters;
 using Orleans.Runtime.GrainDirectory;
@@ -53,7 +51,7 @@ namespace Orleans.Runtime
         }
 
         private readonly ILocalSiloDetails siloDetails;
-        private readonly SiloOptions siloOptions;
+        private readonly ClusterOptions clusterOptions;
         private readonly ISiloMessageCenter messageCenter;
         private readonly OrleansTaskScheduler scheduler;
         private readonly LocalGrainDirectory localGrainDirectory;
@@ -79,8 +77,8 @@ namespace Orleans.Runtime
         private readonly List<IHealthCheckParticipant> healthCheckParticipants = new List<IHealthCheckParticipant>();
         private readonly object lockable = new object();
         private readonly GrainFactory grainFactory;
-        private readonly IGrainRuntime grainRuntime;
-        private readonly ILifecycleObserver siloLifecycle;
+        private readonly ISiloLifecycleSubject siloLifecycle;
+        private List<GrainService> grainServices = new List<GrainService>();
 
         private readonly ILoggerFactory loggerFactory;
         /// <summary>
@@ -111,11 +109,12 @@ namespace Orleans.Runtime
         private SchedulingContext membershipOracleContext;
         private SchedulingContext multiClusterOracleContext;
         private SchedulingContext reminderServiceContext;
+        private LifecycleSchedulingSystemTarget lifecycleSchedulingSystemTarget;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Silo"/> class.
         /// </summary>
-        /// <param name="initializationParams">The silo initialization parameters.</param>
+        /// <param name="siloDetails">The silo initialization parameters</param>
         /// <param name="services">Dependency Injection container</param>
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "Should not Dispose of messageCenter in this method because it continues to run / exist after this point.")]
@@ -132,11 +131,11 @@ namespace Orleans.Runtime
             IOptions<SiloStatisticsOptions> statisticsOptions = services.GetRequiredService<IOptions<SiloStatisticsOptions>>();
             StatisticsCollector.Initialize(statisticsOptions.Value.CollectionLevel);
 
-            IOptions<MembershipOptions> membershipOptions = services.GetRequiredService<IOptions<MembershipOptions>>();
-            initTimeout = membershipOptions.Value.MaxJoinAttemptTime;
+            IOptions<ClusterMembershipOptions> clusterMembershipOptions = services.GetRequiredService<IOptions<ClusterMembershipOptions>>();
+            initTimeout = clusterMembershipOptions.Value.MaxJoinAttemptTime;
             if (Debugger.IsAttached)
             {
-                initTimeout = StandardExtensions.Max(TimeSpan.FromMinutes(10), membershipOptions.Value.MaxJoinAttemptTime);
+                initTimeout = StandardExtensions.Max(TimeSpan.FromMinutes(10), clusterMembershipOptions.Value.MaxJoinAttemptTime);
                 stopTimeout = initTimeout;
             }
 
@@ -191,9 +190,6 @@ namespace Orleans.Runtime
             messageCenter.RerouteHandler = dispatcher.RerouteMessage;
             messageCenter.SniffIncomingMessage = runtimeClient.SniffIncomingMessage;
 
-            // GrainRuntime can be created only here, after messageCenter was created.
-            this.grainRuntime = Services.GetRequiredService<IGrainRuntime>();
-
             // Now the router/directory service
             // This has to come after the message center //; note that it then gets injected back into the message center.;
             localGrainDirectory = Services.GetRequiredService<LocalGrainDirectory>();
@@ -215,7 +211,7 @@ namespace Orleans.Runtime
             incomingAgent = new IncomingMessageAgent(Message.Categories.Application, messageCenter, activationDirectory, scheduler, catalog.Dispatcher, messageFactory, executorService, this.loggerFactory);
 
             membershipOracle = Services.GetRequiredService<IMembershipOracle>();
-            this.siloOptions = Services.GetRequiredService<IOptions<SiloOptions>>().Value;
+            this.clusterOptions = Services.GetRequiredService<IOptions<ClusterOptions>>().Value;
             var multiClusterOptions = Services.GetRequiredService<IOptions<MultiClusterOptions>>().Value;
 
             if (!multiClusterOptions.HasMultiClusterNetwork)
@@ -233,13 +229,12 @@ namespace Orleans.Runtime
             StringValueStatistic.FindOrCreate(StatisticNames.SILO_START_TIME,
                 () => LogFormatter.PrintDate(startTime)); // this will help troubleshoot production deployment when looking at MDS logs.
 
-            var fullSiloLifecycle = this.Services.GetRequiredService<SiloLifecycle>();
-            this.siloLifecycle = fullSiloLifecycle;
+            this.siloLifecycle = this.Services.GetRequiredService<ISiloLifecycleSubject>();
             // register all lifecycle participants
             IEnumerable<ILifecycleParticipant<ISiloLifecycle>> lifecycleParticipants = this.Services.GetServices<ILifecycleParticipant<ISiloLifecycle>>();
             foreach(ILifecycleParticipant<ISiloLifecycle> participant in lifecycleParticipants)
             {
-                participant?.Participate(fullSiloLifecycle);
+                participant?.Participate(this.siloLifecycle);
             }
             // register all named lifecycle participants
             IKeyedServiceCollection<string, ILifecycleParticipant<ISiloLifecycle>> namedLifecycleParticipantCollection = this.Services.GetService<IKeyedServiceCollection<string,ILifecycleParticipant<ISiloLifecycle>>>();
@@ -247,11 +242,11 @@ namespace Orleans.Runtime
                 ?.GetServices(this.Services)
                 ?.Select(s => s.GetService(this.Services)))
             {
-                participant?.Participate(fullSiloLifecycle);
+                participant?.Participate(this.siloLifecycle);
             }
 
             // add self to lifecycle
-            this.Participate(fullSiloLifecycle);
+            this.Participate(this.siloLifecycle);
 
             logger.Info(ErrorCode.SiloInitializingFinished, "-------------- Started silo {0}, ConsistentHashCode {1:X} --------------", SiloAddress.ToLongString(), SiloAddress.GetConsistentHashCode());
         }
@@ -263,9 +258,16 @@ namespace Orleans.Runtime
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
+            StartTaskWithPerfAnalysis("Start Scheduler", scheduler.Start, new Stopwatch());
+
+            // SystemTarget for provider init calls
+            this.lifecycleSchedulingSystemTarget = Services.GetRequiredService<LifecycleSchedulingSystemTarget>();
+            this.fallbackScheduler = Services.GetRequiredService<FallbackSystemTarget>();
+            RegisterSystemTarget(lifecycleSchedulingSystemTarget);
+
             try
             {
-                await this.siloLifecycle.OnStart(cancellationToken);
+                await this.scheduler.QueueTask(() => this.siloLifecycle.OnStart(cancellationToken), this.lifecycleSchedulingSystemTarget.SchedulingContext);
             }
             catch (Exception exc)
             {
@@ -317,7 +319,7 @@ namespace Orleans.Runtime
                 logger.Debug("Creating {0} System Target", "MultiClusterOracle");
                 RegisterSystemTarget((SystemTarget)multiClusterOracle);
             }
-
+            
             var transactionAgent = this.Services.GetRequiredService<ITransactionAgent>() as SystemTarget;
             if (transactionAgent != null)
             {
@@ -362,10 +364,6 @@ namespace Orleans.Runtime
             // SystemTarget for provider init calls
             this.fallbackScheduler = Services.GetRequiredService<FallbackSystemTarget>();
             RegisterSystemTarget(fallbackScheduler);
-
-            // SystemTarget for startup tasks
-            var startupTaskTarget = Services.GetRequiredService<StartupTaskSystemTarget>();
-            RegisterSystemTarget(startupTaskTarget);
         }
 
         private Task OnRuntimeInitializeStart(CancellationToken ct)
@@ -411,7 +409,6 @@ namespace Orleans.Runtime
             //TODO: Setup all (or as many as possible) of the class started in this call to work directly with lifecyce
             var stopWatch = Stopwatch.StartNew();
             // The order of these 4 is pretty much arbitrary.
-            StartTaskWithPerfAnalysis("Start Scheduler", scheduler.Start, stopWatch);
             StartTaskWithPerfAnalysis("Start Message center",messageCenter.Start,stopWatch);
             StartTaskWithPerfAnalysis("Start Incoming message agents", IncomingMessageAgentsStart, stopWatch);
             void IncomingMessageAgentsStart()
@@ -463,9 +460,8 @@ namespace Orleans.Runtime
             }
 
             // Load and init grain services before silo becomes active.
-            GrainServiceOptions grainServiceOptions = Services.GetRequiredService<IOptions<GrainServiceOptions>>().Value;
             await StartAsyncTaskWithPerfAnalysis("Init grain services",
-                () => CreateGrainServices(grainServiceOptions), stopWatch);
+                () => CreateGrainServices(), stopWatch);
 
             this.membershipOracleContext = (this.membershipOracle as SystemTarget)?.SchedulingContext ??
                                        this.fallbackScheduler.SchedulingContext;
@@ -477,9 +473,6 @@ namespace Orleans.Runtime
                 await scheduler.QueueTask(() => this.membershipOracle.Start(), this.membershipOracleContext)
                     .WithTimeout(initTimeout, $"Starting MembershipOracle failed due to timeout {initTimeout}");
                 logger.Debug("Local silo status oracle created successfully.");
-                await scheduler.QueueTask(this.membershipOracle.BecomeActive, this.membershipOracleContext)
-                    .WithTimeout(initTimeout, $"MembershipOracle activating failed due to timeout {initTimeout}");
-                logger.Debug("Local silo status oracle became active successfully.");
             }
 
             var versionStore = Services.GetService<IVersionStore>();
@@ -494,7 +487,7 @@ namespace Orleans.Runtime
                 async Task StartMultiClusterOracle()
                 {
                     logger.Info("Starting multicluster oracle with my ServiceId={0} and ClusterId={1}.",
-                        this.siloOptions.ServiceId, this.siloOptions.ClusterId);
+                        this.clusterOptions.ServiceId, this.clusterOptions.ClusterId);
 
                     this.multiClusterOracleContext = (multiClusterOracle as SystemTarget)?.SchedulingContext ??
                                                      this.fallbackScheduler.SchedulingContext;
@@ -525,30 +518,6 @@ namespace Orleans.Runtime
                 this.platformWatchdog = new Watchdog(statisticsOptions.LogWriteInterval, this.healthCheckParticipants, this.executorService, this.loggerFactory);
                 this.platformWatchdog.Start();
                 if (this.logger.IsEnabled(LogLevel.Debug)) { logger.Debug("Silo platform watchdog started successfully."); }
-
-                if (this.reminderService != null)
-                {
-                    await StartAsyncTaskWithPerfAnalysis("Start reminder service", StartReminderService, stopWatch);
-                    async Task StartReminderService()
-                    {
-                        // so, we have the view of the membership in the consistentRingProvider. We can start the reminder service
-                        this.reminderServiceContext = (this.reminderService as SystemTarget)?.SchedulingContext ??
-                                                      this.fallbackScheduler.SchedulingContext;
-                        await this.scheduler.QueueTask(this.reminderService.Start, this.reminderServiceContext)
-                            .WithTimeout(this.initTimeout, $"Starting ReminderService failed due to timeout {initTimeout}");
-                        this.logger.Debug("Reminder service started successfully.");
-                    }
-                }
-
-                StartTaskWithPerfAnalysis("Start gateway", StartGateway, stopWatch);
-                void StartGateway()
-                {
-                    // Now that we're active, we can start the gateway
-                    var mc = this.messageCenter as MessageCenter;
-                    mc?.StartGateway(this.Services.GetRequiredService<ClientObserverRegistrar>());
-                    logger.Debug("Message gateway service started successfully.");
-                }
-                this.SystemStatus = SystemStatus.Running;
             }
             catch (Exception exc)
             {
@@ -558,35 +527,76 @@ namespace Orleans.Runtime
             if (logger.IsEnabled(LogLevel.Debug)) { logger.Debug("Silo.Start complete: System status = {0}", this.SystemStatus); }
         }
 
-        private async Task CreateGrainServices(GrainServiceOptions grainServiceOptions)
+        private async Task OnBecomeActiveStart(CancellationToken ct)
         {
-            foreach (KeyValuePair<string, short> serviceConfig in grainServiceOptions.GrainServices)
+            var stopWatch = Stopwatch.StartNew();
+            StartTaskWithPerfAnalysis("Start gateway", StartGateway, stopWatch);
+            void StartGateway()
             {
-                // Construct the Grain Service
-                var serviceType = System.Type.GetType(serviceConfig.Key);
-                if (serviceType == null)
-                {
-                    throw new Exception(String.Format("Cannot find Grain Service type {0} of with Service Id {1}", serviceConfig.Key, serviceConfig.Value));
-                }
-                
-                var grainServiceInterfaceType = serviceType.GetInterfaces().FirstOrDefault(x => x.GetInterfaces().Contains(typeof(IGrainService)));
-                if (grainServiceInterfaceType == null)
-                {
-                    throw new Exception(String.Format("Cannot find an interface on {0} which implements IGrainService", serviceConfig.Value));
-                }
+                // Now that we're active, we can start the gateway
+                var mc = this.messageCenter as MessageCenter;
+                mc?.StartGateway(this.Services.GetRequiredService<ClientObserverRegistrar>());
+                logger.Debug("Message gateway service started successfully.");
+            }
 
-                var typeCode = GrainInterfaceUtils.GetGrainClassTypeCode(grainServiceInterfaceType);
-                var grainId = (IGrainIdentity)GrainId.GetGrainServiceGrainId(serviceConfig.Value, typeCode);
-                var grainService = (GrainService)ActivatorUtilities.CreateInstance(this.Services, serviceType, grainId);
-                RegisterSystemTarget(grainService);
+            await StartAsyncTaskWithPerfAnalysis("Starting local silo status oracle", BecomeActive, stopWatch);
+            async Task BecomeActive()
+            {
+                await scheduler.QueueTask(this.membershipOracle.BecomeActive, this.membershipOracleContext)
+                .WithTimeout(initTimeout, $"MembershipOracle activating failed due to timeout {initTimeout}");
+                logger.Debug("Local silo status oracle became active successfully.");
+            }
+            this.SystemStatus = SystemStatus.Running;
+        }
 
-                await this.scheduler.QueueTask(() => grainService.Init(Services), grainService.SchedulingContext).WithTimeout(this.initTimeout, $"GrainService Initializing failed due to timeout {initTimeout}");
-                await this.scheduler.QueueTask(grainService.Start, grainService.SchedulingContext).WithTimeout(this.initTimeout, $"Starting GrainService failed due to timeout {initTimeout}");
-                if (this.logger.IsEnabled(LogLevel.Debug))
+        private async Task OnActiveStart(CancellationToken ct)
+        {
+            var stopWatch = Stopwatch.StartNew();
+            if (this.reminderService != null)
+            {
+                await StartAsyncTaskWithPerfAnalysis("Start reminder service", StartReminderService, stopWatch);
+                async Task StartReminderService()
                 {
-                    logger.Debug(String.Format("{0} Grain Service with Id {1} started successfully.", serviceConfig.Key, serviceConfig.Value));
+                    // so, we have the view of the membership in the consistentRingProvider. We can start the reminder service
+                    this.reminderServiceContext = (this.reminderService as SystemTarget)?.SchedulingContext ??
+                                                  this.fallbackScheduler.SchedulingContext;
+                    await this.scheduler.QueueTask(this.reminderService.Start, this.reminderServiceContext)
+                        .WithTimeout(this.initTimeout, $"Starting ReminderService failed due to timeout {initTimeout}");
+                    this.logger.Debug("Reminder service started successfully.");
                 }
             }
+            foreach (var grainService in grainServices)
+            {
+                await StartGrainService(grainService);
+            }
+        }
+
+        private async Task CreateGrainServices()
+        {
+            var grainServices = this.Services.GetServices<IGrainService>();
+            foreach (var grainService in grainServices)
+            {
+                await RegisterGrainService(grainService);
+
+            }
+        }
+
+        private async Task RegisterGrainService(IGrainService service)
+        {
+            var grainService = (GrainService)service;
+            RegisterSystemTarget(grainService);
+            grainServices.Add(grainService);
+
+            await this.scheduler.QueueTask(() => grainService.Init(Services), grainService.SchedulingContext).WithTimeout(this.initTimeout, $"GrainService Initializing failed due to timeout {initTimeout}");
+            logger.Info($"Grain Service {service.GetType().FullName} registered successfully.");
+        }
+
+        private async Task StartGrainService(IGrainService service)
+        {
+            var grainService = (GrainService)service;
+
+            await this.scheduler.QueueTask(grainService.Start, grainService.SchedulingContext).WithTimeout(this.initTimeout, $"Starting GrainService failed due to timeout {initTimeout}");
+            logger.Info($"Grain Service {service.GetType().FullName} started successfully.");
         }
 
         private void ConfigureThreadPoolAndServicePointSettings()
@@ -655,7 +665,7 @@ namespace Orleans.Runtime
         /// Gracefully stop the run time system only, but not the application. 
         /// Applications requests would be abruptly terminated, while the internal system state gracefully stopped and saved as much as possible.
         /// </summary>
-        public Task StopAsync(CancellationToken cancellationToken)
+        public async Task StopAsync(CancellationToken cancellationToken)
         {
             bool gracefully = !cancellationToken.IsCancellationRequested;
             string operation = gracefully ? "Shutdown()" : "Stop()";
@@ -691,22 +701,23 @@ namespace Orleans.Runtime
                     logger.Info(ErrorCode.WaitingForSiloStop, "Waiting {0} for termination to complete", pause);
                     Thread.Sleep(pause);
                 }
-                return this.siloTerminatedTask.Task;
+
+                await this.siloTerminatedTask.Task;
+                return;
             }
-            return this.siloLifecycle.OnStop(cancellationToken);
+
+            try
+            {
+                await this.scheduler.QueueTask(() => this.siloLifecycle.OnStop(cancellationToken), this.lifecycleSchedulingSystemTarget.SchedulingContext);
+            } finally
+            {
+                SafeExecute(scheduler.Stop);
+                SafeExecute(scheduler.PrintStatistics);
+            }
         }
 
         private Task OnRuntimeServicesStop(CancellationToken cancellationToken)
         {
-            if (!cancellationToken.IsCancellationRequested)
-            {
-                // Deactivate all grains
-                SafeExecute(() => catalog.DeactivateAllActivations().WaitWithThrow(stopTimeout));
-            }
-
-            // Stop the gateway
-            SafeExecute(messageCenter.StopAcceptingClientMessages);
-
             // Start rejecting all silo to silo application messages
             SafeExecute(messageCenter.BlockApplicationMessages);
 
@@ -719,41 +730,6 @@ namespace Orleans.Runtime
             SafeExecute(() => LocalGrainDirectory.StopPreparationCompletion.WaitWithThrow(stopTimeout));
 
             return Task.CompletedTask;
-        }
-
-        private async Task OnRuntimeGrainServicesStop(CancellationToken cancellationToken)
-        {
-            bool gracefully = !cancellationToken.IsCancellationRequested;
-            string operation = gracefully ? "Shutdown()" : "Stop()";
-            try
-            {
-                if (gracefully)
-                {
-                    logger.Info(ErrorCode.SiloShuttingDown, "Silo starting to Shutdown()");
-                    // 1: Write "ShutDown" state in the table + broadcast gossip msgs to re-read the table to everyone
-                    await scheduler.QueueTask(this.membershipOracle.ShutDown, this.membershipOracleContext)
-                        .WithTimeout(stopTimeout, $"MembershipOracle Shutting down failed due to timeout {stopTimeout}");
-                }
-                else
-                {
-                    logger.Info(ErrorCode.SiloStopping, "Silo starting to Stop()");
-                    // 1: Write "Stopping" state in the table + broadcast gossip msgs to re-read the table to everyone
-                    await scheduler.QueueTask(this.membershipOracle.Stop, this.membershipOracleContext)
-                        .WithTimeout(stopTimeout, $"Stopping MembershipOracle faield due to timeout {stopTimeout}");
-                }
-            }
-            catch (Exception exc)
-            {
-                logger.Error(ErrorCode.SiloFailedToStopMembership, String.Format("Failed to {0} membership oracle. About to FastKill this silo.", operation), exc);
-                return; // will go to finally
-            }
-
-            if (reminderService != null)
-            {
-                // 2: Stop reminder service
-                await scheduler.QueueTask(reminderService.Stop, this.reminderServiceContext)
-                    .WithTimeout(stopTimeout, $"Stopping ReminderService failed due to timeout {stopTimeout}");
-            }
         }
 
         private Task OnRuntimeInitializeStop(CancellationToken ct)
@@ -773,8 +749,6 @@ namespace Orleans.Runtime
             if (platformWatchdog != null) 
                 SafeExecute(platformWatchdog.Stop); // Silo may be dying before platformWatchdog was set up
 
-            SafeExecute(scheduler.Stop);
-            SafeExecute(scheduler.PrintStatistics);
             SafeExecute(activationDirectory.PrintActivationDirectory);
             SafeExecute(messageCenter.Stop);
             SafeExecute(siloStatistics.Stop);
@@ -786,6 +760,56 @@ namespace Orleans.Runtime
             // Do nothing after that!
             this.siloTerminatedTask.SetResult(0);
             return Task.CompletedTask;
+        }
+
+        private async Task OnBecomeActiveStop(CancellationToken ct)
+        {
+            bool gracefully = !ct.IsCancellationRequested;
+            string operation = gracefully ? "Shutdown()" : "Stop()";
+            try
+            {
+                if (gracefully)
+                {
+                    logger.Info(ErrorCode.SiloShuttingDown, "Silo starting to Shutdown()");
+                    // Write "ShutDown" state in the table + broadcast gossip msgs to re-read the table to everyone
+                    await scheduler.QueueTask(this.membershipOracle.ShutDown, this.membershipOracleContext)
+                        .WithTimeout(stopTimeout, $"MembershipOracle Shutting down failed due to timeout {stopTimeout}");
+                    // Deactivate all grains
+                    SafeExecute(() => catalog.DeactivateAllActivations().WaitWithThrow(stopTimeout));
+                }
+                else
+                {
+                    logger.Info(ErrorCode.SiloStopping, "Silo starting to Stop()");
+                    // Write "Stopping" state in the table + broadcast gossip msgs to re-read the table to everyone
+                    await scheduler.QueueTask(this.membershipOracle.Stop, this.membershipOracleContext)
+                        .WithTimeout(stopTimeout, $"Stopping MembershipOracle faield due to timeout {stopTimeout}");
+                }
+            }
+            catch (Exception exc)
+            {
+                logger.Error(ErrorCode.SiloFailedToStopMembership, String.Format("Failed to {0} membership oracle. About to FastKill this silo.", operation), exc);
+                return; // will go to finally
+            }
+            // Stop the gateway
+            SafeExecute(messageCenter.StopAcceptingClientMessages);
+        }
+
+        private async Task OnActiveStop(CancellationToken ct)
+        {
+            if (reminderService != null)
+            {
+                // 2: Stop reminder service
+                await scheduler.QueueTask(reminderService.Stop, this.reminderServiceContext)
+                    .WithTimeout(stopTimeout, $"Stopping ReminderService failed due to timeout {stopTimeout}");
+            }
+            foreach (var grainService in grainServices)
+            {
+                await this.scheduler.QueueTask(grainService.Stop, grainService.SchedulingContext).WithTimeout(this.stopTimeout, $"Stopping GrainService failed due to timeout {initTimeout}");
+                if (this.logger.IsEnabled(LogLevel.Debug))
+                {
+                    logger.Debug(String.Format("{0} Grain Service with Id {1} stopped successfully.", grainService.GetType().FullName, grainService.GetPrimaryKeyLong(out string ignored)));
+                }
+            }
         }
 
         private void SafeExecute(Action action)
@@ -850,10 +874,11 @@ namespace Orleans.Runtime
 
         private void Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
-            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeServices, OnRuntimeServicesStart, OnRuntimeServicesStop);
-            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeGrainServices, OnRuntimeGrainServicesStart, OnRuntimeGrainServicesStop);
-            
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeInitialize, (ct) => Task.Run(() => OnRuntimeInitializeStart(ct)), (ct) => Task.Run(() => OnRuntimeInitializeStop(ct)));
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeServices, (ct) => Task.Run(() => OnRuntimeServicesStart(ct)), (ct) => Task.Run(() => OnRuntimeServicesStop(ct)));
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeGrainServices, (ct) => Task.Run(() => OnRuntimeGrainServicesStart(ct)));
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.BecomeActive, (ct) => Task.Run(() => OnBecomeActiveStart(ct)), (ct) => Task.Run(() => OnBecomeActiveStop(ct)));
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.Active, (ct) => Task.Run(() => OnActiveStart(ct)), (ct) => Task.Run(() => OnActiveStop(ct)));
         }
     }
 
@@ -866,11 +891,11 @@ namespace Orleans.Runtime
         }
     }
 
-    // A dummy system target for scheduling startup tasks.
-    internal class StartupTaskSystemTarget : SystemTarget
+    // A dummy system target for fallback scheduler
+    internal class LifecycleSchedulingSystemTarget : SystemTarget
     {
-        public StartupTaskSystemTarget(ILocalSiloDetails localSiloDetails, ILoggerFactory loggerFactory)
-            : base(Constants.StartupTaskSystemTargetId, localSiloDetails.SiloAddress, loggerFactory)
+        public LifecycleSchedulingSystemTarget(ILocalSiloDetails localSiloDetails, ILoggerFactory loggerFactory)
+            : base(Constants.LifecycleSchedulingSystemTargetId, localSiloDetails.SiloAddress, loggerFactory)
         {
         }
     }

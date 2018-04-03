@@ -1,19 +1,19 @@
 using System;
 using System.Threading.Tasks;
 using System.Collections.Generic;
-using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
-using UnitTests.GrainInterfaces;
-using Orleans.TestingHost;
+using Microsoft.Extensions.Options;
 using Xunit;
+using Orleans.Hosting;
+using Orleans.TestingHost;
+using UnitTests.GrainInterfaces;
 using TestExtensions;
 using Tester;
-using Microsoft.Extensions.Options;
+
 using Orleans.Configuration;
 
 namespace Tests.GeoClusterTests
 {
-    [TestCategory("GeoCluster")]
+    [TestCategory("GeoCluster"), TestCategory("Functional")]
     public class BasicLogTestGrainTests : IClassFixture<BasicLogTestGrainTests.Fixture>
     {
         private readonly Fixture fixture;
@@ -24,17 +24,6 @@ namespace Tests.GeoClusterTests
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.Options.InitialSilosCount = 1;
-
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                    legacy.ClusterConfiguration.AddStateStorageBasedLogConsistencyProvider();
-                    legacy.ClusterConfiguration.AddLogStorageBasedLogConsistencyProvider();
-                    legacy.ClusterConfiguration.AddCustomStorageInterfaceBasedLogConsistencyProvider("CustomStorage");
-
-                    legacy.ClusterConfiguration.AddCustomStorageInterfaceBasedLogConsistencyProvider("CustomStoragePrimaryCluster", "A");
-                });
                 builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
             }
 
@@ -43,16 +32,20 @@ namespace Tests.GeoClusterTests
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddAzureTableGrainStorageAsDefault(builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                        .AddStateStorageBasedLogConsistencyProvider()
+                        .AddLogStorageBasedLogConsistencyProvider()
+                        .AddCustomStorageBasedLogConsistencyProvider("CustomStorage")
+                        .AddCustomStorageBasedLogConsistencyProvider("CustomStoragePrimaryCluster", "A")
+                        .AddAzureTableGrainStorageAsDefault(builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
-                            options.ServiceId = silo.Value.ServiceId.ToString();
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         }))
-                        .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                        .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
-                            options.ServiceId = silo.Value.ServiceId.ToString();
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        }));
+                        }))
+                        .AddMemoryGrainStorageAsDefault()
+                        .AddMemoryGrainStorage("MemoryStore"); 
                 }
             }
         }

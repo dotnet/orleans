@@ -5,7 +5,7 @@ namespace Orleans.Runtime.Configuration
     public static class PerfCountersConfigurationExtensions
     {
         /// <summary>
-        /// Adds a metrics telemetric consumer provider of type <see cref="OrleansPerfCounterTelemetryConsumer"/>.
+        /// Adds a metrics telemetric consumer provider./>.
         /// </summary>
         /// <param name="config">The cluster configuration object to add the telemetry consumer to.</param>
         public static void AddPerfCountersTelemetryConsumer(this ClusterConfiguration config)

@@ -24,7 +24,7 @@ namespace Orleans.TestingHost.Tests
         public async Task CanInitialize()
         {
             var builder = new TestClusterBuilder(2);
-            builder.Options.ServiceId = Guid.NewGuid();
+            builder.Options.ServiceId = Guid.NewGuid().ToString();
             builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
             this.testCluster = builder.Build();
 
@@ -41,10 +41,7 @@ namespace Orleans.TestingHost.Tests
         {
             var builder = new TestClusterBuilder(2);
             builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
-            });
+            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             this.testCluster = builder.Build();
 
             await this.testCluster.DeployAsync();
@@ -55,6 +52,13 @@ namespace Orleans.TestingHost.Tests
             Assert.Equal(2, await grain.GetA());
         }
 
+        public class SiloConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder.AddMemoryGrainStorageAsDefault();
+            }
+        }
         public void Dispose()
         {
             this.testCluster?.StopAllSilos();

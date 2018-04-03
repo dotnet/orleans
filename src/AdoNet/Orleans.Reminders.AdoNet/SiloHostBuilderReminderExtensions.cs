@@ -11,77 +11,38 @@ namespace Orleans.Hosting
     /// </summary>
     public static class SiloHostBuilderReminderExtensions
     {
-        /// <summary>
-        /// Adds reminder storage using ADO.NET.
-        /// </summary>
-        /// <param name="builder">
-        /// The builder.
-        /// </param>
-        /// <param name="configure">
-        /// The delegate used to configure the reminder store.
-        /// </param>
-        /// <returns>
-        /// The provided <see cref="ISiloHostBuilder"/>, for chaining.
-        /// </returns>
-        public static ISiloHostBuilder UseAdoNetReminderService(this ISiloHostBuilder builder, Action<AdoNetReminderTableOptions> configure)
+        /// <summary>Adds reminder storage using ADO.NET.</summary>
+        /// <param name="builder">The builder.</param>
+        /// <param name="configureOptions">Configuration delegate.</param>
+        /// <returns>The provided <see cref="ISiloHostBuilder"/>, for chaining.</returns>
+        public static ISiloHostBuilder UseAdoNetReminderService(
+            this ISiloHostBuilder builder,
+            Action<AdoNetReminderTableOptions> configureOptions)
         {
-            builder.ConfigureServices(services => services.UseAdoNetReminderService(configure));
-            return builder;
+            return builder.UseAdoNetReminderService(ob => ob.Configure(configureOptions));
         }
 
-        /// <summary>
-        /// Adds reminder storage using ADO.NET.
-        /// </summary>
-        /// <param name="builder">
-        /// The builder.
-        /// </param>
-        /// <param name="connectionString">
-        /// The storage connection string.
-        /// </param>
-        /// <returns>
-        /// The provided <see cref="ISiloHostBuilder"/>, for chaining.
-        /// </returns>
-        public static ISiloHostBuilder UseAdoNetReminderService(this ISiloHostBuilder builder, string connectionString)
+        /// <summary>Adds reminder storage using ADO.NET.</summary>
+        /// <param name="builder">The builder.</param>
+        /// <param name="configureOptions">Configuration delegate.</param>
+        /// <returns>The provided <see cref="ISiloHostBuilder"/>, for chaining.</returns>
+        public static ISiloHostBuilder UseAdoNetReminderService(
+            this ISiloHostBuilder builder,
+            Action<OptionsBuilder<AdoNetReminderTableOptions>> configureOptions)
         {
-            builder.UseAdoNetReminderService(options => options.ConnectionString = connectionString);
-            return builder;
+            return builder.ConfigureServices(services => services.UseAdoNetReminderService(configureOptions));
         }
 
-        /// <summary>
-        /// Adds reminder storage using ADO.NET.
-        /// </summary>
-        /// <param name="services">
-        /// The service collection.
-        /// </param>
-        /// <param name="configure">
-        /// The delegate used to configure the reminder store.
-        /// </param>
-        /// <returns>
-        /// The provided <see cref="ISiloHostBuilder"/>, for chaining.
-        /// </returns>
-        public static IServiceCollection UseAdoNetReminderService(this IServiceCollection services, Action<AdoNetReminderTableOptions> configure)
+        /// <summary>Adds reminder storage using ADO.NET.</summary>
+        /// <param name="services">The service collection.</param>
+        /// <param name="configureOptions">Configuration delegate.</param>
+        /// <returns>The provided <see cref="ISiloHostBuilder"/>, for chaining.</returns>
+        public static IServiceCollection UseAdoNetReminderService(this IServiceCollection services, Action<OptionsBuilder<AdoNetReminderTableOptions>> configureOptions)
         {
             services.AddSingleton<IReminderTable, AdoNetReminderTable>();
-            services.TryConfigureFormatter<AdoNetReminderTableOptions, AdoNetReminderTableOptionsFormatter>();
-            services.Configure(configure);
-            return services;
-        }
-
-        /// <summary>
-        /// Adds reminder storage using ADO.NET.
-        /// </summary>
-        /// <param name="services">
-        /// The service collection.
-        /// </param>
-        /// <param name="connectionString">
-        /// The storage connection string.
-        /// </param>
-        /// <returns>
-        /// The provided <see cref="ISiloHostBuilder"/>, for chaining.
-        /// </returns>
-        public static IServiceCollection UseAdoNetReminderService(this IServiceCollection services, string connectionString)
-        {
-            services.UseAdoNetReminderService(options => options.ConnectionString = connectionString);
+            services.ConfigureFormatter<AdoNetReminderTableOptions>();
+            services.AddSingleton<IConfigurationValidator, AdoNetReminderTableOptionsValidator>();
+            configureOptions(services.AddOptions<AdoNetReminderTableOptions>());
             return services;
         }
     }

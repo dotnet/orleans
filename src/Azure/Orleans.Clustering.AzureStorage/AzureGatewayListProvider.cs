@@ -16,10 +16,10 @@ namespace Orleans.AzureUtils
         private readonly ILoggerFactory loggerFactory;
         private readonly TimeSpan maxStaleness;
 
-        public AzureGatewayListProvider(ILoggerFactory loggerFactory, IOptions<AzureStorageGatewayOptions> options, IOptions<ClusterClientOptions> clusterClientOptions, IOptions<GatewayOptions> gatewayOptions)
+        public AzureGatewayListProvider(ILoggerFactory loggerFactory, IOptions<AzureStorageGatewayOptions> options, IOptions<ClusterOptions> clusterOptions, IOptions<GatewayOptions> gatewayOptions)
         {
             this.loggerFactory = loggerFactory;
-            this.clusterId = clusterClientOptions.Value.ClusterId;
+            this.clusterId = clusterOptions.Value.ClusterId;
             this.maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
             this.options = options.Value;
         }

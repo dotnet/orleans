@@ -56,12 +56,15 @@ namespace Orleans.Runtime.Membership
         /// </summary>
         private string rootConnectionString;
         
-        public ZooKeeperBasedMembershipTable(ILogger<ZooKeeperBasedMembershipTable> logger, IOptions<ZooKeeperClusteringSiloOptions> membershipTableOptions, IOptions<SiloOptions> siloOptions)
+        public ZooKeeperBasedMembershipTable(
+            ILogger<ZooKeeperBasedMembershipTable> logger, 
+            IOptions<ZooKeeperClusteringSiloOptions> membershipTableOptions, 
+            IOptions<ClusterOptions> clusterOptions)
         {
             this.logger = logger;
             var options = membershipTableOptions.Value;
             watcher = new ZooKeeperWatcher(logger);
-            InitConfig(options.ConnectionString, siloOptions.Value.ClusterId);
+            InitConfig(options.ConnectionString, clusterOptions.Value.ClusterId);
         }
 
         /// <summary>

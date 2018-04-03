@@ -9,6 +9,10 @@
     <IsPackable>true</IsPackable>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
   <!-- Configure source link: https://github.com/ctaggart/SourceLink -->
   <PropertyGroup>
     <SourceLinkCreate>true</SourceLinkCreate>

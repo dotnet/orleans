@@ -78,7 +78,9 @@ namespace UnitTests.TestHelper
         /// <param name="siloHandle">The target silo that should provide this information from it's cache</param>
         internal static Task<DetailedGrainReport> GetDetailedGrainReport(IInternalGrainFactory grainFactory, GrainId grainId, SiloHandle siloHandle)
         {
-            var siloControl = grainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, siloHandle.GatewayAddress);
+            // Use the siloAddress here, not the gateway address, since we may be targeting a silo on which we are not 
+            // connected to the gateway
+            var siloControl = grainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, siloHandle.SiloAddress);
             return siloControl.GetDetailedGrainReport(grainId);
         }
     }

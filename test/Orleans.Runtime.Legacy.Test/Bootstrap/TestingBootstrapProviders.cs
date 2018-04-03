@@ -139,7 +139,7 @@ namespace UnitTests.General
             EchoArg = Base + 1
         }
 
-        private Guid serviceId;
+        private string serviceId;
         private string siloId;
 
         private static int idCounter;

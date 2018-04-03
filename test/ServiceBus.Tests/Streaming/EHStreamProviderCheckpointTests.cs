@@ -2,71 +2,84 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.WindowsAzure.Storage.Table;
 using Orleans;
 using Orleans.Providers.Streams.Common;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
-using Orleans.Streaming.EventHubs;
 using TestExtensions;
 using TestGrainInterfaces;
 using TestGrains;
 using UnitTests.Grains;
 using Xunit;
-using Microsoft.WindowsAzure.Storage.Table;
-using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Hosting;
-using Orleans.Storage;
+using Orleans.Configuration;
 
 namespace ServiceBus.Tests.StreamingTests
 {
     [TestCategory("EventHub"), TestCategory("Streaming")]
     public class EHStreamProviderCheckpointTests : TestClusterPerTest
     {
-        private static readonly string StreamProviderTypeName = typeof(EventHubStreamProvider).FullName;
+        private static readonly string StreamProviderTypeName = typeof(PersistentStreamProvider).FullName;
         private const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
         private const string EHPath = "ehorleanstest";
         private const string EHConsumerGroup = "orleansnightly";
-        private const string EHCheckpointTable = "ehcheckpoint";
-        private static readonly string CheckpointNamespace = Guid.NewGuid().ToString();
 
-        private static readonly Lazy<EventHubSettings> EventHubConfig = new Lazy<EventHubSettings>(() =>
-            new EventHubSettings(
-                TestDefaultConfiguration.EventHubConnectionString,
-                EHConsumerGroup, EHPath));
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        {
+            builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+            builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
+        }
 
-        private static readonly EventHubCheckpointerSettings CheckpointerSettings =
-            new EventHubCheckpointerSettings(TestDefaultConfiguration.DataConnectionString,
-                EHCheckpointTable, CheckpointNamespace, TimeSpan.FromSeconds(1));
-
-        private static readonly EventHubStreamProviderSettings ProviderSettings =
-            new EventHubStreamProviderSettings(StreamProviderName);
-
-        private class SiloBuilderConfigurator : ISiloBuilderConfigurator
+        private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
-                hostBuilder.AddAzureBlobGrainStorage(
+                hostBuilder
+                    .AddAzureBlobGrainStorage(
                     ImplicitSubscription_RecoverableStream_CollectorGrain.StorageProviderName,
                     (AzureBlobStorageOptions options) =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                    });
+                    })
+                    .AddEventHubStreams(StreamProviderName, b=>b
+                    .ConfigureEventHub(ob=>ob.Configure(
+                    options =>
+                    {
+                        options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                        options.ConsumerGroup = EHConsumerGroup;
+                        options.Path = EHPath;
+                     
+                    }))
+                    .UseEventHubCheckpointer(ob=>ob.Configure(options => {
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.PersistInterval = TimeSpan.FromSeconds(1);
+                    }))
+                    .UseDynamicClusterConfigDeploymentBalancer()
+                    .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
             }
         }
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        private class MyClientBuilderConfigurator : IClientBuilderConfigurator
         {
-            builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
-            builder.ConfigureLegacyConfiguration(legacy =>
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
-                AdjustConfig(legacy.ClusterConfiguration);
-                AdjustConfig(legacy.ClientConfiguration);
-            });
+                clientBuilder
+                    .AddEventHubStreams(StreamProviderName, b=>b
+                    .ConfigureEventHub(ob => ob.Configure(
+                    options =>
+                    {
+                        options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                        options.ConsumerGroup = EHConsumerGroup;
+                        options.Path = EHPath;
+                    }))
+                    .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
+            }
         }
 
         [Fact]
@@ -81,14 +94,6 @@ namespace ServiceBus.Tests.StreamingTests
         {
             logger.Info("************************ EHRestartSiloAfterCheckpointTest *********************************");
             await this.RestartSiloAfterCheckpointTestRunner(ImplicitSubscription_RecoverableStream_CollectorGrain.StreamNamespace, 8, 32);
-        }
-
-        public override void Dispose()
-        {
-            var dataManager = new AzureTableDataManager<TableEntity>(CheckpointerSettings.TableName, CheckpointerSettings.DataConnectionString, NullLoggerFactory.Instance);
-            dataManager.InitTableAsync().Wait();
-            dataManager.ClearTableAsync().Wait();
-            base.Dispose();
         }
 
         private async Task ReloadFromCheckpointTestRunner(string streamNamespace, int streamCount, int eventsInStream)
@@ -182,34 +187,6 @@ namespace ServiceBus.Tests.StreamingTests
             {
                 await producers[j].OnNextAsync(new GeneratedEvent { EventType = GeneratedEvent.GeneratedEventType.Report, Payload = new int[payloadSize] });
             }
-        }
-
-        private static void AdjustConfig(ClusterConfiguration config)
-        {
-            // register stream provider
-            config.Globals.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
-        }
-
-        private static void AdjustConfig(ClientConfiguration config)
-        {
-            config.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
-        }
-
-        private static Dictionary<string, string> BuildProviderSettings()
-        {
-            var settings = new Dictionary<string, string>();
-
-            // get initial settings from configs
-            ProviderSettings.WriteProperties(settings);
-            EventHubConfig.Value.WriteProperties(settings);
-            CheckpointerSettings.WriteProperties(settings);
-
-            // add queue balancer setting
-            settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.AssemblyQualifiedName);
-
-            // add pub/sub settting
-            settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
-            return settings;
         }
     }
 }

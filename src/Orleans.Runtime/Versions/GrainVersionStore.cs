@@ -1,27 +1,31 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans;
 using Orleans.Storage;
 using Orleans.Versions;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
 using Microsoft.Extensions.DependencyInjection;
+using System.Threading;
 
 namespace Orleans.Runtime.Versions
 {
-    internal class GrainVersionStore : IVersionStore
+    internal class GrainVersionStore : IVersionStore, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly IInternalGrainFactory grainFactory;
+        private readonly IServiceProvider services;
         private readonly string clusterId;
         private IVersionStoreGrain StoreGrain => this.grainFactory.GetGrain<IVersionStoreGrain>(this.clusterId);
 
-        public bool IsEnabled { get; }
+        public bool IsEnabled { get; private set; }
 
         public GrainVersionStore(IInternalGrainFactory grainFactory, ILocalSiloDetails siloDetails, IServiceProvider services)
         {
             this.grainFactory = grainFactory;
+            this.services = services;
             this.clusterId = siloDetails.ClusterId;
-            this.IsEnabled = services.GetService<IGrainStorage>() != null;
+            this.IsEnabled = false;
         }
 
         public async Task SetCompatibilityStrategy(CompatibilityStrategy strategy)
@@ -74,6 +78,17 @@ namespace Orleans.Runtime.Versions
         {
             if (!IsEnabled)
                 throw new OrleansException("Version store not enabled, make sure the store is configured");
+        }
+
+        public void Participate(ISiloLifecycle lifecycle)
+        {
+            lifecycle.Subscribe<GrainVersionStore>(ServiceLifecycleStage.ApplicationServices, this.OnStart);
+        }
+
+        private Task OnStart(CancellationToken token)
+        {
+            this.IsEnabled = this.services.GetService<IGrainStorage>() != null;
+            return Task.CompletedTask;
         }
     }
 }

@@ -1,11 +1,8 @@
-﻿using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System;
 using Microsoft.Extensions.Logging;
+using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
+using Orleans.Configuration;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -15,10 +12,6 @@ namespace Orleans.ServiceBus.Providers
     /// </summary>
     public class AveragingCachePressureMonitor : ICachePressureMonitor
     {
-        /// <summary>
-        /// Default flow control threshold
-        /// </summary>
-        public static readonly double DefaultThreshold = 1.0 / 3.0;
         /// <summary>
         /// Cache monitor which is used to report cache related metrics
         /// </summary>
@@ -38,7 +31,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="logger"></param>
         /// <param name="monitor"></param>
         public AveragingCachePressureMonitor(ILogger logger, ICacheMonitor monitor=null)
-            :this(DefaultThreshold, logger, monitor)
+            :this(EventHubStreamCachePressureOptions.DEFAULT_AVERAGING_CACHE_PRESSURE_MONITORING_THRESHOLD, logger, monitor)
         { }
 
         /// <summary>

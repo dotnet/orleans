@@ -1,9 +1,11 @@
+using Microsoft.Extensions.Configuration;
+using Orleans;
+using Orleans.Hosting;
 using Orleans.Providers.GCP.Streams.PubSub;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using TestExtensions;
 using UnitTests.StreamingTests;
@@ -25,23 +27,42 @@ namespace GoogleUtils.Tests.Streaming
                 throw new SkipException("Google PubSub Simulator not available");
             }
             
-            var providerSettings = new Dictionary<string, string>
-                {
-                    { "ProjectId",  GoogleTestUtils.ProjectId },
-                    { "TopicId",  GoogleTestUtils.TopicId },
-                    { "DeploymentId",  GoogleTestUtils.DeploymentId.ToString()},
-                    { "Deadline",  "600" },
-                    //{ "CustomEndpoint", "localhost:8085" }
-                };
             builder.ConfigureLegacyConfiguration(legacy =>
             {
-                legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-
                 legacy.ClusterConfiguration.Globals.ClusterId = GoogleTestUtils.ProjectId;
                 legacy.ClientConfiguration.ClusterId = GoogleTestUtils.ProjectId;
-                legacy.ClientConfiguration.RegisterStreamProvider<PubSubStreamProvider>(PROVIDER_NAME, providerSettings);
-                legacy.ClusterConfiguration.Globals.RegisterStreamProvider<PubSubStreamProvider>(PROVIDER_NAME, providerSettings);
             });
+            builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+            builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
+        }
+
+        private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder
+                    .AddMemoryGrainStorage("PubSubStore")
+                    .AddPubSubStreams<PubSubDataAdapter>(PROVIDER_NAME, options =>
+                    {
+                        options.ProjectId = GoogleTestUtils.ProjectId;
+                        options.TopicId = GoogleTestUtils.TopicId;
+                        options.Deadline = TimeSpan.FromSeconds(600);
+                    });
+            }
+        }
+
+        private class MyClientBuilderConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder
+                    .AddPubSubStreams<PubSubDataAdapter>(PROVIDER_NAME, options =>
+                    {
+                        options.ProjectId = GoogleTestUtils.ProjectId;
+                        options.TopicId = GoogleTestUtils.TopicId;
+                        options.Deadline = TimeSpan.FromSeconds(600);
+                    });
+            }
         }
 
         public PubSubSubscriptionMultiplicityTests()

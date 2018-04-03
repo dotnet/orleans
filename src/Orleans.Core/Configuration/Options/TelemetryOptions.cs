@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 
 namespace Orleans.Configuration
@@ -22,23 +21,6 @@ namespace Orleans.Configuration
         {
             options.Consumers.Add(typeof(T));
             return options;
-        }
-    }
-
-    public class TelemetryOptionsFormatter : IOptionFormatter<TelemetryOptions>
-    {
-        public string Name => nameof(TelemetryOptions);
-
-        private TelemetryOptions options;
-        public TelemetryOptionsFormatter(IOptions<TelemetryOptions> options)
-        {
-            this.options = options.Value;
-        }
-
-        public IEnumerable<string> Format()
-        {
-            return new List<string>()
-                {OptionFormattingUtilities.Format(nameof(this.options.Consumers), string.Join(";", this.options.Consumers))};
         }
     }
 }

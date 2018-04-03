@@ -25,11 +25,10 @@ namespace Tester.AzureUtils.TimerTests
     {
         private readonly ITestOutputHelper output;
         private readonly TestEnvironmentFixture fixture;
+        private readonly string serviceId;
+        private readonly ILogger log;
+        private readonly ILoggerFactory loggerFactory;
 
-        private Guid serviceId;
-
-        private ILogger log;
-        private ILoggerFactory loggerFactory;
         public ReminderTests_Azure_Standalone(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;
@@ -37,33 +36,33 @@ namespace Tester.AzureUtils.TimerTests
             this.loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{GetType().Name}.log");
             this.log = this.loggerFactory.CreateLogger<ReminderTests_Azure_Standalone>();
 
-            this.serviceId = Guid.NewGuid();
+            this.serviceId = Guid.NewGuid().ToString();
 
             TestUtils.ConfigureClientThreadPoolSettingsForStorageTests(1000);
         }
 
         #region Extra tests / experiments
 
-        [SkippableFact, TestCategory("ReminderService"), TestCategory("Performance")]
+        [SkippableFact, TestCategory("Reminders"), TestCategory("Performance")]
         public async Task Reminders_AzureTable_InsertRate()
         {
-            var siloOptions = Options.Create(new SiloOptions { ClusterId = "TMSLocalTesting", ServiceId = this.serviceId });
+            var clusterOptions = Options.Create(new ClusterOptions { ClusterId = "TMSLocalTesting", ServiceId = this.serviceId });
             var storageOptions = Options.Create(new AzureTableReminderStorageOptions { ConnectionString = TestDefaultConfiguration.DataConnectionString });
 
-            IReminderTable table = new AzureBasedReminderTable(this.fixture.Services.GetRequiredService<IGrainReferenceConverter>(), this.loggerFactory, siloOptions, storageOptions);
+            IReminderTable table = new AzureBasedReminderTable(this.fixture.Services.GetRequiredService<IGrainReferenceConverter>(), this.loggerFactory, clusterOptions, storageOptions);
             await table.Init();
 
             await TestTableInsertRate(table, 10);
             await TestTableInsertRate(table, 500);
         }
 
-        [SkippableFact, TestCategory("ReminderService")]
+        [SkippableFact, TestCategory("Reminders")]
         public async Task Reminders_AzureTable_InsertNewRowAndReadBack()
         {
             string clusterId = NewClusterId();
-            var siloOptions = Options.Create(new SiloOptions { ClusterId = clusterId, ServiceId = this.serviceId });
+            var clusterOptions = Options.Create(new ClusterOptions { ClusterId = clusterId, ServiceId = this.serviceId });
             var storageOptions = Options.Create(new AzureTableReminderStorageOptions { ConnectionString = TestDefaultConfiguration.DataConnectionString });
-            IReminderTable table = new AzureBasedReminderTable(this.fixture.Services.GetRequiredService<IGrainReferenceConverter>(), this.loggerFactory, siloOptions, storageOptions);
+            IReminderTable table = new AzureBasedReminderTable(this.fixture.Services.GetRequiredService<IGrainReferenceConverter>(), this.loggerFactory, clusterOptions, storageOptions);
             await table.Init();
 
             ReminderEntry[] rows = (await GetAllRows(table)).ToArray();

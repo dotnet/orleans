@@ -42,6 +42,100 @@ namespace Tester
         }
 
         [Fact]
+        public void CanResolveGenericFormatter()
+        {
+            // expected output
+            TestLoggerFactory expected = BuildOptionsExpectedResult();
+
+            // actual output
+            var services = new ServiceCollection();
+            services.AddOptions();
+            services.AddSingleton<TestLoggerFactory>();
+            services.AddSingleton<ILoggerFactory>(sp => sp.GetRequiredService<TestLoggerFactory>());
+            services.AddSingleton(typeof(ILogger<>), typeof(TestLogger<>));
+            services.AddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
+            services.AddSingleton<OptionsLogger, TestOptionsLogger>();
+            services.Configure<TestOptions>(options => options.IntField = 1);
+            services.ConfigureFormatter<TestOptions>();
+            var servicesProvider = services.BuildServiceProvider();
+            servicesProvider.GetRequiredService<OptionsLogger>().LogOptions();
+
+            var logFormatters = servicesProvider.GetServices<IOptionFormatter>();
+            Assert.Single(logFormatters);
+            Assert.True(logFormatters.First() is IOptionFormatter<TestOptions>);
+            // ensure logging output is as expected
+            var actual = servicesProvider.GetRequiredService<TestLoggerFactory>();
+            Assert.Equal(expected.ToString(), actual.ToString());
+        }
+
+        [Fact]
+        public void GenericFormatterRedact()
+        {
+            // actual output
+            var services = new ServiceCollection();
+            services.AddOptions();
+            services.AddSingleton<TestLoggerFactory>();
+            services.AddSingleton<ILoggerFactory>(sp => sp.GetRequiredService<TestLoggerFactory>());
+            services.AddSingleton(typeof(ILogger<>), typeof(TestLogger<>));
+            services.AddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
+            services.AddSingleton<OptionsLogger, TestOptionsLogger>();
+            services.Configure<TestOptionsWithSecrets>(options => {
+                options.Data = "Hello";
+                options.Password = "v3ryS3cur3!!!";
+                options.SomeConnectionString = "DefaultEndpointsProtocol=https;AccountName=someAccount;AccountKey=someKey;EndpointSuffix=core.windows.net";
+            });
+            services.ConfigureFormatter<TestOptionsWithSecrets>();
+            var servicesProvider = services.BuildServiceProvider();
+            servicesProvider.GetRequiredService<OptionsLogger>().LogOptions();
+
+            var logFormatters = servicesProvider.GetServices<IOptionFormatter>();
+            Assert.Single(logFormatters);
+            Assert.True(logFormatters.First() is IOptionFormatter<TestOptionsWithSecrets>);
+            // ensure logging output is as expected
+            var actual = servicesProvider.GetRequiredService<TestLoggerFactory>();
+            Assert.Contains("Hello", actual.ToString());
+            Assert.Contains("Password: REDACTED", actual.ToString());
+            Assert.Contains("SomeConnectionString: DefaultEndpointsProtocol=https;AccountName=someAccount;AccountKey=<--SNIP-->", actual.ToString());
+        }
+
+        [Fact]
+        public void GenericFormatterWithListAndDictionary()
+        {
+            // actual output
+            var services = new ServiceCollection();
+            services.AddOptions();
+            services.AddSingleton<TestLoggerFactory>();
+            services.AddSingleton<ILoggerFactory>(sp => sp.GetRequiredService<TestLoggerFactory>());
+            services.AddSingleton(typeof(ILogger<>), typeof(TestLogger<>));
+            services.AddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
+            services.AddSingleton<OptionsLogger, TestOptionsLogger>();
+            services.Configure<TestOptionsWithListAndDictionary>(options => {
+                options.SomeDictionary.Add("Account1", "Key1");
+                options.SomeDictionary.Add("Account2", "Key2");
+                options.SomeDictionary.Add("Account3", "Key3");
+                options.SomeList.Add(10);
+                options.SomeList.Add(11);
+            });
+            services.ConfigureFormatter<TestOptionsWithListAndDictionary>();
+            var servicesProvider = services.BuildServiceProvider();
+            servicesProvider.GetRequiredService<OptionsLogger>().LogOptions();
+
+            var logFormatters = servicesProvider.GetServices<IOptionFormatter>();
+            Assert.Single(logFormatters);
+            Assert.True(logFormatters.First() is IOptionFormatter<TestOptionsWithListAndDictionary>);
+            // ensure logging output is as expected
+            var actual = servicesProvider.GetRequiredService<TestLoggerFactory>();
+            var txt = actual.ToString();
+            Assert.Contains("SomeList.0: 10", actual.ToString());
+            Assert.Contains("SomeList.1: 11", actual.ToString());
+            Assert.Contains("SomeDictionary.Account1: Key1", actual.ToString());
+            Assert.Contains("SomeDictionary.Account2: Key2", actual.ToString());
+            Assert.Contains("SomeDictionary.Account3: Key3", actual.ToString());
+            Assert.Contains("NullList:", actual.ToString());
+            Assert.Contains("NullDictionary:", actual.ToString());
+        }
+
+        [Fact]
         public void FormatterConfiguredTwiceDoesNotLeadToDuplicatedFormatter()
         {
             // expected output
@@ -176,6 +270,40 @@ namespace Tester
         }
 
         [Fact]
+        public void NamedGenericFormatterGoldenPath()
+        {
+            // expected output
+            TestLoggerFactory expected = BuildNamedOptionsExpectedResult();
+
+            // actual output
+            var services = new ServiceCollection();
+            services.AddOptions();
+            services.AddSingleton<TestLoggerFactory>();
+            services.AddSingleton<ILoggerFactory>(sp => sp.GetRequiredService<TestLoggerFactory>());
+            services.AddSingleton(typeof(ILogger<>), typeof(TestLogger<>));
+            services.AddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
+            services.AddSingleton(typeof(IOptionFormatterResolver<>), typeof(DefaultOptionsFormatterResolver<>));
+            services.AddSingleton<OptionsLogger, TestOptionsLogger>();
+            Enumerable
+                .Range(1, 3)
+                .ToList()
+                .ForEach(i =>
+                {
+                    string name = i.ToString();
+                    services.Configure<TestOptions>(name, (options => options.IntField = i));
+                    services.ConfigureNamedOptionForLogging<TestOptions>(name);
+                });
+            var servicesProvider = services.BuildServiceProvider();
+            servicesProvider.GetRequiredService<OptionsLogger>().LogOptions();
+
+            var logFormatters = servicesProvider.GetServices<IOptionFormatter>();
+            Assert.Equal(3, logFormatters.Count());
+            var logFormatter = servicesProvider.GetService<IOptionFormatterResolver<TestOptions>>();
+            var actual = servicesProvider.GetRequiredService<TestLoggerFactory>();
+            Assert.Equal(expected.ToString(), actual.ToString());
+        }
+
+        [Fact]
         public void CustomFormatterResolverOverridesDefaultFormatter_PreRegistration()
         {
             // expected output
@@ -284,9 +412,31 @@ namespace Tester
             return expected;
         }
 
+        private class TestOptionsWithSecrets
+        {
+            [Redact()]
+            public string Password { get; set; }
+
+            public string Data { get; set; }
+
+            [RedactConnectionString()]
+            public string SomeConnectionString { get; set; }
+        }
+
         private class TestOptions
         {
             public int IntField { get; set; } = 0;
+        }
+
+        private class TestOptionsWithListAndDictionary
+        {
+            public List<int> SomeList { get; set; } = new List<int>();
+
+            public Dictionary<string, string> SomeDictionary { get; set; } = new Dictionary<string, string>();
+
+            public List<int> NullList { get; set; } = null;
+
+            public Dictionary<string, string> NullDictionary { get; set; } = null;
         }
 
         private class TestOptionsFormatter2 : IOptionFormatter<TestOptions>
@@ -340,13 +490,13 @@ namespace Tester
             public TestOptionsFormatter(IOptions<TestOptions> options)
             {
                 this.options = options.Value;
-                this.Name = nameof(TestOptions);
+                this.Name = typeof(TestOptions).FullName;
             }
 
             public static TestOptionsFormatter CreateNamed(string name, IOptions<TestOptions> options)
             {
                 var result = new TestOptionsFormatter(options);
-                result.Name = $"{nameof(TestOptions)}-{name}";
+                result.Name = $"{typeof(TestOptions).FullName}-{name}";
                 return result;
             }
 

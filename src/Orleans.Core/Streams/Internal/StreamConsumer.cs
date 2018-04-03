@@ -25,21 +25,22 @@ namespace Orleans.Streams
         [NonSerialized]
         private readonly ILogger logger;
 
-        public StreamConsumer(StreamImpl<T> stream, string streamProviderName, IStreamProviderRuntime providerUtilities, IStreamPubSub pubSub, ILoggerFactory loggerFactory, bool isRewindable)
+        public StreamConsumer(StreamImpl<T> stream, string streamProviderName, IStreamProviderRuntime runtime, IStreamPubSub pubSub, ILogger logger, bool isRewindable)
         {
-            if (stream == null) throw new ArgumentNullException("stream");
-            if (providerUtilities == null) throw new ArgumentNullException("providerUtilities");
-            if (pubSub == null) throw new ArgumentNullException("pubSub");
+            if (stream == null) throw new ArgumentNullException(nameof(stream));
+            if (runtime == null) throw new ArgumentNullException(nameof(runtime));
+            if (pubSub == null) throw new ArgumentNullException(nameof(pubSub));
+            if (logger == null) throw new ArgumentNullException(nameof(logger));
 
-            logger = loggerFactory.CreateLogger(string.Format("<{0}>-{1}", typeof(StreamConsumer<T>).FullName, stream));
+            this.logger = logger;
             this.stream = stream;
             this.streamProviderName = streamProviderName;
-            providerRuntime = providerUtilities;
+            this.providerRuntime = runtime;
             this.pubSub = pubSub;
-            IsRewindable = isRewindable;
-            myExtension = null;
-            myGrainReference = null;
-            bindExtLock = new AsyncLock();
+            this.IsRewindable = isRewindable;
+            this.myExtension = null;
+            this.myGrainReference = null;
+            this.bindExtLock = new AsyncLock();
         }
 
         public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer)

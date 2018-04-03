@@ -18,6 +18,8 @@ namespace Orleans.Persistence.DynamoDB
 namespace Orleans.Reminders.DynamoDB
 #elif AWSUTILS_TESTS
 namespace Orleans.AWSUtils.Tests
+#elif TRANSACTIONS_DYNAMODB
+namespace Orleans.Transactions.DynamoDB
 #else
 // No default namespace intentionally to cause compile errors if something is not defined
 #endif
@@ -27,12 +29,6 @@ namespace Orleans.AWSUtils.Tests
     /// </summary>
     internal class DynamoDBStorage
     {
-        private const string AccessKeyPropertyName = "AccessKey";
-        private const string SecretKeyPropertyName = "SecretKey";
-        private const string ServicePropertyName = "Service";
-        private const string ReadCapacityUnitsPropertyName = "ReadCapacityUnits";
-        private const string WriteCapacityUnitsPropertyName = "WriteCapacityUnits";
-
         private string accessKey;
 
         /// <summary> Secret key for this dynamoDB table </summary>
@@ -48,25 +44,15 @@ namespace Orleans.AWSUtils.Tests
         /// <summary>
         /// Create a DynamoDBStorage instance
         /// </summary>
-        /// <param name="dataConnectionString">The connection string to be parsed for DynamoDB connection settings</param>
-        /// <param name="loggerFactory">logger factory used to create loggers</param>
-        public DynamoDBStorage(string dataConnectionString, ILoggerFactory loggerFactory)
-        {
-            ParseDataConnectionString(dataConnectionString, out accessKey, out secretKey, out service, out readCapacityUnits, out writeCapacityUnits);
-            Logger = loggerFactory.CreateLogger<DynamoDBStorage>();
-            CreateClient();
-        }
-
-        /// <summary>
-        /// Create a DynamoDBStorage instance
-        /// </summary>
         /// <param name="loggerFactory"></param>
         /// <param name="accessKey"></param>
         /// <param name="secretKey"></param>
         /// <param name="service"></param>
         /// <param name="readCapacityUnits"></param>
         /// <param name="writeCapacityUnits"></param>
-        public DynamoDBStorage(ILoggerFactory loggerFactory, string accessKey, string secretKey, string service, int readCapacityUnits = DefaultReadCapacityUnits,
+        public DynamoDBStorage(ILoggerFactory loggerFactory, string service,
+            string accessKey = "", string secretKey = "",  
+            int readCapacityUnits = DefaultReadCapacityUnits,
             int writeCapacityUnits = DefaultWriteCapacityUnits)
         {
             if (service == null) throw new ArgumentNullException(nameof(service));
@@ -102,58 +88,7 @@ namespace Orleans.AWSUtils.Tests
         }
 
 #region Table Management Operations
-
-        internal static void ParseDataConnectionString(string dataConnectionString, out string accessKey, out string secretKey, out string service, out int readCapacityUnits, out int writeCapacityUnits)
-        {
-            var parameters = dataConnectionString.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
-            //set default value
-            accessKey = null;
-            secretKey = null;
-            service = null;
-            readCapacityUnits = DefaultReadCapacityUnits;
-            writeCapacityUnits = DefaultReadCapacityUnits;
-
-            var serviceConfig = parameters.Where(p => p.Contains(ServicePropertyName)).FirstOrDefault();
-            if (!string.IsNullOrWhiteSpace(serviceConfig))
-            {
-                var value = serviceConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
-                if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
-                    service = value[1];
-            }
-
-            var secretKeyConfig = parameters.Where(p => p.Contains(SecretKeyPropertyName)).FirstOrDefault();
-            if (!string.IsNullOrWhiteSpace(secretKeyConfig))
-            {
-                var value = secretKeyConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
-                if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
-                    secretKey = value[1];
-            }
-
-            var accessKeyConfig = parameters.Where(p => p.Contains(AccessKeyPropertyName)).FirstOrDefault();
-            if (!string.IsNullOrWhiteSpace(accessKeyConfig))
-            {
-                var value = accessKeyConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
-                if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
-                    accessKey = value[1];
-            }
-
-            var readCapacityUnitsConfig = parameters.Where(p => p.Contains(ReadCapacityUnitsPropertyName)).FirstOrDefault();
-            if (!string.IsNullOrWhiteSpace(readCapacityUnitsConfig))
-            {
-                var value = readCapacityUnitsConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
-                if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
-                    readCapacityUnits = int.Parse(value[1]);
-            }
-
-            var writeCapacityUnitsConfig = parameters.Where(p => p.Contains(WriteCapacityUnitsPropertyName)).FirstOrDefault();
-            if (!string.IsNullOrWhiteSpace(writeCapacityUnitsConfig))
-            {
-                var value = writeCapacityUnitsConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
-                if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
-                    writeCapacityUnits = int.Parse(value[1]);
-            }
-        }
-
+        
         private void CreateClient()
         {
             if (service.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
@@ -499,8 +434,9 @@ namespace Orleans.AWSUtils.Tests
         /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is != null and will be called for each entry that match the query and added to the results list</param>
         /// <param name="indexName">In case a secondary index is used in the keyConditionExpression</param>
         /// <param name="scanIndexForward">In case an index is used, show if the seek order is ascending (true) or descending (false)</param>
-        /// <returns>The collection containing a list of objects translated by the resolver function</returns>
-        public async Task<List<TResult>> QueryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver, string indexName = "", bool scanIndexForward = true) where TResult : class
+        /// <param name="lastEvaluatedKey">The primary key of the first item that this operation will evaluate. Use the value that was returned for LastEvaluatedKey in the previous operation</param>
+        /// <returns>The collection containing a list of objects translated by the resolver function and the LastEvaluatedKey for paged results</returns>
+        public async Task<(List<TResult> results, Dictionary<string, AttributeValue> lastEvaluatedKey)> QueryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver, string indexName = "", bool scanIndexForward = true, Dictionary<string, AttributeValue> lastEvaluatedKey = null) where TResult : class
         {
             try
             {
@@ -510,7 +446,8 @@ namespace Orleans.AWSUtils.Tests
                     ExpressionAttributeValues = keys,
                     ConsistentRead = true,
                     KeyConditionExpression = keyConditionExpression,
-                    Select = Select.ALL_ATTRIBUTES
+                    Select = Select.ALL_ATTRIBUTES,
+                    ExclusiveStartKey = lastEvaluatedKey
                 };
 
                 if (!string.IsNullOrWhiteSpace(indexName))
@@ -526,7 +463,7 @@ namespace Orleans.AWSUtils.Tests
                 {
                     resultList.Add(resolver(item));
                 }
-                return resultList;
+                return (resultList, response.LastEvaluatedKey);
             }
             catch (Exception)
             {

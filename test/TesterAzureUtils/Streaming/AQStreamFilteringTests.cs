@@ -1,8 +1,11 @@
 using System;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Tester.StreamingTests;
@@ -16,19 +19,28 @@ namespace Tester.AzureUtils.Streaming
     [TestCategory("Streaming"), TestCategory("Filters"), TestCategory("Azure")]
     public class StreamFilteringTests_AQ : StreamFilteringTestsBase, IClassFixture<StreamFilteringTests_AQ.Fixture>, IDisposable
     {
-        private readonly string clusterId;
+        private readonly string serviceId;
         public class Fixture : BaseAzureTestClusterFixture
         {
             public const string StreamProvider = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+            }
 
-                    legacy.ClusterConfiguration.AddAzureQueueStreamProvider(StreamProvider);
-                });
+            private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder
+                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamProvider, ob=>ob.Configure(
+                        options =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        }))
+                        .AddMemoryGrainStorage("MemoryStore")
+                        .AddMemoryGrainStorage("PubSubStore");
+                }
             }
 
             public override void Dispose()
@@ -43,7 +55,7 @@ namespace Tester.AzureUtils.Streaming
         public StreamFilteringTests_AQ(Fixture fixture) : base(fixture)
         {
             fixture.EnsurePreconditionsMet();
-            this.clusterId = fixture.HostedCluster.Options.ClusterId;
+            this.serviceId = fixture.HostedCluster.Options.ServiceId.ToString();
             streamProviderName = Fixture.StreamProvider;
         }
 
@@ -51,7 +63,7 @@ namespace Tester.AzureUtils.Streaming
         {
                 AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(NullLoggerFactory.Instance, 
                     streamProviderName,
-                    this.clusterId,
+                    this.serviceId,
                     TestDefaultConfiguration.DataConnectionString).Wait();
             }
 

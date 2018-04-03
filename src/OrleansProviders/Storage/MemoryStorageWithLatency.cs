@@ -1,13 +1,23 @@
 using System;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 
 namespace Orleans.Storage
 {
+
+    public class MemoryStorageWithLatencyOptions : MemoryGrainStorageOptions
+    {
+        public static readonly TimeSpan DefaultLatency = TimeSpan.FromMilliseconds(200);
+        public TimeSpan Latency { get; set; } = DefaultLatency;
+        public bool MockCallsOnly { get;set; }
+    }
+
     /// <summary>
     /// This is a simple in-memory implementation of a storage provider which presents fixed latency of storage calls.
     /// This class is useful for system testing and investigation of the effects of storage latency.
@@ -29,63 +39,38 @@ namespace Orleans.Storage
     /// </code>
     /// </example>
     [DebuggerDisplay("MemoryStore:{Name},WithLatency:{latency}")]
-    public class MemoryStorageWithLatency : MemoryStorage
+    public class MemoryGrainStorageWithLatency :IGrainStorage
     {
-        internal const string LATENCY_PARAM_STRING = "Latency";
-        internal const string MOCK_CALLS_PARAM_STRING = "MockCalls";
-        internal static readonly TimeSpan DefaultLatency = TimeSpan.FromMilliseconds(200);
-
         private const int NUM_STORE_GRAINS = 1;
-        
-        private TimeSpan latency;
-        private bool mockCallsOnly;
-
+        private MemoryGrainStorage baseGranStorage;
+        private MemoryStorageWithLatencyOptions options;
         /// <summary> Default constructor. </summary>
-        public MemoryStorageWithLatency()
-            : base(NUM_STORE_GRAINS)
+        public MemoryGrainStorageWithLatency(string name, MemoryStorageWithLatencyOptions options,
+            ILoggerFactory loggerFactory, IGrainFactory grainFactory)
         {
-        }
-
-        /// <summary> Initialization function for this storage provider. </summary>
-        /// <see cref="IProvider.Init"/>
-        public override async Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
-        {
-            await base.Init(name, providerRuntime, config);
-
-            string latencyParam = config.Properties[LATENCY_PARAM_STRING];
-            latency = latencyParam == null ? DefaultLatency : TimeSpan.Parse(latencyParam);
-            var logger = providerRuntime.ServiceProvider.GetRequiredService<ILogger<MemoryStorageWithLatency>>();
-            logger.Info("Init: Fixed Store Latency={0}", latency);
-
-            mockCallsOnly = config.Properties.ContainsKey(MOCK_CALLS_PARAM_STRING) &&
-                "true".Equals(config.Properties[MOCK_CALLS_PARAM_STRING], StringComparison.OrdinalIgnoreCase);
-        }
-
-        /// <summary> Shutdown function for this storage provider. </summary>
-        public override async Task Close()
-        {
-            await MakeFixedLatencyCall(() => base.Close());
+            this.baseGranStorage = new MemoryGrainStorage(name, options, loggerFactory, grainFactory);
+            this.options = options;
         }
 
         /// <summary> Read state data function for this storage provider. </summary>
-        /// <see cref="IStorageProvider.ReadStateAsync"/>
-        public override async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        /// <see cref="IGrainStorage.ReadStateAsync"/>
+        public async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
-            await MakeFixedLatencyCall(() => base.ReadStateAsync(grainType, grainReference, grainState));
+            await MakeFixedLatencyCall(() => baseGranStorage.ReadStateAsync(grainType, grainReference, grainState));
         }
 
         /// <summary> Write state data function for this storage provider. </summary>
-        /// <see cref="IStorageProvider.WriteStateAsync"/>
-        public override async Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        /// <see cref="IGrainStorage.WriteStateAsync"/>
+        public async Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
-           await MakeFixedLatencyCall(() => base.WriteStateAsync(grainType, grainReference, grainState));
+           await MakeFixedLatencyCall(() => baseGranStorage.WriteStateAsync(grainType, grainReference, grainState));
         }
 
         /// <summary> Delete / Clear state data function for this storage provider. </summary>
-        /// <see cref="IStorageProvider.ClearStateAsync"/>
-        public override async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        /// <see cref="IGrainStorage.ClearStateAsync"/>
+        public async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
-            await MakeFixedLatencyCall(() => base.ClearStateAsync(grainType, grainReference, grainState));
+            await MakeFixedLatencyCall(() => baseGranStorage.ClearStateAsync(grainType, grainReference, grainState));
         }
 
         private async Task MakeFixedLatencyCall(Func<Task> action)
@@ -94,7 +79,7 @@ namespace Orleans.Storage
             Exception error = null;
             try
             {
-                if (mockCallsOnly)
+                if (this.options.MockCallsOnly)
                 {
                     // Simulated call with slight delay
                     await Task.Delay(10);
@@ -110,9 +95,9 @@ namespace Orleans.Storage
                 error = exc;
             }
 
-            if (sw.Elapsed < latency)
+            if (sw.Elapsed < this.options.Latency)
             {
-                await Task.Delay(latency.Subtract(sw.Elapsed));
+                await Task.Delay(this.options.Latency.Subtract(sw.Elapsed));
             }
 
             if (error != null)

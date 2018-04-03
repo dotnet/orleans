@@ -60,23 +60,20 @@ namespace NonSilo.Tests
     public class SiloHostBuilderTests
     {
         /// <summary>
-        /// Tests that the silo builder will fail if no assemblies are configured.
+        /// Tests that a silo cannot be created without specifying a ClusterId.
         /// </summary>
         [Fact]
-        public void SiloHostBuilder_AssembliesTest()
+        public void SiloHostBuilder_NoClusterIdTest()
         {
-            var builder = new SiloHostBuilder()
-                .ConfigureEndpoints(IPAddress.Loopback, 9999, 0)
-                .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
-            Assert.Throws<OrleansConfigurationException>(() => builder.Build());
-
-            // Adding an application assembly allows the silo to be correctly built.
-            builder = new SiloHostBuilder()
-                .ConfigureOrleans()
-                .ConfigureEndpoints(IPAddress.Loopback, 9999, 0)
-                .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IAccountGrain).Assembly))
+            Assert.Throws<OrleansConfigurationException>(() => new SiloHostBuilder()
+                .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
                 .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>())
-                .ConfigureServices(RemoveConfigValidators);
+                .Build());
+
+            var builder = new SiloHostBuilder()
+                .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
+                .Configure<ClusterOptions>(options => options.ClusterId = "test")
+                .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
             using (var silo = builder.Build())
             {
                 Assert.NotNull(silo);
@@ -89,10 +86,9 @@ namespace NonSilo.Tests
         [Fact]
         public void SiloHostBuilder_NoSpecifiedConfigurationTest()
         {
-            var builder = new SiloHostBuilder().ConfigureOrleans()
-                .ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory().AddFromAppDomain())
+            var builder = new SiloHostBuilder().ConfigureDefaults()
                 .UseConfiguration(new ClusterConfiguration())
-                .ConfigureServices(RemoveConfigValidators)
+                .ConfigureServices(RemoveConfigValidatorsAndSetAddress)
                 .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
             using (var silo = builder.Build())
             {
@@ -106,10 +102,9 @@ namespace NonSilo.Tests
         [Fact]
         public void SiloHostBuilder_DoubleBuildTest()
         {
-            var builder = new SiloHostBuilder().ConfigureOrleans()
-                .ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory().AddFromAppDomain())
+            var builder = new SiloHostBuilder().ConfigureDefaults()
                 .UseConfiguration(new ClusterConfiguration())
-                .ConfigureServices(RemoveConfigValidators)
+                .ConfigureServices(RemoveConfigValidatorsAndSetAddress)
                 .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
             using (builder.Build())
             {
@@ -123,9 +118,8 @@ namespace NonSilo.Tests
         [Fact]
         public void SiloHostBuilder_DoubleSpecifyConfigurationTest()
         {
-            var builder = new SiloHostBuilder().ConfigureOrleans()
-                .ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory().AddFromAppDomain())
-                .ConfigureServices(RemoveConfigValidators)
+            var builder = new SiloHostBuilder().ConfigureDefaults()
+                .ConfigureServices(RemoveConfigValidatorsAndSetAddress)
                 .UseConfiguration(new ClusterConfiguration())
                 .UseConfiguration(new ClusterConfiguration());
             Assert.Throws<InvalidOperationException>(() => builder.Build());
@@ -137,9 +131,8 @@ namespace NonSilo.Tests
         [Fact]
         public void SiloHostBuilder_NullConfigurationTest()
         {
-            var builder = new SiloHostBuilder().ConfigureOrleans()
-                .ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory().AddFromAppDomain())
-                .ConfigureServices(RemoveConfigValidators);
+            var builder = new SiloHostBuilder().ConfigureDefaults()
+                .ConfigureServices(RemoveConfigValidatorsAndSetAddress);
             Assert.Throws<ArgumentNullException>(() => builder.UseConfiguration(null));
         }
 
@@ -149,10 +142,9 @@ namespace NonSilo.Tests
         [Fact]
         public void SiloHostBuilder_ServiceProviderTest()
         {
-            var builder = new SiloHostBuilder().ConfigureOrleans()
-                .ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory().AddFromAppDomain())
+            var builder = new SiloHostBuilder().ConfigureDefaults()
                 .UseConfiguration(new ClusterConfiguration())
-                .ConfigureServices(RemoveConfigValidators)
+                .ConfigureServices(RemoveConfigValidatorsAndSetAddress)
                 .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
 
             Assert.Throws<ArgumentNullException>(() => builder.ConfigureServices(null));
@@ -193,10 +185,12 @@ namespace NonSilo.Tests
             }
         }
 
-        private static void RemoveConfigValidators(IServiceCollection services)
+        private static void RemoveConfigValidatorsAndSetAddress(IServiceCollection services)
         {
             var validators = services.Where(descriptor => descriptor.ServiceType == typeof(IConfigurationValidator)).ToList();
             foreach (var validator in validators) services.Remove(validator);
+            // Configure endpoints because validator is set just before Build()
+            services.Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback);
         }
 
         private class MyService

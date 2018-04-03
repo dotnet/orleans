@@ -1,73 +1,52 @@
 ﻿
 using System;
+using System.Dynamic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Storage;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.TestingHost
 {
     /// <summary>
+    /// Options for fault injection grain storage
+    /// </summary>
+    public class FaultInjectionGrainStorageOptions
+    {
+        public static TimeSpan DEFAULT_LATENCY = TimeSpan.FromMilliseconds(10);
+        /// <summary>
+        /// Latency applied on storage operation
+        /// </summary>
+        public TimeSpan Latency { get; set; } = DEFAULT_LATENCY;
+    }
+    /// <summary>
     /// Fault injection decorator for storage providers.  This allows users to inject storage exceptions to test error handling scenarios.
     /// </summary>
-    /// <typeparam name="TStorage"></typeparam>
-    public class FaultInjectionStorageProvider<TStorage> : IStorageProvider
-        where TStorage : IStorageProvider, new()
+    public class FaultInjectionGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
     {
-        private readonly TStorage realStorageProvider;
+        private readonly IGrainStorage realStorageProvider;
         private IGrainFactory grainFactory;
         private ILogger logger;
-        /// <summary>The name of this provider instance, as given to it in the config.</summary>
-        public string Name => realStorageProvider.Name;
+        private readonly FaultInjectionGrainStorageOptions options;
         
         /// <summary>
         /// Default conststructor which creates the decorated storage provider
         /// </summary>
-        public FaultInjectionStorageProvider()
+        public FaultInjectionGrainStorage(IGrainStorage realStorageProvider, string name, ILoggerFactory loggerFactory, 
+            IGrainFactory grainFactory, FaultInjectionGrainStorageOptions faultInjectionOptions)
         {
-            realStorageProvider = new TStorage();
-        }
-
-        /// <summary>  Name of the property that controls the inserted delay. </summary>
-        public const string DelayMillisecondsPropertyName = "DelayMilliseconds";
-
-        private int delayMilliseconds;
-
-        /// <summary>
-        /// Initializes the decorated storage provider.
-        /// </summary>
-        /// <param name="name">Name assigned for this provider</param>
-        /// <param name="providerRuntime">Callback for accessing system functions in the Provider Runtime</param>
-        /// <param name="config">Configuration metadata to be used for this provider instance</param>
-        /// <returns>Completion promise Task for the inttialization work for this provider</returns>
-        public async Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
-        {
-            grainFactory = providerRuntime.GrainFactory;
-            await realStorageProvider.Init(name, providerRuntime, config);
-            var loggerFactory = providerRuntime.ServiceProvider.GetService<ILoggerFactory>();
-            logger = loggerFactory.CreateLogger<FaultInjectionStorageProvider<TStorage>>();
-            logger.Info($"Initialized fault injection for storage provider {Name}");
-
-            string value;
-            if (config.Properties.TryGetValue(DelayMillisecondsPropertyName, out value))
-                delayMilliseconds = int.Parse(value);
-        }
-
-        /// <summary>Close function for this provider instance.</summary>
-        /// <returns>Completion promise for the Close operation on this provider.</returns>
-        public async Task Close()
-        {
-                await realStorageProvider.Close();
+            this.realStorageProvider = realStorageProvider;
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().FullName}.{name}");
+            this.grainFactory = grainFactory;
+            this.options = faultInjectionOptions;
         }
 
         private Task InsertDelay()
         {
-            if (delayMilliseconds > 0)
-                return Task.Delay(delayMilliseconds);
-            else
-                return Task.CompletedTask;
+            return Task.Delay(this.options.Latency);
         }
            
         /// <summary>Faults if exception is provided, otherwise calls through to  decorated storage provider.</summary>
@@ -134,6 +113,28 @@ namespace Orleans.TestingHost
             }
             logger.Info($"ClearState for grain {grainReference} of type {grainType}");
             await realStorageProvider.ClearStateAsync(grainType, grainReference, grainState);
+        }
+
+        public void Participate(ISiloLifecycle lifecycle)
+        {
+            (realStorageProvider as ILifecycleParticipant<ISiloLifecycle>)?.Participate(lifecycle);
+        }
+    }
+
+    /// <summary>
+    /// Factory to create FaultInjectionGrainStorage
+    /// </summary>
+    public class FaultInjectionGrainStorageFactory
+    {
+        /// <summary>Create FaultInjectionGrainStorage</summary>
+        /// <param name="services"></param>
+        /// <param name="name"></param>
+        /// <param name="injectedGrainStorageFactory"></param>
+        /// <returns></returns>
+        public static IGrainStorage Create(IServiceProvider services, string name, Func<IServiceProvider, string, IGrainStorage> injectedGrainStorageFactory)
+        {
+            return new FaultInjectionGrainStorage(injectedGrainStorageFactory(services,name), name, services.GetRequiredService<ILoggerFactory>(), services.GetRequiredService<IGrainFactory>(),
+                services.GetService<IOptionsSnapshot<FaultInjectionGrainStorageOptions>>().Get(name));
         }
     }
 }

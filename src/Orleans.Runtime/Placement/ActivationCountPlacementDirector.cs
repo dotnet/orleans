@@ -39,21 +39,27 @@ namespace Orleans.Runtime.Placement
         // Track created activations on this silo between statistic intervals.
         private readonly ConcurrentDictionary<SiloAddress, CachedLocalStat> localCache = new ConcurrentDictionary<SiloAddress, CachedLocalStat>();
         private readonly ILogger logger;
+        private readonly SiloAddress localAddress;
         private readonly bool useLocalCache = true;
         // For: SelectSiloPowerOfK
         private readonly SafeRandom random = new SafeRandom();
         private int chooseHowMany = 2;
 
-        public ActivationCountPlacementDirector(DeploymentLoadPublisher deploymentLoadPublisher, IOptions<GrainPlacementOptions> options, ILogger<ActivationCountPlacementDirector> logger)
+        public ActivationCountPlacementDirector(
+            ILocalSiloDetails localSiloDetails,
+            DeploymentLoadPublisher deploymentLoadPublisher, 
+            IOptions<ActivationCountBasedPlacementOptions> options, 
+            ILogger<ActivationCountPlacementDirector> logger)
         {
             this.logger = logger;
+            this.localAddress = localSiloDetails.SiloAddress;
 
             SelectSilo = SelectSiloPowerOfK;
-            if (options.Value.ActivationCountPlacementChooseOutOf <= 0)
+            if (options.Value.ChooseOutOf <= 0)
                 throw new ArgumentException(
-                    "GlobalConfig.ActivationCountBasedPlacementChooseOutOf is " + options.Value.ActivationCountPlacementChooseOutOf);
+                    "GlobalConfig.ActivationCountBasedPlacementChooseOutOf is " + options.Value.ChooseOutOf);
 
-            chooseHowMany = options.Value.ActivationCountPlacementChooseOutOf;
+            chooseHowMany = options.Value.ChooseOutOf;
             deploymentLoadPublisher?.SubscribeToStatisticsChangeEvents(this);
         }
 
@@ -164,6 +170,10 @@ namespace Orleans.Runtime.Placement
         public override Task<SiloAddress> OnAddActivation(
             PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
+            // If the cache was not populated, just place locally
+            if (this.localCache.IsEmpty)
+                return Task.FromResult(this.localAddress);
+
             return SelectSilo(strategy, target, context);
         }
 

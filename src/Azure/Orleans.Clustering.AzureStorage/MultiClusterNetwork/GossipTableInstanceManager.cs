@@ -122,15 +122,15 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
         public string GlobalServiceId { get; private set; }
 
-        private GossipTableInstanceManager(Guid globalServiceId, string storageConnectionString, ILoggerFactory loggerFactory)
+        private GossipTableInstanceManager(string globalServiceId, string storageConnectionString, ILoggerFactory loggerFactory)
         {
-            GlobalServiceId = globalServiceId.ToString();
+            GlobalServiceId = globalServiceId;
             this.logger = loggerFactory.CreateLogger<GossipTableInstanceManager>();
             storage = new AzureTableDataManager<GossipTableEntry>(
                 INSTANCE_TABLE_NAME, storageConnectionString, loggerFactory);
         }
 
-        public static async Task<GossipTableInstanceManager> GetManager(Guid globalServiceId, string storageConnectionString, ILoggerFactory loggerFactory)
+        public static async Task<GossipTableInstanceManager> GetManager(string globalServiceId, string storageConnectionString, ILoggerFactory loggerFactory)
         {
             if (loggerFactory == null) throw new ArgumentNullException(nameof(loggerFactory));
             

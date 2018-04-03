@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Orleans.Streams;
+using Orleans.Configuration;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -13,14 +14,19 @@ namespace Orleans.ServiceBus.Providers
     public class EventHubQueueMapper : HashRingBasedStreamQueueMapper, IEventHubQueueMapper
     {
         private readonly Dictionary<QueueId, string> partitionDictionary = new Dictionary<QueueId, string>();
-
+        private static HashRingStreamQueueMapperOptions GetHashRingStreamQueueMapperOptions(string[] partitionIds)
+        {
+            var options = new HashRingStreamQueueMapperOptions();
+            options.TotalQueueCount = partitionIds.Length;
+            return options;
+        }
         /// <summary>
         /// Queue mapper that tracks which EventHub partition was mapped to which queueId
         /// </summary>
         /// <param name="partitionIds">List of EventHubPartitions</param>
         /// <param name="queueNamePrefix">Prefix for queueIds.  Must be unique per stream provider</param>
         public EventHubQueueMapper(string[] partitionIds, string queueNamePrefix)
-            : base(partitionIds.Length, queueNamePrefix)
+            : base(GetHashRingStreamQueueMapperOptions(partitionIds), queueNamePrefix)
         {
             QueueId[] queues = GetAllQueues().ToArray();
             if (queues.Length != partitionIds.Length)

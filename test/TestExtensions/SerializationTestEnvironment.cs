@@ -4,6 +4,7 @@ using System.Net;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
@@ -19,12 +20,12 @@ namespace TestExtensions
 
             var builder = new ClientBuilder()
                 .ConfigureDefaults()
-                .ConfigureApplicationParts(
-                    parts => parts
-                        .AddFromApplicationBaseDirectory()
-                        .AddFromAppDomain());
-            builder.UseConfiguration(config);
-            builder.ConfigureApplicationParts(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory());
+                .Configure<ClusterOptions>(options =>
+                {
+                    options.ClusterId = nameof(SerializationTestEnvironment);
+                    options.ServiceId = Guid.NewGuid().ToString();
+                })
+                .UseConfiguration(config);
             configureClientBuilder?.Invoke(builder);
             this.Client = builder.Build();
             this.RuntimeClient = this.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
@@ -70,7 +71,7 @@ namespace TestExtensions
 
         internal IInternalGrainFactory InternalGrainFactory => this.RuntimeClient.InternalGrainFactory;
 
-        internal IServiceProvider Services => this.RuntimeClient.ServiceProvider;
+        internal IServiceProvider Services => this.Client.ServiceProvider;
 
         public SerializationManager SerializationManager => this.RuntimeClient.ServiceProvider.GetRequiredService<SerializationManager>();
         

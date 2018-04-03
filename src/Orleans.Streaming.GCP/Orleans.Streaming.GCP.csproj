@@ -1,14 +1,19 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <PackageId>Microsoft.Orleans.OrleansGCPUtils</PackageId>
-    <Title>Microsoft Orleans Google Cloud Platform Utilities</Title>
-    <Description>Library of utility types for Google Cloud Platform of Microsoft Orleans.</Description>
+    <PackageId>Microsoft.Orleans.Streaming.GCP</PackageId>
+    <Title>Microsoft Orleans stream provider for Google Cloud Platform</Title>
+    <Description>Microsoft Orleans stream provider for Google Cloud Platform PubSub.</Description>
     <PackageTags>$(PackageTags)</PackageTags>
   </PropertyGroup>
 
   <PropertyGroup>
     <AssemblyName>Orleans.Streaming.GCP</AssemblyName>
     <RootNamespace>Orleans.Providers.GCP</RootNamespace>
+  </PropertyGroup>
+  
+  <PropertyGroup>
+    <!-- Cannot release a stable version of this package that depends on a prerelease version of Google.Cloud.PubSub.V1. -->
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
     <ProjectReference Include="..\OrleansProviders\OrleansProviders.csproj" />
   </ItemGroup>
 </Project>

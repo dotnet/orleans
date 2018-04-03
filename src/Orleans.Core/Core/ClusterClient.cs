@@ -36,12 +36,12 @@ namespace Orleans
         /// Initializes a new instance of the <see cref="ClusterClient"/> class.
         /// </summary>
         /// <param name="runtimeClient">The runtime client.</param>
-        /// <param name="configuration">The client configuration.</param>
         /// <param name="loggerFactory">Logger factory used to create loggers</param>
+        /// <param name="clientMessagingOptions">Messaging parameters</param>
         public ClusterClient(OutsideRuntimeClient runtimeClient, ILoggerFactory loggerFactory, IOptions<ClientMessagingOptions> clientMessagingOptions)
         {
             this.runtimeClient = runtimeClient;
-            this.clusterClientLifecycle = new ClusterClientLifecycle(loggerFactory);
+            this.clusterClientLifecycle = new ClusterClientLifecycle(loggerFactory.CreateLogger<LifecycleSubject>());
 
             //set PropagateActivityId flag from node cofnig
             RequestContext.PropagateActivityId = clientMessagingOptions.Value.PropagateActivityId;
@@ -104,7 +104,7 @@ namespace Orleans
         }
 
         /// <inheritdoc />
-        public async Task Connect()
+        public async Task Connect(Func<Exception, Task<bool>> retryFilter = null)
         {
             this.ThrowIfDisposedOrAlreadyInitialized();
             using (await this.initLock.LockAsync().ConfigureAwait(false))
@@ -116,8 +116,8 @@ namespace Orleans
                 }
                 
                 this.state = LifecycleState.Starting;
-                await this.runtimeClient.Start().ConfigureAwait(false);
-                await this.clusterClientLifecycle.OnStart();
+                await this.runtimeClient.Start(retryFilter).ConfigureAwait(false);
+                await this.clusterClientLifecycle.OnStart().ConfigureAwait(false);
                 this.state = LifecycleState.Started;
             }
         }

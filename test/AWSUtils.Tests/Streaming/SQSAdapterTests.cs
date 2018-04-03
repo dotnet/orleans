@@ -1,22 +1,22 @@
-﻿using Orleans.Providers;
-using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.Streams;
-using OrleansAWSUtils.Streams;
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
+using Orleans.Streams;
+using OrleansAWSUtils.Streams;
+using AWSUtils.Tests.StorageTests;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 using OrleansAWSUtils.Storage;
+using Orleans.Configuration;
 
 namespace AWSUtils.Tests.Streaming
 {
@@ -53,19 +53,16 @@ namespace AWSUtils.Tests.Streaming
         [SkippableFact]
         public async Task SendAndReceiveFromSQS()
         {
-            var properties = new Dictionary<string, string>
-                {
-                    {SQSAdapterFactory.DataConnectionStringPropertyName, AWSTestConstants.DefaultSQSConnectionString},
-                    {SQSAdapterFactory.DeploymentIdPropertyName, this.clusterId}
-                };
-            var config = new ProviderConfiguration(properties, "type", "name");
-
-            var adapterFactory = new SQSAdapterFactory();
-            adapterFactory.Init(config, SQS_STREAM_PROVIDER_NAME, this.fixture.Services);
-            await SendAndReceiveFromQueueAdapter(adapterFactory, config);
+            var options = new SqsOptions
+            {
+                ConnectionString = AWSTestConstants.DefaultSQSConnectionString,
+            };
+            var adapterFactory = new SQSAdapterFactory(SQS_STREAM_PROVIDER_NAME, options, new HashRingStreamQueueMapperOptions(), new SimpleQueueCacheOptions(), null, Options.Create(new ClusterOptions()), null, null);
+            adapterFactory.Init();
+            await SendAndReceiveFromQueueAdapter(adapterFactory);
         }
 
-        private async Task SendAndReceiveFromQueueAdapter(IQueueAdapterFactory adapterFactory, IProviderConfiguration config)
+        private async Task SendAndReceiveFromQueueAdapter(IQueueAdapterFactory adapterFactory)
         {
             IQueueAdapter adapter = await adapterFactory.CreateAdapter();
             IQueueAdapterCache cache = adapterFactory.GetQueueAdapterCache();

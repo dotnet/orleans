@@ -3,22 +3,18 @@ using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
-using Orleans.Runtime.Scheduler;
 using Orleans.Providers;
 using System.Collections.Generic;
+using Orleans.Services;
 
 namespace Orleans.Hosting
 {
     public static class LegacyClusterConfigurationExtensions
     {
-        private const int SiloDefaultProviderInitStage = ServiceLifecycleStage.RuntimeStorageServices;
-        private const int SiloDefaultProviderStartStage = ServiceLifecycleStage.ApplicationServices;
-
         /// <summary>
         /// Specifies the configuration to use for this silo.
         /// </summary>
@@ -29,10 +25,7 @@ namespace Orleans.Hosting
         public static ISiloHostBuilder UseConfiguration(this ISiloHostBuilder builder, ClusterConfiguration configuration)
         {
             if (configuration == null) throw new ArgumentNullException(nameof(configuration));
-            return builder.ConfigureServices((context, services) =>
-            {
-                services.AddLegacyClusterConfigurationSupport(configuration);
-            });
+            return builder.AddLegacyClusterConfigurationSupport(configuration);
         }
 
         /// <summary>
@@ -56,11 +49,19 @@ namespace Orleans.Hosting
         /// <returns>The silo builder.</returns>
         public static ISiloHostBuilder ConfigureLocalHostPrimarySilo(this ISiloHostBuilder builder, int siloPort = 22222, int gatewayPort = 40000)
         {
-            builder.ConfigureSiloName(Silo.PrimarySiloName);
+            string siloName = Silo.PrimarySiloName;
+            builder.Configure<SiloOptions>(options => options.SiloName = siloName);
             return builder.UseConfiguration(ClusterConfiguration.LocalhostPrimarySilo(siloPort, gatewayPort));
         }
 
-        public static IServiceCollection AddLegacyClusterConfigurationSupport(this IServiceCollection services, ClusterConfiguration configuration)
+        public static ISiloHostBuilder AddLegacyClusterConfigurationSupport(this ISiloHostBuilder builder, ClusterConfiguration configuration)
+        {
+            LegacyMembershipConfigurator.ConfigureServices(configuration.Globals, builder);
+            LegacyRemindersConfigurator.Configure(configuration.Globals, builder);
+            return builder.ConfigureServices(services => AddLegacyClusterConfigurationSupport(services, configuration));
+        }
+
+        private static void AddLegacyClusterConfigurationSupport(IServiceCollection services, ClusterConfiguration configuration)
         {
             if (configuration == null) throw new ArgumentNullException(nameof(configuration));
 
@@ -81,16 +82,16 @@ namespace Orleans.Hosting
                     return () => initializationParams.NodeConfig;
                 });
 
-            services.Configure<SiloOptions>(options =>
+            services.Configure<ClusterOptions>(options =>
             {
                 if (string.IsNullOrWhiteSpace(options.ClusterId) && !string.IsNullOrWhiteSpace(configuration.Globals.ClusterId))
                 {
                     options.ClusterId = configuration.Globals.ClusterId;
                 }
 
-                if (options.ServiceId == Guid.Empty)
+                if (string.IsNullOrWhiteSpace(options.ServiceId))
                 {
-                    options.ServiceId = configuration.Globals.ServiceId;
+                    options.ServiceId = configuration.Globals.ServiceId.ToString();
                 }
             });
 
@@ -182,9 +183,7 @@ namespace Orleans.Hosting
                 var nodeConfig = configuration.GetOrCreateNodeConfigurationForSilo(siloOptions.Value.SiloName);
                 options.ExcludedGrainTypes.AddRange(nodeConfig.ExcludedGrainTypes);
             });
-
-            LegacyMembershipConfigurator.ConfigureServices(configuration.Globals, services);
-
+            
             services.AddOptions<SchedulingOptions>()
                 .Configure<GlobalConfiguration>((options, config) =>
                 {
@@ -216,19 +215,16 @@ namespace Orleans.Hosting
                 };
             });
 
-            services.TryAddSingleton<LegacyProviderConfigurator.ScheduleTask>(sp =>
-            {
-                OrleansTaskScheduler scheduler = sp.GetRequiredService<OrleansTaskScheduler>();
-                SystemTarget fallbackSystemTarget = sp.GetRequiredService<FallbackSystemTarget>();
-                return (taskFunc) => scheduler.QueueTask(taskFunc, fallbackSystemTarget.SchedulingContext);
-            });
+            LegacyProviderConfigurator<ISiloLifecycle>.ConfigureServices(configuration.Globals.ProviderConfigurations, services);
 
-            LegacyProviderConfigurator<ISiloLifecycle>.ConfigureServices(configuration.Globals.ProviderConfigurations, services, SiloDefaultProviderInitStage, SiloDefaultProviderStartStage);
-
-            services.AddOptions<GrainPlacementOptions>().Configure<GlobalConfiguration>((options, config) =>
+            if (!string.IsNullOrWhiteSpace(configuration.Globals.DefaultPlacementStrategy))
             {
-                options.DefaultPlacementStrategy = config.DefaultPlacementStrategy;
-                options.ActivationCountPlacementChooseOutOf = config.ActivationCountBasedPlacementChooseOutOf;
+                services.AddSingleton(typeof(PlacementStrategy), MapDefaultPlacementStrategy(configuration.Globals.DefaultPlacementStrategy));
+            }
+
+            services.AddOptions<ActivationCountBasedPlacementOptions>().Configure<GlobalConfiguration>((options, config) =>
+            {
+                options.ChooseOutOf = config.ActivationCountBasedPlacementChooseOutOf;
             });
 
             services.AddOptions<StaticClusterDeploymentOptions>().Configure<ClusterConfiguration>((options, config) =>
@@ -237,20 +233,17 @@ namespace Orleans.Hosting
             });
 
             // add grain service configs as keyed services
-            short id = 0;
             foreach (IGrainServiceConfiguration grainServiceConfiguration in configuration.Globals.GrainServiceConfigurations.GrainServices.Values)
             {
-                services.AddSingletonKeyedService<long, IGrainServiceConfiguration>(id++, (sp, k) => grainServiceConfiguration);
+                var type = Type.GetType(grainServiceConfiguration.ServiceType);
+                services.AddSingletonKeyedService(type, (sp, k) => grainServiceConfiguration);
             }
+
             // populate grain service options
-            id = 0;
-            services.AddOptions<GrainServiceOptions>().Configure<GlobalConfiguration>((options, config) =>
+            foreach(IGrainServiceConfiguration grainServiceConfiguration in configuration.Globals.GrainServiceConfigurations.GrainServices.Values)
             {
-                foreach(IGrainServiceConfiguration grainServiceConfiguration in config.GrainServiceConfigurations.GrainServices.Values)
-                {
-                    options.GrainServices.Add(new KeyValuePair<string, short>(grainServiceConfiguration.ServiceType, id++));
-                }
-            });
+                services.AddGrainService(Type.GetType(grainServiceConfiguration.ServiceType));
+            }
 
             services.AddOptions<ConsistentRingOptions>().Configure<GlobalConfiguration>((options, config) =>
             {
@@ -258,7 +251,7 @@ namespace Orleans.Hosting
                 options.NumVirtualBucketsConsistentRing = config.NumVirtualBucketsConsistentRing;
             });
 
-            services.AddOptions<MembershipOptions>()
+            services.AddOptions<ClusterMembershipOptions>()
                 .Configure<GlobalConfiguration>((options, config) =>
                 {
                     options.NumMissedTableIAmAliveLimit = config.NumMissedTableIAmAliveLimit;
@@ -279,7 +272,6 @@ namespace Orleans.Hosting
                 {
                     options.IsRunningAsUnitTest = config.IsRunningAsUnitTest;
                 });
-            LegacyRemindersConfigurator.Configure(configuration.Globals, services);
             
             services.AddOptions<GrainVersioningOptions>()
                 .Configure<GlobalConfiguration>((options, config) =>
@@ -313,8 +305,25 @@ namespace Orleans.Hosting
                     options.CacheTTLExtensionFactor = config.CacheTTLExtensionFactor;
                     options.LazyDeregistrationDelay = config.DirectoryLazyDeregistrationDelay;
                 });
+        }
 
-            return services;
+        private static Type MapDefaultPlacementStrategy(string strategy)
+        {
+            switch (strategy)
+            {
+                case nameof(RandomPlacement):
+                    return typeof(RandomPlacement);
+                case nameof(PreferLocalPlacement):
+                    return typeof(PreferLocalPlacement);
+                case nameof(SystemPlacement):
+                    return typeof(SystemPlacement);
+                case nameof(ActivationCountBasedPlacement):
+                    return typeof(ActivationCountBasedPlacement);
+                case nameof(HashBasedPlacement):
+                    return typeof(HashBasedPlacement);
+                default:
+                    return null;
+            }
         }
 
         public static ClusterConfiguration TryGetClusterConfiguration(this IServiceCollection services)

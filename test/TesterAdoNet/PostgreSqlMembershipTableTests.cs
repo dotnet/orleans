@@ -1,19 +1,15 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Messaging;
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Membership;
 using Orleans.Runtime.MembershipService;
 using Orleans.Tests.SqlUtils;
+using Orleans.Configuration;
 using TestExtensions;
 using UnitTests.General;
 using Xunit;
-using Orleans.AdoNet;
-using Orleans.Configuration;
 
 namespace UnitTests.MembershipTests
 {
@@ -35,10 +31,10 @@ namespace UnitTests.MembershipTests
         {
             var options = new AdoNetClusteringSiloOptions()
             {
-                AdoInvariant = GetAdoInvariant(),
+                Invariant = GetAdoInvariant(),
                 ConnectionString = this.connectionString,
             };
-            return new AdoNetClusteringTable(this.GrainReferenceConverter, this.siloOptions, Options.Create(options), this.loggerFactory.CreateLogger<AdoNetClusteringTable>());
+            return new AdoNetClusteringTable(this.GrainReferenceConverter, this.clusterOptions, Options.Create(options), this.loggerFactory.CreateLogger<AdoNetClusteringTable>());
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
@@ -46,10 +42,10 @@ namespace UnitTests.MembershipTests
             var options = new AdoNetClusteringClientOptions()
             {
                 ConnectionString = this.connectionString,
-                AdoInvariant = GetAdoInvariant()
+                Invariant = GetAdoInvariant()
             };
             return new AdoNetGatewayListProvider(this.loggerFactory.CreateLogger<AdoNetGatewayListProvider>(), this.GrainReferenceConverter
-                ,this.clientConfiguration, Options.Create(options), this.clientOptions);
+                , Options.Create(options), this.gatewayOptions, this.clusterOptions);
         }
 
         protected override string GetAdoInvariant()

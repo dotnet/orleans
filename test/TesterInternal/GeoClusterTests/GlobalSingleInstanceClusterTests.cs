@@ -9,6 +9,7 @@ using Orleans.GrainDirectory;
 using Orleans.Runtime;
 using TestGrainInterfaces;
 using Orleans.Runtime.Configuration;
+using Orleans.TestingHost;
 using Xunit;
 using Xunit.Abstractions;
 using Tester;
@@ -30,7 +31,7 @@ namespace Tests.GeoClusterTests
         /// Run all tests on a small configuration (two clusters, one silo each, one client each)
         /// </summary>
         /// <returns></returns>
-        [SkippableFact, TestCategory("Functional")]
+        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/4281"), TestCategory("Functional")]
         public async Task All_Small()
         {
             await Setup_Clusters(false);
@@ -59,10 +60,10 @@ namespace Tests.GeoClusterTests
 
         public class ClientWrapper : ClientWrapperBase
         {
-            public static readonly Func<string, int, string, Action<ClientConfiguration>, ClientWrapper> Factory =
-                (name, gwPort, clusterId, configUpdater) => new ClientWrapper(name, gwPort, clusterId, configUpdater);
+            public static readonly Func<string, int, string, Action<ClientConfiguration>, Action<IClientBuilder>, ClientWrapper> Factory =
+                (name, gwPort, clusterId, configUpdater, clientConfgirator) => new ClientWrapper(name, gwPort, clusterId, configUpdater, clientConfgirator);
 
-            public ClientWrapper(string name, int gatewayport, string clusterId, Action<ClientConfiguration> customizer) : base(name, gatewayport, clusterId, customizer)
+            public ClientWrapper(string name, int gatewayport, string clusterId, Action<ClientConfiguration> customizer, Action<IClientBuilder> clientConfigurator) : base(name, gatewayport, clusterId, customizer, clientConfigurator)
             {
                 this.systemManagement = this.GrainFactory.GetGrain<IManagementGrain>(0);
             }
@@ -515,7 +516,8 @@ namespace Tests.GeoClusterTests
             int totalSoFar = 0;
             foreach (var silo in silos)
             {
-                var dir = silo.AppDomainTestHook.GetDirectoryForTypeNamesContaining("ClusterTestGrain");
+                var hooks = ((AppDomainSiloHandle)silo).AppDomainTestHook;
+                var dir = hooks.GetDirectoryForTypeNamesContaining("ClusterTestGrain");
                 foreach (var grainKeyValue in dir)
                 {
                     GrainId grainId = grainKeyValue.Key;
@@ -546,12 +548,14 @@ namespace Tests.GeoClusterTests
         {
             var grains = new Dictionary<GrainId, List<IActivationInfo>>();
 
-            int instancecount = 0;
+            int instanceCount = 0;
 
             foreach (var kvp in Clusters)
+            {
                 foreach (var silo in kvp.Value.Silos)
                 {
-                    var dir = silo.AppDomainTestHook.GetDirectoryForTypeNamesContaining("ClusterTestGrain");
+                    var hooks = ((AppDomainSiloHandle) silo).AppDomainTestHook;
+                    var dir = hooks.GetDirectoryForTypeNamesContaining("ClusterTestGrain");
 
                     foreach (var grainKeyValue in dir)
                     {
@@ -561,19 +565,19 @@ namespace Tests.GeoClusterTests
                         if (exclude != null && exclude.ContainsKey(grainId))
                             continue;
 
-                        List<IActivationInfo> acts;
-                        if (!grains.TryGetValue(grainId, out acts))
-                            grains[grainId] = acts = new List<IActivationInfo>();
+                        if (!grains.TryGetValue(grainId, out var activations))
+                            grains[grainId] = activations = new List<IActivationInfo>();
 
-                        foreach (var instinfo in grainInfo.Instances)
+                        foreach (var instanceInfo in grainInfo.Instances)
                         {
-                            acts.Add(instinfo.Value);
-                            instancecount++;
+                            activations.Add(instanceInfo.Value);
+                            instanceCount++;
                         }
                     }
                 }
+            }
 
-            WriteLog("Returning: {0} instances for {1} grains", instancecount, grains.Count());
+            WriteLog("Returning: {0} instances for {1} grains", instanceCount, grains.Count());
 
             return grains;
         }

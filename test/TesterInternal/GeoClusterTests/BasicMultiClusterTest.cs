@@ -18,12 +18,12 @@ namespace Tests.GeoClusterTests
         // this client is used to call into the management grain.
         public class ClientWrapper : TestingClusterHost.ClientWrapperBase
         {
-            public static readonly Func<string, int, string, Action<ClientConfiguration>, ClientWrapper> Factory =
-                (name, gwPort, clusterId, configUpdater) => new ClientWrapper(name, gwPort, clusterId, configUpdater);
+            public static readonly Func<string, int, string, Action<ClientConfiguration>, Action<IClientBuilder>, ClientWrapper> Factory =
+                (name, gwPort, clusterId, configUpdater, clientConfigurator) => new ClientWrapper(name, gwPort, clusterId, configUpdater, clientConfigurator);
 
-            public ClientWrapper(string name, int gatewayport, string clusterId, Action<ClientConfiguration> customizer)
+            public ClientWrapper(string name, int gatewayport, string clusterId, Action<ClientConfiguration> customizer, Action<IClientBuilder> clientConfigurator)
                 // use null clusterId, in this test, because we are testing non-geo clients
-                : base(name, gatewayport, null, customizer)
+                : base(name, gatewayport, clusterId, customizer, clientConfigurator)
             {
                 this.systemManagement = this.GrainFactory.GetGrain<IManagementGrain>(0);
             }
@@ -45,16 +45,18 @@ namespace Tests.GeoClusterTests
         [SkippableFact, TestCategory("Functional")]
         public void CreateTwoIndependentClusters()
         {
+            var serviceId = Guid.NewGuid();
+
             using (var host = new TestingClusterHost(output))
             {
                 // create cluster A with one silo and clientA
                 var clusterA = "A";
-                host.NewCluster(clusterA, 1);
+                host.NewCluster(serviceId, clusterA, 1);
                 var clientA = host.NewClient(clusterA, 0, ClientWrapper.Factory);
 
                 // create cluster B with 5 silos and clientB
                 var clusterB = "B";
-                host.NewCluster(clusterB, 5);
+                host.NewCluster(serviceId, clusterB, 5);
                 var clientB = host.NewClient(clusterB, 0, ClientWrapper.Factory);
 
                 // call management grain in each cluster to count the silos

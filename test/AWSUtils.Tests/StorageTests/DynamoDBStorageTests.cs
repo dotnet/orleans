@@ -109,8 +109,8 @@ namespace AWSUtils.Tests.StorageTests.AWSUtils
             await manager.PutEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetValues(toPersist2, true));
             var keys = new Dictionary<string, AttributeValue> { { ":PK", new AttributeValue(toPersist.PartitionKey) } };
             var found = await manager.QueryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, keys, $"PartitionKey = :PK", item => new UnitTestDynamoDBTableData(item));
-            Assert.NotNull(found);
-            Assert.True(found.Count == 2);
+            Assert.NotNull(found.results);
+            Assert.True(found.results.Count == 2);
         }
         
         internal static Dictionary<string, AttributeValue> GetKeys(UnitTestDynamoDBTableData data)

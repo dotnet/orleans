@@ -17,6 +17,7 @@ using Orleans.Configuration;
 using TestExtensions;
 using Xunit;
 using Orleans.ServiceBus.Providers.Testing;
+using Orleans.Hosting;
 
 namespace ServiceBus.Tests.EvictionStrategyTests
 {
@@ -40,8 +41,9 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             //an mock eh settings
             this.ehSettings = new EventHubPartitionSettings
             {
-                Hub = new EventHubSettings(),
-                Partition = "MockPartition"
+                Hub = new EventHubOptions(),
+                Partition = "MockPartition",
+                ReceiverOptions = new EventHubReceiverOptions()
             };
 
             //set up cache pressure monitor and purge predicate

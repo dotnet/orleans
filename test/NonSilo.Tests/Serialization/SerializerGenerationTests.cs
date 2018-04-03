@@ -1,5 +1,10 @@
+using System.Linq;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.ApplicationParts;
+using Orleans.Serialization;
 using Orleans.UnitTest.GrainInterfaces;
 using TestExtensions;
+using UnitTests.GrainInterfaces;
 using Xunit;
 
 // ReSharper disable NotAccessedVariable
@@ -10,6 +15,7 @@ namespace UnitTests.Serialization
     /// Test the built-in serializers
     /// </summary>
     [Collection(TestEnvironmentFixture.DefaultCollection)]
+    [TestCategory("BVT"), TestCategory("Serialization")]
     public class SerializerGenerationTests
     {
         private readonly TestEnvironmentFixture fixture;
@@ -19,13 +25,31 @@ namespace UnitTests.Serialization
             this.fixture = fixture;
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact]
         public void SerializationTests_TypeWithInternalNestedClass()
         {
             var v = new MyTypeWithAnInternalTypeField();
 
             Assert.NotNull(this.fixture.SerializationManager.GetSerializer(typeof (MyTypeWithAnInternalTypeField)));
             Assert.NotNull(this.fixture.SerializationManager.GetSerializer(typeof(MyTypeWithAnInternalTypeField.MyInternalDependency)));
+        }
+
+        /// <summary>
+        /// Types with an ancestor marked with <see cref="KnownBaseTypeAttribute"/> should have serializers generated.
+        /// </summary>
+        [Fact]
+        public void SerializationTests_TypeWithWellKnownBaseClass()
+        {
+            Assert.NotNull(this.fixture.SerializationManager.GetSerializer(typeof(DescendantOfWellKnownBaseClass)));
+            Assert.NotNull(this.fixture.SerializationManager.GetSerializer(typeof(ImplementsWellKnownInterface)));
+            Assert.Null(this.fixture.SerializationManager.GetSerializer(typeof(NotDescendantOfWellKnownBaseType)));
+
+            var partManager = this.fixture.Services.GetRequiredService<IApplicationPartManager>();
+            var serializerFeature = new SerializerFeature();
+            partManager.PopulateFeature(serializerFeature);
+            Assert.Contains(serializerFeature.SerializerTypes, s => s.Target == typeof(DescendantOfWellKnownBaseClass));
+            Assert.Contains(serializerFeature.SerializerTypes, s => s.Target == typeof(ImplementsWellKnownInterface));
+            Assert.DoesNotContain(serializerFeature.SerializerTypes, s => s.Target == typeof(NotDescendantOfWellKnownBaseType));
         }
     }
 }

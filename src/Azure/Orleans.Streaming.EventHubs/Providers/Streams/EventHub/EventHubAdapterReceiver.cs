@@ -11,6 +11,7 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.ServiceBus.Providers.Testing;
+using Orleans.Hosting;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -22,7 +23,9 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Eventhub settings
         /// </summary>
-        public IEventHubSettings Hub { get; set; }
+        public EventHubOptions Hub { get; set; }
+
+        public EventHubReceiverOptions ReceiverOptions { get; set; }
         /// <summary>
         /// Partition name
         /// </summary>
@@ -280,7 +283,7 @@ namespace Orleans.ServiceBus.Providers
             EventHubClient client = EventHubClient.CreateFromConnectionString(connectionStringBuilder.ToString());
 
             // if we have a starting offset or if we're not configured to start reading from utc now, read from offset
-            if (!partitionSettings.Hub.StartFromNow ||
+            if (!partitionSettings.ReceiverOptions.StartFromNow ||
                 offset != EventHubConstants.StartOfStream)
             {
                 logger.Info("Starting to read from EventHub partition {0}-{1} at offset {2}", partitionSettings.Hub.Path, partitionSettings.Partition, offset);
@@ -297,8 +300,8 @@ namespace Orleans.ServiceBus.Providers
 
             PartitionReceiver receiver = client.CreateReceiver(partitionSettings.Hub.ConsumerGroup, partitionSettings.Partition, offset, offsetInclusive);
 
-            if (partitionSettings.Hub.PrefetchCount.HasValue)
-                receiver.PrefetchCount = partitionSettings.Hub.PrefetchCount.Value;
+            if (partitionSettings.ReceiverOptions.PrefetchCount.HasValue)
+                receiver.PrefetchCount = partitionSettings.ReceiverOptions.PrefetchCount.Value;
 
             return new EventHubReceiverProxy(receiver);
         }

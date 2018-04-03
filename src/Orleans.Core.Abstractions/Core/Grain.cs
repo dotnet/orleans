@@ -240,7 +240,7 @@ namespace Orleans
 
         public virtual void Participate(IGrainLifecycle lifecycle)
         {
-            lifecycle.Subscribe(GrainLifecycleStage.Activate, ct => OnActivateAsync(), ct => OnDeactivateAsync());
+            lifecycle.Subscribe(this.GetType().FullName, GrainLifecycleStage.Activate, ct => OnActivateAsync(), ct => OnDeactivateAsync());
         }
     }
 
@@ -302,7 +302,7 @@ namespace Orleans
         public override void Participate(IGrainLifecycle lifecycle)
         {
             base.Participate(lifecycle);
-            lifecycle.Subscribe(GrainLifecycleStage.SetupState, OnSetupState);
+            lifecycle.Subscribe(this.GetType().FullName, GrainLifecycleStage.SetupState, OnSetupState);
         }
 
         private async Task OnSetupState(CancellationToken ct)

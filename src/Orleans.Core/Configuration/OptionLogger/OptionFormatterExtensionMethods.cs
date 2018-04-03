@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using System.Linq;
+
 namespace Orleans.Configuration
 {
     /// <summary>
@@ -8,7 +9,7 @@ namespace Orleans.Configuration
     public static class OptionConfigureExtensionMethods
     {
         /// <summary>
-        /// configure option formatter for <typeparam name="TOptions"/>
+        /// configure option formatter for TOptions/>
         /// </summary>
         public static IServiceCollection ConfigureFormatter<TOptions, TOptionFormatter>(this IServiceCollection services)
             where TOptions : class
@@ -17,8 +18,9 @@ namespace Orleans.Configuration
             var registration = services.FirstOrDefault(service => service.ServiceType == typeof(IOptionFormatter<TOptions>));
             if (registration == null)
             {
-                services.AddSingleton<IOptionFormatter<TOptions>, TOptionFormatter>()
-                        .AddFromExisting<IOptionFormatter, IOptionFormatter<TOptions>>();
+                services
+                    .AddSingleton<IOptionFormatter<TOptions>, TOptionFormatter>()
+                    .AddFromExisting<IOptionFormatter, IOptionFormatter<TOptions>>();
             } else
             {
                 // override IOptionFormatter<TOptions>
@@ -28,7 +30,16 @@ namespace Orleans.Configuration
         }
 
         /// <summary>
-        /// Configure a option formatter for option <typeparam name="TOptions"/> if none is configured
+        /// configure option formatter for <typeparam name="TOptions"/>
+        /// </summary>
+        public static IServiceCollection ConfigureFormatter<TOptions>(this IServiceCollection services)
+            where TOptions : class, new()
+        {
+            return services.AddSingleton<IOptionFormatter>(sp => sp.GetService<IOptionFormatter<TOptions>>());
+        }
+
+        /// <summary>
+        /// Configure a option formatter for option TOptions if none is configured
         /// </summary>
         /// <typeparam name="TOptions"></typeparam>
         /// <typeparam name="TOptionFormatter"></typeparam>

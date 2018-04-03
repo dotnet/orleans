@@ -15,23 +15,4 @@ namespace Orleans.Configuration
         /// </summary>
         public bool FastKillOnProcessExit { get; set; } = true;
     }
-
-    public class ProcessExitHandlingOptionsFormatter : IOptionFormatter<ProcessExitHandlingOptions>
-    {
-        public string Name => nameof(ProcessExitHandlingOptions);
-
-        private ProcessExitHandlingOptions options;
-        public ProcessExitHandlingOptionsFormatter(IOptions<ProcessExitHandlingOptions> options)
-        {
-            this.options = options.Value;
-        }
-
-        public IEnumerable<string> Format()
-        {
-            return new List<string>()
-            {
-                OptionFormattingUtilities.Format(nameof(this.options.FastKillOnProcessExit),this.options.FastKillOnProcessExit),
-            };
-        }
-    }
 }

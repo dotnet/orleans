@@ -1,6 +1,4 @@
-using System.Collections.Generic;
 using System.Net.Sockets;
-using Microsoft.Extensions.Options;
 
 namespace Orleans.Configuration
 {
@@ -16,38 +14,17 @@ namespace Orleans.Configuration
         ///  This number should be about 10 to 100 times larger than the expected number of gateway connections.
         ///  If this attribute is not specified, then Math.Pow(2, 13) is used.
         /// </summary>
-        public int ClientSenderBuckets { get; set; } = 8192;
+        public int ClientSenderBuckets { get; set; } = DEFAULT_CLIENT_SENDER_BUCKETS;
+        public const int DEFAULT_CLIENT_SENDER_BUCKETS = 8192;
 
         /// <summary>
         /// </summary>
-        public AddressFamily PreferredFamily { get; set; } = AddressFamily.InterNetwork;
+        public AddressFamily PreferredFamily { get; set; } = DEFAULT_PREFERRED_FAMILY;
+        public const AddressFamily DEFAULT_PREFERRED_FAMILY = AddressFamily.InterNetwork;
+
         /// <summary>
         /// The Interface attribute specifies the name of the network interface to use to work out an IP address for this machine.
         /// </summary>
         public string NetworkInterfaceName { get; set; }
-    }
-
-    public class ClientMessagingOptionFormatter : MessagingOptionsFormatter, IOptionFormatter<ClientMessagingOptions>
-    {
-        public string Name => nameof(ClientMessagingOptions);
-
-        private ClientMessagingOptions options;
-        public ClientMessagingOptionFormatter(IOptions<ClientMessagingOptions> messageOptions)
-            : base(messageOptions.Value)
-        {
-            options = messageOptions.Value;
-        }
-
-        public IEnumerable<string> Format()
-        {
-            List<string> format = base.FormatSharedOptions();
-            format.AddRange(new List<string>
-            {
-                OptionFormattingUtilities.Format(nameof(this.options.ClientSenderBuckets), this.options.ClientSenderBuckets),
-                OptionFormattingUtilities.Format(nameof(options.PreferredFamily), options.PreferredFamily),
-                OptionFormattingUtilities.Format(nameof(options.NetworkInterfaceName), options.NetworkInterfaceName),
-            });
-            return format;
-        }
     }
 }

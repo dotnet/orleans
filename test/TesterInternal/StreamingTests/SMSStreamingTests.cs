@@ -1,5 +1,8 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Orleans;
+using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Providers.Streams.SimpleMessageStream;
 using Orleans.Runtime.Configuration;
@@ -16,7 +19,7 @@ namespace UnitTests.StreamingTests
             private static readonly Guid ServiceId = Guid.NewGuid();
             public const string AzureQueueStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
             public const string SmsStreamProviderName = "SMSProvider";
-
+            public const bool SMSFireAndForgetOnSilo = false;
             public ClusterConfiguration ClusterConfiguration { get; set; }
 
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -25,19 +28,34 @@ namespace UnitTests.StreamingTests
 
                 builder.ConfigureLegacyConfiguration(legacy =>
                 {
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-
-                    legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
-                    legacy.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData",
-                        fireAndForgetDelivery: false,
-                        optimizeForImmutableData: false);
-
-                    legacy.ClientConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
-
                     legacy.ClusterConfiguration.Globals.ServiceId = ServiceId;
                     this.ClusterConfiguration = legacy.ClusterConfiguration;
                 });
+                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+                builder.AddClientBuilderConfigurator<ClientConfiguretor>();
+            }
+
+            public class SiloConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder.AddSimpleMessageStreamProvider(SmsStreamProviderName)
+                        .AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData",
+                            options =>
+                            {
+                                options.OptimizeForImmutableData = false;
+                                options.FireAndForgetDelivery = SMSFireAndForgetOnSilo;
+                            })
+                        .AddMemoryGrainStorage("MemoryStore", op => op.NumStorageGrains = 1)
+                        .AddMemoryGrainStorage("PubSubStore");
+                }
+            }
+            public class ClientConfiguretor : IClientBuilderConfigurator
+            {
+                public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+                {
+                    clientBuilder.AddSimpleMessageStreamProvider(SmsStreamProviderName);
+                }
             }
         }
 
@@ -48,7 +66,7 @@ namespace UnitTests.StreamingTests
         {
             runner = new SingleStreamTestRunner(fixture.HostedCluster.InternalClient, SingleStreamTestRunner.SMS_STREAM_PROVIDER_NAME);
             // runner = new SingleStreamTestRunner(SingleStreamTestRunner.SMS_STREAM_PROVIDER_NAME, 0, false);
-            fireAndForgetDeliveryProperty = ExtractFireAndForgetDeliveryProperty(fixture);
+            fireAndForgetDeliveryProperty = Fixture.SMSFireAndForgetOnSilo;
         }
 
         #region Simple Message Stream Tests
@@ -142,27 +160,6 @@ namespace UnitTests.StreamingTests
         public async Task SMS_14_SameGrain_ProducerFirstConsumerLater()
         {
             await runner.StreamTest_14_SameGrain_ProducerFirstConsumerLater(!fireAndForgetDeliveryProperty);
-        }
-
-        private bool ExtractFireAndForgetDeliveryProperty(Fixture fixture)
-        {
-            ProviderCategoryConfiguration providerConfigs;
-            if (fixture.ClusterConfiguration.Globals.ProviderConfigurations.TryGetValue(ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, 
-                out providerConfigs))
-            {
-                IProviderConfiguration provider;
-                if (providerConfigs.Providers.TryGetValue(SingleStreamTestRunner.SMS_STREAM_PROVIDER_NAME, out provider))
-                {
-                    string fireAndForgetProperty = null;
-                    bool fireAndForget = false;
-                    if (provider.Properties.TryGetValue(SimpleMessageStreamProvider.FIRE_AND_FORGET_DELIVERY, out fireAndForgetProperty))
-                    {
-                        fireAndForget = Boolean.Parse(fireAndForgetProperty);
-                    }
-                    return fireAndForget;
-                }
-            }
-            throw new Exception("failed to get fire and forget");
         }
 
         //----------------------------------------------//

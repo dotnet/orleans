@@ -1,4 +1,3 @@
-using Orleans.Logging.Legacy;
 using System;
 using System.Net;
 
@@ -40,7 +39,6 @@ namespace Orleans.Runtime
     /// <summary>
     /// An interface used to consume log entries. 
     /// </summary>
-    [Obsolete(OrleansLoggingUtils.ObsoleteMessageStringForLegacyLoggingInfrastructure)]
     public interface ILogConsumer
     {
         /// <summary>
@@ -69,7 +67,6 @@ namespace Orleans.Runtime
     /// <summary>
     /// An interface used to consume log entries, when a Flush function is also supported. 
     /// </summary>
-    [Obsolete(OrleansLoggingUtils.ObsoleteMessageStringForLegacyLoggingInfrastructure)]
     public interface IFlushableLogConsumer : ILogConsumer
     {
         /// <summary>Flush any pending log writes.</summary>
@@ -79,7 +76,6 @@ namespace Orleans.Runtime
     /// <summary>
     /// An interface used to consume log entries, when a Close function is also supported. 
     /// </summary>
-    [Obsolete(OrleansLoggingUtils.ObsoleteMessageStringForLegacyLoggingInfrastructure)]
     public interface ICloseableLogConsumer : ILogConsumer
     {
         /// <summary>Close this log.</summary>

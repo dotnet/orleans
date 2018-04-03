@@ -3,6 +3,8 @@ using Orleans.CodeGeneration;
 using Orleans.Serialization;
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -12,27 +14,34 @@ namespace Orleans.Runtime
     {
         private const bool USE_DEBUG_CONTEXT = false;
         private const bool USE_DEBUG_CONTEXT_PARAMS = false;
-        private static ConcurrentDictionary<int, string> debugContexts = new ConcurrentDictionary<int, string>();
+        private static readonly ConcurrentDictionary<int, string> debugContexts = new ConcurrentDictionary<int, string>();
 
         private readonly Action<Message, TaskCompletionSource<object>> responseCallbackDelegate;
+        private readonly Func<GrainReference, InvokeMethodRequest, string, InvokeMethodOptions, Task<object>> sendRequestDelegate;
         private readonly ILogger logger;
         private readonly IInternalGrainFactory internalGrainFactory;
         private readonly SerializationManager serializationManager;
         private readonly IGrainCancellationTokenRuntime cancellationTokenRuntime;
+        private readonly IOutgoingGrainCallFilter[] filters;
+        private readonly InterfaceToImplementationMappingCache grainReferenceMethodCache;
 
         public GrainReferenceRuntime(
             ILogger<GrainReferenceRuntime> logger,
             IRuntimeClient runtimeClient,
             IGrainCancellationTokenRuntime cancellationTokenRuntime,
             IInternalGrainFactory internalGrainFactory,
-            SerializationManager serializationManager)
+            SerializationManager serializationManager,
+            IEnumerable<IOutgoingGrainCallFilter> outgoingCallFilters)
         {
+            this.grainReferenceMethodCache = new InterfaceToImplementationMappingCache();
             this.responseCallbackDelegate = this.ResponseCallback;
+            this.sendRequestDelegate = SendRequest;
             this.logger = logger;
             this.RuntimeClient = runtimeClient;
             this.cancellationTokenRuntime = cancellationTokenRuntime;
             this.internalGrainFactory = internalGrainFactory;
             this.serializationManager = serializationManager;
+            this.filters = outgoingCallFilters.ToArray();
         }
 
         public IRuntimeClient RuntimeClient { get; private set; }
@@ -110,11 +119,28 @@ namespace Orleans.Runtime
             // Call any registered client pre-call interceptor function.
             CallClientInvokeCallback(reference, request);
 
-            bool isOneWayCall = ((options & InvokeMethodOptions.OneWay) != 0);
+            if (this.filters?.Length > 0)
+            {
+                return InvokeWithFilters(reference, request, debugContext, options);
+            }
+            
+            return SendRequest(reference, request, debugContext, options);
+        }
+
+        private Task<object> SendRequest(GrainReference reference, InvokeMethodRequest request, string debugContext, InvokeMethodOptions options)
+        {
+            bool isOneWayCall = (options & InvokeMethodOptions.OneWay) != 0;
 
             var resolver = isOneWayCall ? null : new TaskCompletionSource<object>();
             this.RuntimeClient.SendRequest(reference, request, resolver, this.responseCallbackDelegate, debugContext, options, reference.GenericArguments);
             return isOneWayCall ? null : resolver.Task;
+        }
+
+        private async Task<object> InvokeWithFilters(GrainReference reference, InvokeMethodRequest request, string debugContext, InvokeMethodOptions options)
+        {
+            var invoker = new OutgoingCallInvoker(reference, request, options, debugContext, this.sendRequestDelegate, this.grainReferenceMethodCache, this.filters);
+            await invoker.Invoke();
+            return invoker.Result;
         }
 
         private void CallClientInvokeCallback(GrainReference reference, InvokeMethodRequest request)

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Concurrency;
+using ProtoBuf;
 
 namespace UnitTests.GrainInterfaces
 {
@@ -40,21 +41,31 @@ namespace UnitTests.GrainInterfaces
         Enemy3
     }
 
+    [ProtoContract]
     [Serializable]
     public class ClassWithEnumTestData
     {
+        [ProtoMember(1)]
         public TestEnum EnumValue { get; set; }
+        [ProtoMember(2)]
         public CampaignEnemyTestType Enemy { get; set; }
     }
 
+    [ProtoContract]
     [Serializable]
     public class LargeTestData
     {
+        [ProtoMember(1)]
         public string TestString { get; set; }
+        [ProtoMember(2)]
         private readonly bool[] boolArray;
+        [ProtoMember(3)]
         protected Dictionary<string, int> stringIntDict;
+        [ProtoMember(4)]
         public TestEnum EnumValue { get; set; }
+        [ProtoMember(5)]
         private readonly ClassWithEnumTestData[] classArray;
+        [ProtoMember(6)]
         public string Description { get; set; }
 
         public LargeTestData()

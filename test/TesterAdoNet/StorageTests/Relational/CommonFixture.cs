@@ -59,7 +59,8 @@ namespace UnitTests.StorageTests.Relational
         /// </summary>
         public CommonFixture()
         {
-            DefaultProviderRuntime = new ClientProviderRuntime(this.InternalGrainFactory, this.Services, NullLoggerFactory.Instance);
+            var clusterOptions = this.Services.GetRequiredService<IOptions<ClusterOptions>>();
+            DefaultProviderRuntime = new ClientProviderRuntime(this.InternalGrainFactory, this.Services, NullLoggerFactory.Instance, clusterOptions);
         }
 
         /// <summary>
@@ -86,12 +87,12 @@ namespace UnitTests.StorageTests.Relational
                                 ConnectionString = Storage.Storage.ConnectionString,
                                 Invariant = storageInvariant
                             };
-                            var siloOptions = new SiloOptions()
+                            var clusterOptions = new ClusterOptions()
                             {
-                                ServiceId = Guid.NewGuid()
+                                ServiceId = Guid.NewGuid().ToString()
                             };
-                            var storageProvider = new AdoNetGrainStorage(DefaultProviderRuntime.ServiceProvider.GetService<ILogger<AdoNetGrainStorage>>(), DefaultProviderRuntime, Options.Create(options), Options.Create(siloOptions), storageInvariant + "_StorageProvider");
-                            var siloLifeCycle = new SiloLifecycle(NullLoggerFactory.Instance);
+                            var storageProvider = new AdoNetGrainStorage(DefaultProviderRuntime.ServiceProvider.GetService<ILogger<AdoNetGrainStorage>>(), DefaultProviderRuntime, Options.Create(options), Options.Create(clusterOptions), storageInvariant + "_StorageProvider");
+                            ISiloLifecycleSubject siloLifeCycle = new SiloLifecycleSubject(new LifecycleSubject(NullLoggerFactory.Instance.CreateLogger<LifecycleSubject>()), NullLoggerFactory.Instance.CreateLogger<SiloLifecycleSubject>());
                             storageProvider.Participate(siloLifeCycle);
                             await siloLifeCycle.OnStart(CancellationToken.None);
 

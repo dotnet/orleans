@@ -18,7 +18,6 @@ namespace Orleans.Transactions
         /// <param name="transactionId">the id of the transaction to prepare</param>
         /// <param name="accessCount">number of reads/writes performed on this participant by this transaction</param>
         /// <param name="timeStamp">the commit timestamp for this transaction</param>
-        /// <param name=""></param>
         /// <returns></returns>
         Task<TransactionalStatus> CommitReadOnly(Guid transactionId, AccessCounter accessCount, DateTime timeStamp);
 
@@ -39,7 +38,6 @@ namespace Orleans.Transactions
         /// <param name="transactionId">the id of the transaction to prepare</param>
         /// <param name="accessCount">number of reads/writes performed on this participant by this transaction</param>
         /// <param name="timeStamp">the commit timestamp for this transaction</param>
-        /// <param name="TransactionManager">the transaction manager for this transaction</param>
         /// <param name="writeParticipants">the participants who wrote during the transaction</param>
         /// <param name="totalParticipants">the total number of participants in the transaction</param>
         /// <returns>the status of the transaction</returns>

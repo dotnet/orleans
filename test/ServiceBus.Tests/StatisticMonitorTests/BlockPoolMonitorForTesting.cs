@@ -15,12 +15,7 @@ namespace ServiceBus.Tests.MonitorTests
 {
     public class BlockPoolMonitorForTesting : IBlockPoolMonitor
     {
-        public static BlockPoolMonitorForTesting Instance = new BlockPoolMonitorForTesting();
-        public ObjectPoolMonitorCounters CallCounters;
-        private BlockPoolMonitorForTesting()
-        {
-            CallCounters = new ObjectPoolMonitorCounters();
-        }
+        public ObjectPoolMonitorCounters CallCounters { get; } = new ObjectPoolMonitorCounters();
  
         public void TrackMemoryAllocated(long allocatedMemoryInByte)
         {
@@ -37,11 +32,12 @@ namespace ServiceBus.Tests.MonitorTests
             Interlocked.Increment(ref this.CallCounters.ReportCallCounter);
         }
     }
+
     [Serializable]
     public class ObjectPoolMonitorCounters
     {
-        public int TrackObjectAllocatedByCacheCallCounter = 0;
-        public int TrackObjectReleasedFromCacheCallCounter = 0;
-        public int ReportCallCounter = 0;
+        public int TrackObjectAllocatedByCacheCallCounter;
+        public int TrackObjectReleasedFromCacheCallCounter;
+        public int ReportCallCounter;
     }
 }

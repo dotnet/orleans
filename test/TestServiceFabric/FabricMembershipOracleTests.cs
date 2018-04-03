@@ -8,7 +8,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Clustering.ServiceFabric;
 using Orleans.Configuration;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.ServiceFabric;
 using TestExtensions;
 using Xunit;
@@ -38,10 +37,11 @@ namespace TestServiceFabric
             };
 
             this.resolver = new MockResolver();
-            var globalConfig = new ClusterConfiguration().Globals;
-            globalConfig.HasMultiClusterNetwork = true;
-            globalConfig.MaxMultiClusterGateways = 2;
-            globalConfig.ClusterId = "MegaGoodCluster";
+            var multiClusterOptions = new MultiClusterOptions
+            {
+                HasMultiClusterNetwork = true,
+                MaxMultiClusterGateways = 2
+            };
 
             this.fabricClusteringOptions = new ServiceFabricClusteringOptions();
             this.unknownSiloMonitor = new UnknownSiloMonitor(
@@ -49,10 +49,10 @@ namespace TestServiceFabric
                 new TestOutputLogger<UnknownSiloMonitor>(this.Output));
             this.oracle = new FabricMembershipOracle(
                 this.siloDetails,
-                globalConfig,
                 this.resolver,
                 new NullLogger<FabricMembershipOracle>(),
-                this.unknownSiloMonitor);
+                this.unknownSiloMonitor,
+                Options.Create(multiClusterOptions));
         }
 
         [Fact]

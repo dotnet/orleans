@@ -45,7 +45,6 @@ namespace OrleansManager
         private static void RunCommand(string command, string[] args)
         {
             var clientBuilder = new ClientBuilder()
-                .ConfigureApplicationParts(parts => parts.AddFromAppDomain().AddFromApplicationBaseDirectory())
                 .LoadConfiguration();
             using (client = (IInternalClusterClient)clientBuilder.Build())
             {

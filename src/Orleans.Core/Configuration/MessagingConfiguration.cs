@@ -1,3 +1,4 @@
+using Orleans.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -122,17 +123,10 @@ namespace Orleans.Runtime.Configuration
         public List<TypeInfo> SerializationProviders { get; private set; }
         public TypeInfo FallbackSerializationProvider { get; set; }
 
-        private static readonly TimeSpan DEFAULT_MAX_SOCKET_AGE = TimeSpan.MaxValue;
         internal const int DEFAULT_MAX_FORWARD_COUNT = 2;
         private const bool DEFAULT_RESEND_ON_TIMEOUT = false;
         private static readonly int DEFAULT_SILO_SENDER_QUEUES = Environment.ProcessorCount;
         private static readonly int DEFAULT_GATEWAY_SENDER_QUEUES = Environment.ProcessorCount;
-        private static readonly int DEFAULT_CLIENT_SENDER_BUCKETS = (int)Math.Pow(2, 13);
-
-        private const int DEFAULT_BUFFER_POOL_BUFFER_SIZE = 4 * 1024;
-        private const int DEFAULT_BUFFER_POOL_MAX_SIZE = 10000;
-        private const int DEFAULT_BUFFER_POOL_PREALLOCATION_SIZE = 250;
-        private const bool DEFAULT_DROP_EXPIRED_MESSAGES = true;
 
         private readonly bool isSiloConfig;
 
@@ -140,21 +134,21 @@ namespace Orleans.Runtime.Configuration
         {
             isSiloConfig = isSilo;
 
-            OpenConnectionTimeout = Constants.DEFAULT_OPENCONNECTION_TIMEOUT;
-            ResponseTimeout = Constants.DEFAULT_RESPONSE_TIMEOUT;
+            OpenConnectionTimeout = NetworkingOptions.DEFAULT_OPENCONNECTION_TIMEOUT;
+            ResponseTimeout = MessagingOptions.DEFAULT_RESPONSE_TIMEOUT;
             MaxResendCount = 0;
             ResendOnTimeout = DEFAULT_RESEND_ON_TIMEOUT;
-            MaxSocketAge = DEFAULT_MAX_SOCKET_AGE;
-            DropExpiredMessages = DEFAULT_DROP_EXPIRED_MESSAGES;
+            MaxSocketAge = NetworkingOptions.DEFAULT_MAX_SOCKET_AGE;
+            DropExpiredMessages = MessagingOptions.DEFAULT_DROP_EXPIRED_MESSAGES;
 
             SiloSenderQueues = DEFAULT_SILO_SENDER_QUEUES;
             GatewaySenderQueues = DEFAULT_GATEWAY_SENDER_QUEUES;
-            ClientSenderBuckets = DEFAULT_CLIENT_SENDER_BUCKETS;
+            ClientSenderBuckets = ClientMessagingOptions.DEFAULT_CLIENT_SENDER_BUCKETS;
             ClientDropTimeout = Constants.DEFAULT_CLIENT_DROP_TIMEOUT;
 
-            BufferPoolBufferSize = DEFAULT_BUFFER_POOL_BUFFER_SIZE;
-            BufferPoolMaxSize = DEFAULT_BUFFER_POOL_MAX_SIZE;
-            BufferPoolPreallocationSize = DEFAULT_BUFFER_POOL_PREALLOCATION_SIZE;
+            BufferPoolBufferSize = MessagingOptions.DEFAULT_BUFFER_POOL_BUFFER_SIZE;
+            BufferPoolMaxSize = MessagingOptions.DEFAULT_BUFFER_POOL_MAX_SIZE;
+            BufferPoolPreallocationSize = MessagingOptions.DEFAULT_BUFFER_POOL_PREALLOCATION_SIZE;
 
             if (isSiloConfig)
             {
@@ -207,7 +201,7 @@ namespace Orleans.Runtime.Configuration
             ResponseTimeout = child.HasAttribute("ResponseTimeout")
                                       ? ConfigUtilities.ParseTimeSpan(child.GetAttribute("ResponseTimeout"),
                                                                  "Invalid ResponseTimeout")
-                                      : Constants.DEFAULT_RESPONSE_TIMEOUT;
+                                      : MessagingOptions.DEFAULT_RESPONSE_TIMEOUT;
 
             if (child.HasAttribute("MaxResendCount"))
             {

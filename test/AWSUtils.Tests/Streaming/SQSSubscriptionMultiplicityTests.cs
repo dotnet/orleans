@@ -1,17 +1,19 @@
+using System;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using AWSUtils.Tests.StorageTests;
+using Xunit;
 using Orleans;
-using Orleans.Providers.Streams;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using OrleansAWSUtils.Streams;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Logging.Abstractions;
+using Orleans.Hosting;
 using TestExtensions;
 using UnitTests.StreamingTests;
-using Xunit;
+using Orleans.Configuration;
 
 namespace AWSUtils.Tests.Streaming
 {
@@ -30,24 +32,45 @@ namespace AWSUtils.Tests.Streaming
             }
 
             var clusterId = Guid.NewGuid().ToString();
-            var streamConnectionString = new Dictionary<string, string>
-            {
-                {"DataConnectionString", StreamConnectionString},
-                {"DeploymentId", clusterId}
-            };
 
             builder.ConfigureLegacyConfiguration(legacy =>
             {
-                legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
 
                 legacy.ClusterConfiguration.Globals.ClusterId = clusterId;
                 legacy.ClientConfiguration.ClusterId = clusterId;
                 legacy.ClientConfiguration.DataConnectionString = StreamConnectionString;
                 legacy.ClusterConfiguration.Globals.DataConnectionString = StreamConnectionString;
-                legacy.ClusterConfiguration.Globals.RegisterStreamProvider<SQSStreamProvider>(SQSStreamProviderName, streamConnectionString);
-                legacy.ClientConfiguration.RegisterStreamProvider<SQSStreamProvider>(SQSStreamProviderName, streamConnectionString);
             });
+            builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+            builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
         }
+
+        private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder
+                    .AddMemoryGrainStorage("PubSubStore")
+                    .AddSqsStreams(SQSStreamProviderName, options =>
+                    {
+                        options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+                    });
+            }
+        }
+
+        private class MyClientBuilderConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder
+                    .AddSqsStreams(SQSStreamProviderName, options =>
+                    {
+                        options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+                    });
+            }
+        }
+
+
 
         public SQSSubscriptionMultiplicityTests()
         {

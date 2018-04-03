@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.WindowsAzure.Storage.Table;
 using Xunit;
 using Xunit.Abstractions;
@@ -33,7 +34,8 @@ namespace Tester.AzureUtils.Persistence
         {
             this.output = output;
             this.fixture = fixture;
-            this.providerRuntime = new ClientProviderRuntime(fixture.InternalGrainFactory, fixture.Services, NullLoggerFactory.Instance);
+            var clusterOptions = fixture.Services.GetRequiredService<IOptions<ClusterOptions>>();
+            this.providerRuntime = new ClientProviderRuntime(fixture.InternalGrainFactory, fixture.Services, NullLoggerFactory.Instance, clusterOptions);
             this.providerCfgProps.Clear();
         }
 
@@ -203,12 +205,11 @@ namespace Tester.AzureUtils.Persistence
         {
             const string testName = nameof(PersistenceProvider_Memory_FixedLatency_WriteRead);
             TimeSpan expectedLatency = TimeSpan.FromMilliseconds(200);
-
-            IStorageProvider store = new MemoryStorageWithLatency();
-            this.providerCfgProps.Add("Latency", expectedLatency.ToString());
-            this.providerCfgProps.Add("MockCalls", "true");
-            var cfg = new ProviderConfiguration(this.providerCfgProps);
-            await store.Init(testName, this.providerRuntime, cfg);
+            MemoryGrainStorageWithLatency store = new MemoryGrainStorageWithLatency(testName, new MemoryStorageWithLatencyOptions()
+            {
+                Latency = expectedLatency,
+                MockCallsOnly = true
+            }, NullLoggerFactory.Instance, this.providerRuntime.ServiceProvider.GetService<IGrainFactory>());
 
             GrainReference reference = this.fixture.InternalGrainFactory.GetGrain(GrainId.NewId());
             var state = TestStoreGrainState.NewRandomState();
@@ -271,8 +272,8 @@ namespace Tester.AzureUtils.Persistence
 
         private async Task<AzureTableGrainStorage> InitAzureTableGrainStorage(AzureTableStorageOptions options)
         {
-            AzureTableGrainStorage store = ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(this.providerRuntime.ServiceProvider, options);
-            SiloLifecycle lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycle>(this.providerRuntime.ServiceProvider);
+            AzureTableGrainStorage store = ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(this.providerRuntime.ServiceProvider, options, "TestStorage");
+            ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(this.providerRuntime.ServiceProvider, new LifecycleSubject(null));
             store.Participate(lifecycle);
             await lifecycle.OnStart();
             return store;

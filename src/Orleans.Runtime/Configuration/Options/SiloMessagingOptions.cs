@@ -77,36 +77,4 @@ namespace Orleans.Configuration
         /// </summary>
         public bool AssumeHomogenousSilosForTesting { get; set; } = false;
     }
-
-    public class SiloMessagingOptionFormatter : MessagingOptionsFormatter, IOptionFormatter<SiloMessagingOptions>
-    {
-        public string Name => nameof(SiloMessagingOptions);
-
-        private SiloMessagingOptions options;
-        public SiloMessagingOptionFormatter(IOptions<SiloMessagingOptions> messageOptions)
-            : base(messageOptions.Value)
-        {
-            options = messageOptions.Value;
-        }
-
-        public IEnumerable<string> Format()
-        {
-            List<string> format = base.FormatSharedOptions();
-            format.AddRange(new List<string>
-            {
-                OptionFormattingUtilities.Format(nameof(this.options.SiloSenderQueues), this.options.SiloSenderQueues),
-                OptionFormattingUtilities.Format(nameof(this.options.GatewaySenderQueues), this.options.GatewaySenderQueues),
-                OptionFormattingUtilities.Format(nameof(this.options.MaxForwardCount), this.options.MaxForwardCount),
-                OptionFormattingUtilities.Format(nameof(this.options.ClientDropTimeout), this.options.ClientDropTimeout),
-                OptionFormattingUtilities.Format(nameof(this.options.ClientRegistrationRefresh), this.options.ClientRegistrationRefresh),
-                OptionFormattingUtilities.Format(nameof(this.options.MaxEnqueuedRequestsSoftLimit), this.options.MaxEnqueuedRequestsSoftLimit),
-                OptionFormattingUtilities.Format(nameof(this.options.MaxEnqueuedRequestsHardLimit), this.options.MaxEnqueuedRequestsHardLimit),
-                OptionFormattingUtilities.Format(nameof(this.options.MaxEnqueuedRequestsSoftLimit_StatelessWorker), this.options.MaxEnqueuedRequestsSoftLimit_StatelessWorker),
-                OptionFormattingUtilities.Format(nameof(this.options.MaxEnqueuedRequestsHardLimit_StatelessWorker), this.options.MaxEnqueuedRequestsHardLimit_StatelessWorker),
-                OptionFormattingUtilities.Format(nameof(this.options.MaxRequestProcessingTime), this.options.MaxRequestProcessingTime),
-                OptionFormattingUtilities.Format(nameof(this.options.AssumeHomogenousSilosForTesting), this.options.AssumeHomogenousSilosForTesting)
-            });
-            return format;
-        }
-    }
 }

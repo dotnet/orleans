@@ -1,13 +1,9 @@
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading.Tasks;
-using Orleans.Runtime.Configuration;
 using TestExtensions;
 using Xunit;
 
@@ -77,8 +73,7 @@ namespace Tester.ClientConnectionTests
         private async Task<bool> WaitForClusterSize(int expectedSize)
         {
             var mgmtGrain = this.Client.GetGrain<IManagementGrain>(0);
-            var clusterConfig = new ClusterConfiguration();
-            var timeout = TestCluster.GetLivenessStabilizationTime(clusterConfig.Globals);
+            var timeout = TestCluster.GetLivenessStabilizationTime(new Orleans.Configuration.ClusterMembershipOptions());
             var stopWatch = Stopwatch.StartNew();
             do
             {

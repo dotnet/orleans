@@ -15,6 +15,7 @@ using TestExtensions;
 
 namespace PSUtils.Tests
 {
+    using Orleans.Hosting;
     using System.Linq;
 
     public class PowershellHostFixture : BaseTestClusterFixture
@@ -27,10 +28,18 @@ namespace PSUtils.Tests
         {
             builder.ConfigureLegacyConfiguration(legacy =>
             {
-                legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
-                legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
                 ClientConfig = legacy.ClientConfiguration;
             });
+            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+        }
+
+        public class SiloConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder.AddMemoryGrainStorageAsDefault()
+                    .AddMemoryGrainStorage("MemoryStore");
+            }
         }
 
         public PowershellHostFixture()

@@ -5,15 +5,12 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Azure.EventHubs;
-using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
-using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Hosting;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -22,6 +19,8 @@ namespace Orleans.ServiceBus.Providers
     /// </summary>
     public class EventHubAdapterFactory : IQueueAdapterFactory, IQueueAdapter, IQueueAdapterCache
     {
+        private readonly ILoggerFactory loggerFactory;
+
         /// <summary>
         /// Orleans logging
         /// </summary>
@@ -33,31 +32,18 @@ namespace Orleans.ServiceBus.Providers
         protected IServiceProvider serviceProvider;
 
         /// <summary>
-        /// Provider configuration
-        /// </summary>
-        protected IProviderConfiguration providerConfig;
-
-        /// <summary>
         /// Stream provider settings
         /// </summary>
-        protected EventHubStreamProviderSettings adapterSettings;
-
-        /// <summary>
-        /// Event Hub settings
-        /// </summary>
-        protected IEventHubSettings hubSettings;
-
-        /// <summary>
-        /// Checkpointer settings
-        /// </summary>
-        protected ICheckpointerSettings checkpointerSettings;
-
+        private EventHubOptions ehOptions;
+        private EventHubStreamCachePressureOptions cacheOptions;
+        private EventHubReceiverOptions receiverOptions;
+        private StreamStatisticOptions statisticOptions;
+        private StreamCacheEvictionOptions cacheEvictionOptions;
         private IEventHubQueueMapper streamQueueMapper;
         private string[] partitionIds;
         private ConcurrentDictionary<QueueId, EventHubAdapterReceiver> receivers;
         private EventHubClient client;
         private ITelemetryProducer telemetryProducer;
-		private ILoggerFactory loggerFactory;        
         /// <summary>
         /// Gets the serialization manager.
         /// </summary>
@@ -66,7 +52,7 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Name of the adapter. Primarily for logging purposes
         /// </summary>
-        public string Name => this.adapterSettings.StreamProviderName;
+        public string Name { get; }
 
         /// <summary>
         /// Determines whether this is a rewindable stream adapter - supports subscribing from previous point in time.
@@ -88,7 +74,7 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Creates a parition checkpointer.
         /// </summary>
-        protected Func<string, Task<IStreamQueueCheckpointer<string>>> CheckpointerFactory { get; set; }
+        private IStreamQueueCheckpointerFactory checkpointerFactory;
 
         /// <summary>
         /// Creates a failure handler for a partition.
@@ -113,40 +99,33 @@ namespace Orleans.ServiceBus.Providers
         protected Func<EventHubPartitionSettings, string, ILogger, ITelemetryProducer, Task<IEventHubReceiver>> EventHubReceiverFactory;
         internal ConcurrentDictionary<QueueId, EventHubAdapterReceiver> EventHubReceivers { get { return this.receivers; } }
         internal IEventHubQueueMapper EventHubQueueMapper { get { return this.streamQueueMapper; } }
-        /// <summary>
-        /// Factory initialization.
-        /// Provider config must contain the event hub settings type or the settings themselves.
-        /// EventHubSettingsType is recommended for consumers that do not want to include secure information in the cluster configuration.
-        /// </summary>
-        /// <param name="providerCfg"></param>
-        /// <param name="providerName"></param>
-        /// <param name="log"></param>
-        /// <param name="svcProvider"></param>
-        public virtual void Init(IProviderConfiguration providerCfg, string providerName, IServiceProvider svcProvider)
-        {
-            if (providerCfg == null) throw new ArgumentNullException(nameof(providerCfg));
-            if (string.IsNullOrWhiteSpace(providerName)) throw new ArgumentNullException(nameof(providerName));
 
-            this.providerConfig = providerCfg;
-            this.serviceProvider = svcProvider;
-            this.loggerFactory = this.serviceProvider.GetRequiredService<ILoggerFactory>();
+        public EventHubAdapterFactory(string name, EventHubOptions ehOptions, EventHubReceiverOptions receiverOptions, EventHubStreamCachePressureOptions cacheOptions, 
+            StreamCacheEvictionOptions cacheEvictionOptions, StreamStatisticOptions statisticOptions,
+            IServiceProvider serviceProvider, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
+        {
+            this.Name = name;
+            this.cacheEvictionOptions = cacheEvictionOptions ?? throw new ArgumentNullException(nameof(cacheEvictionOptions));
+            this.statisticOptions = statisticOptions ?? throw new ArgumentNullException(nameof(statisticOptions));
+            this.ehOptions = ehOptions ?? throw new ArgumentNullException(nameof(ehOptions));
+            this.cacheOptions = cacheOptions?? throw new ArgumentNullException(nameof(cacheOptions));
+            this.receiverOptions = receiverOptions?? throw new ArgumentNullException(nameof(receiverOptions));
+            this.serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+            this.SerializationManager = serializationManager ?? throw new ArgumentNullException(nameof(serializationManager));
+            this.telemetryProducer = telemetryProducer ?? throw new ArgumentNullException(nameof(telemetryProducer));
+            this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
+        }
+
+        public virtual void Init()
+        {
             this.receivers = new ConcurrentDictionary<QueueId, EventHubAdapterReceiver>();
-            this.SerializationManager = this.serviceProvider.GetRequiredService<SerializationManager>();
-            this.adapterSettings = new EventHubStreamProviderSettings(providerName);
-            this.adapterSettings.PopulateFromProviderConfig(this.providerConfig);
-            this.hubSettings = this.adapterSettings.GetEventHubSettings(this.providerConfig, this.serviceProvider);
             this.telemetryProducer = this.serviceProvider.GetService<ITelemetryProducer>();
 
             InitEventHubClient();
-            if (this.CheckpointerFactory == null)
-            {
-                this.checkpointerSettings = this.adapterSettings.GetCheckpointerSettings(this.providerConfig, this.serviceProvider);
-                this.CheckpointerFactory = partition => EventHubCheckpointer.Create(this.checkpointerSettings, this.adapterSettings.StreamProviderName, partition, this.loggerFactory);
-            }
 
             if (this.CacheFactory == null)
             {
-                this.CacheFactory = CreateCacheFactory(this.adapterSettings).CreateCache;
+                this.CacheFactory = CreateCacheFactory(this.cacheOptions).CreateCache;
             }
 
             if (this.StreamFailureHandlerFactory == null)
@@ -157,7 +136,7 @@ namespace Orleans.ServiceBus.Providers
 
             if (this.QueueMapperFactory == null)
             {
-                this.QueueMapperFactory = partitions => new EventHubQueueMapper(partitions, this.adapterSettings.StreamProviderName);
+                this.QueueMapperFactory = partitions => new EventHubQueueMapper(partitions, this.Name);
             }
 
             if (this.ReceiverMonitorFactory == null)
@@ -165,9 +144,14 @@ namespace Orleans.ServiceBus.Providers
                 this.ReceiverMonitorFactory = (dimensions, logger, telemetryProducer) => new DefaultEventHubReceiverMonitor(dimensions, telemetryProducer);
             }
 
-            this.logger = this.loggerFactory.CreateLogger($"{this.GetType().FullName}.{this.hubSettings.Path}");
+            this.logger = this.loggerFactory.CreateLogger($"{this.GetType().FullName}.{this.ehOptions.Path}");
         }
 
+        //should only need checkpointer on silo side, so move its init logic when it is used
+        private void InitCheckpointerFactory()
+        {
+            this.checkpointerFactory = this.serviceProvider.GetRequiredServiceByName<IStreamQueueCheckpointerFactory>(this.Name);
+        }
         /// <summary>
         /// Create queue adapter.
         /// </summary>
@@ -259,9 +243,9 @@ namespace Orleans.ServiceBus.Providers
 
         protected virtual void InitEventHubClient()
         {
-            var connectionStringBuilder = new EventHubsConnectionStringBuilder(this.hubSettings.ConnectionString)
+            var connectionStringBuilder = new EventHubsConnectionStringBuilder(this.ehOptions.ConnectionString)
             {
-                EntityPath = this.hubSettings.Path
+                EntityPath = this.ehOptions.Path
             };
             this.client = EventHubClient.CreateFromConnectionString(connectionStringBuilder.ToString());
         }
@@ -271,21 +255,21 @@ namespace Orleans.ServiceBus.Providers
         /// User can override this function to return their own implementation of IEventHubQueueCacheFactory,
         /// and other customization of IEventHubQueueCacheFactory if they may.
         /// </summary>
-        /// <param name="providerSettings"></param>
         /// <returns></returns>
-        protected virtual IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamProviderSettings providerSettings)
+        protected virtual IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamCachePressureOptions eventHubCacheOptions)
         {
-            var eventHubPath = this.hubSettings.Path;
+            var eventHubPath = this.ehOptions.Path;
             var sharedDimensions = new EventHubMonitorAggregationDimensions(eventHubPath);
-            return new EventHubQueueCacheFactory(providerSettings, this.SerializationManager, sharedDimensions, this.loggerFactory);
+            return new EventHubQueueCacheFactory(eventHubCacheOptions, cacheEvictionOptions, statisticOptions, this.SerializationManager, sharedDimensions);
         }
 
         private EventHubAdapterReceiver MakeReceiver(QueueId queueId)
         {
             var config = new EventHubPartitionSettings
             {
-                Hub = hubSettings,
+                Hub = ehOptions,
                 Partition = this.streamQueueMapper.QueueToPartition(queueId),
+                ReceiverOptions = this.receiverOptions
             };
 
             var receiverMonitorDimensions = new EventHubReceiverMonitorDimensions
@@ -293,8 +277,9 @@ namespace Orleans.ServiceBus.Providers
                 EventHubPartition = config.Partition,
                 EventHubPath = config.Hub.Path,
             };
-
-            return new EventHubAdapterReceiver(config, this.CacheFactory, this.CheckpointerFactory, this.loggerFactory, this.ReceiverMonitorFactory(receiverMonitorDimensions, this.loggerFactory, this.telemetryProducer), 
+            if (this.checkpointerFactory == null)
+                InitCheckpointerFactory();
+            return new EventHubAdapterReceiver(config, this.CacheFactory, this.checkpointerFactory.Create, this.loggerFactory, this.ReceiverMonitorFactory(receiverMonitorDimensions, this.loggerFactory, this.telemetryProducer), 
                 this.serviceProvider.GetRequiredService<IOptions<LoadSheddingOptions>>().Value,
                 this.telemetryProducer,
                 this.EventHubReceiverFactory);
@@ -308,6 +293,18 @@ namespace Orleans.ServiceBus.Providers
         {
             EventHubRuntimeInformation runtimeInfo = await client.GetRuntimeInformationAsync();
             return runtimeInfo.PartitionIds;
+        }
+
+        public static EventHubAdapterFactory Create(IServiceProvider services, string name)
+        {
+            var ehOptions = services.GetOptionsByName<EventHubOptions>(name);
+            var receiverOptions = services.GetOptionsByName<EventHubReceiverOptions>(name);
+            var cacheOptions = services.GetOptionsByName<EventHubStreamCachePressureOptions>(name);
+            var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
+            var evictionOptions = services.GetOptionsByName<StreamCacheEvictionOptions>(name);
+            var factory = ActivatorUtilities.CreateInstance<EventHubAdapterFactory>(services, name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions);
+            factory.Init();
+            return factory;
         }
     }
 }

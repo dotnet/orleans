@@ -47,7 +47,7 @@ namespace Orleans.Streams
         /// Constructor
         /// </summary>
         /// <param name="loadSheddingLimit"></param>
-        /// <param name="getNodeConfig">The method used to get the current node configuration.</param>
+        /// <param name="options"></param>
         private LoadShedQueueFlowController(int loadSheddingLimit, LoadSheddingOptions options)
         {
             this.options = options;

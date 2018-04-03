@@ -1,10 +1,16 @@
 using System;
+using System.Linq;
+using System.Net;
+using System.Collections.Generic;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.ApplicationParts;
+using Orleans.CodeGeneration;
 using Orleans.Messaging;
+using Orleans.Runtime;
 
 namespace Orleans
 {
@@ -17,8 +23,7 @@ namespace Orleans
         /// Configures default client services.
         /// </summary>
         /// <param name="builder">The host builder.</param>
-        /// <param name="siloName">The silo name.</param>
-        /// <returns>The silo builder.</returns>
+        /// <returns>The client builder.</returns>
         public static IClientBuilder ConfigureDefaults(this IClientBuilder builder)
         {
             // Configure the container to use an Orleans client.
@@ -32,6 +37,71 @@ namespace Orleans
                 }
             });
             return builder;
+        }
+        /// <summary>
+        /// Specify the environment to be used by the host.
+        /// </summary>
+        /// <param name="hostBuilder">The host builder to configure.</param>
+        /// <param name="environment">The environment to host the application in.</param>
+        /// <returns>The host builder.</returns>
+        public static IClientBuilder UseEnvironment(this IClientBuilder hostBuilder, string environment)
+        {
+            return hostBuilder.ConfigureHostConfiguration(configBuilder =>
+            {
+                configBuilder.AddInMemoryCollection(new[]
+                {
+                    new KeyValuePair<string, string>(HostDefaults.EnvironmentKey,
+                        environment  ?? throw new ArgumentNullException(nameof(environment)))
+                });
+            });
+        }
+
+        /// <summary>
+        /// Adds services to the container. This can be called multiple times and the results will be additive.
+        /// </summary>
+        /// <param name="hostBuilder">The <see cref="IClientBuilder" /> to configure.</param>
+        /// <param name="configureDelegate"></param>
+        /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
+        public static IClientBuilder ConfigureServices(this IClientBuilder hostBuilder, Action<IServiceCollection> configureDelegate)
+        {
+            return hostBuilder.ConfigureServices((context, collection) => configureDelegate(collection));
+        }
+
+        /// <summary>
+        /// Sets up the configuration for the remainder of the build process and application. This can be called multiple times and
+        /// the results will be additive. The results will be available at <see cref="HostBuilderContext.Configuration"/> for
+        /// subsequent operations./>.
+        /// </summary>
+        /// <param name="hostBuilder">The host builder to configure.</param>
+        /// <param name="configureDelegate"></param>
+        /// <returns>The same instance of the host builder for chaining.</returns>
+        public static IClientBuilder ConfigureAppConfiguration(this IClientBuilder hostBuilder, Action<IConfigurationBuilder> configureDelegate)
+        {
+            return hostBuilder.ConfigureAppConfiguration((context, builder) => configureDelegate(builder));
+        }
+
+        /// <summary>
+        /// Registers an action used to configure a particular type of options.
+        /// </summary>
+        /// <typeparam name="TOptions">The options type to be configured.</typeparam>
+        /// <param name="builder">The host builder.</param>
+        /// <param name="configureOptions">The action used to configure the options.</param>
+        /// <returns>The client builder.</returns>
+        public static IClientBuilder Configure<TOptions>(this IClientBuilder builder, Action<TOptions> configureOptions) where TOptions : class
+        {
+            return builder.ConfigureServices(services => services.Configure(configureOptions));
+        }
+
+        /// <summary>
+        /// Registers a configuration instance which <typeparamref name="TOptions"/> will bind against.
+        /// </summary>
+        /// <typeparam name="TOptions">The options type to be configured.</typeparam>
+        /// <param name="builder">The host builder.</param>
+        /// <param name="configuration">The configuration.</param>
+        /// <returns>The client builder.</returns>
+        public static IClientBuilder Configure<TOptions>(this IClientBuilder builder, IConfiguration configuration) where TOptions : class
+        {
+            return builder.ConfigureServices(services => services.AddOptions<TOptions>().Bind(configuration));
         }
 
         /// <summary>
@@ -91,6 +161,48 @@ namespace Orleans
         }
 
         /// <summary>
+        /// Configures the client to connect to a silo on the localhost.
+        /// </summary>
+        /// <param name="builder"></param>
+        /// <param name="gatewayPort">The local silo's gateway port.</param>
+        /// <param name="clusterId">Cluster ID to use</param>
+        public static IClientBuilder UseLocalhostClustering(
+            this IClientBuilder builder,
+            int gatewayPort = 30000,
+            string clusterId = ClusterOptions.DevelopmentClusterId)
+        {
+            return builder.UseStaticClustering(new IPEndPoint(IPAddress.Loopback, gatewayPort))
+                .Configure<ClusterOptions>(options =>
+                {
+                    if (!string.IsNullOrWhiteSpace(clusterId)) options.ClusterId = clusterId;
+                });
+        }
+
+        /// <summary>
+        /// Configures the client to connect to a silo on the localhost.
+        /// </summary>
+        /// <param name="builder"></param>
+        /// <param name="gatewayPorts">The local silo gateway port.</param>
+        public static IClientBuilder UseLocalhostClustering(this IClientBuilder builder, params int[] gatewayPorts)
+        {
+            return builder.UseStaticClustering(gatewayPorts.Select(p => new IPEndPoint(IPAddress.Loopback, p)).ToArray())
+                .Configure<ClusterOptions>(options =>
+                {
+                    options.ClusterId = ClusterOptions.DevelopmentClusterId;
+                });
+        }
+
+        /// <summary>
+        /// Configures the client to use static clustering.
+        /// </summary>
+        /// <param name="builder"></param>
+        /// <param name="endpoints">The gateway endpoints.</param>
+        public static IClientBuilder UseStaticClustering(this IClientBuilder builder, params IPEndPoint[] endpoints)
+        {
+            return builder.UseStaticClustering(options => options.Gateways = endpoints.Select(ep => ep.ToGatewayUri()).ToList());
+        }
+
+        /// <summary>
         /// Configures the client to use static clustering.
         /// </summary>
         public static IClientBuilder UseStaticClustering(this IClientBuilder builder, Action<StaticGatewayListProviderOptions> configureOptions)
@@ -104,7 +216,7 @@ namespace Orleans
                     }
 
                     collection.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>()
-                        .TryConfigureFormatter<StaticGatewayListProviderOptions, StaticGatewayListProviderOptionsFormatter>();
+                        .ConfigureFormatter<StaticGatewayListProviderOptions>();
                 });
         }
 
@@ -118,7 +230,7 @@ namespace Orleans
                 {
                     configureOptions?.Invoke(collection.AddOptions<StaticGatewayListProviderOptions>());
                     collection.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>()
-                        .TryConfigureFormatter<StaticGatewayListProviderOptions, StaticGatewayListProviderOptionsFormatter>();
+                        .ConfigureFormatter<StaticGatewayListProviderOptions>();
                 });
         }
 
@@ -148,41 +260,6 @@ namespace Orleans
             }
 
             configure(builder.GetApplicationPartManager());
-            return builder;
-        }
-
-        /// <summary>
-        /// Configures the cluster client general options.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <param name="configureOptions">The delegate that configures the options.</param>
-        /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
-        public static IClientBuilder ConfigureClusterClient(this IClientBuilder builder, Action<ClusterClientOptions> configureOptions)
-        {
-            if (configureOptions != null)
-            {
-                builder.ConfigureServices(services => services.Configure<ClusterClientOptions>(configureOptions));
-            }
-
-            return builder;
-        }
-
-        /// <summary>
-        /// Configures the cluster client general options.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <param name="configureOptions">The delegate that configures the options using the options builder.</param>
-        /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
-        public static IClientBuilder ConfigureClusterClient(this IClientBuilder builder, Action<OptionsBuilder<ClusterClientOptions>> configureOptions)
-        {
-            if (configureOptions != null)
-            {
-                builder.ConfigureServices(services =>
-                {
-                    configureOptions.Invoke(services.AddOptions<ClusterClientOptions>());
-                });
-            }
-
             return builder;
         }
     }

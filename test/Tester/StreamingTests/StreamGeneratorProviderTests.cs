@@ -1,7 +1,8 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -17,6 +18,7 @@ namespace UnitTests.StreamingTests
 {
     public class StreamGeneratorProviderTests : OrleansTestingBase, IClassFixture<StreamGeneratorProviderTests.Fixture>
     {
+        private const int TotalQueueCount = 4;
         private readonly Fixture fixture;
 
         public class Fixture : BaseTestClusterFixture
@@ -24,36 +26,28 @@ namespace UnitTests.StreamingTests
             public const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
             public const string StreamNamespace = GeneratedEventCollectorGrain.StreamNamespace;
 
-            public readonly static SimpleGeneratorConfig GeneratorConfig = new SimpleGeneratorConfig
+            public readonly static SimpleGeneratorOptions GeneratorConfig = new SimpleGeneratorOptions
             {
                 StreamNamespace = StreamNamespace,
                 EventsInStream = 100
             };
 
-            public readonly static GeneratorAdapterConfig AdapterConfig = new GeneratorAdapterConfig(StreamProviderName)
-            {
-                TotalQueueCount = 4,
-                GeneratorConfigType = GeneratorConfig.GetType()
-            };
-
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var settings = new Dictionary<string, string>();
-                // get initial settings from configs
-                AdapterConfig.WriteProperties(settings);
-                GeneratorConfig.WriteProperties(settings);
+                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+            }
 
-                // add queue balancer setting
-                settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.AssemblyQualifiedName);
-
-                // add pub/sub settting
-                settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
-
-                // register stream provider
-                builder.ConfigureLegacyConfiguration(legacy =>
+            private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
                 {
-                    legacy.ClusterConfiguration.Globals.RegisterStreamProvider<GeneratorStreamProvider>(StreamProviderName, settings);
-                });
+                    hostBuilder
+                        .ConfigureServices(services => services.AddSingletonNamedService<IStreamGeneratorConfig>(StreamProviderName, (s, n) => GeneratorConfig))
+                        .AddPersistentStreams(StreamProviderName, GeneratorAdapterFactory.Create, b=>
+                            b.Configure<HashRingStreamQueueMapperOptions>(ob=>ob.Configure(options => options.TotalQueueCount = TotalQueueCount))
+                            .UseDynamicClusterConfigDeploymentBalancer()
+                            .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
+                }
             }
         }
 
@@ -79,13 +73,13 @@ namespace UnitTests.StreamingTests
             if (assertIsTrue)
             {
                 // one stream per queue
-                Assert.Equal(Fixture.AdapterConfig.TotalQueueCount, report.Count);
+                Assert.Equal(TotalQueueCount, report.Count);
                 foreach (int eventsPerStream in report.Values)
                 {
                     Assert.Equal(Fixture.GeneratorConfig.EventsInStream, eventsPerStream);
                 }
             }
-            else if (Fixture.AdapterConfig.TotalQueueCount != report.Count ||
+            else if (TotalQueueCount != report.Count ||
                      report.Values.Any(count => count != Fixture.GeneratorConfig.EventsInStream))
             {
                 return false;

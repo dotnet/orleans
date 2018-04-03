@@ -196,6 +196,7 @@ namespace Orleans
         /// </summary>
         /// <param name="taskToComplete">The task we will timeout after timeSpan</param>
         /// <param name="timeout">Amount of time to wait before timing out</param>
+        /// <param name="exceptionMessage">Text to put into the timeout exception message</param>
         /// <exception cref="TimeoutException">If we time out we will get this exception</exception>
         /// <returns>The completed task</returns>
         public static async Task WithTimeout(this Task taskToComplete, TimeSpan timeout, string exceptionMessage = null)
@@ -229,6 +230,8 @@ namespace Orleans
         /// </summary>
         /// <param name="taskToComplete">The task we will timeout after timeSpan</param>
         /// <param name="timeSpan">Amount of time to wait before timing out</param>
+        /// <param name="exceptionMessage">Text to put into the timeout exception message</param>
+        /// <exception cref="TimeoutException">If we time out we will get this exception</exception>
         /// <exception cref="TimeoutException">If we time out we will get this exception</exception>
         /// <returns>The value of the completed task</returns>
         public static async Task<T> WithTimeout<T>(this Task<T> taskToComplete, TimeSpan timeSpan, string exceptionMessage = null)
@@ -253,6 +256,46 @@ namespace Orleans
             taskToComplete.Ignore();
             var errorMessage = exceptionMessage ?? $"WithTimeout has timed out after {timeSpan}";
             throw new TimeoutException(errorMessage);
+        }
+
+        /// <summary>
+        /// For making an uncancellable task cancellable, by ignoring its result.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="taskToComplete">The task to wait for unless cancelled</param>
+        /// <param name="cancellationToken">A cancellation token for cancelling the wait</param>
+        /// <returns></returns>
+        internal static Task<T> WithCancellation<T>(this Task<T> taskToComplete, CancellationToken cancellationToken)
+        {
+            if (taskToComplete.IsCompleted || !cancellationToken.CanBeCanceled)
+            {
+                return taskToComplete;
+            }
+            else if (cancellationToken.IsCancellationRequested)
+            {
+                return TaskFromCanceled<T>();
+            }
+            else 
+            {
+                return MakeCancellable(taskToComplete, cancellationToken);
+            }
+        }
+
+        private static async Task<T> MakeCancellable<T>(Task<T> task, CancellationToken cancellationToken)
+        {
+            var tcs = new TaskCompletionSource<T>();
+            using (cancellationToken.Register(() =>
+                      tcs.TrySetCanceled(cancellationToken), useSynchronizationContext: false))
+            {
+                var firstToComplete = await Task.WhenAny(task, tcs.Task).ConfigureAwait(false);
+
+                if (firstToComplete != task)
+                {
+                    task.Ignore();
+                }
+
+                return await firstToComplete.ConfigureAwait(false);
+            }
         }
 
         internal static Task WrapInTask(Action action)

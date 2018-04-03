@@ -30,9 +30,8 @@ namespace Orleans.Transactions.AzureStorage.Tests
                 var id = (uint) Guid.NewGuid().GetHashCode() % 100000;
                 hostBuilder
                     .UseInClusterTransactionManager()
-                    .AddAzureTableGrainStorage(TransactionTestConstants.TransactionStore, builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                    .AddAzureTableGrainStorage(TransactionTestConstants.TransactionStore, builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                     {
-                        options.ServiceId = silo.Value.ServiceId.ToString();
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     }))
                     .UseAzureTransactionLog(options => {

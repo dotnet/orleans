@@ -228,7 +228,7 @@ namespace Orleans.Runtime.Configuration
             this.LoadSheddingEnabled = false;
             this.LoadSheddingLimit = LoadSheddingOptions.DEFAULT_LOAD_SHEDDING_LIMIT;
 
-            this.PropagateActivityId = Constants.DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
+            this.PropagateActivityId = MessagingOptions.DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
 
             this.StatisticsMetricsTableWriteInterval = DEFAULT_METRICS_TABLE_WRITE_PERIOD;
             this.StatisticsPerfCountersWriteInterval = SILO_DEFAULT_PERF_COUNTERS_WRITE_PERIOD;

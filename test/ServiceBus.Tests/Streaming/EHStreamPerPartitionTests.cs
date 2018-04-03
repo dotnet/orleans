@@ -4,10 +4,12 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Extensions.Configuration;
+using Orleans;
+using Orleans.Hosting;
+using Orleans.Configuration;
 using Orleans.Streaming.EventHubs;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
@@ -15,6 +17,7 @@ using ServiceBus.Tests.TestStreamProviders.EventHub;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
+using Orleans.ServiceBus.Providers;
 
 namespace ServiceBus.Tests.StreamingTests
 {
@@ -25,55 +28,55 @@ namespace ServiceBus.Tests.StreamingTests
         private const string StreamProviderName = "EHStreamPerPartition";
         private const string EHPath = "ehorleanstest";
         private const string EHConsumerGroup = "orleansnightly";
-        private const string EHCheckpointTable = "ehcheckpoint";
-        private static readonly string CheckpointNamespace = Guid.NewGuid().ToString();
-
-        private static readonly Lazy<EventHubSettings> EventHubConfig = new Lazy<EventHubSettings>(() =>
-            new EventHubSettings(
-                TestDefaultConfiguration.EventHubConnectionString,
-                EHConsumerGroup, EHPath));
-
-        private static readonly EventHubCheckpointerSettings CheckpointerSettings =
-            new EventHubCheckpointerSettings(TestDefaultConfiguration.DataConnectionString,
-                EHCheckpointTable, CheckpointNamespace, TimeSpan.FromSeconds(1));
-
-        private static readonly EventHubStreamProviderSettings ProviderSettings =
-            new EventHubStreamProviderSettings(StreamProviderName);
 
         public class Fixture : BaseTestClusterFixture
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.ConfigureLegacyConfiguration(legacy =>
+                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+                builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
+            }
+
+            private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
                 {
-                    // register stream provider
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-                    legacy.ClusterConfiguration.Globals.RegisterStreamProvider<StreamPerPartitionEventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
-                    legacy.ClientConfiguration.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
-                });
+                    hostBuilder
+                        .AddPersistentStreams(StreamProviderName, StreamPerPartitionEventHubStreamAdapterFactory.Create, b=>
+                        b.Configure<EventHubOptions>(ob => ob.Configure(options =>
+                          {
+                              options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                              options.ConsumerGroup = EHConsumerGroup;
+                              options.Path = EHPath;
+                          }))
+                        .UseStaticClusterConfigDeploymentBalancer()
+                        .ConfigureComponent<AzureTableStreamCheckpointerOptions, IStreamQueueCheckpointerFactory>(EventHubCheckpointerFactory.CreateFactory,
+                            ob => ob.Configure(
+                            options =>
+                            {
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.PersistInterval = TimeSpan.FromSeconds(1);
+                        })));
+
+                    hostBuilder
+                        .AddMemoryGrainStorage("PubSubStore");
+                }
             }
 
-            public override void Dispose()
+            private class MyClientBuilderConfigurator : IClientBuilderConfigurator
             {
-                base.Dispose();
-                var dataManager = new AzureTableDataManager<TableEntity>(CheckpointerSettings.TableName, CheckpointerSettings.DataConnectionString, NullLoggerFactory.Instance);
-                dataManager.InitTableAsync().Wait();
-                dataManager.ClearTableAsync().Wait();
-            }
-
-            private static Dictionary<string, string> BuildProviderSettings()
-            {
-                var settings = new Dictionary<string, string>();
-
-                // get initial settings from configs
-                ProviderSettings.WriteProperties(settings);
-                EventHubConfig.Value.WriteProperties(settings);
-                CheckpointerSettings.WriteProperties(settings);
-
-                // add queue balancer setting
-                settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.StaticClusterConfigDeploymentBalancer.AssemblyQualifiedName);
-
-                return settings;
+                public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+                {
+                    clientBuilder
+                        .AddPersistentStreams(StreamProviderName, StreamPerPartitionEventHubStreamAdapterFactory.Create, b=>
+                            b.Configure<EventHubOptions>(ob=>ob.Configure(
+                            options =>
+                            {
+                                options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                                options.ConsumerGroup = EHConsumerGroup;
+                                options.Path = EHPath;
+                            })));
+                }
             }
         }
 
@@ -99,7 +102,7 @@ namespace ServiceBus.Tests.StreamingTests
 
             // subscribe to each partition
             List<Task> becomeConsumersTasks = consumers
-                .Select( (consumer, i) => consumer.BecomeConsumer( StreamPerPartitionEventHubStreamProvider.GetPartitionGuid(i.ToString()), null, StreamProviderName))
+                .Select( (consumer, i) => consumer.BecomeConsumer(StreamPerPartitionEventHubStreamAdapterFactory.GetPartitionGuid(i.ToString()), null, StreamProviderName))
                 .ToList();
             await Task.WhenAll(becomeConsumersTasks);
 

@@ -13,6 +13,7 @@ namespace Orleans.Runtime.Configuration
         /// Registers a given type of <typeparamref name="T"/> where <typeparamref name="T"/> is bootstrap provider
         /// </summary>
         /// <typeparam name="T">Non-abstract type which implements <see cref="IBootstrapProvider"/> interface</typeparam>
+        /// <param name="config">Configuration object</param>
         /// <param name="providerName">Name of the bootstrap provider</param>
         /// <param name="properties">Properties that will be passed to bootstrap provider upon initialization</param>
         public static void RegisterBootstrapProvider<T>(this GlobalConfiguration config, string providerName, IDictionary<string, string> properties = null) where T : IBootstrapProvider
@@ -30,6 +31,7 @@ namespace Orleans.Runtime.Configuration
         /// <summary>
         /// Registers a given bootstrap provider.
         /// </summary>
+        /// <param name="config">Configuration object</param>
         /// <param name="providerTypeFullName">Full name of the bootstrap provider type</param>
         /// <param name="providerName">Name of the bootstrap provider</param>
         /// <param name="properties">Properties that will be passed to the bootstrap provider upon initialization </param>

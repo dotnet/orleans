@@ -9,7 +9,6 @@ namespace Orleans.Logging.Legacy
     /// <summary>
     /// LegacyFileLogConsumer, which logs message into a file in orleans logging message style
     /// </summary>
-    [Obsolete(OrleansLoggingUtils.ObsoleteMessageString)]
     public class LegacyFileLogConsumer : ICloseableLogConsumer, IFlushableLogConsumer
     {
         private StreamWriter logOutput;

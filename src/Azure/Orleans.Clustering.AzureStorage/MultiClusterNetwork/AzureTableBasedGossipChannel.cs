@@ -28,7 +28,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
             this.loggerFactory = loggerFactory;
         }
 
-        public async Task Initialize(Guid serviceid, string connectionstring)
+        public async Task Initialize(string serviceid, string connectionstring)
         {
 
             logger.Info("Initializing Gossip Channel for ServiceId={0} using connection: {1}",

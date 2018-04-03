@@ -9,7 +9,7 @@ namespace UnitTests.GrainInterfaces
 {
     public interface IServiceIdGrain : IGrainWithGuidKey
     {
-        Task<Guid> GetServiceId();
+        Task<string> GetServiceId();
     }
 
     public interface IPersistenceTestGrain : IGrainWithGuidKey

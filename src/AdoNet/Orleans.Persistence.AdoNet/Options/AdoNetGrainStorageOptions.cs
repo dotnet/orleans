@@ -18,6 +18,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// Connection string for AdoNet storage.
         /// </summary>
+        [Redact]
         public string ConnectionString { get; set; }
 
         /// <summary>
@@ -77,62 +78,19 @@ namespace Orleans.Configuration
         /// <inheritdoc cref="IConfigurationValidator"/>
         public void ValidateConfiguration()
         {
+            if (string.IsNullOrWhiteSpace(this.options.Invariant))
+            {
+                throw new OrleansConfigurationException($"Invalid {nameof(AdoNetGrainStorageOptions)} values for {nameof(AdoNetGrainStorage)} \"{name}\". {nameof(options.Invariant)} is required.");
+            }
+
             if (string.IsNullOrWhiteSpace(this.options.ConnectionString))
             {
-                throw new OrleansConfigurationException($"Invalid {nameof(AdoNetGrainStorageOptions)} values for {nameof(AdoNetGrainStorage)} \"{name}\". ConnectionString is required.");
+                throw new OrleansConfigurationException($"Invalid {nameof(AdoNetGrainStorageOptions)} values for {nameof(AdoNetGrainStorage)} \"{name}\". {nameof(options.ConnectionString)} is required.");
             }
+
             if (options.UseXmlFormat&&options.UseJsonFormat)
             {
                 throw new OrleansConfigurationException($"Invalid {nameof(AdoNetGrainStorageOptions)} values for {nameof(AdoNetGrainStorage)} \"{name}\". {nameof(options.UseXmlFormat)} and {nameof(options.UseJsonFormat)} cannot both be set to true");
-            }
-        }
-    }
-
-    /// <summary>
-    /// Formatter resolver for AdoNetGrainStorageOptions
-    /// </summary>
-    public class AdoNetStorageOptionsFormatterResolver : IOptionFormatterResolver<AdoNetGrainStorageOptions>
-    {
-        private IOptionsSnapshot<AdoNetGrainStorageOptions> optionsSnapshot;
-        /// <summary>
-        /// Constructor
-        /// </summary>
-        /// <param name="optionsSnapshot">Option snapshot for AdoNetGrainStorageOptions</param>
-        public AdoNetStorageOptionsFormatterResolver(IOptionsSnapshot<AdoNetGrainStorageOptions> optionsSnapshot)
-        {
-            this.optionsSnapshot = optionsSnapshot;
-        }
-
-        /// <inheritdoc cref="IOptionFormatterResolver"/>
-        public IOptionFormatter<AdoNetGrainStorageOptions> Resolve(string name)
-        {
-            return new AdoNetStorageOptionsFormatteFormatter(name, optionsSnapshot.Get(name));
-        }
-
-        private class AdoNetStorageOptionsFormatteFormatter : IOptionFormatter<AdoNetGrainStorageOptions>
-        {
-            public string Name { get; }
-
-            private AdoNetGrainStorageOptions options;
-            public AdoNetStorageOptionsFormatteFormatter(string name, AdoNetGrainStorageOptions options)
-            {
-                this.options = options;
-                this.Name = OptionFormattingUtilities.Name<AdoNetGrainStorageOptions>(name);
-            }
-
-            public IEnumerable<string> Format()
-            {
-                return new List<string>()
-                {
-                    OptionFormattingUtilities.Format(nameof(this.options.ConnectionString), ConfigUtilities.RedactConnectionStringInfo(this.options.ConnectionString)),
-                    OptionFormattingUtilities.Format(nameof(this.options.InitStage),this.options.InitStage),
-                    OptionFormattingUtilities.Format(nameof(this.options.Invariant),this.options.Invariant),
-                    OptionFormattingUtilities.Format(nameof(this.options.UseJsonFormat),this.options.UseJsonFormat),
-                    OptionFormattingUtilities.Format(nameof(this.options.UseFullAssemblyNames),this.options.UseFullAssemblyNames),
-                    OptionFormattingUtilities.Format(nameof(this.options.IndentJson),this.options.IndentJson),
-                    OptionFormattingUtilities.Format(nameof(this.options.TypeNameHandling),this.options.TypeNameHandling),
-                    OptionFormattingUtilities.Format(nameof(this.options.UseXmlFormat),this.options.UseXmlFormat),
-                };
             }
         }
     }

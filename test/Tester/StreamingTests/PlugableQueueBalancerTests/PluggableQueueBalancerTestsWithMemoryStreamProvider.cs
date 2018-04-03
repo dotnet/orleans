@@ -1,15 +1,15 @@
+using Microsoft.Extensions.Configuration;
+using Orleans;
+using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Storage;
 using Orleans.TestingHost;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using TestExtensions;
 using Xunit;
+using Orleans.Streams;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Tester.StreamingTests.PlugableQueueBalancerTests
 {
@@ -18,8 +18,6 @@ namespace Tester.StreamingTests.PlugableQueueBalancerTests
         private const string StreamProviderName = "MemoryStreamProvider";
         private static readonly int totalQueueCount = 6;
         private static readonly short siloCount = 2;
-        public static readonly MemoryAdapterConfig ProviderSettings =
-            new MemoryAdapterConfig(StreamProviderName);
 
         private readonly Fixture fixture;
 
@@ -29,24 +27,32 @@ namespace Tester.StreamingTests.PlugableQueueBalancerTests
             {
                 builder.Options.InitialSilosCount = siloCount;
                 builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
-                ProviderSettings.TotalQueueCount = totalQueueCount;
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    AdjustClusterConfiguration(legacy.ClusterConfiguration);
-                });
+                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+                builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
             }
 
-            private static void AdjustClusterConfiguration(ClusterConfiguration config)
+            private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                var settings = new Dictionary<string, string>();
-                // get initial settings from configs
-                ProviderSettings.WriteProperties(settings);
-                ConfigureCustomQueueBalancer(settings, config);
-
-                // register stream provider
-                config.Globals.RegisterStreamProvider<MemoryStreamProvider>(StreamProviderName, settings);
-                config.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder
+                        .AddMemoryGrainStorage("PubSubStore")
+                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, b=>b
+                        .ConfigurePartitioning(totalQueueCount)
+                        .ConfigurePartitionBalancing((s, n) => ActivatorUtilities.CreateInstance<LeaseBasedQueueBalancerForTest>(s, n)));
+                        
+                }
             }
+            
+            private class MyClientBuilderConfigurator : IClientBuilderConfigurator
+            {
+                public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+                {
+                    clientBuilder
+                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName);
+                }
+            }
+
         }
 
         public PluggableQueueBalancerTestsWithMemoryStreamProvider(Fixture fixture)
@@ -54,7 +60,7 @@ namespace Tester.StreamingTests.PlugableQueueBalancerTests
             this.fixture = fixture;
         }
 
-        [Fact, TestCategory("BVT")]
+        [Fact(Skip = "https://github.com/dotnet/orleans/issues/4317"), TestCategory("BVT")]
         public Task PluggableQueueBalancerTest_ShouldUseInjectedQueueBalancerAndBalanceCorrectly()
         {
             return base.ShouldUseInjectedQueueBalancerAndBalanceCorrectly(this.fixture, StreamProviderName, siloCount, totalQueueCount);

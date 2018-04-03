@@ -11,6 +11,7 @@ using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Legacy;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
 using TestExtensions;
@@ -204,7 +205,10 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             if (this.siloIdx == 0)
             {
                 // Setup configuration
-                this.builder = new TestClusterBuilder(1);
+                this.builder = new TestClusterBuilder(1)
+                {
+                    CreateSilo = AppDomainSiloHandle.Create
+                };
                 TestDefaultConfiguration.ConfigureTestCluster(this.builder);
                 builder.Options.ApplicationBaseDirectory = rootDir.FullName;
                 builder.AddSiloBuilderConfigurator<VersionGrainsSiloBuilderConfigurator>();
@@ -215,11 +219,10 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                     legacy.ClusterConfiguration.Globals.TypeMapRefreshInterval = refreshInterval;
                     legacy.ClusterConfiguration.Globals.DefaultVersionSelectorStrategy = VersionSelectorStrategy;
                     legacy.ClusterConfiguration.Globals.DefaultCompatibilityStrategy = CompatibilityStrategy;
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
 
                     legacy.ClientConfiguration.Gateways = legacy.ClientConfiguration.Gateways.Take(1).ToList(); // Only use primary gw
                     
-                    waitDelay = TestCluster.GetLivenessStabilizationTime(legacy.ClusterConfiguration.Globals, false);
+                    waitDelay = TestClusterLegacyUtils.GetLivenessStabilizationTime(legacy.ClusterConfiguration.Globals, false);
                 });
 
                 this.cluster = builder.Build();

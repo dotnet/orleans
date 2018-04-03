@@ -15,13 +15,9 @@ namespace Orleans.Configuration
     public class AzureTableStorageOptions
     {
         /// <summary>
-        /// Gets or sets a unique identifier for this service, which should survive deployment and redeployment.
-        /// </summary>
-        public string ServiceId { get; set; } = string.Empty;
-
-        /// <summary>
         /// Azure table connection string
         /// </summary>
+        [RedactConnectionString]
         public string ConnectionString { get; set; }
 
         /// <summary>
@@ -80,49 +76,6 @@ namespace Orleans.Configuration
             {
                 throw new OrleansConfigurationException(
                     $"Configuration for AzureTableStorageProvider {name} is invalid. {nameof(this.options.TableName)} is not valid", e);
-            }
-        }
-    }
-
-
-    public class AzureTableStorageOptionsFormatterResolver : IOptionFormatterResolver<AzureTableStorageOptions>
-    {
-        private IOptionsSnapshot<AzureTableStorageOptions> optionsSnapshot;
-        public AzureTableStorageOptionsFormatterResolver(IOptionsSnapshot<AzureTableStorageOptions> optionsSnapshot)
-        {
-            this.optionsSnapshot = optionsSnapshot;
-        }
-
-        public IOptionFormatter<AzureTableStorageOptions> Resolve(string name)
-        {
-            return new AzureTableStorageOptionsFormatter(name, optionsSnapshot.Get(name));
-        }
-
-        private class AzureTableStorageOptionsFormatter : IOptionFormatter<AzureTableStorageOptions>
-        {
-            public string Name { get; }
-
-            private AzureTableStorageOptions options;
-            public AzureTableStorageOptionsFormatter(string name,  AzureTableStorageOptions options)
-            {
-                this.options = options;
-                this.Name = OptionFormattingUtilities.Name<AzureTableStorageOptions>(name);
-            }
-
-            public IEnumerable<string> Format()
-            {
-                return new List<string>()
-                {
-                    OptionFormattingUtilities.Format(nameof(this.options.ServiceId),this.options.ServiceId),
-                    OptionFormattingUtilities.Format(nameof(this.options.ConnectionString), ConfigUtilities.RedactConnectionStringInfo(this.options.ConnectionString)),
-                    OptionFormattingUtilities.Format(nameof(this.options.TableName),this.options.TableName),
-                    OptionFormattingUtilities.Format(nameof(this.options.DeleteStateOnClear),this.options.DeleteStateOnClear),
-                    OptionFormattingUtilities.Format(nameof(this.options.InitStage),this.options.InitStage),
-                    OptionFormattingUtilities.Format(nameof(this.options.UseJson),this.options.UseJson),
-                    OptionFormattingUtilities.Format(nameof(this.options.UseFullAssemblyNames),this.options.UseFullAssemblyNames),
-                    OptionFormattingUtilities.Format(nameof(this.options.IndentJson),this.options.IndentJson),
-                    OptionFormattingUtilities.Format(nameof(this.options.TypeNameHandling),this.options.TypeNameHandling),
-                };
             }
         }
     }

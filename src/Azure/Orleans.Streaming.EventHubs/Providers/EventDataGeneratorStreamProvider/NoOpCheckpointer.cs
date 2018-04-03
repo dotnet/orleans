@@ -7,6 +7,14 @@ using System.Threading.Tasks;
 
 namespace Orleans.ServiceBus.Providers.Testing
 {
+    public class NoOpCheckpointerFactory : IStreamQueueCheckpointerFactory
+    {
+        public static NoOpCheckpointerFactory Instance = new NoOpCheckpointerFactory();
+        public Task<IStreamQueueCheckpointer<string>> Create(string partition)
+        {
+            return Task.FromResult<IStreamQueueCheckpointer<string>>(NoOpCheckpointer.Instance);
+        }
+    }
     /// <summary>
     /// NoOpCheckpointer is used in EventDataGeneratorStreamProvider eco system to replace the default Checkpointer which requires a back end storage. In EventHubDataGeneratorStreamProvider,
     /// it is generating EventData on the fly when receiver pull messages from the queue, which means it doesn't support recoverable stream, hence check pointing won't bring much value there. 

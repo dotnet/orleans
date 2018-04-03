@@ -1,18 +1,20 @@
-using Orleans;
-using Orleans.Providers;
-using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans;
+using Orleans.Configuration;
+using Orleans.Providers;
+using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using TesterInternal;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Xunit.Abstractions;
-using static Orleans.Storage.DynamoDBStorageProvider;
+using static Orleans.Storage.DynamoDBGrainStorage;
+using Orleans.Hosting;
 
 namespace AWSUtils.Tests.StorageTests
 {
@@ -37,23 +39,31 @@ namespace AWSUtils.Tests.StorageTests
 
                         legacy.ClusterConfiguration.Globals.MaxResendCount = 0;
 
-
                         legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test1");
                         legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test2",
-                            new Dictionary<string, string> {{"Config1", "1"}, {"Config2", "2"}});
+                            new Dictionary<string, string> { { "Config1", "1" }, { "Config2", "2" } });
                         legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.ErrorInjectionStorageProvider>("ErrorInjector");
                         legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("lowercase");
 
-                        legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                        legacy.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("DDBStore",
-                            new Dictionary<string, string> {{"DeleteStateOnClear", "true"}, {"DataConnectionString", dataConnectionString}});
-                        legacy.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("DDBStore1",
-                            new Dictionary<string, string> {{"DataConnectionString", dataConnectionString}});
-                        legacy.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("DDBStore2",
-                            new Dictionary<string, string> {{"DataConnectionString", dataConnectionString}});
-                        legacy.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("DDBStore3",
-                            new Dictionary<string, string> {{"DataConnectionString", dataConnectionString}});
+                        // FIXME: How to configure the TestClusterBuilder to use the new extensions?
+                        //legacy.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBGrainStorage>("DDBStore",
+                        //    new Dictionary<string, string> {{"DeleteStateOnClear", "true"}, {"DataConnectionString", dataConnectionString}});
+                        //legacy.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBGrainStorage>("DDBStore1",
+                        //    new Dictionary<string, string> {{"DataConnectionString", dataConnectionString}});
+                        //legacy.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBGrainStorage>("DDBStore2",
+                        //    new Dictionary<string, string> {{"DataConnectionString", dataConnectionString}});
+                        //legacy.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBGrainStorage>("DDBStore3",
+                        //    new Dictionary<string, string> {{"DataConnectionString", dataConnectionString}});
                     });
+                    builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+                }
+            }
+
+            public class SiloBuilderConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder.AddMemoryGrainStorage("MemoryStore");
                 }
             }
         }
@@ -142,7 +152,7 @@ namespace AWSUtils.Tests.StorageTests
         [SkippableFact, TestCategory("Functional")]
         public Task Persistence_Silo_StorageProvider_AWSDynamoDBStore()
         {
-            return base.Persistence_Silo_StorageProvider_AWS(typeof(DynamoDBStorageProvider));
+            return base.Persistence_Silo_StorageProvider_AWS(typeof(DynamoDBGrainStorage));
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -197,13 +207,15 @@ namespace AWSUtils.Tests.StorageTests
             Assert.Equal(initialState.Grain, convertedState.Grain);  // "Grain"
         }
 
-        private async Task<DynamoDBStorageProvider> InitDynamoDBTableStorageProvider(IProviderRuntime runtime, string storageName)
+        private async Task<DynamoDBGrainStorage> InitDynamoDBTableStorageProvider(IProviderRuntime runtime, string storageName)
         {
-            Dictionary<string, string> providerCfgProps = new Dictionary<string, string>();
-            var store = new DynamoDBStorageProvider();
-            providerCfgProps["DataConnectionString"] = DataConnectionString;
-            var cfg = new ProviderConfiguration(providerCfgProps);
-            await store.Init(storageName, runtime, cfg);
+            var options = new DynamoDBStorageOptions();
+            options.Service = AWSTestConstants.Service;
+
+            DynamoDBGrainStorage store = ActivatorUtilities.CreateInstance<DynamoDBGrainStorage>(runtime.ServiceProvider, options);
+            ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(runtime.ServiceProvider, new LifecycleSubject(null));
+            store.Participate(lifecycle);
+            await lifecycle.OnStart();
             return store;
         }
     }

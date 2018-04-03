@@ -16,12 +16,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Hosting;
+using Orleans.Configuration.Overrides;
 
 namespace Orleans.Storage
 {
     /// <summary>
-    /// Logging codes used by <see cref="AdoNetStorageProvider"/>.
+    /// Logging codes used by <see cref="AdoNetGrainStorage"/>.
     /// </summary>
     /// <remarks> These are taken from <em>Orleans.Providers.ProviderErrorCode</em> and <em>Orleans.Providers.AzureProviderErrorCode</em>.</remarks>
     internal enum RelationalStorageProviderCodes
@@ -49,7 +49,8 @@ namespace Orleans.Storage
         public static IGrainStorage Create(IServiceProvider services, string name)
         {
             IOptionsSnapshot<AdoNetGrainStorageOptions> optionsSnapshot = services.GetRequiredService<IOptionsSnapshot<AdoNetGrainStorageOptions>>();
-            return ActivatorUtilities.CreateInstance<AdoNetGrainStorage>(services, Options.Create(optionsSnapshot.Get(name)), name);
+            IOptions<ClusterOptions> clusterOptions = services.GetProviderClusterOptions(name);
+            return ActivatorUtilities.CreateInstance<AdoNetGrainStorage>(services, Options.Create(optionsSnapshot.Get(name)), name, clusterOptions);
         }
     }
 
@@ -91,7 +92,8 @@ namespace Orleans.Storage
         /// </summary>
         private readonly string serviceId;
 
-        private ILogger logger;
+        private readonly ILogger logger;
+
         /// <summary>
         /// The storage used for back-end operations.
         /// </summary>
@@ -128,24 +130,30 @@ namespace Orleans.Storage
         /// </summary>
         public IStorageHasherPicker HashPicker { get; set; } = new StorageHasherPicker(new[] { new OrleansDefaultHasher() });
 
-        private AdoNetGrainStorageOptions options;
-        private IProviderRuntime providerRuntime;
-        private string name;
-        public AdoNetGrainStorage(ILogger<AdoNetGrainStorage> logger, IProviderRuntime providerRuntime, IOptions<AdoNetGrainStorageOptions> options, IOptions<SiloOptions> siloOptions, string name)
+        private readonly AdoNetGrainStorageOptions options;
+        private readonly IProviderRuntime providerRuntime;
+        private readonly string name;
+
+        public AdoNetGrainStorage(
+            ILogger<AdoNetGrainStorage> logger, 
+            IProviderRuntime providerRuntime, 
+            IOptions<AdoNetGrainStorageOptions> options, 
+            IOptions<ClusterOptions> clusterOptions, 
+            string name)
         {
             this.options = options.Value;
             this.providerRuntime = providerRuntime;
             this.name = name;
             this.logger = logger;
-            this.serviceId = siloOptions.Value.ServiceId.ToString();
+            this.serviceId = clusterOptions.Value.ServiceId;
         }
 
         public void Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe(this.options.InitStage, Init, Close);
+            lifecycle.Subscribe(OptionFormattingUtilities.Name<AdoNetGrainStorage>(this.name), this.options.InitStage, Init, Close);
         }
         /// <summary>Clear state data function for this storage provider.</summary>
-        /// <see cref="IStorageProvider.ClearStateAsync(string, GrainReference, IGrainState)"/>.
+        /// <see cref="IGrainStorage.ClearStateAsync(string, GrainReference, IGrainState)"/>.
         public async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             //It assumed these parameters are always valid. If not, an exception will be thrown,
@@ -198,7 +206,7 @@ namespace Orleans.Storage
 
 
         /// <summary> Read state data function for this storage provider.</summary>
-        /// <see cref="IStorageProvider.ReadStateAsync(string, GrainReference, IGrainState)"/>.
+        /// <see cref="IGrainStorage.ReadStateAsync(string, GrainReference, IGrainState)"/>.
         public async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             //It assumed these parameters are always valid. If not, an exception will be thrown, even if not as clear
@@ -323,7 +331,7 @@ namespace Orleans.Storage
 
 
         /// <summary> Write state data function for this storage provider.</summary>
-        /// <see cref="IStorageProvider.WriteStateAsync"/>
+        /// <see cref="IGrainStorage.WriteStateAsync"/>
         public async Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             //It assumed these parameters are always valid. If not, an exception will be thrown, even if not as clear
@@ -498,17 +506,57 @@ namespace Orleans.Storage
         private static string ExtractBaseClass(string typeName)
         {
             var genericPosition = typeName.IndexOf("`", StringComparison.OrdinalIgnoreCase);
-            if(genericPosition != -1)
+            if (genericPosition != -1)
             {
                 //The following relies the generic argument list to be in form as described
                 //at https://msdn.microsoft.com/en-us/library/w3f99sx1.aspx.
                 var split = typeName.Split(BaseClassExtractionSplitDelimeters, StringSplitOptions.RemoveEmptyEntries);
-                return split[0] + string.Format($"[{string.Join(",", split.Skip(1).Where(i => i.Length > 1 && i[0] != ',').Select(i => string.Format($"[{i.Substring(0, i.IndexOf(',', i.IndexOf(',') + 1))}]")))}]");
+                var stripped = new Queue<string>(split.Where(i => i.Length > 1 && i[0] != ',').Select(WithoutAssemblyVersion));
+
+                return ReformatClassName(stripped);
             }
 
             return typeName;
-        }
 
+            string WithoutAssemblyVersion(string input)
+            {
+                var asmNameIndex = input.IndexOf(',');
+                if (asmNameIndex >= 0)
+                {
+                    var asmVersionIndex = input.IndexOf(',', asmNameIndex + 1);
+                    if (asmVersionIndex >= 0) return input.Substring(0, asmVersionIndex);
+                    return input.Substring(0, asmNameIndex);
+                }
+
+                return input;
+            }
+
+            string ReformatClassName(Queue<string> segments)
+            {
+                var simpleTypeName = segments.Dequeue();
+                var arity = GetGenericArity(simpleTypeName);
+                if (arity <= 0) return simpleTypeName;
+
+                var args = new List<string>(arity);
+                for (var i = 0; i < arity; i++)
+                {
+                    args.Add(ReformatClassName(segments));
+                }
+
+                return $"{simpleTypeName}[{string.Join(",", args.Select(arg => $"[{arg}]"))}]";
+            }
+
+            int GetGenericArity(string input)
+            {
+                var arityIndex = input.IndexOf("`", StringComparison.OrdinalIgnoreCase);
+                if (arityIndex != -1)
+                {
+                    return int.Parse(input.Substring(arityIndex + 1));
+                }
+
+                return 0;
+            }
+        }
 
         private ICollection<IStorageDeserializer> ConfigureDeserializers(AdoNetGrainStorageOptions options, IProviderRuntime providerRuntime)
         {

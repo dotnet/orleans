@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
 using System.Threading;
@@ -10,8 +9,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
-using Orleans.Hosting;
-using Orleans.Providers;
+using Orleans.Configuration;
 using Orleans.Providers.Azure;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -55,7 +53,7 @@ namespace Orleans.Storage
         }
 
         /// <summary> Read state data function for this storage provider. </summary>
-        /// <see cref="IStorageProvider.ReadStateAsync"/>
+        /// <see cref="IGrainStorage.ReadStateAsync"/>
         public async Task ReadStateAsync(string grainType, GrainReference grainId, IGrainState grainState)
         {
             var blobName = GetBlobName(grainType, grainId);
@@ -109,7 +107,7 @@ namespace Orleans.Storage
         }
 
         /// <summary> Write state data function for this storage provider. </summary>
-        /// <see cref="IStorageProvider.WriteStateAsync"/>
+        /// <see cref="IGrainStorage.WriteStateAsync"/>
         public async Task WriteStateAsync(string grainType, GrainReference grainId, IGrainState grainState)
         {
             var blobName = GetBlobName(grainType, grainId);
@@ -137,7 +135,7 @@ namespace Orleans.Storage
         }
 
         /// <summary> Clear / Delete state data function for this storage provider. </summary>
-        /// <see cref="IStorageProvider.ClearStateAsync"/>
+        /// <see cref="IGrainStorage.ClearStateAsync"/>
         public async Task ClearStateAsync(string grainType, GrainReference grainId, IGrainState grainState)
         {
             var blobName = GetBlobName(grainType, grainId);
@@ -197,11 +195,10 @@ namespace Orleans.Storage
 
         public void Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe(this.options.InitStage, Init);
+            lifecycle.Subscribe(OptionFormattingUtilities.Name<AzureBlobGrainStorage>(this.name), this.options.InitStage, Init);
         }
 
         /// <summary> Initialization function for this storage provider. </summary>
-        /// <see cref="IProvider.Init"/>
         private async Task Init(CancellationToken ct)
         {
             var stopWatch = Stopwatch.StartNew();

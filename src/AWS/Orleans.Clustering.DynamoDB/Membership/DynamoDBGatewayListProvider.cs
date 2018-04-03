@@ -1,43 +1,47 @@
 ﻿using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Messaging;
-using Orleans.Runtime.Configuration;
+using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
 using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Options;
-using Orleans.Clustering.DynamoDB;
-using Orleans.Configuration;
 
-namespace Orleans.Runtime.Membership
+namespace Orleans.Clustering.DynamoDB
 {
     internal class DynamoDBGatewayListProvider : IGatewayListProvider
     {
-        private const string TABLE_NAME_DEFAULT_VALUE = "OrleansSiloInstances";
-
         private DynamoDBStorage storage;
         private string clusterId;
         private readonly string INSTANCE_STATUS_ACTIVE = ((int)SiloStatus.Active).ToString();
         private readonly ILoggerFactory loggerFactory;
-        private readonly DynamoDBClusteringClientOptions options;
+        private readonly DynamoDBGatewayOptions options;
         private readonly TimeSpan maxStaleness;
-        public DynamoDBGatewayListProvider(ILoggerFactory loggerFactory, ClientConfiguration clientConfiguration, IOptions<DynamoDBClusteringClientOptions> options, IOptions<ClusterClientOptions> clusterClientOptions)
+
+        public DynamoDBGatewayListProvider(
+            ILoggerFactory loggerFactory, 
+            IOptions<DynamoDBGatewayOptions> options,
+            IOptions<ClusterOptions> clusterOptions, 
+            IOptions<GatewayOptions> gatewayOptions)
         {
             this.loggerFactory = loggerFactory;
             this.options = options.Value;
-            this.clusterId = clusterClientOptions.Value.ClusterId;
-            this.maxStaleness = clientConfiguration.GatewayListRefreshPeriod;
+            this.clusterId = clusterOptions.Value.ClusterId;
+            this.maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
         }
 
         #region Implementation of IGatewayListProvider
 
         public Task InitializeGatewayListProvider()
         {
-            storage = new DynamoDBStorage(loggerFactory, options.AccessKey, options.SecretKey, options.Service, options.ReadCapacityUnits, options.WriteCapacityUnits);
-            return storage.InitializeTable(TABLE_NAME_DEFAULT_VALUE,
+            this.storage = new DynamoDBStorage(this.loggerFactory, this.options.Service, this.options.AccessKey, this.options.SecretKey,
+                 this.options.ReadCapacityUnits, this.options.WriteCapacityUnits);
+
+            return this.storage.InitializeTable(this.options.TableName,
                 new List<KeySchemaElement>
                 {
                     new KeySchemaElement { AttributeName = SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME, KeyType = KeyType.HASH },
@@ -61,10 +65,10 @@ namespace Orleans.Runtime.Membership
 
             var expression =
                 $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} = :{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} " +
-                $"AND {SiloInstanceRecord.STATUS_PROPERTY_NAME} = :{SiloInstanceRecord.STATUS_PROPERTY_NAME} " + 
+                $"AND {SiloInstanceRecord.STATUS_PROPERTY_NAME} = :{SiloInstanceRecord.STATUS_PROPERTY_NAME} " +
                 $"AND {SiloInstanceRecord.PROXY_PORT_PROPERTY_NAME} > :{SiloInstanceRecord.PROXY_PORT_PROPERTY_NAME}";
 
-            var records = await storage.ScanAsync<Uri>(TABLE_NAME_DEFAULT_VALUE, expressionValues,
+            var records = await storage.ScanAsync<Uri>(this.options.TableName, expressionValues,
                 expression, gateway =>
                 {
                     return SiloAddress.New(

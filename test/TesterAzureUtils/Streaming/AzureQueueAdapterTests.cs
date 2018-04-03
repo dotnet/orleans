@@ -7,17 +7,17 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage.Queue;
-using Orleans.Providers;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using TestExtensions;
 using Xunit;
-using Microsoft.Extensions.DependencyInjection;
 using Xunit.Abstractions;
 using Orleans.Configuration;
+using Orleans.Serialization;
 
 namespace Tester.AzureUtils.Streaming
 {
@@ -51,20 +51,19 @@ namespace Tester.AzureUtils.Streaming
         [SkippableFact, TestCategory("Functional"), TestCategory("Halo")]
         public async Task SendAndReceiveFromAzureQueue()
         {
-            var properties = new Dictionary<string, string>
-                {
-                    {AzureQueueAdapterConstants.DataConnectionStringPropertyName, TestDefaultConfiguration.DataConnectionString},
-                    {AzureQueueAdapterConstants.DeploymentIdPropertyName, this.clusterId},
-                    {AzureQueueAdapterConstants.MessageVisibilityTimeoutPropertyName, "00:00:30" }
-                };
-            var config = new ProviderConfiguration(properties, "type", "name");
-
-            var adapterFactory = new AzureQueueAdapterFactory<AzureQueueDataAdapterV2>();
-            adapterFactory.Init(config, AZURE_QUEUE_STREAM_PROVIDER_NAME, this.fixture.Services);
-            await SendAndReceiveFromQueueAdapter(adapterFactory, config);
+            var options = new AzureQueueOptions
+            {
+                ConnectionString = TestDefaultConfiguration.DataConnectionString,
+                MessageVisibilityTimeout = TimeSpan.FromSeconds(30)
+            };
+            var adapterFactory = new AzureQueueAdapterFactory<AzureQueueDataAdapterV2>(AZURE_QUEUE_STREAM_PROVIDER_NAME, options,
+                new HashRingStreamQueueMapperOptions(), new SimpleQueueCacheOptions(), this.fixture.Services, this.fixture.Services.GetService<IOptions<ClusterOptions>>(), 
+                this.fixture.Services.GetRequiredService<SerializationManager>(), loggerFactory);
+            adapterFactory.Init();
+            await SendAndReceiveFromQueueAdapter(adapterFactory);
         }
 
-        private async Task SendAndReceiveFromQueueAdapter(IQueueAdapterFactory adapterFactory, IProviderConfiguration config)
+        private async Task SendAndReceiveFromQueueAdapter(IQueueAdapterFactory adapterFactory)
         {
             IQueueAdapter adapter = await adapterFactory.CreateAdapter();
             IQueueAdapterCache cache = adapterFactory.GetQueueAdapterCache();

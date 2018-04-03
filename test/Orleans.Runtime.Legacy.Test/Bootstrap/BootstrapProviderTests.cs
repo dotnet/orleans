@@ -30,10 +30,17 @@ namespace UnitTests.General
                     legacy.ClusterConfiguration.Globals.RegisterBootstrapProvider<GrainCallBootstrapper>(GrainCallBootstrapperName);
                     legacy.ClusterConfiguration.Globals.RegisterBootstrapProvider<LocalGrainInitBootstrapper>(LocalGrainInitBootstrapperName);
                     legacy.ClusterConfiguration.Globals.RegisterBootstrapProvider<ControllableBootstrapProvider>(ControllableBootstrapProviderName);
-
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("Default", numStorageGrains: 1);
                 });
+                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+            }
+
+            public class SiloConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder.AddMemoryGrainStorageAsDefault(ops => ops.NumStorageGrains = 1)
+                        .AddMemoryGrainStorage("MemoryStore", ops=>ops.NumStorageGrains = 1);
+                }
             }
         }
 

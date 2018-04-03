@@ -5,7 +5,9 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Clustering.ServiceFabric.Utilities;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.ServiceFabric;
@@ -25,10 +27,10 @@ namespace Orleans.Clustering.ServiceFabric
         private readonly BlockingCollection<StatusChangeNotification> notifications = new BlockingCollection<StatusChangeNotification>();
         private readonly TimeSpan refreshPeriod = TimeSpan.FromSeconds(5);
         private readonly ILocalSiloDetails localSiloDetails;
-        private readonly GlobalConfiguration globalConfig;
         private readonly IFabricServiceSiloResolver fabricServiceSiloResolver;
         private readonly ILogger log;
         private readonly UnknownSiloMonitor unknownSiloMonitor;
+        private readonly MultiClusterOptions multiClusterOptions;
 
         // Cached collection of active silos.
         private volatile Dictionary<SiloAddress, SiloStatus> activeSilosCache;
@@ -46,22 +48,22 @@ namespace Orleans.Clustering.ServiceFabric
         /// Initializes a new instance of the <see cref="FabricMembershipOracle"/> class.
         /// </summary>
         /// <param name="localSiloDetails">The silo which this instance will provide membership information for.</param>
-        /// <param name="globalConfig">The cluster configuration.</param>
         /// <param name="fabricServiceSiloResolver">The service resolver which this instance will use.</param>
         /// <param name="logger">The logger.</param>
         /// <param name="unknownSiloMonitor">The unknown silo monitor.</param>
+        /// <param name="multiClusterOptions">Multi-cluster configuration parameters.</param>
         public FabricMembershipOracle(
             ILocalSiloDetails localSiloDetails,
-            GlobalConfiguration globalConfig,
             IFabricServiceSiloResolver fabricServiceSiloResolver,
             ILogger<FabricMembershipOracle> logger,
-            UnknownSiloMonitor unknownSiloMonitor)
+            UnknownSiloMonitor unknownSiloMonitor,
+            IOptions<MultiClusterOptions> multiClusterOptions)
         {
             this.log = logger;
             this.localSiloDetails = localSiloDetails;
-            this.globalConfig = globalConfig;
             this.fabricServiceSiloResolver = fabricServiceSiloResolver;
             this.unknownSiloMonitor = unknownSiloMonitor;
+            this.multiClusterOptions = multiClusterOptions.Value;
             this.silos[this.SiloAddress] = new SiloEntry(SiloStatus.Created, this.SiloName);
         }
 
@@ -91,7 +93,7 @@ namespace Orleans.Clustering.ServiceFabric
                 if (this.multiClusterSilosCache != null) return this.multiClusterSilosCache;
 
                 // Take all the active silos if their count does not exceed the desired number of gateways
-                var maxSize = this.globalConfig.MaxMultiClusterGateways;
+                var maxSize = this.multiClusterOptions.MaxMultiClusterGateways;
                 var gateways = this.silos.Where(entry => entry.Value.Status == SiloStatus.Active).Select(entry => entry.Key);
                 result = new List<SiloAddress>(gateways);
 

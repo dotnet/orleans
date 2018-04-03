@@ -3,20 +3,25 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime
 {
-    public class KeyedService<TKey, TService, TInstance> : IKeyedService<TKey, TService>
-            where TInstance : TService
+    public class KeyedService<TKey, TService> : IKeyedService<TKey, TService>
+        where TService : class
     {
+        private readonly Func<IServiceProvider, TKey, TService> factory;
+
         public TKey Key { get; }
 
-        public KeyedService(TKey key)
+        public KeyedService(TKey key, IServiceProvider services, Func<IServiceProvider, TKey, TService> factory)
         {
             this.Key = key;
+            this.factory = factory;
         }
 
-        public TService GetService(IServiceProvider services) => services.GetService<TInstance>();
+        public TService GetService(IServiceProvider services) => factory(services,Key);
 
         public bool Equals(TKey other)
         {
@@ -24,10 +29,20 @@ namespace Orleans.Runtime
         }
     }
 
+    public class KeyedService<TKey, TService, TInstance> : KeyedService<TKey, TService>
+        where TInstance : TService
+        where TService : class
+    {
+        public KeyedService(TKey key, IServiceProvider services)
+            : base(key, services, (sp, k) => sp.GetService<TInstance>())
+        {
+        }
+    }
+
     public class KeyedSingletonService<TKey, TService> : IKeyedService<TKey, TService>
     where TService : class
     {
-        private Lazy<TService> instance;
+        private readonly Lazy<TService> instance;
 
         public TKey Key { get; }
 
@@ -74,12 +89,21 @@ namespace Orleans.Runtime
         /// <summary>
         /// Register a transient keyed service
         /// </summary>
+        public static IServiceCollection AddTransientKeyedService<TKey, TService>(this IServiceCollection collection, TKey key, Func<IServiceProvider, TKey, TService> factory)
+             where TService : class
+        {
+            return collection.AddSingleton<IKeyedService<TKey, TService>>(sp => new KeyedService<TKey, TService>(key, sp, factory));
+        }
+
+        /// <summary>
+        /// Register a transient keyed service
+        /// </summary>
         public static IServiceCollection AddTransientKeyedService<TKey, TService, TInstance>(this IServiceCollection collection, TKey key)
             where TInstance : class, TService
             where TService : class
         {
             collection.TryAddTransient<TInstance>();
-            return collection.AddSingleton<IKeyedService<TKey, TService>>(sp => new KeyedService<TKey, TService, TInstance>(key));
+            return collection.AddSingleton<IKeyedService<TKey, TService>>(sp => new KeyedService<TKey, TService, TInstance>(key,sp));
         }
 
         /// <summary>
@@ -100,6 +124,15 @@ namespace Orleans.Runtime
         {
             collection.TryAddTransient<TInstance>();
             return collection.AddSingleton<IKeyedService<TKey, TService>>(sp => new KeyedSingletonService<TKey, TService, TInstance>(key, sp));
+        }
+
+        /// <summary>
+        /// Register a transient named service
+        /// </summary>
+        public static IServiceCollection AddTransientNamedService<TService>(this IServiceCollection collection, string name, Func<IServiceProvider, string, TService> factory)
+            where TService : class
+        {
+            return collection.AddTransientKeyedService<string, TService>(name, factory);
         }
 
         /// <summary>

@@ -22,18 +22,14 @@ namespace NetCore.Tests
                 .ConfigureApplicationParts(
                     parts =>
                         parts.AddApplicationPart(typeof(ExceptionGrain).Assembly).WithReferences())
-                .ConfigureLocalHostPrimarySilo()
+                .UseLocalhostClustering()
                 .Build();
             this.silo.StartAsync().GetAwaiter().GetResult();
 
             this.client = new ClientBuilder()
-                .ConfigureApplicationParts(
-                    parts => parts
-                        .AddFromApplicationBaseDirectory()
-                        .AddFromAppDomain())
                 .ConfigureApplicationParts(parts =>
                     parts.AddApplicationPart(typeof(IExceptionGrain).Assembly).WithReferences())
-                .UseConfiguration(ClientConfiguration.LocalhostSilo())
+                .UseLocalhostClustering()
                 .Build();
             this.client.Connect().GetAwaiter().GetResult();
         }

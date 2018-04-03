@@ -66,7 +66,7 @@ namespace Orleans.Runtime.TestHooks
             return Task.FromResult(consistentRingProvider.ToString()); 
         }
         
-        public Task<Guid> GetServiceId() => Task.FromResult(this.host.Services.GetRequiredService<IOptions<SiloOptions>>().Value.ServiceId);
+        public Task<string> GetServiceId() => Task.FromResult(this.host.Services.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId);
 
         public Task<bool> HasStorageProvider(string providerName)
         {

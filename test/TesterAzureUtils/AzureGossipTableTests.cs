@@ -51,7 +51,7 @@ namespace Tester.AzureUtils
             };
 
             this.gossipTable = new AzureTableBasedGossipChannel(this.loggerFactory);
-            var done = this.gossipTable.Initialize(config.ServiceId, config.DataConnectionString);
+            var done = this.gossipTable.Initialize(config.ServiceId.ToString(), config.DataConnectionString);
             if (!done.Wait(Timeout))
             {
                 throw new TimeoutException("Could not create/read table.");

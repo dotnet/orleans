@@ -11,11 +11,21 @@ using Orleans.Logging;
 #pragma warning disable CS0618 // Type or member is obsolete
 namespace UnitTests
 {
-    public class ClientInitTests : OrleansTestingBase, IClassFixture<DefaultClusterFixture>
+    public class ClientInitTests : OrleansTestingBase, IClassFixture<ClientInitTests.Fixture>
     {
-        private readonly DefaultClusterFixture fixture;
+        private readonly Fixture fixture;
 
-        public ClientInitTests(DefaultClusterFixture fixture)
+        public class Fixture : BaseTestClusterFixture
+        {
+            public ClientConfiguration ClientConfiguration { get; private set; }
+
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            {
+                builder.ConfigureLegacyConfiguration(legacy => this.ClientConfiguration = legacy.ClientConfiguration);
+            }
+        }
+
+        public ClientInitTests(Fixture fixture)
         {
             this.fixture = fixture;
             if (!GrainClient.IsInitialized)

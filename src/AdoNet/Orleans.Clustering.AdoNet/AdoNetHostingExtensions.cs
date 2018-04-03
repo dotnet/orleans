@@ -7,6 +7,9 @@ using Orleans.Configuration;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Extensions for configuring ADO.NET for clustering.
+    /// </summary>
     public static class AdoNetHostingExtensions
     {
         /// <summary>
@@ -34,6 +37,7 @@ namespace Orleans.Hosting
                     }
 
                     services.AddSingleton<IMembershipTable, AdoNetClusteringTable>();
+                    services.AddSingleton<IConfigurationValidator, AdoNetClusteringSiloOptionsValidator>();
                 });
         }
 
@@ -58,6 +62,7 @@ namespace Orleans.Hosting
                 {
                     configureOptions?.Invoke(services.AddOptions<AdoNetClusteringSiloOptions>());
                     services.AddSingleton<IMembershipTable, AdoNetClusteringTable>();
+                    services.AddSingleton<IConfigurationValidator, AdoNetClusteringSiloOptionsValidator>();
                 });
         }
 
@@ -86,6 +91,7 @@ namespace Orleans.Hosting
                     }
 
                     services.AddSingleton<IGatewayListProvider, AdoNetGatewayListProvider>();
+                    services.AddSingleton<IConfigurationValidator, AdoNetClusteringClientOptionsValidator>();
                 });
         }
 
@@ -110,6 +116,7 @@ namespace Orleans.Hosting
                 {
                     configureOptions?.Invoke(services.AddOptions<AdoNetClusteringClientOptions>());
                     services.AddSingleton<IGatewayListProvider, AdoNetGatewayListProvider>();
+                    services.AddSingleton<IConfigurationValidator, AdoNetClusteringClientOptionsValidator>();
                 });
         }
     }

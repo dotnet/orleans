@@ -1,10 +1,10 @@
-using Orleans.TestingHost;
+using System;
 using Microsoft.Extensions.Logging;
 using Orleans.EventSourcing.CustomStorage;
 using Orleans.Hosting;
-using TestExtensions;
-using Orleans.Runtime.Configuration;
 using Orleans.Storage;
+using Orleans.TestingHost;
+using TestExtensions;
 
 namespace Tester.EventSourcingTests
 {
@@ -17,18 +17,6 @@ namespace Tester.EventSourcingTests
     {
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                // we use a slowed-down memory storage provider
-                legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
-                legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-
-                legacy.ClusterConfiguration.AddFaultyMemoryStorageProvider("SlowMemoryStore", 10, 15);
-
-                // log consistency providers are used to configure journaled grains
-                legacy.ClusterConfiguration.AddLogStorageBasedLogConsistencyProvider("LogStorage");
-                legacy.ClusterConfiguration.AddStateStorageBasedLogConsistencyProvider("StateStorage");
-            });
             builder.AddSiloBuilderConfigurator<TestSiloConfigurator>();
         }
 
@@ -36,13 +24,19 @@ namespace Tester.EventSourcingTests
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
-                hostBuilder.ConfigureLogging(builder =>
-                {
-                    builder.AddFilter(typeof(MemoryStorage).FullName, LogLevel.Debug);
-                    builder.AddFilter(typeof(LogConsistencyProvider).Namespace, LogLevel.Debug);
-                });
+                // we use a slowed-down memory storage provider
+                hostBuilder
+                    .AddLogStorageBasedLogConsistencyProvider("LogStorage")
+                    .AddStateStorageBasedLogConsistencyProvider("StateStorage")
+                    .ConfigureLogging(builder =>
+                    {
+                        builder.AddFilter(typeof(MemoryGrainStorage).FullName, LogLevel.Debug);
+                        builder.AddFilter(typeof(LogConsistencyProvider).Namespace, LogLevel.Debug);
+                    })
+                    .AddMemoryGrainStorageAsDefault()
+                    .AddMemoryGrainStorage("MemoryStore")
+                    .AddFaultInjectionMemoryStorage("SlowMemoryStore", options=>options.NumStorageGrains = 10, faultyOptions => faultyOptions.Latency = TimeSpan.FromMilliseconds(15));
             }
         }
-
     }
 }

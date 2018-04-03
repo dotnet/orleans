@@ -96,9 +96,10 @@ namespace TestExtensions.Runners
             var renewResults = await this.leaseProvider.Renew(LeaseCategory, acquiredLeaseWithWrongToken.ToArray());
             for (int i = 0; i < renewResults.Count(); i++)
             {
-                var result = renewResults[i];
+                LeaseRequest request = leaseRequests[i];
+                AcquireLeaseResult result = renewResults[i];
                 Assert.Equal(ResponseCode.InvalidToken, result.StatusCode);
-                Assert.Null(result.AcquiredLease);
+                Assert.Equal(request.ResourceKey, result.AcquiredLease.ResourceKey);
             }
         }
 

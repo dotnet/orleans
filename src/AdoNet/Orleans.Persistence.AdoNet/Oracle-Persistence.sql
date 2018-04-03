@@ -232,9 +232,9 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'WriteToStorageKey','
-  SELECT WriteToStorage(:GRAINIDHASH, :GRAINIDN0, :GRAINIDN1, :GRAINTYPEHASH, :GRAINTYPESTRING,
-                                             :GRAINIDEXTENSIONSTRING, :SERVICEID, :GRAINSTATEVERSION, :PAYLOADBINARY,
-                                             :PAYLOADJSON, :PAYLOADXML) AS NewGrainStateVersion FROM DUAL
+  SELECT WriteToStorage(:GrainIdHash, :GrainIdN0, :GrainIdN1, :GrainTypeHash, :GrainTypeString,
+                                             :GrainIdExtensionString, :ServiceId, :GrainStateVersion, :PayloadBinary,
+                                             :PayloadJson, :PayloadXml) AS NewGrainStateVersion FROM DUAL
 ');
 /
 
@@ -242,8 +242,8 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'ClearStorageKey',
-    'SELECT ClearStorage(:GRAINIDHASH, :GRAINIDN0, :GRAINIDN1, :GRAINTYPEHASH, :GRAINTYPESTRING,
-                                             :GRAINIDEXTENSIONSTRING, :SERVICEID, :GRAINSTATEVERSION) AS VERSION FROM DUAL'
+    'SELECT ClearStorage(:GrainIdHash, :GrainIdN0, :GrainIdN1, :GrainTypeHash, :GrainTypeString,
+                                             :GrainIdExtensionString, :ServiceId, :GrainStateVersion) AS Version FROM DUAL'
 );
 /
 
@@ -254,13 +254,13 @@ VALUES
     '
      SELECT PayloadBinary, PayloadXml, PayloadJson, Version
      FROM Storage
-     WHERE GrainIdHash = :GRAINIDHASH AND :GRAINIDHASH IS NOT NULL
-       AND (GrainIdN0 = :GRAINIDN0 OR :GRAINIDN0 IS NULL)
-       AND (GrainIdN1 = :GRAINIDN1 OR :GRAINIDN1 IS NULL)
-       AND GrainTypeHash = :GRAINTYPEHASH AND :GRAINTYPEHASH IS NOT NULL
-       AND (GrainTypeString = :GRAINTYPESTRING OR :GRAINTYPESTRING IS NULL)
-       AND ((:GRAINIDEXTENSIONSTRING IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = :GRAINIDEXTENSIONSTRING) OR:GRAINIDEXTENSIONSTRING IS NULL AND GrainIdExtensionString IS NULL)
-       AND ServiceId = :SERVICEID AND :SERVICEID IS NOT NULL'
+     WHERE GrainIdHash = :GrainIdHash AND :GrainIdHash IS NOT NULL
+       AND (GrainIdN0 = :GrainIdN0 OR :GrainIdN0 IS NULL)
+       AND (GrainIdN1 = :GrainIdN1 OR :GrainIdN1 IS NULL)
+       AND GrainTypeHash = :GrainTypeHash AND :GrainTypeHash IS NOT NULL
+       AND (GrainTypeString = :GrainTypeString OR :GrainTypeString IS NULL)
+       AND ((:GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = :GrainIdExtensionString) OR :GrainIdExtensionString IS NULL AND GrainIdExtensionString IS NULL)
+       AND ServiceId = :ServiceId AND :ServiceId IS NOT NULL'
 );
 /
 

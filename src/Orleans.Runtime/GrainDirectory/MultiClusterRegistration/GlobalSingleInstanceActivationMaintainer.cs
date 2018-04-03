@@ -10,10 +10,12 @@ using Orleans.SystemTargetInterfaces;
 using Orleans.Runtime.Scheduler;
 using OutcomeState = Orleans.Runtime.GrainDirectory.GlobalSingleInstanceResponseOutcome.OutcomeState;
 using Orleans.Runtime.MultiClusterNetwork;
+using Orleans.MultiCluster;
+using System.Threading;
 
 namespace Orleans.Runtime.GrainDirectory
 {
-    internal class GlobalSingleInstanceActivationMaintainer : DedicatedAsynchAgent
+    internal class GlobalSingleInstanceActivationMaintainer : DedicatedAsynchAgent, IMultiClusterConfigurationListener
     {
         private readonly object lockable = new object();
         private readonly LocalGrainDirectory router;
@@ -28,6 +30,9 @@ namespace Orleans.Runtime.GrainDirectory
         // therefore, we maintain a list of potentially doubtful activations on the side.
         // maintainer periodically takes and processes this list.
         private List<GrainId> doubtfulGrains = new List<GrainId>();
+
+        // used to cut short the waiting time before next run
+        private ManualResetEvent runNow = new ManualResetEvent(false);
 
         public GlobalSingleInstanceActivationMaintainer(
             LocalGrainDirectory router,
@@ -47,6 +52,7 @@ namespace Orleans.Runtime.GrainDirectory
             this.siloDetails = siloDetails;
             this.multiClusterOptions = multiClusterOptions.Value;
             this.period = multiClusterOptions.Value.GlobalSingleInstanceRetryInterval;
+            multiClusterOracle.SubscribeToMultiClusterConfigurationEvents(this);
             logger.Debug("GSIP:M GlobalSingleInstanceActivationMaintainer Started, Period = {0}", period);
         }
 
@@ -83,21 +89,26 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
         // the following method runs for the whole lifetime of the silo, doing the periodic maintenance
-        protected override async void Run()
+        protected override void Run()
         {
             if (!this.multiClusterOptions.HasMultiClusterNetwork)
                 return;
 
             var myClusterId = this.siloDetails.ClusterId;
 
-            while (router.Running)
+            Cts.Token.Register(this.Prod);
+
+            while (router.Running && !Cts.IsCancellationRequested)
             {
                 try
                 {
-                    await Task.Delay(period);
-                    if (!router.Running) break;
+                    // wait until it is time, or someone prodded us to continue
+                    runNow.WaitOne(period);
+                    runNow.Reset();
 
-                    logger.Debug("GSIP:M running periodic check (having waited {0})", period);
+                    if (!router.Running || Cts.IsCancellationRequested) break;
+
+                    logger.Debug("GSIP:M running check");
 
                     // examine the multicluster configuration
                     var multiClusterConfig = this.multiClusterOracle.GetMultiClusterConfiguration();
@@ -116,32 +127,39 @@ namespace Orleans.Runtime.GrainDirectory
 
                         logger.Debug("GSIP:M Not joined to multicluster. Make {0} owned entries doubtful {1}", ownedEntries.Count, logger.IsEnabled(LogLevel.Trace) ? string.Join(",", ownedEntries.Select(s => s.Item1)) : "");
 
-                        await router.Scheduler.QueueTask(
+                        router.Scheduler.QueueTask(
                             () => RunBatchedDemotion(ownedEntries),
                             router.CacheValidator.SchedulingContext
-                        );
+                        ).Wait();
                     }
                     else
                     {
                         // we are joined to the multicluster.
-                        // go through all doubtful entries and broadcast ownership requests for each
 
-                        // take them all out of the list for processing.
-                        List<GrainId> grains;
-                        lock (lockable)
+                        List<KeyValuePair<string, SiloAddress>> remoteClusters = multiClusterConfig.Clusters
+                            .Where(id => id != myClusterId)
+                            .Select(id => new KeyValuePair<string, SiloAddress>(id, this.multiClusterOracle.GetRandomClusterGateway(id)))
+                            .ToList();
+
+                        if (!remoteClusters.Any(kvp => kvp.Value == null))
                         {
-                            grains = doubtfulGrains;
-                            doubtfulGrains = new List<GrainId>();
+                            // all clusters have at least one gateway reporting.
+                            // go through all doubtful entries and broadcast ownership requests for each
+
+                            List<GrainId> grains;
+                            lock (lockable)
+                            {
+                                grains = doubtfulGrains;
+                                doubtfulGrains = new List<GrainId>();
+                            }
+
+                            logger.Debug("GSIP:M retry {0} doubtful entries {1}", grains.Count, logger.IsEnabled(LogLevel.Trace) ? string.Join(",", grains) : "");
+
+                            router.Scheduler.QueueTask(
+                                () => RunBatchedActivationRequests(remoteClusters, grains),
+                                router.CacheValidator.SchedulingContext
+                            ).Wait();
                         }
-
-                        // filter
-                        logger.Debug("GSIP:M retry {0} doubtful entries {1}", grains.Count, logger.IsEnabled(LogLevel.Trace) ? string.Join(",", grains) : "");
-
-                        var remoteClusters = multiClusterConfig.Clusters.Where(id => id != myClusterId).ToList();
-                        await router.Scheduler.QueueTask(
-                            () => RunBatchedActivationRequests(remoteClusters, grains),
-                            router.CacheValidator.SchedulingContext
-                        );
                     }
                 }
                 catch (Exception e)
@@ -162,7 +180,7 @@ namespace Orleans.Runtime.GrainDirectory
             return Task.CompletedTask;
         }
 
-        private async Task RunBatchedActivationRequests(List<string> remoteClusters, List<GrainId> grains)
+        private async Task RunBatchedActivationRequests(List<KeyValuePair<string, SiloAddress>> remoteClusters, List<GrainId> grains)
         {
             var addresses = new List<ActivationAddress>();
 
@@ -188,15 +206,14 @@ namespace Orleans.Runtime.GrainDirectory
                 return;
 
             var batchResponses = new List<RemoteClusterActivationResponse[]>();
-
-            var tasks = remoteClusters.Select(async remotecluster =>
+                   
+            var tasks = remoteClusters.Select(async remotecluster => 
             {
                 // find gateway and send batched request
                 try
                 {
-                    var clusterGatewayAddress = this.multiClusterOracle.GetRandomClusterGateway(remotecluster);
-                    var clusterGrainDir = this.grainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
-                    var r = await clusterGrainDir.ProcessActivationRequestBatch(addresses.Select(a => a.Grain).ToArray(), this.siloDetails.ClusterId);
+                    var clusterGrainDir = this.grainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, remotecluster.Value);
+                    var r = await clusterGrainDir.ProcessActivationRequestBatch(addresses.Select(a => a.Grain).ToArray(), this.siloDetails.ClusterId).WithCancellation(Cts.Token);
                     batchResponses.Add(r);
                 }
                 catch (Exception e)
@@ -335,5 +352,16 @@ namespace Orleans.Runtime.GrainDirectory
             logger.Error((int) ErrorCode.GlobalSingleInstance_ProtocolError, string.Format("GSIP:Req {0} {1}", address.Grain.ToString(), msg));
         }
 
+        public void OnMultiClusterConfigurationChange(MultiClusterConfiguration next)
+        {
+            logger.Debug($"GSIP:M MultiClusterConfiguration {next}");
+            Prod();
+        }
+
+        public void Prod()
+        {
+            // cancel the waiting, to proceed immediately
+            runNow.Set();
+        }
     }
 }

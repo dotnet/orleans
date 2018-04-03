@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Configuration;
+using Orleans.Hosting;
 using Orleans.Providers.Streams;
 using Orleans.Storage;
 using Orleans.TestingHost;
@@ -11,6 +13,7 @@ using Orleans.Runtime.Configuration;
 using TestExtensions;
 using UnitTests.Streaming;
 using OrleansAWSUtils.Streams;
+using Orleans;
 
 namespace AWSUtils.Tests.Streaming
 {
@@ -30,43 +33,65 @@ namespace AWSUtils.Tests.Streaming
 
             builder.ConfigureLegacyConfiguration(options =>
             {
-                //from the config files
-                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
-
-                options.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProvider", fireAndForgetDelivery: false);
-
-                options.ClientConfiguration.AddSimpleMessageStreamProvider("SMSProvider", fireAndForgetDelivery: false);
-
                 //previous silo creation
                 options.ClusterConfiguration.Globals.DataConnectionString = AWSTestConstants.DefaultSQSConnectionString;
                 options.ClientConfiguration.DataConnectionString = AWSTestConstants.DefaultSQSConnectionString;
-                var streamConnectionString = new Dictionary<string, string>
-                {
-                    {"DataConnectionString", AWSTestConstants.DefaultSQSConnectionString}
-                };
-
-                options.ClientConfiguration.RegisterStreamProvider<SQSStreamProvider>("SQSProvider", streamConnectionString);
-
-                options.ClusterConfiguration.Globals.RegisterStreamProvider<SQSStreamProvider>("SQSProvider", streamConnectionString);
-                options.ClusterConfiguration.Globals.RegisterStreamProvider<SQSStreamProvider>("SQSProvider2", streamConnectionString);
 
                 var storageConnectionString = new Dictionary<string, string>
                 {
                     {"DataConnectionString", $"Service={AWSTestConstants.Service}"},
                     {"DeleteStateOnClear", "true"}
                 };
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("DynamoDBStore", storageConnectionString);
-                var storageConnectionString2 = new Dictionary<string, string>
-                {
-                    {"DataConnectionString", $"Service={AWSTestConstants.Service}"},
-                    {"DeleteStateOnClear", "true"},
-                    {"UseJsonFormat", "true"}
-                };
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBStorageProvider>("PubSubStore", storageConnectionString2);
             });
+            builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+            builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
         }
 
+        private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder
+                    .AddSimpleMessageStreamProvider("SMSProvider")
+                    .AddSqsStreams("SQSProvider", options =>
+                    {
+                        options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+                    })
+                    .AddSqsStreams("SQSProvider2", options =>
+                     {
+                         options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+                     })
+                    .AddDynamoDBGrainStorage("DynamoDBStore", options =>
+                    {
+                        options.Service = AWSTestConstants.Service;
+                        options.SecretKey = AWSTestConstants.SecretKey;
+                        options.AccessKey = AWSTestConstants.AccessKey;
+                        options.DeleteStateOnClear = true;
+                        options.UseJson = true;
+                    })
+                    .AddDynamoDBGrainStorage("PubSubStore", options =>
+                    {
+                        options.Service = AWSTestConstants.Service;
+                        options.SecretKey = AWSTestConstants.SecretKey;
+                        options.AccessKey = AWSTestConstants.AccessKey;
+                    })
+                    .AddMemoryGrainStorage("MemoryStore", op=>op.NumStorageGrains = 1);
+            }
+        }
 
+        private class MyClientBuilderConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder
+                    .AddSimpleMessageStreamProvider("SMSProvider")
+                    .AddSqsStreams("SQSProvider", options =>
+                    {
+                        options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+                    });
+            }
+        }
+        
         public SQSStreamTests()
         {
             runner = new SingleStreamTestRunner(this.InternalClient, SQS_STREAM_PROVIDER_NAME);

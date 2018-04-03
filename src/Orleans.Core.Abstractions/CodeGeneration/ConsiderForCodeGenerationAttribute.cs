@@ -49,4 +49,12 @@ namespace Orleans.CodeGeneration
         /// <param name="type">The type that the generator should generate code for</param>
         public GenerateSerializerAttribute(Type type) : base(type, true){ }
     }
+
+    /// <summary>
+    /// Indicates that this type and all subtypes are to be considered as [Serializable].
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface)]
+    public sealed class KnownBaseTypeAttribute : Attribute
+    {
+    }
 }

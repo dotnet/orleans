@@ -1,9 +1,10 @@
-﻿using Orleans.Streams;
-using OrleansAWSUtils.Storage;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Streams;
+using OrleansAWSUtils.Storage;
+using Orleans.Configuration;
 
 namespace OrleansAWSUtils.Streams
 {
@@ -20,7 +21,7 @@ namespace OrleansAWSUtils.Streams
         {
             if (clusterId != null)
             {
-                var queueMapper = new HashRingBasedStreamQueueMapper(SQSAdapterFactory.NumQueuesDefaultValue, providerName);
+                var queueMapper = new HashRingBasedStreamQueueMapper(new HashRingStreamQueueMapperOptions(), providerName);
                 List<QueueId> allQueues = queueMapper.GetAllQueues().ToList();
 
                 var deleteTasks = new List<Task>();

@@ -2,7 +2,9 @@ using System;
 using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.TestingHost;
 
 namespace TestExtensions
@@ -65,5 +67,7 @@ namespace TestExtensions
         {
             this.HostedCluster?.StopAllSilos();
         }
+
+        public string GetClientServiceId() => Client.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId;
     }
 }

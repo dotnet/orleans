@@ -1,9 +1,8 @@
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Azure.EventHubs;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.ServiceBus.Providers.Testing;
 using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.TestingHost;
@@ -12,6 +11,10 @@ using TestExtensions;
 using UnitTests.Grains.ProgrammaticSubscribe;
 using Xunit;
 using ServiceBus.Tests.SlowConsumingTests;
+using Orleans.Hosting;
+using Orleans.Providers.Streams.Common;
+using Orleans.ServiceBus.Providers.Testing;
+using Orleans.Configuration;
 
 namespace ServiceBus.Tests.MonitorTests
 {
@@ -23,9 +26,6 @@ namespace ServiceBus.Tests.MonitorTests
         private static readonly TimeSpan timeout = TimeSpan.FromSeconds(5);
         private static readonly TimeSpan monitorWriteInterval = TimeSpan.FromSeconds(2);
         private static readonly int ehPartitionCountPerSilo = 4;
-        public static readonly EventHubGeneratorStreamProviderSettings ProviderSettings =
-            new EventHubGeneratorStreamProviderSettings(StreamProviderName);
-
 
         private readonly Fixture fixture;
 
@@ -34,24 +34,28 @@ namespace ServiceBus.Tests.MonitorTests
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.Options.InitialSilosCount = 1;
-                ProviderSettings.StatisticMonitorWriteInterval = monitorWriteInterval;
-                builder.ConfigureLegacyConfiguration(legacy => AdjustClusterConfiguration(legacy.ClusterConfiguration));
+                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             }
 
-            private static void AdjustClusterConfiguration(ClusterConfiguration config)
+
+            private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                var settings = new Dictionary<string, string>();
-                // get initial settings from configs
-                ProviderSettings.WriteProperties(settings);
-                ProviderSettings.WriteDataGeneratingConfig(settings);
-
-                // add queue balancer setting
-                settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.AssemblyQualifiedName);
-
-                // register stream provider
-                config.Globals.RegisterStreamProvider<EHStreamProviderForMonitorTests>(StreamProviderName, settings);
-                config.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder
+                        .AddPersistentStreams(StreamProviderName, EHStreamProviderForMonitorTestsAdapterFactory.Create, b=>b
+                        .ConfigureComponent<IStreamQueueCheckpointerFactory>((s, n) => NoOpCheckpointerFactory.Instance)
+                        .Configure<StreamStatisticOptions>(ob => ob.Configure(options => options.StatisticMonitorWriteInterval = monitorWriteInterval))
+                        .UseDynamicClusterConfigDeploymentBalancer());
+                    hostBuilder
+                        .ConfigureServices(services =>
+                        {
+                            services.AddTransientNamedService<Func<IStreamIdentity, IStreamDataGenerator<EventData>>>(StreamProviderName, (s, n) => SimpleStreamEventDataGenerator.CreateFactory(s));
+                        })
+                        .AddMemoryGrainStorage("PubSubStore");
+                }
             }
+
         }
 
         private readonly Random seed;
@@ -73,34 +77,34 @@ namespace ServiceBus.Tests.MonitorTests
 
             //configure data generator for stream and start producing
             var mgmtGrain = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
-            var randomStreamPlacementArg = new EventDataGeneratorStreamProvider.AdapterFactory.StreamRandomPlacementArg(streamId, this.seed.Next(100));
-            await mgmtGrain.SendControlCommandToProvider(typeof(EHStreamProviderForMonitorTests).FullName, StreamProviderName,
-                (int)EventDataGeneratorStreamProvider.AdapterFactory.Commands.Randomly_Place_Stream_To_Queue, randomStreamPlacementArg);
+            var randomStreamPlacementArg = new EHStreamProviderForMonitorTestsAdapterFactory.StreamRandomPlacementArg(streamId, this.seed.Next(100));
+            await mgmtGrain.SendControlCommandToProvider(typeof(PersistentStreamProvider).FullName, StreamProviderName,
+                (int)EHStreamProviderForMonitorTestsAdapterFactory.Commands.Randomly_Place_Stream_To_Queue, randomStreamPlacementArg);
 
             // let the test to run for a while to build up some streaming traffic
             await Task.Delay(timeout);
             //wait sometime after cache pressure changing, for the system to notice it and trigger cache monitor to track it
-            await mgmtGrain.SendControlCommandToProvider(typeof(EHStreamProviderForMonitorTests).FullName, StreamProviderName,
-                (int)EHStreamProviderForMonitorTests.AdapterFactory.QueryCommands.ChangeCachePressure, null);
+            await mgmtGrain.SendControlCommandToProvider(typeof(PersistentStreamProvider).FullName, StreamProviderName,
+                (int)EHStreamProviderForMonitorTestsAdapterFactory.QueryCommands.ChangeCachePressure, null);
             await Task.Delay(timeout);
 
             //assert EventHubReceiverMonitor call counters
-            var receiverMonitorCounters = await mgmtGrain.SendControlCommandToProvider(typeof(EHStreamProviderForMonitorTests).FullName, StreamProviderName,
-                (int)EHStreamProviderForMonitorTests.AdapterFactory.QueryCommands.GetReceiverMonitorCallCounters, null);
+            var receiverMonitorCounters = await mgmtGrain.SendControlCommandToProvider(typeof(PersistentStreamProvider).FullName, StreamProviderName,
+                (int)EHStreamProviderForMonitorTestsAdapterFactory.QueryCommands.GetReceiverMonitorCallCounters, null);
             foreach (var callCounter in receiverMonitorCounters)
             {
                 AssertReceiverMonitorCallCounters(callCounter as EventHubReceiverMonitorCounters);
             }
 
-            var cacheMonitorCounters = await mgmtGrain.SendControlCommandToProvider(typeof(EHStreamProviderForMonitorTests).FullName, StreamProviderName,
-                (int)EHStreamProviderForMonitorTests.AdapterFactory.QueryCommands.GetCacheMonitorCallCounters, null);
+            var cacheMonitorCounters = await mgmtGrain.SendControlCommandToProvider(typeof(PersistentStreamProvider).FullName, StreamProviderName,
+                (int)EHStreamProviderForMonitorTestsAdapterFactory.QueryCommands.GetCacheMonitorCallCounters, null);
             foreach (var callCounter in cacheMonitorCounters)
             {
                 AssertCacheMonitorCallCounters(callCounter as CacheMonitorCounters);
             }
 
-            var objectPoolMonitorCounters = await mgmtGrain.SendControlCommandToProvider(typeof(EHStreamProviderForMonitorTests).FullName, StreamProviderName,
-             (int)EHStreamProviderForMonitorTests.AdapterFactory.QueryCommands.GetObjectPoolMonitorCallCounters, null);
+            var objectPoolMonitorCounters = await mgmtGrain.SendControlCommandToProvider(typeof(PersistentStreamProvider).FullName, StreamProviderName,
+             (int)EHStreamProviderForMonitorTestsAdapterFactory.QueryCommands.GetObjectPoolMonitorCallCounters, null);
             foreach (var callCounter in objectPoolMonitorCounters)
             {
                 AssertObjectPoolMonitorCallCounters(callCounter as ObjectPoolMonitorCounters);

@@ -1,19 +1,30 @@
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Configuration;
 using OrleansTelemetryConsumers.Counters;
 
-namespace Orleans.Runtime.Configuration
+namespace Orleans.Hosting
 {
     public static class PerfCountersConfigurationExtensions
     {
         /// <summary>
         /// Adds a metrics telemetric consumer provider of type <see cref="OrleansPerfCounterTelemetryConsumer"/>.
         /// </summary>
-        /// <param name="config">The cluster configuration object to add the telemetry consumer to.</param>
-        public static void AddPerfCountersTelemetryConsumer(this ClientConfiguration config)
+        public static ISiloHostBuilder AddPerfCountersTelemetryConsumer(this ISiloHostBuilder hostBuilder)
         {
-            string typeName = typeof(OrleansPerfCounterTelemetryConsumer).FullName;
-            string assemblyName = typeof(OrleansPerfCounterTelemetryConsumer).Assembly.GetName().Name;
+            return hostBuilder.ConfigureServices(ConfigureServices);
+        }
 
-            config.TelemetryConfiguration.Add(typeName, assemblyName, null);
+        /// <summary>
+        /// Adds a metrics telemetric consumer provider of type <see cref="OrleansPerfCounterTelemetryConsumer"/>.
+        /// </summary>
+        public static IClientBuilder AddPerfCountersTelemetryConsumer(this IClientBuilder clientBuilder)
+        {
+            return clientBuilder.ConfigureServices(ConfigureServices);
+        }
+
+        private static void ConfigureServices(HostBuilderContext context, IServiceCollection services)
+        {
+            services.Configure<TelemetryOptions>(options => options.AddConsumer<OrleansPerfCounterTelemetryConsumer>());
         }
     }
 }

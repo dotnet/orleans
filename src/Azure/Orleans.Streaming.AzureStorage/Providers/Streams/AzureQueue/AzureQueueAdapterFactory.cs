@@ -2,9 +2,12 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Serialization;
 using Orleans.Streams;
 using Orleans.Providers.Streams.Common;
+using Orleans.Configuration;
+using Orleans.Configuration.Overrides;
 
 namespace Orleans.Providers.Streams.AzureQueue
 {
@@ -12,78 +15,63 @@ namespace Orleans.Providers.Streams.AzureQueue
     public class AzureQueueAdapterFactory<TDataAdapter> : IQueueAdapterFactory
         where TDataAdapter : IAzureQueueDataAdapter
     {
-        private string deploymentId;
-        private string dataConnectionString;
-        private string providerName;
-        private int cacheSize;
-        private int numQueues;
-        private TimeSpan? messageVisibilityTimeout;
+        private readonly string providerName;
+        private readonly AzureQueueOptions options;
+        private readonly ClusterOptions clusterOptions;
+        private readonly ILoggerFactory loggerFactory;
+        private readonly Func<TDataAdapter> dataAadaptorFactory;
         private HashRingBasedStreamQueueMapper streamQueueMapper;
         private IQueueAdapterCache adapterCache;
-        private Func<TDataAdapter> adaptorFactory;
-        private ILoggerFactory loggerFactory;
         /// <summary>
         /// Gets the serialization manager.
         /// </summary>
-        public SerializationManager SerializationManager { get; private set; }
+
+        protected SerializationManager SerializationManager { get; }
 
         /// <summary>
         /// Application level failure handler override.
         /// </summary>
         protected Func<QueueId, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { private get; set; }
 
-        /// <summary> Init the factory.</summary>
-        public virtual void Init(IProviderConfiguration config, string providerName, IServiceProvider serviceProvider)
+        public AzureQueueAdapterFactory(
+            string name,
+            AzureQueueOptions options, 
+            HashRingStreamQueueMapperOptions queueMapperOptions,
+            SimpleQueueCacheOptions cacheOptions,
+            IServiceProvider serviceProvider, 
+            IOptions<ClusterOptions> clusterOptions, 
+            SerializationManager serializationManager, 
+            ILoggerFactory loggerFactory)
         {
-            if (config == null) throw new ArgumentNullException(nameof(config));
-            if (!config.Properties.TryGetValue(AzureQueueAdapterConstants.DataConnectionStringPropertyName, out dataConnectionString))
-                throw new ArgumentException($"{AzureQueueAdapterConstants.DataConnectionStringPropertyName} property not set");
-            if (!config.Properties.TryGetValue(AzureQueueAdapterConstants.DeploymentIdPropertyName, out deploymentId))
-                throw new ArgumentException($"{AzureQueueAdapterConstants.DeploymentIdPropertyName} property not set");
-            string messageVisibilityTimeoutRaw;
-            if (config.Properties.TryGetValue(AzureQueueAdapterConstants.MessageVisibilityTimeoutPropertyName, out messageVisibilityTimeoutRaw))
-            {
-                TimeSpan messageVisibilityTimeoutTemp;
-                if (!TimeSpan.TryParse(messageVisibilityTimeoutRaw, out messageVisibilityTimeoutTemp))
-                {
-                    throw new ArgumentException(
-                        $"Failed to parse {AzureQueueAdapterConstants.MessageVisibilityTimeoutPropertyName} value '{messageVisibilityTimeoutRaw}' as a TimeSpan");
-                }
+            this.providerName = name;
+            this.options = options ?? throw new ArgumentNullException(nameof(options));
+            this.clusterOptions = clusterOptions.Value;
+            this.SerializationManager = serializationManager ?? throw new ArgumentNullException(nameof(serializationManager));
+            this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
+            this.dataAadaptorFactory = () => ActivatorUtilities.GetServiceOrCreateInstance<TDataAdapter>(serviceProvider);
+            this.streamQueueMapper = new HashRingBasedStreamQueueMapper(queueMapperOptions, providerName);
+            this.adapterCache = new SimpleQueueAdapterCache(cacheOptions, this.providerName, this.loggerFactory);
+        }
 
-                messageVisibilityTimeout = messageVisibilityTimeoutTemp;
-            }
-            else
-            {
-                messageVisibilityTimeout = null;
-            }
-            
-            cacheSize = SimpleQueueAdapterCache.ParseSize(config, AzureQueueAdapterConstants.CacheSizeDefaultValue);
-            this.loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
-            string numQueuesString;
-            numQueues = AzureQueueAdapterConstants.NumQueuesDefaultValue;
-            if (config.Properties.TryGetValue(AzureQueueAdapterConstants.NumQueuesPropertyName, out numQueuesString))
-            {
-                if (!int.TryParse(numQueuesString, out numQueues))
-                    throw new ArgumentException($"{AzureQueueAdapterConstants.NumQueuesPropertyName} invalid.  Must be int");
-            }
-
-            this.providerName = providerName;
-            streamQueueMapper = new HashRingBasedStreamQueueMapper(numQueues, providerName);
-            adapterCache = new SimpleQueueAdapterCache(cacheSize, providerName, loggerFactory);
-            if (StreamFailureHandlerFactory == null)
-            {
-                StreamFailureHandlerFactory =
-                    qid => Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler());
-            }
-
-            this.SerializationManager = serviceProvider.GetRequiredService<SerializationManager>();
-            this.adaptorFactory = () => ActivatorUtilities.GetServiceOrCreateInstance<TDataAdapter>(serviceProvider);
+        /// <summary> Init the factory.</summary>
+        public virtual void Init()
+        {
+            this.StreamFailureHandlerFactory = this.StreamFailureHandlerFactory ?? 
+                    ((qid) => Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler()));
         }
 
         /// <summary>Creates the Azure Queue based adapter.</summary>
         public virtual Task<IQueueAdapter> CreateAdapter()
         {
-            var adapter = new AzureQueueAdapter<TDataAdapter>(this.adaptorFactory(), this.SerializationManager, streamQueueMapper, this.loggerFactory, dataConnectionString, deploymentId, providerName, messageVisibilityTimeout);
+            var adapter = new AzureQueueAdapter<TDataAdapter>(
+                this.dataAadaptorFactory(), 
+                this.SerializationManager, 
+                this.streamQueueMapper, 
+                this.loggerFactory, 
+                this.options.ConnectionString, 
+                this.clusterOptions.ServiceId, 
+                this.providerName, 
+                this.options.MessageVisibilityTimeout);
             return Task.FromResult<IQueueAdapter>(adapter);
         }
 
@@ -107,6 +95,17 @@ namespace Orleans.Providers.Streams.AzureQueue
         public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
         {
             return StreamFailureHandlerFactory(queueId);
+        }
+
+        public static AzureQueueAdapterFactory<TDataAdapter> Create(IServiceProvider services, string name)
+        {
+            var azureQueueOptions = services.GetOptionsByName<AzureQueueOptions>(name);
+            var queueMapperOptions = services.GetOptionsByName<HashRingStreamQueueMapperOptions>(name);
+            var cacheOptions = services.GetOptionsByName<SimpleQueueCacheOptions>(name);
+            IOptions<ClusterOptions> clusterOptions = services.GetProviderClusterOptions(name);
+            var factory = ActivatorUtilities.CreateInstance<AzureQueueAdapterFactory<TDataAdapter>>(services, name, azureQueueOptions, queueMapperOptions, cacheOptions, clusterOptions);
+            factory.Init();
+            return factory;
         }
     }
 }

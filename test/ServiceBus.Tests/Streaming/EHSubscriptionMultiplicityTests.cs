@@ -13,6 +13,7 @@ using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.StreamingTests;
 using Xunit;
+using Orleans.Hosting;
 
 namespace ServiceBus.Tests.StreamingTests
 {
@@ -22,20 +23,6 @@ namespace ServiceBus.Tests.StreamingTests
         private const string StreamNamespace = "EHSubscriptionMultiplicityTestsNamespace";
         private const string EHPath = "ehorleanstest";
         private const string EHConsumerGroup = "orleansnightly";
-        private const string EHCheckpointTable = "ehcheckpoint";
-        private static readonly string CheckpointNamespace = Guid.NewGuid().ToString();
-
-        public static readonly EventHubStreamProviderSettings ProviderSettings =
-            new EventHubStreamProviderSettings(StreamProviderName);
-
-        private static readonly Lazy<EventHubSettings> EventHubConfig = new Lazy<EventHubSettings>(() =>
-            new EventHubSettings(
-                TestDefaultConfiguration.EventHubConnectionString,
-                EHConsumerGroup, EHPath));
-
-        private static readonly EventHubCheckpointerSettings CheckpointerSettings =
-            new EventHubCheckpointerSettings(TestDefaultConfiguration.DataConnectionString,
-                EHCheckpointTable, CheckpointNamespace, TimeSpan.FromSeconds(1));
 
         private readonly SubscriptionMultiplicityTestRunner runner;
         private readonly Fixture fixture;
@@ -44,34 +31,31 @@ namespace ServiceBus.Tests.StreamingTests
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.ConfigureLegacyConfiguration(legacy =>
+                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+            }
+
+            private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
                 {
-                    AdjustClusterConfiguration(legacy.ClusterConfiguration);
-                });
-            }
-
-            public override void Dispose()
-            {
-                base.Dispose();
-                var dataManager = new AzureTableDataManager<TableEntity>(CheckpointerSettings.TableName, CheckpointerSettings.DataConnectionString, NullLoggerFactory.Instance);
-                dataManager.InitTableAsync().Wait();
-                dataManager.ClearTableAsync().Wait();
-            }
-
-            private static void AdjustClusterConfiguration(ClusterConfiguration config)
-            {
-                var settings = new Dictionary<string, string>();
-                // get initial settings from configs
-                ProviderSettings.WriteProperties(settings);
-                EventHubConfig.Value.WriteProperties(settings);
-                CheckpointerSettings.WriteProperties(settings);
-
-                // add queue balancer setting
-                settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.AssemblyQualifiedName);
-
-                // register stream provider
-                config.Globals.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, settings);
-                config.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
+                    hostBuilder
+                        .AddMemoryGrainStorage("PubSubStore")
+                        .AddEventHubStreams(StreamProviderName, b=>b
+                        .ConfigureEventHub(ob => ob.Configure(
+                        options =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                            options.ConsumerGroup = EHConsumerGroup;
+                            options.Path = EHPath;
+                          
+                        }))
+                        .UseEventHubCheckpointer(ob=>ob.Configure(options=>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.PersistInterval = TimeSpan.FromSeconds(1);
+                        }))
+                        .UseDynamicClusterConfigDeploymentBalancer());
+                }
             }
         }
 

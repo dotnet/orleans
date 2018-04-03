@@ -41,7 +41,7 @@ namespace Orleans.Runtime
         private ILocalGrainDirectory directory;
         private Catalog catalog;
         private Dispatcher dispatcher;
-        private List<IGrainCallFilter> grainCallFilters;
+        private List<IIncomingGrainCallFilter> grainCallFilters;
         private SerializationManager serializationManager;
 
         private readonly InterfaceToImplementationMappingCache interfaceToImplementationMapping = new InterfaceToImplementationMappingCache();
@@ -108,8 +108,8 @@ namespace Orleans.Runtime
         private ILocalGrainDirectory Directory
             => this.directory ?? (this.directory = this.ServiceProvider.GetRequiredService<ILocalGrainDirectory>());
 
-        private List<IGrainCallFilter> GrainCallFilters
-            => this.grainCallFilters ?? (this.grainCallFilters = new List<IGrainCallFilter>(this.ServiceProvider.GetServices<IGrainCallFilter>()));
+        private List<IIncomingGrainCallFilter> GrainCallFilters
+            => this.grainCallFilters ?? (this.grainCallFilters = new List<IIncomingGrainCallFilter>(this.ServiceProvider.GetServices<IIncomingGrainCallFilter>()));
 
         private Dispatcher Dispatcher => this.dispatcher ?? (this.dispatcher = this.ServiceProvider.GetRequiredService<Dispatcher>());
 
@@ -814,7 +814,7 @@ namespace Orleans.Runtime
 
         public void Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
+            lifecycle.Subscribe<InsideRuntimeClient>(ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
         }
     }
 }

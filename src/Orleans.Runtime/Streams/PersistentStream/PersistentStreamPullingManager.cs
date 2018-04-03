@@ -6,7 +6,8 @@ using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Providers;
+using Orleans.Configuration;
+using RunState = Orleans.Configuration.StreamLifecycleOptions.RunState;
 
 namespace Orleans.Streams
 {
@@ -19,8 +20,7 @@ namespace Orleans.Streams
         private readonly IStreamProviderRuntime providerRuntime;
         private readonly IStreamPubSub pubSub;
 
-        private readonly PersistentStreamProviderConfig config;
-        private readonly IProviderConfiguration providerConfig;
+        private readonly StreamPullingAgentOptions options;
         private readonly AsyncSerialExecutor nonReentrancyGuarantor; // for non-reentrant execution of queue change notifications.
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
@@ -30,7 +30,7 @@ namespace Orleans.Streams
         private readonly IQueueAdapterCache queueAdapterCache;
         private IStreamQueueBalancer queueBalancer;
         private readonly IQueueAdapterFactory adapterFactory;
-        private PersistentStreamProviderState managerState;
+        private RunState managerState;
         private IDisposable queuePrintTimer;
         private int NumberRunningAgents { get { return queuesToAgentsMap.Count; } }
 
@@ -41,8 +41,7 @@ namespace Orleans.Streams
             IStreamPubSub streamPubSub,
             IQueueAdapterFactory adapterFactory,
             IStreamQueueBalancer streamQueueBalancer,
-            PersistentStreamProviderConfig config,
-            IProviderConfiguration providerConfig,
+            StreamPullingAgentOptions options,
             ILoggerFactory loggerFactory)
             : base(id, runtime.ExecutingSiloAddress, loggerFactory)
         {
@@ -67,8 +66,7 @@ namespace Orleans.Streams
             streamProviderName = strProviderName;
             providerRuntime = runtime;
             pubSub = streamPubSub;
-            this.config = config;
-            this.providerConfig = providerConfig;
+            this.options = options;
             nonReentrancyGuarantor = new AsyncSerialExecutor();
             latestRingNotificationSequenceNumber = 0;
             latestCommandNumber = 0;
@@ -90,14 +88,14 @@ namespace Orleans.Streams
 
             // Remove cast once we cleanup
             queueAdapter = qAdapter.Value;
-            await this.queueBalancer.Initialize(this.streamProviderName, this.adapterFactory.GetStreamQueueMapper(), config.SiloMaturityPeriod, this.providerConfig);
+            await this.queueBalancer.Initialize(this.adapterFactory.GetStreamQueueMapper());
             queueBalancer.SubscribeToQueueDistributionChangeEvents(this);
 
             List<QueueId> myQueues = queueBalancer.GetMyQueues().ToList();
             Log(ErrorCode.PersistentStreamPullingManager_03, String.Format("Initialize: I am now responsible for {0} queues: {1}.", myQueues.Count, PrintQueues(myQueues)));
 
             queuePrintTimer = this.RegisterTimer(AsyncTimerCallback, null, QUEUES_PRINT_PERIOD, QUEUES_PRINT_PERIOD);
-            managerState = PersistentStreamProviderState.Initialized;
+            managerState = RunState.Initialized;
         }
 
         public async Task Stop()
@@ -114,7 +112,7 @@ namespace Orleans.Streams
 
         public async Task StartAgents()
         {
-            managerState = PersistentStreamProviderState.AgentsStarted;
+            managerState = RunState.AgentsStarted;
             List<QueueId> myQueues = queueBalancer.GetMyQueues().ToList();
 
             Log(ErrorCode.PersistentStreamPullingManager_Starting, "Starting agents for {0} queues: {1}", myQueues.Count, PrintQueues(myQueues));
@@ -124,7 +122,7 @@ namespace Orleans.Streams
 
         public async Task StopAgents()
         {
-            managerState = PersistentStreamProviderState.AgentsStopped;
+            managerState = RunState.AgentsStopped;
             List<QueueId> queuesToRemove = queuesToAgentsMap.Keys.ToList();
             Log(ErrorCode.PersistentStreamPullingManager_Stopping, "Stopping agents for {0} queues: {1}", queuesToRemove.Count, PrintQueues(queuesToRemove));
             await RemoveQueues(queuesToRemove);
@@ -152,7 +150,7 @@ namespace Orleans.Streams
             Log(ErrorCode.PersistentStreamPullingManager_04,
                 "Got QueueChangeNotification number {0} from the queue balancer. managerState = {1}", notificationSeqNumber, managerState);
 
-            if (managerState == PersistentStreamProviderState.AgentsStopped)
+            if (managerState == RunState.AgentsStopped)
             {
                 return Task.CompletedTask; // if agents not running, no need to rebalance the queues among them.
             }
@@ -168,7 +166,7 @@ namespace Orleans.Streams
                         notificationSeqNumber, latestRingNotificationSequenceNumber);
                     return Task.CompletedTask;
                 }
-                if (managerState == PersistentStreamProviderState.AgentsStopped)
+                if (managerState == RunState.AgentsStopped)
                 {
                     return Task.CompletedTask; // if agents not running, no need to rebalance the queues among them.
                 }
@@ -220,7 +218,7 @@ namespace Orleans.Streams
                 try
                 {
                     var agentId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENT_SYSTEM_TARGET_TYPE_CODE);
-                    var agent = new PersistentStreamPullingAgent(agentId, streamProviderName, providerRuntime, this.loggerFactory, pubSub, queueId, config);
+                    var agent = new PersistentStreamPullingAgent(agentId, streamProviderName, providerRuntime, this.loggerFactory, pubSub, queueId, this.options);
                     providerRuntime.RegisterSystemTarget(agent);
                     queuesToAgentsMap.Add(queueId, agent);
                     agents.Add(agent);

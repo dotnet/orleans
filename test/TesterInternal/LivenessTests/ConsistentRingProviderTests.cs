@@ -113,7 +113,9 @@ namespace UnitTests.LivenessTests
 
         private Dictionary<SiloAddress, List<int>> GetQueueHistogram(Dictionary<SiloAddress, List<IRingRangeInternal>> siloRanges, int totalNumQueues)
         {
-            HashRingBasedStreamQueueMapper queueMapper = new HashRingBasedStreamQueueMapper(totalNumQueues, "AzureQueues");
+            var options = new HashRingStreamQueueMapperOptions();
+            options.TotalQueueCount = totalNumQueues;
+            HashRingBasedStreamQueueMapper queueMapper = new HashRingBasedStreamQueueMapper(options, "AzureQueues");
             var allQueues = queueMapper.GetAllQueues();
 
             Dictionary<SiloAddress, List<int>> queueHistogram = new Dictionary<SiloAddress, List<int>>();

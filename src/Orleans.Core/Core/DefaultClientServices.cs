@@ -18,6 +18,10 @@ namespace Orleans
     {
         public static void AddDefaultServices(IClientBuilder builder, IServiceCollection services)
         {
+            // Options logging
+            services.TryAddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
+            services.TryAddSingleton(typeof(IOptionFormatterResolver<>), typeof(DefaultOptionsFormatterResolver<>));
+
             services.TryAddSingleton<ILifecycleParticipant<IClusterClientLifecycle>, ClientOptionsLogger>();
             services.TryAddSingleton<TelemetryManager>();
             services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();
@@ -66,10 +70,10 @@ namespace Orleans
             services.TryAddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
 
             // Add default option formatter if none is configured, for options which are requied to be configured 
-            services.TryConfigureFormatter<ClusterClientOptions, ClusterClientOptionsFormatter>();
-            services.TryConfigureFormatter<ClientMessagingOptions, ClientMessagingOptionFormatter>();
-            services.TryConfigureFormatter<NetworkingOptions, NetworkingOptionsFormatter>();
-            services.TryConfigureFormatter<ClientStatisticsOptions, ClientStatisticsOptionsFormatter>();
+            services.ConfigureFormatter<ClusterOptions>();
+            services.ConfigureFormatter<ClientMessagingOptions>();
+            services.ConfigureFormatter<NetworkingOptions>();
+            services.ConfigureFormatter<ClientStatisticsOptions>();
             
             services.AddTransient<IConfigurationValidator, ClientClusteringValidator>();
         }

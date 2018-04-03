@@ -2,6 +2,7 @@ using System;
 using System.Net;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Hosting;
 
 namespace Orleans.Runtime
 {
@@ -12,11 +13,11 @@ namespace Orleans.Runtime
 
         public LocalSiloDetails(
             IOptions<SiloOptions> siloOptions,
+            IOptions<ClusterOptions> clusterOptions,
             IOptions<EndpointOptions> siloEndpointOptions)
         {
-            var options = siloOptions.Value;
-            this.Name = options.SiloName;
-            this.ClusterId = options.ClusterId;
+            this.Name = siloOptions.Value.SiloName;
+            this.ClusterId = clusterOptions.Value.ClusterId;
             this.DnsHostName = Dns.GetHostName();
 
             var endpointOptions = siloEndpointOptions.Value;

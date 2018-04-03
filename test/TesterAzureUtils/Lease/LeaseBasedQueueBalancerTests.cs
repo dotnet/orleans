@@ -1,7 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.LeaseProviders;
 using Orleans.Providers;
+using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -25,15 +27,6 @@ namespace Tester.AzureUtils.Lease
         private const string StreamProviderName = "MemoryStreamProvider";
         private static readonly int totalQueueCount = 6;
         private static readonly short siloCount = 4;
-        public static readonly MemoryAdapterConfig ProviderSettings =
-            new MemoryAdapterConfig(StreamProviderName);
-        public static readonly PersistentStreamProviderConfig ProviderConfig = new PersistentStreamProviderConfig()
-        { BalancerType = StreamQueueBalancerType.ClusterConfigDeploymentLeaseBasedBalancer };
-        public static readonly LeaseBasedQueueBalancerConfig BalancerConfig = new LeaseBasedQueueBalancerConfig()
-        {
-            LeaseProviderType = typeof(AzureBlobLeaseProvider),
-            LeaseLength = TimeSpan.FromSeconds(15)
-        };
 
         //since lease length is 1 min, so set time out to be two minutes to fulfill some test scenario
         public static readonly TimeSpan TimeOut = TimeSpan.FromMinutes(2);
@@ -42,11 +35,6 @@ namespace Tester.AzureUtils.Lease
             TestUtils.CheckForAzureStorage();
             builder.Options.InitialSilosCount = siloCount;
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
-            ProviderSettings.TotalQueueCount = totalQueueCount;
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                AdjustClusterConfiguration(legacy.ClusterConfiguration);
-            });
         }
 
         public class SiloBuilderConfigurator : ISiloBuilderConfigurator
@@ -59,25 +47,27 @@ namespace Tester.AzureUtils.Lease
                     BlobContainerName = "test-container-leasebasedqueuebalancer"
                 };
                 services.AddSingleton<AzureBlobLeaseProviderConfig>(leaseProviderConfig);
-                services.AddTransient<AzureBlobLeaseProvider>();
+                services.AddTransient<AzureBlobLeaseProvider>()
+                    .ConfigureNamedOptionForLogging<LeaseBasedQueueBalancerOptions>(StreamProviderName);
+                services.AddOptions<LeaseBasedQueueBalancerOptions>(StreamProviderName).Configure(options =>
+               {
+                   options.LeaseProviderType = typeof(AzureBlobLeaseProvider);
+                   options.LeaseLength = TimeSpan.FromSeconds(15);
+               });
+                
             }
 
             public void Configure(ISiloHostBuilder hostBuilder)
             {
-                hostBuilder.ConfigureServices(ConfigureServices);
-            }
-        }
+                hostBuilder
+                    .ConfigureServices(ConfigureServices)
+                    .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, b=>b
+                    .ConfigurePartitioning(totalQueueCount)
+                    .UseClusterConfigDeploymentLeaseBasedBalancer());
 
-        private static void AdjustClusterConfiguration(ClusterConfiguration config)
-        {
-            var settings = new Dictionary<string, string>();
-            // get initial settings from configs
-            ProviderSettings.WriteProperties(settings);
-            ProviderConfig.WriteProperties(settings);
-            BalancerConfig.WriterProperties(settings);
-            // register stream provider
-            config.Globals.RegisterStreamProvider<MemoryStreamProvider>(StreamProviderName, settings);
-            config.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
+                hostBuilder
+                    .AddMemoryGrainStorage("PubSubStore");
+            }
         }
 
         [SkippableFact]
@@ -124,7 +114,7 @@ namespace Tester.AzureUtils.Lease
                     throw new OrleansException($"AgentManager doesn't own correct amount of agents");
                 }
 
-                var agentStarted = await mgmtGrain.SendControlCommandToProvider(typeof(MemoryStreamProvider).FullName, StreamProviderName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents);
+                var agentStarted = await mgmtGrain.SendControlCommandToProvider(typeof(PersistentStreamProvider).FullName, StreamProviderName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents);
                 return agentStarted.All(startedAgentInEachSilo => Convert.ToInt32(startedAgentInEachSilo) >= expectedAgentCountMin && Convert.ToInt32(startedAgentInEachSilo) <= expectedAgentCountMax);
             }
             catch { return false; }

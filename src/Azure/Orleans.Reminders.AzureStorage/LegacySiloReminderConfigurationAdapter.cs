@@ -8,11 +8,11 @@ namespace Orleans.Hosting
     internal class LegacySiloReminderConfigurationAdapter : ILegacyReminderTableAdapter
     {
         /// <inheritdoc />
-        public void Configure(object configuration, IServiceCollection services)
+        public void Configure(object configuration, ISiloHostBuilder builder)
         {
             var reader = new GlobalConfigurationReader(configuration);
             var connectionString = reader.GetPropertyValue<string>("DataConnectionStringForReminders");
-            services.UseAzureTableReminderService(connectionString);
+            builder.UseAzureTableReminderService(connectionString);
         }
     }
 }

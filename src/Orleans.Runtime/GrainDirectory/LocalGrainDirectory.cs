@@ -100,7 +100,7 @@ namespace Orleans.Runtime.GrainDirectory
             Factory<GrainDirectoryPartition> grainDirectoryPartitionFactory,
             RegistrarManager registrarManager,
             ExecutorService executorService,
-            IOptions<DevelopmentMembershipOptions> developmentMembershipOptions,
+            IOptions<DevelopmentClusterMembershipOptions> developmentClusterMembershipOptions,
             IOptions<MultiClusterOptions> multiClusterOptions,
             IOptions<GrainDirectoryOptions> grainDirectoryOptions,
             ILoggerFactory loggerFactory)
@@ -138,7 +138,7 @@ namespace Orleans.Runtime.GrainDirectory
                     loggerFactory);
             GsiActivationMaintainer = new GlobalSingleInstanceActivationMaintainer(this, this.Logger, grainFactory, multiClusterOracle, executorService, siloDetails, multiClusterOptions, loggerFactory);
 
-            var primarySiloEndPoint = developmentMembershipOptions.Value.PrimarySiloEndpoint;
+            var primarySiloEndPoint = developmentClusterMembershipOptions.Value.PrimarySiloEndpoint;
             if (primarySiloEndPoint != null)
             {
                 this.seed = this.MyAddress.Endpoint.Equals(primarySiloEndPoint) ? this.MyAddress : SiloAddress.New(primarySiloEndPoint, 0);
@@ -256,6 +256,10 @@ namespace Orleans.Runtime.GrainDirectory
             if (maintainer != null)
             {
                 maintainer.Stop();
+            }
+            if (GsiActivationMaintainer != null)
+            {
+                GsiActivationMaintainer.Stop();
             }
             DirectoryCache.Clear();
         }
@@ -598,6 +602,8 @@ namespace Orleans.Runtime.GrainDirectory
 
                 // we are the owner     
                 var registrar = this.registrarManager.GetRegistrarForGrain(address.Grain);
+
+                if (log.IsEnabled(LogLevel.Trace)) log.Trace($"use registrar {registrar.GetType().Name} for activation {address}");
 
                 return registrar.IsSynchronous ? registrar.Register(address, singleActivation)
                     : await registrar.RegisterAsync(address, singleActivation);

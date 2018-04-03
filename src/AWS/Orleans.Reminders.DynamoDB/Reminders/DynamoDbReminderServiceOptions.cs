@@ -14,29 +14,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets or sets the connection string.
         /// </summary>
+        [RedactConnectionString]
         public string ConnectionString { get; set; }
-    }
-
-    /// <inheritdoc />
-    internal class DynamoDBReminderTableOptionsFormatter : IOptionFormatter<DynamoDBReminderTableOptions>
-    {
-        private readonly DynamoDBReminderTableOptions options;
-
-        public DynamoDBReminderTableOptionsFormatter(IOptions<DynamoDBReminderTableOptions> options)
-        {
-            this.options = options.Value;
-        }
-
-        /// <inheritdoc />
-        public string Name => nameof(DynamoDBReminderTableOptions);
-
-        /// <inheritdoc />
-        public IEnumerable<string> Format()
-        {
-            return new[]
-            {
-                OptionFormattingUtilities.Format(nameof(this.options.ConnectionString), ConfigUtilities.RedactConnectionStringInfo(this.options.ConnectionString))
-            };
-        }
     }
 }

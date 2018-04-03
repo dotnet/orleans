@@ -73,7 +73,7 @@ namespace Orleans.LeaseProviders
                     case 412: statusCode = ResponseCode.LeaseNotAvailable; break;
                     default: statusCode = ResponseCode.TransientFailure; break;
                 }
-                return new AcquireLeaseResult(null, statusCode, e);
+                return new AcquireLeaseResult(new AcquiredLease(leaseRequest.ResourceKey), statusCode, e);
             }
         }
 
@@ -128,7 +128,7 @@ namespace Orleans.LeaseProviders
                     case 412: statusCode = ResponseCode.InvalidToken; break;
                     default: statusCode = ResponseCode.TransientFailure; break;
                 }
-                return new AcquireLeaseResult(null, statusCode, e);
+                return new AcquireLeaseResult(new AcquiredLease(acquiredLease.ResourceKey), statusCode, e);
             }
         }
     }

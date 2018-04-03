@@ -8,7 +8,6 @@ using System.Text;
 using System.Threading;
 using System.Xml;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Providers;
 
 namespace Orleans.Runtime.Configuration
@@ -19,6 +18,7 @@ namespace Orleans.Runtime.Configuration
     [Serializable]
     public class ClientConfiguration : MessagingConfiguration, IStatisticsConfiguration
     {
+        internal const string DEPRECATE_DEPLOYMENT_ID_MESSAGE = "DeploymentId is the same as ClusterId. Please use ClusterId instead of DeploymentId.";
         /// <summary>
         /// Specifies the type of the gateway provider.
         /// </summary>
@@ -78,7 +78,7 @@ namespace Orleans.Runtime.Configuration
         /// <summary>
         /// Deployment Id. This is the same as ClusterId and has been deprecated in favor of it.
         /// </summary>
-        [Obsolete("DeploymentId is the same as ClusterId.")]
+        [Obsolete(DEPRECATE_DEPLOYMENT_ID_MESSAGE)]
         public string DeploymentId
         {
             get => this.ClusterId;
@@ -175,10 +175,10 @@ namespace Orleans.Runtime.Configuration
             : base(false)
         {
             SourceFile = null;
-            PreferedGatewayIndex = -1;
+            PreferedGatewayIndex = GatewayOptions.DEFAULT_PREFERED_GATEWAY_INDEX;
             Gateways = new List<IPEndPoint>();
             GatewayProvider = GatewayProviderType.None;
-            PreferredFamily = AddressFamily.InterNetwork;
+            PreferredFamily = ClientMessagingOptions.DEFAULT_PREFERRED_FAMILY;
             NetInterface = null;
             Port = 0;
             DNSHostName = Dns.GetHostName();
@@ -187,7 +187,7 @@ namespace Orleans.Runtime.Configuration
             // Assume the ado invariant is for sql server storage if not explicitly specified
             AdoInvariant = Constants.INVARIANT_NAME_SQL_SERVER;
             
-            PropagateActivityId = Constants.DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
+            PropagateActivityId = MessagingOptions.DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
 
             GatewayListRefreshPeriod = GatewayOptions.DEFAULT_GATEWAY_LIST_REFRESH_PERIOD;
             StatisticsProviderName = null;

@@ -7,7 +7,7 @@ namespace Orleans.TestingHost
     public class TestClusterOptions
     {
         public string ClusterId { get; set; }
-        public Guid ServiceId { get; set; }
+        public string ServiceId { get; set; }
         public int BaseSiloPort{ get; set; }
         public int BaseGatewayPort { get; set; }
         public bool UseTestClusterMembership { get; set; }
@@ -16,6 +16,7 @@ namespace Orleans.TestingHost
         public string ApplicationBaseDirectory { get; set; }
         public bool ConfigureFileLogging { get; set; } = true;
         public bool AssumeHomogenousSilosForTesting { get; set; }
+        public bool GatewayPerSilo { get; set; } = true;
         public List<string> SiloBuilderConfiguratorTypes { get; } = new List<string>();
         public List<string> ClientBuilderConfiguratorTypes { get; } = new List<string>();
 
@@ -24,7 +25,7 @@ namespace Orleans.TestingHost
             var result = new Dictionary<string, string>
             {
                 [nameof(ClusterId)] = this.ClusterId,
-                [nameof(ServiceId)] = this.ServiceId.ToString(),
+                [nameof(ServiceId)] = this.ServiceId,
                 [nameof(BaseSiloPort)] = this.BaseSiloPort.ToString(),
                 [nameof(BaseGatewayPort)] = this.BaseGatewayPort.ToString(),
                 [nameof(UseTestClusterMembership)] = this.UseTestClusterMembership.ToString(),
@@ -73,7 +74,7 @@ namespace Orleans.TestingHost
                 var result = new TestSiloSpecificOptions
                 {
                     SiloPort = siloPort,
-                    GatewayPort = gatewayPort,
+                    GatewayPort = (instanceNumber == 0 || testClusterOptions.GatewayPerSilo) ? gatewayPort : 0,
                     SiloName = siloName,
                     PrimarySiloPort = testClusterOptions.UseTestClusterMembership ? testClusterOptions.BaseSiloPort : 0,
                 };
@@ -84,7 +85,7 @@ namespace Orleans.TestingHost
                 var result = new TestSiloSpecificOptions
                 {
                     SiloPort = testClusterOptions.BaseSiloPort + instanceNumber,
-                    GatewayPort = testClusterOptions.BaseGatewayPort + instanceNumber,
+                    GatewayPort = (instanceNumber == 0 || testClusterOptions.GatewayPerSilo) ? testClusterOptions.BaseGatewayPort + instanceNumber : 0,
                     SiloName = siloName,
                     PrimarySiloPort = testClusterOptions.UseTestClusterMembership ? testClusterOptions.BaseSiloPort : 0,
                 };

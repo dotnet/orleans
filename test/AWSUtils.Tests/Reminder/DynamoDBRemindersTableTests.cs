@@ -6,8 +6,9 @@ using Microsoft.Extensions.Options;
 
 using Orleans;
 using Orleans.Configuration;
+using Orleans.Hosting;
+using Orleans.Reminders.DynamoDB;
 using Orleans.Runtime;
-using OrleansAWSUtils.Reminders;
 using TestExtensions;
 using UnitTests;
 using UnitTests.RemindersTest;
@@ -28,14 +29,13 @@ namespace AWSUtils.Tests.RemindersTest
             if (!AWSTestConstants.IsDynamoDbAvailable)
                 throw new SkipException("Unable to connect to AWS DynamoDB simulator");
 
-            var options = new DynamoDBReminderTableOptions
-            {
-                ConnectionString = this.connectionStringFixture.ConnectionString
-            };
+            var options = new DynamoDBReminderStorageOptions();
+            LegacySiloReminderConfigurationAdapter.ParseDataConnectionString(this.connectionStringFixture.ConnectionString, options);
+
             return new DynamoDBReminderTable(
                 this.ClusterFixture.Services.GetRequiredService<IGrainReferenceConverter>(),
                 this.loggerFactory,
-                this.siloOptions,
+                this.clusterOptions,
                 Options.Create(options));
         }
 

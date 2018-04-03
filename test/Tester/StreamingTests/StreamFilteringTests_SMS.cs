@@ -2,6 +2,9 @@ using System;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Orleans;
+using Orleans.Hosting;
 using Xunit;
 using TestExtensions;
 using UnitTests.StreamingTests;
@@ -15,14 +18,25 @@ namespace Tester.StreamingTests
             public const string StreamProvider = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+                builder.AddClientBuilderConfigurator<ClientConfiguretor>();
+                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+            }
 
-                    legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamProvider, false);
-                    legacy.ClientConfiguration.AddSimpleMessageStreamProvider(StreamProvider, false);
-                });
+            public class SiloConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder.AddSimpleMessageStreamProvider(StreamProvider)
+                        .AddMemoryGrainStorage("MemoryStore")
+                        .AddMemoryGrainStorage("PubSubStore");
+                }
+            }
+            public class ClientConfiguretor : IClientBuilderConfigurator
+            {
+                public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+                {
+                    clientBuilder.AddSimpleMessageStreamProvider(StreamProvider);
+                }
             }
         }
 

@@ -16,7 +16,7 @@ namespace Orleans.Runtime.MembershipService
         /// Legacy way to create membership table. Will need to move to a legacy package in the future
         /// </summary>
         /// <returns></returns>
-        internal static void ConfigureServices(GlobalConfiguration configuration, IServiceCollection services)
+        internal static void ConfigureServices(GlobalConfiguration configuration, ISiloHostBuilder builder)
         {
             ILegacyMembershipConfigurator configurator = null;
             switch (configuration.LivenessType)
@@ -52,32 +52,26 @@ namespace Orleans.Runtime.MembershipService
                     break;
             }
 
-            configurator?.Configure(configuration, services);
+            configurator?.Configure(configuration, builder);
         }
 
         private class LegacyGrainBasedMembershipConfigurator : ILegacyMembershipConfigurator
         {
-            public void Configure(object configuration, IServiceCollection services)
+            public void Configure(object configuration, ISiloHostBuilder builder)
             {
-                GlobalConfiguration config = configuration as GlobalConfiguration;
-                if (config == null) throw new ArgumentException($"{nameof(GlobalConfiguration)} expected", nameof(configuration));
-                ConfigureServices(config, services);
-            }
-
-            private void ConfigureServices(GlobalConfiguration configuration, IServiceCollection services)
-            {
-                services.Configure<DevelopmentMembershipOptions>(options => CopyGlobalGrainBasedMembershipOptions(configuration, options));
-                services
-                    .AddSingleton<GrainBasedMembershipTable>()
-                    .AddFromExisting<IMembershipTable, GrainBasedMembershipTable>();
-            }
-
-            private static void CopyGlobalGrainBasedMembershipOptions(GlobalConfiguration configuration, DevelopmentMembershipOptions options)
-            {
-                if (configuration.SeedNodes?.Count > 0)
+                if (!(configuration is GlobalConfiguration config))
                 {
-                    options.PrimarySiloEndpoint = configuration.SeedNodes?.FirstOrDefault();
+                    throw new ArgumentException($"{nameof(GlobalConfiguration)} expected", nameof(configuration));
                 }
+
+                builder.UseDevelopmentClustering(options =>
+                {
+                    if (config.SeedNodes?.Count > 0)
+                    {
+                        options.PrimarySiloEndpoint = config.SeedNodes?.FirstOrDefault();
+                    }
+                },
+                config.ClusterId);
             }
         }
     }

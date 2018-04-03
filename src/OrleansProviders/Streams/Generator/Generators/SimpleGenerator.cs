@@ -1,6 +1,7 @@
 
 using System;
 using System.Collections.Generic;
+using Orleans.Hosting;
 using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
 
@@ -12,18 +13,18 @@ namespace Orleans.Providers.Streams.Generator
     /// </summary>
     internal class SimpleGenerator : IStreamGenerator
     {
-        private SimpleGeneratorConfig config;
+        private SimpleGeneratorOptions options;
         private Guid streamGuid;
         private int sequenceId;
 
         public void Configure(IServiceProvider serviceProvider, IStreamGeneratorConfig generatorConfig)
         {
-            var cfg = generatorConfig as SimpleGeneratorConfig;
+            var cfg = generatorConfig as SimpleGeneratorOptions;
             if (cfg == null)
             {
                 throw new ArgumentOutOfRangeException(nameof(generatorConfig));
             }
-            config = cfg;
+            options = cfg;
             sequenceId = 0;
             streamGuid = Guid.NewGuid();
         }
@@ -37,7 +38,7 @@ namespace Orleans.Providers.Streams.Generator
         public bool TryReadEvents(DateTime utcNow, out List<IBatchContainer> events)
         {
             events = new List<IBatchContainer>();
-            if (sequenceId >= config.EventsInStream)
+            if (sequenceId >= this.options.EventsInStream)
             {
                 return false;
             }
@@ -53,11 +54,11 @@ namespace Orleans.Providers.Streams.Generator
             var evt = new GeneratedEvent
             {
                 // If this is the last event generated, mark it as such, so test grains know to report results.
-                EventType = (sequenceId != config.EventsInStream)
+                EventType = (sequenceId != this.options.EventsInStream)
                         ? GeneratedEvent.GeneratedEventType.Fill
                         : GeneratedEvent.GeneratedEventType.Report
             };
-            return new GeneratedBatchContainer(streamGuid, config.StreamNamespace, evt, new EventSequenceTokenV2(sequenceId));
+            return new GeneratedBatchContainer(streamGuid, this.options.StreamNamespace, evt, new EventSequenceTokenV2(sequenceId));
         }
     }
 }

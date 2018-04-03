@@ -15,6 +15,7 @@ using Tester;
 
 namespace UnitTests.TimerTests
 {
+    [TestCategory("Functional"), TestCategory("Reminders")]
     public class ReminderTests_TableGrain : ReminderTests_Base, IClassFixture<ReminderTests_TableGrain.Fixture>
     {
         public class Fixture : BaseTestClusterFixture
@@ -35,19 +36,19 @@ namespace UnitTests.TimerTests
 
         // Basic tests
 
-        [Fact, TestCategory("Functional"), TestCategory("ReminderService")]
+        [Fact]
         public async Task Rem_Grain_Basic_StopByRef()
         {
             await Test_Reminders_Basic_StopByRef();
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("ReminderService")]
+        [Fact]
         public async Task Rem_Grain_Basic_ListOps()
         {
             await Test_Reminders_Basic_ListOps();
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("ReminderService")]
+        [Fact]
         public async Task Rem_Grain_MultipleReminders()
         {
             //log.Info(TestContext.TestName);
@@ -57,13 +58,13 @@ namespace UnitTests.TimerTests
 
         // Single join tests ... multi grain, multi reminders
 
-        [Fact, TestCategory("Functional"), TestCategory("ReminderService")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4318")]
         public async Task Rem_Grain_1J_MultiGrainMultiReminders()
         {
             await Test_Reminders_1J_MultiGrainMultiReminders();
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("ReminderService")]
+        [Fact]
         public async Task Rem_Grain_ReminderNotFounds()
         {
             await Test_Reminders_ReminderNotFound();

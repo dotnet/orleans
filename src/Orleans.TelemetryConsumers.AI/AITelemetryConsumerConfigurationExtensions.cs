@@ -1,38 +1,37 @@
-﻿using System.Collections.Generic;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Orleans.Configuration;
 using Orleans.TelemetryConsumers.AI;
-using System.Linq;
 
-namespace Orleans.Runtime.Configuration
+namespace Orleans.Hosting
 {
     public static class AITelemetryConsumerConfigurationExtensions
     {
         /// <summary>
         /// Adds a metrics telemetric consumer provider of type <see cref="AITelemetryConsumer"/>.
         /// </summary>
-        /// <param name="config">The cluster configuration object to add the telemetry consumer to.</param>
+        /// <param name="hostBuilder"></param>
         /// <param name="instrumentationKey">The Application Insights instrumentation key.</param>
-        public static void AddPerfCountersTelemetryConsumer(this ClusterConfiguration config, string instrumentationKey)
+        public static ISiloHostBuilder AddApplicationInsightsTelemetryConsumer(this ISiloHostBuilder hostBuilder, string instrumentationKey = null)
         {
-            string typeName = typeof(AITelemetryConsumer).FullName;
-            string assemblyName = typeof(AITelemetryConsumer).Assembly.GetName().Name;
-
-            foreach (var nodeConfig in config.Overrides.Values.Union(new[] { config.Defaults }))
-            {
-                nodeConfig.TelemetryConfiguration.Add(typeName, assemblyName, new Dictionary<string, object> { { "instrumentationKey", instrumentationKey} });
-            }
+            return hostBuilder.ConfigureServices((context, services) => ConfigureServices(context, services, instrumentationKey));
         }
 
         /// <summary>
         /// Adds a metrics telemetric consumer provider of type <see cref="AITelemetryConsumer"/>.
         /// </summary>
-        /// <param name="config">The cluster configuration object to add the telemetry consumer to.</param>
+        /// <param name="clientBuilder"></param>
         /// <param name="instrumentationKey">The Application Insights instrumentation key.</param>
-        public static void AddPerfCountersTelemetryConsumer(this ClientConfiguration config, string instrumentationKey)
+        public static IClientBuilder AddApplicationInsightsTelemetryConsumer(this IClientBuilder clientBuilder, string instrumentationKey = null)
         {
-            string typeName = typeof(AITelemetryConsumer).FullName;
-            string assemblyName = typeof(AITelemetryConsumer).Assembly.GetName().Name;
+            return clientBuilder.ConfigureServices((context, services) => ConfigureServices(context, services, instrumentationKey));
+        }
 
-            config.TelemetryConfiguration.Add(typeName, assemblyName, new Dictionary<string, object> { { "instrumentationKey", instrumentationKey } });
+        private static void ConfigureServices(HostBuilderContext context, IServiceCollection services, string instrumentationKey)
+        {
+            services.ConfigureFormatter<ApplicationInsightsTelemetryConsumerOptions>();
+            services.Configure<TelemetryOptions>(options => options.AddConsumer<AITelemetryConsumer>());
+            if (!string.IsNullOrWhiteSpace(instrumentationKey))
+                services.Configure<ApplicationInsightsTelemetryConsumerOptions>(options => options.InstrumentationKey = instrumentationKey);
         }
     }
 }

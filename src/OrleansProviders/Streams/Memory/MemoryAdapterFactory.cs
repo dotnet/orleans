@@ -4,11 +4,13 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 
 namespace Orleans.Providers
 {
@@ -20,25 +22,25 @@ namespace Orleans.Providers
     public class MemoryAdapterFactory<TSerializer> : IQueueAdapterFactory, IQueueAdapter, IQueueAdapterCache
         where TSerializer : class, IMemoryMessageBodySerializer
     {
-
-        private TSerializer serializer;
+        private readonly StreamCacheEvictionOptions cacheOptions;
+        private readonly StreamStatisticOptions statisticOptions;
+        private readonly HashRingStreamQueueMapperOptions queueMapperOptions;
+        private readonly IGrainFactory grainFactory;
+        private readonly ITelemetryProducer telemetryProducer;
+        private readonly ILoggerFactory loggerFactory;
+        private readonly ILogger logger;
+        private readonly TSerializer serializer;
         private IStreamQueueMapper streamQueueMapper;
         private ConcurrentDictionary<QueueId, IMemoryStreamQueueGrain> queueGrains;
         private IObjectPool<FixedSizeBuffer> bufferPool;
         private BlockPoolMonitorDimensions blockPoolMonitorDimensions;
         private IStreamFailureHandler streamFailureHandler;
-        private IServiceProvider serviceProvider;
-        private MemoryAdapterConfig adapterConfig;
-        private ITelemetryProducer telemetryProducer;
-        private ILogger logger;
-        private ILoggerFactory loggerFactory;
-        private String providerName;
-        private IGrainFactory grainFactory;
         private TimePurgePredicate purgePredicate;
+
         /// <summary>
         /// Name of the adapter. Primarily for logging purposes
         /// </summary>
-        public string Name => adapterConfig.StreamProviderName;
+        public string Name { get; }
 
         /// <summary>
         /// Determines whether this is a rewindable stream adapter - supports subscribing from previous point in time.
@@ -75,33 +77,34 @@ namespace Orleans.Providers
         /// </summary>
         protected Func<ReceiverMonitorDimensions, ITelemetryProducer, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory;
 
+        public MemoryAdapterFactory(string providerName, StreamCacheEvictionOptions cacheOptions, StreamStatisticOptions statisticOptions, HashRingStreamQueueMapperOptions queueMapperOptions,
+            IServiceProvider serviceProvider, IGrainFactory grainFactory, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
+        {
+            this.Name = providerName;
+            this.queueMapperOptions = queueMapperOptions ?? throw new ArgumentNullException(nameof(queueMapperOptions));
+            this.cacheOptions = cacheOptions ?? throw new ArgumentNullException(nameof(cacheOptions));
+            this.statisticOptions = statisticOptions ?? throw new ArgumentException(nameof(statisticOptions));
+            this.grainFactory = grainFactory ?? throw new ArgumentNullException(nameof(grainFactory));
+            this.telemetryProducer = telemetryProducer ?? throw new ArgumentNullException(nameof(telemetryProducer));
+            this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
+            this.logger = loggerFactory.CreateLogger<ILogger<MemoryAdapterFactory<TSerializer>>>();
+            this.serializer = MemoryMessageBodySerializerFactory<TSerializer>.GetOrCreateSerializer(serviceProvider);
+        }
+
         /// <summary>
         /// Factory initialization.
         /// </summary>
-        /// <param name="providerConfig"></param>
-        /// <param name="name"></param>
-        /// <param name="svcProvider"></param>
-        public void Init(IProviderConfiguration providerConfig, string name, IServiceProvider svcProvider)
+        public void Init()
         {
-            logger = svcProvider.GetService<ILogger<MemoryAdapterFactory<TSerializer>>>();
-            this.loggerFactory = svcProvider.GetRequiredService<ILoggerFactory>();
-            serviceProvider = svcProvider;
-            providerName = name;
-            queueGrains = new ConcurrentDictionary<QueueId, IMemoryStreamQueueGrain>();
-            adapterConfig = new MemoryAdapterConfig(providerName);
-            this.telemetryProducer = svcProvider.GetService<ITelemetryProducer>();
+            this.queueGrains = new ConcurrentDictionary<QueueId, IMemoryStreamQueueGrain>();
             if (CacheMonitorFactory == null)
                 this.CacheMonitorFactory = (dimensions, telemetryProducer) => new DefaultCacheMonitor(dimensions, telemetryProducer);
             if (this.BlockPoolMonitorFactory == null)
                 this.BlockPoolMonitorFactory = (dimensions, telemetryProducer) => new DefaultBlockPoolMonitor(dimensions, telemetryProducer);
             if (this.ReceiverMonitorFactory == null)
                 this.ReceiverMonitorFactory = (dimensions, telemetryProducer) => new DefaultQueueAdapterReceiverMonitor(dimensions, telemetryProducer);
-            purgePredicate = new TimePurgePredicate(adapterConfig.DataMinTimeInCache, adapterConfig.DataMaxAgeInCache);
-            grainFactory = (IGrainFactory)serviceProvider.GetService(typeof(IGrainFactory));
-            adapterConfig.PopulateFromProviderConfig(providerConfig);
-            streamQueueMapper = new HashRingBasedStreamQueueMapper(adapterConfig.TotalQueueCount, adapterConfig.StreamProviderName);
-
-            this.serializer = MemoryMessageBodySerializerFactory<TSerializer>.GetOrCreateSerializer(svcProvider);
+            this.purgePredicate = new TimePurgePredicate(this.cacheOptions.DataMinTimeInCache, this.cacheOptions.DataMaxAgeInCache);
+            this.streamQueueMapper = new HashRingBasedStreamQueueMapper(this.queueMapperOptions, this.Name);
         }
 
         private void CreateBufferPoolIfNotCreatedYet()
@@ -112,7 +115,7 @@ namespace Orleans.Providers
                 this.blockPoolMonitorDimensions = new BlockPoolMonitorDimensions($"BlockPool-{Guid.NewGuid()}");
                 var oneMb = 1 << 20;
                 var objectPoolMonitor = new ObjectPoolMonitorBridge(this.BlockPoolMonitorFactory(blockPoolMonitorDimensions, this.telemetryProducer), oneMb);
-                this.bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(oneMb), objectPoolMonitor, this.adapterConfig.StatisticMonitorWriteInterval);
+                this.bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(oneMb), objectPoolMonitor, this.statisticOptions.StatisticMonitorWriteInterval);
             }
         }
 
@@ -151,7 +154,7 @@ namespace Orleans.Providers
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
             var dimensions = new ReceiverMonitorDimensions(queueId.ToString());
-            var receiverLogger = this.loggerFactory.CreateLogger($"{typeof(MemoryAdapterReceiver<TSerializer>).FullName}.{this.providerName}.{queueId}");
+            var receiverLogger = this.loggerFactory.CreateLogger($"{typeof(MemoryAdapterReceiver<TSerializer>).FullName}.{this.Name}.{queueId}");
             var receiverMonitor = this.ReceiverMonitorFactory(dimensions, this.telemetryProducer);
             IQueueAdapterReceiver receiver = new MemoryAdapterReceiver<TSerializer>(GetQueueGrain(queueId), receiverLogger, this.serializer, receiverMonitor);
             return receiver;
@@ -192,9 +195,9 @@ namespace Orleans.Providers
         {
             //move block pool creation from init method to here, to avoid unnecessary block pool creation when stream provider is initialized in client side. 
             CreateBufferPoolIfNotCreatedYet();
-            var logger = this.loggerFactory.CreateLogger($"{typeof(MemoryPooledCache<TSerializer>).FullName}.{this.providerName}.{queueId}");
+            var logger = this.loggerFactory.CreateLogger($"{typeof(MemoryPooledCache<TSerializer>).FullName}.{this.Name}.{queueId}");
             var monitor = this.CacheMonitorFactory(new CacheMonitorDimensions(queueId.ToString(), this.blockPoolMonitorDimensions.BlockPoolId), this.telemetryProducer);
-            return new MemoryPooledCache<TSerializer>(bufferPool, purgePredicate, logger, this.serializer, monitor, this.adapterConfig.StatisticMonitorWriteInterval);
+            return new MemoryPooledCache<TSerializer>(bufferPool, purgePredicate, logger, this.serializer, monitor, this.statisticOptions.StatisticMonitorWriteInterval);
         }
 
         /// <summary>
@@ -215,7 +218,7 @@ namespace Orleans.Providers
         private Guid GenerateDeterministicGuid(QueueId queueId)
         {
             // provider name hash code
-            int providerNameGuidHash = (int)JenkinsHash.ComputeHash(providerName);
+            int providerNameGuidHash = (int)JenkinsHash.ComputeHash(this.Name);
 
             // get queueId hash code
             uint queueIdHash = queueId.GetUniformHashCode();
@@ -243,6 +246,16 @@ namespace Orleans.Providers
         private IMemoryStreamQueueGrain GetQueueGrain(QueueId queueId)
         {
             return queueGrains.GetOrAdd(queueId, grainFactory.GetGrain<IMemoryStreamQueueGrain>(GenerateDeterministicGuid(queueId)));
+        }
+
+        public static MemoryAdapterFactory<TSerializer> Create(IServiceProvider services, string name)
+        {
+            var cachePurgeOptions = services.GetOptionsByName<StreamCacheEvictionOptions>(name);
+            var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
+            var queueMapperOptions = services.GetOptionsByName<HashRingStreamQueueMapperOptions>(name);
+            var factory = ActivatorUtilities.CreateInstance<MemoryAdapterFactory<TSerializer>>(services, name, cachePurgeOptions, statisticOptions, queueMapperOptions);
+            factory.Init();
+            return factory;
         }
     }
 }

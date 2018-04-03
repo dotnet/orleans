@@ -113,7 +113,7 @@ namespace Tester
         [Fact, TestCategory("BVT"), TestCategory("Lifecycle")]
         public async Task MultiStageObserverLifecycleTest()
         {
-            var lifecycle = new LifecycleObservable(null);
+            var lifecycle = new LifecycleSubject(null);
             var multiStageObserver = new MultiStageObserver();
             multiStageObserver.Participate(lifecycle);
             await lifecycle.OnStart();
@@ -128,7 +128,7 @@ namespace Tester
         {
             // setup lifecycle observers
             var observersByStage = new Dictionary<TestStages, List<Observer>>();
-            var lifecycle = new LifecycleObservable(null);
+            var lifecycle = new LifecycleSubject(null);
             foreach (KeyValuePair<TestStages, int> kvp in observerCountByStage)
             {
                 List<Observer> observers = Enumerable
@@ -218,10 +218,10 @@ namespace Tester
 
             public void Participate(ILifecycleObservable lifecycle)
             {
-                lifecycle.Subscribe((int)TestStages.Down, ct => OnStartStage(TestStages.Down), ct => OnStopStage(TestStages.Down));
-                lifecycle.Subscribe((int)TestStages.Initialize, ct => OnStartStage(TestStages.Initialize), ct => OnStopStage(TestStages.Initialize));
-                lifecycle.Subscribe((int)TestStages.Configure, ct => OnStartStage(TestStages.Configure), ct => OnStopStage(TestStages.Configure));
-                lifecycle.Subscribe((int)TestStages.Run, ct => OnStartStage(TestStages.Run), ct => OnStopStage(TestStages.Run));
+                lifecycle.Subscribe<MultiStageObserver>((int)TestStages.Down, ct => OnStartStage(TestStages.Down), ct => OnStopStage(TestStages.Down));
+                lifecycle.Subscribe<MultiStageObserver>((int)TestStages.Initialize, ct => OnStartStage(TestStages.Initialize), ct => OnStopStage(TestStages.Initialize));
+                lifecycle.Subscribe<MultiStageObserver>((int)TestStages.Configure, ct => OnStartStage(TestStages.Configure), ct => OnStopStage(TestStages.Configure));
+                lifecycle.Subscribe<MultiStageObserver>((int)TestStages.Run, ct => OnStartStage(TestStages.Run), ct => OnStopStage(TestStages.Run));
             }
         }
     }

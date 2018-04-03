@@ -2,7 +2,6 @@ using System;
 using System.Threading.Tasks;
 
 using Orleans.Concurrency;
-using Orleans.Providers;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Scheduler;
 using Orleans.Streams;
@@ -10,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Hosting;
 
 namespace Orleans.Runtime.Providers
 {
@@ -24,16 +24,16 @@ namespace Orleans.Runtime.Providers
         private readonly IStreamPubSub implictPubSub;
         private readonly IStreamPubSub combinedGrainBasedAndImplicitPubSub;
         private readonly ILoggerFactory loggerFactory;
-
+        private readonly ILogger logger;
         public IGrainFactory GrainFactory => this.runtimeClient.InternalGrainFactory;
         public IServiceProvider ServiceProvider => this.runtimeClient.ServiceProvider;
 
-        public Guid ServiceId { get; }
+        public string ServiceId { get; }
         public string SiloIdentity { get; }
 
         public SiloProviderRuntime(
             ILocalSiloDetails siloDetails,
-            IOptions<SiloOptions> siloOptions,
+            IOptions<ClusterOptions> clusterOptions,
             IConsistentRingProvider consistentRingProvider,
             ISiloRuntimeClient runtimeClient,
             ImplicitStreamSubscriberTable implicitStreamSubscriberTable,
@@ -48,9 +48,9 @@ namespace Orleans.Runtime.Providers
             this.activationDirectory = activationDirectory;
             this.consistentRingProvider = consistentRingProvider;
             this.runtimeClient = runtimeClient;
-            this.ServiceId = siloOptions.Value.ServiceId;
+            this.ServiceId = clusterOptions.Value.ServiceId;
             this.SiloIdentity = siloDetails.SiloAddress.ToLongString();
-
+            this.logger = this.loggerFactory.CreateLogger<SiloProviderRuntime>();
             this.grainBasedPubSub = new GrainBasedPubSubRuntime(this.GrainFactory);
             var tmp = new ImplicitStreamPubSub(this.runtimeClient.InternalGrainFactory, implicitStreamSubscriberTable);
             this.implictPubSub = tmp;
@@ -99,13 +99,13 @@ namespace Orleans.Runtime.Providers
         public async Task<IPersistentStreamPullingManager> InitializePullingAgents(
             string streamProviderName,
             IQueueAdapterFactory adapterFactory,
-            IQueueAdapter queueAdapter,
-            PersistentStreamProviderConfig config,
-            IProviderConfiguration providerConfig)
+            IQueueAdapter queueAdapter)
         {
-            IStreamQueueBalancer queueBalancer = CreateQueueBalancer(config, streamProviderName);
+            IStreamQueueBalancer queueBalancer = CreateQueueBalancer(streamProviderName);
             var managerId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE);
-            var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, this.PubSub(config.PubSubType), adapterFactory, queueBalancer, config, providerConfig, this.loggerFactory);
+            var pubsubOptions = this.ServiceProvider.GetOptionsByName<StreamPubSubOptions>(streamProviderName);
+            var pullingAgentOptions = this.ServiceProvider.GetOptionsByName<StreamPullingAgentOptions>(streamProviderName);
+            var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, this.PubSub(pubsubOptions.PubSubType), adapterFactory, queueBalancer, pullingAgentOptions, this.loggerFactory);
             this.RegisterSystemTarget(manager);
             // Init the manager only after it was registered locally.
             var pullingAgentManager = manager.AsReference<IPersistentStreamPullingManager>();
@@ -114,21 +114,19 @@ namespace Orleans.Runtime.Providers
             return pullingAgentManager;
         }
 
-        private IStreamQueueBalancer CreateQueueBalancer(PersistentStreamProviderConfig config, string streamProviderName)
+        private IStreamQueueBalancer CreateQueueBalancer(string streamProviderName)
         {
-            //default type is ConsistentRingBalancer
-            if (config.BalancerType == null)
-                config.BalancerType = StreamQueueBalancerType.ConsistentRingBalancer;
             try
             {
-                var balancer = this.ServiceProvider.GetRequiredService(config.BalancerType) as IStreamQueueBalancer;
+                var balancer = this.ServiceProvider.GetServiceByName<IStreamQueueBalancer>(streamProviderName)??this.ServiceProvider.GetService<IStreamQueueBalancer>();
                 if (balancer == null)
-                    throw new ArgumentOutOfRangeException("balancerType", $"Configured BalancerType isn't a type which implements IStreamQueueBalancer. BalancerType: {config.BalancerType}, StreamProvider: {streamProviderName}");
+                    throw new ArgumentOutOfRangeException("balancerType", $"Cannot create stream queue balancer for StreamProvider: {streamProviderName}.Please configure your stream provider with a queue balancer.");
+                this.logger.LogInformation($"Successfully created queue balancer of type {balancer.GetType()} for stream provider {streamProviderName}");
                 return balancer;
             }
             catch (Exception e)
             {
-                string error = $"Unsupported balancerType for stream provider. BalancerType: {config.BalancerType}, StreamProvider: {streamProviderName}, Exception: {e}";
+                string error = $"Cannot create stream queue balancer for StreamProvider: {streamProviderName}, Exception: {e}. Please configure your stream provider with a queue balancer.";
                 throw new ArgumentOutOfRangeException("balancerType", error);
             }
         }

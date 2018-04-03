@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 
 namespace Orleans.Runtime
 {
@@ -37,7 +36,7 @@ namespace Orleans.Runtime
         public static readonly GrainId MembershipOracleId = GrainId.GetSystemTargetGrainId(15);
         public static readonly GrainId TypeManagerId = GrainId.GetSystemTargetGrainId(17);
         public static readonly GrainId FallbackSystemTargetId = GrainId.GetSystemTargetGrainId(19);
-        public static readonly GrainId StartupTaskSystemTargetId = GrainId.GetSystemTargetGrainId(20);
+        public static readonly GrainId LifecycleSchedulingSystemTargetId = GrainId.GetSystemTargetGrainId(20);
         public static readonly GrainId DeploymentLoadPublisherSystemTargetId = GrainId.GetSystemTargetGrainId(22);
         public static readonly GrainId MultiClusterOracleId = GrainId.GetSystemTargetGrainId(23);
         public static readonly GrainId ClusterDirectoryServiceId = GrainId.GetSystemTargetGrainId(24);
@@ -54,13 +53,6 @@ namespace Orleans.Runtime
 
         internal const long ReminderTableGrainId = 12345;
 
-        public static readonly TimeSpan DEFAULT_OPENCONNECTION_TIMEOUT = TimeSpan.FromSeconds(5);
-
-        /// <summary>
-        /// The default timeout before a request is assumed to have failed.
-        /// </summary>
-        public static readonly TimeSpan DEFAULT_RESPONSE_TIMEOUT = Debugger.IsAttached ? TimeSpan.FromMinutes(30) : TimeSpan.FromSeconds(30);
-
         /// <summary>
         /// Minimum period for registering a reminder ... we want to enforce a lower bound
         /// </summary>
@@ -71,8 +63,6 @@ namespace Orleans.Runtime
         public static readonly TimeSpan RefreshReminderList = TimeSpan.FromMinutes(5);
 
         public const int LARGE_OBJECT_HEAP_THRESHOLD = 85000;
-
-        public const bool DEFAULT_PROPAGATE_E2E_ACTIVITY_ID = false;
 
         public const int DEFAULT_LOGGER_BULK_MESSAGE_LIMIT = 5;
 

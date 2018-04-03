@@ -6,11 +6,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Orleans.TestingHost;
 using TestExtensions;
 using TestGrainInterfaces;
 using Tests.GeoClusterTests;
 using Xunit;
 using Xunit.Abstractions;
+using Orleans.Hosting;
 
 namespace UnitTests.GeoClusterTests
 {
@@ -31,7 +33,7 @@ namespace UnitTests.GeoClusterTests
         {
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [SkippableFact]
         public async Task TwoClusterBattery()
         {
 
@@ -50,7 +52,7 @@ namespace UnitTests.GeoClusterTests
                 await t;
         }
 
-        [SkippableFact]
+        [SkippableFact(Skip= "https://github.com/dotnet/orleans/issues/4265"), TestCategory("Functional")]
         public async Task ThreeClusterBattery()
         {
 
@@ -95,7 +97,13 @@ namespace UnitTests.GeoClusterTests
         {
             return StartClustersAndClients(null, null, silos);
         }
-
+        public class SiloConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder.AddSimpleMessageStreamProvider("SMSProvider");
+            }
+        }
         private Task StartClustersAndClients(Action<ClusterConfiguration> config_customizer, Action<ClientConfiguration> clientconfig_customizer, params short[] silos)
         {
             WriteLog("Creating clusters and clients...");
@@ -111,13 +119,8 @@ namespace UnitTests.GeoClusterTests
             // configuration for cluster
             Action<ClusterConfiguration> addtracing = (ClusterConfiguration c) =>
             {
-                c.AddSimpleMessageStreamProvider("SMSProvider", fireAndForgetDelivery: false);
-
                 config_customizer?.Invoke(c);
             };
-            // configuration for clients
-            Action<ClientConfiguration> ccc = (config) =>
-               config.RegisterStreamProvider("Orleans.Providers.Streams.SimpleMessageStream.SimpleMessageStreamProvider", "SMSProvider");
 
             // Create clusters and clients
             ClusterNames = new string[silos.Length];
@@ -127,9 +130,9 @@ namespace UnitTests.GeoClusterTests
                 var numsilos = silos[i];
                 var clustername = ClusterNames[i] = ((char)('A' + i)).ToString();
                 var c = Clients[i] = new ClientWrapper[numsilos];
-                NewGeoCluster(globalserviceid, clustername, silos[i], addtracing);
+                NewGeoCluster<SiloConfigurator>(globalserviceid, clustername, silos[i], addtracing);
                 // create one client per silo
-                Parallel.For(0, numsilos, paralleloptions, (j) => c[j] = this.NewClient(clustername, j, ClientWrapper.Factory, ccc));
+                Parallel.For(0, numsilos, paralleloptions, (j) => c[j] = this.NewClient(clustername, j, ClientWrapper.Factory, null, clientBuilder => clientBuilder.AddSimpleMessageStreamProvider("SMSProvider")));
             }
 
             WriteLog("Clusters and clients are ready (elapsed = {0})", stopwatch.Elapsed);
@@ -152,10 +155,10 @@ namespace UnitTests.GeoClusterTests
         #region client wrappers
         public class ClientWrapper : ClientWrapperBase
         {
-            public static readonly Func<string, int, string, Action<ClientConfiguration>, ClientWrapper> Factory =
-                (name, gwPort, clusterId, configUpdater) => new ClientWrapper(name, gwPort, clusterId, configUpdater);
+            public static readonly Func<string, int, string, Action<ClientConfiguration>, Action<IClientBuilder>, ClientWrapper> Factory =
+                (name, gwPort, clusterId, configUpdater, clientConfigurator) => new ClientWrapper(name, gwPort, clusterId, configUpdater, clientConfigurator);
             
-            public ClientWrapper(string name, int gatewayport, string clusterId, Action<ClientConfiguration> configCustomizer) : base(name, gatewayport, clusterId, configCustomizer)
+            public ClientWrapper(string name, int gatewayport, string clusterId, Action<ClientConfiguration> configCustomizer, Action<IClientBuilder> clientConfigurator) : base(name, gatewayport, clusterId, configCustomizer, clientConfigurator)
             {
                 this.systemManagement = this.GrainFactory.GetGrain<IManagementGrain>(0);
             }
@@ -443,7 +446,7 @@ namespace UnitTests.GeoClusterTests
                 AssertEqual(1, p.Result, gref);
         }
 
-        [SkippableFact]
+        [SkippableFact, TestCategory("Functional")]
         public async Task BlockedDeact()
         {
             await RunWithTimeout("Start Clusters and Clients", 180 * 1000, () =>

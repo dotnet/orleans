@@ -23,7 +23,7 @@ namespace UnitTests.RemindersTest
 
         private readonly IReminderTable remindersTable;
         protected ILoggerFactory loggerFactory;
-        protected IOptions<SiloOptions> siloOptions;
+        protected IOptions<ClusterOptions> clusterOptions;
 
         protected ConnectionStringFixture connectionStringFixture;
 
@@ -36,11 +36,11 @@ namespace UnitTests.RemindersTest
             loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType()}.log", filters);
             this.ClusterFixture = clusterFixture;
             logger = loggerFactory.CreateLogger<ReminderTableTestsBase>();
-            var serviceId = Guid.NewGuid();
+            var serviceId = Guid.NewGuid().ToString();
             var clusterId = "test-" + serviceId;
 
             logger.Info("ClusterId={0}", clusterId);
-            this.siloOptions = Options.Create(new SiloOptions { ClusterId = clusterId, ServiceId = serviceId });
+            this.clusterOptions = Options.Create(new ClusterOptions { ClusterId = clusterId, ServiceId = serviceId });
             
             var rmndr = CreateRemindersTable();
             rmndr.Init().WithTimeout(TimeSpan.FromMinutes(1)).Wait();

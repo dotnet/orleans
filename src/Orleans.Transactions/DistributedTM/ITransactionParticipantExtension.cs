@@ -8,7 +8,7 @@ namespace Orleans.Transactions
 {
     /// <summary>
     /// This is a grain extension interface that allows a grain to be a participant in a transaction.
-    /// For documentation of the methods, see <see cref="ITransactionalParticipant">.
+    /// For documentation of the methods, see <see cref="ITransactionParticipant"/>.
     /// </summary>
     public interface ITransactionParticipantExtension : IGrainExtension
     {

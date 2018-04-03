@@ -26,28 +26,4 @@ namespace Orleans.Configuration
         /// </summary>
         public Dictionary<string, TimeSpan> ClassSpecificCollectionAge { get; set; } = new Dictionary<string, TimeSpan>();
     }
-
-    public class GrainCollectionOptionsFormatter : IOptionFormatter<GrainCollectionOptions>
-    {
-        public string Name => nameof(GrainCollectionOptions);
-        private GrainCollectionOptions options;
-        public GrainCollectionOptionsFormatter(IOptions<GrainCollectionOptions> options)
-        {
-            this.options = options.Value;
-        }
-
-        public IEnumerable<string> Format()
-        {
-            var formated = new List<string>()
-            {
-                OptionFormattingUtilities.Format(nameof(this.options.CollectionQuantum), this.options.CollectionQuantum),
-                OptionFormattingUtilities.Format(nameof(this.options.CollectionAge), this.options.CollectionAge),
-            };
-            foreach(KeyValuePair<string, TimeSpan> classCollectionAge in this.options.ClassSpecificCollectionAge)
-            {
-                formated.Add(OptionFormattingUtilities.Format($"{nameof(this.options.CollectionAge)}.{classCollectionAge.Key}", classCollectionAge.Value));
-            }
-            return formated;
-        }
-    }
 }

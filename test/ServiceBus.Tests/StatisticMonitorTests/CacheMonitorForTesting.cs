@@ -15,14 +15,8 @@ namespace ServiceBus.Tests.MonitorTests
 {
     public class CacheMonitorForTesting : ICacheMonitor
     {
-        public static CacheMonitorForTesting Instance = new CacheMonitorForTesting();
-        public CacheMonitorCounters CallCounters;
-
-        private CacheMonitorForTesting()
-        {
-            this.CallCounters = new CacheMonitorCounters();
-        }
-
+        public CacheMonitorCounters CallCounters { get; } = new CacheMonitorCounters();
+        
         public void TrackCachePressureMonitorStatusChange(string pressureMonitorType, bool underPressure, double? cachePressureContributionCount, double? currentPressure,
             double? flowControlThreshold)
         {
@@ -63,12 +57,12 @@ namespace ServiceBus.Tests.MonitorTests
     [Serializable]
     public class CacheMonitorCounters
     {
-        public int TrackCachePressureMonitorStatusChangeCallCounter = 0;
-        public int ReportCacheSizeCallCounter = 0;
-        public int ReportMessageStatisticsCallCounter = 0;
-        public int TrackMemoryAllocatedCallCounter = 0;
-        public int TrackMemoryReleasedCallCounter = 0;
-        public int TrackMessageAddedCounter = 0;
-        public int TrackMessagePurgedCounter = 0;
+        public int TrackCachePressureMonitorStatusChangeCallCounter;
+        public int ReportCacheSizeCallCounter;
+        public int ReportMessageStatisticsCallCounter;
+        public int TrackMemoryAllocatedCallCounter;
+        public int TrackMemoryReleasedCallCounter;
+        public int TrackMessageAddedCounter;
+        public int TrackMessagePurgedCounter;
     }
 }

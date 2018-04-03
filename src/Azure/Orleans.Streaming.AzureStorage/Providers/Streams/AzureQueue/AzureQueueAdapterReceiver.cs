@@ -27,15 +27,15 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         public QueueId Id { get; }
 
-        public static IQueueAdapterReceiver Create(SerializationManager serializationManager, ILoggerFactory loggerFactory, QueueId queueId, string dataConnectionString, string deploymentId, IAzureQueueDataAdapter dataAdapter, TimeSpan? messageVisibilityTimeout = null)
+        public static IQueueAdapterReceiver Create(SerializationManager serializationManager, ILoggerFactory loggerFactory, QueueId queueId, string dataConnectionString, string serviceId, IAzureQueueDataAdapter dataAdapter, TimeSpan? messageVisibilityTimeout = null)
         {
             if (queueId == null) throw new ArgumentNullException(nameof(queueId));
             if (string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException(nameof(dataConnectionString));
-            if (string.IsNullOrEmpty(deploymentId)) throw new ArgumentNullException(nameof(deploymentId));
+            if (string.IsNullOrEmpty(serviceId)) throw new ArgumentNullException(nameof(serviceId));
             if (dataAdapter == null) throw new ArgumentNullException(nameof(dataAdapter));
             if (serializationManager == null) throw new ArgumentNullException(nameof(serializationManager));
 
-            var queue = new AzureQueueDataManager(loggerFactory, queueId.ToString(), deploymentId, dataConnectionString, messageVisibilityTimeout);
+            var queue = new AzureQueueDataManager(loggerFactory, queueId.ToString(), serviceId, dataConnectionString, messageVisibilityTimeout);
             return new AzureQueueAdapterReceiver(serializationManager, loggerFactory, queueId, queue, dataAdapter);
         }
 

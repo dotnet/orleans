@@ -1,5 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
-
+using Orleans.Configuration;
 using Orleans.Runtime.MembershipService;
 
 namespace Orleans.Hosting
@@ -8,11 +8,16 @@ namespace Orleans.Hosting
     internal class LegacySiloReminderConfigurationAdapter : ILegacyReminderTableAdapter
     {
         /// <inheritdoc />
-        public void Configure(object configuration, IServiceCollection services)
+        public void Configure(object configuration, ISiloHostBuilder builder)
         {
             var reader = new GlobalConfigurationReader(configuration);
             var connectionString = reader.GetPropertyValue<string>("DataConnectionStringForReminders");
-            services.UseAdoNetReminderService(connectionString);
+            var invariant = reader.GetPropertyValue<string>("AdoInvariantForReminders");
+            builder.UseAdoNetReminderService(options =>
+            {
+                options.ConnectionString = connectionString;
+                options.Invariant = invariant;
+            });
         }
     }
 }

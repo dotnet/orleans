@@ -9,7 +9,7 @@ using Orleans.TestingHost;
 using Orleans.Runtime.Configuration;
 using TestExtensions;
 using Orleans.Hosting;
-using Orleans.Storage;
+using Orleans.Configuration;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -23,7 +23,6 @@ namespace Tester.AzureUtils.Persistence
     [TestCategory("Persistence"), TestCategory("Azure")]
     public class PersistenceGrainTests_AzureBlobStore : Base_PersistenceGrainTests_AzureStore, IClassFixture<PersistenceGrainTests_AzureBlobStore.Fixture>
     {
-        public static Guid ServiceId = Guid.NewGuid();
         public class Fixture : BaseAzureTestClusterFixture
         {
             private class StorageSiloBuilderConfigurator : ISiloBuilderConfigurator
@@ -33,32 +32,35 @@ namespace Tester.AzureUtils.Persistence
                     hostBuilder.AddAzureBlobGrainStorage("AzureStore", (AzureBlobStorageOptions options) =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                    });
-                    hostBuilder.AddAzureBlobGrainStorage("AzureStore1", (AzureBlobStorageOptions options) =>
+                    })
+                    .AddAzureBlobGrainStorage("AzureStore1", (AzureBlobStorageOptions options) =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                    });
-                    hostBuilder.AddAzureBlobGrainStorage("AzureStore2", (AzureBlobStorageOptions options) =>
+                    })
+                    .AddAzureBlobGrainStorage("AzureStore2", (AzureBlobStorageOptions options) =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                    });
-                    hostBuilder.AddAzureBlobGrainStorage("AzureStore3", (AzureBlobStorageOptions options) =>
+                    })
+                    .AddAzureBlobGrainStorage("AzureStore3", (AzureBlobStorageOptions options) =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                    });
+                    })
+                    .AddAzureBlobGrainStorage("GrainStorageForTest", (AzureBlobStorageOptions options) =>
+                    {
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    })
+                    .AddMemoryGrainStorage("MemoryStore");
                 }
             }
 
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                
                 builder.Options.InitialSilosCount = 4;
                 builder.Options.UseTestClusterMembership = false;
                 builder.ConfigureLegacyConfiguration(legacy =>
                 {
+                    legacy.ClusterConfiguration.Globals.ServiceId = Guid.NewGuid();
                     legacy.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
-
-                    legacy.ClusterConfiguration.Globals.ServiceId = ServiceId;
                     legacy.ClusterConfiguration.Globals.MaxResendCount = 0;
 
                     legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test1");
@@ -66,8 +68,7 @@ namespace Tester.AzureUtils.Persistence
                         new Dictionary<string, string> {{"Config1", "1"}, {"Config2", "2"}});
                     legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.ErrorInjectionStorageProvider>("ErrorInjector");
                     legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("lowercase");
-
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+                    
                 });
                 builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
                 builder.AddSiloBuilderConfigurator<StorageSiloBuilderConfigurator>();
@@ -75,7 +76,7 @@ namespace Tester.AzureUtils.Persistence
             }
         }
 
-        public PersistenceGrainTests_AzureBlobStore(ITestOutputHelper output, Fixture fixture) : base(output, fixture, ServiceId)
+        public PersistenceGrainTests_AzureBlobStore(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
         {
             fixture.EnsurePreconditionsMet();
         }

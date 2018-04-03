@@ -1,4 +1,4 @@
-# Microsoft Orleans Changelog
+## Microsoft Orleans Changelog
 
 All notable end-user facing changes are documented in this file.
 
@@ -6,6 +6,131 @@ All notable end-user facing changes are documented in this file.
 
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
+
+### [2.0.0] (changes since 2.0.0-rc2)
+
+- Major changes
+  - All included providers obtain ServiceId and ClusterId from the global ClusterOptions and do not have those properties on their own options classes (#4235, #4277, #4290)
+  - Use string for ServiceId instead of Guid (#4262)
+
+- Breaking changes
+  - WithCodeGeneration: accept ILoggerFactory instead of ILogger (#4204)
+  - Remove Service Fabric configuration helpers & update sample (#4234)
+  - Disable packaging of Orleans.Clustering.ServiceFabric (#4259)
+  - Stop packaging Microsoft.Orleans.OrleansGCPUtils (#4330)
+
+- Non-breaking improvements
+  - Add serialization methods to RulesViolationException (#4215)
+  - CodeGen: only filter out generated types where the generator is Orleans (#4249)
+  - Add simple retry functionality to IClusterClient.Connect(...) (#4161)
+  - Grain call filters: add distinction between InterfaceMethod and ImplementationMethod (#4216)
+  - Improves ADO.NET script finding by moving them to project directory (#4243)
+  - protobuf-net serializer (#4170)
+  - Improve startup time for localhost cluster. (#4245)
+  - Client typemap refresh (#4257)
+  - Conditionally include @(Compile) cache file (#4258)
+  - Enable SystemTarget routing in the Gateway (#4254)
+  - Add config option to override MessagingOptions.ResponseTimeout when the debugger is attached (#4193, #4307)
+  - Remove [Obsolete] attributes from most legacy types (#4255)
+  - Orleans.TestingHost: support for .NET Standard (#4223)
+  - Add validation for pubsubstore when using persistent streams (#4273)
+  - Clean up EH checkpointing (#4271)
+  - Improve error message when attempting to use reminders without configuring a reminder table (#4287)
+  - Ported log consistency providers from IProvider. (#4292)
+  - Remove inconsistent sub builder pattern in streaming (#4289)
+  - DynamoDB transaction log (#4056)
+
+- Non-breaking bug fixes
+  - PerfCounterEnvironmentStatistics never reports CpuUsage (#4219)
+  - Fix ADO.NET Reminder configuration & re-enable tests (#4214)
+  - Register SiloClusteringValidator later so other validator will be called before (#4211)
+  - Fixes for Multi-Cluster Support (#3974)
+  - Change SQL parameter casing for Turkish parameter binding support on ODP .Net Managed (#4246)
+  - Fix race condition (#4269)
+  - Lease based queue balancer fixes (#4267)
+  - Fixed bug in custom storage log consistency provider factory. (#4323)
+
+### [2.0.0-rc2] (changes since 2.0.0-rc1)
+
+- Major changes
+  - A new "facade" API for easier configuration of various aspects of stream providers: Persistent stream configurators (#4164)
+
+- Breaking changes
+  - Align IClientBuilder APIs with ISiloHostBuilder (#4079)
+  - Rename MembershipOptions to ClusterMembershipOptions (#4145)
+  - Normalize cluster config & simplify binding IConfiguration to TOptions (#4136)
+
+- Non-breaking improvements
+  - Improve usability of dev cluster (#4090)
+  - Extensions should add their own application parts (#4091)
+  - Moved IStartupTask to Runtime.Abstractions package. Address #4106 (#4108)
+  - Improve configuration validators for ADO.NET configuration (#4097)
+  - In ActivationCountPlacementDirector, place locally if the cache is not populated yet (#4130)
+  - Improve usability of custom grain placement configuration (#4102)
+  - Remove legacy configuration requirement from Service Fabric hosting (#4138)
+  - Fix #4123: use List instead of IList in StaticGatewayListProviderOptions (#4147)
+  - Support treating all descendants of a base class as [Serializable] (#4133)
+  - Improve how grain services are registered (#4155)
+  - Do not call ResolveIPAddress in EndpointOptions constructor (#4171)
+  - When the silo shutdown, deactivate grain activations at an earlier stage (#4177)
+  - Improved transparancy and timing of silo lifecycle. (#4175)
+  - Set GrainService.Status to Started in the base implementation of StartInBackground(). (#4180)
+  - Validate that a ClusterId has been specified (#4160)
+
+- Non-breaking bug fixes
+  - ADO.NET: Fix formatting of generic class names in storage provider (#4140)
+  - Fix for PerfCounterEnvironmentStatistics never reports CpuUsage (#4148)
+  - Fix silo startup (#4135)
+  
+### [2.0.0-rc1] (changes since 2.0.0-beta3)
+
+- Major changes
+  - New provider lifecycle model to replace the old one (#3738, #3887, #3946, #3927, #4000, #4026, #4022, #4045, #4031, #4047, #4063, #4042, #4064, #4066, #4067, )
+  - Builder pattern and options-based configuration of components and extensions (#3897, #3900, #3878, #3901, #3947, #3972, #3977, #3948, #3963, #3981, #4020, #4025, #4024, #4030, #4035, #4029, #4022, #4031, #4049, #4064, #4066, #4070, #4067, #4074)
+
+- Breaking changes
+  - Allow reentrancy within a grain call chain (#3185, #3958). Enabled by default.
+  - Move legacy logging methods to legacy package (#3808)
+  - Rename "SQL" to "AdoNet" everywhere (#3990)
+  - Move ObserverSubscriptionManager to legacy (#3999)
+  - Remove metrics publishers (#3988)
+  - Make most methods of Grain class non-virtual. (#4004)
+  - Refactor EndpointOptions to allow listening on an address that is different from the externally reachable address  (#4005)
+  - Remove statistics table publishers (#4023)
+  - Add startup tasks to replace deprecated bootstrap providers (#4026)
+  - Remove FastKillOnCancel setting, add ProcessExitHandlingOptions (#4036)
+  - Configure default application parts if no assemblies have been added (#4058)
+
+- Non-breaking improvements
+  - Add processing time measure on silo start up sequence and code gen (#3788)
+  - Make buffer size bounded when reading connection preamble (#3818)
+  - Make UnObservedExceptionHandler optional (#3829)
+  - Display GrainId/type of SystemGrain and SystemTarget in GrainId.ToStringImpl (#3849)
+  - Disable debug context usage (#3861)
+  - Allow for null access/secret for EC2 provisioned credentials. (#3870)
+  - Bring back PerfCounterEnvironmentStatistics  (#3891)
+  - Expose RequestContextData in PlacementTarget (#3899)
+  - Mark all created threads as background & name all threads (#3902)
+  - Remove Newtonsoft.JSON dependency from core abstractions (#3926)
+  - Update Service Fabric to support .NET Standard (#3931)
+  - Dispose InboundMessageQueue during MessageCenter disposal (#3938)
+  - Removed uncessesary lock in LocalGrainDirectory (#3961)
+  - Add exception msg to WithTimeout method. Refactor MembershipTableFactory (#3962)
+  - Allow OrleansJsonSerializer to be used as an external serialization provider (#3960)
+  - Sanitize azure queue name (#4001)
+  - Outgoing grain call filters (#3842)
+
+- Non-breaking bug fixes
+  - Fix read lock on FileLogger & FileLogConsumer. and switch to UTF8 (#3856)
+  - Return the Cluster GrainInterfaceMap instead of the local one in InsideRuntimeClient (#3875)
+  - Remove locks in LoadedProviderTypeLoaders and ProviderTypeLoader that appear unnecessary and caused occasional deadlocks in tests. (#3914)
+  - TestCluster: set instance number for new Silo handles (#3939)
+  - Use UriBuilder in ToGatewayUri() (#3937)
+  - Fix deadlocks in AdoNet provider and tests caused by AdoNet driver implementations (#3163)
+  - Fix FastKillOnCancelKeyPress not stopping the process. (#3935)
+  - Fix logger exceptions (#3916)
+  - Sort list of silos in HashBasedPlacementDirector (#3964)
+  - Fix leasebasedbalancer bug (#4072)
 
 ### [2.0.0-beta3]
 

@@ -22,27 +22,4 @@ namespace Orleans.Configuration
         public TimeSpan DeploymentLoadPublisherRefreshTime { get; set; } = DEFAULT_DEPLOYMENT_LOAD_PUBLISHER_REFRESH_TIME;
         public static readonly TimeSpan DEFAULT_DEPLOYMENT_LOAD_PUBLISHER_REFRESH_TIME = TimeSpan.FromSeconds(1);
     }
-
-    public class SiloStatisticsOptionsFormatter : StatisticsOptionsFormatter, IOptionFormatter<SiloStatisticsOptions>
-    {
-        public string Name => nameof(SiloStatisticsOptions);
-
-        private readonly SiloStatisticsOptions options;
-
-        public SiloStatisticsOptionsFormatter(IOptions<SiloStatisticsOptions> options)
-            :base(options.Value)
-        {
-            this.options = options.Value;
-        }
-
-        public IEnumerable<string> Format()
-        {
-            List<string> format = base.FormatSharedOptions();
-            format.AddRange(new List<string>
-            {
-                OptionFormattingUtilities.Format(nameof(this.options.DeploymentLoadPublisherRefreshTime), this.options.DeploymentLoadPublisherRefreshTime)
-            });
-            return format;
-        }
-    }
 }

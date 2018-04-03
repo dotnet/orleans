@@ -44,6 +44,15 @@ namespace Orleans.LeaseProviders
             this.Token = token;
             this.StartTimeUtc = startTimeUtc;
         }
+
+        /// <summary>
+        /// Consructor
+        /// </summary>
+        /// <param name="resourceKey"></param>
+        public AcquiredLease(string resourceKey)
+        {
+            this.ResourceKey = resourceKey;
+        }
     }
 
     /// <summary>

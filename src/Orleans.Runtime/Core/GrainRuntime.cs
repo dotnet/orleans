@@ -13,8 +13,9 @@ namespace Orleans.Runtime
         private readonly ISiloRuntimeClient runtimeClient;
         private readonly ILoggerFactory loggerFactory;
         private readonly ILogger logger;
+
         public GrainRuntime(
-            IOptions<SiloOptions> siloOptions,
+            IOptions<ClusterOptions> clusterOptions,
             ILocalSiloDetails localSiloDetails,
             IGrainFactory grainFactory,
             ITimerRegistry timerRegistry,
@@ -25,7 +26,7 @@ namespace Orleans.Runtime
         {
             this.logger = loggerFactory.CreateLogger<GrainRuntime>();
             this.runtimeClient = runtimeClient;
-            ServiceId = siloOptions.Value.ServiceId;
+            ServiceId = clusterOptions.Value.ServiceId;
             SiloAddress = localSiloDetails.SiloAddress;
             SiloIdentity = SiloAddress.ToLongString();
             GrainFactory = grainFactory;
@@ -35,7 +36,7 @@ namespace Orleans.Runtime
             this.loggerFactory = loggerFactory;
         }
 
-        public Guid ServiceId { get; }
+        public string ServiceId { get; }
 
         public string SiloIdentity { get; }
 

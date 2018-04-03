@@ -1,11 +1,13 @@
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Extensions.Configuration;
 using Orleans.Runtime;
+using Orleans.Hosting;
+using Orleans;
+using Orleans.Configuration;
 using Orleans.Runtime.Configuration;
-using Orleans.ServiceBus.Providers;
 using Orleans.Streaming.EventHubs;
 using Orleans.TestingHost;
 using Tester.TestStreamProviders;
@@ -14,6 +16,8 @@ using Tester.StreamingTests;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
+using Orleans.Streams;
+using Orleans.ServiceBus.Providers;
 
 namespace ServiceBus.Tests.StreamingTests
 {
@@ -24,21 +28,6 @@ namespace ServiceBus.Tests.StreamingTests
         private const string StreamNamespace = "StreamNamespace";
         private const string EHPath = "ehorleanstest";
         private const string EHConsumerGroup = "orleansnightly";
-        private const string EHCheckpointTable = "ehcheckpoint";
-        private static readonly string CheckpointNamespace = Guid.NewGuid().ToString();
-
-        private static readonly Lazy<EventHubSettings> EventHubConfig = new Lazy<EventHubSettings>(() =>
-            new EventHubSettings(
-                TestDefaultConfiguration.EventHubConnectionString,
-                EHConsumerGroup, EHPath));
-
-        private static readonly EventHubStreamProviderSettings ProviderSettings =
-            new EventHubStreamProviderSettings(StreamProviderName);
-
-        private static readonly EventHubCheckpointerSettings CheckpointerSettings =
-            new EventHubCheckpointerSettings(TestDefaultConfiguration.DataConnectionString, EHCheckpointTable,
-                CheckpointNamespace,
-                TimeSpan.FromSeconds(10));
 
         private readonly ITestOutputHelper output;
         private readonly ClientStreamTestRunner runner;
@@ -53,17 +42,47 @@ namespace ServiceBus.Tests.StreamingTests
             builder.ConfigureLegacyConfiguration(legacy =>
             {
                 AdjustConfig(legacy.ClusterConfiguration);
-                AdjustConfig(legacy.ClientConfiguration);
             });
+            builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+            builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
         }
 
-        public override void Dispose()
+        private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            base.Dispose();
-            var dataManager = new AzureTableDataManager<TableEntity>(CheckpointerSettings.TableName, CheckpointerSettings.DataConnectionString, NullLoggerFactory.Instance);
-            dataManager.InitTableAsync().Wait();
-            dataManager.ClearTableAsync().Wait();
-            TestAzureTableStorageStreamFailureHandler.DeleteAll().Wait();
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder
+                    .AddPersistentStreams(StreamProviderName, TestEventHubStreamAdapterFactory.Create, b=>b
+                    .Configure<EventHubOptions>(ob => ob.Configure(options =>
+                      {
+                          options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                          options.ConsumerGroup = EHConsumerGroup;
+                          options.Path = EHPath;
+                      }))
+                    .ConfigureComponent<AzureTableStreamCheckpointerOptions, IStreamQueueCheckpointerFactory>(EventHubCheckpointerFactory.CreateFactory, ob => ob.Configure(options =>
+                    {
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.PersistInterval = TimeSpan.FromSeconds(10);
+                    })));
+                hostBuilder
+                    .AddMemoryGrainStorage("PubSubStore");
+            }
+        }
+
+        private class MyClientBuilderConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder
+                    .AddPersistentStreams(StreamProviderName, TestEventHubStreamAdapterFactory.Create, b=>
+                        b.Configure<EventHubOptions>(ob=>ob.Configure(
+                        options =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                            options.ConsumerGroup = EHConsumerGroup;
+                            options.Path = EHPath;
+                        })));
+            }
         }
 
         [Fact]
@@ -84,24 +103,7 @@ namespace ServiceBus.Tests.StreamingTests
         private static void AdjustConfig(ClusterConfiguration config)
         {
             // register stream provider
-            config.AddMemoryStorageProvider("PubSubStore");
-            config.Globals.RegisterStreamProvider<TestEventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
             config.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
-        }
-
-        private static void AdjustConfig(ClientConfiguration config)
-        {
-            config.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
-        }
-
-        private static Dictionary<string, string> BuildProviderSettings()
-        {
-            var settings = new Dictionary<string, string>();
-            // get initial settings from configs
-            ProviderSettings.WriteProperties(settings);
-            EventHubConfig.Value.WriteProperties(settings);
-            CheckpointerSettings.WriteProperties(settings);
-            return settings;
         }
     }
 }

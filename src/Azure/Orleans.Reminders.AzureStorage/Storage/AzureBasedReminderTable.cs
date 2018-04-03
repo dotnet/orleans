@@ -13,22 +13,26 @@ namespace Orleans.Runtime.ReminderService
         private readonly IGrainReferenceConverter grainReferenceConverter;
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
-        private readonly SiloOptions siloOptions;
+        private readonly ClusterOptions clusterOptions;
         private readonly AzureTableReminderStorageOptions storageOptions;
         private RemindersTableManager remTableManager;
 
-        public AzureBasedReminderTable(IGrainReferenceConverter grainReferenceConverter, ILoggerFactory loggerFactory, IOptions<SiloOptions> siloOptions, IOptions<AzureTableReminderStorageOptions> storageOptions)
+        public AzureBasedReminderTable(
+            IGrainReferenceConverter grainReferenceConverter, 
+            ILoggerFactory loggerFactory, 
+            IOptions<ClusterOptions> clusterOptions, 
+            IOptions<AzureTableReminderStorageOptions> storageOptions)
         {
             this.grainReferenceConverter = grainReferenceConverter;
             this.logger = loggerFactory.CreateLogger<AzureBasedReminderTable>();
             this.loggerFactory = loggerFactory;
-            this.siloOptions = siloOptions.Value;
+            this.clusterOptions = clusterOptions.Value;
             this.storageOptions = storageOptions.Value;
         }
 
         public async Task Init()
         {
-            this.remTableManager = await RemindersTableManager.GetManager(this.siloOptions.ServiceId, this.siloOptions.ClusterId, this.storageOptions.ConnectionString, this.loggerFactory);
+            this.remTableManager = await RemindersTableManager.GetManager(this.clusterOptions.ServiceId, this.clusterOptions.ClusterId, this.storageOptions.ConnectionString, this.loggerFactory);
         }
 
         #region Utility methods
@@ -73,7 +77,7 @@ namespace Orleans.Runtime.ReminderService
             }
             finally
             {
-                string serviceIdStr = ReminderTableEntry.ConstructServiceIdStr(this.remTableManager.ServiceId);
+                string serviceIdStr = this.remTableManager.ServiceId;
                 if (!tableEntry.ServiceId.Equals(serviceIdStr))
                 {
                     var error =
@@ -84,11 +88,10 @@ namespace Orleans.Runtime.ReminderService
             }
         }
 
-        private static ReminderTableEntry ConvertToTableEntry(ReminderEntry remEntry, Guid serviceId, string deploymentId)
+        private static ReminderTableEntry ConvertToTableEntry(ReminderEntry remEntry, string serviceId, string deploymentId)
         {
             string partitionKey = ReminderTableEntry.ConstructPartitionKey(serviceId, remEntry.GrainRef);
             string rowKey = ReminderTableEntry.ConstructRowKey(remEntry.GrainRef, remEntry.ReminderName);
-            string serviceIdStr = ReminderTableEntry.ConstructServiceIdStr(serviceId);
 
             var consistentHash = remEntry.GrainRef.GetUniformHashCode();
 
@@ -97,7 +100,7 @@ namespace Orleans.Runtime.ReminderService
                 PartitionKey = partitionKey,
                 RowKey = rowKey,
 
-                ServiceId = serviceIdStr,
+                ServiceId = serviceId,
                 DeploymentId = deploymentId,
                 GrainReference = remEntry.GrainRef.ToKeyString(),
                 ReminderName = remEntry.ReminderName,
@@ -172,7 +175,7 @@ namespace Orleans.Runtime.ReminderService
             try
             {
                 if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("UpsertRow entry = {0}", entry.ToString());
-                ReminderTableEntry remTableEntry = ConvertToTableEntry(entry, this.remTableManager.ServiceId, this.remTableManager.DeploymentId);
+                ReminderTableEntry remTableEntry = ConvertToTableEntry(entry, this.remTableManager.ServiceId, this.remTableManager.ClusterId);
 
                 string result = await this.remTableManager.UpsertRow(remTableEntry);
                 if (result == null)

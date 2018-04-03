@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using Orleans;
 using Orleans.TestingHost;
@@ -11,23 +10,20 @@ using UnitTests.StreamingTests;
 using Xunit;
 using Xunit.Abstractions;
 using System.Threading.Tasks;
-using Orleans.Runtime.TestHooks;
-using Orleans.Runtime;
+using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 
 namespace UnitTests.Streaming
 {
-    public class StreamProvidersTests_ProviderConfigNotLoaded : OrleansTestingBase, IClassFixture<StreamProvidersTests_ProviderConfigNotLoaded.Fixture>
+    public class StreamProvidersTests_ProviderConfigNotLoaded : IClassFixture<StreamProvidersTests_ProviderConfigNotLoaded.Fixture>
     {
-
-        private static readonly Guid ServiceId = Guid.NewGuid();
-
         public class Fixture : BaseTestClusterFixture
         {
-            public ClusterConfiguration ClusterConfiguration { get; set; }
+            public string ServiceId { get; set; }
 
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
+                this.ServiceId = builder.Options.ServiceId;
                 builder.Options.InitialSilosCount = 4;
                 builder.ConfigureLegacyConfiguration(legacy =>
                 {
@@ -35,11 +31,16 @@ namespace UnitTests.Streaming
                     legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test2");
                     legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.ErrorInjectionStorageProvider>("ErrorInjector");
                     legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("lowercase");
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                    legacy.ClusterConfiguration.Globals.ServiceId = ServiceId;
-
-                    this.ClusterConfiguration = legacy.ClusterConfiguration;
                 });
+                builder.AddSiloBuilderConfigurator<SiloHostConfigurator>();
+            }
+
+            public class SiloHostConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder.AddMemoryGrainStorage("MemoryStore");
+                }
             }
         }
 
@@ -67,20 +68,20 @@ namespace UnitTests.Streaming
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("ServiceId"), TestCategory("Providers")]
         public async Task ServiceId_ProviderRuntime()
         {
-            Guid thisRunServiceId = this.fixture.ClusterConfiguration.Globals.ServiceId;
+            var thisRunServiceId = this.fixture.ServiceId;
 
             SiloHandle siloHandle = this.HostedCluster.GetActiveSilos().First();
-            Guid serviceId = await this.fixture.Client.GetTestHooks(siloHandle).GetServiceId();
+            var serviceId = await this.fixture.Client.GetTestHooks(siloHandle).GetServiceId();
             Assert.Equal(thisRunServiceId, serviceId);  // "ServiceId active in silo"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("ServiceId")]
         public async Task ServiceId_SiloRestart()
         {
-            Guid configServiceId = this.fixture.ClusterConfiguration.Globals.ServiceId;
-            output.WriteLine("ServiceId={0}", ServiceId);
+            var configServiceId = this.fixture.GetClientServiceId();
+            output.WriteLine("ServiceId={0}", this.fixture.ServiceId);
 
-            Assert.Equal(ServiceId, configServiceId);  // "ServiceId in test config"
+            Assert.Equal(this.fixture.ServiceId, configServiceId);  // "ServiceId in test config"
 
             output.WriteLine("About to reset Silos .....");
             output.WriteLine("Restarting Silos ...");
@@ -91,14 +92,15 @@ namespace UnitTests.Streaming
             }
 
             output.WriteLine("..... Silos restarted");
+            
+            var activeSilos = this.HostedCluster.GetActiveSilos().ToArray();
+            Assert.True(activeSilos.Length > 0);
 
-            output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.Options.ClusterId, this.fixture.ClusterConfiguration.Globals.ServiceId);
-
-            Assert.Equal(ServiceId, this.fixture.ClusterConfiguration.Globals.ServiceId);  // "ServiceId same after restart."
-
-            SiloHandle siloHandle = this.HostedCluster.GetActiveSilos().First();
-            Guid serviceId = await this.fixture.Client.GetTestHooks(siloHandle).GetServiceId();
-            Assert.Equal(ServiceId, serviceId);  // "ServiceId active in silo"
+            foreach (var siloHandle in activeSilos)
+            {
+                var serviceId = await this.fixture.Client.GetTestHooks(siloHandle).GetServiceId();
+                Assert.Equal(this.fixture.ServiceId, serviceId); // "ServiceId active in silo"
+            }
         }
     }
 
@@ -109,15 +111,17 @@ namespace UnitTests.Streaming
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.Options.InitialSilosCount = 4;
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
+                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+            }
 
-                    legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
-                    legacy.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData",
-                        fireAndForgetDelivery: false,
-                        optimizeForImmutableData: false);
-                });
+            public class SiloConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME)
+                        .AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData", options => options.OptimizeForImmutableData = false)
+                        .AddMemoryGrainStorage("MemoryStore", op => op.NumStorageGrains = 1);
+                }
             }
         }
 

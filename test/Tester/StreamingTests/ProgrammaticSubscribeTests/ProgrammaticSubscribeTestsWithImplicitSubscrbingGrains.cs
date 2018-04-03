@@ -3,6 +3,9 @@ using Orleans.Streams;
 using Orleans.TestingHost;
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Orleans;
+using Orleans.Hosting;
 using TestExtensions;
 using Xunit;
 using UnitTests.Grains.ProgrammaticSubscribe;
@@ -18,21 +21,29 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
-                    legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-                    legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamProviderName,
-                        false,
-                        true,
-                        StreamPubSubType.ImplicitOnly);
-                    legacy.ClientConfiguration.AddSimpleMessageStreamProvider(StreamProviderName,
-                        false,
-                        true,
-                        StreamPubSubType.ImplicitOnly);
-                });
+                builder.AddClientBuilderConfigurator<ClientConfiguretor>();
+                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             }
         }
+
+        public class SiloConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder.AddSimpleMessageStreamProvider(StreamProviderName,options => options.PubSubType = StreamPubSubType.ImplicitOnly)
+                            .AddMemoryGrainStorageAsDefault()
+                            .AddMemoryGrainStorage("PubSubStore");
+            }
+        }
+
+        public class ClientConfiguretor : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder.AddSimpleMessageStreamProvider(StreamProviderName, options => options.PubSubType = StreamPubSubType.ImplicitOnly);
+            }
+        }
+
 
         public ProgrammaticSubscribeTestsWithImplicitSubscrbingGrains(Fixture fixture)
         {

@@ -23,12 +23,16 @@ namespace Orleans.Runtime.MembershipService
         private OrleansSiloInstanceManager tableManager;
         private readonly AzureStorageClusteringOptions options;
         private readonly string clusterId;
-        public AzureBasedMembershipTable(ILoggerFactory loggerFactory, IOptions<AzureStorageClusteringOptions> membershipOptions, IOptions<SiloOptions> siloOptions)
+
+        public AzureBasedMembershipTable(
+            ILoggerFactory loggerFactory, 
+            IOptions<AzureStorageClusteringOptions> clusteringOptions, 
+            IOptions<ClusterOptions> clusterOptions)
         {
             this.loggerFactory = loggerFactory;
             logger = loggerFactory.CreateLogger<AzureBasedMembershipTable>();
-            this.options = membershipOptions.Value;
-            this.clusterId = siloOptions.Value.ClusterId;
+            this.options = clusteringOptions.Value;
+            this.clusterId = clusterOptions.Value.ClusterId;
         }
 
         public async Task InitializeMembershipTable(bool tryInitTableVersion)

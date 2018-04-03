@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using Microsoft.Extensions.Options;
 
 namespace Orleans.Configuration
 {
@@ -21,26 +18,5 @@ namespace Orleans.Configuration
         /// </summary>
         public int LoadSheddingLimit { get; set; } = DEFAULT_LOAD_SHEDDING_LIMIT;
         public const int DEFAULT_LOAD_SHEDDING_LIMIT = 95;
-    }
-
-    public class LoadSheddingOptionsFormatter : IOptionFormatter<LoadSheddingOptions>
-    {
-        public string Name => nameof(LoadSheddingOptions);
-
-        private readonly LoadSheddingOptions options;
-
-        public LoadSheddingOptionsFormatter(IOptions<LoadSheddingOptions> options)
-        {
-            this.options = options.Value;
-        }
-
-        public IEnumerable<string> Format()
-        {
-            return new List<string>()
-            {
-                OptionFormattingUtilities.Format(nameof(this.options.LoadSheddingEnabled), this.options.LoadSheddingEnabled),
-                OptionFormattingUtilities.Format(nameof(this.options.LoadSheddingLimit), this.options.LoadSheddingLimit),
-            };
-        }
     }
 }

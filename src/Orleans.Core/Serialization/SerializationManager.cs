@@ -354,6 +354,7 @@ namespace Orleans.Serialization
         /// For instance, abstract base types and interfaces need to be registered this way.
         /// </summary>
         /// <param name="t">Type to be registered.</param>
+        /// <param name="typeKey">Type key to associate with the type.</param>
         private void Register(Type t, string typeKey = null)
         {
             string name = typeKey ?? t.OrleansTypeKeyString();

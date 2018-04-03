@@ -41,7 +41,7 @@ namespace Tests.GeoClusterTests
             await fixture.RunChecksOnGrainClass("TestGrains.GsiLogTestGrain", true, phases, output);
         }
 
-        [SkippableFact]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4293"), TestCategory("Functional")]
         public async Task TestBattery_MemoryStorageProvider()
         {
             await fixture.RunChecksOnGrainClass("TestGrains.LogTestGrainMemoryStorage", true, phases, output);

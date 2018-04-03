@@ -37,8 +37,7 @@ namespace Orleans.Counter.Control
             IsRunningAsAdministrator = userPrincipal.IsInRole(WindowsBuiltInRole.Administrator);
 
             var parts = new ApplicationPartManager();
-            parts.AddFromAppDomain()
-                .AddFromApplicationBaseDirectory()
+            parts.ConfigureDefaults()
                 .AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainClassFeature>());
             var grainClassFeature = parts.CreateAndPopulateFeature<GrainClassFeature>();
 

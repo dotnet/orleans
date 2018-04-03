@@ -730,8 +730,44 @@ namespace UnitTests.Grains
         }
     }
 
+    public interface IReducer<TState, TAction>
+    {
+        Task<TState> Handle(TState prevState, TAction act);
+    }
 
 
+    [Serializable]
+    public class Reducer1Action { }
+
+    [Serializable]
+    public class Reducer2Action { }
+
+    public class Reducer1 : IReducer<string, Reducer1Action>
+    {
+        public Task<string> Handle(string prevState, Reducer1Action act) => Task.FromResult(prevState + act);
+    }
+
+    public class Reducer2 : IReducer<Int32, Reducer2Action>
+    {
+        public Task<int> Handle(int prevState, Reducer2Action act) => Task.FromResult(prevState + act.ToString().Length);
+    }
+
+    public interface IReducerGameGrain<TState, TAction> : IGrainWithStringKey
+    {
+        Task<TState> Go(TState prevState, TAction act);
+    }
+
+    public class ReducerGameGrain<TState, TAction> : Grain, IReducerGameGrain<TState, TAction>
+    {
+        private readonly IReducer<TState, TAction> reducer;
+
+        public ReducerGameGrain(IReducer<TState, TAction> reducer)
+        {
+            this.reducer = reducer;
+        }
+
+        public Task<TState> Go(TState prevState, TAction act) => this.reducer.Handle(prevState, act);
+    }
 
     namespace Generic.EdgeCases
     {

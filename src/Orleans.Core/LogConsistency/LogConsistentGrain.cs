@@ -54,11 +54,11 @@ namespace Orleans.LogConsistency
         public override void Participate(IGrainLifecycle lifecycle)
         {
             base.Participate(lifecycle);
-            lifecycle.Subscribe(GrainLifecycleStage.SetupState, OnSetupState);
+            lifecycle.Subscribe<ClientOptionsLogger>(GrainLifecycleStage.SetupState, OnSetupState);
             if(this is ILogConsistencyProtocolParticipant)
             {
-                lifecycle.Subscribe(GrainLifecycleStage.Activate - 1, PreActivate);
-                lifecycle.Subscribe(GrainLifecycleStage.Activate + 1, PostActivate);
+                lifecycle.Subscribe<LogConsistentGrain<TView>>(GrainLifecycleStage.Activate - 1, PreActivate);
+                lifecycle.Subscribe<LogConsistentGrain<TView>>(GrainLifecycleStage.Activate + 1, PostActivate);
             }
         }
 
@@ -103,8 +103,8 @@ namespace Orleans.LogConsistency
             var attr = this.GetType().GetTypeInfo().GetCustomAttributes<LogConsistencyProviderAttribute>(true).FirstOrDefault();
 
             ILogViewAdaptorFactory defaultFactory = attr != null
-                ? this.ServiceProvider.GetServiceByName<ILogConsistencyProvider>(attr.ProviderName)
-                : this.ServiceProvider.GetService<ILogConsistencyProvider>();
+                ? this.ServiceProvider.GetServiceByName<ILogViewAdaptorFactory>(attr.ProviderName)
+                : this.ServiceProvider.GetService<ILogViewAdaptorFactory>();
             if (attr != null && defaultFactory == null)
             {
                 var errMsg = attr != null

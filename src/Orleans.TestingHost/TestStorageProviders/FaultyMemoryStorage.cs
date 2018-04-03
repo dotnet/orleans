@@ -1,47 +1,60 @@
 ﻿
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Configuration;
+using Orleans.Hosting;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Storage;
 
 namespace Orleans.TestingHost
 {
-    /// <summary>
-    /// A memory storage provider that supports injection of storage exceptions.
-    /// </summary>
-    public class FaultyMemoryStorage : FaultInjectionStorageProvider<MemoryStorage>
-    {
-    }
-
-    /// <summary>
-    /// Extension methods for configuring a FaultyMemoryStorage 
-    /// </summary>
-    public static class FaultInjectionStorageProviderConfigurationExtensions
+    public static class SiloHostBuilderExtensions
     {
         /// <summary>
-        /// Adds a storage provider of type <see cref="FaultyMemoryStorage"/>
+        /// Configure silo to use FaultInjectionMemoryStorage
         /// </summary>
-        /// <param name="config">The cluster configuration object to add provider to.</param>
-        /// <param name="providerName">The provider name.</param>
-        /// <param name="numStorageGrains">The number of storage grains to use.</param>
-        /// <param name="delayMilliseconds">A delay to add to each access, in milliseconds</param>
-        public static void AddFaultyMemoryStorageProvider(
-            this ClusterConfiguration config,
-            string providerName = "FaultyMemoryStore",
-            int numStorageGrains = MemoryStorage.NumStorageGrainsDefaultValue,
-            int delayMilliseconds = 0)
+        public static ISiloHostBuilder AddFaultInjectionMemoryStorage(this ISiloHostBuilder builder, string name, Action<MemoryGrainStorageOptions> configureOptions,
+            Action<FaultInjectionGrainStorageOptions> configureFaultInjecitonOptions)
         {
-            //TODO: find a way to share the provider configuration setup so we don't have duplicate code.
+            return builder.ConfigureServices(services => services.AddFaultInjectionMemoryStorage(name,
+                ob => ob.Configure(configureOptions), faultOb => faultOb.Configure(configureFaultInjecitonOptions)));
+        }
 
-            if (string.IsNullOrWhiteSpace(providerName)) throw new ArgumentNullException(nameof(providerName));
+        /// <summary>
+        /// Configure silo to use FaultInjectionMemoryStorage
+        /// </summary>
+        public static ISiloHostBuilder AddFaultInjectionMemoryStorage(this ISiloHostBuilder builder, string name, Action<OptionsBuilder<MemoryGrainStorageOptions>> configureOptions = null,
+            Action<OptionsBuilder<FaultInjectionGrainStorageOptions>> configureFaultInjecitonOptions = null)
+        {
+            return builder.ConfigureServices(services => services.AddFaultInjectionMemoryStorage(name,
+               configureOptions, configureFaultInjecitonOptions));
+        }
 
-            var properties = new Dictionary<string, string>
-            {
-                { MemoryStorage.NumStorageGrainsPropertyName, numStorageGrains.ToString() },
-                { FaultyMemoryStorage.DelayMillisecondsPropertyName, delayMilliseconds.ToString() },
-            };
+        /// <summary>
+        /// Configure silo to use FaultInjectionMemoryStorage
+        /// </summary>
+        public static IServiceCollection AddFaultInjectionMemoryStorage(this IServiceCollection services, string name, Action<MemoryGrainStorageOptions> configureOptions,
+            Action<FaultInjectionGrainStorageOptions> configureFaultInjecitonOptions)
+        {
+            return services.AddFaultInjectionMemoryStorage(name,
+                ob => ob.Configure(configureOptions), faultOb => faultOb.Configure(configureFaultInjecitonOptions));
+        }
 
-            config.Globals.RegisterStorageProvider<FaultyMemoryStorage>(providerName, properties);
+        /// <summary>
+        /// Configure silo to use FaultInjectionMemoryStorage
+        /// </summary>
+        public static IServiceCollection AddFaultInjectionMemoryStorage(this IServiceCollection services,string name, Action<OptionsBuilder<MemoryGrainStorageOptions>> configureOptions = null,
+            Action<OptionsBuilder<FaultInjectionGrainStorageOptions>> configureFaultInjecitonOptions = null)
+        {
+            configureOptions?.Invoke(services.AddOptions<MemoryGrainStorageOptions>(name));
+            configureFaultInjecitonOptions?.Invoke(services.AddOptions<FaultInjectionGrainStorageOptions>(name));
+            services.ConfigureNamedOptionForLogging<MemoryGrainStorageOptions>(name);
+            services.ConfigureNamedOptionForLogging<FaultInjectionGrainStorageOptions>(name);
+            services.AddSingletonNamedService<IGrainStorage>(name, (svc, n) => FaultInjectionGrainStorageFactory.Create(svc, n, MemoryGrainStorageFactory.Create))
+                .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainStorage>(n)); ;
+            return services;
         }
     }
 

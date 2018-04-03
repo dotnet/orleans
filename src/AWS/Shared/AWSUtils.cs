@@ -11,6 +11,8 @@ namespace Orleans.Reminders.DynamoDB
 namespace Orleans.Streaming.SQS
 #elif AWSUTILS_TESTS
 namespace Orleans.AWSUtils.Tests
+#elif TRANSACTIONS_DYNAMODB
+namespace Orleans.Transactions.DynamoDB
 #else
 // No default namespace intentionally to cause compile errors if something is not defined
 #endif

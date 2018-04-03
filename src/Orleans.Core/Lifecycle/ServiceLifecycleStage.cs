@@ -37,12 +37,20 @@ namespace Orleans
         public const int ApplicationServices = 10000;
 
         /// <summary>
+        /// Service will be active after this step.
+        /// It should only be used by the memebrship oracle 
+        /// and the gateway, no other component should run
+        /// at this stage
+        /// </summary>
+        public const int BecomeActive = Active-1;
+
+        /// <summary>
         /// Service is active.
         /// </summary>
         public const int Active = 20000;
 
         /// <summary>
-        /// First stage in service's lifecycle
+        /// Last stage in service's lifecycle
         /// </summary>
         public const int Last = int.MaxValue;
     }

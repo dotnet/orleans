@@ -725,6 +725,7 @@ namespace Orleans.Runtime
         /// <param name="builder">The <see cref="StringBuilder"/> to append results to.</param>
         /// <param name="typeArguments">The type arguments of <paramref name="type"/>.</param>
         /// <param name="options">The type formatting options.</param>
+        /// <param name="getNameFunc">Delegate that returns name for a type.</param>
         private static void GetParseableName(
             Type type,
             StringBuilder builder,

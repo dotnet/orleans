@@ -14,7 +14,6 @@ namespace Orleans.Logging.Legacy
     /// <see cref="ICloseableLogConsumer"/>, <see cref="IFlushableLogConsumer"/>, <see cref="Severity"/>. 
     /// LegacyOrleansLoggerProvider also supports configuration on those legacy features.
     /// </summary>
-    [Obsolete(OrleansLoggingUtils.ObsoleteMessageString)]
     public class LegacyOrleansLoggerProvider : ILoggerProvider
     {
         /// <summary>
@@ -71,7 +70,6 @@ namespace Orleans.Logging.Legacy
     /// <summary>
     /// Orleans severity overrides on a per logger base
     /// </summary>
-    [Obsolete("Use Microsoft.Extensions.Logging.LoggerFilterRule")]
     public class OrleansLoggerSeverityOverrides
     {
         /// <summary>

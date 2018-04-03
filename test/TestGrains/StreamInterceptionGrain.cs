@@ -6,7 +6,7 @@ using UnitTests.GrainInterfaces;
 namespace UnitTests.Grains
 {
     [ImplicitStreamSubscription("InterceptedStream")]
-    public class StreamInterceptionGrain : Grain, IStreamInterceptionGrain, IGrainCallFilter
+    public class StreamInterceptionGrain : Grain, IStreamInterceptionGrain, IIncomingGrainCallFilter
     {
         private int lastStreamValue;
         
@@ -25,7 +25,7 @@ namespace UnitTests.Grains
 
         public Task<int> GetLastStreamValue() => Task.FromResult(this.lastStreamValue);
 
-        public async Task Invoke(IGrainCallContext context)
+        public async Task Invoke(IIncomingGrainCallContext context)
         {
             var initialLastStreamValue = this.lastStreamValue;
             await context.Invoke();

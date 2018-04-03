@@ -62,8 +62,8 @@ namespace Orleans.Hosting
         public static IServiceCollection UseAzureTableReminderService(this IServiceCollection services, Action<AzureTableReminderStorageOptions> configure)
         {
             services.AddSingleton<IReminderTable, AzureBasedReminderTable>();
-            services.Configure(configure);
-            services.TryConfigureFormatter<AzureTableReminderStorageOptions, AzureTableReminderStorageOptionsFormatter>();
+            services.Configure<AzureTableReminderStorageOptions>(configure);
+            services.ConfigureFormatter<AzureTableReminderStorageOptions>();
             return services;
         }
 

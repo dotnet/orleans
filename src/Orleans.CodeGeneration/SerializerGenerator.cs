@@ -24,8 +24,8 @@ namespace Orleans.CodeGenerator
     /// [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Orleans-CodeGenerator", "2.0.0.0"), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute, global::Orleans.CodeGeneration.SerializerAttribute(typeof(global::MyType))]
     /// internal sealed class OrleansCodeGenUnitTests_GrainInterfaces_MyTypeSerializer
     /// {
-    ///    private readonly global::System.Func<global::MyType, global::System.Int32> getField0;
-    ///    private readonly global::System.Action<global::MyType, global::System.Int32> setField0;
+    ///    private readonly global::System.Func&lt;global::MyType, global::System.Int32&gt; getField0;
+    ///    private readonly global::System.Action&lt;global::MyType, global::System.Int32&gt; setField0;
     ///    public OrleansCodeGenUnitTests_GrainInterfaces_MyTypeSerializer(global::Orleans.Serialization.IFieldUtils fieldUtils)
     ///    {
     ///        [...]

@@ -1,9 +1,12 @@
+using System;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Orleans;
+using Orleans.Hosting;
 using Orleans.Providers.GCP.Streams.PubSub;
 using Orleans.Runtime.Configuration;
 using Orleans.Storage;
 using Orleans.TestingHost;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using TestExtensions;
 using UnitTests.Streaming;
 using UnitTests.StreamingTests;
@@ -24,26 +27,42 @@ namespace GoogleUtils.Tests.Streaming
                 throw new SkipException("Google PubSub Simulator not available");
             }
 
-            builder.ConfigureLegacyConfiguration(legacy =>
+            builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+            builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
+        }
+
+        private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
             {
-                //from the config files
-                legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
-                legacy.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProvider", fireAndForgetDelivery: false);
-                legacy.ClientConfiguration.AddSimpleMessageStreamProvider("SMSProvider", fireAndForgetDelivery: false);
+                hostBuilder
+                    .AddMemoryGrainStorage("MemoryStore", op => op.NumStorageGrains = 1)
+                    .AddMemoryGrainStorage("PubSubStorage")
+                    .AddSimpleMessageStreamProvider("SMSProvider")
+                    .AddPubSubStreams<PubSubDataAdapter>(PUBSUB_STREAM_PROVIDER_NAME, b=>
+                        b.ConfigurePubSub(ob=>ob.Configure(options =>
+                        {
+                            options.ProjectId = GoogleTestUtils.ProjectId;
+                            options.TopicId = GoogleTestUtils.TopicId;
+                            options.Deadline = TimeSpan.FromSeconds(600);
+                        })));
+            }
+        }
 
-                var providerSettings = new Dictionary<string, string>
-                {
-                    {"ProjectId", GoogleTestUtils.ProjectId},
-                    {"TopicId", GoogleTestUtils.TopicId},
-                    {"DeploymentId", GoogleTestUtils.DeploymentId.ToString()},
-                    {"Deadline", "600"},
-                    //{ "CustomEndpoint", "localhost:8085" }
-                };
-
-                legacy.ClientConfiguration.RegisterStreamProvider<PubSubStreamProvider>(PUBSUB_STREAM_PROVIDER_NAME, providerSettings);
-                legacy.ClusterConfiguration.Globals.RegisterStreamProvider<PubSubStreamProvider>(PUBSUB_STREAM_PROVIDER_NAME, providerSettings);
-                legacy.ClusterConfiguration.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
-            });
+        private class MyClientBuilderConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder
+                    .AddSimpleMessageStreamProvider("SMSProvider")
+                    .AddPubSubStreams<PubSubDataAdapter>(PUBSUB_STREAM_PROVIDER_NAME, b=>
+                        b.ConfigurePubSub(ob=>ob.Configure(options =>
+                        {
+                            options.ProjectId = GoogleTestUtils.ProjectId;
+                            options.TopicId = GoogleTestUtils.TopicId;
+                            options.Deadline = TimeSpan.FromSeconds(600);
+                        })));
+            }
         }
 
         public PubSubStreamTests()

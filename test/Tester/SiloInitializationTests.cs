@@ -27,6 +27,7 @@ namespace Tester
             try
             {
                 var config = ClusterConfiguration.LocalhostPrimarySilo();
+                config.Globals.ClusterId = Guid.NewGuid().ToString();
                 var originalLivenessType = config.Globals.LivenessType;
                 var originalMembershipAssembly = config.Globals.MembershipTableAssembly;
 

@@ -32,8 +32,11 @@ namespace Orleans
         /// Starts the client and connects to the configured cluster.
         /// </summary>
         /// <remarks>This method may be called at-most-once per instance.</remarks>
+        /// <param name="retryFilter">
+        /// An optional delegate which determines whether or not the initial connection attempt should be retried.
+        /// </param>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
-        Task Connect();
+        Task Connect(Func<Exception, Task<bool>> retryFilter = null);
 
         /// <summary>
         /// Stops the client gracefully, disconnecting from the cluster.

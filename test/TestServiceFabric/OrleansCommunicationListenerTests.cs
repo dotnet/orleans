@@ -12,15 +12,15 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Newtonsoft.Json;
 using NSubstitute;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Hosting.ServiceFabric;
-using Orleans.Runtime.Configuration;
 using Orleans.ServiceFabric;
 using Xunit;
 
 namespace TestServiceFabric
 {
-    [TestCategory("ServiceFabric")]
+    [TestCategory("ServiceFabric"), TestCategory("Functional")]
     public class OrleansCommunicationListenerTests
     {
         private readonly ICodePackageActivationContext activationContext = Substitute.For<ICodePackageActivationContext>();
@@ -33,7 +33,6 @@ namespace TestServiceFabric
             Dns.GetHostName());
 
         private readonly MockServiceContext serviceContext;
-        private readonly ClusterConfiguration clusterConfig = new ClusterConfiguration();
 
         public OrleansCommunicationListenerTests()
         {
@@ -58,7 +57,6 @@ namespace TestServiceFabric
 
             activationContext.GetEndpoints().Returns(_ => endpoints);
             
-            clusterConfig.Defaults.ConfigureServiceFabricSiloEndpoints(this.serviceContext);
             var listener = new OrleansCommunicationListener(
                 builder =>
                 {
@@ -69,9 +67,13 @@ namespace TestServiceFabric
                             services.Replace(ServiceDescriptor.Singleton<ISiloHost>(sp => Substitute.ForPartsOf<MockSiloHost>(sp)));
                         });
 
-                    // Our cluster configuration is what feeds the endpoint info, so add it.
-                    builder.UseConfiguration(this.clusterConfig);
                     builder.ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory());
+                    builder.UseLocalhostClustering();
+                    builder.Configure<EndpointOptions>(options =>
+                    {
+                        options.SiloPort = 9082;
+                        options.GatewayPort = 8888;
+                    });
                 });
             
             var result = await listener.OpenAsync(CancellationToken.None);
@@ -97,23 +99,6 @@ namespace TestServiceFabric
         }
 
         [Fact]
-        public void MissingEndpointsCauseException()
-        {
-            var endpoints = new EndpointsCollection();
-            activationContext.GetEndpoints().Returns(_ => endpoints);
-
-            // Check for the silo endpoint.
-            var exception = Assert.Throws<KeyNotFoundException>(() => this.clusterConfig.Defaults.ConfigureServiceFabricSiloEndpoints(this.serviceContext));
-            var siloEndpointName = ServiceFabricConstants.SiloEndpointName;
-            Assert.Contains(siloEndpointName, exception.Message);
-
-            // Check for the proxy endpoint.
-            endpoints.Add(CreateEndpoint(siloEndpointName, 9082));
-            exception = Assert.Throws<KeyNotFoundException>(() => clusterConfig.Defaults.ConfigureServiceFabricSiloEndpoints(serviceContext));
-            Assert.Contains(ServiceFabricConstants.GatewayEndpointName, exception.Message);
-        }
-
-        [Fact]
         public async Task AbortStopAndDisposesSilo()
         {
             var endpoints = new EndpointsCollection
@@ -123,7 +108,6 @@ namespace TestServiceFabric
             };
 
             activationContext.GetEndpoints().Returns(_ => endpoints);
-            clusterConfig.Defaults.ConfigureServiceFabricSiloEndpoints(this.serviceContext);
             var listener = new OrleansCommunicationListener(
                 builder =>
                 {
@@ -134,9 +118,13 @@ namespace TestServiceFabric
                             services.Replace(ServiceDescriptor.Singleton<ISiloHost>(sp => Substitute.ForPartsOf<MockSiloHost>(sp)));
                         });
 
-                    // Our cluster configuration is what feeds the endpoint info, so add it.
-                    builder.UseConfiguration(this.clusterConfig);
                     builder.ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory());
+                    builder.Configure<EndpointOptions>(options =>
+                    {
+                        options.SiloPort = 9082;
+                        options.GatewayPort = 8888;
+                    });
+                    builder.UseLocalhostClustering();
                 });
 
             await listener.OpenAsync(CancellationToken.None);
@@ -158,7 +146,6 @@ namespace TestServiceFabric
             };
 
             activationContext.GetEndpoints().Returns(_ => endpoints);
-            clusterConfig.Defaults.ConfigureServiceFabricSiloEndpoints(this.serviceContext);
             var listener = new OrleansCommunicationListener(
                 builder =>
                 {
@@ -169,9 +156,13 @@ namespace TestServiceFabric
                             services.Replace(ServiceDescriptor.Singleton<ISiloHost>(sp => Substitute.ForPartsOf<MockSiloHost>(sp)));
                         });
 
-                    // Our cluster configuration is what feeds the endpoint info, so add it.
-                    builder.UseConfiguration(this.clusterConfig);
                     builder.ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory());
+                    builder.Configure<EndpointOptions>(options =>
+                    {
+                        options.SiloPort = 9082;
+                        options.GatewayPort = 8888;
+                    });
+                    builder.UseLocalhostClustering();
                 });
 
             await listener.OpenAsync(CancellationToken.None);

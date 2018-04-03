@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
-using Orleans.Providers;
 
 namespace Orleans.Streams
 {
@@ -11,6 +11,11 @@ namespace Orleans.Streams
     {
         private IConsistentRingStreamQueueMapper streamQueueMapper;
         private IRingRange myRange;
+
+        public static IStreamQueueBalancer Create(IServiceProvider services, string name)
+        {
+            return ActivatorUtilities.CreateInstance<ConsistentRingQueueBalancer>(services);
+        }
 
         public ConsistentRingQueueBalancer(IStreamProviderRuntime streamProviderRuntime)
         {
@@ -23,10 +28,7 @@ namespace Orleans.Streams
             ringProvider.SubscribeToRangeChangeEvents(this);
         }
 
-        public override Task Initialize(string strProviderName,
-            IStreamQueueMapper queueMapper,
-            TimeSpan siloMaturityPeriod,
-            IProviderConfiguration providerConfig)
+        public override Task Initialize(IStreamQueueMapper queueMapper)
         {
             if (queueMapper == null)
             {
