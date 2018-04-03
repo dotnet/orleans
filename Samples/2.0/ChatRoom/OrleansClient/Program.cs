@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Linq;
-using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using GrainInterfaces;
@@ -9,14 +7,12 @@ using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
-using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Streams;
 using Utils;
 
 namespace OrleansClient
 {
-	class Program
+    class Program
 	{
         //To make this sample simple
         //In this sample, one client can only join one channel, hence we have a static variable of one channel name.
@@ -192,6 +188,7 @@ namespace OrleansClient
 		    var streamId = await room.Leave(userName);
             var stream = client.GetStreamProvider(Constants.ChatRoomStreamProvider)
 		        .GetStream<ChatMsg>(streamId, Constants.CharRoomStreamNameSpace);
+
             //unsubscribe from the channel/stream since client left, so that client won't
             //receive furture messages from this channel/stream
 		    var subscriptionHandles = await stream.GetAllSubscriptionHandles();
