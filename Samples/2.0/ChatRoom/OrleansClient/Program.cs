@@ -178,8 +178,6 @@ namespace OrleansClient
             joinedChannel = channelName;
 			var room = client.GetGrain<IChannel>(joinedChannel);
 		    var streamId = await room.Join(userName);
-            //empty stream id meaning client already joined this channel, so return 
-		    if (streamId == Guid.Empty) return;
             var stream = client.GetStreamProvider(Constants.ChatRoomStreamProvider)
 		        .GetStream<ChatMsg>(streamId, Constants.CharRoomStreamNameSpace);
             //subscribe to the stream to receiver furthur messages sent to the chatroom
@@ -192,8 +190,6 @@ namespace OrleansClient
 		    PrettyConsole.Line($"Leaving channel {joinedChannel}");
             var room = client.GetGrain<IChannel>(joinedChannel);
 		    var streamId = await room.Leave(userName);
-            //empty stream id meaning client already leaved the channel, so return 
-		    if (streamId == Guid.Empty) return;
             var stream = client.GetStreamProvider(Constants.ChatRoomStreamProvider)
 		        .GetStream<ChatMsg>(streamId, Constants.CharRoomStreamNameSpace);
             //unsubscribe from the channel/stream since client left, so that client won't
