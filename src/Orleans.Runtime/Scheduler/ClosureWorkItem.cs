@@ -61,6 +61,67 @@ namespace Orleans.Runtime.Scheduler
         }
     }
 
+    internal class ClosureWorkItem<TState> : WorkItemBase
+    {
+        // ReSharper disable once FieldCanBeMadeReadOnly.Local
+        private TState state;
+        private readonly Action<TState> continuation;
+        private readonly string name;
+
+        public override string Name => this.name ?? GetMethodName(this.continuation);
+
+        public ClosureWorkItem(Action<TState> closure, TState state)
+        {
+            this.state = state;
+            continuation = closure;
+#if TRACK_DETAILED_STATS
+            if (StatisticsCollector.CollectGlobalShedulerStats)
+            {
+                SchedulerStatisticsGroup.OnClosureWorkItemsCreated();
+            }
+#endif
+        }
+
+        public ClosureWorkItem(Action<TState> closure, TState state, string name)
+        {
+            this.state = state;
+            continuation = closure;
+            this.name = name;
+#if TRACK_DETAILED_STATS
+            if (StatisticsCollector.CollectGlobalShedulerStats)
+            {
+                SchedulerStatisticsGroup.OnClosureWorkItemsCreated();
+            }
+#endif
+        }
+
+        #region IWorkItem Members
+
+        public override void Execute()
+        {
+#if TRACK_DETAILED_STATS
+            if (StatisticsCollector.CollectGlobalShedulerStats)
+            {
+                SchedulerStatisticsGroup.OnClosureWorkItemsExecuted();
+            }
+#endif
+            continuation(this.state);
+        }
+
+        public override WorkItemType ItemType => WorkItemType.Closure;
+
+        #endregion
+
+        internal static string GetMethodName(Delegate action)
+        {
+            var continuationMethodInfo = action.GetMethodInfo();
+            return string.Format(
+                "{0}->{1}",
+                action.Target?.ToString() ?? string.Empty,
+                continuationMethodInfo == null ? string.Empty : continuationMethodInfo.ToString());
+        }
+    }
+
     internal class AsyncClosureWorkItem : WorkItemBase
     {
         private readonly TaskCompletionSource<bool> completion = new TaskCompletionSource<bool>();

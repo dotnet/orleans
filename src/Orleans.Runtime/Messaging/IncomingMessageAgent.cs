@@ -174,20 +174,27 @@ namespace Orleans.Runtime.Messaging
         {
             MessagingProcessingStatisticsGroup.OnImaMessageEnqueued(context);
 
-            if (targetActivation != null) targetActivation.IncrementEnqueuedOnDispatcherCount();
+            targetActivation?.IncrementEnqueuedOnDispatcherCount();
 
-            scheduler.QueueWorkItem(new ClosureWorkItem(() =>
-            {
-                try
-                {
-                    dispatcher.ReceiveMessage(msg);
-                }
-                finally
-                {
-                    if (targetActivation != null) targetActivation.DecrementEnqueuedOnDispatcherCount();
-                }
-            },
-            "Dispatcher.ReceiveMessage"), context);
+            scheduler.QueueWorkItem(
+                new ClosureWorkItem<ValueTuple<Dispatcher, Message, ActivationData>>(
+                    EnqueueMessageAction,
+                    ValueTuple.Create(dispatcher, msg, targetActivation),
+                    "Dispatcher.ReceiveMessage"),
+                context);
         }
+
+        private static readonly Action<ValueTuple<Dispatcher, Message, ActivationData>> EnqueueMessageAction = state =>
+        {
+            var (dispatcher, msg, targetActivation) = state;
+            try
+            {
+                dispatcher.ReceiveMessage(msg);
+            }
+            finally
+            {
+                targetActivation?.DecrementEnqueuedOnDispatcherCount();
+            }
+        };
     }
 }
