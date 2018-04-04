@@ -23,10 +23,8 @@ namespace Orleans
     {
         internal static bool TestOnlyThrowExceptionDuringInit { get; set; }
 
-        private ILogger logger;
-        private ILogger callBackDataLogger;
-        private ILogger timerLogger;
-        private ClientMessagingOptions clientMessagingOptions;
+        private readonly ILogger logger;
+        private readonly ClientMessagingOptions clientMessagingOptions;
 
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
         private InvokableObjectManager localObjects;
@@ -43,34 +41,26 @@ namespace Orleans
         private GrainId clientId;
         private readonly GrainId handshakeClientId;
         private ThreadTrackingStatistic incomingMessagesThreadTimeTracking;
-        private readonly Func<Message, bool> tryResendMessage;
-        private readonly Action<Message> unregisterCallback;
 
-        private TimeSpan typeMapRefreshInterval;
+        private readonly TimeSpan typeMapRefreshInterval;
         private AsyncTaskSafeTimer typeMapRefreshTimer = null;
 
-        // initTimeout used to be AzureTableDefaultPolicies.TableCreationTimeout, which was 3 min
-        private static readonly TimeSpan initTimeout = TimeSpan.FromMinutes(1);
-
-        private static readonly TimeSpan resetTimeout = TimeSpan.FromMinutes(1);
+        private static readonly TimeSpan ResetTimeout = TimeSpan.FromMinutes(1);
 
         private const string BARS = "----------";
         
         public IInternalGrainFactory InternalGrainFactory { get; private set; }
 
-        /// <summary>
-        /// Response timeout.
-        /// </summary>
-        private TimeSpan responseTimeout;
-        
         private MessageFactory messageFactory;
         private IPAddress localAddress;
         private IGatewayListProvider gatewayListProvider;
         private readonly ILoggerFactory loggerFactory;
         private readonly IOptions<StatisticsOptions> statisticsOptions;
+        private readonly ApplicationRequestsStatisticsGroup appRequestStatistics;
 
-        private ApplicationRequestsStatisticsGroup appRequestStatistics;
-        private StageAnalysisStatisticsGroup schedulerStageStatistics;
+        private readonly StageAnalysisStatisticsGroup schedulerStageStatistics;
+        private SharedCallbackData sharedCallbackData;
+        private SafeTimer callbackTimer;
         public ActivationAddress CurrentActivationAddress
         {
             get;
@@ -98,58 +88,70 @@ namespace Orleans
             ILoggerFactory loggerFactory, 
             IOptions<ClientMessagingOptions> clientMessagingOptions,
             IOptions<TypeManagementOptions> typeManagementOptions,
-            IOptions<StatisticsOptions> statisticsOptions)
+            IOptions<StatisticsOptions> statisticsOptions,
+            ApplicationRequestsStatisticsGroup appRequestStatistics,
+            StageAnalysisStatisticsGroup schedulerStageStatistics,
+            ClientStatisticsManager clientStatisticsManager)
         {
             this.loggerFactory = loggerFactory;
             this.statisticsOptions = statisticsOptions;
+            this.appRequestStatistics = appRequestStatistics;
+            this.schedulerStageStatistics = schedulerStageStatistics;
+            this.ClientStatistics = clientStatisticsManager;
             this.logger = loggerFactory.CreateLogger<OutsideRuntimeClient>();
             this.handshakeClientId = GrainId.NewClientId();
-            tryResendMessage = TryResendMessage;
-            unregisterCallback = msg => UnRegisterCallback(msg.Id);
             callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
-            this.callBackDataLogger = loggerFactory.CreateLogger<CallbackData>();
-            this.timerLogger = loggerFactory.CreateLogger<SafeTimer>();
             this.clientMessagingOptions = clientMessagingOptions.Value;
             this.typeMapRefreshInterval = typeManagementOptions.Value.TypeMapRefreshInterval;
-            this.responseTimeout = clientMessagingOptions.Value.ResponseTimeout;
         }
 
         internal void ConsumeServices(IServiceProvider services)
         {
-            this.ServiceProvider = services;
-
-            var connectionLostHandlers = this.ServiceProvider.GetServices<ConnectionToClusterLostHandler>();
-            foreach (var handler in connectionLostHandlers)
-            {
-                this.ClusterConnectionLost += handler;
-            }
-
-            var clientInvokeCallbacks = this.ServiceProvider.GetServices<ClientInvokeCallback>();
-            foreach (var handler in clientInvokeCallbacks)
-            {
-                this.ClientInvokeCallback += handler;
-            }
-
-            this.InternalGrainFactory = this.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
-            this.ClientStatistics = this.ServiceProvider.GetRequiredService<ClientStatisticsManager>();
-            this.messageFactory = this.ServiceProvider.GetService<MessageFactory>();
-            this.localObjects = new InvokableObjectManager(
-                this,
-                services.GetRequiredService<SerializationManager>(),
-                this.loggerFactory.CreateLogger<InvokableObjectManager>());
-
-            this.GrainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
-
-            this.schedulerStageStatistics = this.ServiceProvider.GetRequiredService<StageAnalysisStatisticsGroup>();
-            this.appRequestStatistics = this.ServiceProvider.GetRequiredService<ApplicationRequestsStatisticsGroup>();
-
-            BufferPool.InitGlobalBufferPool(this.clientMessagingOptions);
-
             try
             {
                 AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
 
-                clientProviderRuntime = this.ServiceProvider.GetRequiredService<ClientProviderRuntime>();
+                this.ServiceProvider = services;
+
+                var connectionLostHandlers = this.ServiceProvider.GetServices<ConnectionToClusterLostHandler>();
+                foreach (var handler in connectionLostHandlers)
+                {
+                    this.ClusterConnectionLost += handler;
+                }
+
+                var clientInvokeCallbacks = this.ServiceProvider.GetServices<ClientInvokeCallback>();
+                foreach (var handler in clientInvokeCallbacks)
+                {
+                    this.ClientInvokeCallback += handler;
+                }
+
+                this.InternalGrainFactory = this.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
+                this.ClientStatistics = this.ServiceProvider.GetRequiredService<ClientStatisticsManager>();
+                this.messageFactory = this.ServiceProvider.GetService<MessageFactory>();
+
+                var serializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
+                this.localObjects = new InvokableObjectManager(
+                    this,
+                    serializationManager,
+                    this.loggerFactory.CreateLogger<InvokableObjectManager>());
+
+                this.sharedCallbackData = new SharedCallbackData(
+                    this.TryResendMessage,
+                    msg => this.UnregisterCallback(msg.Id),
+                    this.loggerFactory.CreateLogger<CallbackData>(),
+                    this.clientMessagingOptions,
+                    serializationManager,
+                    this.appRequestStatistics);
+                var timerLogger = this.loggerFactory.CreateLogger<SafeTimer>();
+                var minTicks = Math.Min(this.clientMessagingOptions.ResponseTimeout.Ticks, TimeSpan.FromSeconds(1).Ticks);
+                var period = TimeSpan.FromTicks(minTicks);
+                this.callbackTimer = new SafeTimer(timerLogger, this.OnCallbackExpiryTick, null, period, period);
+                
+                this.GrainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
+
+                BufferPool.InitGlobalBufferPool(this.clientMessagingOptions);
+
+                this.clientProviderRuntime = this.ServiceProvider.GetRequiredService<ClientProviderRuntime>();
 
                 this.localAddress = ConfigUtilities.GetLocalIPAddress(this.clientMessagingOptions.PreferredFamily, this.clientMessagingOptions.NetworkInterfaceName);
 
@@ -375,13 +377,13 @@ namespace Orleans
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "CallbackData is IDisposable but instances exist beyond lifetime of this method so cannot Dispose yet.")]
-        public void SendRequest(GrainReference target, InvokeMethodRequest request, TaskCompletionSource<object> context, Action<Message, TaskCompletionSource<object>> callback, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null)
+        public void SendRequest(GrainReference target, InvokeMethodRequest request, TaskCompletionSource<object> context, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null)
         {
             var message = this.messageFactory.CreateMessage(request, options);
-            SendRequestMessage(target, message, context, callback, debugContext, options, genericArguments);
+            SendRequestMessage(target, message, context, debugContext, options, genericArguments);
         }
 
-        private void SendRequestMessage(GrainReference target, Message message, TaskCompletionSource<object> context, Action<Message, TaskCompletionSource<object>> callback, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null)
+        private void SendRequestMessage(GrainReference target, Message message, TaskCompletionSource<object> context, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null)
         {
             var targetGrainId = target.GrainId;
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
@@ -413,23 +415,13 @@ namespace Orleans
             if (message.IsExpirableMessage(this.clientMessagingOptions.DropExpiredMessages))
             {
                 // don't set expiration for system target messages.
-                message.TimeToLive = responseTimeout;
+                message.TimeToLive = this.clientMessagingOptions.ResponseTimeout;
             }
 
             if (!oneWay)
             {
-                var callbackData = new CallbackData(
-                    callback,
-                    tryResendMessage,
-                    context,
-                    message,
-                    unregisterCallback,
-                    this.clientMessagingOptions,
-                    this.callBackDataLogger,
-                    this.timerLogger,
-                    this.appRequestStatistics);
+                var callbackData = new CallbackData(this.sharedCallbackData, context, message);
                 callbacks.TryAdd(message.Id, callbackData);
-                callbackData.StartTimer(responseTimeout);
             }
 
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Send {0}", message);
@@ -482,7 +474,7 @@ namespace Orleans
             }
         }
 
-        private void UnRegisterCallback(CorrelationId id)
+        private void UnregisterCallback(CorrelationId id)
         {
             CallbackData ignore;
             callbacks.TryRemove(id, out ignore);
@@ -510,7 +502,7 @@ namespace Orleans
             {
                 if (clientProviderRuntime != null)
                 {
-                    clientProviderRuntime.Reset(cleanup).WaitWithThrow(resetTimeout);
+                    clientProviderRuntime.Reset(cleanup).WaitWithThrow(ResetTimeout);
                 }
             }, logger, "Client.clientProviderRuntime.Reset");
             Utils.SafeExecute(() =>
@@ -569,7 +561,7 @@ namespace Orleans
             {
                 if (clientProviderRuntime != null)
                 {
-                    clientProviderRuntime.Reset().WaitWithThrow(resetTimeout);
+                    clientProviderRuntime.Reset().WaitWithThrow(ResetTimeout);
                 }
             }
             catch (Exception) { }
@@ -577,15 +569,11 @@ namespace Orleans
             Utils.SafeExecute(() => this.Dispose());
         }
 
-        public void SetResponseTimeout(TimeSpan timeout)
-        {
-            responseTimeout = timeout;
-        }
+        /// <inheritdoc />
+        public TimeSpan GetResponseTimeout() => this.sharedCallbackData.ResponseTimeout;
 
-        public TimeSpan GetResponseTimeout()
-        {
-            return responseTimeout;
-        }
+        /// <inheritdoc />
+        public void SetResponseTimeout(TimeSpan timeout) => this.sharedCallbackData.ResponseTimeout = timeout;
 
         public GrainReference CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker)
         {
@@ -637,7 +625,8 @@ namespace Orleans
         {
             if (this.disposing) return;
             this.disposing = true;
-
+            
+            Utils.SafeExecute(() => this.callbackTimer?.Dispose());
             Utils.SafeExecute(() =>
             {
                 if (typeMapRefreshTimer != null)
@@ -694,6 +683,17 @@ namespace Orleans
             catch (Exception ex)
             {
                 this.logger.Error(ErrorCode.ClientError, "Error when sending cluster disconnection notification", ex);
+            }
+        }
+
+        private void OnCallbackExpiryTick(object state)
+        {
+            var currentStopwatchTicks = Stopwatch.GetTimestamp();
+            foreach (var pair in callbacks)
+            {
+                var callback = pair.Value;
+                if (callback.IsCompleted) continue;
+                if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout(this.clientMessagingOptions.ResponseTimeout);
             }
         }
     }
