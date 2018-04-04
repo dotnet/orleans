@@ -25,7 +25,7 @@ namespace Benchmarks
                     mapReduceBenchmark.BenchmarkSetup();
                     return mapReduceBenchmark;
                 },
-                benchmark => benchmark.Bench().Wait(),
+                benchmark => benchmark.Bench().GetAwaiter().GetResult(),
                 benchmark => benchmark.Teardown());
             },
             ["Serialization"] = () =>
@@ -64,21 +64,25 @@ namespace Benchmarks
                     benchmark.Setup();
                     return benchmark;
                 },
-                benchmark => benchmark.RunAsync().Wait(),
+                benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
                 benchmark => benchmark.Teardown());
             },
             ["Ping"] = () =>
             {
                 RunBenchmark(
-                "Running Ping benchmark",
-                () =>
-                {
-                    var benchmark = new PingBenchmark();
-                    benchmark.Setup();
-                    return benchmark;
-                },
-                benchmark => benchmark.RunAsync().Wait(),
-                benchmark => benchmark.Teardown());
+                    "Running Ping benchmark",
+                    () =>
+                    {
+                        var benchmark = new PingBenchmark();
+                        benchmark.Setup();
+                        return benchmark;
+                    },
+                    benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
+                    benchmark => benchmark.Teardown());
+            },
+            ["SequentialPing"] = () =>
+            {
+                BenchmarkRunner.Run<SequentialPingBenchmark>();
             },
         };
 
