@@ -15,7 +15,4 @@
     <PackageReference Include="Microsoft.Extensions.Options" Version="$(MicrosoftExtensionsOptionsVersion)" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" />
-  </ItemGroup>
 </Project>
