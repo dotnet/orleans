@@ -1,157 +1,73 @@
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
+using System.Threading;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime.Configuration;
+using Orleans.Threading;
 
 namespace Orleans.Runtime
 {
-    internal abstract class AsynchQueueAgent<T> : AsynchAgent, IDisposable where T : IOutgoingMessage
+    internal abstract class AsynchQueueAgent<T> : AsynchAgent
     {
-        private BlockingCollection<T> requestQueue;
-        private QueueTrackingStatistic queueTracking;
+        private readonly QueueCounter queueCounter = new QueueCounter();
 
         protected AsynchQueueAgent(string nameSuffix, ExecutorService executorService, ILoggerFactory loggerFactory)
             : base(nameSuffix, executorService, loggerFactory)
         {
-            requestQueue = new BlockingCollection<T>();
-            if (StatisticsCollector.CollectQueueStats)
-            {
-                queueTracking = new QueueTrackingStatistic(base.Name);
-            }
+            ProcessAction = state => Process((T)state);
         }
+
+        public WaitCallback ProcessAction { get; }
+
+        public int Count => queueCounter.Count;
 
         public void QueueRequest(T request)
         {
-            if (requestQueue==null)
+            if (State != ThreadState.Running)
             {
+                Log.LogWarning($"Invalid usage attempt of {Name} agent in {State.ToString()} state");
                 return;
             }
 
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectQueueStats)
-            {
-                queueTracking.OnEnQueueRequest(1, requestQueue.Count, request);
-            }
-#endif
-
-            requestQueue.Add(request);
+            OnEnqueue(request);
+            executor.QueueWorkItem(ProcessAction, request);
         }
 
         protected abstract void Process(T request);
 
-        protected override void Run()
+        protected virtual bool DrainAfterCancel { get; } = false;
+
+        protected virtual void OnEnqueue(T request)
         {
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectThreadTimeTrackingStats)
-            {
-                threadTracking.OnStartExecution();
-                queueTracking.OnStartExecution();
-            }
-#endif
-            try
-            {
-                RunNonBatching();
-            }
-            finally
-            {
-#if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                {
-                    threadTracking.OnStopExecution();
-                    queueTracking.OnStopExecution();
-                }
-#endif
-            }
+            queueCounter.Increment();
         }
 
+        protected override ThreadPoolExecutorOptions.Builder ExecutorOptionsBuilder => base.ExecutorOptionsBuilder
+            .WithDrainAfterCancel(DrainAfterCancel)
+            .WithActionFilters(queueCounter);
 
-        protected void RunNonBatching()
-        {            
-            while (true)
-            {
-                if (Cts == null || Cts.IsCancellationRequested)
-                {
-                    return;
-                }
-                T request;
-                try
-                {
-                    request = requestQueue.Take();
-                }
-                catch (InvalidOperationException)
-                {
-                    Log.Info(ErrorCode.Runtime_Error_100312, "Stop request processed");
-                    break;
-                }
-#if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectQueueStats)
-                {
-                    queueTracking.OnDeQueueRequest(request);
-                }
-                if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                {
-                    threadTracking.OnStartProcessing();
-                }
-#endif
-                Process(request);
-#if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                {
-                    threadTracking.OnStopProcessing();
-                    threadTracking.IncrementNumberOfProcessed();
-                }
-#endif
-            }
-        }
-
-        public override void Stop()
+        protected T GetWorkItemState(Threading.ExecutionContext context)
         {
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectThreadTimeTrackingStats)
-            {
-                threadTracking.OnStopExecution();
-            }
-#endif
-            requestQueue?.CompleteAdding();
-            base.Stop();
+            return (T)context.WorkItem.State;
         }
 
-        protected void DrainQueue(Action<T> action)
+        private sealed class QueueCounter : ExecutionActionFilter
         {
-            T request;
-            while (requestQueue.TryTake(out request))
+            private int requestsInQueueCount;
+
+            public int Count => requestsInQueueCount;
+
+            public override void OnActionExecuting(Threading.ExecutionContext context)
             {
-                action(request);
+                Decrement();
+            }
+
+            public void Increment()
+            {
+                Interlocked.Increment(ref requestsInQueueCount);
+            }
+
+            public void Decrement()
+            {
+                Interlocked.Decrement(ref requestsInQueueCount);
             }
         }
-
-        public virtual int Count
-        {
-            get
-            {
-                return requestQueue.Count;
-            }
-        }
-
-        #region IDisposable Members
-
-        protected override void Dispose(bool disposing)
-        {
-            if (!disposing) return;
-            
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectThreadTimeTrackingStats)
-            {
-                threadTracking.OnStopExecution();
-            }
-#endif
-            base.Dispose(disposing);
-
-            requestQueue?.Dispose();
-            requestQueue = null;
-        }
-
-        #endregion
     }
 }

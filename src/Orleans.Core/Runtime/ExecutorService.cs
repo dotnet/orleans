@@ -1,15 +1,12 @@
-﻿using System.Threading.Tasks;
-using Orleans.Runtime.Scheduler;
+﻿using Orleans.Threading;
 
 namespace Orleans.Runtime
 {
-    internal class ExecutorService : ITaskScheduler
+    internal class ExecutorService
     {
-        private readonly TaskScheduler taskScheduler = new ThreadPerTaskScheduler(task => (task as AsynchAgentTask)?.Name);
-
-        public void RunTask(Task task)
+        public ThreadPoolExecutor GetExecutor(ThreadPoolExecutorOptions options)
         {
-            task.Start(taskScheduler);
+            return new ThreadPoolExecutor(options);
         }
     }
 }

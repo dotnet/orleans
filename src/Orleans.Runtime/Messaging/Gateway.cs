@@ -322,7 +322,7 @@ namespace Orleans.Runtime.Messaging
         }
 
 
-        private class GatewayClientCleanupAgent : AsynchAgent
+        private class GatewayClientCleanupAgent : DedicatedAsynchAgent
         {
             private readonly Gateway gateway;
             private readonly TimeSpan clientDropTimeout;

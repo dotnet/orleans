@@ -1,11 +1,13 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Threading;
 
 namespace Orleans.Runtime
 {
-    internal abstract class AsynchAgent : IDisposable
+    internal abstract class AsynchAgent : IHealthCheckable, IDisposable
     {
         public enum FaultBehavior
         {
@@ -14,23 +16,24 @@ namespace Orleans.Runtime
             IgnoreFault     // Allow the agent to stop if it faults, but take no other action (other than logging)
         }
 
+        private readonly ExecutorFaultHandler executorFaultHandler;
+
         protected readonly ExecutorService executorService;
+        protected ThreadPoolExecutor executor;
         protected CancellationTokenSource Cts;
         protected object Lockable;
         protected ILogger Log;
-        private readonly string type;
+        protected ILoggerFactory loggerFactory;
+        protected readonly string type;
         protected FaultBehavior OnFault;
+        protected bool disposed;
 
-#if TRACK_DETAILED_STATS
-        internal protected ThreadTrackingStatistic threadTracking;
-#endif
+        public ThreadState State { get; protected set; }
 
-        public ThreadState State { get; private set; }
         internal string Name { get; private set; }
 
         protected AsynchAgent(string nameSuffix, ExecutorService executorService, ILoggerFactory loggerFactory)
         {
-            this.executorService = executorService;
             Cts = new CancellationTokenSource();
             var thisType = GetType();
 
@@ -51,16 +54,11 @@ namespace Orleans.Runtime
             Lockable = new object();
             State = ThreadState.Unstarted;
             OnFault = FaultBehavior.IgnoreFault;
-            Log = loggerFactory.CreateLogger(Name);
 
-            AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
-
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectThreadTimeTrackingStats)
-            {
-                threadTracking = new ThreadTrackingStatistic(Name);
-            }
-#endif
+            this.loggerFactory = loggerFactory;
+            this.Log = loggerFactory.CreateLogger(Name);
+            this.executorService = executorService;
+            this.executorFaultHandler = new ExecutorFaultHandler(this);
         }
 
         protected AsynchAgent(ExecutorService executorService, ILoggerFactory loggerFactory)
@@ -87,6 +85,7 @@ namespace Orleans.Runtime
 
         public virtual void Start()
         {
+            ThrowIfDisposed();
             lock (Lockable)
             {
                 if (State == ThreadState.Running)
@@ -99,23 +98,31 @@ namespace Orleans.Runtime
                     Cts = new CancellationTokenSource();
                 }
 
-                executorService.RunTask(new AsynchAgentTask(() => AgentThreadProc(this), Name));
+                AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
+                LogStatus(Log, "Starting AsyncAgent {0} on managed thread {1}", Name, Thread.CurrentThread.ManagedThreadId);
+                EnsureExecutorInitialized();
+                OnStart();
                 State = ThreadState.Running;
             }
+
             if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Started asynch agent " + this.Name);
         }
+
+        public virtual void OnStart() { }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         public virtual void Stop()
         {
             try
             {
+                ThrowIfDisposed();
                 lock (Lockable)
                 {
                     if (State == ThreadState.Running)
                     {
                         State = ThreadState.StopRequested;
                         Cts.Cancel();
+                        executor = null;
                         State = ThreadState.Stopped;
                     }
                 }
@@ -129,71 +136,6 @@ namespace Orleans.Runtime
             }
             Log.Debug("Stopped agent");
         }
-        
-        protected abstract void Run();
-
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        private static void AgentThreadProc(Object obj)
-        {
-            var agent = obj as AsynchAgent;
-            if (agent == null)
-            {
-                throw new InvalidOperationException("Agent thread started with incorrect parameter type");
-            }
-
-            try
-            {
-                LogStatus(agent.Log, "Starting AsyncAgent {0} on managed thread {1}", agent.Name, Thread.CurrentThread.ManagedThreadId);
-                CounterStatistic.SetOrleansManagedThread(); // do it before using CounterStatistic.
-                CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.RUNTIME_THREADS_ASYNC_AGENT_PERAGENTTYPE, agent.type)).Increment();
-                CounterStatistic.FindOrCreate(StatisticNames.RUNTIME_THREADS_ASYNC_AGENT_TOTAL_THREADS_CREATED).Increment();
-                agent.Run();
-            }
-            catch (Exception exc)
-            {
-                if (agent.State == ThreadState.Running) // If we're stopping, ignore exceptions
-                {
-                    var log = agent.Log;
-                    switch (agent.OnFault)
-                    {
-                        case FaultBehavior.CrashOnFault:
-                            Console.WriteLine(
-                                "The {0} agent has thrown an unhandled exception, {1}. The process will be terminated.",
-                                agent.Name, exc);
-                            log.Error(ErrorCode.Runtime_Error_100023,
-                                "AsynchAgent Run method has thrown an unhandled exception. The process will be terminated.",
-                                exc);
-                            log.Fail(ErrorCode.Runtime_Error_100024, "Terminating process because of an unhandled exception caught in AsynchAgent.Run.");
-                            break;
-                        case FaultBehavior.IgnoreFault:
-                            log.Error(ErrorCode.Runtime_Error_100025, "AsynchAgent Run method has thrown an unhandled exception. The agent will exit.",
-                                exc);
-                            agent.State = ThreadState.Stopped;
-                            break;
-                        case FaultBehavior.RestartOnFault:
-                            log.Error(ErrorCode.Runtime_Error_100026,
-                                "AsynchAgent Run method has thrown an unhandled exception. The agent will be restarted.",
-                                exc);
-                            agent.State = ThreadState.Stopped;
-                            try
-                            {
-                                agent.Start();
-                            }
-                            catch (Exception ex)
-                            {
-                                log.Error(ErrorCode.Runtime_Error_100027, "Unable to restart AsynchAgent", ex);
-                                agent.State = ThreadState.Stopped;
-                            }
-                            break;
-                    }
-                }
-            }
-            finally
-            {
-                CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.RUNTIME_THREADS_ASYNC_AGENT_PERAGENTTYPE, agent.type)).DecrementBy(1);
-                agent.Log.Info(ErrorCode.Runtime_Error_100328, "Stopping AsyncAgent {0} that runs on managed thread {1}", agent.Name, Thread.CurrentThread.ManagedThreadId);
-            }
-        }
 
 #region IDisposable Members
 
@@ -205,13 +147,15 @@ namespace Orleans.Runtime
 
         protected virtual void Dispose(bool disposing)
         {
-            if (!disposing) return;
+            if (!disposing || disposed) return;
 
             if (Cts != null)
             {
                 Cts.Dispose();
                 Cts = null;
             }
+
+            disposed = true;
         }
 
 #endregion
@@ -221,7 +165,86 @@ namespace Orleans.Runtime
             return Name;
         }
 
+        public bool CheckHealth(DateTime lastCheckTime)
+        {
+            return executor.CheckHealth(lastCheckTime);
+        }
+
         internal static bool IsStarting { get; set; }
+
+        protected virtual ThreadPoolExecutorOptions.Builder ExecutorOptionsBuilder =>
+            new ThreadPoolExecutorOptions.Builder(Name, GetType(), Cts, loggerFactory).WithExceptionFilters(executorFaultHandler);
+
+        private sealed class ExecutorFaultHandler : ExecutionExceptionFilter
+        {
+            private readonly AsynchAgent agent;
+
+            public ExecutorFaultHandler(AsynchAgent agent)
+            {
+                this.agent = agent;
+            }
+
+            public override bool ExceptionHandler(Exception ex, Threading.ExecutionContext context)
+            {
+                context.CancellationTokenSource.Cancel();
+                agent.HandleFault(ex);
+                return true;
+            }
+        }
+
+        protected void HandleFault(Exception ex)
+        {
+            State = ThreadState.Stopped;
+            if (ex is ThreadAbortException)
+            {
+                return;
+            }
+
+            LogExecutorError(ex);
+
+            if (OnFault == FaultBehavior.RestartOnFault && !Cts.IsCancellationRequested)
+            {
+                try
+                {
+                    Start();
+                }
+                catch (Exception exc)
+                {
+                    Log.Error(ErrorCode.Runtime_Error_100027, "Unable to restart AsynchAgent", exc);
+                    State = ThreadState.Stopped;
+                }
+            }
+        }
+
+        private void EnsureExecutorInitialized()
+        {
+            if (executor == null)
+            {
+                executor = executorService.GetExecutor(ExecutorOptionsBuilder.Options);
+            }
+        }
+
+        private void LogExecutorError(Exception exc)
+        {
+            var logMessagePrefix = $"Asynch agent {Name} encountered unexpected exception";
+            switch (OnFault)
+            {
+                case FaultBehavior.CrashOnFault:
+                    var logMessage = $"{logMessagePrefix} The process will be terminated.";
+                    Console.WriteLine(logMessage, exc);
+                    Log.Error(ErrorCode.Runtime_Error_100023, logMessage, exc);
+                    Log.Fail(ErrorCode.Runtime_Error_100024, logMessage);
+                    break;
+                case FaultBehavior.IgnoreFault:
+                    Log.Error(ErrorCode.Runtime_Error_100025, $"{logMessagePrefix} The executor will exit.", exc);
+                    break;
+                case FaultBehavior.RestartOnFault:
+                    Log.Error(ErrorCode.Runtime_Error_100026, $"{logMessagePrefix} The Stage will be restarted.", exc);
+                    break;
+                default:
+                    throw new NotImplementedException();
+            }
+        }
 
         private static void LogStatus(ILogger log, string msg, params object[] args)
         {
@@ -234,6 +257,14 @@ namespace Orleans.Runtime
             {
                 // Changes in agent threads during all operations aside for initial creation are usually important diag events.
                 log.Info(msg, args);
+            }
+        }
+
+        private void ThrowIfDisposed()
+        {
+            if (disposed)
+            {
+                throw new ObjectDisposedException("Cannot access disposed AsynchAgent");
             }
         }
     }

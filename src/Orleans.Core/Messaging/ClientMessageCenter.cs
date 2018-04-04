@@ -374,6 +374,10 @@ namespace Orleans.Messaging
             }
         }
 
+        public void RegisterLocalMessageHandler(Message.Categories category, Action<Message> handler)
+        {
+        }
+
         internal void QueueIncomingMessage(Message msg)
         {
 #if TRACK_DETAILED_STATS

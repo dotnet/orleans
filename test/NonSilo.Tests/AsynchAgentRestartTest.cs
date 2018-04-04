@@ -11,7 +11,7 @@ namespace UnitTests.MessageCenterTests
     {
         private readonly ITestOutputHelper output;
 
-        private class TestAgent : AsynchAgent
+        private class TestAgent : DedicatedAsynchAgent
         {
             private readonly ITestOutputHelper output;
 
