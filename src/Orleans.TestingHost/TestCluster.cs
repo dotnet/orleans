@@ -207,6 +207,7 @@ namespace Orleans.TestingHost
                 if (totalWait.Elapsed < TimeSpan.FromSeconds(60))
                 {
                     WriteLog($"Warning! {remainingSilos} silos do not have a consistent cluster view after {totalWait.ElapsedMilliseconds}ms, continuing without stabilization.");
+                    break;
                 }
             }
         }
