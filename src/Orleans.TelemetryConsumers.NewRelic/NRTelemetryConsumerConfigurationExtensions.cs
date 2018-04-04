@@ -10,28 +10,23 @@ namespace Orleans.Hosting
         /// Adds a metrics telemetric consumer provider of type <see cref="NRTelemetryConsumer"/>.
         /// </summary>
         /// <param name="hostBuilder"></param>
-        /// <param name="instrumentationKey">The instrumentation key for New Relic.</param>
-        public static ISiloHostBuilder AddNewRelicTelemetryConsumer(this ISiloHostBuilder hostBuilder, string instrumentationKey = null)
+        public static ISiloHostBuilder AddNewRelicTelemetryConsumer(this ISiloHostBuilder hostBuilder)
         {
-            return hostBuilder.ConfigureServices((context, services) => ConfigureServices(context, services, instrumentationKey));
+            return hostBuilder.ConfigureServices((context, services) => ConfigureServices(context, services));
         }
 
         /// <summary>
         /// Adds a metrics telemetric consumer provider of type <see cref="NRTelemetryConsumer"/>.
         /// </summary>
         /// <param name="clientBuilder"></param>
-        /// <param name="instrumentationKey">The instrumentation key for New Relic.</param>
-        public static IClientBuilder AddNewRelicTelemetryConsumer(this IClientBuilder clientBuilder, string instrumentationKey = null)
+        public static IClientBuilder AddNewRelicTelemetryConsumer(this IClientBuilder clientBuilder)
         {
-            return clientBuilder.ConfigureServices((context, services) => ConfigureServices(context, services, instrumentationKey));
+            return clientBuilder.ConfigureServices((context, services) => ConfigureServices(context, services));
         }
 
-        private static void ConfigureServices(HostBuilderContext context, IServiceCollection services, string instrumentationKey)
+        private static void ConfigureServices(HostBuilderContext context, IServiceCollection services)
         {
-            services.ConfigureFormatter<NewRelicTelemetryConsumerOptions>();
             services.Configure<TelemetryOptions>(options => options.AddConsumer<NRTelemetryConsumer>());
-            if (!string.IsNullOrWhiteSpace(instrumentationKey))
-                services.Configure<NewRelicTelemetryConsumerOptions>(options => options.InstrumentationKey = instrumentationKey);
         }
 
     }
