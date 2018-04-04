@@ -92,7 +92,15 @@ namespace Orleans.Core.Abstractions.Internal
             return FindOrCreate(key, creatorFunc, key);
         }
 
-        private T FindOrCreate<TState>(K key, Func<TState, T> creatorFunc, TState state)
+
+        /// <summary>
+        /// Find cached copy of object with specified key, otherwise create new one using the supplied creator-function.
+        /// </summary>
+        /// <param name="key">key to find</param>
+        /// <param name="creatorFunc">function to create new object and store for this key if no cached copy exists</param>
+        /// <param name="state">value passed as an argument to <paramref name="creatorFunc"/></param>
+        /// <returns>Object with specified key - either previous cached copy or newly created</returns>
+        public T FindOrCreate<TState>(K key, Func<TState, T> creatorFunc, TState state)
         {
             T result;
             WeakReference<T> cacheEntry;
