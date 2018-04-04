@@ -115,6 +115,51 @@
     <VersionSuffix Condition=" '$(VersionDateSuffix)'!='' ">$(VersionSuffix)-$(VersionDateSuffix)</VersionSuffix>
   </PropertyGroup>
 
+  <PropertyGroup Condition=" $(FullBuild)=='' ">
+    <FullBuild>true</FullBuild>
+  </PropertyGroup>
+
+  <!-- Inner dependency versions -->
+  <PropertyGroup Condition="$(FullBuild) != 'true'">
+    <OrleansCoreAbstractionsVersion>2.0.0</OrleansCoreAbstractionsVersion>
+    <OrleansRuntimeAbstractionsVersion>2.0.0</OrleansRuntimeAbstractionsVersion>
+    <OrleansCoreVersion>2.0.0</OrleansCoreVersion>
+    <OrleansRuntimeVersion>2.0.0</OrleansRuntimeVersion>
+    <OrleansCoreLegacyVersion>2.0.0</OrleansCoreLegacyVersion>
+    <OrleansRuntimeLegacyVersion>2.0.0</OrleansRuntimeLegacyVersion>
+    <OrleansProvidersVersion>2.0.0</OrleansProvidersVersion>
+    <OrleansExtensionsVersion>2.0.0</OrleansExtensionsVersion>
+    <OrleansEventSourcingVersion>2.0.0</OrleansEventSourcingVersion>
+    <OrleansAdoNetVersion>2.0.0</OrleansAdoNetVersion>
+    <OrleansAWSVersion>2.0.0</OrleansAWSVersion>
+    <OrleansAzureVersion>2.0.0</OrleansAzureVersion>
+    <OrleansTestingHostVersion>2.0.0</OrleansTestingHostVersion>
+    <OrleansTransactionsVersion>2.0.0</OrleansTransactionsVersion>
+    <OrleansServiceFabricVersion>2.0.0</OrleansServiceFabricVersion>
+    <OrleansSerializersVersion>2.0.0</OrleansSerializersVersion>
+    <OrleansToolsVersion>2.0.0</OrleansToolsVersion>
+  </PropertyGroup>
+  
+  <PropertyGroup Condition="$(FullBuild) == 'true'">
+    <OrleansCoreAbstractionsVersion>$(VersionPrefix)</OrleansCoreAbstractionsVersion>
+    <OrleansRuntimeAbstractionsVersion>$(VersionPrefix)</OrleansRuntimeAbstractionsVersion>
+    <OrleansCoreVersion>$(VersionPrefix)</OrleansCoreVersion>
+    <OrleansRuntimeVersion>$(VersionPrefix)</OrleansRuntimeVersion>
+    <OrleansCoreLegacyVersion>$(VersionPrefix)</OrleansCoreLegacyVersion>
+    <OrleansRuntimeLegacyVersion>$(VersionPrefix)</OrleansRuntimeLegacyVersion>
+    <OrleansProvidersVersion>$(VersionPrefix)</OrleansProvidersVersion>
+    <OrleansExtensionsVersion>$(VersionPrefix)</OrleansExtensionsVersion>
+    <OrleansEventSourcingVersion>$(VersionPrefix)</OrleansEventSourcingVersion>
+    <OrleansAdoNetVersion>$(VersionPrefix)</OrleansAdoNetVersion>
+    <OrleansAWSVersion>$(VersionPrefix)</OrleansAWSVersion>
+    <OrleansAzureVersion>$(VersionPrefix)</OrleansAzureVersion>
+    <OrleansTestingHostVersion>$(VersionPrefix)</OrleansTestingHostVersion>
+    <OrleansTransactionsVersion>$(VersionPrefix)</OrleansTransactionsVersion>
+    <OrleansServiceFabricVersion>$(VersionPrefix)</OrleansServiceFabricVersion>
+    <OrleansSerializersVersion>$(VersionPrefix)</OrleansSerializersVersion>
+    <OrleansToolsVersion>$(VersionPrefix)</OrleansToolsVersion>
+  </PropertyGroup>
+
   <!-- Set output folder for created NuGet packages -->
   <PropertyGroup>
     <PackageOutputPath Condition=" '$(PackageOutputPath)'=='' ">$(SourceRoot)/Artifacts/$(Configuration)</PackageOutputPath>
