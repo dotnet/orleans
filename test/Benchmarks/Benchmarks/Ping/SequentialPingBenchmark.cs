@@ -29,7 +29,7 @@ namespace Benchmarks.Ping
 
         public SequentialPingBenchmark()
         {
-            this.host = new SiloHostBuilder().ConfigureLocalHostPrimarySilo().Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev").Build();
+            this.host = new SiloHostBuilder().UseLocalhostClustering().Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev").Build();
             this.host.StartAsync().GetAwaiter().GetResult();
 
             this.client = new ClientBuilder().UseLocalhostClustering().Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev").Build();
@@ -41,7 +41,15 @@ namespace Benchmarks.Ping
         
         [Benchmark]
         public Task Ping() => grain.Run();
-        
+
+        public async Task PingForever()
+        {
+            while (true)
+            {
+                await grain.Run();
+            }
+        }
+
         public void Dispose()
         {
             this.client.Dispose();
