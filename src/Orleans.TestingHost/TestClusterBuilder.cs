@@ -6,6 +6,8 @@ using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using Microsoft.Extensions.Configuration;
+using Orleans.Hosting;
+using Orleans.Runtime.TestHooks;
 using Orleans.TestingHost.Utils;
 
 namespace Orleans.TestingHost
@@ -41,6 +43,8 @@ namespace Orleans.TestingHost
                 AssumeHomogenousSilosForTesting = true
             };
 
+            this.AddClientBuilderConfigurator<AddTestHooksApplicationParts>();
+            this.AddSiloBuilderConfigurator<AddTestHooksApplicationParts>();
             this.ConfigureBuilder(ConfigureDefaultPorts);
         }
         
@@ -155,6 +159,19 @@ namespace Orleans.TestingHost
             }
 
             throw new InvalidOperationException("Cannot find enough free ports to spin up a cluster");
+        }
+
+        internal class AddTestHooksApplicationParts : IClientBuilderConfigurator, ISiloBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder.ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(ITestHooksSystemTarget).Assembly));
+            }
+
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder.ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(ITestHooksSystemTarget).Assembly));
+            }
         }
     }
 }

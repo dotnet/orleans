@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -138,6 +139,8 @@ namespace Orleans.TestingHost
                 string startMsg = "----------------------------- STARTING NEW UNIT TEST SILO HOST: " + GetType().FullName + " -------------------------------------";
                 WriteLog(startMsg);
                 await InitializeAsync();
+
+                await WaitForInitialStabilization();
             }
             catch (TimeoutException te)
             {
@@ -168,6 +171,44 @@ namespace Orleans.TestingHost
                 //    string.Format("Exception during test initialization: {0}",
                 //        LogFormatter.PrintException(baseExc)));
                 throw;
+            }
+        }
+
+        private async Task WaitForInitialStabilization()
+        {
+            // Poll each silo to check that it knows the expected number of active silos.
+            // If any silo does not have the expected number of active silos in its cluster membership oracle, try again.
+            // If the cluster membership has not stabilized after a certain period of time, give up and continue anyway.
+            var totalWait = Stopwatch.StartNew();
+            while (true)
+            {
+                var silos = this.Silos;
+                var expectedCount = silos.Count;
+                var remainingSilos = expectedCount;
+
+                foreach (var silo in silos)
+                {
+                    var hooks = this.InternalClient.GetTestHooks(silo);
+                    var statuses = await hooks.GetApproximateSiloStatuses();
+                    var activeCount = statuses.Count(s => s.Value == SiloStatus.Active);
+                    if (activeCount != expectedCount) break;
+                    remainingSilos--;
+                }
+
+                if (remainingSilos == 0)
+                {
+                    totalWait.Stop();
+                    break;
+                }
+
+                WriteLog($"{remainingSilos} silos do not have a consistent cluster view, waiting until stabilization.");
+                await Task.Delay(TimeSpan.FromMilliseconds(100));
+
+                if (totalWait.Elapsed < TimeSpan.FromSeconds(60))
+                {
+                    WriteLog($"Warning! {remainingSilos} silos do not have a consistent cluster view after {totalWait.ElapsedMilliseconds}ms, continuing without stabilization.");
+                    break;
+                }
             }
         }
 
