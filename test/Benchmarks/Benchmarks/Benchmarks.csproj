@@ -2,15 +2,16 @@
   <PropertyGroup>
     <RootNamespace>Benchmarks</RootNamespace>
     <AssemblyName>Benchmarks</AssemblyName>
-    <ApplicationIcon />
+    <TargetFrameworks>netcoreapp2.0;net461</TargetFrameworks>
     <OutputType>Exe</OutputType>
-    <StartupObject />
+    <DebugType>pdbonly</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    <RuntimeIdentifiers Condition=" '$(TargetFrameworkIdentifier)' == '.NETCoreApp' ">win7-x64;win7-x86;osx.10.10-x64;osx.10.11-x64;ubuntu.14.04-x64;ubuntu.16.04-x64;centos.7-x64;rhel.7.2-x64;debian.8-x64;fedora.23-x64;opensuse.13.2-x64</RuntimeIdentifiers>
+    <RuntimeIdentifiers Condition=" '$(TargetFrameworkIdentifier)' == '.NETFramework' ">win7-x64;win7-x86</RuntimeIdentifiers>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="BenchmarkDotNet" Version="$(BenchmarkDotNetVersion)" />
-    <PackageReference Include="BenchmarkDotNet.Diagnostics.Windows" Version="$(BenchmarkDotNetVersion)" />
-    <PackageReference Include="BenchmarkDotNet.Toolchains.Roslyn" Version="$(BenchmarkDotNetVersion)" />
   </ItemGroup>
 
   <ItemGroup>
@@ -19,9 +20,7 @@
     <ProjectReference Include="..\..\..\src\Orleans.Serialization.ProtobufNet\Orleans.Serialization.ProtobufNet.csproj" />
     <ProjectReference Include="..\..\..\src\Orleans.Transactions\Orleans.Transactions.csproj" />
     <ProjectReference Include="..\..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
-    <ProjectReference Include="..\..\Orleans.TestingHost.Legacy\Orleans.TestingHost.Legacy.csproj" />
     <ProjectReference Include="..\..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
-    <ProjectReference Include="..\..\TestExtensions\TestExtensions.csproj" />
     <ProjectReference Include="..\BenchmarkGrains\BenchmarkGrains.csproj" />
   </ItemGroup>
 </Project>
