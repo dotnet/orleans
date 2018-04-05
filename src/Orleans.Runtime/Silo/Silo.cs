@@ -187,7 +187,7 @@ namespace Orleans.Runtime
             // Initialize the message center
             messageCenter = Services.GetRequiredService<MessageCenter>();
             var dispatcher = this.Services.GetRequiredService<Dispatcher>();
-            messageCenter.RerouteHandler = message => dispatcher.SendMessage(message);
+            messageCenter.RerouteHandler = dispatcher.RerouteMessage;
             messageCenter.SniffIncomingMessage = runtimeClient.SniffIncomingMessage;
 
             // Now the router/directory service

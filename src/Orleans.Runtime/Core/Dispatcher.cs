@@ -569,6 +569,15 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <summary>
+        /// Reroute a message coming in through a gateway
+        /// </summary>
+        /// <param name="message"></param>
+        internal void RerouteMessage(Message message)
+        {
+            ResendMessageImpl(message);
+        }
+
         internal bool TryResendMessage(Message message)
         {
             if (!message.MayResend(this.messagingOptions.MaxResendCount)) return false;
