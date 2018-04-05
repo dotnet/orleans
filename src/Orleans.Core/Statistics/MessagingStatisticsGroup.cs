@@ -56,13 +56,31 @@ namespace Orleans.Runtime
 
         private static PerSocketDirectionStats[] perSocketDirectionStatsSend;
         private static PerSocketDirectionStats[] perSocketDirectionStatsReceive;
-        private static ConcurrentDictionary<string, CounterStatistic> perSiloSendCounters;
-        private static ConcurrentDictionary<string, CounterStatistic> perSiloReceiveCounters;
-        private static ConcurrentDictionary<string, CounterStatistic> perSiloPingSendCounters;
-        private static ConcurrentDictionary<string, CounterStatistic> perSiloPingReceiveCounters;
-        private static ConcurrentDictionary<string, CounterStatistic> perSiloPingReplyReceivedCounters;
-        private static ConcurrentDictionary<string, CounterStatistic> perSiloPingReplyMissedCounters;
-                
+        private static ConcurrentDictionary<SiloAddress, CounterStatistic> perSiloSendCounters;
+        private static ConcurrentDictionary<SiloAddress, CounterStatistic> perSiloReceiveCounters;
+        private static ConcurrentDictionary<SiloAddress, CounterStatistic> perSiloPingSendCounters;
+        private static ConcurrentDictionary<SiloAddress, CounterStatistic> perSiloPingReceiveCounters;
+        private static ConcurrentDictionary<SiloAddress, CounterStatistic> perSiloPingReplyReceivedCounters;
+        private static ConcurrentDictionary<SiloAddress, CounterStatistic> perSiloPingReplyMissedCounters;
+
+        private static readonly Func<SiloAddress, (StatisticName, CounterStorage)> GetSendCounterDetails = targetSilo =>
+            (new StatisticName(StatisticNames.MESSAGING_SENT_MESSAGES_PER_SILO, targetSilo != null ? targetSilo.ToString() : "Null"), CounterStorage.LogOnly);
+
+        private static readonly Func<SiloAddress, (StatisticName, CounterStorage)> GetReceiveCounterDetails = addr =>
+            (new StatisticName(StatisticNames.MESSAGING_RECEIVED_MESSAGES_PER_SILO, addr != null ? addr.ToString() : "Null"), CounterStorage.LogOnly);
+
+        private static readonly Func<SiloAddress, (StatisticName, CounterStorage)> GetPingSendCounterDetails =
+            destination => (new StatisticName(StatisticNames.MESSAGING_PINGS_SENT_PER_SILO, destination.ToString()), CounterStorage.LogOnly);
+
+        private static readonly Func<SiloAddress, (StatisticName, CounterStorage)> GetPingReceiveCounterDetails = destination =>
+            (new StatisticName(StatisticNames.MESSAGING_PINGS_RECEIVED_PER_SILO, destination.ToString()), CounterStorage.LogOnly);
+
+        private static readonly Func<SiloAddress, (StatisticName, CounterStorage)> GetPingReplyReceivedCounterDetails = replier =>
+            (new StatisticName(StatisticNames.MESSAGING_PINGS_REPLYRECEIVED_PER_SILO, replier.ToString()), CounterStorage.LogOnly);
+
+        private static readonly Func<SiloAddress, (StatisticName, CounterStorage)> GetPingReplyMissedCounterDetails =
+            replier => (new StatisticName(StatisticNames.MESSAGING_PINGS_REPLYMISSED_PER_SILO, replier.ToString()), CounterStorage.LogOnly);
+
         internal enum Phase
         {
             Send,
@@ -141,12 +159,12 @@ namespace Orleans.Runtime
                 perSocketDirectionStatsReceive[(int)SocketDirection.ClientToGateway] = new PerSocketDirectionStats(false, SocketDirection.ClientToGateway);
             }
 
-            perSiloSendCounters = new ConcurrentDictionary<string, CounterStatistic>();
-            perSiloReceiveCounters = new ConcurrentDictionary<string, CounterStatistic>();
-            perSiloPingSendCounters = new ConcurrentDictionary<string, CounterStatistic>();
-            perSiloPingReceiveCounters = new ConcurrentDictionary<string, CounterStatistic>();
-            perSiloPingReplyReceivedCounters = new ConcurrentDictionary<string, CounterStatistic>();
-            perSiloPingReplyMissedCounters = new ConcurrentDictionary<string, CounterStatistic>();
+            perSiloSendCounters = new ConcurrentDictionary<SiloAddress, CounterStatistic>();
+            perSiloReceiveCounters = new ConcurrentDictionary<SiloAddress, CounterStatistic>();
+            perSiloPingSendCounters = new ConcurrentDictionary<SiloAddress, CounterStatistic>();
+            perSiloPingReceiveCounters = new ConcurrentDictionary<SiloAddress, CounterStatistic>();
+            perSiloPingReplyReceivedCounters = new ConcurrentDictionary<SiloAddress, CounterStatistic>();
+            perSiloPingReplyMissedCounters = new ConcurrentDictionary<SiloAddress, CounterStatistic>();
         }
 
         internal static void OnMessageSend(SiloAddress targetSilo, Message.Directions direction, int numTotalBytes, int headerBytes, SocketDirection socketDirection)
@@ -172,18 +190,19 @@ namespace Orleans.Runtime
             TotalBytesSent.IncrementBy(numTotalBytes);
             HeaderBytesSent.IncrementBy(headerBytes);
             sentMsgSizeHistogram.AddData(numTotalBytes);
-            FindCounter(perSiloSendCounters, new StatisticName(StatisticNames.MESSAGING_SENT_MESSAGES_PER_SILO, (targetSilo != null ? targetSilo.ToString() : "Null")), CounterStorage.LogOnly).IncrementBy(numMsgsInBatch);
+            FindCounter(perSiloSendCounters, targetSilo, GetSendCounterDetails).IncrementBy(numMsgsInBatch);
         }
 
-        private static CounterStatistic FindCounter(ConcurrentDictionary<string, CounterStatistic> counters, StatisticName name, CounterStorage storage)
+        private static CounterStatistic FindCounter<TKey>(ConcurrentDictionary<TKey, CounterStatistic> counters, TKey key, Func<TKey, (StatisticName, CounterStorage)> createDetails)
         {
-            CounterStatistic stat;
-            if (counters.TryGetValue(name.Name, out stat))
+            if (key != null && counters.TryGetValue(key, out var stat))
             {
                 return stat;
             }
+
+            var (name, storage) = createDetails(key);
             stat = CounterStatistic.FindOrCreate(name, storage);
-            counters.TryAdd(name.Name, stat);
+            if (key != null) counters.TryAdd(key, stat);
             return stat;
         }
 
@@ -195,7 +214,7 @@ namespace Orleans.Runtime
             headerBytesReceived.IncrementBy(headerBytes);
             receiveMsgSizeHistogram.AddData(headerBytes + bodyBytes);
             SiloAddress addr = msg.SendingSilo;
-            FindCounter(perSiloReceiveCounters, new StatisticName(StatisticNames.MESSAGING_RECEIVED_MESSAGES_PER_SILO, (addr != null ? addr.ToString() : "Null")), CounterStorage.LogOnly).Increment();
+            FindCounter(perSiloReceiveCounters, addr, GetReceiveCounterDetails).Increment();
         }
 
         internal static void OnMessageBatchReceive(SocketDirection socketDirection, int numMsgsInBatch, int totalBytes)
@@ -227,22 +246,23 @@ namespace Orleans.Runtime
 
         internal static void OnPingSend(SiloAddress destination)
         {
-            FindCounter(perSiloPingSendCounters, new StatisticName(StatisticNames.MESSAGING_PINGS_SENT_PER_SILO, destination.ToString()), CounterStorage.LogOnly).Increment();
+            FindCounter(perSiloPingSendCounters, destination, GetPingSendCounterDetails).Increment();
         }
+
 
         internal static void OnPingReceive(SiloAddress destination)
         {
-            FindCounter(perSiloPingReceiveCounters, new StatisticName(StatisticNames.MESSAGING_PINGS_RECEIVED_PER_SILO, destination.ToString()), CounterStorage.LogOnly).Increment();
+            FindCounter(perSiloPingReceiveCounters, destination, GetPingReceiveCounterDetails).Increment();
         }
 
         internal static void OnPingReplyReceived(SiloAddress replier)
         {
-            FindCounter(perSiloPingReplyReceivedCounters, new StatisticName(StatisticNames.MESSAGING_PINGS_REPLYRECEIVED_PER_SILO, replier.ToString()), CounterStorage.LogOnly).Increment();
+            FindCounter(perSiloPingReplyReceivedCounters, replier, GetPingReplyReceivedCounterDetails).Increment();
         }
 
         internal static void OnPingReplyMissed(SiloAddress replier)
         {
-            FindCounter(perSiloPingReplyMissedCounters, new StatisticName(StatisticNames.MESSAGING_PINGS_REPLYMISSED_PER_SILO, replier.ToString()), CounterStorage.LogOnly).Increment();
+            FindCounter(perSiloPingReplyMissedCounters, replier, GetPingReplyMissedCounterDetails).Increment();
         }
 
         internal static void OnFailedSentMessage(Message msg)
