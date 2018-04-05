@@ -1,13 +1,16 @@
 using System;
+using Orleans.Core.Abstractions.Internal;
 
 namespace Orleans.Runtime
 {
     [Serializable]
     internal class ActivationAddress
     {
-        public GrainId Grain { get; private set; }
-        public ActivationId Activation { get; private set; }
-        public SiloAddress Silo { get; private set; }
+        private static readonly Interner<ValueTuple<SiloAddress, GrainId, ActivationId>, ActivationAddress> interner =
+            new Interner<(SiloAddress, GrainId, ActivationId), ActivationAddress>(128, TimeSpan.FromMinutes(1));
+        public GrainId Grain { get; }
+        public ActivationId Activation { get; }
+        public SiloAddress Silo { get; }
 
         public bool IsComplete
         {
@@ -32,7 +35,7 @@ namespace Orleans.Runtime
             // Silo part is not mandatory
             if (grain == null) throw new ArgumentNullException("grain");
 
-            return new ActivationAddress(silo, grain, activation);
+            return interner.FindOrCreate((silo, grain, activation), key => new ActivationAddress(key.Item1, key.Item2, key.Item3));
         }
 
         public override bool Equals(object obj)
