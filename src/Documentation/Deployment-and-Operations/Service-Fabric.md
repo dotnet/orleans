@@ -17,7 +17,7 @@ Each time the communication listener is opened, the `configure` delegate passed 
 
 ## Example: Configuring Service Fabric hosting
 
-The following example demonstrates a Service Fabric `StatelessService` class which hosts an Orleans silo. The full sample can be found in the [Samples/2.0/ServiceFabric](https://github.com/dotnet/orleans/tree/master/Samples/2.0ServiceFabric) directory of the Orleans repository.
+The following example demonstrates a Service Fabric `StatelessService` class which hosts an Orleans silo. The full sample can be found in the [Samples/2.0/ServiceFabric](https://github.com/dotnet/orleans/tree/master/Samples/2.0/ServiceFabric) directory of the Orleans repository.
 
 ```csharp
 /// <summary>
