@@ -15,7 +15,6 @@ namespace Benchmarks.Ping
     {
         public SequentialPingBenchmarkConfig()
         {
-            Add(Job.ShortRun);
             Add(new MemoryDiagnoser());
         }
     }
@@ -52,7 +51,7 @@ namespace Benchmarks.Ping
 
         public void Dispose()
         {
-            this.client.Dispose();
+            this.client.Dispose(); 
             this.host.Dispose();
         }
     }
