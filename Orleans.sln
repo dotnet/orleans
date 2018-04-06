@@ -48,11 +48,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Streaming.EventHubs
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Clustering.ServiceFabric", "src\Orleans.Clustering.ServiceFabric\Orleans.Clustering.ServiceFabric.csproj", "{3D1792C3-935E-4952-AFA1-4D32FEC557FA}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TelemetryConsumers.AI", "src\Orleans.TelemetryConsumers.AI\Orleans.TelemetryConsumers.AI.csproj", "{D1037BFE-B0D6-40AA-9D53-8DB9838D2889}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TelemetryConsumers.AI", "src\TelemetryConsumers\Orleans.TelemetryConsumers.AI\Orleans.TelemetryConsumers.AI.csproj", "{D1037BFE-B0D6-40AA-9D53-8DB9838D2889}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TelemetryConsumers.Counters", "src\Orleans.TelemetryConsumers.Counters\Orleans.TelemetryConsumers.Counters.csproj", "{2EA4E3CD-60AF-499B-86A5-A2C102C33893}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TelemetryConsumers.Counters", "src\TelemetryConsumers\Orleans.TelemetryConsumers.Counters\Orleans.TelemetryConsumers.Counters.csproj", "{2EA4E3CD-60AF-499B-86A5-A2C102C33893}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TelemetryConsumers.NewRelic", "src\Orleans.TelemetryConsumers.NewRelic\Orleans.TelemetryConsumers.NewRelic.csproj", "{F409A36D-3571-470E-980A-3229FC252781}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TelemetryConsumers.NewRelic", "src\TelemetryConsumers\Orleans.TelemetryConsumers.NewRelic\Orleans.TelemetryConsumers.NewRelic.csproj", "{F409A36D-3571-470E-980A-3229FC252781}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TestingHost", "src\Orleans.TestingHost\Orleans.TestingHost.csproj", "{9BCF7A12-6A5B-43FF-828A-A804F9B9DBB4}"
 EndProject

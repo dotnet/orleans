@@ -36,7 +36,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Serialization.Proto
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Streaming.EventHubs", "src\Azure\Orleans.Streaming.EventHubs\Orleans.Streaming.EventHubs.csproj", "{E6B25995-CDB0-4FAE-BA47-5E629812B300}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TelemetryConsumers.AI", "src\Orleans.TelemetryConsumers.AI\Orleans.TelemetryConsumers.AI.csproj", "{D1037BFE-B0D6-40AA-9D53-8DB9838D2889}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TelemetryConsumers.AI", "src\TelemetryConsumers\Orleans.TelemetryConsumers.AI\Orleans.TelemetryConsumers.AI.csproj", "{D1037BFE-B0D6-40AA-9D53-8DB9838D2889}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Clustering.ZooKeeper", "src\Orleans.Clustering.ZooKeeper\Orleans.Clustering.ZooKeeper.csproj", "{9EA82917-64A9-4F00-9A2B-C02F2571A6DF}"
 EndProject
