@@ -46,7 +46,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.PowerShell", "src\O
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Streaming.EventHubs", "src\Azure\Orleans.Streaming.EventHubs\Orleans.Streaming.EventHubs.csproj", "{E6B25995-CDB0-4FAE-BA47-5E629812B300}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Clustering.ServiceFabric", "src\Orleans.Clustering.ServiceFabric\Orleans.Clustering.ServiceFabric.csproj", "{3D1792C3-935E-4952-AFA1-4D32FEC557FA}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Clustering.ServiceFabric", "src\Azure\Orleans.Clustering.ServiceFabric\Orleans.Clustering.ServiceFabric.csproj", "{3D1792C3-935E-4952-AFA1-4D32FEC557FA}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TelemetryConsumers.AI", "src\TelemetryConsumers\Orleans.TelemetryConsumers.AI\Orleans.TelemetryConsumers.AI.csproj", "{D1037BFE-B0D6-40AA-9D53-8DB9838D2889}"
 EndProject
@@ -150,7 +150,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Streaming.AzureStor
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Hosting.AzureCloudServices", "src\Azure\Orleans.Hosting.AzureCloudServices\Orleans.Hosting.AzureCloudServices.csproj", "{E767F67A-5ABF-4F98-AA20-5A891638C249}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Hosting.ServiceFabric", "src\Orleans.Hosting.ServiceFabric\Orleans.Hosting.ServiceFabric.csproj", "{1AF48B10-B2CE-4DE9-9A3F-0A656FBF1C02}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Hosting.ServiceFabric", "src\Azure\Orleans.Hosting.ServiceFabric\Orleans.Hosting.ServiceFabric.csproj", "{1AF48B10-B2CE-4DE9-9A3F-0A656FBF1C02}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Clustering.DynamoDB", "src\AWS\Orleans.Clustering.DynamoDB\Orleans.Clustering.DynamoDB.csproj", "{B89D0C76-243E-4871-8984-8093EC27DC3B}"
 EndProject
@@ -160,7 +160,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Reminders.DynamoDB"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Streaming.SQS", "src\AWS\Orleans.Streaming.SQS\Orleans.Streaming.SQS.csproj", "{DA0FC102-756F-4C1F-8018-FEC5A64F06F6}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.ServiceFabric", "src\Orleans.ServiceFabric\Orleans.ServiceFabric.csproj", "{814FF01E-1466-4A71-A48F-F40143EF49AA}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.ServiceFabric", "src\Azure\Orleans.ServiceFabric\Orleans.ServiceFabric.csproj", "{814FF01E-1466-4A71-A48F-F40143EF49AA}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RuntimeCodeGen.Tests", "test\RuntimeCodeGen.Tests\RuntimeCodeGen.Tests.csproj", "{E0B8833A-D96E-4E9D-AC0E-E06ADD2D5ED0}"
 EndProject
