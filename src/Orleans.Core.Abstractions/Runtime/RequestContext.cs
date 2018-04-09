@@ -82,6 +82,9 @@ namespace Orleans.Runtime
             }
             else
             {
+                // Have to copy the actual Dictionary value, mutate it and set it back.
+                // This is since AsyncLocal copies link to dictionary, not create a new one.
+                // So we need to make sure that modifying the value, we doesn't affect other threads.
                 var hadPreviousValue = values.ContainsKey(key);
                 var newValues = new Dictionary<string, object>(values.Count + (hadPreviousValue ? 0 : 1));
                 foreach (var pair in values)
