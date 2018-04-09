@@ -78,16 +78,21 @@ namespace Orleans.Runtime
 
             if (values != null)
             {
-                values[key] = value;
+                var hadPreviousValue = values.ContainsKey(key);
+                var newValues = new Dictionary<string, object>(values.Count + (hadPreviousValue ? 0 : 1));
+                foreach (var pair in values)
+                {
+                    newValues.Add(pair.Key, pair.Value);
+                }
+
+                values = newValues;
             }
             else
             {
-                values = new Dictionary<string, object>
-                {
-                    { key, value }
-                };
+                values = new Dictionary<string, object>(1);
             }
 
+            values[key] = value;
             CallContextData.Value = values;
         }
 
