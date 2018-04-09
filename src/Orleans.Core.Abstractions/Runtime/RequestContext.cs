@@ -78,14 +78,21 @@ namespace Orleans.Runtime
 
             if (values == null)
             {
-                values = new Dictionary<string, object>();
+                values = new Dictionary<string, object>(1);
             }
             else
             {
                 // Have to copy the actual Dictionary value, mutate it and set it back.
-                // http://blog.stephencleary.com/2013/04/implicit-async-context-asynclocal.html
-                // This is since LLC is only copy-on-write copied only upon LogicalSetData.
-                values = new Dictionary<string, object>(values);
+                // This is since AsyncLocal copies link to dictionary, not create a new one.
+                // So we need to make sure that modifying the value, we doesn't affect other threads.
+                var hadPreviousValue = values.ContainsKey(key);
+                var newValues = new Dictionary<string, object>(values.Count + (hadPreviousValue ? 0 : 1));
+                foreach (var pair in values)
+                {
+                    newValues.Add(pair.Key, pair.Value);
+                }
+
+                values = newValues;
             }
             values[key] = value;
             CallContextData.Value = values;
