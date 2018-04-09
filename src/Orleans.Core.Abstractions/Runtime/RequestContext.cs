@@ -76,18 +76,18 @@ namespace Orleans.Runtime
         {
             var values = CallContextData.Value;
 
-            if (values == null)
+            if (values != null)
             {
-                values = new Dictionary<string, object>();
+                values[key] = value;
             }
             else
             {
-                // Have to copy the actual Dictionary value, mutate it and set it back.
-                // http://blog.stephencleary.com/2013/04/implicit-async-context-asynclocal.html
-                // This is since LLC is only copy-on-write copied only upon LogicalSetData.
-                values = new Dictionary<string, object>(values);
+                values = new Dictionary<string, object>
+                {
+                    { key, value }
+                };
             }
-            values[key] = value;
+
             CallContextData.Value = values;
         }
 
