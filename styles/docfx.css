@@ -23,20 +23,6 @@ a.disable:hover {
   color: #000000;
 }
 
-/* workaround for leave space for fixed navbar with # anchor url*/
-
-h1:before,
-h2:before,
-h3:before,
-h4:before {
-    content: '';
-    display: block;
-    position: relative;
-    width: 0;
-    height: 100px;
-    margin-top: -100px;
-}
-
 h1, h2, h3, h4, h5, h6, .text-break {
     word-wrap: break-word;
     word-break: break-word;

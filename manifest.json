@@ -1,6 +1,6 @@
 {
   "homepages": [],
-  "source_base_path": "c:/GitHub/sergeybykov/orleans-2/src",
+  "source_base_path": "c:/GitHub/sergeybykov/orleans/src",
   "xrefmap": "xrefmap.yml",
   "files": [
     {
@@ -18,7 +18,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Advanced-Concepts/Activation-Garbage-Collection.html",
-          "hash": "aXUUuYcI1Hq0OdRXixiW/g=="
+          "hash": "gTA0FqbcsuAv8dVYK4uHGg=="
         }
       },
       "is_incremental": false,
@@ -30,7 +30,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Advanced-Concepts/Application-Bootstrap-within-a-Silo.html",
-          "hash": "7Ajo4EiZ1h2Wn4ahjpn4/A=="
+          "hash": "EFFbQjvbunNskEEgtyH/PA=="
         }
       },
       "is_incremental": false,
@@ -42,7 +42,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Advanced-Concepts/Cancellation-Tokens.html",
-          "hash": "ak8XoKrG3p2g0CcH04Tgcw=="
+          "hash": "Ud8T7nF+h7LqDBiXIbZloA=="
         }
       },
       "is_incremental": false,
@@ -54,7 +54,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Advanced-Concepts/Codegen.html",
-          "hash": "k25unVR+fponKL3rWqJnGg=="
+          "hash": "7hL3SAWrv4l5te7FNWWDeg=="
         }
       },
       "is_incremental": false,
@@ -66,7 +66,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Advanced-Concepts/External-Tasks-and-Grains.html",
-          "hash": "bmmy7kOpCbUxnBNiN1/I6A=="
+          "hash": "G/2jO8kwcXtowgaqk6wCRA=="
         }
       },
       "is_incremental": false,
@@ -78,7 +78,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Advanced-Concepts/Interceptors.html",
-          "hash": "i6rQ0r9BgiFBk4VccOwCJg=="
+          "hash": "xdoRPPwgjuhohqPmQMmIsA=="
         }
       },
       "is_incremental": false,
@@ -90,7 +90,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Advanced-Concepts/Powershell-Client.html",
-          "hash": "vzXaoL0gkBvljXvxEhzkYw=="
+          "hash": "rNUgtKX/Bwcu2D9He0DjsQ=="
         }
       },
       "is_incremental": false,
@@ -102,7 +102,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Advanced-Concepts/Reentrant-Grains.html",
-          "hash": "Mz5uPDYpQbkSKoCOu92TBQ=="
+          "hash": "MzUjKp8iRh5fvpz6epKMdg=="
         }
       },
       "is_incremental": false,
@@ -114,7 +114,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Advanced-Concepts/Request-Context.html",
-          "hash": "LIWIcITzYS/Sce7ILAXbQA=="
+          "hash": "Met2+QPDE85U6nom7dTxhQ=="
         }
       },
       "is_incremental": false,
@@ -126,7 +126,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Advanced-Concepts/Serialization.html",
-          "hash": "1YWOlJoLgxb2dJaIXTPnQQ=="
+          "hash": "zGE7SHNC+unvQznRXW75rg=="
         }
       },
       "is_incremental": false,
@@ -138,7 +138,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Benefits.html",
-          "hash": "kZvlB8K3HfMrVZJujM+0fw=="
+          "hash": "nmblqLAShZOntI+1WBuo7w=="
         }
       },
       "is_incremental": false,
@@ -150,7 +150,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.html",
-          "hash": "Ne5avcVV/FCi119PatQg4A=="
+          "hash": "5MnXJfhR/xEtOpy9dfoFxw=="
         }
       },
       "is_incremental": false,
@@ -162,7 +162,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Core-Features/Dependency-Injection.html",
-          "hash": "FPW2rV8Dx+3lbKwQ7SidRA=="
+          "hash": "bHEfMghMTTrDBeAC8tgzmw=="
         }
       },
       "is_incremental": false,
@@ -174,7 +174,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Core-Features/Grain-Persistence.html",
-          "hash": "qkCcVN65l5QP+lRtyg+S2g=="
+          "hash": "qtJiunnGHEy0UoFe+lfFAw=="
         }
       },
       "is_incremental": false,
@@ -186,7 +186,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Core-Features/Observers.html",
-          "hash": "Eg9toMvBy26OiskOzfMjUg=="
+          "hash": "s+eX+RnP0hrfOw2W/Bee1Q=="
         }
       },
       "is_incremental": false,
@@ -198,7 +198,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Core-Features/StatelessWorker.html",
-          "hash": "9iebu50ItTVpn7OzIJwAdQ=="
+          "hash": "9pBqx7JuQV8OmBpTHAizgQ=="
         }
       },
       "is_incremental": false,
@@ -210,7 +210,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Core-Features/Timers-and-Reminders.html",
-          "hash": "tGcFZKlSnOFexf8LOaDZrA=="
+          "hash": "iTueIYCpHnA6hnoWoA5Bbw=="
         }
       },
       "is_incremental": false,
@@ -222,7 +222,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Deployment-and-Operations/Configuration-Guide/Client-Configuration.html",
-          "hash": "KDwG6zuuB7akvu1C2lT4eQ=="
+          "hash": "tpqk9tbcLtD0YQMAxeq1MQ=="
         }
       },
       "is_incremental": false,
@@ -234,7 +234,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Deployment-and-Operations/Configuration-Guide/Configuring-.NET-Garbage-Collection.html",
-          "hash": "nDTf3XlrgbQ5YzWRYBqHqQ=="
+          "hash": "/5P5GaJ2docyPQTGjxv2PQ=="
         }
       },
       "is_incremental": false,
@@ -246,7 +246,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Deployment-and-Operations/Configuration-Guide/Configuring-SQL-Tables.html",
-          "hash": "asrbu/qWuT+TtFyx6vGS7g=="
+          "hash": "wm7zb+l75fxtEeh6rcbUuQ=="
         }
       },
       "is_incremental": false,
@@ -258,7 +258,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Deployment-and-Operations/Configuration-Guide/Server-Configuration.html",
-          "hash": "JCpRnJZMjHfL5opWakncqA=="
+          "hash": "ojFZsv/pwJiypf/8dg4isA=="
         }
       },
       "is_incremental": false,
@@ -270,7 +270,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Deployment-and-Operations/Configuration-Guide/Typical-Configurations.html",
-          "hash": "URPH4r5LH/ccbKCsHNe4vA=="
+          "hash": "gQJ3l+k0lO+Td6fAmeDDYQ=="
         }
       },
       "is_incremental": false,
@@ -282,7 +282,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Deployment-and-Operations/Configuration-Guide/index.html",
-          "hash": "3fuSVnluLMlQVYzJbza7fw=="
+          "hash": "yrTwfpnAIALI671OaE9SEw=="
         }
       },
       "is_incremental": false,
@@ -294,7 +294,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Deployment-and-Operations/Docker-Deployment.html",
-          "hash": "Ar33HqXzlnYUEVDGjGsaig=="
+          "hash": "QCIhow2nkKYo867YUVTYsg=="
         }
       },
       "is_incremental": false,
@@ -306,7 +306,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Deployment-and-Operations/Heterogeneous-Silos.html",
-          "hash": "z6Jey9jIoHyGtPNGvyuxYQ=="
+          "hash": "8ojw3gbbSY2yE+iUpOqHKw=="
         }
       },
       "is_incremental": false,
@@ -329,7 +329,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Deployment-and-Operations/Monitoring/Client-Error-Code-Monitoring.html",
-          "hash": "ZUwmyITyoXcc/xQUCAiCMg=="
+          "hash": "8uk/cmIBPvWxM+DLAToQYQ=="
         }
       },
       "is_incremental": false,
@@ -341,7 +341,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Deployment-and-Operations/Monitoring/Runtime-Monitoring.html",
-          "hash": "p+FkCcMoWXPWvFlSg7V5gg=="
+          "hash": "gKQjaKCiWA6kZyBeNFWpSA=="
         }
       },
       "is_incremental": false,
@@ -353,7 +353,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Deployment-and-Operations/Monitoring/Silo-Error-Code-Monitoring.html",
-          "hash": "HYQNtONRERI/4Buz7Tn2bQ=="
+          "hash": "O5jfDsoNhE4xMiiWX1tdcg=="
         }
       },
       "is_incremental": false,
@@ -365,7 +365,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Deployment-and-Operations/Service-Fabric.html",
-          "hash": "HQcjC+j0cHYyv9WfD/jRsQ=="
+          "hash": "LXBuRPEslapVlRTW1uYYeQ=="
         }
       },
       "is_incremental": false,
@@ -377,7 +377,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Deployment-and-Operations/Troubleshooting-Deployments.html",
-          "hash": "Bzhxfx3L2LtOtwztbn552w=="
+          "hash": "stXe2iJnObbLn+HqFHk+kw=="
         }
       },
       "is_incremental": false,
@@ -389,7 +389,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Deployment-and-Operations/Using-Azure-Web-Apps.html",
-          "hash": "Rx1BTIatJKGlY7gmiuh4Ng=="
+          "hash": "6FEZm678p3iMvugdqfCQRg=="
         }
       },
       "is_incremental": false,
@@ -412,7 +412,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Event-Sourcing/Configuration.html",
-          "hash": "X7zsJ48U2tlV1Tde+/ZEjQ=="
+          "hash": "2pdHdmLo7LCY1h4qyDewlg=="
         }
       },
       "is_incremental": false,
@@ -424,7 +424,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Event-Sourcing/Diagnostics.html",
-          "hash": "yzm1dlMSsTwQiKAe8WFZzA=="
+          "hash": "+FIe2PhOoOf7Pnkz3zwiLA=="
         }
       },
       "is_incremental": false,
@@ -436,7 +436,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Event-Sourcing/GrainStateAPI.html",
-          "hash": "5xvn/ZJ7NDvP5QV3nlyNVQ=="
+          "hash": "S5y/2c6dK7X101m1wULiBg=="
         }
       },
       "is_incremental": false,
@@ -448,7 +448,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Event-Sourcing/LogConsistencyProviders.html",
-          "hash": "x8RAoaSRBk/e3j7tzFTyqA=="
+          "hash": "n2+/SERTMNlKQJixVThyLg=="
         }
       },
       "is_incremental": false,
@@ -460,7 +460,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Event-Sourcing/MultiInstance.html",
-          "hash": "XKBgJU84VasCAg1OtR03eQ=="
+          "hash": "fdmHYROwHc72W1ef9IFxZQ=="
         }
       },
       "is_incremental": false,
@@ -472,7 +472,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Event-Sourcing/MultiVersion.html",
-          "hash": "U0IBYwK7Newo2DF+dnH5Yg=="
+          "hash": "51hFB/kcPjNufIsW4kEvsA=="
         }
       },
       "is_incremental": false,
@@ -484,7 +484,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Event-Sourcing/Overview.html",
-          "hash": "TR5xhQRAfzmWvKCnwd7ZYA=="
+          "hash": "wNA0Hp8khrK+QeypDwKxjw=="
         }
       },
       "is_incremental": false,
@@ -496,7 +496,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Event-Sourcing/Subscribe.html",
-          "hash": "O3DrxMNvottBxtwiMNKY9w=="
+          "hash": "2ChN8zZyvKCInqL0ZWS5Wg=="
         }
       },
       "is_incremental": false,
@@ -508,7 +508,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Getting-Started-With-Orleans/Debugging.html",
-          "hash": "Unead9zcLpmJuCTum4n0sw=="
+          "hash": "4EUmtIcR74GHFtiJYSQpVQ=="
         }
       },
       "is_incremental": false,
@@ -520,7 +520,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Getting-Started-With-Orleans/Developing-a-Client.html",
-          "hash": "TG0rDjyMG++d1Nw1NwB77Q=="
+          "hash": "ovMOqiaapW3jMyDexRZTYA=="
         }
       },
       "is_incremental": false,
@@ -532,7 +532,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Getting-Started-With-Orleans/Developing-a-Grain.html",
-          "hash": "fFaKxp2+MeOM9dUxgNMA+g=="
+          "hash": "LagkqK+fBavd6gHrvFRslg=="
         }
       },
       "is_incremental": false,
@@ -555,7 +555,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Getting-Started-With-Orleans/Grains.html",
-          "hash": "qtf1Oafx79cCGQzjEEmItA=="
+          "hash": "HzzF/Q4d7wxySn7ZE7BsCg=="
         }
       },
       "is_incremental": false,
@@ -567,7 +567,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Getting-Started-With-Orleans/Running-the-Application.html",
-          "hash": "apul6DVRVy3g9vHnoGoxow=="
+          "hash": "2TA4ggdcmVwlcrDiGHoFDw=="
         }
       },
       "is_incremental": false,
@@ -579,7 +579,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Grain-Versioning/Backward-compatibility-guidelines.html",
-          "hash": "T0OrawMyD45nDjVMDrlhuw=="
+          "hash": "0e0rBttRzXqLKD0dXTJJeQ=="
         }
       },
       "is_incremental": false,
@@ -591,7 +591,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Grain-Versioning/Compatible-grains.html",
-          "hash": "yP0dMFHv/tH7233BrLUiAA=="
+          "hash": "9p5531+aFXGb1CIengRDKA=="
         }
       },
       "is_incremental": false,
@@ -603,7 +603,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Grain-Versioning/Deployment.html",
-          "hash": "tq/nZcJsoVwPYS+ert5WoA=="
+          "hash": "GhOE6OpbkX8RRuNt7bDreQ=="
         }
       },
       "is_incremental": false,
@@ -615,7 +615,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Grain-Versioning/Grain-versioning.html",
-          "hash": "ZeJ7Di52sJzGtFcAIZCXBA=="
+          "hash": "DEM38sczPRsnsss7cPyorA=="
         }
       },
       "is_incremental": false,
@@ -627,7 +627,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Grain-Versioning/Version-selector-strategy.html",
-          "hash": "f23gOdrSZiXQyRQjITeb4Q=="
+          "hash": "tZg3iXJcsHyaS5ZdDbkX/g=="
         }
       },
       "is_incremental": false,
@@ -661,7 +661,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Installation/NuGets.html",
-          "hash": "WUXptzTUt8LFOyVLSEKy/Q=="
+          "hash": "rxeLpK8jKwKbsWB8mFJOOw=="
         }
       },
       "is_incremental": false,
@@ -673,7 +673,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Installation/Prerequisites.html",
-          "hash": "0eA0RBIMY67qmOWjd3NWNQ=="
+          "hash": "izm6i6ShnKYeyhnawR9PsA=="
         }
       },
       "is_incremental": false,
@@ -685,7 +685,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Introduction.html",
-          "hash": "Y2C/5JQscdjGZNjf4c1V2w=="
+          "hash": "Fw7Vs8gLk0GnaQBYXeX3JQ=="
         }
       },
       "is_incremental": false,
@@ -697,7 +697,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Multi-Cluster/GlobalSingleInstance.html",
-          "hash": "ICFYjjLLwKePXu0yfjtIkA=="
+          "hash": "Rva6DA8JkzZ5lsK6klnX9w=="
         }
       },
       "is_incremental": false,
@@ -709,7 +709,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Multi-Cluster/GossipChannels.html",
-          "hash": "AdiAg9hlZZJdiSBOBk7oLQ=="
+          "hash": "hUk/SQyLWxdnd9fjRoKb3A=="
         }
       },
       "is_incremental": false,
@@ -721,7 +721,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Multi-Cluster/MultiClusterConfiguration.html",
-          "hash": "Hmt8pTvHHceodGgBXYiTWg=="
+          "hash": "bmDrCO3tAvy3srEco9862g=="
         }
       },
       "is_incremental": false,
@@ -733,7 +733,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Multi-Cluster/Overview.html",
-          "hash": "J0MH0b8UzTS0dqVcsqWklw=="
+          "hash": "Mn6S3u2+cBGQvkGL27bRhg=="
         }
       },
       "is_incremental": false,
@@ -745,7 +745,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Multi-Cluster/SiloConfiguration.html",
-          "hash": "NunhxxtdiPAQWAxlyMKS7A=="
+          "hash": "86zOgKZecOBb/cVahkEU9g=="
         }
       },
       "is_incremental": false,
@@ -757,7 +757,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Orleans-Streams/Stream-Providers.html",
-          "hash": "J5o4CYGnuivPJMdl8eFdsg=="
+          "hash": "jBEeZgs3EA1tA/Y9ZHWtYQ=="
         }
       },
       "is_incremental": false,
@@ -769,7 +769,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Orleans-Streams/Streams-Extensibility.html",
-          "hash": "N1mMH0HHU5BUIeXZcQxfFQ=="
+          "hash": "7ZiY0ZOwajhjYs4GePgJSA=="
         }
       },
       "is_incremental": false,
@@ -781,7 +781,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Orleans-Streams/Streams-Implementation.html",
-          "hash": "L9IfTPVrViDTBRyeOIyu/A=="
+          "hash": "ClHh9dQCT4TOp5eAVyFykg=="
         }
       },
       "is_incremental": false,
@@ -793,7 +793,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Orleans-Streams/Streams-Programming-APIs.html",
-          "hash": "jAvVpquIf8t2BxGDsji6IA=="
+          "hash": "iOyb7yh1ZRn2f0W/5krRyw=="
         }
       },
       "is_incremental": false,
@@ -805,7 +805,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Orleans-Streams/Streams-Quick-Start.html",
-          "hash": "HngRj09uGTX/qJ/VOWyhiA=="
+          "hash": "oo26Jxx0OMrTsN7jlBPngA=="
         }
       },
       "is_incremental": false,
@@ -817,7 +817,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Orleans-Streams/Streams-Why.html",
-          "hash": "0q0lQgj7CprM8nvFBk634g=="
+          "hash": "ELiYYC2rLiaawdT2UQNnnA=="
         }
       },
       "is_incremental": false,
@@ -829,7 +829,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Orleans-Streams/index.html",
-          "hash": "iVJ2QBY9KNKgphUvYLwjrQ=="
+          "hash": "DZKoALJUUklVQIDAiCKLwg=="
         }
       },
       "is_incremental": false,
@@ -841,7 +841,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Presentations/index.html",
-          "hash": "8e3rpKqiWIp9cwFyfq6XNA=="
+          "hash": "/JbzroqGBDwp5IStxY9Zjg=="
         }
       },
       "is_incremental": false,
@@ -853,7 +853,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Runtime-Implementation-Details/Cluster-Management.html",
-          "hash": "PNj1B215Pisie7JG2s70JQ=="
+          "hash": "TVM6Sgz0KCm3zQpugCB5vw=="
         }
       },
       "is_incremental": false,
@@ -865,7 +865,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Runtime-Implementation-Details/Consul-Deployment.html",
-          "hash": "gOhzk543Hfl5uM4CGnhsIA=="
+          "hash": "dxPaTWuZ14FKWwv9mbBcSw=="
         }
       },
       "is_incremental": false,
@@ -877,7 +877,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Runtime-Implementation-Details/Load-Balancing.html",
-          "hash": "6S5fZmDTR0V8YqV9E9Usog=="
+          "hash": "cGEoSae1EYAqqp7bAg0TSQ=="
         }
       },
       "is_incremental": false,
@@ -889,7 +889,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Runtime-Implementation-Details/Messaging-Delivery-Guarantees.html",
-          "hash": "0D+AyX9dWiwjC5g+KzZ8CA=="
+          "hash": "yU1JCJgPfJtlUHbsqP7B4g=="
         }
       },
       "is_incremental": false,
@@ -901,7 +901,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Runtime-Implementation-Details/Relational-Storage.html",
-          "hash": "Fp3GYfbeoZFEeStoPkO0ng=="
+          "hash": "b3eZyf8U+huRDNoEa8FgvA=="
         }
       },
       "is_incremental": false,
@@ -913,7 +913,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Runtime-Implementation-Details/Runtime-Tables.html",
-          "hash": "17ncwtWkUn12oXFi0u6F1A=="
+          "hash": "SoAUhxl9KROzmQQtUaSPlA=="
         }
       },
       "is_incremental": false,
@@ -925,7 +925,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Runtime-Implementation-Details/Scheduler.html",
-          "hash": "ly9wO1oKqhDFE64AYQM9LQ=="
+          "hash": "7qHCvJSxQokqJANs2yB8Yg=="
         }
       },
       "is_incremental": false,
@@ -937,7 +937,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Samples-Overview/Adventure.html",
-          "hash": "p2bSvDSgoqVo1uPNXSUHyA=="
+          "hash": "Kw79z1MGm4v/z1mx6Tt/zQ=="
         }
       },
       "is_incremental": false,
@@ -949,7 +949,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Samples-Overview/Azure-Web-Sample.html",
-          "hash": "OzDzvfsJbIGRXOhx+fEz/A=="
+          "hash": "2MQZrV83nwC4bIcNzdYvuQ=="
         }
       },
       "is_incremental": false,
@@ -1027,7 +1027,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Samples-Overview/Chirper.html",
-          "hash": "KvcxlrOxBR4sDtvBvMZ3Bg=="
+          "hash": "XLuulAzFe4ThkaP1juEkig=="
         }
       },
       "is_incremental": false,
@@ -1039,7 +1039,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Samples-Overview/GPS-Tracker.html",
-          "hash": "yK0NUR+08iBxyh3XtBf4qA=="
+          "hash": "rhBTV0BNvepynCN/xU/XDg=="
         }
       },
       "is_incremental": false,
@@ -1062,7 +1062,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Samples-Overview/Hello-World.html",
-          "hash": "wdeHErcmC8Y9UGCkSzKG4Q=="
+          "hash": "HpC4K1zwlWqsbPQGixRxoA=="
         }
       },
       "is_incremental": false,
@@ -1074,7 +1074,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Samples-Overview/Presence-Service.html",
-          "hash": "mRt7uJIDEozB9dktnGoV9g=="
+          "hash": "Erc18WySjRvsA7yxdSJvgw=="
         }
       },
       "is_incremental": false,
@@ -1097,7 +1097,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Samples-Overview/Storage-Providers.html",
-          "hash": "97ApR0hslNW+rfgb43aUBg=="
+          "hash": "4qgoPKMoI14fWfv/lcPCDA=="
         }
       },
       "is_incremental": false,
@@ -1109,7 +1109,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Samples-Overview/Tic-Tac-Toe.html",
-          "hash": "vX4lxySum2hLHWtufprhFA=="
+          "hash": "ar1osksWmYU3YfdrCvIlRA=="
         }
       },
       "is_incremental": false,
@@ -1121,7 +1121,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Samples-Overview/Twitter-Sentiment.html",
-          "hash": "VSfw57hTyN5cSAlZZ5cwGQ=="
+          "hash": "2tUWQOegRHxmVCuiFs2ltg=="
         }
       },
       "is_incremental": false,
@@ -1144,7 +1144,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Samples-Overview/index.html",
-          "hash": "PpN6PS4UC9TYha/SAv8tUQ=="
+          "hash": "tdbjprwfYAVILxVLNjRI5Q=="
         }
       },
       "is_incremental": false,
@@ -1619,7 +1619,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/A-Service-is-a-Collection-of-Communicating-Actors.html",
-          "hash": "kTzQxkALg1dc7869csyEvA=="
+          "hash": "8hPIAa7A3oVYB3gbSlbYbQ=="
         }
       },
       "is_incremental": false,
@@ -1631,7 +1631,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/Actor-Identity.html",
-          "hash": "jzvi/zHgTg+1RlqZtES7xQ=="
+          "hash": "wIuK98fhbkgjf9SOMNW3mA=="
         }
       },
       "is_incremental": false,
@@ -1643,7 +1643,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/Cloud-Deployment.html",
-          "hash": "r6mCLp26gVZ8tFkerJUcHw=="
+          "hash": "cFLl8WgnV7RTgGXGVFqmBQ=="
         }
       },
       "is_incremental": false,
@@ -1655,7 +1655,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/Concurrency.html",
-          "hash": "mhIf1ZvyXDjzWX8qugNhyA=="
+          "hash": "fvdYQeFftFOxYXaAGUo+sw=="
         }
       },
       "is_incremental": false,
@@ -1667,7 +1667,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/Custom-Storage-Providers.html",
-          "hash": "SPGNTkojuUFssMxK8UE0OA=="
+          "hash": "ACML1od+PDh9bvpvB7zYGQ=="
         }
       },
       "is_incremental": false,
@@ -1679,7 +1679,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/Declarative-Persistence.html",
-          "hash": "/nRrfUutYDoxtux5k4+tWQ=="
+          "hash": "lh+LdFNC1UyG7X9M4MMKPQ=="
         }
       },
       "is_incremental": false,
@@ -1691,7 +1691,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/Failure-Handling.html",
-          "hash": "SFaXEbQ80ULoC3IEVj//+g=="
+          "hash": "jtPsFVXcbW93OWLUEFxwcA=="
         }
       },
       "is_incremental": false,
@@ -1703,7 +1703,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/Front-Ends-for-Orleans-Services.html",
-          "hash": "vrUDwZaD64Em8+CeluLzVQ=="
+          "hash": "JbIQf4TJEESenuyH4lmr6Q=="
         }
       },
       "is_incremental": false,
@@ -1715,7 +1715,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/Interaction-with-Libraries-and-Services.html",
-          "hash": "jSbsnvT4aPMNOPMBHL54cg=="
+          "hash": "UrzaftIrA5CHiH5mHCTAdA=="
         }
       },
       "is_incremental": false,
@@ -1727,7 +1727,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/Minimal-Orleans-Application.html",
-          "hash": "J3pU/U9Wdf2kR+0+JvzYPw=="
+          "hash": "KN3BTyN3Y6EJCcdFh5YSIA=="
         }
       },
       "is_incremental": false,
@@ -1739,7 +1739,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/My-First-Orleans-Application.html",
-          "hash": "2oUOnqLfpEITDX0oG5dKww=="
+          "hash": "Seq0lIYjurrA9A72AMkq2w=="
         }
       },
       "is_incremental": false,
@@ -1751,7 +1751,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/On-Premise-Deployment.html",
-          "hash": "u9ky4PdTxEBeW9vXUwt2ww=="
+          "hash": "+6q1quAbvyXgztMrjVN9yw=="
         }
       },
       "is_incremental": false,
@@ -1763,7 +1763,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/Running-in-a-Stand-alone-Silo.html",
-          "hash": "qaDzpXmlIeVwWEplZvVogA=="
+          "hash": "uGA94EluKHcUOREFGggHhw=="
         }
       },
       "is_incremental": false,
@@ -1775,7 +1775,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/Unit-Testing-Grains.html",
-          "hash": "pOtLHPqjIICgFnIrGCaMlA=="
+          "hash": "ZUFW3r7sHqOXRbRlvi8Gng=="
         }
       },
       "is_incremental": false,
@@ -1787,7 +1787,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/index.html",
-          "hash": "VfZQsdqMTGJstAOgutn/DQ=="
+          "hash": "n8kRyInrfseistu1x+Wwgg=="
         }
       },
       "is_incremental": false,
@@ -1811,7 +1811,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/warning-banner.html",
-          "hash": "rEmqXn0E8LwDXRDO+arUIg=="
+          "hash": "2jPG+VSjeIDo1XFrHL5X/A=="
         }
       },
       "is_incremental": false,
@@ -1823,7 +1823,7 @@
       "output": {
         ".html": {
           "relative_path": "Community/Contributing.html",
-          "hash": "zJ5MTVACGTYsRm2bmmQeMg=="
+          "hash": "z4dXQC1EdJpMkmIC6VWXsg=="
         }
       },
       "is_incremental": false,
@@ -1835,7 +1835,7 @@
       "output": {
         ".html": {
           "relative_path": "Community/Documentation-Guidelines.html",
-          "hash": "ONv7fI5R7EUosx08VMawiw=="
+          "hash": "oakB1/1wYQWA74nHNL2H8Q=="
         }
       },
       "is_incremental": false,
@@ -1847,7 +1847,7 @@
       "output": {
         ".html": {
           "relative_path": "Community/Ideas-for-Contributions.html",
-          "hash": "XEq2V25cwsXtcWrPT5DMwA=="
+          "hash": "botbV2AaupVzmaJXWNReQA=="
         }
       },
       "is_incremental": false,
@@ -1859,7 +1859,7 @@
       "output": {
         ".html": {
           "relative_path": "Community/Links.html",
-          "hash": "NSGZIr6e2txiFhRO0sGFMg=="
+          "hash": "dSNvoXrjPSmdNWaackETlw=="
         }
       },
       "is_incremental": false,
@@ -1871,7 +1871,7 @@
       "output": {
         ".html": {
           "relative_path": "Community/Orleans-Architecture-Principles-and-Approach-I.html",
-          "hash": "g298iCA7LsTGTzMIQnPbog=="
+          "hash": "BHzDmM4qlqerJWpic6s+BA=="
         }
       },
       "is_incremental": false,
@@ -1883,7 +1883,7 @@
       "output": {
         ".html": {
           "relative_path": "Community/Orleans-Thinking-Big-and-Small.html",
-          "hash": "MZQ/Q9i9jqzV2OA1mXDhGA=="
+          "hash": "/ZmhZA4qKRve88QHVPW26w=="
         }
       },
       "is_incremental": false,
@@ -1895,7 +1895,7 @@
       "output": {
         ".html": {
           "relative_path": "Community/Student-Projects.html",
-          "hash": "IqS2FMdXXesZNpqJBFjyXQ=="
+          "hash": "KQ4NqCg6e6U5bQkc28u5CQ=="
         }
       },
       "is_incremental": false,
@@ -1907,7 +1907,7 @@
       "output": {
         ".html": {
           "relative_path": "Community/Who-Is-Using-Orleans.html",
-          "hash": "fvO2Rfgx7xeCU3TeNnmnVA=="
+          "hash": "wsKpRVfeVG+xehvn/+pLrw=="
         }
       },
       "is_incremental": false,
@@ -1931,7 +1931,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Advanced-Concepts/Activation-Garbage-Collection.html",
-          "hash": "qW7xnrymwAJJ6QJaoBxGiA=="
+          "hash": "01H8D8UbwBm51ERdG7GBzA=="
         }
       },
       "is_incremental": false,
@@ -1943,7 +1943,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Advanced-Concepts/Cancellation-Tokens.html",
-          "hash": "1ytU3bG9bCA79hJJ0w/wvA=="
+          "hash": "HrpAXbfDcDytxnU21xlwAg=="
         }
       },
       "is_incremental": false,
@@ -1955,7 +1955,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Advanced-Concepts/Codegen.html",
-          "hash": "hTWxbos+HrjAbZvyjF413w=="
+          "hash": "iU8A4VZdk2eg54i45rkVzQ=="
         }
       },
       "is_incremental": false,
@@ -1967,7 +1967,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Advanced-Concepts/External-Tasks-and-Grains.html",
-          "hash": "OOiDx0w2un8m0+2bA46JDQ=="
+          "hash": "KfEf8hRjfutWfSSbByULrg=="
         }
       },
       "is_incremental": false,
@@ -1979,7 +1979,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Advanced-Concepts/Interceptors.html",
-          "hash": "oY8l9wJwTCTWkvra7qFraw=="
+          "hash": "220SpmpMcEJ5MV+nHddtvg=="
         }
       },
       "is_incremental": false,
@@ -1991,7 +1991,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Advanced-Concepts/Powershell-Client.html",
-          "hash": "hYmw0NZhKUOJYLoXvJ4euQ=="
+          "hash": "DvkoamsxrqdGc5Vm+7T34w=="
         }
       },
       "is_incremental": false,
@@ -2003,7 +2003,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Advanced-Concepts/Reentrant-Grains.html",
-          "hash": "mVAp0n7TrUCRTh2xPoP8EQ=="
+          "hash": "Og1oSBg1y1fHPPvCaH3eUQ=="
         }
       },
       "is_incremental": false,
@@ -2015,7 +2015,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Advanced-Concepts/Request-Context.html",
-          "hash": "bMuo3vK1fao13xQrvOt6qg=="
+          "hash": "GKx49mlDIXv2qFya30RnFw=="
         }
       },
       "is_incremental": false,
@@ -2027,7 +2027,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Advanced-Concepts/Serialization.html",
-          "hash": "R5o5JmnIaY2ZrKLhfT6KdQ=="
+          "hash": "IXdldVK8H6xz1axVpOxYRA=="
         }
       },
       "is_incremental": false,
@@ -2039,7 +2039,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Advanced-Concepts/StartupTasks.html",
-          "hash": "ls53GymrWZYs4bfs9dZNXQ=="
+          "hash": "ikVNM+TdbQ9KxXUos82Xjw=="
         }
       },
       "is_incremental": false,
@@ -2051,7 +2051,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Advanced-Concepts/Transactions.html",
-          "hash": "5WT8iLYhUlZ8VVwUwCq3/w=="
+          "hash": "7AQUbxcMyHvUkWI6uQMUYA=="
         }
       },
       "is_incremental": false,
@@ -2063,7 +2063,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Benefits.html",
-          "hash": "xbbPxwLCBQaghAelOjGRYg=="
+          "hash": "T6ruLpNmsGxrUmtRCS9Ufw=="
         }
       },
       "is_incremental": false,
@@ -2075,7 +2075,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.html",
-          "hash": "zu2V8uE5X7ljDk5GQztryw=="
+          "hash": "dNQDTBeBkx7G6yBMfOy6XA=="
         }
       },
       "is_incremental": false,
@@ -2087,7 +2087,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Core-Features/Dependency-Injection.html",
-          "hash": "0LspIsUaWjxRqo2EpqlmMA=="
+          "hash": "5HGeGe1oyRyHScMJLeqWjA=="
         }
       },
       "is_incremental": false,
@@ -2099,7 +2099,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Core-Features/Grain-Persistence.html",
-          "hash": "jXCAE08HQwBeaqqTlASkkA=="
+          "hash": "9BUIAjpN4435VIBGdvosJg=="
         }
       },
       "is_incremental": false,
@@ -2111,7 +2111,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Core-Features/Observers.html",
-          "hash": "/AXlTXWqdhzSalQ8ZeMtOQ=="
+          "hash": "jml9C/61CIJ6MVG+9jFwHA=="
         }
       },
       "is_incremental": false,
@@ -2123,7 +2123,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Core-Features/StatelessWorker.html",
-          "hash": "d3CyIW0vJKi44ndl76no1w=="
+          "hash": "eDkSBg5dQZxNE8z+jL9F8A=="
         }
       },
       "is_incremental": false,
@@ -2135,7 +2135,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Core-Features/Timers-and-Reminders.html",
-          "hash": "dzbSB1Lw23bvPUj2LLiptA=="
+          "hash": "cf4tuPqCEm78Uy0g+DfKfA=="
         }
       },
       "is_incremental": false,
@@ -2147,7 +2147,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Configuration-Guide/Client-Configuration.html",
-          "hash": "pa4pqobRs3pfDIG0zi1e0g=="
+          "hash": "NLmYDS4VQXKQakie1UtfHg=="
         }
       },
       "is_incremental": false,
@@ -2159,7 +2159,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Configuration-Guide/Configuring-.NET-Garbage-Collection.html",
-          "hash": "QUFi8C9eTT7HODYY3KpjsA=="
+          "hash": "BVYVZo4CvaOjnNOuBwUKgQ=="
         }
       },
       "is_incremental": false,
@@ -2171,7 +2171,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Configuration-Guide/Configuring-AdoNet-Providers.html",
-          "hash": "ypvpXtZI4a/LxamO5N4hAg=="
+          "hash": "tTc1wwkckhsJJwy4zP+BEg=="
         }
       },
       "is_incremental": false,
@@ -2183,7 +2183,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Configuration-Guide/Local-Development-Configuration.html",
-          "hash": "LZ1ACIJ+Fh+kOj1skMyJQA=="
+          "hash": "TlVWP0LwAasKNvfZI5exFg=="
         }
       },
       "is_incremental": false,
@@ -2195,7 +2195,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Configuration-Guide/Options-List.html",
-          "hash": "OOGkT4MXXPMsQcrorGTt8g=="
+          "hash": "cdB9wbaJe4Jdol+4T4zvdA=="
         }
       },
       "is_incremental": false,
@@ -2207,7 +2207,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Configuration-Guide/Server-Configuration.html",
-          "hash": "8fD7lHRtTKjDObbpaTJD8A=="
+          "hash": "NoMF3ZRffPmA7vFOxo3+RQ=="
         }
       },
       "is_incremental": false,
@@ -2219,7 +2219,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Configuration-Guide/Typical-Configurations.html",
-          "hash": "aCkbFzdItJiqvW+rU8pdrw=="
+          "hash": "ir6T6mWxt7FNxwdGA6Nyeg=="
         }
       },
       "is_incremental": false,
@@ -2231,7 +2231,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Configuration-Guide/index.html",
-          "hash": "Ncjdxt0Sn5Wrye+KogzQZg=="
+          "hash": "ZlsrWilao8HUqQ9GAy1UAQ=="
         }
       },
       "is_incremental": false,
@@ -2243,7 +2243,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Docker-Deployment.html",
-          "hash": "1i6tGehES7wca9+DLig0hg=="
+          "hash": "rqQS1WXjCm2UpidfUsBsqg=="
         }
       },
       "is_incremental": false,
@@ -2255,7 +2255,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Heterogeneous-Silos.html",
-          "hash": "UjS6OaYBiSIOGkxAcKx5cg=="
+          "hash": "ht30oL2qbHqe6pVgNKCAEQ=="
         }
       },
       "is_incremental": false,
@@ -2278,7 +2278,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Monitoring/Client-Error-Code-Monitoring.html",
-          "hash": "PDCPCf024Hu0rGHS+VRM8g=="
+          "hash": "OrbwMvPmNO+XR5/Sca/FRg=="
         }
       },
       "is_incremental": false,
@@ -2290,7 +2290,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Monitoring/Runtime-Monitoring.html",
-          "hash": "egX0eU+Ee087iLUTU+op7w=="
+          "hash": "0lh1kMx5eDMkcYKp1s9z2Q=="
         }
       },
       "is_incremental": false,
@@ -2302,7 +2302,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Monitoring/Silo-Error-Code-Monitoring.html",
-          "hash": "9oLg0ifsRSrX8nykDQ5wqg=="
+          "hash": "PKxQcoVmJRHyu420T+9XWg=="
         }
       },
       "is_incremental": false,
@@ -2314,7 +2314,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Service-Fabric.html",
-          "hash": "vSU0b0yPsD6Pfhalo8hjcg=="
+          "hash": "nRHfimDkUUNOhKafMUI5Aw=="
         }
       },
       "is_incremental": false,
@@ -2326,7 +2326,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/SiloShutdown.html",
-          "hash": "GXtAuQEmNMTziZi69v7ZHQ=="
+          "hash": "JZQ3rrtSWkerz4FA1tcb7Q=="
         }
       },
       "is_incremental": false,
@@ -2338,7 +2338,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Troubleshooting-Deployments.html",
-          "hash": "B9j55L6PssRcErDbmZp5vQ=="
+          "hash": "WKs/SyMaVqqczPQTonVW8A=="
         }
       },
       "is_incremental": false,
@@ -2350,7 +2350,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Using-Azure-Web-Apps.html",
-          "hash": "0rxjr0IJv4kzC0aWB1GBRg=="
+          "hash": "uSBgQ+bF6PT69NU+cqZ4bQ=="
         }
       },
       "is_incremental": false,
@@ -2373,7 +2373,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Event-Sourcing/Configuration.html",
-          "hash": "2Cpfbm+7Q6bGXUFl4pInCg=="
+          "hash": "VgKGqttOLFit15zfOIMvqg=="
         }
       },
       "is_incremental": false,
@@ -2385,7 +2385,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Event-Sourcing/Diagnostics.html",
-          "hash": "fmOlRgJ9SLCPT9aDnuxgJQ=="
+          "hash": "eVurVerivZVg6uru4Lemrw=="
         }
       },
       "is_incremental": false,
@@ -2397,7 +2397,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Event-Sourcing/GrainStateAPI.html",
-          "hash": "bCElLE+IdlJE1GOkXYVl5A=="
+          "hash": "nIHYoOPDxIQGJtjBPMzi0Q=="
         }
       },
       "is_incremental": false,
@@ -2409,7 +2409,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Event-Sourcing/LogConsistencyProviders.html",
-          "hash": "UNAGdcC5nZK0JhwC1Isxew=="
+          "hash": "koJnj6cDsXsG97qDXKNsGg=="
         }
       },
       "is_incremental": false,
@@ -2421,7 +2421,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Event-Sourcing/MultiInstance.html",
-          "hash": "ONo3jjHzcoI7U/h3ZC9pcQ=="
+          "hash": "rWOPuvl25azBiuUDcjm6qQ=="
         }
       },
       "is_incremental": false,
@@ -2433,7 +2433,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Event-Sourcing/MultiVersion.html",
-          "hash": "E32TC8g5v8QE0uRSIqFQJQ=="
+          "hash": "KnyPHhh//PXRCXGqk8VyLw=="
         }
       },
       "is_incremental": false,
@@ -2445,7 +2445,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Event-Sourcing/Overview.html",
-          "hash": "OKxkRDkMtBfB9OoaWx62fw=="
+          "hash": "EPJu1QU6mrxz4dRqFwUZLQ=="
         }
       },
       "is_incremental": false,
@@ -2457,7 +2457,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Event-Sourcing/Subscribe.html",
-          "hash": "gYl9E/vJVLA9llmGkayCfA=="
+          "hash": "if9E3IhyKAouuUqcKuIFUw=="
         }
       },
       "is_incremental": false,
@@ -2469,7 +2469,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Frequently-Asked-Questions.html",
-          "hash": "H4pYOEogN0UHPweM+LdUaA=="
+          "hash": "bimuQSyJd/z89/KGkO27Jg=="
         }
       },
       "is_incremental": false,
@@ -2481,7 +2481,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Getting-Started-With-Orleans/Debugging.html",
-          "hash": "Gf7g+5CoKjDoLzaLupgVDQ=="
+          "hash": "1scvs6vx9eSB9bkw9XBj+Q=="
         }
       },
       "is_incremental": false,
@@ -2493,7 +2493,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Getting-Started-With-Orleans/Developing-a-Client.html",
-          "hash": "8kCKTqkr8Z38VBXY9wIq3A=="
+          "hash": "mb+/lnpAbtY4tb9bqQyCgg=="
         }
       },
       "is_incremental": false,
@@ -2505,7 +2505,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Getting-Started-With-Orleans/Developing-a-Grain.html",
-          "hash": "PszqGkws2IIDDmaGWbbHrA=="
+          "hash": "3WgQtavGGv0iVWCwb/2Yow=="
         }
       },
       "is_incremental": false,
@@ -2528,7 +2528,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Getting-Started-With-Orleans/Grains.html",
-          "hash": "s50bNcamH6eNcyIG0Mm36w=="
+          "hash": "YrDukbxBRA/fxocZkAIhpg=="
         }
       },
       "is_incremental": false,
@@ -2540,7 +2540,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Getting-Started-With-Orleans/NuGets.html",
-          "hash": "ZnKqaoncI7WnUHWowzdWsg=="
+          "hash": "qWQG5Okhw2M4SvQiV8Dnrw=="
         }
       },
       "is_incremental": false,
@@ -2552,7 +2552,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Getting-Started-With-Orleans/Prerequisites.html",
-          "hash": "cshZVkLf8WRE1ams5R1u4g=="
+          "hash": "kmVE6+NtMqOrDyKDPI4Vdg=="
         }
       },
       "is_incremental": false,
@@ -2564,7 +2564,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Getting-Started-With-Orleans/Running-the-Application.html",
-          "hash": "PhLCvPhglYl49ZgHhJJxdA=="
+          "hash": "/8t8g7+5AUKGaiwP59t5TA=="
         }
       },
       "is_incremental": false,
@@ -2576,7 +2576,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Grain-Versioning/Backward-compatibility-guidelines.html",
-          "hash": "l8SNxy3qP0On7/57rYq1+A=="
+          "hash": "h2YKJ4Eg/f/Zdd/st6Wwrw=="
         }
       },
       "is_incremental": false,
@@ -2588,7 +2588,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Grain-Versioning/Compatible-grains.html",
-          "hash": "eW/gyb9IKh4BKd6G+3+2UA=="
+          "hash": "nuJkMOZyeUMaqRXIAgWZng=="
         }
       },
       "is_incremental": false,
@@ -2600,7 +2600,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Grain-Versioning/Deployment.html",
-          "hash": "4U+wuPCPzmuMehXG/SB6tA=="
+          "hash": "cRtW+8J7ptG18SOwZNDJ5w=="
         }
       },
       "is_incremental": false,
@@ -2612,7 +2612,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Grain-Versioning/Grain-versioning.html",
-          "hash": "UgSp+ghzQNRHGCQZGXbMCQ=="
+          "hash": "WbuYbYqwU1tm7O0JtpDEdA=="
         }
       },
       "is_incremental": false,
@@ -2624,7 +2624,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Grain-Versioning/Version-selector-strategy.html",
-          "hash": "SuJrBKUi8npnUrKLMGNpHQ=="
+          "hash": "HDCkxX2KS0v990hZq+MDtQ=="
         }
       },
       "is_incremental": false,
@@ -2658,7 +2658,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Introduction.html",
-          "hash": "PKq2PsDxr94IgJN81JfFlg=="
+          "hash": "QF1iONhZy2BRXT1i3/9LaQ=="
         }
       },
       "is_incremental": false,
@@ -2670,7 +2670,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Migration/Codegen.html",
-          "hash": "RWEhBUGUNGkdUOxOlvj+mw=="
+          "hash": "nijjJSLwTNomLe3YCytzIA=="
         }
       },
       "is_incremental": false,
@@ -2682,7 +2682,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Migration/Migration1.5.html",
-          "hash": "K2InErB4H9JNa8+BD1AI+w=="
+          "hash": "ucrEBWyP23wLtsQSLodDJA=="
         }
       },
       "is_incremental": false,
@@ -2694,7 +2694,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Migration/MigrationAzure2.0.html",
-          "hash": "bn6/lVqkjRkTxI2zjbl7GQ=="
+          "hash": "4As+FFaAh3iWUE5XT1zZaw=="
         }
       },
       "is_incremental": false,
@@ -2706,7 +2706,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Multi-Cluster/GlobalSingleInstance.html",
-          "hash": "G2yC6C3A5Y6ShWfV0tEUsA=="
+          "hash": "iPhDSuJMMnPUgEIpurm7fA=="
         }
       },
       "is_incremental": false,
@@ -2718,7 +2718,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Multi-Cluster/GossipChannels.html",
-          "hash": "g762CJyDDv+hwSq1sv+8vg=="
+          "hash": "INKFaiRW8LUoDnLgN0tetA=="
         }
       },
       "is_incremental": false,
@@ -2730,7 +2730,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Multi-Cluster/MultiClusterConfiguration.html",
-          "hash": "aM0wD/rijiyNYjBfuVFCgg=="
+          "hash": "XDaCTLS/+tAS0ZSHa+9HJA=="
         }
       },
       "is_incremental": false,
@@ -2742,7 +2742,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Multi-Cluster/Overview.html",
-          "hash": "9p+YGRA70qGMdclytL/3Mw=="
+          "hash": "k0xEClFhlIj/jXJkZDzgBQ=="
         }
       },
       "is_incremental": false,
@@ -2754,7 +2754,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Multi-Cluster/SiloConfiguration.html",
-          "hash": "VtHRmuAVpb+fu3HfHu4ifw=="
+          "hash": "yXtQnzN0CUSOAAcZL5TfPg=="
         }
       },
       "is_incremental": false,
@@ -2766,7 +2766,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Orleans-2.0.html",
-          "hash": "gmANaFrLnotH0nwAoxEVeg=="
+          "hash": "9C+Yk8qQsy8NV3gYTnJ8sg=="
         }
       },
       "is_incremental": false,
@@ -2778,7 +2778,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Orleans-Streams/Stream-Providers.html",
-          "hash": "puj2hNJu37iUCG4GN9DzOQ=="
+          "hash": "2/B1uWSKx6dzalygkiy4AA=="
         }
       },
       "is_incremental": false,
@@ -2790,7 +2790,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Orleans-Streams/Streams-Extensibility.html",
-          "hash": "6tXl4Lmeegkr+KWb3q3U1A=="
+          "hash": "CfM/UM/LLROf8NXgdSunvA=="
         }
       },
       "is_incremental": false,
@@ -2802,7 +2802,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Orleans-Streams/Streams-Implementation.html",
-          "hash": "aqSwwTpVW833fzR7Jq7eKA=="
+          "hash": "P7MtsT5s2YP4mYxHfSECUQ=="
         }
       },
       "is_incremental": false,
@@ -2814,7 +2814,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Orleans-Streams/Streams-Programming-APIs.html",
-          "hash": "AaBdTpb3ynWPjGMndPUjPA=="
+          "hash": "ipV/dEdmEasqrO7KzJTIcA=="
         }
       },
       "is_incremental": false,
@@ -2826,7 +2826,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Orleans-Streams/Streams-Quick-Start.html",
-          "hash": "ritPG/DIvoKFUDVQF8V6CA=="
+          "hash": "WRK0h/Ywtjvei42zO8iQQA=="
         }
       },
       "is_incremental": false,
@@ -2838,7 +2838,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Orleans-Streams/Streams-Why.html",
-          "hash": "xLWX1MIJjPV/OTSeFgEu9w=="
+          "hash": "YtT/uxxYmLjc6pICsunN+Q=="
         }
       },
       "is_incremental": false,
@@ -2850,7 +2850,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Orleans-Streams/index.html",
-          "hash": "P+oNYp9jURx5g93xaFjCHw=="
+          "hash": "Bejl1Oi0vSESB+zCE4h2mQ=="
         }
       },
       "is_incremental": false,
@@ -2862,7 +2862,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Presentations/index.html",
-          "hash": "YMzCPD+p4TajBiCDtuwJOQ=="
+          "hash": "83PLaGAXHmR9fCQrsa15PQ=="
         }
       },
       "is_incremental": false,
@@ -2874,7 +2874,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Runtime-Implementation-Details/Cluster-Management.html",
-          "hash": "Cxx4MhoZAlOo8NkSBVOqPg=="
+          "hash": "eBuNlyQ8xeDS2r8JMNgoLg=="
         }
       },
       "is_incremental": false,
@@ -2886,7 +2886,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Runtime-Implementation-Details/Consul-Deployment.html",
-          "hash": "YyFOgKVWx07B5RY4yYH1cQ=="
+          "hash": "DKOAcHUYFwaZRXwKG8zWyg=="
         }
       },
       "is_incremental": false,
@@ -2898,7 +2898,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Runtime-Implementation-Details/Load-Balancing.html",
-          "hash": "d2qqF9jhrfJMBl9I+1+3Xw=="
+          "hash": "mfHYmMaqnaVvROVVOKQ16A=="
         }
       },
       "is_incremental": false,
@@ -2910,7 +2910,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Runtime-Implementation-Details/Messaging-Delivery-Guarantees.html",
-          "hash": "o18iRNqfdhV42Fjmk8wcCA=="
+          "hash": "nTzWTnrMlr7YKPou5y401g=="
         }
       },
       "is_incremental": false,
@@ -2922,7 +2922,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Runtime-Implementation-Details/Relational-Storage.html",
-          "hash": "fz9oEGsHtuEJ8X2SgPpkwg=="
+          "hash": "TZ8XJASE7WsUnNNhk2ZwKw=="
         }
       },
       "is_incremental": false,
@@ -2934,7 +2934,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Runtime-Implementation-Details/Runtime-Tables.html",
-          "hash": "Z9/at71R2je8ZjopwlA8FQ=="
+          "hash": "hY5mBZswKBfEiC3coob5PQ=="
         }
       },
       "is_incremental": false,
@@ -2946,7 +2946,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Runtime-Implementation-Details/Scheduler.html",
-          "hash": "myqcVyuzOVKnzy2n8OdEeA=="
+          "hash": "+t9V0xELrIH+s+tL0ZHPyQ=="
         }
       },
       "is_incremental": false,
@@ -2958,7 +2958,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Samples-Overview/Adventure.html",
-          "hash": "c13wcRXKldXa7wpeCLJKrg=="
+          "hash": "EJilxPU/JTZDBt0CHkFIog=="
         }
       },
       "is_incremental": false,
@@ -2970,7 +2970,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Samples-Overview/Hello-World.html",
-          "hash": "rL76Y+AvzHBFbGGb6EeBeg=="
+          "hash": "FRAU1FpWWLpMFM1wOg1p8g=="
         }
       },
       "is_incremental": false,
@@ -2982,7 +2982,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Samples-Overview/index.html",
-          "hash": "10zw4HTfM5Lx4KV2pNZQBA=="
+          "hash": "oRMqEyKYGMl/oED6OkAvvg=="
         }
       },
       "is_incremental": false,
@@ -2994,7 +2994,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/What's-new-in-Orleans.html",
-          "hash": "W8Z4H2U2QC9HtuuW9jQjXw=="
+          "hash": "yucCHyvgqZo0+QYGuVo7jw=="
         }
       },
       "is_incremental": false,
@@ -3458,7 +3458,7 @@
       "output": {
         ".html": {
           "relative_path": "Tutorials/Declarative-Persistence.html",
-          "hash": "3diDus00QLDhDpY5T0L2FQ=="
+          "hash": "DCYzEfyui79bB9jtf39AvQ=="
         }
       },
       "is_incremental": false,
@@ -3470,7 +3470,7 @@
       "output": {
         ".html": {
           "relative_path": "Tutorials/index.html",
-          "hash": "GzZDfvBTV452hQ1/FYXEgQ=="
+          "hash": "EOciPczpRcTNX4Qp4kP4KQ=="
         }
       },
       "is_incremental": false,
@@ -3494,7 +3494,7 @@
       "output": {
         ".html": {
           "relative_path": "index.html",
-          "hash": "ukAxA+x4nmtpgTjWvTDYrA=="
+          "hash": "XNkx6aKRcq4xe0V6fteDpA=="
         }
       },
       "is_incremental": false,
