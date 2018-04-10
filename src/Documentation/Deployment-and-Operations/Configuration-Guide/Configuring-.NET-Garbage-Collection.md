@@ -20,6 +20,18 @@ See below as an example:
 </PropertyGroup>
 ```
 
+## .NET Framework with old .csproj project format
+
+``` xml
+// App.config
+<configuration>
+  <runtime>
+    <gcServer enabled="true"/>
+    <gcConcurrent enabled="true"/>
+  </runtime>
+</configuration>
+```
+
 However, this is not as easy to do if a silo runs as part of an Azure Worker Role, which by default is configured to use workstation GC. This blog post shows how to set the same configuration for an Azure Worker Role -  https://blogs.msdn.microsoft.com/cclayton/2014/06/05/server-garbage-collection-mode-in-microsoft-azure/
 
 **IMPORTANT NOTE**
