@@ -47,16 +47,12 @@ namespace Orleans.Hosting
         /// <param name="primarySiloEndpoint">
         /// The endpoint of the primary silo, or <see langword="null"/> to use this silo as the primary.
         /// </param>
-        /// <param name="clusterId">Cluster ID</param>
-        /// <param name="serviceId">Service ID</param>
         /// <returns>The silo builder.</returns>
         public static ISiloHostBuilder UseLocalhostClustering(
             this ISiloHostBuilder builder,
             int siloPort = EndpointOptions.DEFAULT_SILO_PORT,
             int gatewayPort = EndpointOptions.DEFAULT_GATEWAY_PORT,
-            IPEndPoint primarySiloEndpoint = null,
-            string clusterId = ClusterOptions.DevelopmentClusterId,
-            string serviceId = ClusterOptions.DevelopmentServiceId)
+            IPEndPoint primarySiloEndpoint = null)
         {
             builder.Configure<EndpointOptions>(options =>
             {
@@ -66,11 +62,6 @@ namespace Orleans.Hosting
             });
 
             builder.UseDevelopmentClustering(primarySiloEndpoint ?? new IPEndPoint(IPAddress.Loopback, siloPort));
-            builder.Configure<ClusterOptions>(options =>
-            {
-                options.ClusterId = clusterId;
-                options.ServiceId = serviceId;
-            });
             builder.Configure<ClusterMembershipOptions>(options => options.ExpectedClusterSize = 1);
 
             return builder;
@@ -94,11 +85,9 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloHostBuilder UseDevelopmentClustering(
             this ISiloHostBuilder builder,
-            Action<DevelopmentClusterMembershipOptions> configureOptions,
-            string clusterId = ClusterOptions.DevelopmentClusterId,
-            string serviceId = ClusterOptions.DevelopmentServiceId)
+            Action<DevelopmentClusterMembershipOptions> configureOptions)
         {
-            return builder.UseDevelopmentClustering(options => options.Configure(configureOptions), clusterId, serviceId);
+            return builder.UseDevelopmentClustering(options => options.Configure(configureOptions));
         }
 
         /// <summary>
@@ -106,9 +95,7 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloHostBuilder UseDevelopmentClustering(
             this ISiloHostBuilder builder,
-            Action<OptionsBuilder<DevelopmentClusterMembershipOptions>> configureOptions,
-            string clusterId = ClusterOptions.DevelopmentClusterId,
-            string serviceId = ClusterOptions.DevelopmentServiceId)
+            Action<OptionsBuilder<DevelopmentClusterMembershipOptions>> configureOptions)
         {
             return builder.ConfigureServices(
                 services =>
@@ -118,11 +105,11 @@ namespace Orleans.Hosting
                     services
                         .AddSingleton<GrainBasedMembershipTable>()
                         .AddFromExisting<IMembershipTable, GrainBasedMembershipTable>();
-                })
-                .Configure<ClusterOptions>(options =>
-                {
-                    options.ClusterId = clusterId;
-                    options.ServiceId = serviceId;
+                    services.PostConfigure<ClusterOptions>(options =>
+                    {
+                        if (string.IsNullOrWhiteSpace(options.ClusterId)) options.ClusterId = ClusterOptions.DevelopmentClusterId;
+                        if (string.IsNullOrWhiteSpace(options.ServiceId)) options.ServiceId = ClusterOptions.DevelopmentServiceId;
+                    });
                 });
         }
     }

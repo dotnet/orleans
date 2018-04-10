@@ -165,19 +165,18 @@ namespace Orleans
         /// </summary>
         /// <param name="builder"></param>
         /// <param name="gatewayPort">The local silo's gateway port.</param>
-        /// <param name="clusterId">Cluster ID to use.</param>
-        /// <param name="serviceId">Service ID to use.</param>
         public static IClientBuilder UseLocalhostClustering(
             this IClientBuilder builder,
-            int gatewayPort = 30000,
-            string clusterId = ClusterOptions.DevelopmentClusterId,
-            string serviceId = ClusterOptions.DevelopmentServiceId)
+            int gatewayPort = 30000)
         {
             return builder.UseStaticClustering(new IPEndPoint(IPAddress.Loopback, gatewayPort))
-                .Configure<ClusterOptions>(options =>
+                .ConfigureServices(services =>
                 {
-                    if (!string.IsNullOrWhiteSpace(clusterId)) options.ClusterId = clusterId;
-                    if (!string.IsNullOrWhiteSpace(serviceId)) options.ServiceId = serviceId;
+                    services.PostConfigure<ClusterOptions>(options =>
+                    {
+                        if (string.IsNullOrWhiteSpace(options.ClusterId)) options.ClusterId = ClusterOptions.DevelopmentClusterId;
+                        if (string.IsNullOrWhiteSpace(options.ServiceId)) options.ServiceId = ClusterOptions.DevelopmentServiceId;
+                    });
                 });
         }
 
@@ -189,10 +188,13 @@ namespace Orleans
         public static IClientBuilder UseLocalhostClustering(this IClientBuilder builder, params int[] gatewayPorts)
         {
             return builder.UseStaticClustering(gatewayPorts.Select(p => new IPEndPoint(IPAddress.Loopback, p)).ToArray())
-                .Configure<ClusterOptions>(options =>
+                .ConfigureServices(services =>
                 {
-                    options.ClusterId = ClusterOptions.DevelopmentClusterId;
-                    options.ServiceId = ClusterOptions.DevelopmentServiceId;
+                    services.PostConfigure<ClusterOptions>(options =>
+                    {
+                        if (string.IsNullOrWhiteSpace(options.ClusterId)) options.ClusterId = ClusterOptions.DevelopmentClusterId;
+                        if (string.IsNullOrWhiteSpace(options.ServiceId)) options.ServiceId = ClusterOptions.DevelopmentServiceId;
+                    });
                 });
         }
 
