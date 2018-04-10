@@ -39,7 +39,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configures a localhost silo for development and testing.
+        /// Configures the silo to use development-only clustering and listen on localhost.
         /// </summary>
         /// <param name="builder">The silo builder.</param>
         /// <param name="siloPort">The silo port.</param>
@@ -48,13 +48,15 @@ namespace Orleans.Hosting
         /// The endpoint of the primary silo, or <see langword="null"/> to use this silo as the primary.
         /// </param>
         /// <param name="clusterId">Cluster ID</param>
+        /// <param name="serviceId">Service ID</param>
         /// <returns>The silo builder.</returns>
         public static ISiloHostBuilder UseLocalhostClustering(
             this ISiloHostBuilder builder,
             int siloPort = EndpointOptions.DEFAULT_SILO_PORT,
             int gatewayPort = EndpointOptions.DEFAULT_GATEWAY_PORT,
             IPEndPoint primarySiloEndpoint = null,
-            string clusterId = ClusterOptions.DevelopmentClusterId)
+            string clusterId = ClusterOptions.DevelopmentClusterId,
+            string serviceId = ClusterOptions.DevelopmentServiceId)
         {
             builder.Configure<EndpointOptions>(options =>
             {
@@ -64,7 +66,11 @@ namespace Orleans.Hosting
             });
 
             builder.UseDevelopmentClustering(primarySiloEndpoint ?? new IPEndPoint(IPAddress.Loopback, siloPort));
-            builder.Configure<ClusterOptions>(options => options.ClusterId = clusterId);
+            builder.Configure<ClusterOptions>(options =>
+            {
+                options.ClusterId = clusterId;
+                options.ServiceId = serviceId;
+            });
             builder.Configure<ClusterMembershipOptions>(options => options.ExpectedClusterSize = 1);
 
             return builder;
@@ -89,23 +95,10 @@ namespace Orleans.Hosting
         public static ISiloHostBuilder UseDevelopmentClustering(
             this ISiloHostBuilder builder,
             Action<DevelopmentClusterMembershipOptions> configureOptions,
-            string clusterId = ClusterOptions.DevelopmentClusterId)
+            string clusterId = ClusterOptions.DevelopmentClusterId,
+            string serviceId = ClusterOptions.DevelopmentServiceId)
         {
-            return builder
-                .Configure<ClusterOptions>(options => options.ClusterId = clusterId)
-                .ConfigureServices(
-                services =>
-                {
-                    if (configureOptions != null)
-                    {
-                        services.Configure(configureOptions);
-                    }
-
-                    services.ConfigureFormatter<DevelopmentClusterMembershipOptions>();
-                    services
-                        .AddSingleton<GrainBasedMembershipTable>()
-                        .AddFromExisting<IMembershipTable, GrainBasedMembershipTable>();
-                });
+            return builder.UseDevelopmentClustering(options => options.Configure(configureOptions), clusterId, serviceId);
         }
 
         /// <summary>
@@ -114,7 +107,8 @@ namespace Orleans.Hosting
         public static ISiloHostBuilder UseDevelopmentClustering(
             this ISiloHostBuilder builder,
             Action<OptionsBuilder<DevelopmentClusterMembershipOptions>> configureOptions,
-            string clusterId = ClusterOptions.DevelopmentClusterId)
+            string clusterId = ClusterOptions.DevelopmentClusterId,
+            string serviceId = ClusterOptions.DevelopmentServiceId)
         {
             return builder.ConfigureServices(
                 services =>
@@ -124,6 +118,11 @@ namespace Orleans.Hosting
                     services
                         .AddSingleton<GrainBasedMembershipTable>()
                         .AddFromExisting<IMembershipTable, GrainBasedMembershipTable>();
+                })
+                .Configure<ClusterOptions>(options =>
+                {
+                    options.ClusterId = clusterId;
+                    options.ServiceId = serviceId;
                 });
         }
     }
