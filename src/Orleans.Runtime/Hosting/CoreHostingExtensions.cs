@@ -63,6 +63,14 @@ namespace Orleans.Hosting
 
             builder.UseDevelopmentClustering(primarySiloEndpoint ?? new IPEndPoint(IPAddress.Loopback, siloPort));
             builder.Configure<ClusterMembershipOptions>(options => options.ExpectedClusterSize = 1);
+            builder.ConfigureServices(services =>
+            {
+                services.PostConfigure<ClusterOptions>(options =>
+                {
+                    if (string.IsNullOrWhiteSpace(options.ClusterId)) options.ClusterId = ClusterOptions.DevelopmentClusterId;
+                    if (string.IsNullOrWhiteSpace(options.ServiceId)) options.ServiceId = ClusterOptions.DevelopmentServiceId;
+                });
+            });
 
             return builder;
         }
@@ -105,11 +113,6 @@ namespace Orleans.Hosting
                     services
                         .AddSingleton<GrainBasedMembershipTable>()
                         .AddFromExisting<IMembershipTable, GrainBasedMembershipTable>();
-                    services.PostConfigure<ClusterOptions>(options =>
-                    {
-                        if (string.IsNullOrWhiteSpace(options.ClusterId)) options.ClusterId = ClusterOptions.DevelopmentClusterId;
-                        if (string.IsNullOrWhiteSpace(options.ServiceId)) options.ServiceId = ClusterOptions.DevelopmentServiceId;
-                    });
                 });
         }
     }
