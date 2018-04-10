@@ -85,6 +85,14 @@ See below as an example:</p>
   &lt;ServerGarbageCollection&gt;true&lt;/ServerGarbageCollection&gt;
   &lt;ConcurrentGarbageCollection&gt;true&lt;/ConcurrentGarbageCollection&gt;
 &lt;/PropertyGroup&gt;
+</code></pre><h2 id="net-framework-with-old-csproj-project-format">.NET Framework with old .csproj project format</h2>
+<pre><code class="lang-xml">// App.config
+&lt;configuration&gt;
+  &lt;runtime&gt;
+    &lt;gcServer enabled=&quot;true&quot;/&gt;
+    &lt;gcConcurrent enabled=&quot;true&quot;/&gt;
+  &lt;/runtime&gt;
+&lt;/configuration&gt;
 </code></pre><p>However, this is not as easy to do if a silo runs as part of an Azure Worker Role, which by default is configured to use workstation GC. This blog post shows how to set the same configuration for an Azure Worker Role -  <a href="https://blogs.msdn.microsoft.com/cclayton/2014/06/05/server-garbage-collection-mode-in-microsoft-azure/">https://blogs.msdn.microsoft.com/cclayton/2014/06/05/server-garbage-collection-mode-in-microsoft-azure/</a></p>
 <p><strong>IMPORTANT NOTE</strong></p>
 <p><a href="https://msdn.microsoft.com/en-us/library/system.runtime.gcsettings.isservergc(v=vs.110).aspx">Server garbage collection is available only on multiprocessor computers</a>.
