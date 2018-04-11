@@ -27,7 +27,7 @@
     </When>
     <Otherwise>
       <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.Core" Version="$(OrleansEventSourcingVersion)"/>
+        <PackageReference Include="Microsoft.Orleans.Core" Version="$(OrleansCoreVersion)"/>
       </ItemGroup>
     </Otherwise>
   </Choose>
@@ -40,7 +40,7 @@
     </When>
     <Otherwise>
       <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.Runtime.Abstractions" Version="$(OrleansEventSourcingVersion)"/>
+        <PackageReference Include="Microsoft.Orleans.Runtime.Abstractions" Version="$(OrleansRuntimeAbstractionsVersion)"/>
       </ItemGroup>
     </Otherwise>
   </Choose>
