@@ -92,6 +92,10 @@ namespace Benchmarks
             {
                 new SequentialPingBenchmark().PingPongForever().GetAwaiter().GetResult();
             },
+            ["PingPongForeverSaturate"] = () =>
+            {
+                new SequentialPingBenchmark().PingPongForever().GetAwaiter().GetResult();
+            },
         };
 
         // requires benchmark name or 'All' word as first parameter

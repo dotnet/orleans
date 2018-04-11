@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
@@ -55,6 +57,24 @@ namespace Benchmarks.Ping
             while (true)
             {
                 await grain.PingPongInterleave(other, 100);
+            }
+        }
+
+        public async Task PingPongForeverSaturate()
+        {
+            var num = Environment.ProcessorCount * Environment.ProcessorCount * 2;
+            var grains = Enumerable.Range(0, num).Select(n => this.client.GetGrain<IPingGrain>(n)).ToArray();
+            var others = Enumerable.Range(num, num*2).Select(n => this.client.GetGrain<IPingGrain>(n)).ToArray();
+            var tasks = new List<Task>(num);
+            while (true)
+            {
+                tasks.Clear();
+                for (var i = 0; i < num; i++)
+                {
+                    tasks.Add(grains[i].PingPongInterleave(others[i], 100));
+                }
+
+                await Task.WhenAll(tasks);
             }
         }
 
