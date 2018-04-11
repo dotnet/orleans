@@ -2,15 +2,14 @@
   <PropertyGroup>
     <RootNamespace>Benchmarks</RootNamespace>
     <AssemblyName>Benchmarks</AssemblyName>
-    <ApplicationIcon />
+    <TargetFrameworks>netcoreapp2.0;net461</TargetFrameworks>
     <OutputType>Exe</OutputType>
-    <StartupObject />
+    <DebugType>pdbonly</DebugType>
+    <DebugSymbols>true</DebugSymbols>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="BenchmarkDotNet" Version="$(BenchmarkDotNetVersion)" />
-    <PackageReference Include="BenchmarkDotNet.Diagnostics.Windows" Version="$(BenchmarkDotNetVersion)" />
-    <PackageReference Include="BenchmarkDotNet.Toolchains.Roslyn" Version="$(BenchmarkDotNetVersion)" />
   </ItemGroup>
 
   <ItemGroup>
@@ -19,9 +18,7 @@
     <ProjectReference Include="..\..\..\src\Serializers\Orleans.Serialization.ProtobufNet\Orleans.Serialization.ProtobufNet.csproj" />
     <ProjectReference Include="..\..\..\src\Orleans.Transactions\Orleans.Transactions.csproj" />
     <ProjectReference Include="..\..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
-    <ProjectReference Include="..\..\Orleans.TestingHost.Legacy\Orleans.TestingHost.Legacy.csproj" />
     <ProjectReference Include="..\..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
-    <ProjectReference Include="..\..\TestExtensions\TestExtensions.csproj" />
     <ProjectReference Include="..\BenchmarkGrains\BenchmarkGrains.csproj" />
   </ItemGroup>
 </Project>

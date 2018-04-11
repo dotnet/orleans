@@ -3,6 +3,7 @@
     <RootNamespace>BenchmarkGrains</RootNamespace>
     <AssemblyName>BenchmarkGrains</AssemblyName>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>

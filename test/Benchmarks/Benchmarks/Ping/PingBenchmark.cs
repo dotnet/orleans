@@ -1,25 +1,25 @@
 using System;
 using System.Threading.Tasks;
 using System.Linq;
-using Orleans.TestingHost;
 using BenchmarkGrainInterfaces.Ping;
-using Microsoft.Extensions.Configuration;
-using TestExtensions;
+using Orleans;
+using Orleans.Configuration;
+using Orleans.Hosting;
 
 namespace Benchmarks.Ping
 {
     public class PingBenchmark
     {
-        private TestCluster host;
+        private ISiloHost host;
+        private IClusterClient client;
 
         public void Setup()
         {
-            var builder = new TestClusterBuilder();
-            TestDefaultConfiguration.ConfigureTestCluster(builder);
-            builder.ConfigureLegacyConfiguration();
+            this.host = new SiloHostBuilder().UseLocalhostClustering().Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev").Build();
+            this.host.StartAsync().GetAwaiter().GetResult();
 
-            this.host = builder.Build();
-            this.host.Deploy();
+            this.client = new ClientBuilder().UseLocalhostClustering().Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev").Build();
+            this.client.Connect().GetAwaiter().GetResult();
         }
 
         public async Task RunAsync()
@@ -47,7 +47,7 @@ namespace Benchmarks.Ping
 
         public async Task<Report> RunAsync(int run, int concurrentPerRun, TimeSpan duration)
         {
-            ILoadGrain load = this.host.Client.GetGrain<ILoadGrain>(Guid.NewGuid());
+            ILoadGrain load = this.client.GetGrain<ILoadGrain>(Guid.NewGuid());
             await load.Generate(run, concurrentPerRun, duration);
             Report report = null;
             while (report == null)
@@ -60,7 +60,8 @@ namespace Benchmarks.Ping
 
         public void Teardown()
         {
-            this.host.StopAllSilos();
+            this.client.Dispose();
+            this.host.Dispose();
         }
     }
 }
