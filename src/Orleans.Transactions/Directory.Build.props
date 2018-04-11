@@ -20,7 +20,7 @@
   </PropertyGroup>
 
   <Choose>
-    <When Condition="$(OrleansTransactionsVersion) == $(VersionPrefix)">
+    <When Condition="$(OrleansTransactionsVersion) == $(VersionPrefix) AND $(OrleansTransactionsVersion) == $(OrleansTransactionsVersion)">
       <ItemGroup >
         <ProjectReference Include="..\Orleans.Runtime\Orleans.Runtime.csproj" />
       </ItemGroup>

@@ -5,7 +5,7 @@
 
   <Import Project="$(_ParentDirectoryBuildPropsPath)" Condition="Exists('$(_ParentDirectoryBuildPropsPath)')"/>
 
-  <PropertyGroup Condition="$(OrleansCoreVersion)!=$(VersionPrefix)">
+  <PropertyGroup Condition="$(OrleansCodegenVersion)!=$(VersionPrefix)">
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 

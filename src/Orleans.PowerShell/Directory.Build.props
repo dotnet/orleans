@@ -20,7 +20,7 @@
   </PropertyGroup>
 
   <Choose>
-    <When Condition="$(OrleansCoreLegacyVersion) == $(VersionPrefix)">
+    <When Condition="$(OrleansCoreLegacyVersion) == $(VersionPrefix) AND $(OrleansCoreLegacyVersion) == $(OrleansToolsVersion)">
       <ItemGroup >
         <ProjectReference Include="..\Orleans.Core.Legacy\Orleans.Core.Legacy.csproj" />
       </ItemGroup>

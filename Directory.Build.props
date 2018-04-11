@@ -133,11 +133,14 @@
     <OrleansAdoNetVersion>2.0.0</OrleansAdoNetVersion>
     <OrleansAWSVersion>2.0.0</OrleansAWSVersion>
     <OrleansAzureVersion>2.0.0</OrleansAzureVersion>
-    <OrleansTestingHostVersion>2.0.0</OrleansTestingHostVersion>
+    <OrleansTestingHostVersion>2.1.0</OrleansTestingHostVersion>
     <OrleansTransactionsVersion>2.0.0</OrleansTransactionsVersion>
     <OrleansServiceFabricVersion>2.0.0</OrleansServiceFabricVersion>
     <OrleansSerializersVersion>2.0.0</OrleansSerializersVersion>
     <OrleansToolsVersion>2.0.0</OrleansToolsVersion>
+    <OrleansClientVersion>2.0.0</OrleansClientVersion>
+    <OrleansServerVersion>2.0.0</OrleansServerVersion>
+    <OrleansCodegenVersion>2.0.0</OrleansCodegenVersion>
   </PropertyGroup>
   
   <PropertyGroup Condition="$(FullBuild) == 'true'">
@@ -158,6 +161,9 @@
     <OrleansServiceFabricVersion>$(VersionPrefix)</OrleansServiceFabricVersion>
     <OrleansSerializersVersion>$(VersionPrefix)</OrleansSerializersVersion>
     <OrleansToolsVersion>$(VersionPrefix)</OrleansToolsVersion>
+    <OrleansClientVersion>$(VersionPrefix)</OrleansClientVersion>
+    <OrleansServerVersion>$(VersionPrefix)</OrleansServerVersion>
+    <OrleansCodegenVersion>$(VersionPrefix)</OrleansCodegenVersion>
   </PropertyGroup>
 
   <!-- Set output folder for created NuGet packages -->

@@ -5,7 +5,7 @@
 
   <Import Project="$(_ParentDirectoryBuildPropsPath)" Condition="Exists('$(_ParentDirectoryBuildPropsPath)')"/>
 
-  <PropertyGroup Condition="$(OrleansCoreVersion)!=$(VersionPrefix)">
+  <PropertyGroup Condition="$(OrleansCodegenVersion)!=$(VersionPrefix)">
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
@@ -20,14 +20,14 @@
   </PropertyGroup>
 
   <Choose>
-    <When Condition="$(OrleansCoreVersion) == $(VersionPrefix)">
+    <When Condition="$(OrleansCoreVersion) == $(VersionPrefix) AND $(OrleansCoreVersion) == $(OrleansCodegenVersion)">
       <ItemGroup >
         <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" />
       </ItemGroup>
     </When>
     <Otherwise>
       <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.Core" Version="$(OrleansCoreVersion)"/>
+        <PackageReference Include="Microsoft.Orleans.Core" Version="$(OrleansCodegenVersion)"/>
       </ItemGroup>
     </Otherwise>
   </Choose>
