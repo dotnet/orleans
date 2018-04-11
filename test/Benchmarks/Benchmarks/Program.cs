@@ -88,6 +88,10 @@ namespace Benchmarks
             {
                 new SequentialPingBenchmark().PingForever().GetAwaiter().GetResult();
             },
+            ["PingPongForever"] = () =>
+            {
+                new SequentialPingBenchmark().PingPongForever().GetAwaiter().GetResult();
+            },
         };
 
         // requires benchmark name or 'All' word as first parameter

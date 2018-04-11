@@ -49,6 +49,15 @@ namespace Benchmarks.Ping
             }
         }
 
+        public async Task PingPongForever()
+        {
+            var other = this.client.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
+            while (true)
+            {
+                await grain.PingPongInterleave(other, 100);
+            }
+        }
+
         public void Dispose()
         {
             this.client.Dispose(); 
