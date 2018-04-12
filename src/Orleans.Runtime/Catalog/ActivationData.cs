@@ -542,15 +542,9 @@ namespace Orleans.Runtime
         /// <summary>
         /// grouped by sending activation: responses first, then sorted by id
         /// </summary>
-        private List<Message> waiting;
+        private LinkedList<Message> waiting;
 
-        public int WaitingCount 
-        { 
-            get
-            {
-                return waiting == null ? 0 : waiting.Count;
-            }
-        }
+        public int WaitingCount => waiting?.Count ?? 0;
 
         public enum EnqueueMessageResult
         {
@@ -600,9 +594,16 @@ namespace Orleans.Runtime
                              currentRequestActiveTime, this.ToDetailedString(), Running, message);
                     }
                 }
+                waiting = waiting ?? new LinkedList<Message>();
+                if (message.Direction == Message.Directions.Response)
+                {
+                    waiting.AddFirst(message);
+                }
+                else
+                {
+                    waiting.AddLast(message);
+                }
 
-                waiting = waiting ?? new List<Message>();
-                waiting.Add(message);
                 return EnqueueMessageResult.Success;
             }
         }
@@ -661,22 +662,21 @@ namespace Orleans.Runtime
 
         public Message PeekNextWaitingMessage()
         {
-            if (waiting != null && waiting.Count > 0) return waiting[0];
-            return null;
+            return waiting?.First?.Value;
         }
 
         public void DequeueNextWaitingMessage()
         {
-            if (waiting != null && waiting.Count > 0)
-                waiting.RemoveAt(0);
+            if (waiting?.First != null)
+                waiting.RemoveFirst();
         }
 
-        internal List<Message> DequeueAllWaitingMessages()
+        internal ICollection<Message> DequeueAllWaitingMessages()
         {
             lock (this)
             {
                 if (waiting == null) return null;
-                List<Message> tmp = waiting;
+                var tmp = waiting;
                 waiting = null;
                 return tmp;
             }
@@ -690,7 +690,7 @@ namespace Orleans.Runtime
         {
             get
             {
-                return !IsCurrentlyExecuting && (waiting == null || waiting.Count == 0);
+                return !IsCurrentlyExecuting && (waiting?.First == null);
             }
         }
 
@@ -847,7 +847,7 @@ namespace Orleans.Runtime
                     sb.AppendFormat("   Processing message: {0}", Running);
                 }
 
-                if (waiting!=null && waiting.Count > 0)
+                if (waiting?.First != null)
                 {
                     sb.AppendFormat("   Messages queued within ActivationData: {0}", PrintWaitingQueue());
                 }

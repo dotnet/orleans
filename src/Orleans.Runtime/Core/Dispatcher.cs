@@ -484,7 +484,7 @@ namespace Orleans.Runtime
         }
 
         internal void ProcessRequestsToInvalidActivation(
-            List<Message> messages,
+            ICollection<Message> messages,
             ActivationAddress oldAddress,
             ActivationAddress forwardingAddress, 
             string failedOperation,
