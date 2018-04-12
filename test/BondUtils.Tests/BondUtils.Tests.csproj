@@ -12,7 +12,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\Orleans.CodeGeneration\Orleans.CodeGeneration.csproj" />
     <ProjectReference Include="..\..\src\Serializers\Orleans.Serialization.Bond\Orleans.Serialization.Bond.csproj" />
     <ProjectReference Include="..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />

@@ -14,10 +14,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\AWS\Orleans.Transactions.DynamoDB\Orleans.Transactions.DynamoDB.csproj" />
-    <ProjectReference Include="..\..\src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
-    <ProjectReference Include="..\..\src\AWS\Orleans.Persistence.DynamoDB\Orleans.Persistence.DynamoDB.csproj" />
-    <ProjectReference Include="..\..\src\Orleans.Transactions\Orleans.Transactions.csproj" />
-    <ProjectReference Include="..\..\src\Orleans.CodeGeneration\Orleans.CodeGeneration.csproj" />
     <ProjectReference Include="..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
     <ProjectReference Include="..\AWSUtils.Tests\AWSUtils.Tests.csproj" />
     <ProjectReference Include="..\Orleans.Transactions.Tests\Orleans.Transactions.Tests.csproj" />
