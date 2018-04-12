@@ -15,6 +15,7 @@ using Orleans.Hosting;
 using Orleans.Providers.Streams.Common;
 using Orleans.ServiceBus.Providers.Testing;
 using Orleans.Configuration;
+using StructureMap;
 
 namespace ServiceBus.Tests.MonitorTests
 {
@@ -43,6 +44,12 @@ namespace ServiceBus.Tests.MonitorTests
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
+                        .UseServiceProviderFactory(services =>
+                        {
+                            var ctr = new Container();
+                            ctr.Populate(services);
+                            return ctr.GetInstance<IServiceProvider>();
+                        })
                         .AddPersistentStreams(StreamProviderName, EHStreamProviderForMonitorTestsAdapterFactory.Create, b=>b
                         .ConfigureComponent<IStreamQueueCheckpointerFactory>((s, n) => NoOpCheckpointerFactory.Instance)
                         .Configure<StreamStatisticOptions>(ob => ob.Configure(options => options.StatisticMonitorWriteInterval = monitorWriteInterval))
