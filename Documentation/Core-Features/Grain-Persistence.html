@@ -408,7 +408,7 @@ public class MemoryGrainStorageOptions
 </code></pre><h2 id="notes-on-storage-providers">Notes on Storage Providers</h2>
 <p>If there is no <code>[StorageProvider]</code> attribute specified for a <code>Grain&lt;T&gt;</code> grain class, then a provider named <code>Default</code> will be searched for instead.
 If not found then this is treated as a missing storage provider.</p>
-<p>If a prorage provider referenced by a grain class is not added to silo at configuration time, grains of that type will fail to activate at run time, and calls to them will be failing an <code>Orleans.Storage.BadProviderConfigException</code> error specifying that the grain type is not loaded.
+<p>If a storage provider referenced by a grain class is not added to silo at configuration time, grains of that type will fail to activate at run time, and calls to them will be failing an <code>Orleans.Storage.BadProviderConfigException</code> error specifying that the grain type is not loaded.
 But the rest of the grain types will not be affected.</p>
 <p>Different grain types can use different configured storage providers, even if both are the same type: for example, two different Azure table storage provider instances, connected to different Azure storage accounts (see config file example above).</p>
 <p>All configuration details for storage providers is defined through ISiloHostBuilder.
