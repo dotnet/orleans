@@ -665,6 +665,31 @@ namespace Orleans.Serialization
             return copy;
         }
 
+        internal void DeepCopyElementsInPlace(object[] args)
+        {
+            var context = this.serializationContext.Value;
+            context.Reset();
+
+            Stopwatch timer = null;
+            if (StatisticsCollector.CollectSerializationStats)
+            {
+                timer = new Stopwatch();
+                timer.Start();
+                context.SerializationManager.Copies.Increment();
+            }
+
+            for (var i = 0; i < args.Length; i++) args[i] = DeepCopyInner(args[i], context);
+
+            context.Reset();
+
+
+            if (timer != null)
+            {
+                timer.Stop();
+                context.SerializationManager.CopyTimeStatistic.IncrementBy(timer.ElapsedTicks);
+            }
+        }
+
         /// <summary>
         /// <para>
         /// This method makes a deep copy of the object passed to it.
