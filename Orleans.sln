@@ -84,7 +84,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BenchmarkGrainInterfaces", 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BenchmarkGrains", "test\Grains\BenchmarkGrains\BenchmarkGrains.csproj", "{D470FD77-BA72-4ACB-908A-5508357D106A}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Benchmarks", "test\Benchmarks\Benchmarks\Benchmarks.csproj", "{AA115AB5-79C6-42B1-B685-556777DE83E8}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Benchmarks", "test\Benchmarks\Benchmarks.csproj", "{AA115AB5-79C6-42B1-B685-556777DE83E8}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BondUtils.Tests", "test\Extensions\Serializers\BondUtils.Tests\BondUtils.Tests.csproj", "{7C718B3E-7883-46CE-8B45-04DBEF7343FC}"
 EndProject
