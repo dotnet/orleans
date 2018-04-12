@@ -1,6 +1,6 @@
 ---
 layout: page
-title: Client Observers
+title: Observers
 ---
 
 # Observers
