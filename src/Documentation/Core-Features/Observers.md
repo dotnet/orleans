@@ -3,6 +3,7 @@ layout: page
 title: Client Observers
 ---
 
+# Observers
 
 There are situations in which a simple message/response pattern is not enough, and the client needs to receive asynchronous notifications.
 For example, a user might want to be notified when a new instant message has been published by a friend.
