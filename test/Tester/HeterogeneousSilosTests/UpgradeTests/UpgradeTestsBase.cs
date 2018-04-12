@@ -36,7 +36,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         private const string AssemblyGrainsV2Build = "TestVersionGrainsV2";
         private const string CommonParentDirectory = "test";
         private const string BinDirectory = "bin";
-        private const string VersionsProjectDirectory = "Versions";
+        private const string VersionsProjectDirectory = "Grains";
         private const string GrainsV1ProjectName = "TestVersionGrains";
         private const string GrainsV2ProjectName = "TestVersionGrains2";
         private const string VersionTestBinaryName = "TestVersionGrains.dll";

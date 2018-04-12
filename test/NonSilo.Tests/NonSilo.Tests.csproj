@@ -10,8 +10,8 @@
     <ProjectReference Include="..\..\src\Azure\Orleans.Streaming.EventHubs\Orleans.Streaming.EventHubs.csproj" />
     <ProjectReference Include="..\Tester\Tester.csproj" />
     <ProjectReference Include="..\TestExtensions\TestExtensions.csproj" />
-    <ProjectReference Include="..\TestGrains\TestGrains.csproj" />
-    <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj" />
+    <ProjectReference Include="..\Grains\TestGrains\TestGrains.csproj" />
+    <ProjectReference Include="..\Grains\TestInternalGrains\TestInternalGrains.csproj" />
   </ItemGroup>
 
   <ItemGroup>

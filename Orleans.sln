@@ -60,11 +60,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Clustering.ZooKeepe
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestInterfaces", "test\TestInterfaces\TestInterfaces.csproj", "{2D1FDB2E-9E12-4453-BFF7-7F726D754791}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestGrainInterfaces", "test\TestGrainInterfaces\TestGrainInterfaces.csproj", "{CC76035A-056B-43F3-8FFB-92DE66A19305}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestGrainInterfaces", "test\Grains\TestGrainInterfaces\TestGrainInterfaces.csproj", "{CC76035A-056B-43F3-8FFB-92DE66A19305}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestGrains", "test\TestGrains\TestGrains.csproj", "{B84A0977-EF3A-44B0-B4EF-CE68B387AE63}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestGrains", "test\Grains\TestGrains\TestGrains.csproj", "{B84A0977-EF3A-44B0-B4EF-CE68B387AE63}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestInternalGrains", "test\TestInternalGrains\TestInternalGrains.csproj", "{A1DD513F-2873-4AC4-8CA6-B8474C391A86}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestInternalGrains", "test\Grains\TestInternalGrains\TestInternalGrains.csproj", "{A1DD513F-2873-4AC4-8CA6-B8474C391A86}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestInternalDtosRefOrleans", "test\TestInternalDtosRefOrleans\TestInternalDtosRefOrleans.csproj", "{B9665A13-9E04-44F9-B509-D48BD0DD07A9}"
 EndProject
@@ -72,9 +72,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestExtensions", "test\Test
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tester", "test\Tester\Tester.csproj", "{A08113E1-DA6E-4861-8F4B-057D09864FA1}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestVersionGrains", "test\Versions\TestVersionGrains\TestVersionGrains.csproj", "{DDE5FD37-930E-4150-973B-FF8FE12E4CFF}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestVersionGrains", "test\Grains\TestVersionGrains\TestVersionGrains.csproj", "{DDE5FD37-930E-4150-973B-FF8FE12E4CFF}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestVersionGrains2", "test\Versions\TestVersionGrains2\TestVersionGrains2.csproj", "{8AEBF029-56E0-4D86-9B51-D57960572D25}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestVersionGrains2", "test\Grains\TestVersionGrains2\TestVersionGrains2.csproj", "{8AEBF029-56E0-4D86-9B51-D57960572D25}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TesterInternal", "test\TesterInternal\TesterInternal.csproj", "{7A4D8643-F6B4-4D65-9688-D81421A7E3EF}"
 EndProject
@@ -82,9 +82,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AWSUtils.Tests", "test\AWSU
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansCounterControl", "src\OrleansCounterControl\OrleansCounterControl.csproj", "{A4E2CF53-1039-4967-882D-11C0B2C929AA}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BenchmarkGrainInterfaces", "test\Benchmarks\BenchmarkGrainInterfaces\BenchmarkGrainInterfaces.csproj", "{46B9C1FC-0D17-4AD1-BAF0-2FF8362E9C83}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BenchmarkGrainInterfaces", "test\Grains\BenchmarkGrainInterfaces\BenchmarkGrainInterfaces.csproj", "{46B9C1FC-0D17-4AD1-BAF0-2FF8362E9C83}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BenchmarkGrains", "test\Benchmarks\BenchmarkGrains\BenchmarkGrains.csproj", "{D470FD77-BA72-4ACB-908A-5508357D106A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BenchmarkGrains", "test\Grains\BenchmarkGrains\BenchmarkGrains.csproj", "{D470FD77-BA72-4ACB-908A-5508357D106A}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Benchmarks", "test\Benchmarks\Benchmarks\Benchmarks.csproj", "{AA115AB5-79C6-42B1-B685-556777DE83E8}"
 EndProject
@@ -112,7 +112,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tester.ZooKeeperUtils", "te
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestServiceFabric", "test\TestServiceFabric\TestServiceFabric.csproj", "{7E2B3E56-5DF7-4518-B989-BE0012682C59}"
 EndProject
-Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "TestFSharp", "test\TestFSharp\TestFSharp.fsproj", "{8A652779-85EF-48E2-A639-1EED3CE2C39C}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "TestFSharp", "test\Grains\TestFSharp\TestFSharp.fsproj", "{8A652779-85EF-48E2-A639-1EED3CE2C39C}"
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "TestFSharpInterfaces", "test\TestFSharpInterfaces\TestFSharpInterfaces.fsproj", "{A4F61392-36A3-457C-80D0-9CDC48F5922F}"
 EndProject
@@ -120,7 +120,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansManager", "src\Orlea
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Streaming.GCP", "src\Orleans.Streaming.GCP\Orleans.Streaming.GCP.csproj", "{6E5860C5-44E7-415C-80D6-3ECF15A80796}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestInternalGrainInterfaces", "test\TestInternalGrainInterfaces\TestInternalGrainInterfaces.csproj", "{EBD697E3-91BE-4844-B3F0-6997300A8C12}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestInternalGrainInterfaces", "test\Grains\TestInternalGrainInterfaces\TestInternalGrainInterfaces.csproj", "{EBD697E3-91BE-4844-B3F0-6997300A8C12}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Core.Abstractions", "src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj", "{73514686-D25D-478B-9943-A86F6B0F3A37}"
 EndProject
