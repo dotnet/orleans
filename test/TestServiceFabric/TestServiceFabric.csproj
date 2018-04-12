@@ -18,7 +18,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\Azure\Orleans.Hosting.ServiceFabric\Orleans.Hosting.ServiceFabric.csproj" />
     <ProjectReference Include="..\..\src\Azure\Orleans.Clustering.ServiceFabric\Orleans.Clustering.ServiceFabric.csproj" />
     <ProjectReference Include="..\TestExtensions\TestExtensions.csproj" />
