@@ -58,7 +58,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TestingHost", "src\
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Clustering.ZooKeeper", "src\Orleans.Clustering.ZooKeeper\Orleans.Clustering.ZooKeeper.csproj", "{9EA82917-64A9-4F00-9A2B-C02F2571A6DF}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestInterfaces", "test\TestInterfaces\TestInterfaces.csproj", "{2D1FDB2E-9E12-4453-BFF7-7F726D754791}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestInterfaces", "test\Misc\TestInterfaces\TestInterfaces.csproj", "{2D1FDB2E-9E12-4453-BFF7-7F726D754791}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestGrainInterfaces", "test\Grains\TestGrainInterfaces\TestGrainInterfaces.csproj", "{CC76035A-056B-43F3-8FFB-92DE66A19305}"
 EndProject
@@ -66,9 +66,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestGrains", "test\Grains\T
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestInternalGrains", "test\Grains\TestInternalGrains\TestInternalGrains.csproj", "{A1DD513F-2873-4AC4-8CA6-B8474C391A86}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestInternalDtosRefOrleans", "test\TestInternalDtosRefOrleans\TestInternalDtosRefOrleans.csproj", "{B9665A13-9E04-44F9-B509-D48BD0DD07A9}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestInternalDtosRefOrleans", "test\Misc\TestInternalDtosRefOrleans\TestInternalDtosRefOrleans.csproj", "{B9665A13-9E04-44F9-B509-D48BD0DD07A9}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestExtensions", "test\TestExtensions\TestExtensions.csproj", "{BA9ED8EC-C8CB-490B-BE88-2173DEF64B27}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestExtensions", "test\TestInfrastructure\TestExtensions\TestExtensions.csproj", "{BA9ED8EC-C8CB-490B-BE88-2173DEF64B27}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tester", "test\Tester\Tester.csproj", "{A08113E1-DA6E-4861-8F4B-057D09864FA1}"
 EndProject
@@ -78,7 +78,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestVersionGrains2", "test\
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TesterInternal", "test\TesterInternal\TesterInternal.csproj", "{7A4D8643-F6B4-4D65-9688-D81421A7E3EF}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AWSUtils.Tests", "test\AWSUtils.Tests\AWSUtils.Tests.csproj", "{C22E1D90-9B8E-4F57-85DC-15CDB6091EDA}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AWSUtils.Tests", "test\Extensions\AWSUtils.Tests\AWSUtils.Tests.csproj", "{C22E1D90-9B8E-4F57-85DC-15CDB6091EDA}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansCounterControl", "src\OrleansCounterControl\OrleansCounterControl.csproj", "{A4E2CF53-1039-4967-882D-11C0B2C929AA}"
 EndProject
@@ -88,33 +88,33 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BenchmarkGrains", "test\Gra
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Benchmarks", "test\Benchmarks\Benchmarks\Benchmarks.csproj", "{AA115AB5-79C6-42B1-B685-556777DE83E8}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BondUtils.Tests", "test\BondUtils.Tests\BondUtils.Tests.csproj", "{7C718B3E-7883-46CE-8B45-04DBEF7343FC}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BondUtils.Tests", "test\Extensions\Serializers\BondUtils.Tests\BondUtils.Tests.csproj", "{7C718B3E-7883-46CE-8B45-04DBEF7343FC}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Consul.Tests", "test\Consul.Tests\Consul.Tests.csproj", "{BFCF64CE-9E5A-42A7-B533-6DBAD0EDE724}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Consul.Tests", "test\Extensions\Consul.Tests\Consul.Tests.csproj", "{BFCF64CE-9E5A-42A7-B533-6DBAD0EDE724}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DefaultCluster.Tests", "test\DefaultCluster.Tests\DefaultCluster.Tests.csproj", "{E249B6ED-A286-469A-8598-24AA5E4239F3}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GoogleUtils.Tests", "test\GoogleUtils.Tests\GoogleUtils.Tests.csproj", "{BC6BB199-72B0-4A17-84E2-C4964C8E2705}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GoogleUtils.Tests", "test\Extensions\Serializers\GoogleUtils.Tests\GoogleUtils.Tests.csproj", "{BC6BB199-72B0-4A17-84E2-C4964C8E2705}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ProtoBuf.Serialization.Tests", "test\ProtoBuf.Serialization.Tests\ProtoBuf.Serialization.Tests.csproj", "{53947CF5-3090-48B4-9EF6-3F47A072146B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ProtoBuf.Serialization.Tests", "test\Extensions\Serializers\ProtoBuf.Serialization.Tests\ProtoBuf.Serialization.Tests.csproj", "{53947CF5-3090-48B4-9EF6-3F47A072146B}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NonSilo.Tests", "test\NonSilo.Tests\NonSilo.Tests.csproj", "{59C211A7-F0F2-421B-86D8-E304BCCD5964}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PSUtils.Tests", "test\PSUtils.Tests\PSUtils.Tests.csproj", "{60699157-6D95-4BC3-8EA6-F12A9C759643}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PSUtils.Tests", "test\Extensions\PSUtils.Tests\PSUtils.Tests.csproj", "{60699157-6D95-4BC3-8EA6-F12A9C759643}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ServiceBus.Tests", "test\ServiceBus.Tests\ServiceBus.Tests.csproj", "{B1AA4D5D-3686-4F93-9D98-BB6DF468A26F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ServiceBus.Tests", "test\Extensions\ServiceBus.Tests\ServiceBus.Tests.csproj", "{B1AA4D5D-3686-4F93-9D98-BB6DF468A26F}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tester.AzureUtils", "test\TesterAzureUtils\Tester.AzureUtils.csproj", "{5ABE2C94-DCC5-4F9C-BD97-CC337B61370B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tester.AzureUtils", "test\Extensions\TesterAzureUtils\Tester.AzureUtils.csproj", "{5ABE2C94-DCC5-4F9C-BD97-CC337B61370B}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tester.AdoNet", "test\TesterAdoNet\Tester.AdoNet.csproj", "{1800DCDA-25EC-4284-9D51-C15E20C4DFFA}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tester.AdoNet", "test\Extensions\TesterAdoNet\Tester.AdoNet.csproj", "{1800DCDA-25EC-4284-9D51-C15E20C4DFFA}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tester.ZooKeeperUtils", "test\TesterZooKeeperUtils\Tester.ZooKeeperUtils.csproj", "{6BA81672-10EA-4DA7-A620-3D60619FD39E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tester.ZooKeeperUtils", "test\Extensions\TesterZooKeeperUtils\Tester.ZooKeeperUtils.csproj", "{6BA81672-10EA-4DA7-A620-3D60619FD39E}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestServiceFabric", "test\TestServiceFabric\TestServiceFabric.csproj", "{7E2B3E56-5DF7-4518-B989-BE0012682C59}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestServiceFabric", "test\Extensions\TestServiceFabric\TestServiceFabric.csproj", "{7E2B3E56-5DF7-4518-B989-BE0012682C59}"
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "TestFSharp", "test\Grains\TestFSharp\TestFSharp.fsproj", "{8A652779-85EF-48E2-A639-1EED3CE2C39C}"
 EndProject
-Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "TestFSharpInterfaces", "test\TestFSharpInterfaces\TestFSharpInterfaces.fsproj", "{A4F61392-36A3-457C-80D0-9CDC48F5922F}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "TestFSharpInterfaces", "test\Misc\TestFSharpInterfaces\TestFSharpInterfaces.fsproj", "{A4F61392-36A3-457C-80D0-9CDC48F5922F}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansManager", "src\OrleansManager\OrleansManager.csproj", "{1153256E-10C2-4729-ACDC-5DF18A7B92B5}"
 EndProject
@@ -134,11 +134,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.CodeGeneration.Boot
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Transactions", "src\Orleans.Transactions\Orleans.Transactions.csproj", "{072B1B88-FE98-4354-86FA-AB6EF80EB9C4}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Transactions.Tests", "test\Orleans.Transactions.Tests\Orleans.Transactions.Tests.csproj", "{CFD22413-CB67-40D6-B389-F038C8C38365}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Transactions.Tests", "test\Transactions\Orleans.Transactions.Tests\Orleans.Transactions.Tests.csproj", "{CFD22413-CB67-40D6-B389-F038C8C38365}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Transactions.AzureStorage", "src\Azure\Orleans.Transactions.AzureStorage\Orleans.Transactions.AzureStorage.csproj", "{BE7FB595-FA25-4D88-8504-E9D4F9D8183D}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Transactions.Azure.Test", "test\Orleans.Transactions.Azure.Test\Orleans.Transactions.Azure.Test.csproj", "{651C7B8E-6EEB-4A6B-84A3-B5D7E4554B99}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Transactions.Azure.Test", "test\Transactions\Orleans.Transactions.Azure.Test\Orleans.Transactions.Azure.Test.csproj", "{651C7B8E-6EEB-4A6B-84A3-B5D7E4554B99}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Clustering.AzureStorage", "src\Azure\Orleans.Clustering.AzureStorage\Orleans.Clustering.AzureStorage.csproj", "{E9A8A1F9-1943-45E2-9B9C-1E51A9154D76}"
 EndProject
@@ -172,7 +172,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "AWS", "AWS", "{DA8E126B-BCD
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Clustering.AdoNet", "src\AdoNet\Orleans.Clustering.AdoNet\Orleans.Clustering.AdoNet.csproj", "{CE21A15A-E376-4B81-BDA6-3AB610CFE03A}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TestingHost.Tests", "test\Orleans.TestingHost.Tests\Orleans.TestingHost.Tests.csproj", "{18B9F2D3-ABA1-4D0C-88A9-25FEC3F79CE8}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TestingHost.Tests", "test\TestInfrastructure\Orleans.TestingHost.Tests\Orleans.TestingHost.Tests.csproj", "{18B9F2D3-ABA1-4D0C-88A9-25FEC3F79CE8}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Persistence.AdoNet", "src\AdoNet\Orleans.Persistence.AdoNet\Orleans.Persistence.AdoNet.csproj", "{3E2C5440-D6C5-4EB8-8D34-10707B322263}"
 EndProject
@@ -190,13 +190,13 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Runtime.Legacy", "s
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Runtime.Legacy.Test", "test\Orleans.Runtime.Legacy.Test\Orleans.Runtime.Legacy.Test.csproj", "{262A898E-0EED-4235-908B-322A699CDD01}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TestingHost.Legacy", "test\Orleans.TestingHost.Legacy\Orleans.TestingHost.Legacy.csproj", "{AC640F05-E013-4D80-A1A4-E577D6883D16}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TestingHost.Legacy", "test\TestInfrastructure\Orleans.TestingHost.Legacy\Orleans.TestingHost.Legacy.csproj", "{AC640F05-E013-4D80-A1A4-E577D6883D16}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TestingHost.AppDomain", "test\Orleans.TestingHost.AppDomain\Orleans.TestingHost.AppDomain.csproj", "{DF911257-3617-4B5C-9B78-AED17BA6DC9C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TestingHost.AppDomain", "test\TestInfrastructure\Orleans.TestingHost.AppDomain\Orleans.TestingHost.AppDomain.csproj", "{DF911257-3617-4B5C-9B78-AED17BA6DC9C}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Transactions.DynamoDB", "src\AWS\Orleans.Transactions.DynamoDB\Orleans.Transactions.DynamoDB.csproj", "{17A7F27C-DBDE-4339-A7F5-18BD80C3F205}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Transactions.DynamoDB.Test", "test\Orleans.Transactions.DynamoDB.Test\Orleans.Transactions.DynamoDB.Test.csproj", "{8B3EEA6B-BE00-482D-9625-15A70B534183}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Transactions.DynamoDB.Test", "test\Transactions\Orleans.Transactions.DynamoDB.Test\Orleans.Transactions.DynamoDB.Test.csproj", "{8B3EEA6B-BE00-482D-9625-15A70B534183}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DependencyInjection.Tests", "test\DependencyInjection.Tests\DependencyInjection.Tests.csproj", "{F23930FE-A219-49E1-8ECB-5A94F271EDC1}"
 EndProject
