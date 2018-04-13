@@ -9,8 +9,8 @@ using Orleans.Runtime;
 namespace DependencyInjection.Tests.AspnetDIContainer
 {
 
-    [TestCategory("DI"), TestCategory("BVT")]
-    public class DependencyInjectionDisambiguationTestsUsingASPNETDIContainer : DependencyInjectionDisambiguationTestRunner
+    [TestCategory("DI"), TestCategory("Functional")]
+    public class DependencyInjectionDisambiguationTestsUsingDefaultServiceProvider : DependencyInjectionDisambiguationTestRunner
     {
         protected override IServiceProvider BuildeServiceProvider(IServiceCollection services)
         {

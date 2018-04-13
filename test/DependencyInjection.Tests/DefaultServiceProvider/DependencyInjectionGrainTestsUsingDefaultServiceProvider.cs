@@ -8,11 +8,12 @@ using Orleans.Hosting;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.Grains;
+using Xunit;
 
 namespace DependencyInjection.Tests.AspnetDIContainer
 {
-    [TestCategory("DI"), TestCategory("BVT")]
-    public class DependencyInjectionGrainTestsUsingASPNETDIContainer : DependencyInjectionGrainTestRunner
+    [TestCategory("DI"), TestCategory("Functional")]
+    public class DependencyInjectionGrainTestsUsingDefaultServiceProvider : DependencyInjectionGrainTestRunner, IClassFixture<DependencyInjectionGrainTestsUsingDefaultServiceProvider.Fixture>
     {
         public class Fixture : BaseTestClusterFixture
         {
@@ -26,8 +27,8 @@ namespace DependencyInjection.Tests.AspnetDIContainer
 
         }
 
-        public DependencyInjectionGrainTestsUsingASPNETDIContainer()
-            : base(new Fixture())
+        public DependencyInjectionGrainTestsUsingDefaultServiceProvider(Fixture fixture)
+            : base(fixture)
         {
         }
     }

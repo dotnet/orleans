@@ -7,11 +7,12 @@ using Orleans.Hosting;
 using Orleans.TestingHost;
 using StructureMap;
 using TestExtensions;
+using Xunit;
 
 namespace DependencyInjection.Tests.StructureMap
 {
-    [TestCategory("DI"), TestCategory("BVT")]
-    public class DependencyInjectionGrainTestsUsingStructureMap : DependencyInjectionGrainTestRunner
+    [TestCategory("DI"), TestCategory("Functional")]
+    public class DependencyInjectionGrainTestsUsingStructureMap : DependencyInjectionGrainTestRunner, IClassFixture<DependencyInjectionGrainTestsUsingStructureMap.Fixture>
     {
         public class Fixture : BaseTestClusterFixture
         {
@@ -37,8 +38,8 @@ namespace DependencyInjection.Tests.StructureMap
 
         }
 
-        public DependencyInjectionGrainTestsUsingStructureMap()
-            : base(new Fixture())
+        public DependencyInjectionGrainTestsUsingStructureMap(Fixture fixture)
+            : base(fixture)
         {
         }
     }

@@ -8,7 +8,7 @@ using StructureMap;
 
 namespace DependencyInjection.Tests.StructureMap
 {
-    [TestCategory("DI"), TestCategory("BVT")]
+    [TestCategory("DI"), TestCategory("Functional")]
     public class DependencyInjectionDisambiguationTestsUsingStructureMap : DependencyInjectionDisambiguationTestRunner
     {
         protected override IServiceProvider BuildeServiceProvider(IServiceCollection services)
