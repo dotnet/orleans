@@ -176,8 +176,8 @@ namespace Orleans
             return builder.UseStaticClustering(new IPEndPoint(IPAddress.Loopback, gatewayPort))
                 .Configure<ClusterOptions>(options =>
                 {
-                    if (!string.IsNullOrWhiteSpace(options.ClusterId)) options.ClusterId = clusterId;
-                    if (!string.IsNullOrWhiteSpace(options.ServiceId)) options.ServiceId = serviceId;
+                    if (string.IsNullOrWhiteSpace(options.ClusterId)) options.ClusterId = clusterId;
+                    if (string.IsNullOrWhiteSpace(options.ServiceId)) options.ServiceId = serviceId;
                 });
         }
 
@@ -191,8 +191,8 @@ namespace Orleans
             return builder.UseStaticClustering(gatewayPorts.Select(p => new IPEndPoint(IPAddress.Loopback, p)).ToArray())
                 .Configure<ClusterOptions>(options =>
                 {
-                    if (!string.IsNullOrWhiteSpace(options.ClusterId)) options.ClusterId = ClusterOptions.DevelopmentClusterId;
-                    if (!string.IsNullOrWhiteSpace(options.ServiceId)) options.ServiceId = ClusterOptions.DevelopmentServiceId;
+                    if (string.IsNullOrWhiteSpace(options.ClusterId)) options.ClusterId = ClusterOptions.DevelopmentClusterId;
+                    if (string.IsNullOrWhiteSpace(options.ServiceId)) options.ServiceId = ClusterOptions.DevelopmentServiceId;
                 });
         }
 

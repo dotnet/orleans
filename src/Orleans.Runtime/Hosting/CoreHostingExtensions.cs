@@ -68,8 +68,8 @@ namespace Orleans.Hosting
             builder.UseDevelopmentClustering(primarySiloEndpoint ?? new IPEndPoint(IPAddress.Loopback, siloPort));
             builder.Configure<ClusterOptions>(options => 
             {
-                if (!string.IsNullOrWhiteSpace(options.ClusterId)) options.ClusterId = clusterId;
-                if (!string.IsNullOrWhiteSpace(options.ServiceId)) options.ServiceId = serviceId;
+                if (string.IsNullOrWhiteSpace(options.ClusterId)) options.ClusterId = clusterId;
+                if (string.IsNullOrWhiteSpace(options.ServiceId)) options.ServiceId = serviceId;
             });
             builder.Configure<ClusterMembershipOptions>(options => options.ExpectedClusterSize = 1);
 
@@ -101,8 +101,8 @@ namespace Orleans.Hosting
             return builder
                 .Configure<ClusterOptions>(options =>
                 {
-                    if (!string.IsNullOrWhiteSpace(options.ClusterId)) options.ClusterId = clusterId;
-                    if (!string.IsNullOrWhiteSpace(options.ServiceId)) options.ServiceId = serviceId;
+                    if (string.IsNullOrWhiteSpace(options.ClusterId)) options.ClusterId = clusterId;
+                    if (string.IsNullOrWhiteSpace(options.ServiceId)) options.ServiceId = serviceId;
                 })
                 .ConfigureServices(
                 services =>
@@ -131,8 +131,8 @@ namespace Orleans.Hosting
             return builder
                 .Configure<ClusterOptions>(options =>
                 {
-                    if (!string.IsNullOrWhiteSpace(options.ClusterId)) options.ClusterId = clusterId;
-                    if (!string.IsNullOrWhiteSpace(options.ServiceId)) options.ServiceId = serviceId;
+                    if (string.IsNullOrWhiteSpace(options.ClusterId)) options.ClusterId = clusterId;
+                    if (string.IsNullOrWhiteSpace(options.ServiceId)) options.ServiceId = serviceId;
                 })
                 .ConfigureServices(
                 services =>
