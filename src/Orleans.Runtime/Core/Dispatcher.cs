@@ -601,7 +601,10 @@ namespace Orleans.Runtime
         private void ResendMessageImpl(Message message, ActivationAddress forwardingAddress = null)
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Resend {0}", message);
-            message.TargetHistory = message.GetTargetHistory();
+            if (message.ForwardCount > 1)
+            {
+                message.TargetHistory = message.GetTargetHistory();
+            }
 
             if (message.TargetGrain.IsSystemTarget)
             {
