@@ -25,7 +25,7 @@ Startup tasks can be configured using the `ISiloHostBuilder` either by registeri
 siloHostBuilder.AddStartupTask(
   async (IServiceProvider services, CancellationToken cancellation) =>
   {
-    // Use the service providr to get the grain factory.
+    // Use the service provider to get the grain factory.
     var grainFactory = services.GetRequiredService<IGrainFactory>();
 
     // Get a reference to a grain and call a method on it.
@@ -56,7 +56,7 @@ public class CallGrainStartupTask : IStartupTask
 }
 ```
 
-That implementation must then be registered with the `ISiloHostBuilder`:
+Then that implementation must be registered with the `ISiloHostBuilder`:
 
 ``` csharp
 siloHostBuilder.AddStartupTask<CallGrainStartupTask>();
