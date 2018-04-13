@@ -21,17 +21,17 @@ Currently implemented stream providers support a number of configuration options
 SMS Stream Provider is configured through following options, using `AddSimpleMessageStreamProvider` extension method on `ISiloHostBuilder` or `IClientBuilder`: 
 
 ```csharp
-    public class SimpleMessageStreamProviderOptions
-    {
-        public bool FireAndForgetDelivery { get; set; } = DEFAULT_VALUE_FIRE_AND_FORGET_DELIVERY;
-        public const bool DEFAULT_VALUE_FIRE_AND_FORGET_DELIVERY = false;
+public class SimpleMessageStreamProviderOptions
+{
+    public bool FireAndForgetDelivery { get; set; } = DEFAULT_VALUE_FIRE_AND_FORGET_DELIVERY;
+    public const bool DEFAULT_VALUE_FIRE_AND_FORGET_DELIVERY = false;
 
-        public bool OptimizeForImmutableData { get; set; } = DEFAULT_VALUE_OPTIMIZE_FOR_IMMUTABLE_DATA;
-        public const bool DEFAULT_VALUE_OPTIMIZE_FOR_IMMUTABLE_DATA = true;
+    public bool OptimizeForImmutableData { get; set; } = DEFAULT_VALUE_OPTIMIZE_FOR_IMMUTABLE_DATA;
+    public const bool DEFAULT_VALUE_OPTIMIZE_FOR_IMMUTABLE_DATA = true;
 
-        public StreamPubSubType PubSubType { get; set; } = DEFAULT_PUBSUB_TYPE;
-        public static StreamPubSubType DEFAULT_PUBSUB_TYPE = StreamPubSubType.ExplicitGrainBasedAndImplicit;
-    }
+    public StreamPubSubType PubSubType { get; set; } = DEFAULT_PUBSUB_TYPE;
+    public static StreamPubSubType DEFAULT_PUBSUB_TYPE = StreamPubSubType.ExplicitGrainBasedAndImplicit;
+}
 ```
 
 ### Persistent Stream Provider Configuration. 
@@ -40,56 +40,56 @@ All persistent stream providers are configured through `ISiloPersistentStreamCon
 - **ConfigureStreamPubSub** method - this method configures stream pubsub to use, supported type: 
 
 ``` csharp
-    public enum StreamPubSubType
-    {
-        ExplicitGrainBasedAndImplicit,
-        ExplicitGrainBasedOnly,
-        ImplicitOnly,
-    }
+public enum StreamPubSubType
+{
+    ExplicitGrainBasedAndImplicit,
+    ExplicitGrainBasedOnly,
+    ImplicitOnly,
+}
 ```
 - **ConfigurePullingAgent** method - this method configures pulling agent. It is only available on `ISiloPersistentStreamConfigurator`, since no need for client to configure pulling agent. It is configured through options below:
 
 ``` csharp
-    public class StreamPullingAgentOptions
-    {
-        //how much time the pulling agents wait after the last attempt to pull from the queue that did not return any items before the agent attempts to pull again. Default is 100 milliseconds.
-        public TimeSpan GetQueueMsgsTimerPeriod { get; set; } = DEFAULT_GET_QUEUE_MESSAGES_TIMER_PERIOD;
-        public static readonly TimeSpan DEFAULT_GET_QUEUE_MESSAGES_TIMER_PERIOD = TimeSpan.FromMilliseconds(100);
+public class StreamPullingAgentOptions
+{
+    //how much time the pulling agents wait after the last attempt to pull from the queue that did not return any items before the agent attempts to pull again. Default is 100 milliseconds.
+    public TimeSpan GetQueueMsgsTimerPeriod { get; set; } = DEFAULT_GET_QUEUE_MESSAGES_TIMER_PERIOD;
+    public static readonly TimeSpan DEFAULT_GET_QUEUE_MESSAGES_TIMER_PERIOD = TimeSpan.FromMilliseconds(100);
 
-        //how much time the pulling agents waits for the adapter to initialize the connection with the queue. Default is 5 seconds.
-        public TimeSpan InitQueueTimeout { get; set; } = DEFAULT_INIT_QUEUE_TIMEOUT;
-        public static readonly TimeSpan DEFAULT_INIT_QUEUE_TIMEOUT = TimeSpan.FromSeconds(5);
+    //how much time the pulling agents waits for the adapter to initialize the connection with the queue. Default is 5 seconds.
+    public TimeSpan InitQueueTimeout { get; set; } = DEFAULT_INIT_QUEUE_TIMEOUT;
+    public static readonly TimeSpan DEFAULT_INIT_QUEUE_TIMEOUT = TimeSpan.FromSeconds(5);
 
-        public TimeSpan MaxEventDeliveryTime { get; set; } = DEFAULT_MAX_EVENT_DELIVERY_TIME;
-        public static readonly TimeSpan DEFAULT_MAX_EVENT_DELIVERY_TIME = TimeSpan.FromMinutes(1);
+    public TimeSpan MaxEventDeliveryTime { get; set; } = DEFAULT_MAX_EVENT_DELIVERY_TIME;
+    public static readonly TimeSpan DEFAULT_MAX_EVENT_DELIVERY_TIME = TimeSpan.FromMinutes(1);
 
-        public TimeSpan StreamInactivityPeriod { get; set; } = DEFAULT_STREAM_INACTIVITY_PERIOD;
-        public static readonly TimeSpan DEFAULT_STREAM_INACTIVITY_PERIOD = TimeSpan.FromMinutes(30);
-    }
+    public TimeSpan StreamInactivityPeriod { get; set; } = DEFAULT_STREAM_INACTIVITY_PERIOD;
+    public static readonly TimeSpan DEFAULT_STREAM_INACTIVITY_PERIOD = TimeSpan.FromMinutes(30);
+}
 ```
 - **ConfigureLifecycle** method - this method configures in which silo/client lifecycle stage the stream provider would initialize and start. It is configured through options below: 
 
 ``` csharp
 public class StreamLifecycleOptions
+{
+    [Serializable]
+    public enum RunState
     {
-        [Serializable]
-        public enum RunState
-        {
-            None,
-            Initialized,
-            AgentsStarted,
-            AgentsStopped,
-        }
-
-        public RunState StartupState = DEFAULT_STARTUP_STATE;
-        public const RunState DEFAULT_STARTUP_STATE = RunState.AgentsStarted;
-
-        public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
-        public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
-
-        public int StartStage { get; set; } = DEFAULT_START_STAGE;
-        public const int DEFAULT_START_STAGE = ServiceLifecycleStage.Active;
+        None,
+        Initialized,
+        AgentsStarted,
+        AgentsStopped,
     }
+
+    public RunState StartupState = DEFAULT_STARTUP_STATE;
+    public const RunState DEFAULT_STARTUP_STATE = RunState.AgentsStarted;
+
+    public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
+    public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
+
+    public int StartStage { get; set; } = DEFAULT_START_STAGE;
+    public const int DEFAULT_START_STAGE = ServiceLifecycleStage.Active;
+}
 
 ```
 - **ConfigurePartitionBalancing** method - this method configures which `IStreamQueueBalancer` to use. You can configure any queue balancer we support natively or custom ones you developped. This method is not available for `IClusterClientPersistentStreamConfigurator`.
@@ -100,13 +100,13 @@ Azure queue stream provider is configured through `SiloAzureQueueStreamConfigura
 - **ConfigureAzureQueue** - this method configures Azure Queue specific settings. It is configured through options below:
 
 ```csharp
-  public class AzureQueueOptions
-    {
-        [RedactConnectionString]
-        public string ConnectionString { get; set; }
+public class AzureQueueOptions
+{
+    [RedactConnectionString]
+    public string ConnectionString { get; set; }
 
-        public TimeSpan? MessageVisibilityTimeout { get; set; }   
-    }
+    public TimeSpan? MessageVisibilityTimeout { get; set; }   
+}
 ```
 - **ConfigureCache** - this method configures cache size. Only available on `SiloAzureQueueStreamConfigurator`, not available on `ClusterClientAzureQueueStreamConfigurator`.
 - **ConfigurePartitioning** - this method configures queue counts to use. 
