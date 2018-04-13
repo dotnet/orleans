@@ -6,25 +6,24 @@ using Xunit;
 using Orleans.Runtime;
 using System.Collections.Generic;
 
-namespace UnitTests.General
+namespace DependencyInjection.Tests
 {
-    [TestCategory("DI")]
-    public class DependencyInjectionDisambiguationTests
+    public abstract class DependencyInjectionDisambiguationTestRunner
     {
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact]
         public void DisambiguateByKeyTest()
         {
-            IServiceProvider services = ConfigureServices();
+            IServiceProvider services = BuildeServiceProvider(ConfigureServices());
             int actual0 = services.GetServiceByKey<int, IValue<int>>(0).Value;
             Assert.StrictEqual(0, actual0);
             int actual1 = services.GetServiceByKey<int, IValue<int>>(1).Value;
             Assert.StrictEqual(1, actual1);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact]
         public void DisambiguateByNameTest()
         {
-            IServiceProvider services = ConfigureServices();
+            IServiceProvider services = BuildeServiceProvider(ConfigureServices());
             string actualThis = services.GetServiceByName<IValue<string>>("this").Value;
             Assert.Equal("this", actualThis);
             string actualThat = services.GetServiceByName<IValue<string>>("that").Value;
@@ -54,17 +53,19 @@ namespace UnitTests.General
             }
         }
 
-        private IServiceProvider ConfigureServices()
-        {
-            IServiceCollection services = new ServiceCollection();
+        //Build the service container, based on which DI solution you uses
+        protected abstract IServiceProvider BuildeServiceProvider(IServiceCollection services);
 
+        protected virtual IServiceCollection ConfigureServices()
+        {
+            var services = new ServiceCollection();
             // add services by Key;
             services.AddSingleton<IKeyedServiceCollection<int, IValue<int>>, ValueServiceCollection<int>>();
 
             // add named services
             services.AddTransient<IKeyedServiceCollection<string, IValue<string>>, ValueServiceCollection<string>>();
 
-            return services.BuildServiceProvider();
+            return services;
         }
     }
 }
