@@ -56,7 +56,7 @@ namespace DependencyInjection.Tests
         //Build the service container, based on which DI solution you uses
         protected abstract IServiceProvider BuildeServiceProvider(IServiceCollection services);
 
-        protected virtual IServiceCollection ConfigureServices()
+        private IServiceCollection ConfigureServices()
         {
             var services = new ServiceCollection();
             // add services by Key;

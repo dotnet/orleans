@@ -9,7 +9,7 @@ using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.Grains;
 
-namespace DependencyInjection.Tests.AspnetDiContainer
+namespace DependencyInjection.Tests.AspnetDIContainer
 {
     [TestCategory("DI"), TestCategory("BVT")]
     public class DependencyInjectionGrainTestsUsingASPNETDIContainer : DependencyInjectionGrainTestRunner

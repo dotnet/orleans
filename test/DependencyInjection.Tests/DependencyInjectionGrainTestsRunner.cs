@@ -19,7 +19,7 @@ namespace DependencyInjection.Tests
     {
         private readonly BaseTestClusterFixture fixture;
 
-        //contains DI set up for the following tests, so should be part of the test runner.
+        //contains IServiceCollection configuration for the following tests, so should be part of the test runner.
         //while different ServiceProviderFactory set up should be in the more concrete test files
         protected class TestSiloBuilderConfigurator : ISiloBuilderConfigurator
         {

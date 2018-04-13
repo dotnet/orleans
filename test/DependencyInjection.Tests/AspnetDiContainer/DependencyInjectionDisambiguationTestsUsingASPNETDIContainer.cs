@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 
-namespace DependencyInjection.Tests.AspnetDiContainer
+namespace DependencyInjection.Tests.AspnetDIContainer
 {
 
     [TestCategory("DI"), TestCategory("BVT")]
