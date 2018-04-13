@@ -13,6 +13,11 @@ namespace Orleans.Configuration
         internal const string DevelopmentClusterId = "dev";
 
         /// <summary>
+        /// Default service id for development clusters.
+        /// </summary>
+        internal const string DevelopmentServiceId = "dev-service";
+
+        /// <summary>
         /// Gets or sets the cluster identity. This used to be called DeploymentId before Orleans 2.0 name.
         /// </summary>
         public string ClusterId { get; set; }
