@@ -5,11 +5,6 @@
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(OutDir)' != ''">
-    <OutDir>$(OutDir)\TestVersionGrainsV1</OutDir>
-    <OutputPath>$(OutDir)</OutputPath>
-  </PropertyGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
     <ProjectReference Include="..\..\Orleans.TestingHost.AppDomain\Orleans.TestingHost.AppDomain.csproj" />

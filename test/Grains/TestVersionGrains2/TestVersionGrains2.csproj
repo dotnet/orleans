@@ -5,11 +5,6 @@
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(OutDir)' != ''">
-    <OutDir>$(OutDir)\TestVersionGrainsV2</OutDir>
-    <OutputPath>$(OutDir)</OutputPath>
-  </PropertyGroup>
-
   <ItemGroup>
     <Compile Include="..\TestVersionGrains\VersionGrainsSiloBuilderfactory.cs" Link="VersionGrainsSiloBuilderfactory.cs" />
   </ItemGroup>
