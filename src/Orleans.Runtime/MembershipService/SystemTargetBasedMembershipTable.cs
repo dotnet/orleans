@@ -57,7 +57,7 @@ namespace Orleans.Runtime.MembershipService
         }
 
         // Only used with MembershipTableGrain to wait for primary to start.
-        private async Task WaitForTableGrainToInit(IMembershipTableSystemTarget membershipTableSystemTargetGrain)
+        private async Task WaitForTableGrainToInit(IMembershipTableSystemTarget membershipTableSystemTarget)
         {
             var timespan = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(5);
             // This is a quick temporary solution to enable primary node to start fully before secondaries.
@@ -66,7 +66,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 try
                 {
-                    await membershipTableSystemTargetGrain.ReadAll().WithTimeout(timespan, $"MembershipGrain trying to read all content of the membership table, failed due to timeout {timespan}");
+                    await membershipTableSystemTarget.ReadAll().WithTimeout(timespan, $"MembershipGrain trying to read all content of the membership table, failed due to timeout {timespan}");
                     logger.Info(ErrorCode.MembershipTableGrainInit2, "-Connected to membership table provider.");
                     return;
                 }
