@@ -187,8 +187,8 @@ namespace Orleans.TestingHost
 
                 services.Configure<DevelopmentClusterMembershipOptions>(options => options.PrimarySiloEndpoint = primarySiloEndPoint);
                 services
-                    .AddSingleton<GrainBasedMembershipTable>()
-                    .AddFromExisting<IMembershipTable, GrainBasedMembershipTable>();
+                    .AddSingleton<SystemTargetBasedMembershipTable>()
+                    .AddFromExisting<IMembershipTable, SystemTargetBasedMembershipTable>();
             }
         }
 

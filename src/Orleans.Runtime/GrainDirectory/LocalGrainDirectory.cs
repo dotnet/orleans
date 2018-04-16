@@ -492,11 +492,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 if (Seed == null)
                 {
-                    string grainName;
-                    if (!Constants.TryGetSystemGrainName(grainId, out grainName))
-                        grainName = "MembershipTableGrain";
-
-                    var errorMsg = $"{grainName} cannot run without Seed node. Please check your silo configuration make sure it specifies a SeedNode element. " +
+                    var errorMsg = $"MembershipTableSystemTarget cannot run without Seed node. Please check your silo configuration make sure it specifies a SeedNode element. " +
                                    $"This is in either the configuration file or the {nameof(NetworkingOptions)} configuration. " +
                                    " Alternatively, you may want to use reliable membership, such as Azure Table.";
                     throw new ArgumentException(errorMsg, "grainId = " + grainId);

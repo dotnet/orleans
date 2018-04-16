@@ -7,27 +7,28 @@ using Microsoft.Extensions.Options;
 using Orleans.Concurrency;
 using Orleans.Configuration;
 using Orleans.MultiCluster;
+using Orleans.Runtime.Providers;
 using Orleans.Serialization;
 
 namespace Orleans.Runtime.MembershipService
 {
-    internal class GrainBasedMembershipTable : IMembershipTable
+    internal class SystemTargetBasedMembershipTable : IMembershipTable
     {
         private readonly IServiceProvider serviceProvider;
         private readonly ILogger logger;
-        private IMembershipTableGrain grain;
+        private IMembershipTableSystemTarget grain;
 
-        public GrainBasedMembershipTable(IServiceProvider serviceProvider, ILogger<GrainBasedMembershipTable> logger)
+        public SystemTargetBasedMembershipTable(IServiceProvider serviceProvider, ILogger<SystemTargetBasedMembershipTable> logger)
         {
             this.serviceProvider = serviceProvider;
             this.logger = logger;
         }
         public async Task InitializeMembershipTable(bool tryInitTableVersion)
         {
-            this.grain = await GetMembershipTableGrain();
+            this.grain = await GetMembershipTable();
         }
 
-        private async Task<IMembershipTableGrain> GetMembershipTableGrain()
+        private async Task<IMembershipTableSystemTarget> GetMembershipTable()
         {
             var options = this.serviceProvider.GetRequiredService<IOptions<DevelopmentClusterMembershipOptions>>().Value;
             if (options.PrimarySiloEndpoint == null)
@@ -40,16 +41,13 @@ namespace Orleans.Runtime.MembershipService
             bool isPrimarySilo = siloDetails.SiloAddress.Endpoint.Equals(options.PrimarySiloEndpoint);
             if (isPrimarySilo)
             {
-                this.logger.Info(ErrorCode.MembershipFactory1, "Creating membership table grain");
-                var catalog = this.serviceProvider.GetRequiredService<Catalog>();
-                await catalog.CreateSystemGrain(
-                    Constants.SystemMembershipTableId,
-                    typeof(GrainBasedMembershipTableGrain).FullName);
+                this.logger.Info(ErrorCode.MembershipFactory1, "Creating in-memory membership table");
+                var providerRuntime = serviceProvider.GetRequiredService<SiloProviderRuntime>();
+                providerRuntime.RegisterSystemTarget(ActivatorUtilities.CreateInstance<MembershipTableSystemTarget>(serviceProvider));
             }
 
             var grainFactory = this.serviceProvider.GetRequiredService<IInternalGrainFactory>();
-            var result = grainFactory.GetGrain<IMembershipTableGrain>(Constants.SystemMembershipTableId);
-
+            var result = grainFactory.GetSystemTarget<IMembershipTableSystemTarget>(Constants.SystemMembershipTableId, SiloAddress.New(options.PrimarySiloEndpoint, 0));
             if (isPrimarySilo)
             {
                 await this.WaitForTableGrainToInit(result);
@@ -59,7 +57,7 @@ namespace Orleans.Runtime.MembershipService
         }
 
         // Only used with MembershipTableGrain to wait for primary to start.
-        private async Task WaitForTableGrainToInit(IMembershipTableGrain membershipTableGrain)
+        private async Task WaitForTableGrainToInit(IMembershipTableSystemTarget membershipTableSystemTargetGrain)
         {
             var timespan = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(5);
             // This is a quick temporary solution to enable primary node to start fully before secondaries.
@@ -68,7 +66,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 try
                 {
-                    await membershipTableGrain.ReadAll().WithTimeout(timespan, $"MembershipGrain trying to read all content of the membership table, failed due to timeout {timespan}");
+                    await membershipTableSystemTargetGrain.ReadAll().WithTimeout(timespan, $"MembershipGrain trying to read all content of the membership table, failed due to timeout {timespan}");
                     logger.Info(ErrorCode.MembershipTableGrainInit2, "-Connected to membership table provider.");
                     return;
                 }
@@ -108,23 +106,20 @@ namespace Orleans.Runtime.MembershipService
 
     [Reentrant]
     [OneInstancePerCluster]
-    internal class GrainBasedMembershipTableGrain : Grain, IMembershipTableGrain
+    internal class MembershipTableSystemTarget : SystemTarget, IMembershipTableSystemTarget
     {
         private InMemoryMembershipTable table;
-        private ILogger logger;
+        private readonly ILogger logger;
 
-        public override Task OnActivateAsync()
+        public MembershipTableSystemTarget(
+            ILocalSiloDetails localSiloDetails,
+            ILoggerFactory loggerFactory,
+            SerializationManager serializationManager)
+            : base(Constants.SystemMembershipTableId, localSiloDetails.SiloAddress, loggerFactory)
         {
-            logger = this.ServiceProvider.GetRequiredService<ILogger<GrainBasedMembershipTableGrain>>();
+            logger = loggerFactory.CreateLogger<MembershipTableSystemTarget>();
+            table = new InMemoryMembershipTable(serializationManager);
             logger.Info(ErrorCode.MembershipGrainBasedTable1, "GrainBasedMembershipTable Activated.");
-            table = new InMemoryMembershipTable(this.ServiceProvider.GetRequiredService<SerializationManager>());
-            return Task.CompletedTask;
-        }
-
-        public override Task OnDeactivateAsync()
-        {
-            logger.Info("GrainBasedMembershipTable Deactivated.");
-            return Task.CompletedTask;
         }
 
         public Task InitializeMembershipTable(bool tryInitTableVersion)
@@ -156,7 +151,7 @@ namespace Orleans.Runtime.MembershipService
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("InsertRow entry = {0}, table version = {1}", entry.ToFullString(), tableVersion);
             bool result = table.Insert(entry, tableVersion);
             if (result == false)
-                logger.Info(ErrorCode.MembershipGrainBasedTable2, 
+                logger.Info(ErrorCode.MembershipGrainBasedTable2,
                     "Insert of {0} and table version {1} failed. Table now is {2}",
                     entry.ToFullString(), tableVersion, table.ReadAll());
 
@@ -183,4 +178,3 @@ namespace Orleans.Runtime.MembershipService
         }
     }
 }
-
