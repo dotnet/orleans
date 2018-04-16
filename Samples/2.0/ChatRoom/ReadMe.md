@@ -21,15 +21,16 @@ Alternatively, you can run from the command line:
 
 To start the silo
 ```
-OrleansServer\bin\Debug(Release)\net462\OrleansServer.exe
+cd OrleansServer
+dotnet run
 ```
 
 
 To start the client (you will have to use a different command window)
 ```
-OrleansClient\bin\Debug(Release)\net462\OrleansClient.exe
+cd OrleansClient
+dotnet run
 ```
-If you build the sample app in debug mode, the exe binary will be in Debug folder. If you build it in release mode, then the exe binary will be in Release folder.
 
 After the client started up, you will see instructions printed on the console, which tells you how to interact with a channel.
 
