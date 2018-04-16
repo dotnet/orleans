@@ -64,12 +64,13 @@ namespace UnitTests.Streaming.Reliability
                 {
                     gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                 })
-                .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AZURE_QUEUE_STREAM_PROVIDER_NAME, ob=>ob.Configure(
+                .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AZURE_QUEUE_STREAM_PROVIDER_NAME, ob => ob.Configure(
                     options =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     }))
-                .AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME);
+                .AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME)
+                .Configure<GatewayOptions>(options => options.GatewayListRefreshPeriod = TimeSpan.FromSeconds(5));
             }
         }
 
@@ -621,7 +622,23 @@ namespace UnitTests.Streaming.Reliability
             string when = "After restart all silos";
             CheckSilosRunning(when, numExpectedSilos);
 
-            await consumerGrain.UnSubscribeFromAllStreams();
+            // Since we restart all silos, the client might not haave had enough
+            // time to reconnect to the new gateways. Let's retry the call if it 
+            // is the case
+            for (int i = 0; i < 3; i++)
+            {
+                try
+                {
+                    await consumerGrain.UnSubscribeFromAllStreams();
+                    break;
+                }
+                catch (OrleansMessageRejectionException ex)
+                {
+                    if (!ex.Message.Contains("No gateways available"))
+                        throw;
+                }
+                await Task.Delay(100);
+            }
 
             StreamTestUtils.LogEndTest(testName, logger);
         }
