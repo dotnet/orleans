@@ -18,7 +18,6 @@ namespace Orleans.Runtime
         {
             None = 0,
             SystemTarget = 1,
-            SystemGrain = 2,
             Grain = 3,
             Client = 4,
             KeyExtGrain = 6,
@@ -51,11 +50,6 @@ namespace Orleans.Runtime
         public bool IsSystemTargetKey
         {
             get { return IdCategory == Category.SystemTarget; }
-        }
-
-        public bool IsSystemGrainKey
-        {
-            get { return IdCategory == Category.SystemGrain; }
         }
 
         public bool HasKeyExt
