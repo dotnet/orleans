@@ -13,45 +13,37 @@ using System.Linq;
 using Orleans.Hosting;
 using Orleans.TestingHost.Utils;
 
-namespace UnitTests.General
+namespace DependencyInjection.Tests
 {
-    [TestCategory("DI"), TestCategory("BVT")]
-    public class DependencyInjectionGrainTests : OrleansTestingBase, IClassFixture<DependencyInjectionGrainTests.Fixture>
+    public class DependencyInjectionGrainTestRunner : OrleansTestingBase
     {
-        private readonly Fixture fixture;
+        private readonly BaseTestClusterFixture fixture;
 
-        public class Fixture : BaseTestClusterFixture
+        //contains IServiceCollection configuration for the following tests, so should be part of the test runner.
+        //while different ServiceProviderFactory set up should be in the more concrete test files
+        protected class TestSiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            public void Configure(ISiloHostBuilder hostBuilder)
             {
-                builder.Options.InitialSilosCount = 1;
-                builder.AddSiloBuilderConfigurator<TestSiloBuilderConfigurator>();
-            }
-
-            private class TestSiloBuilderConfigurator : ISiloBuilderConfigurator
-            {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                hostBuilder.ConfigureServices(services =>
                 {
-                    hostBuilder.ConfigureServices(services =>
-                    {
-                        services.AddSingleton<IReducer<string, Reducer1Action>>(x => new Reducer1());
-                        services.AddSingleton<IReducer<int, Reducer2Action>>(x => new Reducer2());
-                        services.AddSingleton<IInjectedService, InjectedService>();
-                        services.AddScoped<IInjectedScopedService, InjectedScopedService>();
+                    services.AddSingleton<IReducer<string, Reducer1Action>>(x => new Reducer1());
+                    services.AddSingleton<IReducer<int, Reducer2Action>>(x => new Reducer2());
+                    services.AddSingleton<IInjectedService, InjectedService>();
+                    services.AddScoped<IInjectedScopedService, InjectedScopedService>();
 
-                        // explicitly register a grain class to assert that it will NOT use the registration, 
-                        // as by design this is not supported.
-                        services.AddTransient<ExplicitlyRegisteredSimpleDIGrain>(
-                            sp => new ExplicitlyRegisteredSimpleDIGrain(
-                                sp.GetRequiredService<IInjectedService>(),
-                                "some value",
-                                5));
-                    });
-                }
+                    // explicitly register a grain class to assert that it will NOT use the registration, 
+                    // as by design this is not supported.
+                    services.AddTransient<ExplicitlyRegisteredSimpleDIGrain>(
+                        sp => new ExplicitlyRegisteredSimpleDIGrain(
+                            sp.GetRequiredService<IInjectedService>(),
+                            "some value",
+                            5));
+                });
             }
         }
 
-        public DependencyInjectionGrainTests(Fixture fixture)
+        public DependencyInjectionGrainTestRunner(BaseTestClusterFixture fixture)
         {
             this.fixture = fixture;
         }
