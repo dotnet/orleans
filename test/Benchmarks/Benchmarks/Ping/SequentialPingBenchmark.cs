@@ -3,9 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
-using BenchmarkDotNet.Configs;
-using BenchmarkDotNet.Diagnosers;
-using BenchmarkDotNet.Jobs;
 using BenchmarkGrainInterfaces.Ping;
 using Orleans;
 using Orleans.Configuration;
@@ -13,15 +10,7 @@ using Orleans.Hosting;
 
 namespace Benchmarks.Ping
 {
-    public class SequentialPingBenchmarkConfig : ManualConfig
-    {
-        public SequentialPingBenchmarkConfig()
-        {
-            Add(new MemoryDiagnoser());
-        }
-    }
-
-    [Config(typeof(SequentialPingBenchmarkConfig))]
+    [MemoryDiagnoser]
     public class SequentialPingBenchmark : IDisposable 
     {
         private readonly ISiloHost host;
@@ -78,6 +67,7 @@ namespace Benchmarks.Ping
             }
         }
 
+        [GlobalCleanup]
         public void Dispose()
         {
             this.client.Dispose(); 

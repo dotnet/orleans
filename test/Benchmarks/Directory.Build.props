@@ -1,0 +1,12 @@
+<Project>
+  <PropertyGroup>
+    <_ParentDirectoryBuildPropsPath Condition="'$(_DirectoryBuildPropsFile)' != ''">$([System.IO.Path]::Combine('..', '$(_DirectoryBuildPropsFile)'))</_ParentDirectoryBuildPropsPath>
+  </PropertyGroup>
+
+  <Import Project="$(_ParentDirectoryBuildPropsPath)" Condition="Exists('$(_ParentDirectoryBuildPropsPath)')"/>
+  
+  <PropertyGroup>
+    <!-- RuntimeIdentifier breaks the default BenchmarkDotNet .NET Core support, we need to override it with an empty value -->
+    <RuntimeIdentifier></RuntimeIdentifier>
+  </PropertyGroup>
+</Project>

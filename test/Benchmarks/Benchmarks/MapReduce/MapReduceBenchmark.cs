@@ -41,6 +41,7 @@ namespace Benchmarks.MapReduce
             await Task.WhenAll(pipelines);
         }
 
+        [GlobalCleanup]
         public void Teardown()
         {
             _host.StopAllSilos();

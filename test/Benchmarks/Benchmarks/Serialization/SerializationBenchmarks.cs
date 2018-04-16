@@ -20,7 +20,7 @@ namespace Benchmarks.Serialization
         ProtoBufNet
     }
 
-    [Config(typeof(SerializationBenchmarkConfig))]
+    [MemoryDiagnoser]
     public class SerializationBenchmarks
     {
         private void InitializeSerializer(SerializerToUse serializerToUse)
