@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 
-namespace DependencyInjection.Tests.AspnetDIContainer
+namespace DependencyInjection.Tests.DefaultServiceProvider
 {
 
     [TestCategory("DI"), TestCategory("Functional")]
