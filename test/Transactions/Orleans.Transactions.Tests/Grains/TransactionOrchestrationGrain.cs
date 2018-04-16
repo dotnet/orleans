@@ -26,19 +26,19 @@ namespace Orleans.Transactions.Tests
             return Task.CompletedTask;
         }
 
-        public Task<int> Add(int numberToAdd)
+        public Task<int[]> Add(int numberToAdd)
         {
             this.resource.JoinTransaction();
-            return Task.FromResult<int>(0);
+            return Task.FromResult(new int[1]{0});
         }
 
-        public Task<int> Get()
+        public Task<int[]> Get()
         {
             this.resource.JoinTransaction();
-            return Task.FromResult<int>(0);
+            return Task.FromResult(new int[1]{0});
         }
 
-        public Task<int> AddAndThrow(int numberToAdd)
+        public Task AddAndThrow(int numberToAdd)
         {
             throw new NotImplementedException(nameof(AddAndThrow));
         }

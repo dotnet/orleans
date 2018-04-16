@@ -44,8 +44,8 @@ namespace Orleans.Transactions.Tests
 
         private async Task Double(ITransactionTestGrain grain)
         {
-            int value = await grain.Get();
-            await grain.Add(value);
+            int[] values = await grain.Get();
+            await grain.Add(values[0]);
         }
     }
 }
