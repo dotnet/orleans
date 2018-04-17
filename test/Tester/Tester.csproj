@@ -25,11 +25,11 @@
     <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj" />
     <ProjectReference Include="..\Orleans.TestingHost.AppDomain\Orleans.TestingHost.AppDomain.csproj" />
     <ProjectReference Include="..\Orleans.TestingHost.Legacy\Orleans.TestingHost.Legacy.csproj" />
-    <ProjectReference Include="..\TestGrains\TestGrains.csproj" />
-    <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj" />
+    <ProjectReference Include="..\Grains\TestGrains\TestGrains.csproj" />
+    <ProjectReference Include="..\Grains\TestInternalGrains\TestInternalGrains.csproj" />
     <ProjectReference Include="..\TestExtensions\TestExtensions.csproj" />
-    <ProjectReference Include="..\Versions\TestVersionGrains\TestVersionGrains.csproj" />
-    <ProjectReference Include="..\TestFSharp\TestFSharp.fsproj" />
+    <ProjectReference Include="..\Grains\TestVersionGrains\TestVersionGrains.csproj" />
+    <ProjectReference Include="..\Grains\TestFSharp\TestFSharp.fsproj" />
   </ItemGroup>
 
   <ItemGroup>

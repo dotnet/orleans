@@ -11,7 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Orleans.Core\Orleans.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Orleans.Core\Orleans.Core.csproj" />
     <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
   </ItemGroup>
 

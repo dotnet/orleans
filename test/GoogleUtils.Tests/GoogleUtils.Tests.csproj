@@ -19,10 +19,10 @@
     <ProjectReference Include="..\Tester\Tester.csproj" />
     <ProjectReference Include="..\TesterInternal\TesterInternal.csproj" />
     <ProjectReference Include="..\TestExtensions\TestExtensions.csproj" />
-    <ProjectReference Include="..\TestGrains\TestGrains.csproj" />
+    <ProjectReference Include="..\Grains\TestGrains\TestGrains.csproj" />
     <ProjectReference Include="..\TestInterfaces\TestInterfaces.csproj" />
     <ProjectReference Include="..\TestInternalDtosRefOrleans\TestInternalDtosRefOrleans.csproj" />
-    <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj" />
+    <ProjectReference Include="..\Grains\TestInternalGrains\TestInternalGrains.csproj" />
   </ItemGroup>
 
   <ItemGroup>
