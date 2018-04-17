@@ -17,7 +17,7 @@
     <ProjectReference Include="..\..\..\src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\src\Serializers\Orleans.Serialization.ProtobufNet\Orleans.Serialization.ProtobufNet.csproj" />
     <ProjectReference Include="..\..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
-    <ProjectReference Include="..\..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
-    <ProjectReference Include="..\BenchmarkGrains\BenchmarkGrains.csproj" />
+    <ProjectReference Include="..\..\Grains\TestGrainInterfaces\TestGrainInterfaces.csproj" />
+    <ProjectReference Include="..\..\Grains\BenchmarkGrains\BenchmarkGrains.csproj" />
   </ItemGroup>
 </Project>

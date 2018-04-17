@@ -18,13 +18,6 @@ if not exist %TestResultDir% md %TestResultDir%
 
 SET _Directory=bin\%BuildConfiguration%\net461\win10-x64
 
-rem copy Versioning dlls to the appropriate place to make Versioning tests pass.
-if not exist %CMDHOME%\test\Tester\%_Directory%\TestVersionGrainsV1\ mkdir %CMDHOME%\test\Tester\%_Directory%\TestVersionGrainsV1
-if not exist %CMDHOME%\test\Tester\%_Directory%\TestVersionGrainsV2\ mkdir %CMDHOME%\test\Tester\%_Directory%\TestVersionGrainsV2
-
-copy %CMDHOME%\test\Versions\TestVersionGrains\%_Directory%\* %CMDHOME%\test\Tester\%_Directory%\TestVersionGrainsV1\
-copy %CMDHOME%\test\Versions\TestVersionGrains2\%_Directory%\* %CMDHOME%\test\Tester\%_Directory%\TestVersionGrainsV2\
-
 set TESTS=^
 %CMDHOME%\test\TesterAzureUtils,^
 %CMDHOME%\test\TesterInternal,^
