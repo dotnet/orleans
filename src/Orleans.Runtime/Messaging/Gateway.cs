@@ -180,7 +180,7 @@ namespace Orleans.Runtime.Messaging
             // it to this address...
             // EXCEPT if the value is equal to the current GatewayAdress: in this case we will return
             // null and the local dispatcher will forward the Message to a local SystemTarget activation
-            if (msg.TargetGrain.IsSystemTarget && !this.gatewayAddress.Matches(msg.TargetSilo))
+            if (msg.TargetGrain.IsSystemTarget && !IsTargetingLocalGateway(msg.TargetSilo))
                 return msg.TargetSilo;
 
             // for responses from ClientAddressableObject to ClientGrain try to use clientsReplyRoutingCache for sending replies directly back.
@@ -208,6 +208,15 @@ namespace Orleans.Runtime.Messaging
             {
                 clientsReplyRoutingCache.DropExpiredEntries();
             }
+        }
+
+        private bool IsTargetingLocalGateway(SiloAddress siloAddress)
+        {
+            // Special case if the address used by the client was loopback
+            return this.gatewayAddress.Matches(siloAddress)
+                || (IPAddress.IsLoopback(siloAddress.Endpoint.Address)
+                    && siloAddress.Endpoint.Port == this.gatewayAddress.Endpoint.Port
+                    && siloAddress.Generation == this.gatewayAddress.Generation);
         }
         
 
