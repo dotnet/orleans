@@ -87,13 +87,19 @@ namespace PresenceGrains
 
         public Task SubscribeForGameUpdates(IGameObserver subscriber)
         {
-            subscribers.Subscribe(subscriber);
+            if (!subscribers.IsSubscribed(subscriber))
+            {
+                subscribers.Subscribe(subscriber);
+            }
             return TaskDone.Done;
         }
 
         public Task UnsubscribeForGameUpdates(IGameObserver subscriber)
         {
-            subscribers.Unsubscribe(subscriber);
+            if (subscribers.IsSubscribed(subscriber))
+            {
+                subscribers.Unsubscribe(subscriber);
+            }
             return TaskDone.Done;
         }
     }
