@@ -23,11 +23,11 @@
     <ProjectReference Include="..\..\src\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
     <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj" />
-    <ProjectReference Include="..\Orleans.TestingHost.AppDomain\Orleans.TestingHost.AppDomain.csproj" />
-    <ProjectReference Include="..\Orleans.TestingHost.Legacy\Orleans.TestingHost.Legacy.csproj" />
+    <ProjectReference Include="..\TestInfrastructure\Orleans.TestingHost.AppDomain\Orleans.TestingHost.AppDomain.csproj" />
+    <ProjectReference Include="..\TestInfrastructure\Orleans.TestingHost.Legacy\Orleans.TestingHost.Legacy.csproj" />
     <ProjectReference Include="..\Grains\TestGrains\TestGrains.csproj" />
     <ProjectReference Include="..\Grains\TestInternalGrains\TestInternalGrains.csproj" />
-    <ProjectReference Include="..\TestExtensions\TestExtensions.csproj" />
+    <ProjectReference Include="..\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
     <ProjectReference Include="..\Grains\TestVersionGrains\TestVersionGrains.csproj" />
     <ProjectReference Include="..\Grains\TestFSharp\TestFSharp.fsproj" />
   </ItemGroup>
