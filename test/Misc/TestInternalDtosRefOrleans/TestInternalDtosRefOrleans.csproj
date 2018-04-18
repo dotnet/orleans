@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>TestInternalDtosRefOrleans</RootNamespace>
+    <AssemblyName>TestInternalDtosRefOrleans</AssemblyName>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Grains\TestGrainInterfaces\TestGrainInterfaces.csproj" />
+  </ItemGroup>
+</Project>
