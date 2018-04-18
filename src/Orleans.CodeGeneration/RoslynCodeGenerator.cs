@@ -204,7 +204,18 @@ namespace Orleans.CodeGenerator
                 {
                     if (treatTypesAsSerializable || type.IsSerializable || TypeHasKnownBase(type))
                     {
-                        serializableTypes.RecordType(type, targetAssembly);
+                        string logContext = null;
+                        if (logger.IsEnabled(LogLevel.Trace))
+                        {
+                            if (treatTypesAsSerializable)
+                                logContext = $"known assembly {assembly.GetName().Name} where 'TreatTypesAsSerializable' = true";
+                            else if (type.IsSerializable)
+                                logContext = $"known assembly {assembly.GetName().Name} where type is [Serializable]";
+                            else if (type.IsSerializable)
+                                logContext = $"known assembly {assembly.GetName().Name} where type has known base type.";
+                        }
+
+                        serializableTypes.RecordType(type, targetAssembly, logContext);
                     }
 
                     // Include grain interfaces and classes.
@@ -229,7 +240,9 @@ namespace Orleans.CodeGenerator
                         {
                             foreach (var arg in baseType.GetGenericArguments())
                             {
-                                this.serializableTypes.RecordType(arg, targetAssembly);
+                                string logContext = null;
+                                if (logger.IsEnabled(LogLevel.Trace)) logContext = "generic base type of " + type.GetLogFormat();
+                                this.serializableTypes.RecordType(arg, targetAssembly, logContext);
                             }
                         }
 
@@ -292,7 +305,12 @@ namespace Orleans.CodeGenerator
                         GrainReferenceGenerator.GenerateClass(
                             grainInterface,
                             referenceTypeName,
-                            encounteredType => this.serializableTypes.RecordType(encounteredType, targetAssembly)));
+                            encounteredType =>
+                            {
+                                string logContext = null;
+                                if (logger.IsEnabled(LogLevel.Trace)) logContext = "used by grain type " + grainInterface.GetLogFormat();
+                                this.serializableTypes.RecordType(encounteredType, targetAssembly, logContext);
+                            }));
                     namespaceMembers.Add(GrainMethodInvokerGenerator.GenerateClass(grainInterface, invokerTypeName));
                     var genericTypeSuffix = GetGenericTypeSuffix(grainInterface.GetGenericArguments().Length);
                     features.GrainInterfaces.Add(
@@ -326,7 +344,7 @@ namespace Orleans.CodeGenerator
 
             foreach (var attribute in knownAssemblies.Keys.SelectMany(asm => asm.GetCustomAttributes<ConsiderForCodeGenerationAttribute>()))
             {
-                this.serializableTypes.RecordType(attribute.Type, targetAssembly);
+                this.serializableTypes.RecordType(attribute.Type, targetAssembly, "[ConsiderForCodeGeneration]");
                 if (attribute.ThrowOnFailure && !this.serializableTypes.IsTypeRecorded(attribute.Type) && !this.serializableTypes.IsTypeIgnored(attribute.Type))
                 {
                     throw new CodeGenerationException(
@@ -376,8 +394,14 @@ namespace Orleans.CodeGenerator
                     this.logger.Trace("Generating serializer for type {0}", toGen.GetParseableName());
                 }
 
+                var type = toGen;
                 var generatedSerializerName = SerializerGenerator.GetGeneratedClassName(toGen);
-                serializerNamespaceMembers.Add(SerializerGenerator.GenerateClass(generatedSerializerName, toGen, encounteredType => this.serializableTypes.RecordType(encounteredType, targetAssembly)));
+                serializerNamespaceMembers.Add(SerializerGenerator.GenerateClass(generatedSerializerName, toGen, encounteredType =>
+                {
+                    string logContext = null;
+                    if (logger.IsEnabled(LogLevel.Trace)) logContext = "generated serializer for " + type.GetLogFormat();
+                    this.serializableTypes.RecordType(encounteredType, targetAssembly, logContext);
+                }));
                 var qualifiedSerializerName = serializerNamespaceName + '.' + generatedSerializerName + GetGenericTypeSuffix(toGen.GetGenericArguments().Length);
                 features.Serializers.SerializerTypes.Add(
                     new SerializerTypeDescription
