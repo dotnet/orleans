@@ -7,7 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
     <ProjectReference Include="..\..\Misc\TestInterfaces\TestInterfaces.csproj" />
     <ProjectReference Include="..\..\Misc\TestFSharpInterfaces\TestFSharpInterfaces.fsproj" />
   </ItemGroup>

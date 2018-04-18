@@ -11,7 +11,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Orleans.Runtime.Legacy\Orleans.Runtime.Legacy.csproj" />
     <ProjectReference Include="..\Grains\TestGrainInterfaces\TestGrainInterfaces.csproj" />
     <ProjectReference Include="..\Grains\TestGrains\TestGrains.csproj" />
   </ItemGroup>

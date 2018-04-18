@@ -20,9 +20,4 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="$(MicrosoftExtensionsConfigurationBinderVersion)" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Orleans.Runtime\Orleans.Runtime.csproj" />
-    <ProjectReference Include="..\..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
-  </ItemGroup>
-
 </Project>
