@@ -6,7 +6,4 @@
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Orleans.Core\Orleans.Core.csproj" />
-  </ItemGroup>
 </Project>

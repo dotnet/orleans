@@ -34,12 +34,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
-    <ProjectReference Include="..\..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
-    <ProjectReference Include="..\..\OrleansProviders\OrleansProviders.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
     <None Include="MySQL-Persistence.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Pack>true</Pack>

@@ -22,12 +22,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
-    <ProjectReference Include="..\..\Orleans.Core\Orleans.Core.csproj" />
-    <ProjectReference Include="..\..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Compile Update="OrleansPerformanceCounterInstaller.cs">
       <SubType>Component</SubType>
     </Compile>

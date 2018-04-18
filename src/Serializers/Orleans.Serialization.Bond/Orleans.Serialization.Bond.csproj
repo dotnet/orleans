@@ -15,7 +15,4 @@
     <PackageReference Include="Bond.Core.CSharp" Version="$(BondCoreCSharpVersion)" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\..\Orleans.Core\Orleans.Core.csproj" />
-  </ItemGroup>
 </Project>

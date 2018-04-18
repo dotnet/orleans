@@ -15,7 +15,4 @@
     <PackageReference Include="Google.Protobuf" Version="$(GoogleProtobufVersion)" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\..\Orleans.Core\Orleans.Core.csproj" />
-  </ItemGroup>
 </Project>
