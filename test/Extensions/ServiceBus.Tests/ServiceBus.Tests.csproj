@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>ServiceBus.Tests</RootNamespace>
+    <AssemblyName>ServiceBus.Tests</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentAssertions" Version="$(FluentAssertionsVersion)" />
+    <PackageReference Include="xunit" Version="$(xUnitVersion)" />
+    <PackageReference Include="Xunit.SkippableFact" Version="$(XunitSkippableFactVersion)" />
+    <DotNetCliToolReference Include="dotnet-xunit" Version="$(xUnitVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Azure\Orleans.Streaming.EventHubs\Orleans.Streaming.EventHubs.csproj" />
+    <ProjectReference Include="..\..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
+    <ProjectReference Include="..\..\TestInfrastructure\Orleans.TestingHost.Legacy\Orleans.TestingHost.Legacy.csproj" />
+    <ProjectReference Include="..\..\Tester\Tester.csproj" />
+    <ProjectReference Include="..\..\Grains\TestGrains\TestGrains.csproj" />
+    <ProjectReference Include="..\..\Misc\TestInternalDtosRefOrleans\TestInternalDtosRefOrleans.csproj" />
+    <ProjectReference Include="..\..\Grains\TestInternalGrains\TestInternalGrains.csproj" />
+    <ProjectReference Include="..\..\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="App.config" />
+    <None Include="ServiceBus.Tests.xunit.runner.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>

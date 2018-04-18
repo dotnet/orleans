@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>TestServiceFabric</RootNamespace>
+    <AssemblyName>TestServiceFabric</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit" Version="$(xUnitVersion)" />
+    <PackageReference Include="FluentAssertions" Version="$(FluentAssertionsVersion)" />
+    <PackageReference Include="Microsoft.ServiceFabric.Services" Version="$(MicrosoftServiceFabricServicesVersion)" />
+    <PackageReference Include="NSubstitute" Version="$(NSubstituteVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="$(MicrosoftExtensionsOptionsVersion)" />
+    <DotNetCliToolReference Include="dotnet-xunit" Version="$(xUnitVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Azure\Orleans.Hosting.ServiceFabric\Orleans.Hosting.ServiceFabric.csproj" />
+    <ProjectReference Include="..\..\..\src\Azure\Orleans.Clustering.ServiceFabric\Orleans.Clustering.ServiceFabric.csproj" />
+    <ProjectReference Include="..\..\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="App.config" />
+    <None Include="TestServiceFabric.xunit.runner.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>
