@@ -26,11 +26,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
-    <ProjectReference Include="..\..\OrleansProviders\OrleansProviders.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Folder Include="Utilities\" />
     <Folder Include="Storage\" />
   </ItemGroup>

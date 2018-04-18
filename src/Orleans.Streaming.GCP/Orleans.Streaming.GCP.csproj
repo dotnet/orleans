@@ -20,9 +20,4 @@
     <PackageReference Include="Google.Cloud.PubSub.V1" Version="$(GoogleCloudPubSubV1Version)" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
-    <ProjectReference Include="..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
-    <ProjectReference Include="..\OrleansProviders\OrleansProviders.csproj" />
-  </ItemGroup>
 </Project>

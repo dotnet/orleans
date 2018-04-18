@@ -25,7 +25,4 @@
     <Folder Include="Storage" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
-  </ItemGroup>
 </Project>

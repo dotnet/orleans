@@ -11,10 +11,4 @@
     <RootNamespace>Orleans.Runtime.Legacy</RootNamespace>
   </PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
-    <ProjectReference Include="..\Orleans.Core.Legacy\Orleans.Core.Legacy.csproj" />
-    <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" />
-    <ProjectReference Include="..\Orleans.Runtime\Orleans.Runtime.csproj" />
-  </ItemGroup>
 </Project>
