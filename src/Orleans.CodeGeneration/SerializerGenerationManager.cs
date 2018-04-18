@@ -74,7 +74,7 @@ namespace Orleans.CodeGenerator
             return this.typesToIgnore.Contains(type);
         }
 
-        internal bool RecordType(Type t, Assembly targetAssembly)
+        internal bool RecordType(Type t, Assembly targetAssembly, string logContext)
         {
             if (!TypeUtilities.IsAccessibleFromAssembly(t, targetAssembly))
             {
@@ -89,7 +89,7 @@ namespace Orleans.CodeGenerator
 
             if (t.IsArray)
             {
-                RecordType(t.GetElementType(), targetAssembly);
+                RecordType(t.GetElementType(), targetAssembly, logContext);
                 return false;
             }
 
@@ -107,7 +107,8 @@ namespace Orleans.CodeGenerator
                 var args = t.GetGenericArguments();
                 foreach (var arg in args)
                 {
-                    RecordType(arg, targetAssembly);
+                    if (log.IsEnabled(LogLevel.Trace)) logContext = "generic argument of type " + t.GetLogFormat();
+                    RecordType(arg, targetAssembly, logContext);
                 }
             }
 
@@ -116,7 +117,7 @@ namespace Orleans.CodeGenerator
 
             if (t.IsConstructedGenericType)
             {
-                return RecordType(t.GetGenericTypeDefinition(), targetAssembly);
+                return RecordType(t.GetGenericTypeDefinition(), targetAssembly, logContext);
             }
 
             if (t.IsOrleansPrimitive() || this.HasSerializer(t) ||
@@ -149,12 +150,15 @@ namespace Orleans.CodeGenerator
             // Instead, a fallback serializer which supports those hooks can be used.
             if (DotNetSerializableUtilities.HasSerializationHookAttributes(t)) return false;
 
-            typesToProcess.Add(t);
+            if (!typesToProcess.Add(t)) return true;
+
+            if (log.IsEnabled(LogLevel.Trace)) log.LogTrace($"Will generate serializer for type {t.GetLogFormat()} encountered from {logContext}");
 
             var interfaces = t.GetInterfaces().Where(x => x.IsConstructedGenericType);
+            if (log.IsEnabled(LogLevel.Trace)) logContext = "generic argument of implemented interface on type " + t.GetLogFormat();
             foreach (var arg in interfaces.SelectMany(v => v.GetGenericArguments()))
             {
-                RecordType(arg, targetAssembly);
+                RecordType(arg, targetAssembly, logContext);
             }
 
             return true;
