@@ -48,7 +48,7 @@
   <Choose>
     <When Condition="$(OrleansAzureVersion) == $(VersionPrefix)">
       <ItemGroup >
-        <ProjectReference Include="..\..\src\Orleans.Streaming.EventHubs\Orleans.Streaming.EventHubs.csproj" />
+        <ProjectReference Include="..\..\src\Azure\Orleans.Streaming.EventHubs\Orleans.Streaming.EventHubs.csproj" />
       </ItemGroup>
     </When>
     <Otherwise>
@@ -113,7 +113,7 @@
   <Choose>
     <When Condition="$(OrleansAzureVersion) == $(VersionPrefix)">
       <ItemGroup >
-        <ProjectReference Include="..\..\src\Orleans.Persistence.AzureStorage\Orleans.Persistence.AzureStorage.csproj" />
+        <ProjectReference Include="..\..\src\Azure\Orleans.Persistence.AzureStorage\Orleans.Persistence.AzureStorage.csproj" />
       </ItemGroup>
     </When>
     <Otherwise>
@@ -126,7 +126,7 @@
   <Choose>
     <When Condition="$(OrleansAzureVersion) == $(VersionPrefix)">
       <ItemGroup >
-        <ProjectReference Include="..\..\src\Orleans.Streaming.AzureStorage\Orleans.Streaming.AzureStorage.csproj" />
+        <ProjectReference Include="..\..\src\Azure\Orleans.Streaming.AzureStorage\Orleans.Streaming.AzureStorage.csproj" />
       </ItemGroup>
     </When>
     <Otherwise>

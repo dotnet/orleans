@@ -61,7 +61,7 @@
   <Choose>
     <When Condition="$(OrleansAzureVersion) == $(VersionPrefix)">
       <ItemGroup >
-        <ProjectReference Include="..\..\src\Orleans.Streaming.EventHubs\Orleans.Streaming.EventHubs.csproj" />
+        <ProjectReference Include="..\..\src\Azure\Orleans.Streaming.EventHubs\Orleans.Streaming.EventHubs.csproj" />
       </ItemGroup>
     </When>
     <Otherwise>
