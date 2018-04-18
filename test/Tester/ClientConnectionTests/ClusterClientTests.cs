@@ -19,7 +19,7 @@ namespace Tester.ClientConnectionTests
     public class ClusterClientTests : TestClusterPerTest
     {
         /// <summary>
-        /// Ensures that <see "ClusterClient.Connect" /> can be retried.
+        /// Ensures that ClusterClient.Connect can be retried.
         /// </summary>
         [Fact]
         public async Task ConnectIsRetryableTest()
