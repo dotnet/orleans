@@ -3,7 +3,7 @@
   <PropertyGroup>
     <RootNamespace>Orleans.TestingHost.Tests</RootNamespace>
     <AssemblyName>Orleans.TestingHost.Tests</AssemblyName>
-    <OrleansBuildTimeCodeGen>false</OrleansBuildTimeCodeGen>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
   <ItemGroup>

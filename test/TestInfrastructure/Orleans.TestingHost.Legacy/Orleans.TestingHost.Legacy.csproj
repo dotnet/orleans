@@ -9,7 +9,7 @@
     <TargetFramework>net461</TargetFramework>
     <AssemblyName>Orleans.TestingHost.Legacy</AssemblyName>
     <RootNamespace>Orleans.TestingHost.Legacy</RootNamespace>
-    <OrleansBuildTimeCodeGen>false</OrleansBuildTimeCodeGen>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
   <PropertyGroup>
