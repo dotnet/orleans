@@ -15,7 +15,4 @@
     <PackageReference Include="protobuf-net" Version="$(ProtobufNetVersion)" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\..\Orleans.Core\Orleans.Core.csproj" />
-  </ItemGroup>
 </Project>

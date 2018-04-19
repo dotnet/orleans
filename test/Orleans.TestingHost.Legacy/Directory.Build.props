@@ -1,0 +1,47 @@
+<Project>
+  <PropertyGroup>
+    <_ParentDirectoryBuildPropsPath Condition="'$(_DirectoryBuildPropsFile)' != ''">$([System.IO.Path]::Combine('..', '$(_DirectoryBuildPropsFile)'))</_ParentDirectoryBuildPropsPath>
+  </PropertyGroup>
+
+  <Import Project="$(_ParentDirectoryBuildPropsPath)" Condition="Exists('$(_ParentDirectoryBuildPropsPath)')"/>
+
+  <Choose>
+    <When Condition="$(OrleansCoreLegacyVersion) == $(VersionPrefix)">
+      <ItemGroup >
+        <ProjectReference Include="..\..\src\Orleans.Core.Legacy\Orleans.Core.Legacy.csproj" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.Core.Legacy" Version="$(OrleansCoreLegacyVersion)"/>
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
+
+  <Choose>
+    <When Condition="$(OrleansRuntimeLegacyVersion) == $(VersionPrefix)">
+      <ItemGroup >
+        <ProjectReference Include="..\..\src\Orleans.Runtime.Legacy\Orleans.Runtime.Legacy.csproj" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.Runtime.Legacy" Version="$(OrleansRuntimeLegacyVersion)"/>
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
+
+  <Choose>
+    <When Condition="$(OrleansTestingHostVersion) == $(VersionPrefix)">
+      <ItemGroup >
+        <ProjectReference Include="..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.TestingHost" Version="$(OrleansTestingHostVersion)"/>
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
+
+</Project>

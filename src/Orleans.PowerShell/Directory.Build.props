@@ -1,0 +1,35 @@
+<Project>
+  <PropertyGroup>
+    <_ParentDirectoryBuildPropsPath Condition="'$(_DirectoryBuildPropsFile)' != ''">$([System.IO.Path]::Combine('..', '$(_DirectoryBuildPropsFile)'))</_ParentDirectoryBuildPropsPath>
+  </PropertyGroup>
+
+  <Import Project="$(_ParentDirectoryBuildPropsPath)" Condition="Exists('$(_ParentDirectoryBuildPropsPath)')"/>
+
+  <PropertyGroup Condition="$(OrleansToolsVersion) != $(VersionPrefix)">
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <!-- Configure source link: https://github.com/ctaggart/SourceLink -->
+  <PropertyGroup>
+    <SourceLinkCreate>true</SourceLinkCreate>
+    <SourceLinkOriginUrl>https://github.com/dotnet/orleans</SourceLinkOriginUrl>
+  </PropertyGroup>
+
+  <Choose>
+    <When Condition="$(OrleansCoreLegacyVersion) == $(VersionPrefix) AND $(OrleansCoreLegacyVersion) == $(OrleansToolsVersion)">
+      <ItemGroup >
+        <ProjectReference Include="..\Orleans.Core.Legacy\Orleans.Core.Legacy.csproj" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.Core.Legacy" Version="$(OrleansToolsVersion)"/>
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
+
+</Project>
