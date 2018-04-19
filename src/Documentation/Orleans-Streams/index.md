@@ -9,7 +9,7 @@ Orleans v.1.0.0 added support for streaming extensions to the programing model. 
 
 ## Why should I care?
 
-If you already know all about [Stream Processing](http://blog.confluent.io/2015/01/29/making-sense-of-stream-processing/) and are familiar with technologies like [Event Hubs](http://azure.microsoft.com/en-us/services/event-hubs/), [Kafka](http://kafka.apache.org/), [Azure Stream Analytics](http://azure.microsoft.com/en-us/services/stream-analytics/), [Apache Storm](https://storm.apache.org/), [Apache Spark Streaming](https://spark.apache.org/streaming/), and [Reactive Extensions (Rx) in .NET](https://msdn.microsoft.com/en-us/data/gg577609.aspx), you may be asking why should you care. **Why do we need yet another Stream Processing System and how Actors are related to Streams?** ["Why Orleans Streams?"](Streams-Why.md) is meant to answer that question.
+If you already know all about [Stream Processing](https://confluentinc.wordpress.com/2015/01/29/making-sense-of-stream-processing/) and are familiar with technologies like [Event Hubs](http://azure.microsoft.com/en-us/services/event-hubs/), [Kafka](http://kafka.apache.org/), [Azure Stream Analytics](http://azure.microsoft.com/en-us/services/stream-analytics/), [Apache Storm](https://storm.apache.org/), [Apache Spark Streaming](https://spark.apache.org/streaming/), and [Reactive Extensions (Rx) in .NET](https://msdn.microsoft.com/en-us/data/gg577609.aspx), you may be asking why should you care. **Why do we need yet another Stream Processing System and how Actors are related to Streams?** ["Why Orleans Streams?"](Streams-Why.md) is meant to answer that question.
 
 
 ## Programming Model
