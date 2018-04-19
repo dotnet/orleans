@@ -1,10 +1,8 @@
 ﻿using Microsoft.Extensions.Options;
-using Orleans.Runtime.Configuration;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Text;
 
 namespace Orleans
 {
@@ -86,13 +84,6 @@ namespace Orleans
             }
 
             return result;
-        }
-
-        private static object RedactIfNeeded(RedactAttribute attribute, object value)
-        {
-            return attribute != null
-                ? attribute.Redact(value)
-                : value;
         }
     }
 
