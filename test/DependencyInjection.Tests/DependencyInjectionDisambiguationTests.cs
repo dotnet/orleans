@@ -13,7 +13,7 @@ namespace DependencyInjection.Tests
         [Fact]
         public void DisambiguateByKeyTest()
         {
-            IServiceProvider services = BuildeServiceProvider(ConfigureServices());
+            IServiceProvider services = BuildServiceProvider(ConfigureServices());
             int actual0 = services.GetServiceByKey<int, IValue<int>>(0).Value;
             Assert.StrictEqual(0, actual0);
             int actual1 = services.GetServiceByKey<int, IValue<int>>(1).Value;
@@ -23,7 +23,7 @@ namespace DependencyInjection.Tests
         [Fact]
         public void DisambiguateByNameTest()
         {
-            IServiceProvider services = BuildeServiceProvider(ConfigureServices());
+            IServiceProvider services = BuildServiceProvider(ConfigureServices());
             string actualThis = services.GetServiceByName<IValue<string>>("this").Value;
             Assert.Equal("this", actualThis);
             string actualThat = services.GetServiceByName<IValue<string>>("that").Value;
@@ -54,7 +54,7 @@ namespace DependencyInjection.Tests
         }
 
         //Build the service container, based on which DI solution you uses
-        protected abstract IServiceProvider BuildeServiceProvider(IServiceCollection services);
+        protected abstract IServiceProvider BuildServiceProvider(IServiceCollection services);
 
         private IServiceCollection ConfigureServices()
         {
