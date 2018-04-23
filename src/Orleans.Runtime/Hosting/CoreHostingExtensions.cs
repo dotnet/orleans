@@ -47,12 +47,16 @@ namespace Orleans.Hosting
         /// <param name="primarySiloEndpoint">
         /// The endpoint of the primary silo, or <see langword="null"/> to use this silo as the primary.
         /// </param>
+        /// <param name="serviceId">The service id.</param>
+        /// <param name="clusterId">The cluster id.</param>
         /// <returns>The silo builder.</returns>
         public static ISiloHostBuilder UseLocalhostClustering(
             this ISiloHostBuilder builder,
             int siloPort = EndpointOptions.DEFAULT_SILO_PORT,
             int gatewayPort = EndpointOptions.DEFAULT_GATEWAY_PORT,
-            IPEndPoint primarySiloEndpoint = null)
+            IPEndPoint primarySiloEndpoint = null,
+            string serviceId = ClusterOptions.DevelopmentServiceId,
+            string clusterId = ClusterOptions.DevelopmentClusterId)
         {
             builder.Configure<EndpointOptions>(options =>
             {
@@ -65,11 +69,23 @@ namespace Orleans.Hosting
             builder.Configure<ClusterMembershipOptions>(options => options.ExpectedClusterSize = 1);
             builder.ConfigureServices(services =>
             {
-                services.PostConfigure<ClusterOptions>(options =>
+                // If the caller did not override service id or cluster id, configure default values as a fallback.
+                if (string.Equals(serviceId, ClusterOptions.DevelopmentServiceId) && string.Equals(clusterId, ClusterOptions.DevelopmentClusterId))
                 {
-                    if (string.IsNullOrWhiteSpace(options.ClusterId)) options.ClusterId = ClusterOptions.DevelopmentClusterId;
-                    if (string.IsNullOrWhiteSpace(options.ServiceId)) options.ServiceId = ClusterOptions.DevelopmentServiceId;
-                });
+                    services.PostConfigure<ClusterOptions>(options =>
+                    {
+                        if (string.IsNullOrWhiteSpace(options.ClusterId)) options.ClusterId = ClusterOptions.DevelopmentClusterId;
+                        if (string.IsNullOrWhiteSpace(options.ServiceId)) options.ServiceId = ClusterOptions.DevelopmentServiceId;
+                    });
+                }
+                else
+                {
+                    services.Configure<ClusterOptions>(options =>
+                    {
+                        options.ServiceId = serviceId;
+                        options.ClusterId = clusterId;
+                    });
+                }
             });
 
             return builder;
