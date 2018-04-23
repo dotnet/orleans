@@ -81,7 +81,10 @@ In order to use Orleans, you need either <a href="https://docs.microsoft.com/en-
 At this point, Orleans is still primarily tested on Windows.
 However, multiple customers successfully run Orleans 2.0 on non-Windows platforms as well.</p>
 <p>For development, it is recommended to use <a href="https://www.visualstudio.com">Visual Studio</a> 2017 or higher.
-But you can also use other development tools of your choice.</p>
+But you can also use other development tools of your choice.
+It is a requirement to use the new .csproj format with Orleans 2.0.
+If your application is still using the legacy .csproj format, please upgrade it as the first step of migrating to Orleans 2.0.
+<a href="https://www.natemcmaster.com/blog/2017/03/09/vs2015-to-vs2017-upgrade/">This blog post</a> is a good reference on how to migrate to the new .csproj format. </p>
 <p>In production, Orleans requires persistent storage for reliable cluster membership.
 The following storage technologies are supported for managing cluster membership state (you only need one of those):</p>
 <ul>

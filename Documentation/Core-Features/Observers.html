@@ -104,7 +104,7 @@ Unlike in the client subscription case, the subscribing grain simply implements 
         Console.WriteLine(message);
     }
 }
-</code></pre><p>Now on the server we should have a Grain which sends these chat messages to clients. The Grain also should have a mechanism for clients to subscribe and unsubscribe themselves to receive notifications. For subscription the Grain can use the utility class <code>ObserverSubscriptionManager</code>:</p>
+</code></pre><p>Now on the server we should have a Grain which sends these chat messages to clients. The Grain also should have a mechanism for clients to subscribe and unsubscribe themselves to receive notifications. For subscription the Grain can use the utility class <code>ObserverSubscriptionManager</code>. This class throws an <code>OrleansException</code> if you try to subscribe an observer that is already subscribed (or unsubscribe an observer that is not subscribed), so it is important to handle this case by using the <code>IsSubscribed()</code> method or by handling the <code>OrleansException</code>:</p>
 <pre><code class="lang-csharp">class HelloGrain : Grain, IHello
 {
     private ObserverSubscriptionManager&lt;IChat&gt; _subsManager;
@@ -119,22 +119,28 @@ Unlike in the client subscription case, the subscribing grain simply implements 
     // Clients call this to subscribe.
     public Task Subscribe(IChat observer)
     {
-        _subsManager.Subscribe(observer);
-        return TaskDone.Done;
+        if (!_subsManager.IsSubscribed(observer))
+        {
+            _subsManager.Subscribe(observer);
+        }
+        return Task.CompletedTask;
     }
 
     //Also clients use this to unsubscribe themselves to no longer receive the messages.
     public Task UnSubscribe(IChat observer)
     {
-        _subsManager.Unsubscribe(observer);
-        return TaskDone.Done;
+        if (_subsManager.IsSubscribed(observer))
+        {
+            _subsManager.Unsubscribe(observer);
+        }
+        return Task.CompletedTask;
     }
 }
 </code></pre><p>To send the message to clients the <code>Notify</code> method of the <code>ObserverSubscriptionManager&lt;IChat&gt;</code> instance can be used. The method takes an <code>Action&lt;T&gt;</code> method or lambda expression (where <code>T</code> is of type <code>IChat</code> here). You can call any method on the interface to send it to clients. In our case we only have one method <code>ReceiveMessage</code> and our sending code on the server would look like this:</p>
 <pre><code class="lang-csharp">public Task SendUpdateMessage(string message)
 {
     _subsManager.Notify(s =&gt; s.ReceiveMessage(message));
-    return TaskDone.Done;
+    return Task.CompletedTask;
 }
 </code></pre><p>Now our server has a method to send messages to observer clients, two methods for subscribing/unsubscribing and the client implemented a class to be able to observe the grain messages. The last step is to create an observer reference on the client using our previously implemented <code>Chat</code> class and let it receive the messages after subscribing it.</p>
 <p>The code would look like this:</p>

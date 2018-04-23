@@ -89,7 +89,7 @@
 <pre><code class="lang-csharp">siloHostBuilder.AddStartupTask(
   async (IServiceProvider services, CancellationToken cancellation) =&gt;
   {
-    // Use the service providr to get the grain factory.
+    // Use the service provider to get the grain factory.
     var grainFactory = services.GetRequiredService&lt;IGrainFactory&gt;();
 
     // Get a reference to a grain and call a method on it.
@@ -113,7 +113,7 @@
         await grain.Initialize();
     }
 }
-</code></pre><p>That implementation must then be registered with the <code>ISiloHostBuilder</code>:</p>
+</code></pre><p>Then that implementation must be registered with the <code>ISiloHostBuilder</code>:</p>
 <pre><code class="lang-csharp">siloHostBuilder.AddStartupTask&lt;CallGrainStartupTask&gt;();
 </code></pre></article>
           </div>
