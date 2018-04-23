@@ -12,27 +12,14 @@ namespace Orleans.Transactions.Tests
         public int Value { get; set; }
     }
 
-    public class EightStateTransactionalGrain : MultiStateTransactionalGrainBaseClass
+    public class MaxStateTransactionalGrain : MultiStateTransactionalGrainBaseClass
     {
-        public EightStateTransactionalGrain(
-            [TransactionalState("data1", TransactionTestConstants.TransactionStore)]
-            ITransactionalState<GrainData> data1,
-            [TransactionalState("data2", TransactionTestConstants.TransactionStore)]
-            ITransactionalState<GrainData> data2,
-            [TransactionalState("data3", TransactionTestConstants.TransactionStore)]
-            ITransactionalState<GrainData> data3,
-            [TransactionalState("data4", TransactionTestConstants.TransactionStore)]
-            ITransactionalState<GrainData> data4,
-            [TransactionalState("data5", TransactionTestConstants.TransactionStore)]
-            ITransactionalState<GrainData> data5,
-            [TransactionalState("data6", TransactionTestConstants.TransactionStore)]
-            ITransactionalState<GrainData> data6,
-            [TransactionalState("data7", TransactionTestConstants.TransactionStore)]
-            ITransactionalState<GrainData> data7,
-            [TransactionalState("data8", TransactionTestConstants.TransactionStore)]
-            ITransactionalState<GrainData> data8,
+        public MaxStateTransactionalGrain(
+            ITransactionalStateFactory stateFactory,
             ILoggerFactory loggerFactory)
-            : base(new ITransactionalState<GrainData>[8] { data1, data2, data3, data4, data5, data6, data7, data8 }, 
+            : base(Enumerable.Range(0, TransactionTestConstants.MaxCoordinatedTransactions)
+                .Select(i => stateFactory.Create<GrainData>(new TransactionalStateAttribute($"data{i}", TransactionTestConstants.TransactionStore)))
+                .ToArray(), 
                   loggerFactory)
         {
         }
@@ -85,26 +72,26 @@ namespace Orleans.Transactions.Tests
         {
             foreach (var data in this.dataArray)
             {
-                TransactionalGrainUtils.Set(data, newValue, this.logger);
+                Set(data, newValue, this.logger);
             }
             return Task.CompletedTask;
         }
 
         public Task<int[]> Add(int numberToAdd)
         {
-            return Task.FromResult(this.dataArray.Select(data => TransactionalGrainUtils.Add(data, numberToAdd, this.logger)).ToArray());
+            return Task.FromResult(this.dataArray.Select(data => Add(data, numberToAdd, this.logger)).ToArray());
         }
 
         public Task<int[]> Get()
         {
-            return Task.FromResult(this.dataArray.Select(data => TransactionalGrainUtils.Get(data, this.logger)).ToArray());
+            return Task.FromResult(this.dataArray.Select(data => Get(data, this.logger)).ToArray());
         }
 
         public Task AddAndThrow(int numberToAdd)
         {
             foreach (var data in dataArray)
             {
-                TransactionalGrainUtils.Add(data, numberToAdd, this.logger);
+                Add(data, numberToAdd, this.logger);
             }
             throw new Exception($"{GetType().Name} test exception");
         }
@@ -114,11 +101,8 @@ namespace Orleans.Transactions.Tests
             DeactivateOnIdle();
             return Task.CompletedTask;
         }
-    }
 
-    public static class TransactionalGrainUtils
-    {
-        public static void Set(ITransactionalState<GrainData> data, int newValue, ILogger logger)
+        private static void Set(ITransactionalState<GrainData> data, int newValue, ILogger logger)
         {
             logger.LogInformation($"Setting from {data.State.Value} to {newValue}.");
             data.State.Value = newValue;
@@ -126,13 +110,13 @@ namespace Orleans.Transactions.Tests
             logger.LogInformation($"Set to {data.State.Value}.");
         }
 
-        public static int Get(ITransactionalState<GrainData> data, ILogger logger)
+        private static int Get(ITransactionalState<GrainData> data, ILogger logger)
         {
             logger.LogInformation($"Get {data.State.Value}.");
             return data.State.Value;
         }
 
-        public static int Add(ITransactionalState<GrainData> data, int numberToAdd, ILogger logger)
+        private static int Add(ITransactionalState<GrainData> data, int numberToAdd, ILogger logger)
         {
             logger.LogInformation($"Adding {numberToAdd} to {data.State.Value}.");
             data.State.Value += numberToAdd;

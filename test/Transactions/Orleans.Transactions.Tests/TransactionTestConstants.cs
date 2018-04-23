@@ -15,6 +15,6 @@ namespace Orleans.Transactions.Tests
         public const string TransactionOrchestrationGrain = "Orleans.Transactions.Tests.TransactionOrchestrationGrain";
         public const string SingleStateTransactionalGrain = "Orleans.Transactions.Tests.SingleStateTransactionalGrain";
         public const string DoubleStateTransactionalGrain = "Orleans.Transactions.Tests.DoubleStateTransactionalGrain";
-        public const string EightStateTransactionalGrain = "Orleans.Transactions.Tests.EightStateTransactionalGrain";
+        public const string MaxStateTransactionalGrain = "Orleans.Transactions.Tests.MaxStateTransactionalGrain";
     }
 }

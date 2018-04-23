@@ -16,7 +16,7 @@ namespace Orleans.Transactions.Tests
         [SkippableTheory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
-        [InlineData(TransactionTestConstants.EightStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
         public virtual async Task SingleGrainReadTransaction(string transactionTestGrainClassName)
         {
             const int expected = 0;
@@ -33,14 +33,14 @@ namespace Orleans.Transactions.Tests
         [SkippableTheory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
-        [InlineData(TransactionTestConstants.EightStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
         public virtual async Task SingleGrainWriteTransaction(string transactionTestGrainClassName)
         {
             const int delta = 5;
             ITransactionTestGrain grain = RandomTestGrain(transactionTestGrainClassName);
             var original = await grain.Get();
             await grain.Add(delta);
-            var expected = original.Select(value => value += delta).ToArray();
+            var expected = original.Select(value => value + delta).ToArray();
             var actual = await grain.Get();
             Assert.Equal(expected, actual);
         }
@@ -48,7 +48,7 @@ namespace Orleans.Transactions.Tests
         [SkippableTheory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
-        [InlineData(TransactionTestConstants.EightStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
         public virtual async Task MultiGrainWriteTransaction(string transactionTestGrainClassName)
         {
             const int expected = 5;
@@ -76,7 +76,7 @@ namespace Orleans.Transactions.Tests
         [SkippableTheory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
-        [InlineData(TransactionTestConstants.EightStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
         public virtual async Task MultiGrainReadWriteTransaction(string transactionTestGrainClassName)
         {
             const int delta = 5;
@@ -107,7 +107,7 @@ namespace Orleans.Transactions.Tests
         [SkippableTheory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
-        [InlineData(TransactionTestConstants.EightStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
         public virtual async Task RepeatGrainReadWriteTransaction(string transactionTestGrainClassName)
         {
             const int repeat = 10;
@@ -145,7 +145,7 @@ namespace Orleans.Transactions.Tests
         [SkippableTheory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
-        [InlineData(TransactionTestConstants.EightStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
         public virtual async Task MultiWriteToSingleGrainTransaction(string transactionTestGrainClassName)
         {
             const int delta = 5;
