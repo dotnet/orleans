@@ -10,6 +10,9 @@ namespace Orleans.Configuration
         public string ConnectionString { get; set; }
 
         public string TableName { get; set; } = "TransactionLog";
+
+        //whether to archive commited transaction log or not. turned off by default
+        public bool ArchiveLog = false;
     }
 
     public class AzureTransactionLogOptionsValidator : IConfigurationValidator

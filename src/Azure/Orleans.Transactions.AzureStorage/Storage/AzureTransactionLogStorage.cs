@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
@@ -9,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Serialization;
 using Orleans.Transactions.Abstractions;
+using DateTime = System.DateTime;
 
 namespace Orleans.Transactions.AzureStorage
 {
@@ -43,11 +45,12 @@ namespace Orleans.Transactions.AzureStorage
         private int currentQueryResultIndex;
         private List<CommitRecord> currentRowTransactions;
         private int currentRowTransactionsIndex;
-
-        public AzureTransactionLogStorage(SerializationManager serializationManager, IOptions<AzureTransactionLogOptions> configurationOptions)
+        private ClusterOptions clusterOptions;
+        public AzureTransactionLogStorage(SerializationManager serializationManager, IOptions<AzureTransactionLogOptions> configurationOptions, IOptions<ClusterOptions> clusterOptions)
         {
             this.serializationManager = serializationManager;
             this.options = configurationOptions.Value;
+            this.clusterOptions = clusterOptions.Value;
         }
 
         public async Task Initialize()
@@ -216,10 +219,32 @@ namespace Orleans.Transactions.AzureStorage
             }
         }
 
+        public async Task<List<CommitRecord>> QueryArchivalRecords(TableQuery<ArchivalRow> query)
+        {
+            var continuationToken = default(TableContinuationToken);
+            var deseriazliedResults = new List<CommitRecord>();
+            do
+            {
+                var queryResult = await table.ExecuteQuerySegmentedAsync(query, continuationToken).ConfigureAwait(false);
+                continuationToken = queryResult.ContinuationToken;
+
+                if (queryResult.Results.Count > 0)
+                {
+                    foreach (var row in queryResult)
+                    {
+                        var transactions = DeserializeCommitRecords(row.Transactions);
+                        deseriazliedResults.AddRange(transactions);
+                    }
+                }
+            } while (continuationToken != null);
+
+            return deseriazliedResults;
+        }
+
         public async Task TruncateLog(long lsn)
         {
             var continuationToken = default(TableContinuationToken);
-
+            var truncatingTime = DateTime.UtcNow;
             var query = new TableQuery<CommitRow>().Where(TableQuery.CombineFilters(
                 TableQuery.GenerateFilterCondition(PartitionKey, QueryComparisons.Equal, CommitRecordPartitionKey),
                 TableOperators.And,
@@ -234,7 +259,7 @@ namespace Orleans.Transactions.AzureStorage
                 if (queryResult.Results.Count > 0)
                 {
                     var batchOperation = new TableBatchOperation();
-
+                    var archivalBatchOperation = new TableBatchOperation();
                     foreach (var row in queryResult)
                     {
                         var transactions = DeserializeCommitRecords(row.Transactions);
@@ -242,11 +267,21 @@ namespace Orleans.Transactions.AzureStorage
                         if (transactions.Count > 0 && transactions[transactions.Count - 1].LSN <= lsn)
                         {
                             batchOperation.Delete(row);
+                            if (this.options.ArchiveLog)
+                            {
+                                var archiveRow = new ArchivalRow(row.Transactions, transactions.Select(tx => tx.TransactionId).Min(), transactions.Select(tx => tx.LSN).Min(), this.clusterOptions.ClusterId, truncatingTime);
+                                archivalBatchOperation.Insert(archiveRow);
+                            }
 
                             if (batchOperation.Count == BatchOperationLimit)
                             {
                                 await table.ExecuteBatchAsync(batchOperation).ConfigureAwait(false);
-
+                                if (this.options.ArchiveLog)
+                                {
+                                    await table.ExecuteBatchAsync(archivalBatchOperation).ConfigureAwait(false);
+                                    archivalBatchOperation = new TableBatchOperation();
+                                }
+                                
                                 batchOperation = new TableBatchOperation();
                             }
                         }
@@ -320,6 +355,30 @@ namespace Orleans.Transactions.AzureStorage
             }
 
             return commitRecords;
+        }
+
+        public class ArchivalRow : TableEntity
+        {
+            public ArchivalRow()
+            {
+            }
+
+            public ArchivalRow(byte[] transactions, long firstTransactionId, long firstLSN, string clusterId, DateTime archivalTime)
+            {
+                this.Transactions = transactions;
+                this.ArchivalTime = archivalTime;
+                this.ClusterId = clusterId;
+                this.FirstLSN = firstLSN;
+                this.FirstTransactionId = firstTransactionId;
+                PartitionKey = $"{clusterId}${this.ArchivalTime.Ticks}";
+                RowKey = $"{this.ArchivalTime.Ticks}${firstTransactionId}";
+            }
+
+            public string ClusterId { get; set; }
+            public DateTime ArchivalTime { get; set; }
+            public long FirstLSN { get; set; }
+            public long FirstTransactionId { get; set; }
+            public byte[] Transactions { get; set; }
         }
 
         private class CommitRow : TableEntity
