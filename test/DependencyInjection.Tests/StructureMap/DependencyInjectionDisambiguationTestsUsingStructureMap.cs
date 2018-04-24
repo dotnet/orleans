@@ -11,7 +11,7 @@ namespace DependencyInjection.Tests.StructureMap
     [TestCategory("DI"), TestCategory("Functional")]
     public class DependencyInjectionDisambiguationTestsUsingStructureMap : DependencyInjectionDisambiguationTestRunner
     {
-        protected override IServiceProvider BuildeServiceProvider(IServiceCollection services)
+        protected override IServiceProvider BuildServiceProvider(IServiceCollection services)
         {
             var ctr = new Container();
             ctr.Populate(services);

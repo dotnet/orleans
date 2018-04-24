@@ -10,7 +10,7 @@ using TestExtensions;
 using UnitTests.Grains;
 using Xunit;
 
-namespace DependencyInjection.Tests.AspnetDIContainer
+namespace DependencyInjection.Tests.DefaultServiceProvider
 {
     [TestCategory("DI"), TestCategory("Functional")]
     public class DependencyInjectionGrainTestsUsingDefaultServiceProvider : DependencyInjectionGrainTestRunner, IClassFixture<DependencyInjectionGrainTestsUsingDefaultServiceProvider.Fixture>
