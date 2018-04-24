@@ -32,11 +32,9 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 #else
         private const string BuildConfiguration = "Release";
 #endif
-        private const string AssemblyGrainsV1Build = "TestVersionGrainsV1";
-        private const string AssemblyGrainsV2Build = "TestVersionGrainsV2";
         private const string CommonParentDirectory = "test";
         private const string BinDirectory = "bin";
-        private const string VersionsProjectDirectory = "Versions";
+        private const string VersionsProjectDirectory = "Grains";
         private const string GrainsV1ProjectName = "TestVersionGrains";
         private const string GrainsV2ProjectName = "TestVersionGrains2";
         private const string VersionTestBinaryName = "TestVersionGrains.dll";
@@ -56,30 +54,20 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
         protected UpgradeTestsBase()
         {
-            // Setup dll references
-            // If test run from old master cmd line with single output directory
-            if (Directory.Exists(AssemblyGrainsV1Build))
+            var testDirectory = new DirectoryInfo(GetType().Assembly.Location);
+
+            while (String.Compare(testDirectory.Name, CommonParentDirectory, StringComparison.OrdinalIgnoreCase) != 0 || testDirectory.Parent == null)
             {
-                assemblyGrainsV1Dir = new DirectoryInfo(AssemblyGrainsV1Build);
-                assemblyGrainsV2Dir = new DirectoryInfo(AssemblyGrainsV2Build);
+                testDirectory = testDirectory.Parent;
             }
-            else
+
+            if (testDirectory.Parent == null)
             {
-                var testDirectory = new DirectoryInfo(GetType().Assembly.Location);
-
-                while (String.Compare(testDirectory.Name, CommonParentDirectory, StringComparison.OrdinalIgnoreCase) != 0 || testDirectory.Parent == null)
-                {
-                    testDirectory = testDirectory.Parent;
-                }
-
-                if (testDirectory.Parent == null)
-                {
-                    throw new InvalidOperationException($"Cannot locate 'test' directory starting from '{GetType().Assembly.Location}'");
-                }
-
-                assemblyGrainsV1Dir = GetVersionTestDirectory(testDirectory, GrainsV1ProjectName);
-                assemblyGrainsV2Dir = GetVersionTestDirectory(testDirectory, GrainsV2ProjectName);
+                throw new InvalidOperationException($"Cannot locate 'test' directory starting from '{GetType().Assembly.Location}'");
             }
+
+            assemblyGrainsV1Dir = GetVersionTestDirectory(testDirectory, GrainsV1ProjectName);
+            assemblyGrainsV2Dir = GetVersionTestDirectory(testDirectory, GrainsV2ProjectName);
         }
 
         private DirectoryInfo GetVersionTestDirectory(DirectoryInfo testDirectory, string directoryName)

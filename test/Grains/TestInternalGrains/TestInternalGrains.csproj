@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>UnitTests.Grains</RootNamespace>
+    <AssemblyName>TestInternalGrains</AssemblyName>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <NoWarn>;1591;1591;618</NoWarn>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <NoWarn>;1591;1591;618</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.assert" Version="$(xUnitVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
+    <ProjectReference Include="..\TestGrains\TestGrains.csproj" />
+    <ProjectReference Include="..\..\Misc\TestInterfaces\TestInterfaces.csproj" />
+    <ProjectReference Include="..\TestInternalGrainInterfaces\TestInternalGrainInterfaces.csproj" />
+  </ItemGroup>
+</Project>

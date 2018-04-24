@@ -93,7 +93,7 @@
 
     <!-- Test related packages -->
     <MicrosoftTestSdkVersion>15.5.0</MicrosoftTestSdkVersion>
-    <BenchmarkDotNetVersion>0.10.9</BenchmarkDotNetVersion>
+    <BenchmarkDotNetVersion>0.10.14</BenchmarkDotNetVersion>
     <FluentAssertionsVersion>4.19.4</FluentAssertionsVersion>
     <XunitSkippableFactVersion>1.3.3</XunitSkippableFactVersion>
     <xUnitVersion>2.3.1</xUnitVersion>
@@ -106,13 +106,64 @@
   <!-- Versioning properties -->
   <PropertyGroup>
     <AssemblyVersion>2.0.0.0</AssemblyVersion>
-    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">2.0.3</VersionPrefix>
+    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">2.1.0</VersionPrefix>
   </PropertyGroup>
 
   <!-- For Debug builds generated a date/time dependent version suffix -->
   <PropertyGroup Condition=" '$(Configuration)'=='Debug' ">
     <VersionSuffix Condition=" '$(VersionSuffix)'=='' ">dev</VersionSuffix>
     <VersionSuffix Condition=" '$(VersionDateSuffix)'!='' ">$(VersionSuffix)-$(VersionDateSuffix)</VersionSuffix>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" $(FullBuild)=='' ">
+    <FullBuild>true</FullBuild>
+  </PropertyGroup>
+
+  <!-- Inner dependency versions -->
+  <PropertyGroup Condition="$(FullBuild) != 'true'">
+    <OrleansCoreAbstractionsVersion>2.0.0</OrleansCoreAbstractionsVersion>
+    <OrleansRuntimeAbstractionsVersion>2.0.0</OrleansRuntimeAbstractionsVersion>
+    <OrleansCoreVersion>2.1.0</OrleansCoreVersion>
+    <OrleansRuntimeVersion>2.1.0</OrleansRuntimeVersion>
+    <OrleansCoreLegacyVersion>2.0.0</OrleansCoreLegacyVersion>
+    <OrleansRuntimeLegacyVersion>2.0.0</OrleansRuntimeLegacyVersion>
+    <OrleansProvidersVersion>2.0.0</OrleansProvidersVersion>
+    <OrleansExtensionsVersion>2.0.0</OrleansExtensionsVersion>
+    <OrleansEventSourcingVersion>2.0.0</OrleansEventSourcingVersion>
+    <OrleansAdoNetVersion>2.0.0</OrleansAdoNetVersion>
+    <OrleansAWSVersion>2.0.0</OrleansAWSVersion>
+    <OrleansAzureVersion>2.0.0</OrleansAzureVersion>
+    <OrleansTestingHostVersion>2.1.0</OrleansTestingHostVersion>
+    <OrleansTransactionsVersion>2.0.0</OrleansTransactionsVersion>
+    <OrleansServiceFabricVersion>2.0.0</OrleansServiceFabricVersion>
+    <OrleansSerializersVersion>2.0.0</OrleansSerializersVersion>
+    <OrleansToolsVersion>2.0.0</OrleansToolsVersion>
+    <OrleansClientVersion>2.0.0</OrleansClientVersion>
+    <OrleansServerVersion>2.0.0</OrleansServerVersion>
+    <OrleansCodegenVersion>2.0.0</OrleansCodegenVersion>
+  </PropertyGroup>
+  
+  <PropertyGroup Condition="$(FullBuild) == 'true'">
+    <OrleansCoreAbstractionsVersion>$(VersionPrefix)</OrleansCoreAbstractionsVersion>
+    <OrleansRuntimeAbstractionsVersion>$(VersionPrefix)</OrleansRuntimeAbstractionsVersion>
+    <OrleansCoreVersion>$(VersionPrefix)</OrleansCoreVersion>
+    <OrleansRuntimeVersion>$(VersionPrefix)</OrleansRuntimeVersion>
+    <OrleansCoreLegacyVersion>$(VersionPrefix)</OrleansCoreLegacyVersion>
+    <OrleansRuntimeLegacyVersion>$(VersionPrefix)</OrleansRuntimeLegacyVersion>
+    <OrleansProvidersVersion>$(VersionPrefix)</OrleansProvidersVersion>
+    <OrleansExtensionsVersion>$(VersionPrefix)</OrleansExtensionsVersion>
+    <OrleansEventSourcingVersion>$(VersionPrefix)</OrleansEventSourcingVersion>
+    <OrleansAdoNetVersion>$(VersionPrefix)</OrleansAdoNetVersion>
+    <OrleansAWSVersion>$(VersionPrefix)</OrleansAWSVersion>
+    <OrleansAzureVersion>$(VersionPrefix)</OrleansAzureVersion>
+    <OrleansTestingHostVersion>$(VersionPrefix)</OrleansTestingHostVersion>
+    <OrleansTransactionsVersion>$(VersionPrefix)</OrleansTransactionsVersion>
+    <OrleansServiceFabricVersion>$(VersionPrefix)</OrleansServiceFabricVersion>
+    <OrleansSerializersVersion>$(VersionPrefix)</OrleansSerializersVersion>
+    <OrleansToolsVersion>$(VersionPrefix)</OrleansToolsVersion>
+    <OrleansClientVersion>$(VersionPrefix)</OrleansClientVersion>
+    <OrleansServerVersion>$(VersionPrefix)</OrleansServerVersion>
+    <OrleansCodegenVersion>$(VersionPrefix)</OrleansCodegenVersion>
   </PropertyGroup>
 
   <!-- Set output folder for created NuGet packages -->

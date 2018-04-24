@@ -11,6 +11,7 @@ using Xunit;
 using Xunit.Abstractions;
 using System.Threading.Tasks;
 using Orleans.Hosting;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
 namespace UnitTests.Streaming
@@ -98,8 +99,15 @@ namespace UnitTests.Streaming
 
             foreach (var siloHandle in activeSilos)
             {
-                var serviceId = await this.fixture.Client.GetTestHooks(siloHandle).GetServiceId();
-                Assert.Equal(this.fixture.ServiceId, serviceId); // "ServiceId active in silo"
+                await AsyncExecutorWithRetries.ExecuteWithRetries(async _ =>
+                    {
+                        var serviceId = await this.fixture.Client.GetTestHooks(siloHandle).GetServiceId();
+                        Assert.Equal(this.fixture.ServiceId, serviceId); // "ServiceId active in silo"
+                    },
+                    30,
+                    (ex, i) => ex is OrleansException,
+                    TimeSpan.FromSeconds(60),
+                    new FixedBackoff(TimeSpan.FromSeconds(2)));
             }
         }
     }

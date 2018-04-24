@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>TestVersionGrains</RootNamespace>
+    <AssemblyName>TestVersionGrains</AssemblyName>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\TestInfrastructure\Orleans.TestingHost.AppDomain\Orleans.TestingHost.AppDomain.csproj" />
+    <ProjectReference Include="..\..\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
+    <ProjectReference Include="..\TestGrains\TestGrains.csproj" />
+  </ItemGroup>
+</Project>

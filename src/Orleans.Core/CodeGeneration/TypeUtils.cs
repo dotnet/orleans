@@ -691,6 +691,11 @@ namespace Orleans.Runtime
 
         /// <summary>Returns a string representation of <paramref name="type"/>.</summary>
         /// <param name="type">The type.</param>
+        /// <returns>A string representation of the <paramref name="type"/>.</returns>
+        public static string GetLogFormat(this Type type) => type.GetParseableName(TypeFormattingOptions.LogFormat);
+
+        /// <summary>Returns a string representation of <paramref name="type"/>.</summary>
+        /// <param name="type">The type.</param>
         /// <param name="options">The type formatting options.</param>
         /// <param name="getNameFunc">The delegate used to get the unadorned, simple type name of <paramref name="type"/>.</param>
         /// <returns>A string representation of the <paramref name="type"/>.</returns>

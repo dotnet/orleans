@@ -213,7 +213,7 @@ namespace Orleans
                         var gatewayProviderType = this.gatewayListProvider.GetType().GetParseableName();
                         var err = $"Could not find any gateway in {gatewayProviderType}. Orleans client cannot initialize.";
                         logger.Error(ErrorCode.GatewayManager_NoGateways, err);
-                        throw new OrleansException(err);
+                        throw new SiloUnavailableException(err);
                     }
                 },
                 retryFilter);
@@ -245,18 +245,8 @@ namespace Orleans
                 },
                 ct).Ignore();
 
-            await ExecuteWithRetries(async () =>
-                {
-                    var originalTimeout = this.GetResponseTimeout();
-                    try
-                    {
-                        await RefreshGrainTypeResolver(null);
-                    }
-                    finally
-                    {
-                        this.SetResponseTimeout(originalTimeout);
-                    }
-                },
+            await ExecuteWithRetries(
+                async () => this.GrainTypeResolver = await transport.GetGrainTypeResolver(this.InternalGrainFactory),
                 retryFilter);
 
             this.typeMapRefreshTimer = new AsyncTaskSafeTimer(
