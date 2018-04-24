@@ -18,13 +18,11 @@ namespace Orleans.Messaging
     public class DnsNameGatewayListProvider : IGatewayListProvider
     {
         private readonly DnsNameGatewayListProviderOptions options;
-        private readonly TimeSpan maxStaleness;
-        private readonly ILoggerFactory loggerFactory;
+        private readonly TimeSpan maxStaleness;        
         private readonly ILogger logger;
 
         public DnsNameGatewayListProvider(ILoggerFactory loggerFactory, IOptions<DnsNameGatewayListProviderOptions> options, IOptions<GatewayOptions> gatewayOptions)
-        {
-            this.loggerFactory = loggerFactory;
+        {            
             this.logger = loggerFactory.CreateLogger<DnsNameGatewayListProvider>();
             this.options = options.Value;
             this.maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
@@ -35,24 +33,32 @@ namespace Orleans.Messaging
         public Task InitializeGatewayListProvider() => Task.CompletedTask;
 
 
-        public Task<IList<Uri>> GetGateways()
+        public async Task<IList<Uri>> GetGateways()
         {
             try
             {
-                var endpointUris = Dns.GetHostEntry(this.options.DnsName)
+                var addresses = (await Dns.GetHostEntryAsync(this.options.DnsName))
                                                 .AddressList
-                                                .Select(a => new IPEndPoint(a, this.options.Port).ToGatewayUri())
-                                                .OrderBy(a => a.AbsoluteUri)
+                                                .OrderBy(a => a.ToString())
                                                 .ToList();
 
-                return Task.FromResult<IList<Uri>>(endpointUris);
+                var endpointUris = addresses.Select(a => new IPEndPoint(a, this.options.Port).ToGatewayUri())
+                                            .ToList();
+                
+                if (this.logger.IsEnabled(LogLevel.Debug))
+                {
+                    var addressesStr = string.Join("\n", addresses.Select(s => s.ToString()));
+                    this.logger.Debug($"DNS Gateway {this.options.DnsName} resolved to: \n {addressesStr}");
+                }
+
+                return endpointUris;
             }
             catch (System.Net.Sockets.SocketException se)
             {
                 if (se.Message == "No such host is known")
                 {
-                    logger.Warn(ErrorCode.ProxyClient_GetGateways, $"No addresses found for silo gateways with DNS hostname: {this.options.DnsName}");
-                    return Task.FromResult<IList<Uri>>(new List<Uri>());
+                    logger.Warn(123, $"No addresses found for silo gateways with DNS hostname: {this.options.DnsName}");
+                    return new List<Uri>();
                 }
                 throw;
             }

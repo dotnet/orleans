@@ -11,6 +11,7 @@ using Orleans.ApplicationParts;
 using Orleans.CodeGeneration;
 using Orleans.Messaging;
 using Orleans.Runtime;
+using Orleans.Configuration.Validators;
 
 namespace Orleans
 {
@@ -230,7 +231,7 @@ namespace Orleans
                 {
                     configureOptions?.Invoke(collection.AddOptions<StaticGatewayListProviderOptions>());
                     collection.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>()
-                        .ConfigureFormatter<StaticGatewayListProviderOptions>();
+                              .ConfigureFormatter<StaticGatewayListProviderOptions>();
                 });
         }
 
@@ -263,7 +264,9 @@ namespace Orleans
                     }
 
                     collection.AddSingleton<IGatewayListProvider, DnsNameGatewayListProvider>()
-                        .ConfigureFormatter<DnsNameGatewayListProviderOptions>();
+                              .ConfigureFormatter<DnsNameGatewayListProviderOptions>();
+
+                    collection.AddSingleton<IConfigurationValidator, DnsNameGatewayListProviderValidator>();
                 });
         }
 
@@ -277,7 +280,9 @@ namespace Orleans
                 {
                     configureOptions?.Invoke(collection.AddOptions<DnsNameGatewayListProviderOptions>());
                     collection.AddSingleton<IGatewayListProvider, DnsNameGatewayListProvider>()
-                        .ConfigureFormatter<DnsNameGatewayListProviderOptions>();
+                              .ConfigureFormatter<DnsNameGatewayListProviderOptions>();
+
+                    collection.AddSingleton<IConfigurationValidator, DnsNameGatewayListProviderValidator>();
                 });
         }
 
