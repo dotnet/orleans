@@ -18,7 +18,7 @@ We will describe those below. Please read the [Orleans Streams Implementation](S
 Currently implemented stream providers support a number of configuration options.
 
 ### Simple Message Stream Provider Configuration. 
-SMS Stream Provider is configured through following options, using `AddSimpleMessageStreamProvider` extension method on `ISiloHostBuilder` or `IClientBuilder`: 
+SMS Stream Provider is configured through the following options, using the `AddSimpleMessageStreamProvider` extension method on `ISiloHostBuilder` or `IClientBuilder`: 
 
 ```csharp
 public class SimpleMessageStreamProviderOptions
@@ -35,9 +35,9 @@ public class SimpleMessageStreamProviderOptions
 ```
 
 ### Persistent Stream Provider Configuration. 
-All persistent stream providers are configured through `ISiloPersistentStreamConfigurator` implementations on silo side, or `IClusterClientPersistentStreamConfigurator` implementations on client side. Different persistent stream provider have different components and options to configure, hence configured through their specific implementation of persistent stream configurator interface. But minimumly, all persistent stream provider supports configuring following components through following methods
+All persistent stream providers are configured through `ISiloPersistentStreamConfigurator` implementations on the silo, or `IClusterClientPersistentStreamConfigurator` implementations on the client. Different persistent stream provider have different components and options to configure and are hence configured through their specific implementation of persistent stream configurator interface. At a minimum, all persistent stream providers supports configuring following components through the following methods:
 
-- **ConfigureStreamPubSub** method - this method configures stream pubsub to use, supported type: 
+- **ConfigureStreamPubSub** configures the kind of stream pubsub to use. Supported types: 
 
 ``` csharp
 public enum StreamPubSubType
@@ -47,7 +47,7 @@ public enum StreamPubSubType
     ImplicitOnly,
 }
 ```
-- **ConfigurePullingAgent** method - this method configures pulling agent. It is only available on `ISiloPersistentStreamConfigurator`, since no need for client to configure pulling agent. It is configured through options below:
+- **ConfigurePullingAgent** configures the pulling agent. It is only available on `ISiloPersistentStreamConfigurator`, since pulling agents only run on silos. It is configured through the options below:
 
 ``` csharp
 public class StreamPullingAgentOptions
@@ -67,7 +67,7 @@ public class StreamPullingAgentOptions
     public static readonly TimeSpan DEFAULT_STREAM_INACTIVITY_PERIOD = TimeSpan.FromMinutes(30);
 }
 ```
-- **ConfigureLifecycle** method - this method configures in which silo/client lifecycle stage the stream provider would initialize and start. It is configured through options below: 
+- **ConfigureLifecycle** configures in which silo/client lifecycle stage the stream provider would initialize and start. It is configured through the options below: 
 
 ``` csharp
 public class StreamLifecycleOptions
@@ -92,12 +92,12 @@ public class StreamLifecycleOptions
 }
 
 ```
-- **ConfigurePartitionBalancing** method - this method configures which `IStreamQueueBalancer` to use. You can configure any queue balancer we support natively or custom ones you developped. This method is not available for `IClusterClientPersistentStreamConfigurator`.
+- **ConfigurePartitionBalancing** configures which `IStreamQueueBalancer` to use. This method is not available for `IClusterClientPersistentStreamConfigurator`.
 
 ### Azure Queue Stream Provider Configuration
-Azure queue stream provider is configured through `SiloAzureQueueStreamConfigurator`, which implements`ISiloPersistentStreamConfigurator`, on the silo side, and configured through `ClusterClientAzureQueueStreamConfigurator`, which implements `IClusterClientPersistentStreamConfigurator`, on the client side. Since Azure queue stream provider is a persistent stream provider, so it supports all the configuring method mentioned on **Persistent Stream Provider Configuration** section above. In addition to that , it supports configuring Azure queue stream provider specific components through following method: 
+Azure queue stream provider is configured through `SiloAzureQueueStreamConfigurator` (which implements `ISiloPersistentStreamConfigurator`) on the silo side and through `ClusterClientAzureQueueStreamConfigurator` (which implements `IClusterClientPersistentStreamConfigurator`) on the client side. Since Azure queue stream provider is a persistent stream provider, it supports all the configuring method mentioned in the **Persistent Stream Provider Configuration** section above. In addition to that, it supports configuring Azure queue stream provider specific components through following method: 
 
-- **ConfigureAzureQueue** - this method configures Azure Queue specific settings. It is configured through options below:
+- **ConfigureAzureQueue** configures Azure Queue specific settings. It is configured through the options below:
 
 ```csharp
 public class AzureQueueOptions
@@ -108,11 +108,10 @@ public class AzureQueueOptions
     public TimeSpan? MessageVisibilityTimeout { get; set; }   
 }
 ```
-- **ConfigureCache** - this method configures cache size. Only available on `SiloAzureQueueStreamConfigurator`, not available on `ClusterClientAzureQueueStreamConfigurator`.
-- **ConfigurePartitioning** - this method configures queue counts to use. 
+- **ConfigureCache** configures cache size. Only available on `SiloAzureQueueStreamConfigurator`, not available on `ClusterClientAzureQueueStreamConfigurator`.
+- **ConfigurePartitioning** configures the number of queue counts to use. 
 
-It would be totally possible and a lot of times easy to provide additional configuration options. For example, in some scenarios developers might want more control over queue names used by the Queue Adapter. This is currently abstracted away with [`IStreamQueueMapper`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IStreamQueueMapper.cs), but there is currently no way to configure which `IStreamQueueMapper` to use without writing a new code. We would be happy to provide such an option, if needed. So please consider adding more configuration options to existing stream providers before writing a completely new  provider.
-
+Additional configuration options can be provided. For example, in some scenarios developers might want more control over queue names used by the Queue Adapter. This is currently abstracted away with [`IStreamQueueMapper`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IStreamQueueMapper.cs), but there is currently no way to configure which `IStreamQueueMapper` to use without writing new code. We would be happy to provide such an option, if needed. So please consider adding more configuration options to existing stream providers before writing a new provider.
 
 ## Writing a Custom Queue Adapter
 
@@ -128,28 +127,28 @@ If you want to use a different queueing technology, you need to write a queue ad
 
      d. Implement a method that returns `IStreamQueueMapper`. Again, it is theoretically possible to build your own `IStreamQueueMapper`, but you don't have to. It is a good idea just to allocate and return an Orleans `HashRingBasedStreamQueueMapper`.
 
-     e. Implement a static factory method which takes `IServiceProvider` and streamProviderName string as input parameters, returns a `MyQueueFactory`. Its signature should look like `public static MyQueueFactory Create(IServiceProvider services, string name)`. And it will be later used in Configuration as the factory delegate which streaming runtime will be using to create `MyQueueFactory`. 
+     e. Implement a static factory method which takes `IServiceProvider` and `streamProviderName` string as input parameters, returns a `MyQueueFactory`. Its signature should look like `public static MyQueueFactory Create(IServiceProvider services, string name)`. It will used in **Configuration** below as the factory delegate which the streaming runtime will be using to create `MyQueueFactory`. 
 
 - Implement `MyQueueAdapter` class that implements the [**`IQueueAdapter`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IQueueAdapter.cs) interface, which is an interfaces that manages access to a **sharded queue**. `IQueueAdapter` manages access to a set of queues/queue partitions (those are the queues that were returned by `IStreamQueueMapper`). It provides an ability to enqueue a message in a specified the queue and create an `IQueueAdapterReceiver` for a particular queue.
 
-- Implement `MyQueueAdapterReceiver` class that implements the [**`IQueueAdapterReceiver`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IQueueAdapterReceiver.cs), which is an interfaces that manages access to **one queue (one queue partition)**. In addition to initialization and shutdown, it basically provides one method: retrieve up to maxCount messages from the queue.
+- Implement a `MyQueueAdapterReceiver` class that implements [**`IQueueAdapterReceiver`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IQueueAdapterReceiver.cs), which is an interface that manages access to **one queue (one queue partition)**. In addition to initialization and shutdown, it provides one method: retrieve up to `maxCount` messages from the queue.
 
 - **Configuration**: in order to load and use you new stream provider you need to configure it properly via `ISiloHostBuilder`. If you need to use it on the client, you need to configure it similarly with `IClientBuilder`. Below is an example of configuring using `ISiloHostBuilder`:
 
 ``` csharp
 var siloHost = new SiloHostBuilder()
-                        .AddPersistentStreams("MyStreamProvider", MyQueueFactory.Create, streamBuilder=>streamBuilder
-                        .Configure<StreamPullingAgentOptions>(ob => ob.Configure(options => options.GetQueueMessagesTimerPeriod = TimeSpan.FromMilliseconds(100)))
-                        .Build();
+    .AddPersistentStreams("MyStreamProvider", MyQueueFactory.Create, streamBuilder=>streamBuilder
+    .Configure<StreamPullingAgentOptions>(ob => ob.Configure(options => options.GetQueueMessagesTimerPeriod = TimeSpan.FromMilliseconds(100)))
+    .Build();
 ```
 
-Similarly when configure with `IClientBuilder`: 
+Similarly when configured with `IClientBuilder`: 
 
 ``` csharp
 var client = new ClientBuilder()
-                        .AddPersistentStreams("MyStreamProvider", MyQueueFactory.Create, streamBuilder=>streamBuilder
-                        .Configure<StreamPullingAgentOptions>(ob => ob.Configure(options => options.GetQueueMessagesTimerPeriod = TimeSpan.FromMilliseconds(100)))
-                        .Build();
+    .AddPersistentStreams("MyStreamProvider", MyQueueFactory.Create, streamBuilder=>streamBuilder
+    .Configure<StreamPullingAgentOptions>(ob => ob.Configure(options => options.GetQueueMessagesTimerPeriod = TimeSpan.FromMilliseconds(100)))
+    .Build();
 ```
 
 ## Writing a Completely New Stream Provider
