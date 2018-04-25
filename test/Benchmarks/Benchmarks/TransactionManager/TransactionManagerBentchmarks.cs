@@ -15,6 +15,7 @@ using Orleans.Transactions;
 using Orleans.Transactions.Development;
 using Orleans.Transactions.AzureStorage;
 using Orleans.TestingHost.Utils;
+using Orleans.Transactions.AzureStorage.Storage.Development;
 
 namespace Benchmarks.TransactionManager
 {
@@ -155,7 +156,8 @@ namespace Benchmarks.TransactionManager
                 TableName = $"TransactionLog{((uint)Guid.NewGuid().GetHashCode()) % 100000}",
                 ConnectionString = "UseDevelopmentStorage=true"
             });
-            AzureTransactionLogStorage storage = new AzureTransactionLogStorage(client.ServiceProvider.GetRequiredService<SerializationManager>(), azureConfig, Options.Create(new ClusterOptions()));
+            AzureTransactionLogStorage storage = new AzureTransactionLogStorage(client.ServiceProvider.GetRequiredService<SerializationManager>(), azureConfig, 
+                Options.Create(new AzureTransactionArchiveLogOptions()), Options.Create(new ClusterOptions()));
             await storage.Initialize();
             return storage;
         }

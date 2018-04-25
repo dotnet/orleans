@@ -9,6 +9,7 @@ using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.Tests;
 using TestExtensions;
 using Orleans.TestingHost.Utils;
+using Orleans.Transactions.AzureStorage.Storage.Development;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {
@@ -41,7 +42,8 @@ namespace Orleans.Transactions.AzureStorage.Tests
                 TableName = $"TransactionLog{((uint)Guid.NewGuid().GetHashCode()) % 100000}",
                 ConnectionString = TestDefaultConfiguration.DataConnectionString
             });
-            AzureTransactionLogStorage storage = new AzureTransactionLogStorage(environment.SerializationManager, azureConfig, Options.Create(new ClusterOptions()));
+            AzureTransactionLogStorage storage = new AzureTransactionLogStorage(environment.SerializationManager, azureConfig, 
+                Options.Create(new AzureTransactionArchiveLogOptions()), Options.Create(new ClusterOptions()));
             await storage.Initialize();
             return storage;
         }
