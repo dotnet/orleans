@@ -1,6 +1,5 @@
 ﻿using System;
 using Xunit;
-using Orleans.Runtime.Configuration;
 using Orleans.Hosting;
 using Orleans.TestingHost;
 using Orleans.Transactions.Tests;
@@ -18,24 +17,23 @@ namespace Orleans.Transactions.AzureStorage.Tests.DistributedTM
             CheckForAzureStorage(TestDefaultConfiguration.DataConnectionString);
         }
 
-        protected override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            var options = new TestClusterOptions();
-            options.ClusterConfiguration.AddAzureTableStorageProvider(TransactionTestConstants.TransactionStore);
-            options.UseSiloBuilderFactory<SiloBuilderFactory>();
-            return new TestCluster(options);
+            builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         }
 
-        private class SiloBuilderFactory : ISiloBuilderFactory
+        private class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            public void Configure(ISiloHostBuilder hostBuilder)
             {
-                return new SiloHostBuilder()
-                    .ConfigureSiloName(siloName)
-                    .UseConfiguration(clusterConfiguration)
-                    .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.ClusterId)))
+                var id = (uint)Guid.NewGuid().GetHashCode() % 100000;
+                hostBuilder
                     .ConfigureLogging(builder => builder.AddFilter("SingleStateTransactionalGrain.data", LogLevel.Trace))
                     .ConfigureLogging(builder => builder.AddFilter("TransactionAgent", LogLevel.Trace))
+                    .AddAzureTableGrainStorage(TransactionTestConstants.TransactionStore, options =>
+                    {
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    })
                     .UseDistributedTM();
             }
         }

@@ -189,8 +189,8 @@ namespace Orleans.Transactions.DistributedTM
 
                     default:
                         {
-                            logger.Error(777, $"internal error: impossible case");
-                            throw new NotImplementedException();
+                            logger.LogError(777, "internal error: impossible case {CommitRole}", bottom.Role);
+                            throw new NotSupportedException($"{bottom.Role} is not a supported CommitRole.");
                         }
                 }
             }
@@ -273,8 +273,8 @@ namespace Orleans.Transactions.DistributedTM
 
                     default:
                         {
-                            logger.Error(777, $"internal error: impossible case");
-                            throw new NotImplementedException();
+                            logger.LogError(777, "internal error: impossible case {CommitRole}", entry.Role);
+                            throw new NotSupportedException($"{entry.Role} is not a supported CommitRole.");
                         }
                 }
             }
@@ -368,8 +368,8 @@ namespace Orleans.Transactions.DistributedTM
                     }
                 default:
                     {
-                        logger.Error(777, $"internal error: impossible case");
-                        throw new NotImplementedException();
+                        logger.LogError(777, "internal error: impossible case {CommitRole}", entry.Role);
+                        throw new NotSupportedException($"{entry.Role} is not a supported CommitRole.");
                     }
             }
         }
@@ -643,8 +643,8 @@ namespace Orleans.Transactions.DistributedTM
 
                 if (localEntry.Role != CommitRole.LocalCommit)
                 {
-                    logger.Error(666, $"transaction abort due to internal error in {nameof(Prepared)}: wrong commit type");
-                    throw new NotImplementedException("wrong commit type");
+                    logger.Error(666, $"transaction abort due to internal error in {nameof(Prepared)}: Wrong commit type");
+                    throw new InvalidOperationException($"Wrong commit type: {localEntry.Role}");
                 }
 
                 if (status == TransactionalStatus.Ok)
@@ -700,7 +700,7 @@ namespace Orleans.Transactions.DistributedTM
                 if (remoteEntry.Role != CommitRole.RemoteCommit)
                 {
                     logger.Error(666, $"internal error in {nameof(Prepared)}: wrong commit type");
-                    throw new NotImplementedException();
+                    throw new InvalidOperationException($"Wrong commit type: {remoteEntry.Role}");
                 }
 
                 // setting this field makes this entry ready for batching
@@ -840,7 +840,8 @@ namespace Orleans.Transactions.DistributedTM
 
                     default:
                         {
-                            throw new NotImplementedException();
+                            logger.LogError(777, "internal error: impossible case {CommitRole}", record.Role);
+                            throw new NotSupportedException($"{record.Role} is not a supported CommitRole.");
                         }
                 }
             }

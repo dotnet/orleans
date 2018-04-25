@@ -42,28 +42,28 @@ namespace Orleans.Transactions.Tests.DistributedTM
             });
         }
 
-        public Task<int> Add(int numberToAdd)
+        public async Task<int[]> Add(int numberToAdd)
         {
-            return this.data.PerformUpdate(state =>
+            return new[] { await this.data.PerformUpdate(state =>
             {
                 this.logger.LogInformation($"Adding {numberToAdd} to {state.Value}.");
                 state.Value += numberToAdd;
                 this.logger.LogInformation($"Value after Adding {numberToAdd} is {state.Value}.");
                 return state.Value;
-            });
+            }) };
         }
 
 
-        public Task<int> Get()
+        public async Task<int[]> Get()
         {
-            return this.data.PerformRead(state =>
+            return new[] { await this.data.PerformRead(state =>
             {
                 this.logger.LogInformation($"Get {state.Value}.");
                 return state.Value;
-            });
+            }) };
         }
 
-        public async Task<int> AddAndThrow(int numberToAdd)
+        public async Task AddAndThrow(int numberToAdd)
         {
             await Add(numberToAdd);
             throw new Exception($"{GetType().Name} test exception");

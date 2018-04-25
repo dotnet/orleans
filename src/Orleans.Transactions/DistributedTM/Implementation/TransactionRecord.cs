@@ -106,7 +106,7 @@ namespace Orleans.Transactions.DistributedTM
                          || (NumberWrites == 0 && LastSent.HasValue);  // this participant did not write and finished prepare
 
                     default:
-                        throw new NotImplementedException();
+                        throw new NotSupportedException($"{Role} is not a supported CommitRole.");
                 }
             }
         }
@@ -124,7 +124,7 @@ namespace Orleans.Transactions.DistributedTM
                     case CommitRole.RemoteCommit:
                         return NumberWrites == 0;
                     default:
-                        throw new NotImplementedException();
+                        throw new NotSupportedException($"{Role} is not a supported CommitRole.");
                 }
             }
         }
@@ -164,7 +164,7 @@ namespace Orleans.Transactions.DistributedTM
                     return $"RCE pip={PrepareIsPersisted} ls={LastSent.HasValue} ro={IsReadOnly} rtb={ReadyToCommit}";
 
                 default:
-                    throw new NotImplementedException();
+                    throw new NotSupportedException($"{Role} is not a supported CommitRole.");
             }
         }
 
