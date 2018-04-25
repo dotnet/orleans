@@ -137,8 +137,10 @@ If you want to use a different queueing technology, you need to write a queue ad
 
 ``` csharp
 var siloHost = new SiloHostBuilder()
-    .AddPersistentStreams("MyStreamProvider", MyQueueFactory.Create, streamBuilder=>streamBuilder
-    .Configure<StreamPullingAgentOptions>(ob => ob.Configure(options => options.GetQueueMessagesTimerPeriod = TimeSpan.FromMilliseconds(100)))
+    .AddPersistentStreams("MyStreamProvider", MyQueueFactory.Create, streamBuilder =>
+        streamBuilder.Configure<StreamPullingAgentOptions>(ob =>
+            ob.Configure(options =>
+                 options.GetQueueMessagesTimerPeriod = TimeSpan.FromMilliseconds(100)))
     .Build();
 ```
 
@@ -146,8 +148,10 @@ Similarly when configured with `IClientBuilder`:
 
 ``` csharp
 var client = new ClientBuilder()
-    .AddPersistentStreams("MyStreamProvider", MyQueueFactory.Create, streamBuilder=>streamBuilder
-    .Configure<StreamPullingAgentOptions>(ob => ob.Configure(options => options.GetQueueMessagesTimerPeriod = TimeSpan.FromMilliseconds(100)))
+    .AddPersistentStreams("MyStreamProvider", MyQueueFactory.Create, streamBuilder =>
+        streamBuilder.Configure<StreamPullingAgentOptions>(ob =>
+            ob.Configure(options =>
+                options.GetQueueMessagesTimerPeriod = TimeSpan.FromMilliseconds(100)))
     .Build();
 ```
 
