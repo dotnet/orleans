@@ -27,8 +27,11 @@ namespace Orleans.Transactions.Tests
 
             await TestAfterDustSettles(async () =>
             {
-                int actual = await grain.Get();
-                Assert.Equal(expected, actual);
+                int[] actualValues = await grain.Get();
+                foreach (var actual in actualValues)
+                {
+                    Assert.Equal(expected, actual);
+                }
             });
         }
 
@@ -56,8 +59,11 @@ namespace Orleans.Transactions.Tests
             {
                 foreach (var grain in grains)
                 {
-                    int actual = await grain.Get();
-                    Assert.Equal(expected, actual);
+                    int[] actualValues = await grain.Get();
+                    foreach (var actual in actualValues)
+                    {
+                        Assert.Equal(expected, actual);
+                    }
                 }
             });
         }
@@ -78,8 +84,11 @@ namespace Orleans.Transactions.Tests
 
             await TestAfterDustSettles(async () =>
             {
-                int actual = await grain.Get();
-                Assert.Equal(expected, actual);
+                int[] actualValues = await grain.Get();
+                foreach (var actual in actualValues)
+                {
+                    Assert.Equal(expected, actual);
+                }
             });
         }
 
