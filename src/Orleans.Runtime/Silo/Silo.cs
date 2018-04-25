@@ -128,9 +128,6 @@ namespace Orleans.Runtime
 
             var startTime = DateTime.UtcNow;
 
-            IOptions<StatisticsOptions> statisticsOptions = services.GetRequiredService<IOptions<StatisticsOptions>>();
-            StatisticsCollector.Initialize(statisticsOptions.Value.CollectionLevel);
-
             IOptions<ClusterMembershipOptions> clusterMembershipOptions = services.GetRequiredService<IOptions<ClusterMembershipOptions>>();
             initTimeout = clusterMembershipOptions.Value.MaxJoinAttemptTime;
             if (Debugger.IsAttached)

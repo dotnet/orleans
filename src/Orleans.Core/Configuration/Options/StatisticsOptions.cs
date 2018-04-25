@@ -8,6 +8,8 @@ namespace Orleans.Configuration
     /// </summary>
     public class StatisticsOptions
     {
+        internal const bool TRACK_DETAILED_STATS = false;
+
         /// <summary>
         /// The PerfCounterWriteInterval property specifies the frequency of updating the windows performance counters.
         /// The default is 30 seconds.

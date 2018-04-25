@@ -146,7 +146,11 @@ namespace Orleans.TestingHost
             applicationPartManager.AddFeatureProvider(new BuiltInTypesSerializationFeaturePopulator());
             applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<SerializerFeature>());
             applicationPartManager.AddApplicationPart(typeof(ClusterConfiguration).Assembly).WithReferences();
-            var serializationManager = new SerializationManager(null, Options.Create(new SerializationProviderOptions()), new NullLoggerFactory(), new CachedTypeResolver());
+            var serializationManager = new SerializationManager(null,
+                Options.Create(new SerializationProviderOptions()),
+                new NullLoggerFactory(),
+                new CachedTypeResolver(),
+                new SerializationStatisticsGroup(Options.Create(new StatisticsOptions {CollectionLevel = StatisticsLevel.Info})));
             serializationManager.RegisterSerializers(applicationPartManager);
             return serializationManager;
         }

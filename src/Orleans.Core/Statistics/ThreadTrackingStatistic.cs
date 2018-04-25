@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
 {
@@ -15,7 +18,6 @@ namespace Orleans.Runtime
         public ulong NumRequests;
         public string Name;
 
-        private static readonly StageAnalysis globalStageAnalyzer = new StageAnalysis();
         private const string CONTEXT_SWTICH_COUNTER_NAME = "Context Switches/sec";
         public static bool ClientConnected = false;
         private bool firstStart;
@@ -30,13 +32,20 @@ namespace Orleans.Runtime
         private static FloatValueStatistic totalProcessingCpuCycleTime;
         private static FloatValueStatistic totalProcessingWallClockTime;
         private static FloatValueStatistic totalNumProcessedRequests;
+        private readonly StatisticsLevel statisticsLevel;
 
         /// <summary>
         /// Keep track of thread statistics, mainly timing, can be created outside the thread to be tracked.
         /// </summary>
         /// <param name="threadName">Name used for logging the collected stastistics</param>
         /// <param name="loggerFactory">LoggerFactory used to create loggers</param>
-        public ThreadTrackingStatistic(string threadName, ILoggerFactory loggerFactory)
+        /// <param name="statisticsOptions"></param>
+        /// <param name="schedulerStageStatistics"></param>
+        public ThreadTrackingStatistic(
+            string threadName,
+            ILoggerFactory loggerFactory,
+            IOptions<StatisticsOptions> statisticsOptions,
+            StageAnalysisStatisticsGroup schedulerStageStatistics)
         {
             ExecutingCpuCycleTime = new TimeIntervalThreadCycleCounterBased(loggerFactory);
             ExecutingWallClockTime = TimeIntervalFactory.CreateTimeInterval(true);
@@ -47,7 +56,9 @@ namespace Orleans.Runtime
             firstStart = true;
             Name = threadName;
 
-            CounterStorage storage = StatisticsCollector.ReportDetailedThreadTimeTrackingStats ? CounterStorage.LogOnly : CounterStorage.DontStore;
+            statisticsLevel = statisticsOptions.Value.CollectionLevel;
+
+            CounterStorage storage = statisticsLevel.ReportDetailedThreadTimeTrackingStats() ? CounterStorage.LogOnly : CounterStorage.DontStore;
             CounterStorage aggrCountersStorage = CounterStorage.LogOnly;
 
             // 4 direct counters
@@ -104,8 +115,8 @@ namespace Orleans.Runtime
                         () => (float)allNumProcessedRequests.Select(cs => cs.GetCurrentValue()).Sum(), aggrCountersStorage);
             }
 
-            if (StatisticsCollector.PerformStageAnalysis)
-                globalStageAnalyzer.AddTracking(this);
+            if (schedulerStageStatistics.PerformStageAnalysis)
+                schedulerStageStatistics.AddTracking(this);
         }
 
         private float CalculateTotalAverage(List<FloatValueStatistic> allthreasCounters, FloatValueStatistic allNumRequestsCounter)
@@ -160,7 +171,7 @@ namespace Orleans.Runtime
             {
                 // If this is the first function call where client has connected, we ensure execution timers are started and context switches are tracked
                 firstStart = false;
-                if (StatisticsCollector.CollectContextSwitchesStats)
+                if (this.statisticsLevel.CollectContextSwitchesStats())
                 {
                     TrackContextSwitches();
                 }

@@ -80,6 +80,11 @@ namespace Orleans.Hosting
 
             services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
             services.TryAddSingleton<IHostEnvironmentStatistics, NoOpHostEnvironmentStatistics>();
+            services.TryAddSingleton<SiloStatisticsManager>();
+            services.TryAddSingleton<ApplicationRequestsStatisticsGroup>();
+            services.TryAddSingleton<StageAnalysisStatisticsGroup>();
+            services.TryAddSingleton<SchedulerStatisticsGroup>();
+            services.TryAddSingleton<SerializationStatisticsGroup>();
             services.TryAddSingleton<OverloadDetector>();
 
             services.TryAddSingleton<ExecutorService>();
@@ -108,7 +113,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<LocalGrainDirectory>();
             services.TryAddFromExisting<ILocalGrainDirectory, LocalGrainDirectory>();
             services.TryAddSingleton(sp => sp.GetRequiredService<LocalGrainDirectory>().GsiActivationMaintainer);
-            services.TryAddSingleton<SiloStatisticsManager>();
             services.TryAddSingleton<GrainTypeManager>();
             services.TryAddSingleton<MessageCenter>();
             services.TryAddFromExisting<IMessageCenter, MessageCenter>();
