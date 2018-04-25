@@ -21,7 +21,6 @@ All Options classes used to configure Orleans should be in the `Orleans.Configur
 | Option type | Used for |
 |-------------|----------|
 | `ClientMessagingOptions` | Setting the number of connection to keep open, and specify what network interface to use |
-| `ClientOptionsLogger` | Configuring logging |
 | `ClientStatisticsOption` | Setting various setting related to statistics output |
 | `GatewayOptions` | Setting the refresh period of the list of available gateways |
 
@@ -41,7 +40,6 @@ All Options classes used to configure Orleans should be in the `Orleans.Configur
 | `SchedulingOptions` | Configuring scheduler behavior |
 | `SiloMessagingOptions` | Configuring global messaging options that are silo related. |
 | `SiloOptions` | Setting the name of the Silo |
-| `SiloOptionsLogger` | Configuring logging |
 | `SiloStatisticsOptions` |  Setting various setting related to statistics output |
 | `TelemetryOptions` | Setting telemetry consumer settings |
 
