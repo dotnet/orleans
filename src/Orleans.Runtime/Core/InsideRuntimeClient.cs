@@ -368,9 +368,7 @@ namespace Orleans.Runtime
                     if (invokeExceptionLogger.IsEnabled(LogLevel.Warning) || message.Direction == Message.Directions.OneWay)
                     {
                         invokeExceptionLogger.Warn(ErrorCode.GrainInvokeException,
-                            exc1,
-                            "Exception during Grain method call of message: {0}",
-                            message);
+                            "Exception during Grain method call of message: " + message, exc1);
                     }
 
                     transactionInfo = TransactionContext.GetTransactionInfo();

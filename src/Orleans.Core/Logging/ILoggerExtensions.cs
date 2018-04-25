@@ -205,11 +205,6 @@ namespace Orleans.Runtime
             logger.LogWarning(LoggingUtils.CreateEventId(logCode), format, args);
         }
 
-        internal static void Warn(this ILogger logger, ErrorCode logCode, Exception exception, string format, params object[] args)
-        {
-            logger.LogWarning(LoggingUtils.CreateEventId(logCode), exception, format, args);
-        }
-
         /// <summary>
         /// Writes a log entry at the Warning level
         /// </summary>
