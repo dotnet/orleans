@@ -51,7 +51,7 @@ namespace Orleans.Transactions
             IOptions<TransactionsOptions> configOption, 
             ILoggerFactory loggerFactory, 
             ITelemetryProducer telemetryProducer,
-            IOptions<SiloStatisticsOptions> statisticsOptions, 
+            IOptions<StatisticsOptions> statisticsOptions, 
             TimeSpan? logMaintenanceInterval = null)
         {
             this.transactionLog = transactionLog;

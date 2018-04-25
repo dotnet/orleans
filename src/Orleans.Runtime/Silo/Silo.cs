@@ -128,7 +128,7 @@ namespace Orleans.Runtime
 
             var startTime = DateTime.UtcNow;
 
-            IOptions<SiloStatisticsOptions> statisticsOptions = services.GetRequiredService<IOptions<SiloStatisticsOptions>>();
+            IOptions<StatisticsOptions> statisticsOptions = services.GetRequiredService<IOptions<StatisticsOptions>>();
             StatisticsCollector.Initialize(statisticsOptions.Value.CollectionLevel);
 
             IOptions<ClusterMembershipOptions> clusterMembershipOptions = services.GetRequiredService<IOptions<ClusterMembershipOptions>>();
@@ -499,7 +499,7 @@ namespace Orleans.Runtime
 
             try
             {
-                SiloStatisticsOptions statisticsOptions = Services.GetRequiredService<IOptions<SiloStatisticsOptions>>().Value;
+                StatisticsOptions statisticsOptions = Services.GetRequiredService<IOptions<StatisticsOptions>>().Value;
                 StartTaskWithPerfAnalysis("Start silo statistics", () => this.siloStatistics.Start(statisticsOptions), stopWatch);
                 logger.Debug("Silo statistics manager started successfully.");
 

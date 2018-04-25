@@ -29,7 +29,7 @@ namespace Orleans.Transactions.DynamoDB.Tests
         private static ITransactionManager MakeTransactionManager()
         {
             TestFixture.CheckForDynamoDBStorage();
-            ITransactionManager tm = new TransactionManager(new TransactionLog(StorageFactory), Options.Create<TransactionsOptions>(new TransactionsOptions()), NullLoggerFactory.Instance, NullTelemetryProducer.Instance, Options.Create<SiloStatisticsOptions>(new SiloStatisticsOptions()), LogMaintenanceInterval);
+            ITransactionManager tm = new TransactionManager(new TransactionLog(StorageFactory), Options.Create<TransactionsOptions>(new TransactionsOptions()), NullLoggerFactory.Instance, NullTelemetryProducer.Instance, Options.Create<StatisticsOptions>(new StatisticsOptions()), LogMaintenanceInterval);
             tm.StartAsync().GetAwaiter().GetResult();
             return tm;
         }

@@ -1,21 +1,12 @@
 using System;
-using System.Collections.Generic;
-using Microsoft.Extensions.Options;
 
 namespace Orleans.Configuration
 {
     /// <summary>
-    /// Statistics output related options for silo.
+    /// Options for configuring deployment load publishing.
     /// </summary>
-    public class SiloStatisticsOptions : StatisticsOptions
+    public class DeploymentLoadPublisherOptions
     {
-        public static readonly TimeSpan SILO_DEFAULT_PERF_COUNTERS_WRITE_PERIOD = TimeSpan.FromSeconds(30);
-
-        public SiloStatisticsOptions()
-        {
-            this.PerfCountersWriteInterval = SILO_DEFAULT_PERF_COUNTERS_WRITE_PERIOD;
-        }
-
         /// <summary>
         /// Interval in which deployment statistics are published.
         /// </summary>

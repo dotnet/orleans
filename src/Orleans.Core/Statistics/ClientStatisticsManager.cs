@@ -10,13 +10,13 @@ namespace Orleans.Runtime
 {
     internal class ClientStatisticsManager : IDisposable
     {
-        private readonly ClientStatisticsOptions statisticsOptions;
+        private readonly StatisticsOptions statisticsOptions;
         private readonly LogStatistics logStatistics;
 
         public ClientStatisticsManager(
             SerializationManager serializationManager, 
             ILoggerFactory loggerFactory, 
-            IOptions<ClientStatisticsOptions> statisticsOptions)
+            IOptions<StatisticsOptions> statisticsOptions)
         {
             this.statisticsOptions = statisticsOptions.Value;
             this.logStatistics = new LogStatistics(this.statisticsOptions.LogWriteInterval, false, serializationManager, loggerFactory);

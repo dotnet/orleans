@@ -116,8 +116,10 @@ namespace Orleans.Hosting
 
             services.TryAddFromExisting<IMessagingConfiguration, GlobalConfiguration>();
 
-            services.AddOptions<SiloStatisticsOptions>()
-                .Configure<NodeConfiguration>((options, nodeConfig) => LegacyConfigurationExtensions.CopyStatisticsOptions(nodeConfig, options))
+            services.AddOptions<StatisticsOptions>()
+                .Configure<NodeConfiguration>((options, nodeConfig) => LegacyConfigurationExtensions.CopyStatisticsOptions(nodeConfig, options));
+
+            services.AddOptions<DeploymentLoadPublisherOptions>()
                 .Configure<GlobalConfiguration>((options, config) =>
                 {
                     options.DeploymentLoadPublisherRefreshTime = config.DeploymentLoadPublisherRefreshTime;
