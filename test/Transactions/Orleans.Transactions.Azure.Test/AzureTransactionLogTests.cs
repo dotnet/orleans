@@ -13,11 +13,12 @@ using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.AzureStorage.Storage.Development;
 using TestExtensions;
 using Xunit;
+using Orleans.Persistence.AzureStorage;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {
     [TestCategory("Azure"), TestCategory("Transactions"), TestCategory("BVT")]
-    public class AzureTransactionLogTests 
+    public class AzureTransactionLogTests : IDisposable
     {
         private const string TestClusterId = "AzureTransactionLogTestCluster";
         private static string TableName = $"TransactionLog{((uint) Guid.NewGuid().GetHashCode()) % 100000}";
@@ -68,6 +69,13 @@ namespace Orleans.Transactions.AzureStorage.Tests
                 Options.Create(archiveOptions), Options.Create(new ClusterOptions(){ClusterId = TestClusterId, ServiceId = "TestServiceID"}));
             await storage.Initialize();
             return storage;
+        }
+
+        public void Dispose()
+        {
+            var tableManager = new AzureTableDataManager<AzureTransactionLogStorage.ArchivalRow>(TableName, TestDefaultConfiguration.DataConnectionString,
+                NullLoggerFactory.Instance);
+            tableManager.DeleteTableAsync().Ignore();
         }
     }
 }
