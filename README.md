@@ -46,7 +46,7 @@ The latest clean development branch build from CI is located: [here](https://ci.
 
 Nightly builds are published to https://dotnet.myget.org/gallery/orleans-ci . These builds pass all functional tests, but are not thoroughly tested as the stable builds or pre-release builds we push to NuGet.org
 
-To use Nightly builds you can add the MyGet feed with:
+To use nightly builds in your project, add the MyGet feed using either of the following methods:
 
 1. Changing the .csproj file to include this section:
 
@@ -58,7 +58,7 @@ To use Nightly builds you can add the MyGet feed with:
 ```
 or
 
-2. Creating a NuGet.config file at the solution directory with the following content:
+2. Creating a `NuGet.config` file in the solution directory with the following contents:
 
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
