@@ -17,12 +17,12 @@ namespace Orleans.Transactions.DistributedTM
         private readonly IStorageProvider storageProvider;
         private readonly IGrainActivationContext context;
         private readonly ConcurrentDictionary<string, IStorage<TransactionalStateRecord<TState>>> stateStorages;
-        private readonly ILogger storageLogger;
+        private readonly ILoggerFactory loggerFactory;
         public TransactionalStateStorageProviderWrapper(IStorageProvider storageProvider, IGrainActivationContext context)
         {
             this.storageProvider = storageProvider;
             this.context = context;
-            this.storageLogger = context.ActivationServices.GetRequiredService<ILoggerFactory>().CreateLogger(storageProvider.GetType().FullName);
+            this.loggerFactory = context.ActivationServices.GetRequiredService<ILoggerFactory>();
             this.stateStorages = new ConcurrentDictionary<string, IStorage<TransactionalStateRecord<TState>>>();
         }
 
@@ -85,7 +85,7 @@ namespace Orleans.Transactions.DistributedTM
 
         private IStorage<TransactionalStateRecord<TState>> GetStateStorage(string stateName)
         {
-            return this.stateStorages.GetOrAdd(stateName, name => new StateStorageBridge<TransactionalStateRecord<TState>>(name, this.context.GrainInstance.GrainReference, storageProvider, this.storageLogger));
+            return this.stateStorages.GetOrAdd(stateName, name => new StateStorageBridge<TransactionalStateRecord<TState>>(name, this.context.GrainInstance.GrainReference, storageProvider, this.loggerFactory));
         }
     }
 

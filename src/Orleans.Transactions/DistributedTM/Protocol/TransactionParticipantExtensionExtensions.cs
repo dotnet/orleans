@@ -22,9 +22,9 @@ namespace Orleans.Transactions.DistributedTM
             return new TransactionParticipantExtensionWrapper(transactionalExtension, resourceId);
         }
 
-        public static JsonSerializerSettings GetJsonSerializerSettings(SerializationManager serializationManager, IGrainFactory grainFactory)
+        public static JsonSerializerSettings GetJsonSerializerSettings(ITypeResolver typeResolver, IGrainFactory grainFactory)
         {
-            var serializerSettings = OrleansJsonSerializer.GetDefaultSerializerSettings(serializationManager, grainFactory);
+            var serializerSettings = OrleansJsonSerializer.GetDefaultSerializerSettings(typeResolver, grainFactory);
             serializerSettings.TypeNameHandling = TypeNameHandling.Auto;
             serializerSettings.PreserveReferencesHandling = PreserveReferencesHandling.None;
             serializerSettings.Converters.Add(new TransactionParticipantExtensionWrapper.CustomJsonConverter(grainFactory));

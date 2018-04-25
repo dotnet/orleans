@@ -18,7 +18,6 @@ namespace Orleans.Transactions.DistributedTM
     /// <summary>
     /// Stateful facet that respects Orleans transaction semantics
     /// </summary>
-    /// <typeparam name="TState"></typeparam>
     public partial class TransactionalState<TState> : ITransactionalState<TState>, ITransactionParticipant, ILifecycleParticipant<IGrainLifecycle>
         where TState : class, new()
     {
@@ -117,7 +116,7 @@ namespace Orleans.Transactions.DistributedTM
             ITransactionAgent transactionAgent, 
             IProviderRuntime runtime, 
             ILoggerFactory loggerFactory, 
-            SerializationManager serializationManager,
+            ITypeResolver typeResolver,
             IGrainFactory grainFactory)
         {
             this.config = transactionalStateConfiguration;
@@ -133,7 +132,7 @@ namespace Orleans.Transactions.DistributedTM
 
             if (MetaData.SerializerSettings == null)
             {
-                MetaData.SerializerSettings = TransactionParticipantExtensionExtensions.GetJsonSerializerSettings(serializationManager, grainFactory);
+                MetaData.SerializerSettings = TransactionParticipantExtensionExtensions.GetJsonSerializerSettings(typeResolver, grainFactory);
             }
         }
 
@@ -141,7 +140,7 @@ namespace Orleans.Transactions.DistributedTM
 
         public void Participate(IGrainLifecycle lifecycle)
         {
-            lifecycle.Subscribe(GrainLifecycleStage.SetupState, OnSetupState);
+            lifecycle.Subscribe<TransactionalState<TState>>(GrainLifecycleStage.SetupState, OnSetupState);
         }
 
         private async Task OnSetupState(CancellationToken ct)

@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 
 namespace Orleans.Transactions.DistributedTM
 {
-
     /// <summary>
     /// State that respects Orleans transaction semantics, and allows
     /// read/write locking
@@ -23,14 +22,14 @@ namespace Orleans.Transactions.DistributedTM
         /// <summary>
         /// Performs an update operation, without returning any result.
         /// </summary>
-        /// <param name="operation">An action that updates the state.</param>
+        /// <param name="updateAction">An action that updates the state.</param>
         Task PerformUpdate(Action<TState> updateAction);
 
         /// <summary>
         /// Performs an update operation and returns the result.
         /// </summary>
         /// <typeparam name="TResult">The type of the return value</typeparam>
-        /// <param name="operation">A function that can read and update the state, and return a result</param>
+        /// <param name="updateFunction">A function that can read and update the state, and return a result</param>
         Task<TResult> PerformUpdate<TResult>(Func<TState, TResult> updateFunction);
 
         /// <summary>

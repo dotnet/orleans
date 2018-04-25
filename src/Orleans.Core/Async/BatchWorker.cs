@@ -47,7 +47,7 @@ namespace Orleans
         /// Instructs the batch worker to run again to check for work, if
         /// it has not run again already by then, at specified <paramref name="utcTime"/>.
         /// </summary>
-        /// <param name="time"></param>
+        /// <param name="utcTime"></param>
         public void Notify(DateTime utcTime)
         {
             var now = DateTime.UtcNow;
