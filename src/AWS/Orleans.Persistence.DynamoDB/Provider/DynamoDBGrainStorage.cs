@@ -303,7 +303,7 @@ namespace Orleans.Storage
 
             try
             {
-                // Try to rehydrate
+                // rehydrate
                 if (binaryData?.Length > 0)
                 {
                     return this.serializationManager.DeserializeFromByteArray<object>(binaryData);
