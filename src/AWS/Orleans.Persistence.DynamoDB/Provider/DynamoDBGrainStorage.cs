@@ -301,25 +301,26 @@ namespace Orleans.Storage
             var binaryData = entity.BinaryState;
             var stringData = entity.StringState;
 
-            object dataValue = null;
             try
             {
+                // Try to rehydrate
                 if (binaryData?.Length > 0)
                 {
-                    // Rehydrate
-                    dataValue = this.serializationManager.DeserializeFromByteArray<object>(binaryData);
-                }
-                else if (!string.IsNullOrEmpty(stringData))
-                {
-                    dataValue = JsonConvert.DeserializeObject<object>(stringData, this.jsonSettings);
+                    return this.serializationManager.DeserializeFromByteArray<object>(binaryData);
                 }
 
-                // Else, no data found
+                if (!string.IsNullOrEmpty(stringData))
+                {
+                    return JsonConvert.DeserializeObject<object>(stringData, this.jsonSettings);
+                }
+
+                // no data found
+                return null;
             }
             catch (Exception exc)
             {
                 var sb = new StringBuilder();
-                if (binaryData.Length > 0)
+                if (binaryData?.Length > 0)
                 {
                     sb.AppendFormat("Unable to convert from storage format GrainStateEntity.Data={0}", binaryData);
                 }
@@ -327,16 +328,10 @@ namespace Orleans.Storage
                 {
                     sb.AppendFormat("Unable to convert from storage format GrainStateEntity.StringData={0}", stringData);
                 }
-                if (dataValue != null)
-                {
-                    sb.AppendFormat("Data Value={0} Type={1}", dataValue, dataValue.GetType());
-                }
 
                 this.logger.Error(0, sb.ToString(), exc);
                 throw new AggregateException(sb.ToString(), exc);
             }
-
-            return dataValue;
         }
 
         internal void ConvertToStorageFormat(object grainState, GrainStateRecord entity)
