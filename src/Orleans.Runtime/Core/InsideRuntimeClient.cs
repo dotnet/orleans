@@ -365,10 +365,12 @@ namespace Orleans.Runtime
                 }
                 catch (Exception exc1)
                 {
-                    if (invokeExceptionLogger.IsEnabled(LogLevel.Debug) || message.Direction == Message.Directions.OneWay)
+                    if (invokeExceptionLogger.IsEnabled(LogLevel.Warning) || message.Direction == Message.Directions.OneWay)
                     {
                         invokeExceptionLogger.Warn(ErrorCode.GrainInvokeException,
-                            "Exception during Grain method call of message: " + message, exc1);
+                            exc1,
+                            "Exception during Grain method call of message: {0}",
+                            message);
                     }
 
                     transactionInfo = TransactionContext.GetTransactionInfo();
