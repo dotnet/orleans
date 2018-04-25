@@ -73,7 +73,7 @@ namespace Orleans
             services.ConfigureFormatter<ClusterOptions>();
             services.ConfigureFormatter<ClientMessagingOptions>();
             services.ConfigureFormatter<NetworkingOptions>();
-            services.ConfigureFormatter<ClientStatisticsOptions>();
+            services.ConfigureFormatter<StatisticsOptions>();
             
             services.AddTransient<IConfigurationValidator, ClientClusteringValidator>();
         }

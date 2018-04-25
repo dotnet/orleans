@@ -41,7 +41,7 @@ namespace Benchmarks.TransactionManager
 
         private async Task Run(Factory<Task<ITransactionLogStorage>> storageFactory)
         {
-            ITransactionManager tm = new Orleans.Transactions.TransactionManager(new TransactionLog(storageFactory), Options.Create(new TransactionsOptions()), NullLoggerFactory.Instance, NullTelemetryProducer.Instance, Options.Create<SiloStatisticsOptions>(new SiloStatisticsOptions()), LogMaintenanceInterval);
+            ITransactionManager tm = new Orleans.Transactions.TransactionManager(new TransactionLog(storageFactory), Options.Create(new TransactionsOptions()), NullLoggerFactory.Instance, NullTelemetryProducer.Instance, Options.Create<StatisticsOptions>(new StatisticsOptions()), LogMaintenanceInterval);
             await tm.StartAsync();
             ITransactionManagerService tms = new TransactionManagerService(tm);
             Stopwatch sw;

@@ -135,7 +135,7 @@ namespace Orleans
 
             this.GrainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
 
-            var statisticsOptions = this.ServiceProvider.GetRequiredService<IOptions<ClientStatisticsOptions>>().Value;
+            var statisticsOptions = this.ServiceProvider.GetRequiredService<IOptions<StatisticsOptions>>().Value;
             StatisticsCollector.Initialize(statisticsOptions.CollectionLevel);
 
             BufferPool.InitGlobalBufferPool(this.clientMessagingOptions);
