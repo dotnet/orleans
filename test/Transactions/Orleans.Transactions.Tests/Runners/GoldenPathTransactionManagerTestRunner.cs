@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Threading.Tasks;
+using System.Diagnostics;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.Transactions.Abstractions;
-using System.Diagnostics;
 
 namespace Orleans.Transactions.Tests
 {

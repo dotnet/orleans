@@ -24,11 +24,11 @@ namespace Orleans.Transactions.DistributedTM
             if (factory != null) return factory.Create<TState>();
 
             // Else try to get storage provider and wrap it
-            IStorageProvider storageProvider = string.IsNullOrEmpty(storageName)
-                ? this.context.ActivationServices.GetService<IStorageProvider>()
-                : this.context.ActivationServices.GetServiceByName<IStorageProvider>(storageName);
+            IGrainStorage grainStorage = string.IsNullOrEmpty(storageName)
+                ? this.context.ActivationServices.GetService<IGrainStorage>()
+                : this.context.ActivationServices.GetServiceByName<IGrainStorage>(storageName);
             
-            if (storageProvider != null) return new TransactionalStateStorageProviderWrapper<TState>(storageProvider, context);
+            if (grainStorage != null) return new TransactionalStateStorageProviderWrapper<TState>(grainStorage, context);
 
             throw (string.IsNullOrEmpty(storageName))
                 ? new InvalidOperationException($"No default {nameof(ITransactionalStateStorageFactory)} nor {nameof(IStorageProvider)} was found while attempting to create transactional state storage.")

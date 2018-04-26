@@ -9,17 +9,17 @@ namespace Orleans.Transactions.Tests
 {
     public abstract class GrainFaultTransactionTestRunner : TransactionTestRunnerBase
     {
-        public GrainFaultTransactionTestRunner(IGrainFactory grainFactory, ITestOutputHelper output)
-        : base(grainFactory, output)
+        public GrainFaultTransactionTestRunner(IGrainFactory grainFactory, ITestOutputHelper output, bool distributedTm = false)
+        : base(grainFactory, output, distributedTm)
         { }
 
         [SkippableTheory]
-        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
-        public async Task AbortTransactionOnExceptions(string transactionTestGrainClassName)
+        [InlineData(TransactionTestConstants.TransactionGrainStates.SingleStateTransaction)]
+        public async Task AbortTransactionOnExceptions(TransactionTestConstants.TransactionGrainStates grainStates)
         {
             const int expected = 5;
 
-            ITransactionTestGrain grain = RandomTestGrain(transactionTestGrainClassName);
+            ITransactionTestGrain grain = RandomTestGrain(grainStates);
             ITransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
             await coordinator.MultiGrainSet(new List<ITransactionTestGrain> { grain }, expected);
@@ -36,16 +36,16 @@ namespace Orleans.Transactions.Tests
         }
 
         [SkippableTheory]
-        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
-        public async Task MultiGrainAbortTransactionOnExceptions(string transactionTestGrainClassName)
+        [InlineData(TransactionTestConstants.TransactionGrainStates.SingleStateTransaction)]
+        public async Task MultiGrainAbortTransactionOnExceptions(TransactionTestConstants.TransactionGrainStates grainStates)
         {
             const int grainCount = TransactionTestConstants.MaxCoordinatedTransactions - 1;
             const int expected = 5;
 
-            ITransactionTestGrain throwGrain = RandomTestGrain(transactionTestGrainClassName);
+            ITransactionTestGrain throwGrain = RandomTestGrain(grainStates);
             List<ITransactionTestGrain> grains =
                 Enumerable.Range(0, grainCount)
-                    .Select(i => RandomTestGrain(transactionTestGrainClassName))
+                    .Select(i => RandomTestGrain(grainStates))
                     .ToList();
             ITransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
@@ -69,12 +69,12 @@ namespace Orleans.Transactions.Tests
         }
 
         [SkippableTheory(Skip = "Intermittent failure, jbragg investigating")]
-        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
-        public async Task AbortTransactionOnOrphanCalls(string transactionTestGrainClassName)
+        [InlineData(TransactionTestConstants.TransactionGrainStates.SingleStateTransaction)]
+        public async Task AbortTransactionOnOrphanCalls(TransactionTestConstants.TransactionGrainStates grainStates)
         {
             const int expected = 5;
 
-            ITransactionTestGrain grain = RandomTestGrain(transactionTestGrainClassName);
+            ITransactionTestGrain grain = RandomTestGrain(grainStates);
             ITransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
             await grain.Set(expected);

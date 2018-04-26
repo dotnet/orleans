@@ -9,18 +9,9 @@ namespace Orleans.Transactions.AzureStorage.Tests.DistributedTM
     public class GrainFaultTests : GrainFaultTransactionTestRunner, IClassFixture<TestFixture>
     {
         public GrainFaultTests(TestFixture fixture, ITestOutputHelper output)
-            : base(fixture.GrainFactory, output)
+            : base(fixture.GrainFactory, output, true)
         {
             fixture.EnsurePreconditionsMet();
-        }
-
-        // change class name for test grains to use the correct grain class for distributed TM
-        protected override ITransactionTestGrain TestGrain(string transactionTestGrainClassName, Guid id)
-        {
-            if (transactionTestGrainClassName == TransactionTestConstants.SingleStateTransactionalGrain)
-                transactionTestGrainClassName = TransactionTestConstants.SingleStateTransactionalGrainDistributedTM;
-
-            return base.TestGrain(transactionTestGrainClassName, id);
         }
     }
 }
