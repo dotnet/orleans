@@ -978,7 +978,7 @@ namespace Orleans.Runtime.MembershipService
             var tuple = table.Get(silo);
             var entry = tuple.Item1;
             string eTag = tuple.Item2;
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("-TryToSuspectOrKill {siloAddress}: The current status of {siloAddress} in the table is {status}, its entry is {sntry}",
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("-TryToSuspectOrKill {siloAddress}: The current status of {siloAddress} in the table is {status}, its entry is {entry}",
                 entry.SiloAddress.ToLongString(), // First
                 entry.SiloAddress.ToLongString(), // Second
                 entry.Status, 
