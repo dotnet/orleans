@@ -81,12 +81,16 @@ namespace Orleans.TestingHost.Utils
             Func<Task> loop =
                 async () =>
                 {
+                    bool passed;
                     do
                     {
                         // need to wait a bit to before re-checking the condition.
                         await Task.Delay(TimeSpan.FromSeconds(1));
+                        passed = await predicate(false);
                     }
-                    while (!await predicate(!keepGoing[0]) && keepGoing[0]);
+                    while (!passed && keepGoing[0]);
+                    if(!passed)
+                        await predicate(true);
                 };
 
             var task = loop();

@@ -2,6 +2,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Orleans.Hosting;
 using Orleans.Hosting.Development;
+using Orleans.Logging;
 using TestExtensions;
 
 namespace Orleans.Transactions.Tests
@@ -13,7 +14,7 @@ namespace Orleans.Transactions.Tests
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         }
 
-        private class SiloBuilderConfigurator : ISiloBuilderConfigurator
+        public class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {

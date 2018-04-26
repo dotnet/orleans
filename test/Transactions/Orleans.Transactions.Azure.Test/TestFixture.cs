@@ -23,7 +23,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         }
 
-        private class SiloBuilderConfigurator : ISiloBuilderConfigurator
+        public class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
