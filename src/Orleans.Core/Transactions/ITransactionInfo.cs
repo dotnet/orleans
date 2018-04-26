@@ -13,7 +13,7 @@ namespace Orleans.Transactions
         /// <summary>
         /// The transaction identifier.
         /// </summary>
-        long TransactionId { get; }
+        string Id { get; }
 
         /// <summary>
         /// Indicates that the transaction has aborted.

@@ -43,6 +43,8 @@ namespace Orleans.Transactions
             DependentTransactions = new HashSet<long>();
         }
 
+        public string Id => TransactionId.ToString();
+
         public long TransactionId { get; }
 
         public bool IsReadOnly { get; }

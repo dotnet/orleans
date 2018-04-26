@@ -1,15 +1,34 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Orleans.Concurrency;
+using Orleans.Runtime;
+using Orleans.Serialization;
 
-namespace Orleans.Transactions.Abstractions
+namespace Orleans.Transactions.DistributedTM
 {
     public static class TransactionParticipantExtensionExtensions
     {
+        public static string ToShortString(this ITransactionParticipant participant)
+        {
+            // Meant to help humans when debugging or reading traces
+            return participant.GetHashCode().ToString("x4").Substring(0, 4);
+        }
+
         public static ITransactionParticipant AsTransactionParticipant(this ITransactionParticipantExtension transactionalExtension, string resourceId)
         {
             return new TransactionParticipantExtensionWrapper(transactionalExtension, resourceId);
+        }
+
+        public static JsonSerializerSettings GetJsonSerializerSettings(ITypeResolver typeResolver, IGrainFactory grainFactory)
+        {
+            var serializerSettings = OrleansJsonSerializer.GetDefaultSerializerSettings(typeResolver, grainFactory);
+            serializerSettings.TypeNameHandling = TypeNameHandling.Auto;
+            serializerSettings.PreserveReferencesHandling = PreserveReferencesHandling.None;
+            serializerSettings.Converters.Add(new TransactionParticipantExtensionWrapper.CustomJsonConverter(grainFactory));
+            return serializerSettings;
         }
 
         [Serializable]
@@ -93,6 +112,54 @@ namespace Orleans.Transactions.Abstractions
             }
 
             #endregion
+
+            public class CustomJsonConverter : JsonConverter
+            {
+                private static readonly Type wrapperType;
+                private readonly IGrainFactory grainFactory;
+
+                static CustomJsonConverter()
+                {
+                    wrapperType = typeof(TransactionParticipantExtensionExtensions.TransactionParticipantExtensionWrapper);
+                }
+
+                public CustomJsonConverter(IGrainFactory grainFactory)
+                {
+                    this.grainFactory = grainFactory;
+                }
+
+                public override bool CanConvert(Type objectType)
+                {
+                    return objectType == wrapperType;
+                }
+
+                public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+                {
+                    var w = (TransactionParticipantExtensionExtensions.TransactionParticipantExtensionWrapper)value;
+
+                    writer.WriteStartObject();
+                    writer.WritePropertyName("grain");
+                    writer.WriteValue((w.extension as GrainReference)?.ToKeyString());
+                    writer.WritePropertyName("facet");
+                    writer.WriteValue(w.resourceId);
+                    writer.WriteEndObject();
+                    writer.Flush();
+                }
+
+                public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+                {
+                    var jobj = JObject.Load(reader);
+
+                    var key = (string)jobj["grain"];
+                    var resourceId = (string)jobj["facet"];
+
+                    var grainref = GrainReference.FromKeyString(key, null);
+                    this.grainFactory.BindGrainReference(grainref);
+                    var extension = grainref.AsReference<ITransactionParticipantExtension>();
+
+                    return new TransactionParticipantExtensionExtensions.TransactionParticipantExtensionWrapper(extension, resourceId);
+                }
+            }
         }
     }
 }

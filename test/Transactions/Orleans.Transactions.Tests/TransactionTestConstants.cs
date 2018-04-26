@@ -11,10 +11,22 @@ namespace Orleans.Transactions.Tests
         // storage providers
         public const string TransactionStore = "TransactionStore";
 
-        // grain implementations
+        // Transaction orchestration grains
         public const string TransactionOrchestrationGrain = "Orleans.Transactions.Tests.TransactionOrchestrationGrain";
+
+        public enum TransactionGrainStates
+        {
+            SingleStateTransaction,
+            DoubleStateTransaction,
+            MaxStateTransaction
+        }
+
+        // grain implementations singleton TM
         public const string SingleStateTransactionalGrain = "Orleans.Transactions.Tests.SingleStateTransactionalGrain";
         public const string DoubleStateTransactionalGrain = "Orleans.Transactions.Tests.DoubleStateTransactionalGrain";
         public const string MaxStateTransactionalGrain = "Orleans.Transactions.Tests.MaxStateTransactionalGrain";
+
+        // grain implementations using distributed TM
+        public const string SingleStateTransactionalGrainDistributedTM = "Orleans.Transactions.Tests.DistributedTM.SingleStateTransactionalGrain";
     }
 }
