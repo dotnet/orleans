@@ -28,7 +28,7 @@ public class HelloGrain : Orleans.Grain, HelloWorldInterfaces.IHello
 {
     Task<string> HelloWorldInterfaces.IHello.SayHello(string greeting)
     {
-        return Task.FromResult("You said: '" + greeting + "', I say: Hello!");
+        return Task.FromResult($"You said: '{greeting}', I say: Hello!");
     }
 }
 ```
