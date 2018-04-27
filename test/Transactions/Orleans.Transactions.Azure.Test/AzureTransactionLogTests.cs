@@ -8,9 +8,9 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.Configuration;
+using Orleans.Configuration.Development;
 using Orleans.Runtime.Configuration;
 using Orleans.Transactions.Abstractions;
-using Orleans.Transactions.AzureStorage.Storage.Development;
 using TestExtensions;
 using Xunit;
 using Orleans.Persistence.AzureStorage;
@@ -18,10 +18,9 @@ using Orleans.Persistence.AzureStorage;
 namespace Orleans.Transactions.AzureStorage.Tests
 {
     [TestCategory("Azure"), TestCategory("Transactions"), TestCategory("BVT")]
-    public class AzureTransactionLogTests : IDisposable
+    public class AzureTransactionLogTests
     {
-        private const string TestClusterId = "AzureTransactionLogTestCluster";
-        private static string TableName = $"TransactionLog{((uint) Guid.NewGuid().GetHashCode()) % 100000}";
+        private static string ClusterServiceId = Guid.NewGuid().ToString();
         public AzureTransactionLogTests()
         {
             TestFixture.CheckForAzureStorage(TestDefaultConfiguration.DataConnectionString);
@@ -33,7 +32,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
             var azureOptions = new AzureTransactionLogOptions()
             {
                 ConnectionString = TestDefaultConfiguration.DataConnectionString,
-                TableName = TableName
+                TableName = "TransactionLog"
             };
             var archiveOptions = new AzureTransactionArchiveLogOptions()
             {
@@ -41,7 +40,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
             };
 
             var logStorage = await StorageFactory(azureOptions, archiveOptions);
-            var recordsNum = 2000;
+            var recordsNum = 20;
             var allTransactions = new List<CommitRecord>(recordsNum);
             for (int i = 0; i< recordsNum; i++)
             {
@@ -49,15 +48,28 @@ namespace Orleans.Transactions.AzureStorage.Tests
             }
             await logStorage.Append(allTransactions);
             //all transactions will be archived 
-            var maxSLN = recordsNum + 2;
+            var maxSLN = recordsNum - 11;
             await logStorage.TruncateLog(maxSLN);
-            //since lsn and transaction id are the same in this test, so use it as the query on row key
-            var query = new TableQuery<AzureTransactionLogStorage.ArchivalRow>().Where(
-                TableQuery.GenerateFilterCondition(nameof(AzureTransactionLogStorage.ArchivalRow.RowKey), QueryComparisons.LessThanOrEqual, AzureTransactionLogStorage.ArchivalRow.MakeRowKey(maxSLN)));
-            var archivalTransactions = await logStorage.QueryArchivalRecords(query);
-            //assert a subset of transaction has been archived and no duplicates
-            Assert.Equal(allTransactions.Select(tx=>tx.LSN).Distinct(), archivalTransactions.Select(tx=>tx.LSN).Distinct());
-            Assert.Equal(archivalTransactions.Select(tx => tx.LSN).Distinct().Count(), archivalTransactions.Select(tx => tx.LSN).Count());
+            //get all archived records
+            var archQuery = new TableQuery<AzureTransactionLogStorage.ArchivalRow>().Where(TableQuery.CombineFilters(
+                TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, AzureTransactionLogStorage.ArchivalRow.MakePartitionKey(ClusterServiceId)),
+                TableOperators.And,
+                TableQuery.CombineFilters(TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.LessThanOrEqual, AzureTransactionLogStorage.ArchivalRow.MaxRowKey),
+                TableOperators.And,
+                TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.GreaterThanOrEqual, AzureTransactionLogStorage.ArchivalRow.MinRowKey))));
+            var archivalTransactions = await logStorage.QueryArchivalRecords(archQuery);
+            //query remaining commited records
+            var cmQuery = new TableQuery<AzureTransactionLogStorage.ArchivalRow>().Where(TableQuery.CombineFilters(
+                TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, AzureTransactionLogStorage.ArchivalRow.MakePartitionKey(ClusterServiceId)),
+                TableOperators.And,
+                TableQuery.CombineFilters(TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.LessThanOrEqual, AzureTransactionLogStorage.CommitRow.MaxRowKey),
+                    TableOperators.And,
+                    TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.GreaterThanOrEqual, AzureTransactionLogStorage.CommitRow.MinRowKey))));
+            var commitTransactions = await logStorage.QueryArchivalRecords(cmQuery);
+            //assert a subset of transaction has been archived 
+            Assert.Equal(allTransactions.FindAll(r=>r.LSN <= maxSLN).Select(r => r.LSN).Distinct(), archivalTransactions.Select(tx=>tx.LSN).Distinct());
+            //assert the remaining transactions still isn't archived 
+            Assert.Equal(allTransactions.FindAll(r => r.LSN > maxSLN).Select(r => r.LSN).Distinct(), commitTransactions.Select(tx => tx.LSN).Distinct());
         }
 
         private static async Task<AzureTransactionLogStorage> StorageFactory(AzureTransactionLogOptions azureOptions, AzureTransactionArchiveLogOptions archiveOptions)
@@ -66,16 +78,10 @@ namespace Orleans.Transactions.AzureStorage.Tests
             var environment = SerializationTestEnvironment.InitializeWithDefaults(config);
             var azureConfig = Options.Create(azureOptions);
             AzureTransactionLogStorage storage = new AzureTransactionLogStorage(environment.SerializationManager, azureConfig, 
-                Options.Create(archiveOptions), Options.Create(new ClusterOptions(){ClusterId = TestClusterId, ServiceId = "TestServiceID"}));
+                Options.Create(archiveOptions), Options.Create(new ClusterOptions(){ClusterId = Guid.NewGuid().ToString(),
+                    ServiceId = ClusterServiceId}));
             await storage.Initialize();
             return storage;
-        }
-
-        public void Dispose()
-        {
-            var tableManager = new AzureTableDataManager<AzureTransactionLogStorage.ArchivalRow>(TableName, TestDefaultConfiguration.DataConnectionString,
-                NullLoggerFactory.Instance);
-            tableManager.DeleteTableAsync().Ignore();
         }
     }
 }

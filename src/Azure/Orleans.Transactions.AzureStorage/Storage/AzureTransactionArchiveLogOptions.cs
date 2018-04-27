@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Orleans.Transactions.AzureStorage.Storage.Development
+namespace Orleans.Configuration.Development
 {
     /// <summary>
     /// Option class to configure Azure transaction log archive behavior

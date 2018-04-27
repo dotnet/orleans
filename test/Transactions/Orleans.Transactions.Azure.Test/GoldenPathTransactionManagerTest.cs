@@ -4,12 +4,12 @@ using Xunit.Abstractions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Configuration.Development;
 using Orleans.Runtime.Configuration;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.Tests;
 using TestExtensions;
 using Orleans.TestingHost.Utils;
-using Orleans.Transactions.AzureStorage.Storage.Development;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {
@@ -39,11 +39,15 @@ namespace Orleans.Transactions.AzureStorage.Tests
             var azureConfig = Options.Create(new AzureTransactionLogOptions()
             {
                 // TODO: Find better way for test isolation.
-                TableName = $"TransactionLog{((uint)Guid.NewGuid().GetHashCode()) % 100000}",
+                TableName = "TransactionLog",
                 ConnectionString = TestDefaultConfiguration.DataConnectionString
             });
             AzureTransactionLogStorage storage = new AzureTransactionLogStorage(environment.SerializationManager, azureConfig, 
-                Options.Create(new AzureTransactionArchiveLogOptions()), Options.Create(new ClusterOptions()));
+                Options.Create(new AzureTransactionArchiveLogOptions()), Options.Create(new ClusterOptions()
+                {
+                    ClusterId = Guid.NewGuid().ToString(),
+                    ServiceId = Guid.NewGuid().ToString()
+                }));
             await storage.Initialize();
             return storage;
         }

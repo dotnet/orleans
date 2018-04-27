@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;
 using Orleans.Configuration;
+using Orleans.Configuration.Development;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.Transactions.Abstractions;
@@ -15,7 +16,6 @@ using Orleans.Transactions;
 using Orleans.Transactions.Development;
 using Orleans.Transactions.AzureStorage;
 using Orleans.TestingHost.Utils;
-using Orleans.Transactions.AzureStorage.Storage.Development;
 
 namespace Benchmarks.TransactionManager
 {
@@ -149,15 +149,21 @@ namespace Benchmarks.TransactionManager
 
         private static async Task<ITransactionLogStorage> AzureStorageFactory()
         {
-            var client = new ClientBuilder().Configure<ClusterOptions>(o => o.ServiceId = o.ClusterId = "fake").Build();
+            var serviceId = Guid.NewGuid().ToString();
+            var clusterId = Guid.NewGuid().ToString();
+            var client = new ClientBuilder().Configure<ClusterOptions>(o =>
+            {
+                o.ServiceId = serviceId;
+                o.ClusterId = clusterId;
+            }).Build();
             var azureConfig = Options.Create(new AzureTransactionLogOptions()
             {
                 // TODO: Find better way for test isolation.
-                TableName = $"TransactionLog{((uint)Guid.NewGuid().GetHashCode()) % 100000}",
+                TableName = "TransactionLog",
                 ConnectionString = "UseDevelopmentStorage=true"
             });
             AzureTransactionLogStorage storage = new AzureTransactionLogStorage(client.ServiceProvider.GetRequiredService<SerializationManager>(), azureConfig, 
-                Options.Create(new AzureTransactionArchiveLogOptions()), Options.Create(new ClusterOptions()));
+                Options.Create(new AzureTransactionArchiveLogOptions()), Options.Create(new ClusterOptions(){ClusterId = clusterId, ServiceId = serviceId }));
             await storage.Initialize();
             return storage;
         }
