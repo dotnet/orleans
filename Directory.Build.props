@@ -140,7 +140,7 @@
     <OrleansToolsVersion>2.0.0</OrleansToolsVersion>
     <OrleansClientVersion>2.0.0</OrleansClientVersion>
     <OrleansServerVersion>2.0.0</OrleansServerVersion>
-    <OrleansCodegenVersion>2.0.0</OrleansCodegenVersion>
+    <OrleansCodegenVersion>2.1.0</OrleansCodegenVersion>
   </PropertyGroup>
   
   <PropertyGroup Condition="$(FullBuild) == 'true'">
