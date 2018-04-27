@@ -365,9 +365,14 @@ namespace Orleans.Runtime
                 }
                 catch (Exception exc1)
                 {
-                    if (invokeExceptionLogger.IsEnabled(LogLevel.Warning) || message.Direction == Message.Directions.OneWay)
+                    if (message.Direction == Message.Directions.OneWay)
                     {
                         invokeExceptionLogger.Warn(ErrorCode.GrainInvokeException,
+                            "Exception during Grain method call of message: " + message, exc1);
+                    }
+                    else if (invokeExceptionLogger.IsEnabled(LogLevel.Debug))
+                    {
+                        invokeExceptionLogger.Debug(ErrorCode.GrainInvokeException,
                             "Exception during Grain method call of message: " + message, exc1);
                     }
 
