@@ -510,7 +510,13 @@ namespace UnitTests.StreamingTests
                 activationCount = await consumer.GetNumActivations(this.client);
             }
             var expectActivationCount = 0;
-            logger.Info("Test {0} CheckGrainsDeactivated: {1}ActivationCount = {2}, Expected{1}ActivationCount = {3}", testNumber, str, activationCount, expectActivationCount);
+            logger.Info(
+                "Test {testNumber} CheckGrainsDeactivated: {type}ActivationCount = {activationCount}, Expected{type}ActivationCount = {expectActivationCount}", 
+                testNumber, 
+                str, 
+                activationCount, 
+                str,
+                expectActivationCount);
             if (assertAreEqual)
             {
                 Assert.Equal(expectActivationCount,  activationCount); // String.Format("Expected{0}ActivationCount = {1}, {0}ActivationCount = {2}", str, expectActivationCount, activationCount));

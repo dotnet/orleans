@@ -156,12 +156,12 @@ namespace Orleans.Runtime.Messaging
             MessagingStatisticsGroup.OnFailedSentMessage(msg);
             if (msg.Direction == Message.Directions.Request)
             {
-                if (Log.IsEnabled(LogLevel.Debug)) Log.Debug(ErrorCode.MessagingSendingRejection, "Silo {0} is rejecting message: {0}. Reason = {1}", messageCenter.MyAddress, msg, reason);
+                if (Log.IsEnabled(LogLevel.Debug)) Log.Debug(ErrorCode.MessagingSendingRejection, "Silo {siloAddress} is rejecting message: {message}. Reason = {reason}", messageCenter.MyAddress, msg, reason);
                 // Done retrying, send back an error instead
                 messageCenter.SendRejection(msg, Message.RejectionTypes.Transient, String.Format("Silo {0} is rejecting message: {1}. Reason = {2}", messageCenter.MyAddress, msg, reason));
             }else
             {
-                Log.Info(ErrorCode.Messaging_OutgoingMS_DroppingMessage, "Silo {0} is dropping message: {0}. Reason = {1}", messageCenter.MyAddress, msg, reason);
+                Log.Info(ErrorCode.Messaging_OutgoingMS_DroppingMessage, "Silo {siloAddress} is dropping message: {message}. Reason = {reason}", messageCenter.MyAddress, msg, reason);
                 MessagingStatisticsGroup.OnDroppedSentMessage(msg);
             }
         }
