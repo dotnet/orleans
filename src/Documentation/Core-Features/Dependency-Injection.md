@@ -18,7 +18,7 @@ Orleans uses the DI abstraction created for [ASP.NET Core](https://docs.asp.net)
 For a detailed explanation about how it works, check out the [official documentation](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/dependency-injection).
 
 # Configuring DI
-DI for silos and client is confiugre through `SiloHostBuilder` and `ClientBuilder` respectively.
+DI for silos and client is configured through `SiloHostBuilder` and `ClientBuilder` respectively.
 For example, to configure DI on the silo side with a `IInjectedService` singleton, whose declaration and implementation as below, 
 
 ``` csharp
