@@ -31,8 +31,8 @@ namespace Orleans.Transactions.DistributedTM
             if (grainStorage != null) return new TransactionalStateStorageProviderWrapper<TState>(grainStorage, context);
 
             throw (string.IsNullOrEmpty(storageName))
-                ? new InvalidOperationException($"No default {nameof(ITransactionalStateStorageFactory)} nor {nameof(IStorageProvider)} was found while attempting to create transactional state storage.")
-                : new InvalidOperationException($"No {nameof(ITransactionalStateStorageFactory)} nor {nameof(IStorageProvider)} with the name {storageName} was found while attempting to create transactional state storage.");
+                ? new InvalidOperationException($"No default {nameof(ITransactionalStateStorageFactory)} nor {nameof(IGrainStorage)} was found while attempting to create transactional state storage.")
+                : new InvalidOperationException($"No {nameof(ITransactionalStateStorageFactory)} nor {nameof(IGrainStorage)} with the name {storageName} was found while attempting to create transactional state storage.");
         }
     }
 }

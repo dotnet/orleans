@@ -8,16 +8,14 @@ namespace Orleans.Transactions.Abstractions
     public interface ITransactionalStateStorage<TState>
         where TState : class, new()
     {
-        Task<TransactionalStorageLoadResponse<TState>> Load(string stateName);
+        Task<TransactionalStorageLoadResponse<TState>> Load();
 
         Task<string> Persist(
-            string stateName,
             string expectedETag,
             string metadata,
             List<PendingTransactionState<TState>> statesToPrepare);
 
         Task<string> Confirm(
-            string stateName,
             string expectedETag,
             string metadata,
             string transactionIdToCommit);
@@ -47,6 +45,8 @@ namespace Orleans.Transactions.Abstractions
     public class TransactionalStorageLoadResponse<TState>
         where TState : class, new()
     {
+        public TransactionalStorageLoadResponse() : this(null, new TState(), null, new List<PendingTransactionState<TState>>()){}
+
         public TransactionalStorageLoadResponse(string etag, TState committedState, string metadata, IReadOnlyList<PendingTransactionState<TState>> pendingStates)
         {
             this.ETag = etag;

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -17,56 +16,58 @@ namespace Orleans.Transactions
         private readonly IGrainStorage grainStorage;
         private readonly IGrainActivationContext context;
         private readonly ILoggerFactory loggerFactory;
-        private readonly ConcurrentDictionary<string, IStorage<TransactionalStateRecord<TState>>> stateStorages;
-        public TransactionalStateStorageProviderWrapper(IGrainStorage grainStorage, IGrainActivationContext context, ILoggerFactory loggerFactory)
+        private readonly string stateName;
+
+        private IStorage<TransactionalStateRecord<TState>> stateStorage;
+        private IStorage<TransactionalStateRecord<TState>> StateStorage => stateStorage ?? (stateStorage = GetStateStorage());
+
+        public TransactionalStateStorageProviderWrapper(IGrainStorage grainStorage, string stateName, IGrainActivationContext context, ILoggerFactory loggerFactory)
         {
             this.grainStorage = grainStorage;
             this.context = context;
             this.loggerFactory = loggerFactory;
-            this.stateStorages = new ConcurrentDictionary<string, IStorage<TransactionalStateRecord<TState>>>();
+            this.stateName = stateName;
         }
 
-        public async Task<TransactionalStorageLoadResponse<TState>> Load(string stateName)
+        public async Task<TransactionalStorageLoadResponse<TState>> Load()
         {
-            IStorage<TransactionalStateRecord<TState>> stateStorage = GetStateStorage(stateName);
-            await stateStorage.ReadStateAsync();
-            return new TransactionalStorageLoadResponse<TState>(stateStorage.Etag, stateStorage.State.CommittedState, stateStorage.State.Metadata, stateStorage.State.PendingStates);
+            await this.StateStorage.ReadStateAsync();
+            return new TransactionalStorageLoadResponse<TState>(this.StateStorage.Etag, this.StateStorage.State.CommittedState, this.StateStorage.State.Metadata, this.StateStorage.State.PendingStates);
         }
 
-        public async Task<string> Persist(string stateName, string expectedETag, string metadata, List<PendingTransactionState<TState>> statesToPrepare)
+        public async Task<string> Persist(string expectedETag, string metadata, List<PendingTransactionState<TState>> statesToPrepare)
         {
-            IStorage<TransactionalStateRecord<TState>> stateStorage = GetStateStorage(stateName);
-            if (stateStorage.Etag != expectedETag)
+            if (this.StateStorage.Etag != expectedETag)
                 throw new ArgumentException(nameof(expectedETag), "Etag does not match");
-            stateStorage.State.Metadata = metadata;
-            foreach(PendingTransactionState<TState> pendingState in statesToPrepare.Where(s => !stateStorage.State.PendingStates.Contains(s)))
+            this.StateStorage.State.Metadata = metadata;
+            foreach(PendingTransactionState<TState> pendingState in statesToPrepare.Where(s => !this.StateStorage.State.PendingStates.Contains(s)))
             {
-                stateStorage.State.PendingStates.Add(pendingState);
+                this.StateStorage.State.PendingStates.Add(pendingState);
             }
-            await stateStorage.WriteStateAsync();
-            return stateStorage.Etag;
+            await this.StateStorage.WriteStateAsync();
+            return this.StateStorage.Etag;
         }
 
-        public async Task<string> Confirm(string stateName, string expectedETag, string metadata, string transactionIdToCommit)
+        public async Task<string> Confirm(string expectedETag, string metadata, string transactionIdToCommit)
         {
-            IStorage<TransactionalStateRecord<TState>> stateStorage = GetStateStorage(stateName);
-            if (stateStorage.Etag != expectedETag)
+            if (this.StateStorage.Etag != expectedETag)
                 throw new ArgumentException(nameof(expectedETag), "Etag does not match");
-            stateStorage.State.Metadata = metadata;
-            PendingTransactionState<TState> committedState = stateStorage.State.PendingStates.FirstOrDefault(pending => transactionIdToCommit == pending.TransactionId);
+            this.StateStorage.State.Metadata = metadata;
+            PendingTransactionState<TState> committedState = this.StateStorage.State.PendingStates.FirstOrDefault(pending => transactionIdToCommit == pending.TransactionId);
             if (committedState != null)
             {
-                stateStorage.State.CommittedTransactionId = committedState.TransactionId;
-                stateStorage.State.CommittedState = committedState.State;
-                stateStorage.State.PendingStates = stateStorage.State.PendingStates.Where(pending => pending.SequenceId > committedState.SequenceId).ToList();
+                this.StateStorage.State.CommittedTransactionId = committedState.TransactionId;
+                this.StateStorage.State.CommittedState = committedState.State;
+                this.StateStorage.State.PendingStates = StateStorage.State.PendingStates.Where(pending => pending.SequenceId > committedState.SequenceId).ToList();
             }
-            await stateStorage.WriteStateAsync();
-            return stateStorage.Etag;
+            await this.StateStorage.WriteStateAsync();
+            return this.StateStorage.Etag;
         }
 
-        private IStorage<TransactionalStateRecord<TState>> GetStateStorage(string stateName)
+        private IStorage<TransactionalStateRecord<TState>> GetStateStorage()
         {
-            return this.stateStorages.GetOrAdd(stateName, name => new StateStorageBridge<TransactionalStateRecord<TState>>(name, this.context.GrainInstance.GrainReference, grainStorage, this.loggerFactory));
+            string fullStateName = $"{this.context.GrainInstance.GetType().FullName}-{this.stateName}";
+            return new StateStorageBridge<TransactionalStateRecord<TState>>(fullStateName, this.context.GrainInstance.GrainReference, grainStorage, this.loggerFactory);
         }
     }
 
