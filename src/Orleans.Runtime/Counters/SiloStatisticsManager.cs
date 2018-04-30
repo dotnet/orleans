@@ -11,7 +11,7 @@ namespace Orleans.Runtime.Counters
         private CountersStatistics countersPublisher;
 
         public SiloStatisticsManager(
-            IOptions<SiloStatisticsOptions> statisticsOptions,
+            IOptions<StatisticsOptions> statisticsOptions,
             SerializationManager serializationManager, 
             ITelemetryProducer telemetryProducer,
             ILoggerFactory loggerFactory)
