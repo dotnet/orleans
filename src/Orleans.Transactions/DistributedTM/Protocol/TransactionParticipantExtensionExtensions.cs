@@ -153,7 +153,7 @@ namespace Orleans.Transactions.DistributedTM
                     var key = (string)jobj["grain"];
                     var resourceId = (string)jobj["facet"];
 
-                    var grainref = GrainReference.FromKeyString(key, null);
+                    var grainref = Utils.FromKeyString(key, null);
                     this.grainFactory.BindGrainReference(grainref);
                     var extension = grainref.AsReference<ITransactionParticipantExtension>();
 

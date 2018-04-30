@@ -397,7 +397,7 @@ namespace Orleans.Runtime
             return String.Format("{0}={1}", GRAIN_REFERENCE_STR, GrainId.ToParsableString());
         }
         
-        public static GrainReference FromKeyString(string key, IGrainReferenceRuntime runtime)
+        internal static GrainReference FromKeyString(string key, IGrainReferenceRuntime runtime)
         {
             if (string.IsNullOrWhiteSpace(key)) throw new ArgumentNullException("key", "GrainReference.FromKeyString cannot parse null key");
             
@@ -438,7 +438,6 @@ namespace Orleans.Runtime
                 grainIdStr = trimmed.Substring(grainIdIndex);
                 return FromGrainId(GrainId.FromParsableString(grainIdStr), runtime);
             }
-            //return FromGrainId(GrainId.FromParsableString(grainIdStr), generic);
         }
 
 
