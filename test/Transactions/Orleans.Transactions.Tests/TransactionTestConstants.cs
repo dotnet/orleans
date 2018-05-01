@@ -28,5 +28,8 @@ namespace Orleans.Transactions.Tests
 
         // grain implementations using distributed TM
         public const string SingleStateTransactionalGrainDistributedTM = "Orleans.Transactions.Tests.DistributedTM.SingleStateTransactionalGrain";
+        public const string DoubleStateTransactionalGrainDistributedTM = "Orleans.Transactions.Tests.DistributedTM.DoubleStateTransactionalGrain";
+        public const string MaxStateTransactionalGrainDistributedTM = "Orleans.Transactions.Tests.DistributedTM.MaxStateTransactionalGrain";
+
     }
 }
