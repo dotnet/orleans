@@ -47,8 +47,8 @@ siloBuilder.ConfigureServices(svc=>svc.AddSingleton<IInjectedService,InjectedSer
 On the client side, you do the same via `ClientBuilder`:
 
 ``` csharp
-var clientBuilder = new SiloHostBuilder();
-//configure silo DI with a IInjectedService using a Action<IServiceCollection> delegate.
+var clientBuilder = new ClientBuilder();
+//configure client DI with a IInjectedService using a Action<IServiceCollection> delegate.
 clientBuilder.ConfigureServices(svc=>svc.AddSingleton<IInjectedService,InjectedService>());
 ```
 
