@@ -264,6 +264,7 @@ namespace Orleans.Hosting
 
             // This validator needs to construct the IMembershipOracle and the IMembershipTable
             // so move it in the end so other validator are called first
+            services.AddTransient<IConfigurationValidator, ClusterOptionsValidator>();
             services.AddTransient<IConfigurationValidator, SiloClusteringValidator>();
         }
     }

@@ -4,6 +4,7 @@ using Xunit.Abstractions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Configuration.Development;
 using Orleans.Runtime.Configuration;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.Tests;
@@ -17,7 +18,6 @@ namespace Orleans.Transactions.AzureStorage.Tests
     {
         private static readonly TimeSpan LogMaintenanceInterval = TimeSpan.FromMilliseconds(10);
         private static readonly TimeSpan StorageDelay = TimeSpan.FromSeconds(30);
-
         public GoldenPathTransactionManagerTest(ITestOutputHelper output)
             : base(MakeTransactionManager(), LogMaintenanceInterval, StorageDelay, output)
         {
@@ -39,10 +39,15 @@ namespace Orleans.Transactions.AzureStorage.Tests
             var azureConfig = Options.Create(new AzureTransactionLogOptions()
             {
                 // TODO: Find better way for test isolation.
-                TableName = $"TransactionLog{((uint)Guid.NewGuid().GetHashCode()) % 100000}",
+                TableName = "TransactionLog",
                 ConnectionString = TestDefaultConfiguration.DataConnectionString
             });
-            AzureTransactionLogStorage storage = new AzureTransactionLogStorage(environment.SerializationManager, azureConfig);
+            AzureTransactionLogStorage storage = new AzureTransactionLogStorage(environment.SerializationManager, azureConfig, 
+                Options.Create(new AzureTransactionArchiveLogOptions()), Options.Create(new ClusterOptions()
+                {
+                    ClusterId = Guid.NewGuid().ToString(),
+                    ServiceId = Guid.NewGuid().ToString()
+                }));
             await storage.Initialize();
             return storage;
         }
