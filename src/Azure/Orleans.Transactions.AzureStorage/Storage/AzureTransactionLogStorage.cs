@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
@@ -7,6 +8,7 @@ using Microsoft.WindowsAzure.Storage.RetryPolicies;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
+using Orleans.Configuration.Development;
 using Orleans.Serialization;
 using Orleans.Transactions.Abstractions;
 
@@ -22,10 +24,6 @@ namespace Orleans.Transactions.AzureStorage
 
         private const int BatchOperationLimit = 100;
         private const int CommitRecordsPerRow = 10;
-        private const string CommitRecordPartitionKey = "0";
-
-        private const string StartRowPartitionKey = "1";
-        private const string StartRowRowKey = "0";
 
         //TODO: jbragg - Do not use serializationManager for persistent data!!
         private readonly SerializationManager serializationManager;
@@ -36,6 +34,7 @@ namespace Orleans.Transactions.AzureStorage
 
         private long startRecordValue;
         private long nextLogSequenceNumber;
+        private readonly string commitRecordPartitionKey;
 
         // Log iteration indexes, reused between operations
         private TableContinuationToken currentContinuationToken;
@@ -43,11 +42,16 @@ namespace Orleans.Transactions.AzureStorage
         private int currentQueryResultIndex;
         private List<CommitRecord> currentRowTransactions;
         private int currentRowTransactionsIndex;
-
-        public AzureTransactionLogStorage(SerializationManager serializationManager, IOptions<AzureTransactionLogOptions> configurationOptions)
+        private readonly ClusterOptions clusterOptions;
+        private readonly AzureTransactionArchiveLogOptions archiveLogOptions;
+        public AzureTransactionLogStorage(SerializationManager serializationManager, IOptions<AzureTransactionLogOptions> configurationOptions, 
+            IOptions<AzureTransactionArchiveLogOptions> archiveOptions, IOptions<ClusterOptions> clusterOptions)
         {
             this.serializationManager = serializationManager;
             this.options = configurationOptions.Value;
+            this.clusterOptions = clusterOptions.Value;
+            this.archiveLogOptions = archiveOptions.Value;
+            this.commitRecordPartitionKey = ArchivalRow.MakePartitionKey(this.clusterOptions.ServiceId);
         }
 
         public async Task Initialize()
@@ -78,16 +82,16 @@ namespace Orleans.Transactions.AzureStorage
             this.table = operationClient.GetTableReference(this.options.TableName);
             
             var query = new TableQuery<StartRow>().Where(TableQuery.CombineFilters(
-                TableQuery.GenerateFilterCondition(PartitionKey, QueryComparisons.Equal, StartRowPartitionKey),
+                TableQuery.GenerateFilterCondition(PartitionKey, QueryComparisons.Equal, StartRow.MakePartitionkey(this.clusterOptions.ServiceId)),
                 TableOperators.And,
-                TableQuery.GenerateFilterCondition(RowKey, QueryComparisons.LessThanOrEqual, StartRowRowKey)));
+                TableQuery.GenerateFilterCondition(RowKey, QueryComparisons.LessThanOrEqual, StartRow.StartRowRowKey)));
             var queryResult = await table.ExecuteQuerySegmentedAsync(query, null).ConfigureAwait(false);
 
             if (queryResult.Results.Count == 0)
             {
                 // This is a fresh deployment, the StartRecord isn't created yet.
                 // Create it here.
-                var row = new StartRow(0);
+                var row = new StartRow(this.clusterOptions, 0);
                 var operation = TableOperation.Insert(row);
 
                 await table.ExecuteAsync(operation).ConfigureAwait(false);
@@ -173,7 +177,7 @@ namespace Orleans.Transactions.AzureStorage
 
         public async Task UpdateStartRecord(long transactionId)
         {
-            var tableOperation = TableOperation.Replace(new StartRow(transactionId));
+            var tableOperation = TableOperation.Replace(new StartRow(this.clusterOptions, transactionId));
 
             await table.ExecuteAsync(tableOperation).ConfigureAwait(false);
 
@@ -191,7 +195,7 @@ namespace Orleans.Transactions.AzureStorage
             {
                 var recordCount = Math.Min(transactionList.Count - nextRecord, CommitRecordsPerRow);
                 var transactionSegment = transactionList.GetRange(nextRecord, recordCount);
-                var commitRow = new CommitRow(nextLogSequenceNumber);
+                var commitRow = new CommitRow(this.clusterOptions, nextLogSequenceNumber);
 
                 foreach (var transaction in transactionSegment)
                 {
@@ -216,15 +220,39 @@ namespace Orleans.Transactions.AzureStorage
             }
         }
 
+        public async Task<List<CommitRecord>> QueryArchivalRecords(TableQuery<ArchivalRow> query)
+        {
+            var continuationToken = default(TableContinuationToken);
+            var deserializedResults = new List<CommitRecord>();
+            do
+            {
+                var queryResult = await table.ExecuteQuerySegmentedAsync(query, continuationToken).ConfigureAwait(false);
+                continuationToken = queryResult.ContinuationToken;
+
+                if (queryResult.Results.Count > 0)
+                {
+                    foreach (var row in queryResult)
+                    {
+                        var transactions = DeserializeCommitRecords(row.Transactions);
+                        deserializedResults.AddRange(transactions);
+                    }
+                }
+            } while (continuationToken != default(TableContinuationToken));
+
+            return deserializedResults;
+        }
+
         public async Task TruncateLog(long lsn)
         {
             var continuationToken = default(TableContinuationToken);
-
             var query = new TableQuery<CommitRow>().Where(TableQuery.CombineFilters(
-                TableQuery.GenerateFilterCondition(PartitionKey, QueryComparisons.Equal, CommitRecordPartitionKey),
+                TableQuery.GenerateFilterCondition(PartitionKey, QueryComparisons.Equal, commitRecordPartitionKey),
                 TableOperators.And,
-                TableQuery.GenerateFilterCondition(RowKey, QueryComparisons.LessThanOrEqual, CommitRow.ToRowKey(lsn))));
-
+                TableQuery.CombineFilters(
+                TableQuery.GenerateFilterCondition(RowKey, QueryComparisons.LessThanOrEqual, CommitRow.MakeRowKey(lsn)),
+                TableOperators.And,
+                TableQuery.GenerateFilterCondition(RowKey, QueryComparisons.GreaterThanOrEqual, CommitRow.MinRowKey))));
+            var batchOperation = new TableBatchOperation();
             do
             {
                 var queryResult = await table.ExecuteQuerySegmentedAsync(query, continuationToken).ConfigureAwait(false);
@@ -233,7 +261,6 @@ namespace Orleans.Transactions.AzureStorage
 
                 if (queryResult.Results.Count > 0)
                 {
-                    var batchOperation = new TableBatchOperation();
 
                     foreach (var row in queryResult)
                     {
@@ -242,11 +269,15 @@ namespace Orleans.Transactions.AzureStorage
                         if (transactions.Count > 0 && transactions[transactions.Count - 1].LSN <= lsn)
                         {
                             batchOperation.Delete(row);
+                            if (this.archiveLogOptions.ArchiveLog)
+                            {
+                                var archiveRow = new ArchivalRow(this.clusterOptions, row.Transactions, transactions.Select(tx => tx.TransactionId).Min(), transactions.Select(tx => tx.LSN).Min());
+                                batchOperation.Insert(archiveRow);
+                            }
 
                             if (batchOperation.Count == BatchOperationLimit)
                             {
                                 await table.ExecuteBatchAsync(batchOperation).ConfigureAwait(false);
-
                                 batchOperation = new TableBatchOperation();
                             }
                         }
@@ -257,7 +288,12 @@ namespace Orleans.Transactions.AzureStorage
                     }
                 }
 
-            } while (continuationToken != null);
+            } while (continuationToken != default(TableContinuationToken));
+
+            if (batchOperation.Count > 0)
+            {
+                await table.ExecuteBatchAsync(batchOperation).ConfigureAwait(false);
+            }
         }
 
         public static Factory<Task<ITransactionLogStorage>> Create(IServiceProvider serviceProvider)
@@ -273,9 +309,12 @@ namespace Orleans.Transactions.AzureStorage
         private async Task ReadRowsFromTable(long keyLowerBound)
         {
             var query = new TableQuery<CommitRow>().Where(TableQuery.CombineFilters(
-                TableQuery.GenerateFilterCondition(PartitionKey, QueryComparisons.Equal, CommitRecordPartitionKey),
+                TableQuery.GenerateFilterCondition(PartitionKey, QueryComparisons.Equal, commitRecordPartitionKey),
                 TableOperators.And,
-                TableQuery.GenerateFilterCondition(RowKey, QueryComparisons.GreaterThanOrEqual, CommitRow.ToRowKey(keyLowerBound))));
+                TableQuery.CombineFilters(
+                TableQuery.GenerateFilterCondition(RowKey, QueryComparisons.GreaterThanOrEqual, CommitRow.MakeRowKey(keyLowerBound)),
+                TableOperators.And,
+                TableQuery.GenerateFilterCondition(RowKey, QueryComparisons.LessThanOrEqual, CommitRow.MaxRowKey))));
 
             currentQueryResult = await table.ExecuteQuerySegmentedAsync(query, currentContinuationToken).ConfigureAwait(false);
 
@@ -322,13 +361,52 @@ namespace Orleans.Transactions.AzureStorage
             return commitRecords;
         }
 
-        private class CommitRow : TableEntity
+        public class ArchivalRow : TableEntity
         {
-            public CommitRow(long firstLSN)
+            public const string MinRowKey = "arch_";
+            public const string MaxRowKey = "arch_~";
+
+            public static string MakeRowKey(long firstTransactionId)
+            {
+                return $"arch_{firstTransactionId:x16}";
+            }
+
+            //CommitRow and ArchivalRow should share the same partitionKey making. So they 
+            //the same method
+            public static string MakePartitionKey(string serviceId)
+            {
+                return $"tlpk_{serviceId}";
+            }
+
+            public ArchivalRow()
+            {
+            }
+
+            public ArchivalRow(ClusterOptions clusterOptions, byte[] transactions, long firstTransactionId, long firstLSN)
+            {
+                this.Transactions = transactions;
+                this.ClusterId = clusterOptions.ClusterId;
+                this.FirstLSN = firstLSN;
+                this.FirstTransactionId = firstTransactionId;
+                PartitionKey = MakePartitionKey(clusterOptions.ServiceId);
+                RowKey = MakeRowKey(firstTransactionId);
+            }
+
+            public string ClusterId { get; set; }
+            public long FirstLSN { get; set; }
+            public long FirstTransactionId { get; set; }
+            public byte[] Transactions { get; set; }
+        }
+
+        public class CommitRow : TableEntity
+        {
+            public const string MaxRowKey = "crrk_~";
+            public const string MinRowKey = "crrk_";
+            public CommitRow(ClusterOptions clusterOptions, long firstLSN)
             {
                 // All entities are in the same partition for atomic read/writes.
-                PartitionKey = CommitRecordPartitionKey;
-                RowKey = ToRowKey(firstLSN);
+                PartitionKey = ArchivalRow.MakePartitionKey(clusterOptions.ServiceId);
+                RowKey = MakeRowKey(firstLSN);
             }
 
             public CommitRow()
@@ -337,18 +415,25 @@ namespace Orleans.Transactions.AzureStorage
 
             public byte[] Transactions { get; set; }
 
-            internal static string ToRowKey(long lsn)
+            internal static string MakeRowKey(long lsn)
             {
-                return $"{lsn:x16}";
+                return $"crrk_{lsn:x16}";
             }
         }
 
         private class StartRow : TableEntity
         {
-            public StartRow(long transactionId)
+            internal const string StartRowRowKey = "srrk_";
+
+            internal static string MakePartitionkey(string serviceId)
+            {
+                return $"srpk_{serviceId}";
+            }
+
+            public StartRow(ClusterOptions options, long transactionId)
             {
                 // only row in the table with this partition key
-                PartitionKey = StartRowPartitionKey;
+                PartitionKey = MakePartitionkey(options.ServiceId);
                 RowKey = StartRowRowKey;
                 ETag = "*";
                 AllocatedTransactionIds = transactionId;
