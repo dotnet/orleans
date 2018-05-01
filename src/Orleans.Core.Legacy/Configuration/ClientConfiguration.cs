@@ -67,6 +67,11 @@ namespace Orleans.Runtime.Configuration
         public GatewayProviderType GatewayProvider { get; set; }
 
         /// <summary>
+        /// Service Id.
+        /// </summary>
+        public Guid ServiceId { get; set; }
+
+        /// <summary>
         /// Specifies a unique identifier for this cluster.
         /// If the silos are deployed on Azure (run as workers roles), deployment id is set automatically by Azure runtime, 
         /// accessible to the role via RoleEnvironment.DeploymentId static variable and is passed to the silo automatically by the role via config. 
@@ -245,6 +250,10 @@ namespace Orleans.Runtime.Configuration
                             if (child.HasAttribute("DeploymentId"))
                             {
                                 this.ClusterId = child.GetAttribute("DeploymentId");
+                            }
+                            if (child.HasAttribute("ServiceId"))
+                            {
+                                this.ServiceId = ConfigUtilities.ParseGuid(child.GetAttribute("ServiceId"), "Invalid Guid value for the ServiceId attribute");
                             }
                             if (child.HasAttribute(Constants.DATA_CONNECTION_STRING_NAME))
                             {
