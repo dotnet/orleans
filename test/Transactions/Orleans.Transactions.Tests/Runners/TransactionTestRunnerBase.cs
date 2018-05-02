@@ -52,10 +52,6 @@ namespace Orleans.Transactions.Tests
 
             if (grainStates == TransactionTestConstants.TransactionGrainStates.SingleStateTransaction)
                 return TransactionTestConstants.SingleStateTransactionalGrain;
-            if (grainStates == TransactionTestConstants.TransactionGrainStates.DoubleStateTransaction)
-                return TransactionTestConstants.DoubleStateTransactionalGrain;
-            if (grainStates == TransactionTestConstants.TransactionGrainStates.MaxStateTransaction)
-                return TransactionTestConstants.MaxStateTransactionalGrain;
             throw new SkipException($"{grainStates} not supported when using distributed transaction manager.");
         }
     }
