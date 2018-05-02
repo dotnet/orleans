@@ -101,9 +101,9 @@ This method should be sufficient in most cases, but you can customize it further
     options.GatewayPort = 30000;
     // IP Address to advertise in the cluster
     options.AdvertisedIPAddress = IPAddress.Parse("172.16.0.42");
-    // The socket used for silo-to-silo will bing to this endpoint
+    // The socket used for silo-to-silo will bind to this endpoint
     options.GatewayListeningEndpoint = new IPEndPoint(IPAddress.Any, 40000);
-    // The socket used by the gateway will bing to this endpoint
+    // The socket used by the gateway will bind to this endpoint
     options.SiloListeningEndpoint = new IPEndPoint(IPAddress.Any, 50000);
 
 })
