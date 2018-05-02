@@ -34,8 +34,8 @@ namespace Orleans.Transactions.AzureStorage
             {
                 Task<KeyEntity> keyTask = ReadKey();
                 Task<List<StateEntity>> statesTask = ReadStates();
-                this.key = await keyTask;
-                this.states = await statesTask;
+                this.key = await keyTask.ConfigureAwait(false);
+                this.states = await statesTask.ConfigureAwait(false);
                 if (string.IsNullOrEmpty(this.key.ETag))
                 {
                     return new TransactionalStorageLoadResponse<TState>();
@@ -113,7 +113,7 @@ namespace Orleans.Transactions.AzureStorage
                 this.key.ETag = expectedETag;
                 this.key.Metadata = metadata;
                 this.key.CommittedTransactionId = transactionIdToCommit;
-                await WriteKey();
+                await WriteKey().ConfigureAwait(false);
                 var dead = this.states.Where(p => string.Compare(p.TransactionId, transactionIdToCommit) <0).ToList();
                 this.states = this.states.Where(p => string.Compare(p.TransactionId, transactionIdToCommit) >= 0).ToList();
                 Cleanup(dead).Ignore();
