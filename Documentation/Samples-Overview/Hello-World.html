@@ -20,7 +20,7 @@
     <meta property="docfx:rel" content="../../">
     
   </head>
-  <body data-spy="scroll" data-target="#affix">
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
     <div id="wrapper">
       <header>
         <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
@@ -58,7 +58,9 @@
         
         <div id="search-results">
           <div class="search-list"></div>
-          <div class="sr-items"></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
           <ul id="pagination"></ul>
         </div>
       </div>
@@ -90,7 +92,7 @@ The implementation, found in HelloGrain.cs, is similarly trivial:<p>
 {
     Task&lt;string&gt; HelloWorldInterfaces.IHello.SayHello(string greeting)
     {
-        return Task.FromResult(&quot;You said: &#39;&quot; + greeting + &quot;&#39;, I say: Hello!&quot;);
+        return Task.FromResult($&quot;You said: &#39;{greeting}&#39;, I say: Hello!&quot;);
     }
 }
 </code></pre><p>The class inherits from the base class <code>Grain</code>, and implements the communication interface defined earlier.

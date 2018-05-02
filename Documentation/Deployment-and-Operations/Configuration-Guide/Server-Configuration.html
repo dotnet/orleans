@@ -20,7 +20,7 @@
     <meta property="docfx:rel" content="../../../">
     
   </head>
-  <body data-spy="scroll" data-target="#affix">
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
     <div id="wrapper">
       <header>
         <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
@@ -58,7 +58,9 @@
         
         <div id="search-results">
           <div class="search-list"></div>
-          <div class="sr-items"></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
           <ul id="pagination"></ul>
         </div>
       </div>
@@ -147,9 +149,9 @@ Option classes in Orleans follow the <a href="https://docs.microsoft.com/en-us/a
     options.GatewayPort = 30000;
     // IP Address to advertise in the cluster
     options.AdvertisedIPAddress = IPAddress.Parse(&quot;172.16.0.42&quot;);
-    // The socket used for silo-to-silo will bing to this endpoint
+    // The socket used for silo-to-silo will bind to this endpoint
     options.GatewayListeningEndpoint = new IPEndPoint(IPAddress.Any, 40000);
-    // The socket used by the gateway will bing to this endpoint
+    // The socket used by the gateway will bind to this endpoint
     options.SiloListeningEndpoint = new IPEndPoint(IPAddress.Any, 50000);
 
 })

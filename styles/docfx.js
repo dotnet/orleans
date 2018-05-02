@@ -223,6 +223,9 @@ $(function () {
         $("body").bind("queryReady", function () {
           worker.postMessage({ q: query });
         });
+        if (query && (query.length >= 3)) {
+          worker.postMessage({ q: query });
+        }
       });
     }
 
@@ -534,36 +537,29 @@ $(function () {
   //Setup Affix
   function renderAffix() {
     var hierarchy = getHierarchy();
-    if (hierarchy.length > 0) {
+    if (hierarchy && hierarchy.length > 0) {
       var html = '<h5 class="title">In This Article</h5>'
       html += util.formList(hierarchy, ['nav', 'bs-docs-sidenav']);
       $("#affix").empty().append(html);
       if ($('footer').is(':visible')) {
         $(".sideaffix").css("bottom", "70px");
       }
-      $('#affix').on('activate.bs.scrollspy', function (e) {
-        if (e.target) {
-          if ($(e.target).find('li.active').length > 0) {
-            return;
-          }
-          var top = $(e.target).position().top;
-          $(e.target).parents('li').each(function (i, e) {
-            top += $(e).position().top;
-          });
-          var container = $('#affix > ul');
-          var height = container.height();
-          container.scrollTop(container.scrollTop() + top - height / 2);
+      $('#affix a').click((e) => {
+        var scrollspy = $('[data-spy="scroll"]').data()['bs.scrollspy'];
+        var target = e.target.hash;
+        if (scrollspy && target) {
+          scrollspy.activate(target);
         }
-      })
+      });
     }
 
     function getHierarchy() {
       // supported headers are h1, h2, h3, and h4
-      var $headers = $($.map(['h1', 'h2', 'h3', 'h4'], function(h) { return ".article article " + h; }).join(", "));
+      var $headers = $($.map(['h1', 'h2', 'h3', 'h4'], function (h) { return ".article article " + h; }).join(", "));
 
       // a stack of hierarchy items that are currently being built
       var stack = [];
-      $headers.each(function(i, e){
+      $headers.each(function (i, e) {
         if (!e.id) {
           return;
         }
@@ -603,21 +599,24 @@ $(function () {
       while (stack.length > 1) {
         buildParent();
       }
-      
+
       function buildParent() {
         var childrenToAttach = stack.pop();
         var parentFrame = stack[stack.length - 1];
         var parent = parentFrame.siblings[parentFrame.siblings.length - 1];
-        $.each(childrenToAttach.siblings, function(i, child) {
+        $.each(childrenToAttach.siblings, function (i, child) {
           parent.items.push(child);
         });
       }
+      if (stack.length > 0) {
 
-      var topLevel = stack.pop().siblings;
-      if (topLevel.length === 1) {  // if there's only one topmost header, dump it
-        return topLevel[0].items;
+        var topLevel = stack.pop().siblings;
+        if (topLevel.length === 1) {  // if there's only one topmost header, dump it
+          return topLevel[0].items;
+        }
+        return topLevel;
       }
-      return topLevel;
+      return undefined;
     }
 
     function htmlEncode(str) {
@@ -856,7 +855,8 @@ $(function () {
             state.selectedTabs.splice(index, 1);
           }
         }
-        firstVisibleTab.selected = true;
+        var tab = firstVisibleTab;
+        tab.selected = true;
         state.selectedTabs.push(tab.tabIds[0]);
       }
     }
@@ -915,7 +915,7 @@ $(function () {
     function selectTabs(tabIds) {
       for (var _i = 0, tabIds_1 = tabIds; _i < tabIds_1.length; _i++) {
         var tabId = tabIds_1[_i];
-        var a = document$1.querySelector(".tabGroup > ul > li > a[data-tab=\"" + tabId + "\"]:not([hidden])");
+        var a = document.querySelector(".tabGroup > ul > li > a[data-tab=\"" + tabId + "\"]:not([hidden])");
         if (a === null) {
           return;
         }
@@ -1080,7 +1080,7 @@ $(function () {
     function getFixedOffset() {
       return $('header').first().height();
     }
-  
+
     /**
      * If the provided href is an anchor which resolves to an element on the
      * page, scroll to it.
@@ -1090,26 +1090,26 @@ $(function () {
     function scrollIfAnchor(href, pushToHistory) {
       var match, rect, anchorOffset;
 
-      if(!ANCHOR_REGEX.test(href)) {
+      if (!ANCHOR_REGEX.test(href)) {
         return false;
       }
 
       match = document.getElementById(href.slice(1));
 
-      if(match) {
+      if (match) {
         rect = match.getBoundingClientRect();
         anchorOffset = window.pageYOffset + rect.top - getFixedOffset();
         window.scrollTo(window.pageXOffset, anchorOffset);
 
         // Add the state to history as-per normal anchor links
-        if(HISTORY_SUPPORT && pushToHistory) {
+        if (HISTORY_SUPPORT && pushToHistory) {
           history.pushState({}, document.title, location.pathname + href);
         }
       }
 
       return !!match;
     }
-  
+
     /**
      * Attempt to scroll to the current location's hash.
      */
@@ -1123,13 +1123,14 @@ $(function () {
     function delegateAnchors(e) {
       var elem = e.target;
 
-      if(scrollIfAnchor(elem.getAttribute('href'), true)) {
+      if (scrollIfAnchor(elem.getAttribute('href'), true)) {
         e.preventDefault();
       }
     }
 
     $(window).on('hashchange', scrollToCurrent);
-    $(document.body).click('a', delegateAnchors);
+    // Exclude tabbed content case
+    $('a:not([data-tab])').click(delegateAnchors);
     scrollToCurrent();
   }
 });

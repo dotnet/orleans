@@ -20,7 +20,7 @@
     <meta property="docfx:rel" content="../../">
     
   </head>
-  <body data-spy="scroll" data-target="#affix">
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
     <div id="wrapper">
       <header>
         <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
@@ -58,7 +58,9 @@
         
         <div id="search-results">
           <div class="search-list"></div>
-          <div class="sr-items"></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
           <ul id="pagination"></ul>
         </div>
       </div>
@@ -83,7 +85,7 @@ Rather than directly instantiating collaborators, or using static references, th
 <p>Orleans uses the DI abstraction created for <a href="https://docs.asp.net">ASP.NET Core</a>.
 For a detailed explanation about how it works, check out the <a href="https://docs.microsoft.com/en-us/aspnet/core/fundamentals/dependency-injection">official documentation</a>.</p>
 <h1 id="configuring-di">Configuring DI</h1>
-<p>DI for silos and client is confiugre through <code>SiloHostBuilder</code> and <code>ClientBuilder</code> respectively.
+<p>DI for silos and client is configured through <code>SiloHostBuilder</code> and <code>ClientBuilder</code> respectively.
 For example, to configure DI on the silo side with a <code>IInjectedService</code> singleton, whose declaration and implementation as below, </p>
 <pre><code class="lang-csharp">public interface IInjectedService
 {
@@ -102,8 +104,8 @@ public class InjectedService : IInjectedService
 //configure silo DI with a IInjectedService using a Action&lt;IServiceCollection&gt; delegate.
 siloBuilder.ConfigureServices(svc=&gt;svc.AddSingleton&lt;IInjectedService,InjectedService&gt;());
 </code></pre><p>On the client side, you do the same via <code>ClientBuilder</code>:</p>
-<pre><code class="lang-csharp">var clientBuilder = new SiloHostBuilder();
-//configure silo DI with a IInjectedService using a Action&lt;IServiceCollection&gt; delegate.
+<pre><code class="lang-csharp">var clientBuilder = new ClientBuilder();
+//configure client DI with a IInjectedService using a Action&lt;IServiceCollection&gt; delegate.
 clientBuilder.ConfigureServices(svc=&gt;svc.AddSingleton&lt;IInjectedService,InjectedService&gt;());
 </code></pre><p>This example shows how a <a href="../Getting-Started-With-Orleans/Grains.html"><code>Grain</code></a> can inject <code>IInjectedService</code> via constructor injection:</p>
 <pre><code class="lang-csharp">public interface ISimpleDIGrain : IGrainWithIntegerKey

@@ -354,6 +354,28 @@ article section {
   text-align: center;
 }
 
+#search-results p .index-loading {
+  animation: index-loading 1.5s infinite linear;
+  -webkit-animation: index-loading 1.5s infinite linear;
+  -o-animation: index-loading 1.5s infinite linear;
+  font-size: 2.5rem;
+}
+
+@keyframes index-loading {
+    from { transform: scale(1) rotate(0deg);}
+    to { transform: scale(1) rotate(360deg);}
+}
+
+@-webkit-keyframes index-loading {
+    from { -webkit-transform: rotate(0deg);}
+    to { -webkit-transform: rotate(360deg);}
+}
+
+@-o-keyframes index-loading {
+    from { -o-transform: rotate(0deg);}
+    to { -o-transform: rotate(360deg);}
+}
+
 #search-results .sr-items {
   font-size: 24px;
 }
