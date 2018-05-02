@@ -1,9 +1,12 @@
 using System;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Runtime.Configuration;
 
 
 namespace Orleans.Runtime
 {
-    internal static class ApplicationRequestsStatisticsGroup
+    internal class ApplicationRequestsStatisticsGroup
     {
         private static HistogramValueStatistic appRequestsLatencyHistogram;
         private const int NUM_APP_REQUESTS_EXP_LATENCY_HISTOGRAM_CATEGORIES = 31;
@@ -14,9 +17,11 @@ namespace Orleans.Runtime
         private static CounterStatistic appRequestsTotalLatency;
         private static FloatValueStatistic appRequestsAverageLatency;
         
-        internal static void Init()
+        public ApplicationRequestsStatisticsGroup(IOptions<StatisticsOptions> statisticsOptions)
         {
-            if (!StatisticsCollector.CollectApplicationRequestsStats) return;
+            this.CollectApplicationRequestsStats = statisticsOptions.Value.CollectionLevel.CollectApplicationRequestsStats();
+
+            if (!this.CollectApplicationRequestsStats) return;
 
             const CounterStorage storage = CounterStorage.LogAndTable;
             appRequestsLatencyHistogram = ExponentialHistogramValueStatistic.Create_ExponentialHistogram_ForTiming(
@@ -27,26 +32,32 @@ namespace Orleans.Runtime
             appRequestsTotalLatency = CounterStatistic.FindOrCreate(StatisticNames.APP_REQUESTS_LATENCY_TOTAL, false, storage, true);
 
             appRequestsAverageLatency = FloatValueStatistic.FindOrCreate(
-                    StatisticNames.APP_REQUESTS_LATENCY_AVERAGE,
-                       () =>
-                       {
-                           long totalLatencyInTicks = appRequestsTotalLatency.GetCurrentValue();
-                           if (totalLatencyInTicks == 0) return 0;
-                           long numReqs = totalAppRequests.GetCurrentValue();
-                           long averageLatencyInTicks = (long)((double)totalLatencyInTicks / (double)numReqs);
-                           return (float)Utils.TicksToMilliSeconds(averageLatencyInTicks);
-                       }, storage);
+                StatisticNames.APP_REQUESTS_LATENCY_AVERAGE,
+                () =>
+                {
+                    long totalLatencyInTicks = appRequestsTotalLatency.GetCurrentValue();
+                    if (totalLatencyInTicks == 0) return 0;
+                    long numReqs = totalAppRequests.GetCurrentValue();
+                    long averageLatencyInTicks = (long)((double)totalLatencyInTicks / (double)numReqs);
+                    return (float)Utils.TicksToMilliSeconds(averageLatencyInTicks);
+                }, storage);
         }
 
-        internal static void OnAppRequestsEnd(TimeSpan timeSpan)
+        public bool CollectApplicationRequestsStats { get; }
+
+        internal void OnAppRequestsEnd(TimeSpan timeSpan)
         {
+            if (!this.CollectApplicationRequestsStats) return;
+
             appRequestsLatencyHistogram?.AddData(timeSpan);
             appRequestsTotalLatency?.IncrementBy(timeSpan.Ticks);
             totalAppRequests?.Increment();
         }
 
-        internal static void OnAppRequestsTimedOut()
+        internal void OnAppRequestsTimedOut()
         {
+            if (!this.CollectApplicationRequestsStats) return;
+
             timedOutRequests?.Increment();
         }
     }

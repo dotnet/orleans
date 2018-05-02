@@ -30,12 +30,6 @@ namespace Orleans.Threading
         public CancellationTokenSource CancellationTokenSource { get; }
 
         public ILoggerFactory LoggerFactory { get; }
-
-        public static readonly bool TRACK_DETAILED_STATS = false;
-
-        public static bool CollectDetailedThreadStatistics = TRACK_DETAILED_STATS && StatisticsCollector.CollectThreadTimeTrackingStats;
-
-        public static bool CollectDetailedQueueStatistics = TRACK_DETAILED_STATS && StatisticsCollector.CollectQueueStats;
     }
 
 

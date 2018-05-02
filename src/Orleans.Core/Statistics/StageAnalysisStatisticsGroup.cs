@@ -2,6 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
 {
@@ -55,22 +58,25 @@ namespace Orleans.Runtime
     /// <summary>
     /// Stage analysis, one instance should exist in each Silo
     /// </summary>
-    internal class StageAnalysis
+    internal class StageAnalysisStatisticsGroup
     {
         private readonly double stableReadyTimeProportion;
         private readonly Dictionary<string, List<ThreadTrackingStatistic>> stageGroups;
 
-        public StageAnalysis()
+        public StageAnalysisStatisticsGroup(IOptions<StatisticsOptions> statisticsOptions)
         {
             // Load test experiments suggested these parameter values
             stableReadyTimeProportion = 0.3;
             stageGroups = new Dictionary<string, List<ThreadTrackingStatistic>>();
 
-            if (StatisticsCollector.CollectThreadTimeTrackingStats && StatisticsCollector.PerformStageAnalysis)
+            this.PerformStageAnalysis = statisticsOptions.Value.CollectionLevel.PerformStageAnalysis();
+            if (this.PerformStageAnalysis)
             {
                 StringValueStatistic.FindOrCreate(StatisticNames.STAGE_ANALYSIS, StageAnalysisInfo);
             }
         }
+
+        public bool PerformStageAnalysis { get; }
 
         public void AddTracking(ThreadTrackingStatistic tts)
         {

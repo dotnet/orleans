@@ -51,6 +51,7 @@ namespace Orleans.Runtime
         private readonly Lazy<ITransactionAgent> transactionAgent;
         private IGrainReferenceRuntime grainReferenceRuntime;
         private readonly IGrainCancellationTokenRuntime cancellationTokenRuntime;
+        private readonly ApplicationRequestsStatisticsGroup appRequestStatistics;
         private readonly SchedulingOptions schedulingOptions;
 
         public InsideRuntimeClient(
@@ -64,7 +65,8 @@ namespace Orleans.Runtime
             ILoggerFactory loggerFactory,
             IOptions<SiloMessagingOptions> messagingOptions,
             IGrainCancellationTokenRuntime cancellationTokenRuntime,
-            IOptions<SchedulingOptions> schedulerOptions)
+            IOptions<SchedulingOptions> schedulerOptions,
+            ApplicationRequestsStatisticsGroup appRequestStatistics)
         {
             this.ServiceProvider = serviceProvider;
             this.MySilo = siloDetails.SiloAddress;
@@ -85,6 +87,7 @@ namespace Orleans.Runtime
             this.callbackDataLogger = loggerFactory.CreateLogger<CallbackData>();
             this.timerLogger = loggerFactory.CreateLogger<SafeTimer>();
             this.cancellationTokenRuntime = cancellationTokenRuntime;
+            this.appRequestStatistics = appRequestStatistics;
             this.schedulingOptions = schedulerOptions.Value;
         }
         
@@ -212,7 +215,8 @@ namespace Orleans.Runtime
                     unregisterCallback,
                     messagingOptions,
                     this.callbackDataLogger,
-                    this.timerLogger);
+                    this.timerLogger,
+                    this.appRequestStatistics);
                 callbacks.TryAdd(message.Id, callbackData);
                 callbackData.StartTimer(ResponseTimeout);
             }

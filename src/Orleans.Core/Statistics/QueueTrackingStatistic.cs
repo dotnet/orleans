@@ -1,4 +1,7 @@
 using System;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Runtime.Configuration;
 
 
 namespace Orleans.Runtime
@@ -15,9 +18,9 @@ namespace Orleans.Runtime
 
         private static readonly bool TrackExtraStats = false;
 
-        public QueueTrackingStatistic(string queueName)
+        public QueueTrackingStatistic(string queueName, IOptions<StatisticsOptions> statisticsOptions)
         {
-            if (StatisticsCollector.CollectQueueStats)
+            if (statisticsOptions.Value.CollectionLevel.CollectQueueStats())
             {
                 const CounterStorage storage = CounterStorage.LogAndTable;
                 averageQueueSizeCounter = AverageValueStatistic.FindOrCreate(
@@ -53,7 +56,7 @@ namespace Orleans.Runtime
                         new StatisticName(StatisticNames.QUEUES_TIME_IN_QUEUE_TOTAL_MILLIS_PER_QUEUE, "AllQueues"), false, storage);
                     totalTimeInAllQueues.AddValueConverter(Utils.TicksToMilliSeconds);
                 }
-            } 
+            }
         }
 
         public void OnEnQueueRequest(int numEnqueuedRequests, int queueLength)

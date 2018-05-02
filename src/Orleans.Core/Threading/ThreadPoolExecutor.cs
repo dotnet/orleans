@@ -3,8 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 // todo: dependency on runtime (due to logging)
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Threading
 {
@@ -16,6 +19,9 @@ namespace Orleans.Threading
         private readonly ThreadPoolWorkQueue workQueue;
 
         private readonly ThreadPoolExecutorOptions options;
+        private readonly SchedulerStatisticsGroup schedulerStatistics;
+        private readonly StageAnalysisStatisticsGroup schedulerStageStatistics;
+        private readonly IOptions<StatisticsOptions> statisticsOptions;
 
         private readonly ThreadPoolTrackingStatistic statistic;
 
@@ -23,13 +29,20 @@ namespace Orleans.Threading
 
         private readonly ILogger log;
 
-        public ThreadPoolExecutor(ThreadPoolExecutorOptions options)
+        public ThreadPoolExecutor(
+            ThreadPoolExecutorOptions options,
+            SchedulerStatisticsGroup schedulerStatistics,
+            StageAnalysisStatisticsGroup schedulerStageStatistics,
+            IOptions<StatisticsOptions> statisticsOptions)
         {
             this.options = options ?? throw new ArgumentNullException(nameof(options));
+            this.schedulerStatistics = schedulerStatistics;
+            this.schedulerStageStatistics = schedulerStageStatistics;
+            this.statisticsOptions = statisticsOptions;
 
             workQueue = new ThreadPoolWorkQueue();
 
-            statistic = new ThreadPoolTrackingStatistic(options.Name, options.LoggerFactory);
+            statistic = new ThreadPoolTrackingStatistic(options.Name, options.LoggerFactory, statisticsOptions, schedulerStageStatistics);
 
             executingWorkTracker = new ExecutingWorkItemsTracker(this);
 
@@ -109,7 +122,7 @@ namespace Orleans.Threading
         {
             var actionFilters = new ActionFilter<ExecutionContext>[]
             {
-                new StatisticsTracker(statistic, options.DelayWarningThreshold, log),
+                new StatisticsTracker(statistic, options.DelayWarningThreshold, log, this.schedulerStatistics),
                 executingWorkTracker
             }.Union(options.ExecutionFilters);
 
@@ -124,7 +137,9 @@ namespace Orleans.Threading
             new ThreadPoolThread(
                     options.Name + index,
                     options.CancellationTokenSource.Token,
-                    options.LoggerFactory)
+                    options.LoggerFactory,
+                    this.statisticsOptions,
+                    this.schedulerStageStatistics)
                 .QueueWorkItem(_ => ProcessWorkItems(context));
         }
 
@@ -158,12 +173,14 @@ namespace Orleans.Threading
             private readonly TimeSpan delayWarningThreshold;
 
             private readonly ILogger log;
+            private readonly SchedulerStatisticsGroup schedulerStatistics;
 
-            public StatisticsTracker(ThreadPoolTrackingStatistic statistic, TimeSpan delayWarningThreshold, ILogger log)
+            public StatisticsTracker(ThreadPoolTrackingStatistic statistic, TimeSpan delayWarningThreshold, ILogger log, SchedulerStatisticsGroup schedulerStatistics)
             {
                 this.statistic = statistic;
                 this.delayWarningThreshold = delayWarningThreshold;
                 this.log = log;
+                this.schedulerStatistics = schedulerStatistics;
             }
 
             public override void OnActionExecuting(ExecutionContext context)
@@ -183,7 +200,7 @@ namespace Orleans.Threading
                 var waitTime = workItem.TimeSinceQueued;
                 if (waitTime > delayWarningThreshold && !System.Diagnostics.Debugger.IsAttached && workItem.State != null)
                 {
-                    SchedulerStatisticsGroup.NumLongQueueWaitTimes.Increment();
+                    this.schedulerStatistics.NumLongQueueWaitTimes.Increment();
                     log.Warn(ErrorCode.SchedulerWorkerPoolThreadQueueWaitTime, SR.Queue_Item_WaitTime, waitTime, workItem.State);
                 }
 
@@ -384,23 +401,25 @@ namespace Orleans.Threading
         private readonly ThreadTrackingStatistic threadTracking;
 
         private readonly QueueTrackingStatistic queueTracking;
+        private readonly StatisticsLevel statisticsLevel;
 
-        public ThreadPoolTrackingStatistic(string name, ILoggerFactory loggerFactory)
+        public ThreadPoolTrackingStatistic(string name, ILoggerFactory loggerFactory, IOptions<StatisticsOptions> statisticsOptions, StageAnalysisStatisticsGroup schedulerStageStatistics)
         {
-            if (StatisticsCollector.CollectQueueStats)
+            this.statisticsLevel = statisticsOptions.Value.CollectionLevel;
+            if (statisticsLevel.CollectQueueStats())
             {
-                queueTracking = new QueueTrackingStatistic(name);
+                queueTracking = new QueueTrackingStatistic(name, statisticsOptions);
             }
 
-            if (ExecutorOptions.CollectDetailedThreadStatistics)
+            if (this.statisticsLevel.CollectDetailedThreadStatistics())
             {
-                threadTracking = new ThreadTrackingStatistic(name, loggerFactory);
+                threadTracking = new ThreadTrackingStatistic(name, loggerFactory, statisticsOptions, schedulerStageStatistics);
             }
         }
 
         public void OnStartExecution()
         {
-            if (ExecutorOptions.CollectDetailedThreadStatistics)
+            if (this.statisticsLevel.CollectDetailedThreadStatistics())
             {
                 queueTracking.OnStartExecution();
             }
@@ -408,7 +427,7 @@ namespace Orleans.Threading
 
         public void OnDeQueueRequest(WorkItem workItem)
         {
-            if (ExecutorOptions.CollectDetailedQueueStatistics)
+            if (this.statisticsLevel.CollectDetailedQueueStatistics())
             {
                 queueTracking.OnDeQueueRequest(workItem.ExecutionTime);
             }
@@ -416,7 +435,7 @@ namespace Orleans.Threading
 
         public void OnEnQueueRequest(WorkItem workItem)
         {
-            if (ExecutorOptions.CollectDetailedQueueStatistics)
+            if (this.statisticsLevel.CollectDetailedQueueStatistics())
             {
                 queueTracking.OnEnQueueRequest(1, queueLength: 0, itemInQueue: workItem.ExecutionTime);
             }
@@ -424,7 +443,7 @@ namespace Orleans.Threading
 
         public void OnStartProcessing()
         {
-            if (ExecutorOptions.CollectDetailedThreadStatistics)
+            if (this.statisticsLevel.CollectDetailedThreadStatistics())
             {
                 threadTracking.OnStartProcessing();
             }
@@ -432,7 +451,7 @@ namespace Orleans.Threading
 
         internal void OnStopProcessing()
         {
-            if (ExecutorOptions.CollectDetailedThreadStatistics)
+            if (this.statisticsLevel.CollectDetailedThreadStatistics())
             {
                 threadTracking.OnStopProcessing();
             }
@@ -440,7 +459,7 @@ namespace Orleans.Threading
 
         internal void IncrementNumberOfProcessed()
         {
-            if (ExecutorOptions.CollectDetailedThreadStatistics)
+            if (this.statisticsLevel.CollectDetailedThreadStatistics())
             {
                 threadTracking.IncrementNumberOfProcessed();
             }
@@ -448,7 +467,7 @@ namespace Orleans.Threading
 
         public void OnStopExecution()
         {
-            if (ExecutorOptions.CollectDetailedThreadStatistics)
+            if (this.statisticsLevel.CollectDetailedThreadStatistics())
             {
                 threadTracking.OnStopExecution();
             }

@@ -5,6 +5,8 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 
 namespace Orleans.Runtime.Scheduler
@@ -36,6 +38,7 @@ namespace Orleans.Runtime.Scheduler
         private readonly long quantumExpirations;
         private readonly int workItemGroupStatisticsNumber;
         private readonly CancellationToken cancellationToken;
+        private readonly SchedulerStatisticsGroup schedulerStatistics;
 
         internal ActivationTaskScheduler TaskRunner { get; private set; }
 
@@ -147,11 +150,14 @@ namespace Orleans.Runtime.Scheduler
             OrleansTaskScheduler sched,
             ISchedulingContext schedulingContext,
             ILoggerFactory loggerFactory,
-            CancellationToken ct)
+            CancellationToken ct,
+            SchedulerStatisticsGroup schedulerStatistics,
+            IOptions<StatisticsOptions> statisticsOptions)
         {
             masterScheduler = sched;
             SchedulingContext = schedulingContext;
             cancellationToken = ct;
+            this.schedulerStatistics = schedulerStatistics;
             state = WorkGroupStatus.Waiting;
             workItems = new Queue<Task>();
             lockable = new Object();
@@ -162,15 +168,15 @@ namespace Orleans.Runtime.Scheduler
             TaskRunner = new ActivationTaskScheduler(this, loggerFactory);
             log = IsSystemPriority ? loggerFactory.CreateLogger($"{this.GetType().Namespace} {Name}.{this.GetType().Name}") : loggerFactory.CreateLogger<WorkItemGroup>();
 
-            if (StatisticsCollector.CollectShedulerQueuesStats)
+            if (schedulerStatistics.CollectShedulerQueuesStats)
             {
-                queueTracking = new QueueTrackingStatistic("Scheduler." + SchedulingContext.Name);
+                queueTracking = new QueueTrackingStatistic("Scheduler." + SchedulingContext.Name, statisticsOptions);
                 queueTracking.OnStartExecution();
             }
 
-            if (StatisticsCollector.CollectPerWorkItemStats)
+            if (schedulerStatistics.CollectPerWorkItemStats)
             {
-                workItemGroupStatisticsNumber = SchedulerStatisticsGroup.RegisterWorkItemGroup(SchedulingContext.Name, SchedulingContext,
+                workItemGroupStatisticsNumber = schedulerStatistics.RegisterWorkItemGroup(SchedulingContext.Name, SchedulingContext,
                     () =>
                     {
                         var sb = new StringBuilder();
@@ -260,13 +266,13 @@ namespace Orleans.Runtime.Scheduler
 
                 state = WorkGroupStatus.Shutdown;
 
-                if (StatisticsCollector.CollectPerWorkItemStats)
-                    SchedulerStatisticsGroup.UnRegisterWorkItemGroup(workItemGroupStatisticsNumber);
+                if (this.schedulerStatistics.CollectPerWorkItemStats)
+                    this.schedulerStatistics.UnRegisterWorkItemGroup(workItemGroupStatisticsNumber);
 
-                if (StatisticsCollector.CollectGlobalShedulerStats)
-                    SchedulerStatisticsGroup.OnWorkItemDrop(WorkItemCount);
+                if (this.schedulerStatistics.CollectGlobalShedulerStats)
+                    this.schedulerStatistics.OnWorkItemDrop(WorkItemCount);
 
-                if (StatisticsCollector.CollectShedulerQueuesStats)
+                if (this.schedulerStatistics.CollectShedulerQueuesStats)
                     queueTracking.OnStopExecution();
 
                 foreach (Task task in workItems)
@@ -375,7 +381,7 @@ namespace Orleans.Runtime.Scheduler
                         var taskLength = stopwatch.Elapsed - taskStart;
                         if (taskLength > OrleansTaskScheduler.TurnWarningLengthThreshold)
                         {
-                            SchedulerStatisticsGroup.NumLongRunningTurns.Increment();
+                            this.schedulerStatistics.NumLongRunningTurns.Increment();
                             log.Warn(ErrorCode.SchedulerTurnTooLong3, "Task {0} in WorkGroup {1} took elapsed time {2:g} for execution, which is longer than {3}. Running on thread {4}",
                                 OrleansTaskExtentions.ToString(task), SchedulingContext.ToString(), taskLength, OrleansTaskScheduler.TurnWarningLengthThreshold, thread.ToString());
                         }
