@@ -14,7 +14,7 @@ namespace Orleans.Transactions.AzureStorage
     {
         private readonly CloudTable table;
         private readonly string partition;
-        JsonSerializerSettings JsonSettings;
+        private readonly JsonSerializerSettings jsonSettings;
         private readonly ILogger logger;
 
         private KeyEntity key;
@@ -24,7 +24,7 @@ namespace Orleans.Transactions.AzureStorage
         {
             this.table = table;
             this.partition = partition;
-            this.JsonSettings = JsonSettings;
+            this.jsonSettings = JsonSettings;
             this.logger = logger;
         }
 
@@ -40,8 +40,13 @@ namespace Orleans.Transactions.AzureStorage
                 {
                     return new TransactionalStorageLoadResponse<TState>();
                 }
-                TState commitedState = TryFindState(this.key.CommittedTransactionId, out TState found) ? found : new TState();
-                var pendingStates = states.Select(s => new PendingTransactionState<TState>(s.TransactionId, s.SequenceId, s.GetState<TState>(this.JsonSettings))).ToList();
+                TState commitedState = (!string.IsNullOrEmpty(this.key.CommittedTransactionId)) ? FindState(this.key.CommittedTransactionId) : new TState();
+                if (commitedState == null)
+                {
+                    this.logger.LogCritical("Transactional state non-recoverable error.  Commited state for transaction {TransactionId} not found.", this.key.CommittedTransactionId);
+                    throw new InvalidOperationException($"Transactional state non-recoverable error.  Commited state for transaction {this.key.CommittedTransactionId} not found.");
+                }
+                var pendingStates = states.Select(s => new PendingTransactionState<TState>(s.TransactionId, s.SequenceId, s.GetState<TState>(this.jsonSettings))).ToList();
                 return new TransactionalStorageLoadResponse<TState>(this.key.ETag, commitedState, this.key.Metadata, pendingStates);
             } catch(Exception ex)
             {
@@ -68,7 +73,7 @@ namespace Orleans.Transactions.AzureStorage
                 List<StateEntity> newStates = new List<StateEntity>();
                 foreach (PendingTransactionState<TState> pendingState in statesToPrepare.Where(p => !stored.Contains(Tuple.Create(p.TransactionId, p.SequenceId))))
                 {
-                    var newState = StateEntity.Create(this.JsonSettings, this.partition, pendingState);
+                    var newState = StateEntity.Create(this.jsonSettings, this.partition, pendingState);
                     newStates.Add(newState);
                     batchOperation.Insert(newState);
                 }
@@ -98,7 +103,8 @@ namespace Orleans.Transactions.AzureStorage
                 if (string.Compare(transactionIdToCommit, this.key.CommittedTransactionId) <= 0)
                     return this.key.ETag;
 
-                if (!TryFindState(transactionIdToCommit, out TState state))
+                TState state = FindState(transactionIdToCommit);
+                if (state == null)
                 {
                     this.logger.LogCritical("Transactional state non-recoverable error.  Attempting to confirm a transaction {TransactionId} for which no state exists.", transactionIdToCommit);
                     throw new InvalidOperationException($"Transactional state non-recoverable error.  Attempting to confirm a transaction {transactionIdToCommit} for which no state exists.");
@@ -130,11 +136,12 @@ namespace Orleans.Transactions.AzureStorage
                 : queryResult.Results[0];
         }
 
-        private Task WriteKey()
+        private async Task WriteKey()
         {
-            return (string.IsNullOrEmpty(this.key.ETag))
+            Task write = (string.IsNullOrEmpty(this.key.ETag))
                 ? this.table.ExecuteAsync(TableOperation.Insert(this.key))
                 : this.table.ExecuteAsync(TableOperation.Replace(this.key));
+            await write.ConfigureAwait(false);
         }
 
         private async Task<List<StateEntity>> ReadStates()
@@ -152,32 +159,58 @@ namespace Orleans.Transactions.AzureStorage
             return results;
         }
 
-        private bool TryFindState(string transactionId, out TState state)
+        private TState FindState(string transactionId)
         {
-            state = null;
-            if (string.IsNullOrEmpty(transactionId))
-                return false;
-
             StateEntity entity = this.states.FirstOrDefault(s => s.TransactionId == transactionId);
-            if (entity == null)
-            {
-                throw new InvalidOperationException($"Transactional state non-recoverable error.  Commited state for transaction {transactionId} not found.");
-            }
-            state = entity.GetState<TState>(this.JsonSettings);
-            return true;
+            return entity?.GetState<TState>(this.jsonSettings);
         }
 
         private async Task Cleanup(List<StateEntity> deadStates)
         {
-            try
+            var batchOperation = new TableBatchOperation();
+            var pendingTasks = new List<Task>();
+            const int MaxInFlight = 3;
+            foreach (StateEntity deadState in deadStates)
             {
-                var batchOperation = new TableBatchOperation();
-                deadStates.ForEach(batchOperation.Delete);
-                await table.ExecuteBatchAsync(batchOperation).ConfigureAwait(false);
+                batchOperation.Delete(deadState);
+                // if batch is full, execute and make new batch
+                if (batchOperation.Count == AzureTableConstants.MaxBatchSize)
+                {
+                    pendingTasks.Add(table.ExecuteBatchAsync(batchOperation));
+                    // if we've more than MaxInFlight storage calls in flight, wait for those to execute before continuing and clear pending tasks
+                    if (pendingTasks.Count == MaxInFlight)
+                    {
+                        try
+                        {
+                            await Task.WhenAll(pendingTasks).ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            this.logger.LogInformation("Error cleaning up transactional states {Exception}.  Ignoring", ex);
+                        }
+                        pendingTasks.Clear();
+                    }
+                    batchOperation = new TableBatchOperation();
+                }
             }
-            catch (Exception ex)
+
+            if (batchOperation.Count != 0)
             {
-                this.logger.LogInformation("Error cleaning up transactional states {Exception}.  Ignoring", ex);
+                pendingTasks.Add(table.ExecuteBatchAsync(batchOperation));
+                batchOperation = new TableBatchOperation();
+            }
+
+            if (pendingTasks.Count != 0)
+            {
+                try
+                {
+                    await Task.WhenAll(pendingTasks).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    this.logger.LogInformation("Error cleaning up transactional states {Exception}.  Ignoring", ex);
+                }
+                pendingTasks.Clear();
             }
         }
     }

@@ -45,7 +45,7 @@ namespace Orleans.Transactions.Abstractions
     public class TransactionalStorageLoadResponse<TState>
         where TState : class, new()
     {
-        public TransactionalStorageLoadResponse() : this(null, new TState(), null, new List<PendingTransactionState<TState>>()){}
+        public TransactionalStorageLoadResponse() : this(null, new TState(), null, Array.Empty<PendingTransactionState<TState>>()){}
 
         public TransactionalStorageLoadResponse(string etag, TState committedState, string metadata, IReadOnlyList<PendingTransactionState<TState>> pendingStates)
         {

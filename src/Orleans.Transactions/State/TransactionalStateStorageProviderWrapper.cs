@@ -7,6 +7,7 @@ using Orleans.Transactions.Abstractions;
 using Orleans.Core;
 using Orleans.Runtime;
 using Orleans.Storage;
+using Orleans.Utilities;
 
 namespace Orleans.Transactions
 {
@@ -66,7 +67,8 @@ namespace Orleans.Transactions
 
         private IStorage<TransactionalStateRecord<TState>> GetStateStorage()
         {
-            string fullStateName = $"{this.context.GrainInstance.GetType().FullName}-{this.stateName}";
+            string formattedTypeName = RuntimeTypeNameFormatter.Format(this.context.GrainInstance.GetType());
+            string fullStateName = $"{formattedTypeName}-{this.stateName}";
             return new StateStorageBridge<TransactionalStateRecord<TState>>(fullStateName, this.context.GrainInstance.GrainReference, grainStorage, this.loggerFactory);
         }
     }

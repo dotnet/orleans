@@ -18,22 +18,29 @@ namespace Orleans.Transactions.AzureStorage.TransactionalState
         private readonly string name;
         private readonly AzureTableTransactionalStateOptions options;
         private readonly ClusterOptions clusterOptions;
+        private readonly JsonSerializerSettings jsonSettings;
         private readonly ILoggerFactory loggerFactory;
         private CloudTable table;
 
-        public AzureTableTransactionalStateStorageFactory(string name, AzureTableTransactionalStateOptions options, IOptions<ClusterOptions> clusterOptions, ILoggerFactory loggerFactory)
+        public static ITransactionalStateStorageFactory Create(IServiceProvider services, string name)
+        {
+            IOptionsSnapshot<AzureTableTransactionalStateOptions> optionsSnapshot = services.GetRequiredService<IOptionsSnapshot<AzureTableTransactionalStateOptions>>();
+            return ActivatorUtilities.CreateInstance<AzureTableTransactionalStateStorageFactory>(services, name, optionsSnapshot.Get(name));
+        }
+
+        public AzureTableTransactionalStateStorageFactory(string name, AzureTableTransactionalStateOptions options, IOptions<ClusterOptions> clusterOptions, ITypeResolver typeResolver, IGrainFactory grainFactory, ILoggerFactory loggerFactory)
         {
             this.name = name;
             this.options = options;
             this.clusterOptions = clusterOptions.Value;
+            this.jsonSettings = OrleansJsonSerializer.GetDefaultSerializerSettings(typeResolver, grainFactory);
             this.loggerFactory = loggerFactory;
         }
 
         public ITransactionalStateStorage<TState> Create<TState>(string stateName, IGrainActivationContext context) where TState : class, new()
         {
             string partitionKey = MakePartitionKey(context, stateName);
-            var settingsResolver = ActivatorUtilities.CreateInstance< JsonSerializerSettingsResolver>(context.ActivationServices);
-            return ActivatorUtilities.CreateInstance<AzureTableTransactionalStateStorage<TState>>(context.ActivationServices, this.table, partitionKey, settingsResolver.Settings);
+            return ActivatorUtilities.CreateInstance<AzureTableTransactionalStateStorage<TState>>(context.ActivationServices, this.table, partitionKey, this.jsonSettings);
         }
 
         public void Participate(ISiloLifecycle lifecycle)
@@ -58,21 +65,6 @@ namespace Orleans.Transactions.AzureStorage.TransactionalState
         private Task Init(CancellationToken cancellationToken)
         {
             return CreateTable();
-        }
-
-        private class JsonSerializerSettingsResolver
-        {
-            public JsonSerializerSettings Settings { get; }
-            public JsonSerializerSettingsResolver(ITypeResolver typeResolver, IGrainFactory grainFactory)
-            {
-                this.Settings = OrleansJsonSerializer.GetDefaultSerializerSettings(typeResolver, grainFactory);
-            }
-        }
-
-        public static ITransactionalStateStorageFactory Create(IServiceProvider services, string name)
-        {
-            IOptionsSnapshot<AzureTableTransactionalStateOptions> optionsSnapshot = services.GetRequiredService<IOptionsSnapshot<AzureTableTransactionalStateOptions>>();
-            return ActivatorUtilities.CreateInstance<AzureTableTransactionalStateStorageFactory>(services, name, optionsSnapshot.Get(name));
         }
     }
 }

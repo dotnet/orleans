@@ -84,7 +84,7 @@ namespace Orleans.Transactions
 
         public override string ToString()
         {
-            return $"{TransactionId:x16}#{WriteNumber:x16}";
+            return $"{TransactionId:x16}#{WriteNumber:x8}";
         }
 
         public static bool TryParse(string source, out TransactionalResourceVersion version)

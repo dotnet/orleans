@@ -42,8 +42,8 @@ namespace Orleans.Transactions.AzureStorage
         /// </summary>
         public const string ANY_ETAG = "*";
 
-        public const string PKProperty = "PartitionKey";
-        public const string RKProperty = "RowKey";
+        public const string PKProperty = nameof(TableEntity.PartitionKey);
+        public const string RKProperty = nameof(TableEntity.RowKey);
 
         public const int MaxBatchSize = 100;
     }
