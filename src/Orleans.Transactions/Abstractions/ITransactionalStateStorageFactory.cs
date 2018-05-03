@@ -1,8 +1,10 @@
 ﻿
+using Orleans.Runtime;
+
 namespace Orleans.Transactions.Abstractions
 {
     public interface ITransactionalStateStorageFactory
     {
-        ITransactionalStateStorage<TState> Create<TState>() where TState : class, new();
+        ITransactionalStateStorage<TState> Create<TState>(string stateName, IGrainActivationContext context) where TState : class, new();
     }
 }

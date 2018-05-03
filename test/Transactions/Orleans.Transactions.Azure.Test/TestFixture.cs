@@ -7,6 +7,7 @@ using Orleans.TestingHost.Utils;
 using TestExtensions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {
@@ -29,17 +30,19 @@ namespace Orleans.Transactions.AzureStorage.Tests
             {
                 var id = (uint) Guid.NewGuid().GetHashCode() % 100000;
                 hostBuilder
+                    .ConfigureLogging(builder => builder.AddFilter("Orleans.Transactions.TransactionalState", LogLevel.Debug))
                     .UseInClusterTransactionManager()
-                    .AddAzureTableGrainStorage(TransactionTestConstants.TransactionStore, builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
+                    .UseAzureTransactionLog(options =>
                     {
-                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                    }))
-                    .UseAzureTransactionLog(options => {
                         // TODO: Find better way for test isolation.  Possibly different partition keys.
                         options.TableName = $"TransactionLog{id:X}";
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     })
-                    .UseTransactionalState();
+                    .UseTransactionalState()
+                    .AddAzureTableTransactionalStateStorage(TransactionTestConstants.TransactionStore, options =>
+                    {
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    });
             }
         }
 
