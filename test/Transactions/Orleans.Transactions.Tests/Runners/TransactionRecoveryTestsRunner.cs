@@ -25,14 +25,15 @@ namespace Orleans.Transactions.Tests
         private readonly TestCluster testCluster;
         private readonly ILogger logger;
         private static TimeSpan RecoveryTimeout = TimeSpan.FromSeconds(60);
-        public TransactionRecoveryTestsRunner(TestCluster testCluster, ITestOutputHelper output)
-            : base(testCluster.GrainFactory, output)
+        public TransactionRecoveryTestsRunner(TestCluster testCluster, ITestOutputHelper output, bool distributedTM = false)
+            : base(testCluster.GrainFactory, output, distributedTM)
         {
             this.testCluster = testCluster;
             this.logger = this.testCluster.ServiceProvider.GetService<ILogger<TransactionRecoveryTestsRunner>>();
             this.seed = new Random();
         }
 
+        // this is only needed for singleTM tests
         public class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
             public void Configure(ISiloHostBuilder hostBuilder)
@@ -41,22 +42,36 @@ namespace Orleans.Transactions.Tests
             }
         }
 
-        public virtual async Task TransactionWillRecoverAfterRandomSiloFailure(string transactionTestGrainClassName, bool killSiloWhichRunsTm)
+        //For distributedTM
+        public virtual async Task TransactionWillRecoverAfterRandomSiloFailure(TransactionTestConstants.TransactionGrainStates transactionTestGrainClassName)
         {
             const int grainCount = 100;
-            const int opsPerGrain = 2;
             var txGrains = Enumerable.Range(0, grainCount)
                 .Select(i => RandomTestGrain(transactionTestGrainClassName))
                 .ToList();
-            var tpsBeforeInterruption = await RecordTPS(txGrains, opsPerGrain);
-            this.logger.LogInformation($"TPS before interruption is {tpsBeforeInterruption}");
+            var txSucceedBeforeInterruption = await AllTxSucceed(txGrains);
+            this.logger.LogInformation($"Tx succeed before interruption : {txSucceedBeforeInterruption}");
+            //randomly ungraceful shut down one silo
+            this.testCluster.KillSilo(this.testCluster.Silos[this.seed.Next(this.testCluster.Silos.Count)]);
+            await TestingUtils.WaitUntilAsync(lastTry => CheckTxResult(txGrains, lastTry), RecoveryTimeout);
+        }
+
+        //For singleTM , only in singleTM we have the need of test two scenarios, whic is kill silo which runs the TM and ramdom silo which doesn't 
+        public virtual async Task TransactionWillRecoverAfterRandomSiloFailure(string transactionTestGrainClassName, bool killSiloWhichRunsTm)
+        {
+            const int grainCount = 100;
+            var txGrains = Enumerable.Range(0, grainCount)
+                .Select(i => RandomTestGrain(transactionTestGrainClassName))
+                .ToList();
+            var txSucceedBeforeInterruption = await AllTxSucceed(txGrains);
+            this.logger.LogInformation($"Tx succeed before interruption : {txSucceedBeforeInterruption}");
             if(killSiloWhichRunsTm)
                 await KillSilo(location => location.ActiveInCurrentSilo);
             else
             {
                 await KillSilo(location => !location.ActiveInCurrentSilo);
             }
-            await TestingUtils.WaitUntilAsync(lastTry => CheckTPS(txGrains, tpsBeforeInterruption, opsPerGrain, lastTry), RecoveryTimeout);
+            await TestingUtils.WaitUntilAsync(lastTry => CheckTxResult(txGrains, lastTry), RecoveryTimeout);
         }
 
         //given a predicate, whether to kill a silo
@@ -107,41 +122,36 @@ namespace Orleans.Transactions.Tests
             }
         }
 
-        private async Task<bool> CheckTPS(IList<ITransactionTestGrain> txGrains, double tpsBeforeInterruption, int opsPerGrain, bool assertIsTrue)
+        private async Task<bool> CheckTxResult(IList<ITransactionTestGrain> txGrains, bool assertIsTrue)
         {
-            var tps = await RecordTPS(txGrains, opsPerGrain);
+            var succeed = await AllTxSucceed(txGrains);
+            this.logger.LogInformation($"All transactions succeed after interruption : {succeed}");
             if (assertIsTrue)
             {
-                //consider it recovered if reaches 95% of tps before
-               Assert.True(tps > tpsBeforeInterruption * 0.95);
+                //consider it recovered if all tx succeed
+                Assert.True(succeed);
                 return true;
             }
             else
             {
-               bool re = tps > tpsBeforeInterruption * 0.95;
-                return re;
+                return succeed;
             }
         }
 
-        private async Task<double> RecordTPS(IEnumerable<ITransactionTestGrain> txGrains, int operationPerGrain)
+        private async Task<bool> AllTxSucceed(IEnumerable<ITransactionTestGrain> txGrains)
         {
-            var stopWatch = Stopwatch.StartNew();
             var tasks = new List<Task>();
-            int successOperation = 0;
-            while (operationPerGrain -- > 0)
-                tasks.AddRange(txGrains.Select(txGrain => txGrain.Add(1).ContinueWith(re => Interlocked.Add(ref successOperation, 1), TaskContinuationOptions.OnlyOnRanToCompletion)));
+            tasks.AddRange(txGrains.Select(txGrain => txGrain.Add(1)));
             try
             {
                 await Task.WhenAll(tasks);
             }
             catch (Exception)
             {
-               //ignore 
+                return false;
             }
-            
-            stopWatch.Stop();
-          
-            return successOperation / stopWatch.Elapsed.TotalSeconds;
+
+            return true;
         }
     }
 }
