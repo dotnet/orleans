@@ -23,6 +23,7 @@ namespace Orleans.Transactions.AzureStorage.Tests.DistributedTM
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
+            TestFixture.CheckForAzureStorage(TestDefaultConfiguration.DataConnectionString);
             builder.Options.InitialSilosCount = 5;
             builder.AddSiloBuilderConfigurator<TestFixture.SiloBuilderConfigurator>();
         }
