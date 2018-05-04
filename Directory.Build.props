@@ -125,8 +125,8 @@
     <OrleansRuntimeAbstractionsVersion>2.0.0</OrleansRuntimeAbstractionsVersion>
     <OrleansCoreVersion>2.1.0</OrleansCoreVersion>
     <OrleansRuntimeVersion>2.1.0</OrleansRuntimeVersion>
-    <OrleansCoreLegacyVersion>2.0.0</OrleansCoreLegacyVersion>
-    <OrleansRuntimeLegacyVersion>2.0.0</OrleansRuntimeLegacyVersion>
+    <OrleansCoreLegacyVersion>2.1.0</OrleansCoreLegacyVersion>
+    <OrleansRuntimeLegacyVersion>2.1.0</OrleansRuntimeLegacyVersion>
     <OrleansProvidersVersion>2.0.0</OrleansProvidersVersion>
     <OrleansExtensionsVersion>2.0.0</OrleansExtensionsVersion>
     <OrleansEventSourcingVersion>2.0.0</OrleansEventSourcingVersion>
