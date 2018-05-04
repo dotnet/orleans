@@ -28,7 +28,7 @@ namespace Orleans.Transactions.AzureStorage.Tests.DistributedTM
             builder.AddSiloBuilderConfigurator<TestFixture.SiloBuilderConfigurator>();
         }
 
-        [SkippableTheory]
+        [SkippableTheory(Skip = "Intermittent failure, investigating...")]
         [InlineData(TransactionTestConstants.TransactionGrainStates.SingleStateTransaction)]
         [InlineData(TransactionTestConstants.TransactionGrainStates.DoubleStateTransaction)]
         [InlineData(TransactionTestConstants.TransactionGrainStates.MaxStateTransaction)]

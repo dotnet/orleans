@@ -26,7 +26,7 @@ namespace Orleans.Transactions.Tests.DistributedTM
             builder.AddSiloBuilderConfigurator<Tests.DistributedTM.MemoryTransactionsFixture.SiloBuilderConfigurator>();
         }
 
-        [SkippableTheory]
+        [SkippableTheory(Skip = "Intermittent failure, investigating...")]
         [InlineData(TransactionTestConstants.TransactionGrainStates.SingleStateTransaction)]
         [InlineData(TransactionTestConstants.TransactionGrainStates.DoubleStateTransaction)]
         [InlineData(TransactionTestConstants.TransactionGrainStates.MaxStateTransaction)]
