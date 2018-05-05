@@ -839,7 +839,6 @@ namespace Orleans
         Watchdog_HealthCheckFailure             = WatchdogBase + 3,
 
         LoggerBase                              = Runtime + 2700,
-        Logger_MiniDumpCreated                  = Runtime_Error_100001, // Backward compatability
         Logger_ProcessCrashing                  = Runtime_Error_100002, // Backward compatability
         Logger_LogMessageTruncated              = LoggerBase + 1,
 
