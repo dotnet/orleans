@@ -53,6 +53,11 @@ namespace UnitTests.General
         Task Method(ref int parameter);
     }
 
+    public interface ITestGrain_ValueTask : IAddressable
+    {
+        ValueTask<int> Method(int parameter);
+    }
+
     #endregion
 
     #region inheritance
@@ -207,6 +212,12 @@ namespace UnitTests.General
         {
             Assert.Throws<GrainInterfaceUtils.RulesViolationException>(() =>
             GrainInterfaceUtils.ValidateInterface(typeof(ITestGrain_RefArgument)));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
+        public void InterfaceRules_ValueTask()
+        {
+            GrainInterfaceUtils.ValidateInterface(typeof(ITestGrain_ValueTask));
         }
 
         #endregion
