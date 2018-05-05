@@ -65,28 +65,7 @@ namespace Orleans.Serialization
         private static readonly RuntimeTypeHandle boolTypeHandle = typeof(bool).TypeHandle;
         private static readonly RuntimeTypeHandle objectTypeHandle = typeof(object).TypeHandle;
         private static readonly RuntimeTypeHandle byteArrayTypeHandle = typeof(byte[]).TypeHandle;
-
-        internal readonly CounterStatistic Copies;
-        internal readonly CounterStatistic Serializations;
-        internal readonly CounterStatistic Deserializations;
-        internal readonly CounterStatistic HeaderSers;
-        internal readonly CounterStatistic HeaderDesers;
-        internal readonly CounterStatistic HeaderSersNumHeaders;
-        internal readonly CounterStatistic HeaderDesersNumHeaders;
-        internal readonly CounterStatistic CopyTimeStatistic;
-        internal readonly CounterStatistic SerTimeStatistic;
-        internal readonly CounterStatistic DeserTimeStatistic;
-        internal readonly CounterStatistic HeaderSerTime;
-        internal readonly CounterStatistic HeaderDeserTime;
-        internal readonly IntValueStatistic TotalTimeInSerializer;
-
-        internal readonly CounterStatistic FallbackSerializations;
-        internal readonly CounterStatistic FallbackDeserializations;
-        internal readonly CounterStatistic FallbackCopies;
-        internal readonly CounterStatistic FallbackSerTimeStatistic;
-        internal readonly CounterStatistic FallbackDeserTimeStatistic;
-        internal readonly CounterStatistic FallbackCopiesTimeStatistic;
-
+        
         internal int LargeObjectSizeThreshold { get; }
 
         private readonly ThreadLocal<SerializationContext> serializationContext;
@@ -94,6 +73,7 @@ namespace Orleans.Serialization
         private readonly ThreadLocal<DeserializationContext> deserializationContext;
         private readonly IServiceProvider serviceProvider;
         private readonly ITypeResolver typeResolver;
+        private readonly SerializationStatisticsGroup serializationStatistics;
         private IRuntimeClient runtimeClient;
 
         internal IRuntimeClient RuntimeClient
@@ -109,7 +89,8 @@ namespace Orleans.Serialization
             IServiceProvider serviceProvider,
             IOptions<SerializationProviderOptions> serializationProviderOptions,
             ILoggerFactory loggerFactory,
-            ITypeResolver typeResolver)
+            ITypeResolver typeResolver,
+            SerializationStatisticsGroup serializationStatistics)
         {
             this.LargeObjectSizeThreshold = Constants.LARGE_OBJECT_HEAP_THRESHOLD;
             this.serializationContext = new ThreadLocal<SerializationContext>(() => new SerializationContext(this));
@@ -118,6 +99,7 @@ namespace Orleans.Serialization
             logger = loggerFactory.CreateLogger<SerializationManager>();
             this.serviceProvider = serviceProvider;
             this.typeResolver = typeResolver;
+            this.serializationStatistics = serializationStatistics;
 
             registeredTypes = new HashSet<Type>();
             externalSerializers = new List<IExternalSerializer>();
@@ -131,42 +113,7 @@ namespace Orleans.Serialization
             var options = serializationProviderOptions.Value;
 
             fallbackSerializer = GetFallbackSerializer(serviceProvider, options.FallbackSerializationProvider);
-
-            if (StatisticsCollector.CollectSerializationStats)
-            {
-                const CounterStorage store = CounterStorage.LogOnly;
-                Copies = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_DEEPCOPIES, store);
-                Serializations = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_SERIALIZATION, store);
-                Deserializations = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_DESERIALIZATION, store);
-                HeaderSers = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_HEADER_SERIALIZATION, store);
-                HeaderDesers = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_HEADER_DESERIALIZATION, store);
-                HeaderSersNumHeaders = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_HEADER_SERIALIZATION_NUMHEADERS, store);
-                HeaderDesersNumHeaders = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_HEADER_DESERIALIZATION_NUMHEADERS, store);
-                CopyTimeStatistic = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_DEEPCOPY_MILLIS, store).AddValueConverter(Utils.TicksToMilliSeconds);
-                SerTimeStatistic = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_SERIALIZATION_MILLIS, store).AddValueConverter(Utils.TicksToMilliSeconds);
-                DeserTimeStatistic = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_DESERIALIZATION_MILLIS, store).AddValueConverter(Utils.TicksToMilliSeconds);
-                HeaderSerTime = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_HEADER_SERIALIZATION_MILLIS, store).AddValueConverter(Utils.TicksToMilliSeconds);
-                HeaderDeserTime = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_HEADER_DESERIALIZATION_MILLIS, store).AddValueConverter(Utils.TicksToMilliSeconds);
-
-                TotalTimeInSerializer = IntValueStatistic.FindOrCreate(
-                    StatisticNames.SERIALIZATION_TOTAL_TIME_IN_SERIALIZER_MILLIS,
-                    () =>
-                    {
-                        long ticks = CopyTimeStatistic.GetCurrentValue() + SerTimeStatistic.GetCurrentValue() + DeserTimeStatistic.GetCurrentValue()
-                                     + HeaderSerTime.GetCurrentValue() + HeaderDeserTime.GetCurrentValue();
-                        return Utils.TicksToMilliSeconds(ticks);
-                    },
-                    CounterStorage.LogAndTable);
-
-                const CounterStorage storeFallback = CounterStorage.LogOnly;
-                FallbackSerializations = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_FALLBACK_SERIALIZATION, storeFallback);
-                FallbackDeserializations = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_FALLBACK_DESERIALIZATION, storeFallback);
-                FallbackCopies = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_FALLBACK_DEEPCOPIES, storeFallback);
-                FallbackSerTimeStatistic = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_FALLBACK_SERIALIZATION_MILLIS, storeFallback).AddValueConverter(Utils.TicksToMilliSeconds);
-                FallbackDeserTimeStatistic = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_FALLBACK_DESERIALIZATION_MILLIS, storeFallback).AddValueConverter(Utils.TicksToMilliSeconds);
-                FallbackCopiesTimeStatistic = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_FALLBACK_DEEPCOPY_MILLIS, storeFallback).AddValueConverter(Utils.TicksToMilliSeconds);
-            }
-
+            
             RegisterSerializationProviders(options.SerializationProviders);
         }
 
@@ -645,11 +592,11 @@ namespace Orleans.Serialization
             context.Reset();
             
             Stopwatch timer = null;
-            if (StatisticsCollector.CollectSerializationStats)
+            if (this.serializationStatistics.CollectSerializationStats)
             {
                 timer = new Stopwatch();
                 timer.Start();
-                context.SerializationManager.Copies.Increment();
+                context.SerializationManager.serializationStatistics.Copies.Increment();
             }
 
             object copy = DeepCopyInner(original, context);
@@ -659,10 +606,35 @@ namespace Orleans.Serialization
             if (timer!=null)
             {
                 timer.Stop();
-                context.SerializationManager.CopyTimeStatistic.IncrementBy(timer.ElapsedTicks);
+                context.SerializationManager.serializationStatistics.CopyTimeStatistic.IncrementBy(timer.ElapsedTicks);
             }
             
             return copy;
+        }
+
+        internal void DeepCopyElementsInPlace(object[] args)
+        {
+            var context = this.serializationContext.Value;
+            context.Reset();
+
+            Stopwatch timer = null;
+            if (this.serializationStatistics.CollectSerializationStats)
+            {
+                timer = new Stopwatch();
+                timer.Start();
+                context.SerializationManager.serializationStatistics.Copies.Increment();
+            }
+
+            for (var i = 0; i < args.Length; i++) args[i] = DeepCopyInner(args[i], context);
+
+            context.Reset();
+
+
+            if (timer != null)
+            {
+                timer.Stop();
+                context.SerializationManager.serializationStatistics.CopyTimeStatistic.IncrementBy(timer.ElapsedTicks);
+            }
         }
 
         /// <summary>
@@ -858,11 +830,11 @@ namespace Orleans.Serialization
         public void Serialize(object raw, IBinaryTokenStreamWriter stream)
         {
             Stopwatch timer = null;
-            if (StatisticsCollector.CollectSerializationStats)
+            if (this.serializationStatistics.CollectSerializationStats)
             {
                 timer = new Stopwatch();
                 timer.Start();
-                Serializations.Increment();
+                serializationStatistics.Serializations.Increment();
             }
 
             var context = this.serializationContext.Value;
@@ -874,7 +846,7 @@ namespace Orleans.Serialization
             if (timer!=null)
             {
                 timer.Stop();
-                SerTimeStatistic.IncrementBy(timer.ElapsedTicks);
+                serializationStatistics.SerTimeStatistic.IncrementBy(timer.ElapsedTicks);
             }
         }
 
@@ -1233,11 +1205,11 @@ namespace Orleans.Serialization
             context.Reset();
             context.StreamReader = stream;
             Stopwatch timer = null;
-            if (StatisticsCollector.CollectSerializationStats)
+            if (this.serializationStatistics.CollectSerializationStats)
             {
                 timer = new Stopwatch();
                 timer.Start();
-                context.SerializationManager.Deserializations.Increment();
+                context.SerializationManager.serializationStatistics.Deserializations.Increment();
             }
             object result = null;
 
@@ -1247,7 +1219,7 @@ namespace Orleans.Serialization
             if (timer!=null)
             {
                 timer.Stop();
-                context.SerializationManager.DeserTimeStatistic.IncrementBy(timer.ElapsedTicks);
+                context.SerializationManager.serializationStatistics.DeserTimeStatistic.IncrementBy(timer.ElapsedTicks);
             }
             return result;
         }
@@ -1561,7 +1533,7 @@ namespace Orleans.Serialization
         {
             var sm = context.SerializationManager;
             Stopwatch timer = null;
-            if (StatisticsCollector.CollectSerializationStats)
+            if (sm.serializationStatistics.CollectSerializationStats)
             {
                 timer = new Stopwatch();
                 timer.Start();
@@ -1573,8 +1545,8 @@ namespace Orleans.Serialization
             if (timer != null)
             {
                 timer.Stop();
-                sm.HeaderSers.Increment();
-                sm.HeaderSerTime.IncrementBy(timer.ElapsedTicks);
+                sm.serializationStatistics.HeaderSers.Increment();
+                sm.serializationStatistics.HeaderSerTime.IncrementBy(timer.ElapsedTicks);
             }
         }
 
@@ -1582,7 +1554,7 @@ namespace Orleans.Serialization
         {
             var sm = context.GetSerializationManager();
             Stopwatch timer = null;
-            if (StatisticsCollector.CollectSerializationStats)
+            if (sm.serializationStatistics.CollectSerializationStats)
             {
                 timer = new Stopwatch();
                 timer.Start();
@@ -1594,8 +1566,8 @@ namespace Orleans.Serialization
             if (timer != null)
             {
                 timer.Stop();
-                sm.HeaderDesers.Increment();
-                sm.HeaderDeserTime.IncrementBy(timer.ElapsedTicks);
+                sm.serializationStatistics.HeaderDesers.Increment();
+                sm.serializationStatistics.HeaderDeserTime.IncrementBy(timer.ElapsedTicks);
             }
 
             return headers;
@@ -1659,37 +1631,37 @@ namespace Orleans.Serialization
         internal void FallbackSerializer(object raw, ISerializationContext context, Type t)
         {
             Stopwatch timer = null;
-            if (StatisticsCollector.CollectSerializationStats)
+            if (this.serializationStatistics.CollectSerializationStats)
             {
                 timer = new Stopwatch();
                 timer.Start();
-                FallbackSerializations.Increment();
+                serializationStatistics.FallbackSerializations.Increment();
             }
 
             context.StreamWriter.Write(SerializationTokenType.Fallback);
             fallbackSerializer.Serialize(raw, context, t);
 
-            if (StatisticsCollector.CollectSerializationStats)
+            if (this.serializationStatistics.CollectSerializationStats)
             {
                 timer.Stop();
-                FallbackSerTimeStatistic.IncrementBy(timer.ElapsedTicks);
+                serializationStatistics.FallbackSerTimeStatistic.IncrementBy(timer.ElapsedTicks);
             }
         }
 
         private object FallbackDeserializer(IDeserializationContext context, Type expectedType)
         {
             Stopwatch timer = null;
-            if (StatisticsCollector.CollectSerializationStats)
+            if (this.serializationStatistics.CollectSerializationStats)
             {
                 timer = new Stopwatch();
                 timer.Start();
-                FallbackDeserializations.Increment();
+                serializationStatistics.FallbackDeserializations.Increment();
             }
             var retVal = fallbackSerializer.Deserialize(expectedType, context);
             if (timer != null)
             {
                 timer.Stop();
-                FallbackDeserTimeStatistic.IncrementBy(timer.ElapsedTicks);
+                serializationStatistics.FallbackDeserTimeStatistic.IncrementBy(timer.ElapsedTicks);
             }
 
             return retVal;
@@ -1712,18 +1684,18 @@ namespace Orleans.Serialization
         private object FallbackSerializationDeepCopy(object obj, ICopyContext context)
         {
             Stopwatch timer = null;
-            if (StatisticsCollector.CollectSerializationStats)
+            if (this.serializationStatistics.CollectSerializationStats)
             {
                 timer = new Stopwatch();
                 timer.Start();
-                FallbackCopies.Increment();
+                serializationStatistics.FallbackCopies.Increment();
             }
 
             var retVal = fallbackSerializer.DeepCopy(obj, context);
-            if (StatisticsCollector.CollectSerializationStats)
+            if (this.serializationStatistics.CollectSerializationStats)
             {
                 timer.Stop();
-                FallbackCopiesTimeStatistic.IncrementBy(timer.ElapsedTicks);
+                serializationStatistics.FallbackCopiesTimeStatistic.IncrementBy(timer.ElapsedTicks);
             }
             return retVal;
         }

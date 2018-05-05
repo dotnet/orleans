@@ -438,7 +438,6 @@ namespace Orleans.Runtime
                 grainIdStr = trimmed.Substring(grainIdIndex);
                 return FromGrainId(GrainId.FromParsableString(grainIdStr), runtime);
             }
-            //return FromGrainId(GrainId.FromParsableString(grainIdStr), generic);
         }
 
 

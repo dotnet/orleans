@@ -46,7 +46,11 @@ namespace API
             const string connectionString = "YOUR_CONNECTION_STRING_HERE";
             var client = new ClientBuilder()
                 .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IValueGrain).Assembly))
-                .Configure<ClusterOptions>(options => options.ClusterId = "orleans-docker")
+                .Configure<ClusterOptions>(options =>
+                {
+                    options.ClusterId = "orleans-docker";
+                    options.ServiceId = "AspNetSampleApp";
+                })
                 .UseAzureStorageClustering(options => options.ConnectionString = connectionString)
                 .Build();
             StartClientWithRetries(client).Wait();

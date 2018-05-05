@@ -305,26 +305,12 @@ namespace Orleans
             lifecycle.Subscribe(this.GetType().FullName, GrainLifecycleStage.SetupState, OnSetupState);
         }
 
-        private async Task OnSetupState(CancellationToken ct)
+        private Task OnSetupState(CancellationToken ct)
         {
             if (ct.IsCancellationRequested)
-                return;
+                return Task.CompletedTask;
             this.storage = this.Runtime.GetStorage<TGrainState>(this);
-            Stopwatch sw = Stopwatch.StartNew();
-            try
-            {
-                await this.ReadStateAsync();
-                sw.Stop();
-                // TODO: find a way to reenable StorageStatisticsGroup here
-                //StorageStatisticsGroup.OnStorageActivate(grainTypeName, sw.Elapsed);
-            }
-            catch (Exception)
-            {
-                sw.Stop();
-                // TODO: find a way to reenable StorageStatisticsGroup here
-                //StorageStatisticsGroup.OnStorageActivateError(grainTypeName);
-                throw;
-            }
+            return this.ReadStateAsync();
         }
     }
 }

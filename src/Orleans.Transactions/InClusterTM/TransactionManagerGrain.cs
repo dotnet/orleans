@@ -13,6 +13,8 @@ namespace Orleans.Transactions
     [Reentrant]
     public class TransactionManagerGrain : Grain, ITransactionManagerGrain
     {
+        //for test use only
+        public static bool IsActive = false;
         private readonly ITransactionManager transactionManager;
         private readonly ITransactionManagerService transactionManagerService;
 
@@ -24,11 +26,13 @@ namespace Orleans.Transactions
 
         public override async Task OnActivateAsync()
         {
+            IsActive = true;
             await transactionManager.StartAsync();
         }
 
         public override async Task OnDeactivateAsync()
         {
+            IsActive = false;
             await transactionManager.StopAsync();
         }
 

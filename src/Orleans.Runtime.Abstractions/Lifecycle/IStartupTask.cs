@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 namespace Orleans.Runtime
 {
     /// <summary>
-    /// Defines an action to be taken during silo startup.
+    /// Defines an action to be taken after silo startup.
     /// </summary>
     public interface IStartupTask
     {

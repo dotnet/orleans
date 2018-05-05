@@ -1,12 +1,10 @@
 ﻿using HelloWorld.Interfaces;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using System;
-using System.Collections.Generic;
-using System.Net;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 
 namespace OrleansClient
 {
@@ -50,6 +48,12 @@ namespace OrleansClient
                 {
                     client = new ClientBuilder()
                         .UseLocalhostClustering()
+                        .Configure<ClusterOptions>(options =>
+                        {
+                            options.ClusterId = "dev";
+                            options.ServiceId = "HelloWorldApp";
+                        })
+                        .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IHello).Assembly).WithReferences())
                         .ConfigureLogging(logging => logging.AddConsole())
                         .Build();
 

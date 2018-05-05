@@ -65,7 +65,7 @@ namespace Orleans.Clustering.DynamoDB
                 var records = await storage.QueryAsync(this.options.TableName, keys, $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} = :{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", item => new SiloInstanceRecord(item));
 
                 var toDelete = new List<Dictionary<string, AttributeValue>>();
-                foreach (var record in records)
+                foreach (var record in records.results)
                 {
                     toDelete.Add(record.GetKeys());
                 }
@@ -114,7 +114,7 @@ namespace Orleans.Clustering.DynamoDB
                 var keys = new Dictionary<string, AttributeValue> { { $":{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(this.clusterId) } };
                 var records = await this.storage.QueryAsync(this.options.TableName, keys, $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} = :{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", item => new SiloInstanceRecord(item));
 
-                MembershipTableData data = Convert(records);
+                MembershipTableData data = Convert(records.results);
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace("ReadAll Table=" + Environment.NewLine + "{0}", data.ToString());
 
                 return data;

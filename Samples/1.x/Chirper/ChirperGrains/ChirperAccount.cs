@@ -179,12 +179,18 @@ namespace Orleans.Samples.Chirper.Grains
         }
         public Task ViewerConnect(IChirperViewer viewer)
         {
-            viewers.Subscribe(viewer);
+            if (!viewers.IsSubscribed(viewer))
+            {
+                viewers.Subscribe(viewer);
+            }
             return TaskDone.Done;
         }
         public Task ViewerDisconnect(IChirperViewer viewer)
         {
-            viewers.Unsubscribe(viewer);
+            if (viewers.IsSubscribed(viewer))
+            {
+                viewers.Unsubscribe(viewer);
+            }
             return TaskDone.Done;
         }
         #endregion

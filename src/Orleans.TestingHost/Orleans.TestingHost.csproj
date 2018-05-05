@@ -17,13 +17,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
-    <ProjectReference Include="..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
-    <ProjectReference Include="..\Orleans.Runtime\Orleans.Runtime.csproj" />
-    <ProjectReference Include="..\OrleansProviders\OrleansProviders.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
     <None Update="ClientConfigurationForTesting.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

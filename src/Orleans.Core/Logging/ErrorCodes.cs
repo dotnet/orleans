@@ -647,7 +647,7 @@ namespace Orleans
         WaitCalledInsideGrain                   = SchedulerBase + 9,
         SchedulerStatus                         = SchedulerBase + 10,
         WaitCalledInServerCode                  = SchedulerBase + 11,
-        SchedulerTurnTooLong                    = SchedulerBase + 12,
+        ExecutorTurnTooLong                     = SchedulerBase + 12,
         SchedulerTooManyPendingItems            = SchedulerBase + 13,
         SchedulerTurnTooLong2                   = SchedulerBase + 14,
         SchedulerTurnTooLong3                   = SchedulerBase + 15,
@@ -665,9 +665,10 @@ namespace Orleans
         SchedulerTaskExecuteIncomplete3         = SchedulerBase + 27,
         SchedulerTaskExecuteIncomplete4         = SchedulerBase + 28,
         SchedulerTaskWaitIncomplete             = SchedulerBase + 29,
-        SchedulerWorkerThreadExc                = SchedulerBase + 30,
+        ExecutorWorkerThreadExc                 = SchedulerBase + 30,
         SchedulerQueueWorkItemWrongContext      = SchedulerBase + 31,
         SchedulerAppTurnsStopped_2              = SchedulerBase + 32,
+        ExecutorProcessingError                 = SchedulerBase + 33,
 
         GatewayBase                             = Runtime + 1300,
         GatewayClientOpenedSocket               = GatewayBase + 1,
@@ -838,7 +839,6 @@ namespace Orleans
         Watchdog_HealthCheckFailure             = WatchdogBase + 3,
 
         LoggerBase                              = Runtime + 2700,
-        Logger_MiniDumpCreated                  = Runtime_Error_100001, // Backward compatability
         Logger_ProcessCrashing                  = Runtime_Error_100002, // Backward compatability
         Logger_LogMessageTruncated              = LoggerBase + 1,
 

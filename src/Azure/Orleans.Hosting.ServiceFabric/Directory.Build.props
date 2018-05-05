@@ -1,0 +1,48 @@
+<Project>
+  <PropertyGroup>
+    <_ParentDirectoryBuildPropsPath Condition="'$(_DirectoryBuildPropsFile)' != ''">$([System.IO.Path]::Combine('..', '$(_DirectoryBuildPropsFile)'))</_ParentDirectoryBuildPropsPath>
+  </PropertyGroup>
+
+  <Import Project="$(_ParentDirectoryBuildPropsPath)" Condition="Exists('$(_ParentDirectoryBuildPropsPath)')"/>
+
+  <PropertyGroup Condition="$(OrleansAzureVersion)!=$(VersionPrefix)">
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <!-- Configure source link: https://github.com/ctaggart/SourceLink -->
+  <PropertyGroup>
+    <SourceLinkCreate>true</SourceLinkCreate>
+    <SourceLinkOriginUrl>https://github.com/dotnet/orleans</SourceLinkOriginUrl>
+  </PropertyGroup>
+
+  <Choose>
+    <When Condition="$(OrleansRuntimeVersion) == $(VersionPrefix) AND $(OrleansRuntimeVersion) == $(OrleansAzureVersion)">
+      <ItemGroup >
+        <ProjectReference Include="..\..\Orleans.Runtime\Orleans.Runtime.csproj" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.OrleansRuntime" Version="$(OrleansAzureVersion)"/>
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
+
+  <Choose>
+    <When Condition="$(OrleansProvidersVersion) == $(VersionPrefix) AND $(OrleansProvidersVersion) == $(OrleansAzureVersion)">
+      <ItemGroup >
+        <ProjectReference Include="..\..\OrleansProviders\OrleansProviders.csproj" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.OrleansProviders" Version="$(OrleansAzureVersion)"/>
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
+
+</Project>

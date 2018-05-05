@@ -1,3 +1,5 @@
+using AdventureGrainInterfaces;
+using AdventureGrains;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
@@ -38,12 +40,24 @@ namespace AdventureSetup
 
             var silo = new SiloHostBuilder()
                 .UseLocalhostClustering()
+                .Configure<ClusterOptions>(options =>
+                {
+                    options.ClusterId = "dev";
+                    options.ServiceId = "AdventureApp";
+                })
                 .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
+                .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(RoomGrain).Assembly).WithReferences())
                 .ConfigureLogging(logging => logging.AddConsole())
                 .Build();
 
             var client = new ClientBuilder()
                 .UseLocalhostClustering()
+                .Configure<ClusterOptions>(options =>
+                {
+                    options.ClusterId = "dev";
+                    options.ServiceId = "AdventureApp";
+                })
+                .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IRoomGrain).Assembly).WithReferences())
                 .ConfigureLogging(logging => logging.AddConsole())
                 .Build();
 

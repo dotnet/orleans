@@ -72,7 +72,6 @@ namespace Orleans.Messaging
             IsLive = false;
             receiver.Stop();
             base.Stop();
-            DrainQueue(RerouteMessage);
             MsgCenter.RuntimeClient.BreakOutstandingMessagesToDeadSilo(Silo);
             Socket s;
             lock (Lockable)
@@ -202,7 +201,7 @@ namespace Orleans.Messaging
             if (Cts.IsCancellationRequested)
             {
                 // Recycle the message we've dequeued. Note that this will recycle messages that were queued up to be sent when the gateway connection is declared dead
-                MsgCenter.SendMessage(msg);
+                RerouteMessage(msg);
                 return false;
             }
 
@@ -308,6 +307,8 @@ namespace Orleans.Messaging
                 MessagingStatisticsGroup.OnDroppedSentMessage(msg);
             }
         }
+
+        protected override bool DrainAfterCancel => true;
 
         private void RerouteMessage(Message msg)
         {

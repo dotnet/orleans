@@ -1,5 +1,4 @@
-﻿using Orleans.Runtime.Configuration;
-using System;
+﻿using System;
 using System.Net;
 using System.Threading.Tasks;
 using HelloWorld.Grains;
@@ -41,7 +40,13 @@ namespace OrleansSiloHost
             // define the cluster configuration
             var builder = new SiloHostBuilder()
                 .UseLocalhostClustering()
+                .Configure<ClusterOptions>(options =>
+                {
+                    options.ClusterId = "dev";
+                    options.ServiceId = "HelloWorldApp";
+                })
                 .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
+                .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(HelloGrain).Assembly).WithReferences())
                 .ConfigureLogging(logging => logging.AddConsole());
 
             var host = builder.Build();

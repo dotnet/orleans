@@ -3,7 +3,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using AccountTransfer.Interfaces;
 using System.Net;
 using Orleans.Configuration;
@@ -53,6 +52,12 @@ namespace OrleansClient
 
                     client = new ClientBuilder()
                         .UseLocalhostClustering()
+                        .Configure<ClusterOptions>(options =>
+                        {
+                            options.ClusterId = "dev";
+                            options.ServiceId = "AccountTransferApp";
+                        })
+                        .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IAccountGrain).Assembly).WithReferences())
                         .ConfigureLogging(logging => logging.AddConsole())
                         .Build();
 

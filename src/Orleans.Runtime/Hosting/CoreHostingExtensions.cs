@@ -39,7 +39,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configures a localhost silo for development and testing.
+        /// Configures the silo to use development-only clustering and listen on localhost.
         /// </summary>
         /// <param name="builder">The silo builder.</param>
         /// <param name="siloPort">The silo port.</param>
@@ -47,13 +47,15 @@ namespace Orleans.Hosting
         /// <param name="primarySiloEndpoint">
         /// The endpoint of the primary silo, or <see langword="null"/> to use this silo as the primary.
         /// </param>
-        /// <param name="clusterId">Cluster ID</param>
+        /// <param name="serviceId">The service id.</param>
+        /// <param name="clusterId">The cluster id.</param>
         /// <returns>The silo builder.</returns>
         public static ISiloHostBuilder UseLocalhostClustering(
             this ISiloHostBuilder builder,
             int siloPort = EndpointOptions.DEFAULT_SILO_PORT,
             int gatewayPort = EndpointOptions.DEFAULT_GATEWAY_PORT,
             IPEndPoint primarySiloEndpoint = null,
+            string serviceId = ClusterOptions.DevelopmentServiceId,
             string clusterId = ClusterOptions.DevelopmentClusterId)
         {
             builder.Configure<EndpointOptions>(options =>
@@ -64,8 +66,27 @@ namespace Orleans.Hosting
             });
 
             builder.UseDevelopmentClustering(primarySiloEndpoint ?? new IPEndPoint(IPAddress.Loopback, siloPort));
-            builder.Configure<ClusterOptions>(options => options.ClusterId = clusterId);
             builder.Configure<ClusterMembershipOptions>(options => options.ExpectedClusterSize = 1);
+            builder.ConfigureServices(services =>
+            {
+                // If the caller did not override service id or cluster id, configure default values as a fallback.
+                if (string.Equals(serviceId, ClusterOptions.DevelopmentServiceId) && string.Equals(clusterId, ClusterOptions.DevelopmentClusterId))
+                {
+                    services.PostConfigure<ClusterOptions>(options =>
+                    {
+                        if (string.IsNullOrWhiteSpace(options.ClusterId)) options.ClusterId = ClusterOptions.DevelopmentClusterId;
+                        if (string.IsNullOrWhiteSpace(options.ServiceId)) options.ServiceId = ClusterOptions.DevelopmentServiceId;
+                    });
+                }
+                else
+                {
+                    services.Configure<ClusterOptions>(options =>
+                    {
+                        options.ServiceId = serviceId;
+                        options.ClusterId = clusterId;
+                    });
+                }
+            });
 
             return builder;
         }
@@ -88,23 +109,9 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloHostBuilder UseDevelopmentClustering(
             this ISiloHostBuilder builder,
-            Action<DevelopmentClusterMembershipOptions> configureOptions,
-            string clusterId = ClusterOptions.DevelopmentClusterId)
+            Action<DevelopmentClusterMembershipOptions> configureOptions)
         {
-            return builder
-                .Configure<ClusterOptions>(options => options.ClusterId = clusterId)
-                .ConfigureServices(
-                services =>
-                {
-                    if (configureOptions != null)
-                    {
-                        services.Configure(configureOptions);
-                    }
-
-                    services
-                        .AddSingleton<GrainBasedMembershipTable>()
-                        .AddFromExisting<IMembershipTable, GrainBasedMembershipTable>();
-                });
+            return builder.UseDevelopmentClustering(options => options.Configure(configureOptions));
         }
 
         /// <summary>
@@ -112,13 +119,13 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloHostBuilder UseDevelopmentClustering(
             this ISiloHostBuilder builder,
-            Action<OptionsBuilder<DevelopmentClusterMembershipOptions>> configureOptions,
-            string clusterId = ClusterOptions.DevelopmentClusterId)
+            Action<OptionsBuilder<DevelopmentClusterMembershipOptions>> configureOptions)
         {
             return builder.ConfigureServices(
                 services =>
                 {
                     configureOptions?.Invoke(services.AddOptions<DevelopmentClusterMembershipOptions>());
+                    services.ConfigureFormatter<DevelopmentClusterMembershipOptions>();
                     services
                         .AddSingleton<GrainBasedMembershipTable>()
                         .AddFromExisting<IMembershipTable, GrainBasedMembershipTable>();

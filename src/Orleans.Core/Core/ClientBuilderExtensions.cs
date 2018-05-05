@@ -165,30 +165,49 @@ namespace Orleans
         /// </summary>
         /// <param name="builder"></param>
         /// <param name="gatewayPort">The local silo's gateway port.</param>
-        /// <param name="clusterId">Cluster ID to use</param>
+        /// <param name="serviceId">The service id.</param>
+        /// <param name="clusterId">The cluster id.</param>
         public static IClientBuilder UseLocalhostClustering(
             this IClientBuilder builder,
             int gatewayPort = 30000,
+            string serviceId = ClusterOptions.DevelopmentServiceId,
             string clusterId = ClusterOptions.DevelopmentClusterId)
         {
-            return builder.UseStaticClustering(new IPEndPoint(IPAddress.Loopback, gatewayPort))
-                .Configure<ClusterOptions>(options =>
-                {
-                    if (!string.IsNullOrWhiteSpace(clusterId)) options.ClusterId = clusterId;
-                });
+            return builder.UseLocalhostClustering(new [] {gatewayPort}, serviceId, clusterId);
         }
 
         /// <summary>
         /// Configures the client to connect to a silo on the localhost.
         /// </summary>
         /// <param name="builder"></param>
-        /// <param name="gatewayPorts">The local silo gateway port.</param>
-        public static IClientBuilder UseLocalhostClustering(this IClientBuilder builder, params int[] gatewayPorts)
+        /// <param name="gatewayPorts">The local silo gateway ports.</param>
+        /// <param name="serviceId">The service id.</param>
+        /// <param name="clusterId">The cluster id.</param>
+        public static IClientBuilder UseLocalhostClustering(this IClientBuilder builder,
+            int[] gatewayPorts,
+            string serviceId = ClusterOptions.DevelopmentServiceId,
+            string clusterId = ClusterOptions.DevelopmentClusterId)
         {
             return builder.UseStaticClustering(gatewayPorts.Select(p => new IPEndPoint(IPAddress.Loopback, p)).ToArray())
-                .Configure<ClusterOptions>(options =>
+                .ConfigureServices(services =>
                 {
-                    options.ClusterId = ClusterOptions.DevelopmentClusterId;
+                    // If the caller did not override service id or cluster id, configure default values as a fallback.
+                    if (string.Equals(serviceId, ClusterOptions.DevelopmentServiceId) && string.Equals(clusterId, ClusterOptions.DevelopmentClusterId))
+                    {
+                        services.PostConfigure<ClusterOptions>(options =>
+                        {
+                            if (string.IsNullOrWhiteSpace(options.ClusterId)) options.ClusterId = ClusterOptions.DevelopmentClusterId;
+                            if (string.IsNullOrWhiteSpace(options.ServiceId)) options.ServiceId = ClusterOptions.DevelopmentServiceId;
+                        });
+                    }
+                    else
+                    {
+                        services.Configure<ClusterOptions>(options =>
+                        {
+                            options.ServiceId = serviceId;
+                            options.ClusterId = clusterId;
+                        });
+                    }
                 });
         }
 

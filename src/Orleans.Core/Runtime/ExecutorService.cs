@@ -1,15 +1,21 @@
-﻿using System.Threading.Tasks;
-using Orleans.Runtime.Scheduler;
+﻿using System;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Threading;
 
 namespace Orleans.Runtime
 {
-    internal class ExecutorService : ITaskScheduler
+    internal class ExecutorService
     {
-        private readonly TaskScheduler taskScheduler = new ThreadPerTaskScheduler(task => (task as AsynchAgentTask)?.Name);
+        private readonly IServiceProvider serviceProvider;
 
-        public void RunTask(Task task)
+        public ExecutorService(IServiceProvider serviceProvider)
         {
-            task.Start(taskScheduler);
+            this.serviceProvider = serviceProvider;
+        }
+
+        public ThreadPoolExecutor GetExecutor(ThreadPoolExecutorOptions options)
+        {
+            return ActivatorUtilities.CreateInstance<ThreadPoolExecutor>(this.serviceProvider, options);
         }
     }
 }

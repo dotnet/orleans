@@ -319,7 +319,7 @@ namespace Orleans.Storage
             catch (Exception exc)
             {
                 var sb = new StringBuilder();
-                if (binaryData.Length > 0)
+                if (binaryData?.Length > 0)
                 {
                     sb.AppendFormat("Unable to convert from storage format GrainStateEntity.Data={0}", binaryData);
                 }

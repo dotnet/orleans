@@ -1,0 +1,71 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>GoogleUtils.Tests</RootNamespace>
+    <AssemblyName>GoogleUtils.Tests</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentAssertions" Version="$(FluentAssertionsVersion)" />
+    <PackageReference Include="xunit" Version="$(xUnitVersion)" />
+    <PackageReference Include="Xunit.SkippableFact" Version="$(XunitSkippableFactVersion)" />
+    <DotNetCliToolReference Include="dotnet-xunit" Version="$(xUnitVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\src\Orleans.Streaming.GCP\Orleans.Streaming.GCP.csproj" />
+    <ProjectReference Include="..\..\..\Tester\Tester.csproj" />
+    <ProjectReference Include="..\..\..\TesterInternal\TesterInternal.csproj" />
+    <ProjectReference Include="..\..\..\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+    <ProjectReference Include="..\..\..\Grains\TestGrains\TestGrains.csproj" />
+    <ProjectReference Include="..\..\..\Misc\TestInterfaces\TestInterfaces.csproj" />
+    <ProjectReference Include="..\..\..\Misc\TestInternalDtosRefOrleans\TestInternalDtosRefOrleans.csproj" />
+    <ProjectReference Include="..\..\..\Grains\TestInternalGrains\TestInternalGrains.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="App.config" />
+    <None Include="GoogleUtils.Tests.xunit.runner.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <Choose>
+    <When Condition="$(OrleansTestingHostVersion) == $(VersionPrefix)">
+      <ItemGroup >
+        <ProjectReference Include="..\..\..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.TestingHost" Version="$(OrleansTestingHostVersion)"/>
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
+
+  <Choose>
+    <When Condition="$(OrleansCoreLegacyVersion) == $(VersionPrefix)">
+      <ItemGroup >
+        <ProjectReference Include="..\..\..\..\src\Orleans.Core.Legacy\Orleans.Core.Legacy.csproj" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.Core.Legacy" Version="$(OrleansCoreLegacyVersion)"/>
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
+
+  <Choose>
+    <When Condition="$(OrleansSerializersVersion) == $(VersionPrefix)">
+      <ItemGroup >
+        <ProjectReference Include="..\..\..\..\src\Serializers\Orleans.Serialization.Protobuf\Orleans.Serialization.Protobuf.csproj" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.OrleansGoogleUtils" Version="$(OrleansSerializersVersion)"/>
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
+
+</Project>

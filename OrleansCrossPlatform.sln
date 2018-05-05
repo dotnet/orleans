@@ -24,19 +24,19 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansAWSUtils", "src\AWS\
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansAzureUtils", "src\Azure\OrleansAzureUtils\OrleansAzureUtils.csproj", "{549F3A9B-582F-4AAB-8CD9-425F1A3CCDDE}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Serialization.Bond", "src\Orleans.Serialization.Bond\Orleans.Serialization.Bond.csproj", "{9F5573CD-D3E4-4CA8-866A-3104BA2CF636}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Serialization.Bond", "src\Serializers\Orleans.Serialization.Bond\Orleans.Serialization.Bond.csproj", "{9F5573CD-D3E4-4CA8-866A-3104BA2CF636}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Clustering.Consul", "src\Orleans.Clustering.Consul\Orleans.Clustering.Consul.csproj", "{2C8AAE89-C0E3-4FD3-89DA-BA0593EDBE06}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.EventSourcing", "src\Orleans.EventSourcing\Orleans.EventSourcing.csproj", "{187AB6FA-B34B-482B-AF4F-E0A82C196BEE}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Serialization.Protobuf", "src\Orleans.Serialization.Protobuf\Orleans.Serialization.Protobuf.csproj", "{CD7707C0-F70A-4121-B980-D4ABD410C5E2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Serialization.Protobuf", "src\Serializers\Orleans.Serialization.Protobuf\Orleans.Serialization.Protobuf.csproj", "{CD7707C0-F70A-4121-B980-D4ABD410C5E2}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Serialization.ProtobufNet", "src\Orleans.Serialization.ProtobufNet\Orleans.Serialization.ProtobufNet.csproj", "{2B0F0CB2-D273-4840-9969-2580C804697A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Serialization.ProtobufNet", "src\Serializers\Orleans.Serialization.ProtobufNet\Orleans.Serialization.ProtobufNet.csproj", "{2B0F0CB2-D273-4840-9969-2580C804697A}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Streaming.EventHubs", "src\Azure\Orleans.Streaming.EventHubs\Orleans.Streaming.EventHubs.csproj", "{E6B25995-CDB0-4FAE-BA47-5E629812B300}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TelemetryConsumers.AI", "src\Orleans.TelemetryConsumers.AI\Orleans.TelemetryConsumers.AI.csproj", "{D1037BFE-B0D6-40AA-9D53-8DB9838D2889}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TelemetryConsumers.AI", "src\TelemetryConsumers\Orleans.TelemetryConsumers.AI\Orleans.TelemetryConsumers.AI.csproj", "{D1037BFE-B0D6-40AA-9D53-8DB9838D2889}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Clustering.ZooKeeper", "src\Orleans.Clustering.ZooKeeper\Orleans.Clustering.ZooKeeper.csproj", "{9EA82917-64A9-4F00-9A2B-C02F2571A6DF}"
 EndProject

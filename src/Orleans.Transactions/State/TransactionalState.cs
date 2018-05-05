@@ -51,9 +51,6 @@ namespace Orleans.Transactions
 
         public TState State => GetState();
 
-        private string stateName;
-        private string StateName => stateName ?? (stateName = StoredName());
-
         public TransactionalState(ITransactionalStateConfiguration transactionalStateConfiguration, IGrainActivationContext context, ITransactionDataCopier<TState> copier, ITransactionAgent transactionAgent, IProviderRuntime runtime, ILoggerFactory loggerFactory)
         {
             this.config = transactionalStateConfiguration;
@@ -251,7 +248,7 @@ namespace Orleans.Transactions
                 HighestVersion = this.version,
                 HighestReadTransactionId = wlb
             };
-            this.eTag = await this.storage.Persist(StateName, this.eTag, metadata.ToString(), pending);
+            this.eTag = await this.storage.Persist(this.eTag, metadata.ToString(), pending);
             this.metadata = metadata;
 
             if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("PersistPrepare TransactionId {1} succeded", transactionId);
@@ -300,7 +297,7 @@ namespace Orleans.Transactions
                 HighestVersion = this.version,
                 HighestReadTransactionId = this.highestReadTransactionId,
             };
-            this.eTag = await this.storage.Confirm(StateName, this.eTag, newMetadata.ToString(), stableversion.ToString());
+            this.eTag = await this.storage.Confirm(this.eTag, newMetadata.ToString(), stableversion.ToString());
             this.metadata = newMetadata;
             this.commitedState = stableState;
             UpdateActiveState();
@@ -434,7 +431,10 @@ namespace Orleans.Transactions
             // Validate that we still have all of the transaction's writes.
             var validate  = this.log.TryGetValue(writeVersion.Value.TransactionId, out LogRecord<TState> logRecord) && logRecord.Version == writeVersion.Value;
             if(!validate && this.logger.IsEnabled(LogLevel.Debug))
-                this.logger.Debug($"ValidateWrite failed, because version is not the same as recorded in state log record of the same transaction, write version in the log record is {logRecord.Version}, version to be validated is {writeVersion.Value}");
+                if(logRecord != null)
+                    this.logger.Debug($"ValidateWrite failed, because version is not the same as recorded in state log record of the same transaction, write version in the log record is {logRecord.Version}, version to be validated is {writeVersion.Value}");
+                else
+                    this.logger.Debug($"ValidateWrite failed, because no log record was found for transaction {writeVersion.Value.TransactionId} of write version to be validated {writeVersion.Value}");
             return validate;
         }
 
@@ -489,7 +489,7 @@ namespace Orleans.Transactions
         {
             this.logger.Debug("DoLoad");
             // load inital state
-            TransactionalStorageLoadResponse<TState> loadResponse = await this.storage.Load(StateName);
+            TransactionalStorageLoadResponse<TState> loadResponse = await this.storage.Load();
             this.eTag = loadResponse.ETag;
             this.metadata = Metadata.FromString(loadResponse.Metadata);
             this.version = this.metadata.HighestVersion;
@@ -532,17 +532,12 @@ namespace Orleans.Transactions
             this.transactionalResource = boundExtension.Item2.AsTransactionalResource(this.config.StateName);
 
             INamedTransactionalStateStorageFactory storageFactory = this.context.ActivationServices.GetRequiredService<INamedTransactionalStateStorageFactory>();
-            this.storage = storageFactory.Create<TState>(this.config.StorageName);
+            this.storage = storageFactory.Create<TState>(this.config.StorageName, this.config.StateName);
 
             // recover state
             await DoLoad();
 
             this.validState = true;
-        }
-
-        private string StoredName()
-        {
-            return $"{this.context.GrainInstance.GetType().FullName}-{this.config.StateName}";
         }
 
         public bool Equals(ITransactionalResource other)
