@@ -154,7 +154,7 @@ namespace Orleans.Transactions.DistributedTM
             this.logger = loggerFactory.CreateLogger($"{context.GrainType.Name}.{this.config.StateName}.{this.thisParticipant.ToShortString()}");
 
             var storageFactory = this.context.ActivationServices.GetRequiredService<INamedTransactionalStateStorageFactory>();
-            this.storage = storageFactory.Create<TState>(this.config.StorageName);
+            this.storage = storageFactory.Create<TState>(this.config.StorageName, this.config.StateName);
 
             // recover state
             await Restore();
@@ -202,7 +202,7 @@ namespace Orleans.Transactions.DistributedTM
             storageBatch = new StorageBatch<TState>(loadresponse);
 
             stableState = loadresponse.CommittedState;
-            stableSequenceNumber = storageBatch.MetaData.StableSequenceNumber;
+            stableSequenceNumber = loadresponse.CommittedSequenceId;
 
             if (logger.IsEnabled(LogLevel.Debug))
                 logger.Debug($"Load v{stableSequenceNumber} {loadresponse.PendingStates.Count}p {storageBatch.MetaData.CommitRecords.Count}c");
@@ -213,7 +213,7 @@ namespace Orleans.Transactions.DistributedTM
             // resume prepared transactions (not TM)
             foreach (var pr in loadresponse.PendingStates.OrderBy(ps => ps.TimeStamp))
             {
-                if (pr.TransactionManager != null)
+                if (pr.SequenceId > stableSequenceNumber && pr.TransactionManager != null)
                 {
                     if (logger.IsEnabled(LogLevel.Debug))
                         logger.Debug($"recover two-phase-commit {pr.TransactionId}");

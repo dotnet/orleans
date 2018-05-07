@@ -34,8 +34,6 @@ namespace Orleans.Transactions.DistributedTM
     [Serializable]
     public class MetaData
     {
-        public long StableSequenceNumber { get; set; }
-
         public DateTime TimeStamp { get; set; }
 
         public Dictionary<Guid, CommitRecord> CommitRecords { get; set; }
@@ -94,8 +92,8 @@ namespace Orleans.Transactions.DistributedTM
         {
             MetaData = ReadMetaData(loadresponse);
             ETag = loadresponse.ETag;
-            confirmUpTo = MetaData.StableSequenceNumber;
-            cancelAbove = loadresponse.PendingStates?.LastOrDefault()?.SequenceId ?? MetaData.StableSequenceNumber;
+            confirmUpTo = loadresponse.CommittedSequenceId;
+            cancelAbove = loadresponse.PendingStates.LastOrDefault()?.SequenceId ?? loadresponse.CommittedSequenceId;
             cancelAboveStart = cancelAbove;
         }
 
@@ -114,7 +112,6 @@ namespace Orleans.Transactions.DistributedTM
                 // this thing is fresh... did not exist in storage yet
                 return new MetaData()
                 {
-                    StableSequenceNumber = 0,
                     TimeStamp = default(DateTime),
                     CommitRecords = new Dictionary<Guid, CommitRecord>(),
                 };
@@ -220,8 +217,6 @@ namespace Orleans.Transactions.DistributedTM
             total++;
 
             confirmUpTo = sequenceNumber;
-
-            MetaData.StableSequenceNumber = sequenceNumber;
 
             // remove all redundant prepare records that are superseded by a later confirmed state
             while (true)

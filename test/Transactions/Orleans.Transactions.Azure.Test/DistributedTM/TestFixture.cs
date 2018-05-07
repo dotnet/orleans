@@ -29,14 +29,18 @@ namespace Orleans.Transactions.AzureStorage.Tests.DistributedTM
                 var id = (uint)Guid.NewGuid().GetHashCode() % 100000;
                 hostBuilder
                     .ConfigureLogging(builder => builder.AddFilter("SingleStateTransactionalGrain.data", LogLevel.Trace))
+                    .ConfigureLogging(builder => builder.AddFilter("DoubleStateTransactionalGrain.data", LogLevel.Trace))
+                    .ConfigureLogging(builder => builder.AddFilter("MaxStateTransactionalGrain.data", LogLevel.Trace))
                     .ConfigureLogging(builder => builder.AddFilter("TransactionAgent", LogLevel.Trace))
-                    .AddAzureTableGrainStorage(TransactionTestConstants.TransactionStore, options =>
+                    .ConfigureLogging(builder => builder.AddFilter("Orleans.Transactions.DistributedTM.AzureStorage.AzureTableTransactionalStateStorage", LogLevel.Trace))
+                    .AddAzureTableTransactionalStateStorage(TransactionTestConstants.TransactionStore, options =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     })
                     .UseDistributedTM();
             }
         }
+        
 
         public static void CheckForAzureStorage(string dataConnectionString)
         {

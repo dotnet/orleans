@@ -38,7 +38,7 @@ namespace Orleans.Transactions.DistributedTM
         where TState : class, new()
     {
         /// <summary>
-        /// Transactions are given sequence numbers starting with 0.
+        /// Transactions are given dense local sequence numbers 1,2,3,4...
         /// If a new transaction is prepared with the same sequence number as a 
         /// previously prepared transaction, it replaces it.
         /// </summary>
@@ -73,10 +73,13 @@ namespace Orleans.Transactions.DistributedTM
     public class TransactionalStorageLoadResponse<TState>
         where TState : class, new()
     {
-        public TransactionalStorageLoadResponse(string etag, TState committedState, string metadata, IReadOnlyList<PendingTransactionState<TState>> pendingStates)
+        public TransactionalStorageLoadResponse() : this(null, new TState(), 0, null, Array.Empty<PendingTransactionState<TState>>()) { }
+
+        public TransactionalStorageLoadResponse(string etag, TState committedState, long committedSequenceId, string metadata, IReadOnlyList<PendingTransactionState<TState>> pendingStates)
         {
             this.ETag = etag;
             this.CommittedState = committedState;
+            this.CommittedSequenceId = committedSequenceId;
             this.Metadata = metadata;
             this.PendingStates = pendingStates;
         }
@@ -85,8 +88,19 @@ namespace Orleans.Transactions.DistributedTM
 
         public TState CommittedState { get; set; }
 
+        /// <summary>
+        /// The local sequence id of the last committed transaction, or zero if none
+        /// </summary>
+        public long CommittedSequenceId { get; set; }
+
+        /// <summary>
+        /// Additional state maintained by the transaction algorithm, such as commit records
+        /// </summary>
         public string Metadata { get; set; }
 
+        /// <summary>
+        /// List of pending states, ordered by sequence id
+        /// </summary>
         public IReadOnlyList<PendingTransactionState<TState>> PendingStates { get; set; }
     }
 }
