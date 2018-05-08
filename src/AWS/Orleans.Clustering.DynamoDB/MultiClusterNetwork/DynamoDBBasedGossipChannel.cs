@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.MultiCluster;
@@ -28,7 +30,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
         {
             logger.Info("Initializing Gossip Channel for ServiceId={0} using connection: {1}",
                 serviceId, ConfigUtilities.RedactConnectionStringInfo(connectionString));
-            
+
             _tableManager = await GossipTableInstanceManager.GetManager(serviceId, connectionString, _loggerFactory);
         }
 
@@ -112,7 +114,54 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
 
         public async Task<IMultiClusterGossipData> Synchronize(IMultiClusterGossipData gossipdata)
         {
-            throw new NotImplementedException();
+            logger.Debug("-Synchronize pushed:{0}", gossipdata);
+
+            try
+            {
+                // read the entire gossip content from storage
+                var configInStorage = await _tableManager.ReadConfigurationEntryAsync();
+                var gatewayInfoInStorage = await _tableManager.ReadGatewayEntriesAsync();
+
+                // diff and write back configuration
+                var configDeltaTask = DiffAndWriteBackConfigAsync(gossipdata.Configuration, configInStorage);
+
+                // diff and write back gateway info for each gateway appearing locally or in storage
+                var gatewayDeltaTasks = new List<Task<GatewayEntry>>();
+                var allAddresses = gatewayInfoInStorage.Keys.Union(gossipdata.Gateways.Keys);
+
+                foreach (var address in allAddresses)
+                {
+                    gossipdata.Gateways.TryGetValue(address, out var pushedInfo);
+                    gatewayInfoInStorage.TryGetValue(address, out var infoInStorage);
+
+                    gatewayDeltaTasks.Add(DiffAndWriteBackGatewayInfoAsync(pushedInfo, infoInStorage));
+                }
+
+                // wait for all the writeback tasks to complete
+                // these are not batched because we want them to fail individually on e-tag conflicts, not all
+                await configDeltaTask;
+                await Task.WhenAll(gatewayDeltaTasks);
+
+                // assemble delta pieces
+                var gw = new Dictionary<SiloAddress, GatewayEntry>();
+                foreach (var t in gatewayDeltaTasks)
+                {
+                    var d = t.Result;
+                    if (d != null)
+                        gw.Add(d.SiloAddress, d);
+                }
+                var delta = new MultiClusterData(gw, configDeltaTask.Result);
+
+                logger.Debug("-Synchronize pulled delta:{0}", delta);
+
+                return delta;
+            }
+            catch (Exception e)
+            {
+                logger.Info("-Synchronize encountered exception {0}", e);
+
+                throw e;
+            }
         }
     }
 }

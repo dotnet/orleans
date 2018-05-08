@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Amazon.DynamoDBv2.Model;
@@ -12,7 +13,7 @@ using Orleans.Runtime.MultiClusterNetwork;
 
 namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
 {
-    class GossipTableInstanceManager
+    internal class GossipTableInstanceManager
     {
         private const string CONF_TABLE_NAME = "OrleansGossipConfigurationTable";
         private const string GATEWAY_TABLE_NAME = "OrleansGossipGatewayTable";
@@ -124,6 +125,19 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
             var gw = new GossipGateway(gateway, _globalServiceId);
 
             return await _gatewayStorage.ReadSingleEntryAsync(GATEWAY_TABLE_NAME, gw.ToKeyAttributes(), fields => new GossipGateway(fields)).ConfigureAwait(false);
+        }
+
+        public async Task<Dictionary<SiloAddress, GossipGateway>> ReadGatewayEntriesAsync()
+        {
+            var q = new Dictionary<string, AttributeValue>
+            {
+                ["ServiceId"] = new AttributeValue(_globalServiceId)
+            };
+
+            var result = await _gatewayStorage.QueryAsync(GATEWAY_TABLE_NAME, q, "", r => new GossipGateway(r));
+            return result.results.ToDictionary(
+                r => SiloAddress.New(new IPEndPoint(IPAddress.Parse(r.SiloAddress), r.SiloPort), r.SiloGeneration),
+                s => s);
         }
 
         public async Task TryCreateGatewayEntryAsync(GatewayEntry gatewayInfo)
