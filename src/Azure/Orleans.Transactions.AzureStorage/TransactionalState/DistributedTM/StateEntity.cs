@@ -9,14 +9,15 @@ namespace Orleans.Transactions.DistributedTM.AzureStorage
     {
         public static string MakeRowKey(long sequenceId)
         {
-            return sequenceId.ToString("x16");
+            return $"{RK_PREFIX}{sequenceId.ToString("x16")}";
         }
 
-        public long SequenceId => long.Parse(RowKey);
+        public long SequenceId => long.Parse(RowKey.Substring(RK_PREFIX.Length));
 
-        // row keys range from 0000000000000001 to 7fffffffffffffff
-        public const string RK_MIN = "0";
-        public const string RK_MAX = "8";
+        // row keys range from s0000000000000001 to s7fffffffffffffff
+        public const string RK_PREFIX = "s";
+        public const string RK_MIN = RK_PREFIX;
+        public const string RK_MAX = RK_PREFIX + "~";
 
         public string TransactionId { get; set; }
 
