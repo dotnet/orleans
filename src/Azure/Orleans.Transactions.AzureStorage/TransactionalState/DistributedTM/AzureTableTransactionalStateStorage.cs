@@ -109,7 +109,7 @@ namespace Orleans.Transactions.DistributedTM.AzureStorage
             // assemble all storage operations into a single batch
             // these operations must commit in sequence, but not necessarily atomically
             // so we can split this up if needed
-            var batchOperation = new TableBatchOperation();
+            var batchOperation = new BatchOperation(logger, key, table);
 
             // first, clean up aborted records
             if (abortAfter.HasValue && states.Count != 0)
@@ -117,7 +117,7 @@ namespace Orleans.Transactions.DistributedTM.AzureStorage
                 while (states.Count > 0 && states[states.Count - 1].Key > abortAfter)
                 {
                     var entity = states[states.Count - 1].Value;
-                    batchOperation.Delete(entity);
+                    await batchOperation.Add(TableOperation.Delete(entity)).ConfigureAwait(false);
                     states.RemoveAt(states.Count - 1);
 
                     if (logger.IsEnabled(LogLevel.Trace))
@@ -139,7 +139,7 @@ namespace Orleans.Transactions.DistributedTM.AzureStorage
                             existing.TransactionTimestamp = s.TimeStamp;
                             existing.TransactionManager = s.TransactionManager;
                             existing.SetState(s.State, this.jsonSettings);
-                            batchOperation.Replace(existing);
+                            await batchOperation.Add(TableOperation.Replace(existing)).ConfigureAwait(false);
                             states.RemoveAt(pos);
 
                             if (logger.IsEnabled(LogLevel.Trace))
@@ -148,7 +148,7 @@ namespace Orleans.Transactions.DistributedTM.AzureStorage
                         else
                         {
                             var entity = StateEntity.Create(this.jsonSettings, this.partition, s);
-                            batchOperation.Insert(entity);
+                            await batchOperation.Add(TableOperation.Insert(entity)).ConfigureAwait(false);
                             states.Insert(pos, new KeyValuePair<long, StateEntity>(s.SequenceId, entity));
 
                             if (logger.IsEnabled(LogLevel.Trace))
@@ -164,14 +164,14 @@ namespace Orleans.Transactions.DistributedTM.AzureStorage
             }
             if (string.IsNullOrEmpty(this.key.ETag))
             {
-                batchOperation.Insert(this.key);
+                await batchOperation.Add(TableOperation.Insert(this.key)).ConfigureAwait(false);
 
                 if (logger.IsEnabled(LogLevel.Trace))
                     logger.LogTrace($"{partition}.k Insert");
             }
             else
             {
-                batchOperation.Replace(this.key);
+                await batchOperation.Add(TableOperation.Replace(this.key)).ConfigureAwait(false);
 
                 if (logger.IsEnabled(LogLevel.Trace))
                     logger.LogTrace($"{partition}.k Update");
@@ -183,7 +183,7 @@ namespace Orleans.Transactions.DistributedTM.AzureStorage
                 FindState(obsoleteBefore, out var pos);
                 for (int i = 0; i < pos; i++)
                 {
-                    batchOperation.Delete(states[i].Value);
+                    await batchOperation.Add(TableOperation.Delete(states[i].Value)).ConfigureAwait(false);
 
                     if (logger.IsEnabled(LogLevel.Trace))
                         logger.LogTrace($"{partition}.{states[i].Key:x16} Delete {states[i].Value.TransactionId}");
@@ -194,7 +194,7 @@ namespace Orleans.Transactions.DistributedTM.AzureStorage
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.LogTrace($"{partition} Storing v{this.key.CommittedSequenceId} {batchOperation.Count} table ops");
 
-            await StoreBatch(batchOperation).ConfigureAwait(false);
+            await batchOperation.Flush().ConfigureAwait(false);
 
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.LogTrace($"{partition} Stored v{this.key.CommittedSequenceId} eTag={key.ETag}");
@@ -249,50 +249,82 @@ namespace Orleans.Transactions.DistributedTM.AzureStorage
             return results;
         }
 
-        private async Task StoreBatch(TableBatchOperation batchOperation)
+        private class BatchOperation
         {
-            try
+            private readonly TableBatchOperation batchOperation;
+            private readonly ILogger logger;
+            private readonly KeyEntity key;
+            private readonly CloudTable table;
+
+            private bool batchContainsKey;
+
+            public BatchOperation(ILogger logger, KeyEntity key, CloudTable table)
             {
-                if (batchOperation.Count < AzureTableConstants.MaxBatchSize)
+                this.batchOperation = new TableBatchOperation();
+                this.logger = logger;
+                this.key = key;
+                this.table = table;
+            }
+
+            public async Task Add(TableOperation operation)
+            {
+                batchOperation.Add(operation);
+
+                if (operation.Entity == key)
                 {
-                    await table.ExecuteBatchAsync(batchOperation).ConfigureAwait(false);
+                    batchContainsKey = true;
                 }
-                else
+
+                if (batchOperation.Count == AzureTableConstants.MaxBatchSize - (batchContainsKey ? 0 : 1))
                 {
-                    var portion = new TableBatchOperation();
-                    var enumerator = batchOperation.GetEnumerator();
-                    while (enumerator.MoveNext())
+                    // the key serves as a synchronizer, to prevent modification by multiple grains under edge conditions,
+                    // like duplicate activations or deployments.Every batch write needs to include the key, 
+                    // even if the key values don't change.
+
+                    if (!batchContainsKey)
                     {
-                        portion.Add(enumerator.Current);
-                        if (portion.Count == AzureTableConstants.MaxBatchSize)
+                        if (string.IsNullOrEmpty(key.ETag))
+                            batchOperation.Insert(key);
+                        else
+                            batchOperation.Replace(key);
+                    }
+
+                    await Flush().ConfigureAwait(false);
+
+                    batchOperation.Clear();
+                    batchContainsKey = false;
+                }
+            }
+
+            public async Task Flush()
+            {
+                if (batchOperation.Count > 0)
+                    try
+                    {
+                        await table.ExecuteBatchAsync(batchOperation).ConfigureAwait(false);
+
+                        batchOperation.Clear();
+                        batchContainsKey = false;
+
+                        if (logger.IsEnabled(LogLevel.Trace))
                         {
-                            await table.ExecuteBatchAsync(portion).ConfigureAwait(false);
-                            portion.Clear();
+                            for (int i = 0; i < batchOperation.Count; i++)
+                                logger.LogTrace($"batch-op ok     {i} PK={batchOperation[i].Entity.PartitionKey} RK={batchOperation[i].Entity.RowKey}");
                         }
                     }
-                    if (portion.Count > 0)
+                    catch (Exception ex)
                     {
-                        await table.ExecuteBatchAsync(portion).ConfigureAwait(false);
+                        if (logger.IsEnabled(LogLevel.Trace))
+                        {
+                            for (int i = 0; i < batchOperation.Count; i++)
+                                logger.LogTrace($"batch-op failed {i} PK={batchOperation[i].Entity.PartitionKey} RK={batchOperation[i].Entity.RowKey}");
+                        }
+
+                        this.logger.LogError("Transactional state store failed {Exception}.", ex);
+                        throw;
                     }
-                }
-
-                if (logger.IsEnabled(LogLevel.Trace))
-                {
-                    for (int i = 0; i < batchOperation.Count; i++)
-                        logger.LogTrace($"batch-op ok     {i} PK={batchOperation[i].Entity.PartitionKey} RK={batchOperation[i].Entity.RowKey}");
-                }
-            }
-            catch (Exception ex)
-            {
-                if (logger.IsEnabled(LogLevel.Trace))
-                {
-                    for (int i = 0; i < batchOperation.Count; i++)
-                        logger.LogTrace($"batch-op failed {i} PK={batchOperation[i].Entity.PartitionKey} RK={batchOperation[i].Entity.RowKey}");
-                }
-
-                this.logger.LogError("Transactional state store failed {Exception}.", ex);
-                throw;
             }
         }
+
     }
 }
