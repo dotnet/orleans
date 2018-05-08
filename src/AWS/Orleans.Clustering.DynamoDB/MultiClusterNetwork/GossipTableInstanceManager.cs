@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Linq;
-using System.Net;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Amazon.DynamoDBv2.Model;
@@ -91,7 +89,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
 
             await _confStorage.PutEntryAsync(CONF_TABLE_NAME, conf.ToAttributes()).ConfigureAwait(false);
         }
-        
+
         public async Task<bool> TryUpdateConfigurationEntryAsync(MultiClusterConfiguration configuration, GossipConfiguration configInStorage)
         {
             if (configuration == null) throw new ArgumentNullException("configuration");
@@ -103,7 +101,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
 
             return (await TryUpdateTableEntryAsync(configInStorage).ConfigureAwait(false));
         }
-        
+
         /// <summary>
         /// Try once to conditionally update a data entry in the Azure table. Returns false if etag does not match.
         /// </summary>
@@ -120,34 +118,34 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
         #endregion
 
         #region Gateway
-        
+
         public async Task<GossipGateway> ReadGatewayEntryAsync(GatewayEntry gateway)
         {
-            var keys = new Dictionary<string, AttributeValue>
-            {
-                ["ServiceId"] = new AttributeValue(_globalServiceId),
-                ["SiloAddress"] = new AttributeValue(gateway.SiloAddress.Endpoint.Address.ToString()),
-                ["SiloPort"] = new AttributeValue(gateway.SiloAddress.Endpoint.Port.ToString()),
-                ["ClusterId"] = new AttributeValue(gateway.ClusterId)
-            };
+            var gw = new GossipGateway(gateway, _globalServiceId);
 
-            return await _gatewayStorage.ReadSingleEntryAsync(GATEWAY_TABLE_NAME, keys, fields => new GossipGateway(fields)).ConfigureAwait(false);
-        }
-        public async Task<bool> TryCreateGatewayEntryAsync(GatewayEntry gatewayInfo)
-        {
-            throw new NotImplementedException();
-        }
-        
-        public Task TryDeleteGatewayEntryAsync(GossipGateway gatewayInfoInStorage, int version)
-        {
-            throw new NotImplementedException();
+            return await _gatewayStorage.ReadSingleEntryAsync(GATEWAY_TABLE_NAME, gw.ToKeyAttributes(), fields => new GossipGateway(fields)).ConfigureAwait(false);
         }
 
-        public Task TryUpdateGatewayEntryAsync(GatewayEntry gatewayInfo, GossipGateway gatewayInfoInStorage, int version)
+        public async Task TryCreateGatewayEntryAsync(GatewayEntry gatewayInfo)
         {
-            throw new NotImplementedException();
+            var gw = new GossipGateway(gatewayInfo, _globalServiceId);
+
+            await _gatewayStorage.PutEntryAsync(GATEWAY_TABLE_NAME, gw.ToAttributes()).ConfigureAwait(false);
         }
 
+        public async Task TryDeleteGatewayEntryAsync(GossipGateway gatewayInfoInStorage)
+        {
+            await _gatewayStorage.DeleteEntryAsync(GATEWAY_TABLE_NAME, gatewayInfoInStorage.ToKeyAttributes(),
+                  conditionValues: gatewayInfoInStorage.ToConditionalAttributes());
+        }
+
+        public async Task TryUpdateGatewayEntryAsync(GatewayEntry gatewayInfo, GossipGateway gatewayInfoInStorage)
+        {
+            var gw = new GossipGateway(gatewayInfo, _globalServiceId) { Version = gatewayInfoInStorage.Version };
+
+            await _gatewayStorage.UpsertEntryAsync(GATEWAY_TABLE_NAME, gw.ToKeyAttributes(), gw.ToAttributes(true),
+                conditionValues: gw.ToConditionalAttributes());
+        }
 
         #endregion
 

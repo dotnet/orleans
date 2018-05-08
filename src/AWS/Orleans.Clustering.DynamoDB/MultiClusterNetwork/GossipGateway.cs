@@ -60,6 +60,18 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
                 SiloGeneration = int.Parse(fields[SILO_GENERATION_PROPERTY_NAME].S);
         }
 
+        public GossipGateway(GatewayEntry gatewayInfo, string serviceId)
+        {
+            ClusterId = gatewayInfo.ClusterId;
+            GossipTimestamp = gatewayInfo.HeartbeatTimestamp;
+            ServiceId = serviceId;
+            SiloAddress = gatewayInfo.SiloAddress.Endpoint.Address.ToString();
+            SiloPort = gatewayInfo.SiloAddress.Endpoint.Port;
+            SiloGeneration = gatewayInfo.SiloAddress.Generation;
+            Status = gatewayInfo.Status.ToString();
+            // todo version ?
+        }
+
         internal GatewayEntry ToGatewayEntry()
         {
             return new GatewayEntry
@@ -68,6 +80,39 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
                 SiloAddress = Runtime.SiloAddress.New(new IPEndPoint(IPAddress.Parse(SiloAddress), SiloPort), SiloGeneration),
                 Status = (GatewayStatus)Enum.Parse(typeof(GatewayStatus), Status),
                 HeartbeatTimestamp = GossipTimestamp
+            };
+        }
+
+        internal Dictionary<string, AttributeValue> ToAttributes(bool incrementVersion = false)
+        {
+            return new Dictionary<string, AttributeValue>
+            {
+                [STATUS_PROPERTY_NAME] = new AttributeValue(Status),
+                [VERSION_PROPERTY_NAME] = new AttributeValue((incrementVersion ? Version + 1 : Version).ToString()),
+                [CLUSTER_ID_PROPERTY_NAME] = new AttributeValue(ClusterId),
+                [SILO_ADDRESS_PROPERTY_NAME] = new AttributeValue(SiloAddress),
+                [SERVICE_ID_PROPERTY_NAME] = new AttributeValue(ServiceId),
+                [SILO_PORT_PROPERTY_NAME] = new AttributeValue(SiloPort.ToString()),
+                [SILO_GENERATION_PROPERTY_NAME] = new AttributeValue(SiloGeneration.ToString())
+            };
+        }
+
+        internal Dictionary<string, AttributeValue> ToKeyAttributes()
+        {
+            return new Dictionary<string, AttributeValue>
+            {
+                [CLUSTER_ID_PROPERTY_NAME] = new AttributeValue(ClusterId),
+                [SILO_ADDRESS_PROPERTY_NAME] = new AttributeValue(SiloAddress),
+                [SERVICE_ID_PROPERTY_NAME] = new AttributeValue(ServiceId),
+                [SILO_PORT_PROPERTY_NAME] = new AttributeValue(SiloPort.ToString()),
+            };
+        }
+
+        internal Dictionary<string, AttributeValue> ToConditionalAttributes()
+        {
+            return new Dictionary<string, AttributeValue>
+            {
+                [VERSION_PROPERTY_NAME] = new AttributeValue(Version.ToString())
             };
         }
     }

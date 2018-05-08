@@ -89,7 +89,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
                 }
                 else
                 {
-                    await _tableManager.TryUpdateGatewayEntryAsync(gatewayInfo, gatewayInfoInStorage, gatewayInfoInStorage.Version);
+                    await _tableManager.TryUpdateGatewayEntryAsync(gatewayInfo, gatewayInfoInStorage);
                 }
             }
             else if (gatewayInfoInStorage != null &&
@@ -99,7 +99,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
                 if (fromstorage.Expired)
                 {
                     // remove gateway info from storage
-                    await _tableManager.TryDeleteGatewayEntryAsync(gatewayInfoInStorage, gatewayInfoInStorage.Version);
+                    await _tableManager.TryDeleteGatewayEntryAsync(gatewayInfoInStorage);
                 }
                 else
                 {
