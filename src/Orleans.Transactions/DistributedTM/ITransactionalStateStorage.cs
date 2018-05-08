@@ -13,11 +13,10 @@ namespace Orleans.Transactions.DistributedTM
     public interface ITransactionalStateStorage<TState>
         where TState : class, new()
     {
-        Task<TransactionalStorageLoadResponse<TState>> Load(string stateName);
+        Task<TransactionalStorageLoadResponse<TState>> Load();
 
         Task<string> Store(
 
-            string stateName,
             string expectedETag,
             string metadata,
 

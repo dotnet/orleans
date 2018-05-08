@@ -122,7 +122,7 @@ namespace Orleans.Transactions.DistributedTM
             }
         }
 
-        public Task<string> Store(ITransactionalStateStorage<TState> storage, string stateName)
+        public Task<string> Store(ITransactionalStateStorage<TState> storage)
         {
             var jsonMetaData = JsonConvert.SerializeObject(MetaData, MetaData.SerializerSettings);
 
@@ -136,7 +136,7 @@ namespace Orleans.Transactions.DistributedTM
                 }
             }
 
-            return storage.Store(stateName, ETag, jsonMetaData, list,
+            return storage.Store(ETag, jsonMetaData, list,
                 (confirm > 0) ? confirmUpTo : (long?)null,
                 (cancelAbove < cancelAboveStart) ? cancelAbove : (long?)null);
         }

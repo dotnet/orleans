@@ -33,13 +33,13 @@ namespace Orleans.Transactions.DistributedTM
             this.stateName = stateName;
         }
 
-        public async Task<TransactionalStorageLoadResponse<TState>> Load(string stateName)
+        public async Task<TransactionalStorageLoadResponse<TState>> Load()
         {
             await this.StateStorage.ReadStateAsync();
             return new TransactionalStorageLoadResponse<TState>(stateStorage.Etag, stateStorage.State.CommittedState, stateStorage.State.CommittedSequenceId, stateStorage.State.Metadata, stateStorage.State.PendingStates);
         }
 
-        public async Task<string> Store(string stateName, string expectedETag, string metadata, List<PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter)
+        public async Task<string> Store(string expectedETag, string metadata, List<PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter)
         {
             if (this.StateStorage.Etag != expectedETag)
                 throw new ArgumentException(nameof(expectedETag), "Etag does not match");

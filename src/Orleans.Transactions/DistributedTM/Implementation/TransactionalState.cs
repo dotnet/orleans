@@ -185,7 +185,7 @@ namespace Orleans.Transactions.DistributedTM
         private async Task Restore()
         {
             // start the load
-            var loadtask = this.storage.Load(this.config.StateName);
+            var loadtask = this.storage.Load();
 
             // abort active transactions, without waking up waiters just yet
             AbortExecutingTransactions("due to restore");
