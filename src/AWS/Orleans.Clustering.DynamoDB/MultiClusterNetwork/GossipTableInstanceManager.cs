@@ -1,10 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
-using Amazon.DynamoDBv2.Model;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.MultiCluster;
@@ -18,9 +16,9 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
         private const string CONF_TABLE_NAME = "OrleansGossipConfigurationTable";
         private const string GATEWAY_TABLE_NAME = "OrleansGossipGatewayTable";
 
-        private readonly string _globalServiceId;
         private readonly DynamoDBStorage _confStorage;
         private readonly DynamoDBStorage _gatewayStorage;
+        private readonly string _globalServiceId;
         private readonly ILogger _logger;
 
         private GossipTableInstanceManager(string globalServiceId, string storageConnectionString, ILoggerFactory loggerFactory)
@@ -73,12 +71,10 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
 
         public async Task<GossipConfiguration> ReadConfigurationEntryAsync()
         {
-            var keys = new Dictionary<string, AttributeValue>
-            {
-                ["ServiceId"] = new AttributeValue(_globalServiceId)
-            };
-
-            return await _confStorage.ReadSingleEntryAsync(CONF_TABLE_NAME, keys, fields => new GossipConfiguration(fields)).ConfigureAwait(false);
+            return await _confStorage.ReadSingleEntryAsync(
+                CONF_TABLE_NAME,
+                GossipConfiguration.KeyAttributes(_globalServiceId),
+                fields => new GossipConfiguration(fields)).ConfigureAwait(false);
         }
 
         public async Task TryCreateConfigurationEntryAsync(MultiClusterConfiguration config)
@@ -98,22 +94,22 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
             configInStorage.GossipTimestamp = configuration.AdminTimestamp;
             configInStorage.Clusters = configuration.Clusters.ToList();
             configInStorage.Comment = configuration.Comment ?? "";
-            configInStorage.Version = ++configInStorage.Version;
+            configInStorage.Version = configInStorage.Version;
 
-            return (await TryUpdateTableEntryAsync(configInStorage).ConfigureAwait(false));
+            return await TryUpdateTableEntryAsync(configInStorage).ConfigureAwait(false);
         }
 
         /// <summary>
-        /// Try once to conditionally update a data entry in the Azure table. Returns false if etag does not match.
+        /// Try once to conditionally update a data entry in the DynamoDB table. Returns false if version does not match.
         /// </summary>
         private async Task<bool> TryUpdateTableEntryAsync(GossipConfiguration data, [CallerMemberName]string operation = null)
         {
-            var keys = new Dictionary<string, AttributeValue>
-            {
-                ["ServiceId"] = new AttributeValue(_globalServiceId),
-            };
-
-            return await TryOperation(() => _confStorage.UpsertEntryAsync(CONF_TABLE_NAME, keys, data.ToAttributes(), "", null, null));
+            return await TryOperation(() => _confStorage.UpsertEntryAsync(
+                CONF_TABLE_NAME,
+                GossipConfiguration.KeyAttributes(_globalServiceId),
+                data.ToAttributes(true),
+                "",
+                data.ToConditionalAttributes()), operation);
         }
 
         #endregion
@@ -124,40 +120,48 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
         {
             var gw = new GossipGateway(gateway, _globalServiceId);
 
-            return await _gatewayStorage.ReadSingleEntryAsync(GATEWAY_TABLE_NAME, gw.ToKeyAttributes(), fields => new GossipGateway(fields)).ConfigureAwait(false);
+            return await _gatewayStorage.ReadSingleEntryAsync(
+                GATEWAY_TABLE_NAME,
+                gw.ToKeyAttributes(),
+                fields => new GossipGateway(fields)).ConfigureAwait(false);
         }
 
         public async Task<Dictionary<SiloAddress, GossipGateway>> ReadGatewayEntriesAsync()
         {
-            var q = new Dictionary<string, AttributeValue>
-            {
-                ["ServiceId"] = new AttributeValue(_globalServiceId)
-            };
+            var result = await _gatewayStorage.QueryAsync(
+                GATEWAY_TABLE_NAME,
+                GossipConfiguration.KeyAttributes(_globalServiceId),
+                "",
+                r => new GossipGateway(r));
 
-            var result = await _gatewayStorage.QueryAsync(GATEWAY_TABLE_NAME, q, "", r => new GossipGateway(r));
             return result.results.ToDictionary(
-                r => SiloAddress.New(new IPEndPoint(IPAddress.Parse(r.SiloAddress), r.SiloPort), r.SiloGeneration),
+                r => r.OrleansSiloAddress,
                 s => s);
         }
 
         public async Task TryCreateGatewayEntryAsync(GatewayEntry gatewayInfo)
         {
-            var gw = new GossipGateway(gatewayInfo, _globalServiceId);
+            var gw = new GossipGateway(gatewayInfo, _globalServiceId) { Version = 0 };
 
             await _gatewayStorage.PutEntryAsync(GATEWAY_TABLE_NAME, gw.ToAttributes()).ConfigureAwait(false);
         }
 
         public async Task TryDeleteGatewayEntryAsync(GossipGateway gatewayInfoInStorage)
         {
-            await _gatewayStorage.DeleteEntryAsync(GATEWAY_TABLE_NAME, gatewayInfoInStorage.ToKeyAttributes(),
-                  conditionValues: gatewayInfoInStorage.ToConditionalAttributes());
+            await _gatewayStorage.DeleteEntryAsync(
+                GATEWAY_TABLE_NAME,
+                gatewayInfoInStorage.ToKeyAttributes(),
+                conditionValues: gatewayInfoInStorage.ToConditionalAttributes());
         }
 
         public async Task TryUpdateGatewayEntryAsync(GatewayEntry gatewayInfo, GossipGateway gatewayInfoInStorage)
         {
             var gw = new GossipGateway(gatewayInfo, _globalServiceId) { Version = gatewayInfoInStorage.Version };
 
-            await _gatewayStorage.UpsertEntryAsync(GATEWAY_TABLE_NAME, gw.ToKeyAttributes(), gw.ToAttributes(true),
+            await _gatewayStorage.UpsertEntryAsync(
+                GATEWAY_TABLE_NAME,
+                gw.ToKeyAttributes(),
+                gw.ToAttributes(true),
                 conditionValues: gw.ToConditionalAttributes());
         }
 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Net;
 using Amazon.DynamoDBv2.Model;
 using Orleans.MultiCluster;
+using Orleans.Runtime;
 using Orleans.Runtime.MultiClusterNetwork;
 
 namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
@@ -17,26 +18,29 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
         private const string SILO_PORT_PROPERTY_NAME = "SiloPort";
         private const string SILO_GENERATION_PROPERTY_NAME = "SiloGeneration";
 
-        public DateTime GossipTimestamp { get; set; }
+        public DateTime GossipTimestamp { get; }
 
-        public string Status { get; set; }
+        public string Status { get; }
 
         public int Version { get; set; }
 
         // Primary Key
-        public string ClusterId { get; set; }
+        public string ClusterId { get; }
 
         // Primary Key
-        public string SiloAddress { get; set; }
+        public string SiloAddress { get; }
 
         // Primary Key
-        public string ServiceId { get; set; }
+        public string ServiceId { get; }
+        
+        // Primary Key
+        public int SiloPort { get; }
 
-        public int SiloPort { get; set; }
+        public int SiloGeneration { get; }
 
-        public int SiloGeneration { get; set; }
+        public SiloAddress OrleansSiloAddress => Runtime.SiloAddress.New(new IPEndPoint(IPAddress.Parse(SiloAddress), SiloPort), SiloGeneration);
 
-        public GossipGateway(Dictionary<string, AttributeValue> fields)
+        public GossipGateway(IReadOnlyDictionary<string, AttributeValue> fields)
         {
             if (fields.ContainsKey(STATUS_PROPERTY_NAME))
                 Status = fields[STATUS_PROPERTY_NAME].S;
@@ -69,7 +73,6 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
             SiloPort = gatewayInfo.SiloAddress.Endpoint.Port;
             SiloGeneration = gatewayInfo.SiloAddress.Generation;
             Status = gatewayInfo.Status.ToString();
-            // todo version ?
         }
 
         internal GatewayEntry ToGatewayEntry()
@@ -77,7 +80,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
             return new GatewayEntry
             {
                 ClusterId = ClusterId,
-                SiloAddress = Runtime.SiloAddress.New(new IPEndPoint(IPAddress.Parse(SiloAddress), SiloPort), SiloGeneration),
+                SiloAddress = OrleansSiloAddress,
                 Status = (GatewayStatus)Enum.Parse(typeof(GatewayStatus), Status),
                 HeartbeatTimestamp = GossipTimestamp
             };
