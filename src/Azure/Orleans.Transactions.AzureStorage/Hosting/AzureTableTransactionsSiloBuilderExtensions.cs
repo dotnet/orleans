@@ -47,10 +47,23 @@ namespace Orleans.Hosting
             Action<OptionsBuilder<AzureTableTransactionalStateOptions>> configureOptions = null)
         {
             configureOptions?.Invoke(services.AddOptions<AzureTableTransactionalStateOptions>(name));
+
+            // single TM
             services.ConfigureNamedOptionForLogging<AzureTableTransactionalStateOptions>(name);
             services.TryAddSingleton<ITransactionalStateStorageFactory>(sp => sp.GetServiceByName<ITransactionalStateStorageFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
-            return services.AddSingletonNamedService<ITransactionalStateStorageFactory>(name, AzureTableTransactionalStateStorageFactory.Create)
-                           .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<ITransactionalStateStorageFactory>(n));
+            services.AddSingletonNamedService<ITransactionalStateStorageFactory>(name, AzureTableTransactionalStateStorageFactory.Create);
+            services.AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<ITransactionalStateStorageFactory>(n));
+
+            // distributed TM
+            services.TryAddSingleton<Orleans.Transactions.DistributedTM.ITransactionalStateStorageFactory>(sp => sp.GetServiceByName<Orleans.Transactions.DistributedTM.ITransactionalStateStorageFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
+            services.AddSingletonNamedService<Orleans.Transactions.DistributedTM.ITransactionalStateStorageFactory>(name, Orleans.Transactions.DistributedTM.AzureStorage.AzureTableTransactionalStateStorageFactory.Create);
+            services.AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<Orleans.Transactions.DistributedTM.ITransactionalStateStorageFactory>(n));
+
+            return services; 
         }
+
+       
+
+
     }
 }

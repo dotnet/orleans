@@ -73,7 +73,7 @@ namespace Orleans.Transactions.DistributedTM
                         // get the next batch in place so it can be filled while we store the old one
                         storageBatch = nextBatch;
 
-                        nextBatch.ETag = await thisBatch.Store(storage, config.StateName);
+                        nextBatch.ETag = await thisBatch.Store(storage);
 
                         if (committableEntries > 0)
                         {
