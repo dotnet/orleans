@@ -42,8 +42,8 @@ namespace Orleans.Transactions.DistributedTM.AzureStorage
 
                 if (string.IsNullOrEmpty(key.ETag))
                 {
-                    if (logger.IsEnabled(LogLevel.Trace))
-                        logger.LogTrace($"{partition} Loaded v0, fresh");
+                    if (logger.IsEnabled(LogLevel.Debug))
+                        logger.LogDebug($"{partition} Loaded v0, fresh");
 
                     // first time load
                     return new TransactionalStorageLoadResponse<TState>();
@@ -87,8 +87,8 @@ namespace Orleans.Transactions.DistributedTM.AzureStorage
                         states[i].Value.StateJson = null;
                     }
 
-                    if (logger.IsEnabled(LogLevel.Trace))
-                        logger.LogTrace($"{partition} Loaded v{this.key.CommittedSequenceId} rows={string.Join(",", states.Select(s => s.Key.ToString("x16")))}");
+                    if (logger.IsEnabled(LogLevel.Debug))
+                        logger.LogDebug($"{partition} Loaded v{this.key.CommittedSequenceId} rows={string.Join(",", states.Select(s => s.Key.ToString("x16")))}");
 
                     return new TransactionalStorageLoadResponse<TState>(this.key.ETag, committedState, this.key.CommittedSequenceId, this.key.Metadata, PrepareRecordsToRecover);
                 }
@@ -191,13 +191,10 @@ namespace Orleans.Transactions.DistributedTM.AzureStorage
                 states.RemoveRange(0, pos);
             }
 
-            if (logger.IsEnabled(LogLevel.Trace))
-                logger.LogTrace($"{partition} Storing v{this.key.CommittedSequenceId} {batchOperation.Count} table ops");
-
             await batchOperation.Flush().ConfigureAwait(false);
 
-            if (logger.IsEnabled(LogLevel.Trace))
-                logger.LogTrace($"{partition} Stored v{this.key.CommittedSequenceId} eTag={key.ETag}");
+            if (logger.IsEnabled(LogLevel.Debug))
+                logger.LogDebug($"{partition} Stored v{this.key.CommittedSequenceId} eTag={key.ETag}");
 
             return key.ETag;
         }
