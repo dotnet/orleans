@@ -106,7 +106,7 @@
   <!-- Versioning properties -->
   <PropertyGroup>
     <AssemblyVersion>2.0.0.0</AssemblyVersion>
-    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">2.1.0</VersionPrefix>
+    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">2.0.3</VersionPrefix>
   </PropertyGroup>
 
   <!-- For Debug builds generated a date/time dependent version suffix -->
@@ -123,25 +123,25 @@
   <PropertyGroup Condition="$(FullBuild) != 'true'">
     <OrleansCoreAbstractionsVersion>2.0.0</OrleansCoreAbstractionsVersion>
     <OrleansRuntimeAbstractionsVersion>2.0.0</OrleansRuntimeAbstractionsVersion>
-    <OrleansCoreVersion>2.1.0</OrleansCoreVersion>
-    <OrleansRuntimeVersion>2.1.0</OrleansRuntimeVersion>
-    <OrleansCoreLegacyVersion>2.1.0</OrleansCoreLegacyVersion>
-    <OrleansRuntimeLegacyVersion>2.1.0</OrleansRuntimeLegacyVersion>
+    <OrleansCoreVersion>2.0.3</OrleansCoreVersion>
+    <OrleansRuntimeVersion>2.0.3</OrleansRuntimeVersion>
+    <OrleansCoreLegacyVersion>2.0.3</OrleansCoreLegacyVersion>
+    <OrleansRuntimeLegacyVersion>2.0.3</OrleansRuntimeLegacyVersion>
     <OrleansProvidersVersion>2.0.0</OrleansProvidersVersion>
     <OrleansExtensionsVersion>2.0.0</OrleansExtensionsVersion>
     <OrleansEventSourcingVersion>2.0.0</OrleansEventSourcingVersion>
     <OrleansAdoNetVersion>2.0.0</OrleansAdoNetVersion>
     <OrleansAWSVersion>2.0.0</OrleansAWSVersion>
     <OrleansAzureVersion>2.0.0</OrleansAzureVersion>
-    <OrleansTestingHostVersion>2.1.0</OrleansTestingHostVersion>
-    <OrleansTransactionsVersion>2.1.0</OrleansTransactionsVersion>
+    <OrleansTestingHostVersion>2.0.3</OrleansTestingHostVersion>
+    <OrleansTransactionsVersion>2.0.3</OrleansTransactionsVersion>
     <OrleansServiceFabricVersion>2.0.0</OrleansServiceFabricVersion>
     <OrleansSerializersVersion>2.0.0</OrleansSerializersVersion>
     <OrleansToolsVersion>2.0.0</OrleansToolsVersion>
     <OrleansClientVersion>2.0.0</OrleansClientVersion>
     <OrleansServerVersion>2.0.0</OrleansServerVersion>
-    <OrleansCodegenVersion>2.1.0</OrleansCodegenVersion>
-    <OrleansEventHubProviderVersion>2.1.0</OrleansEventHubProviderVersion>
+    <OrleansCodegenVersion>2.0.3</OrleansCodegenVersion>
+    <OrleansEventHubProviderVersion>2.0.3</OrleansEventHubProviderVersion>
   </PropertyGroup>
   
   <PropertyGroup Condition="$(FullBuild) == 'true'">
