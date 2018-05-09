@@ -141,6 +141,7 @@
     <OrleansClientVersion>2.0.0</OrleansClientVersion>
     <OrleansServerVersion>2.0.0</OrleansServerVersion>
     <OrleansCodegenVersion>2.1.0</OrleansCodegenVersion>
+    <OrleansEventHubProviderVersion>2.1.0</OrleansEventHubProviderVersion>
   </PropertyGroup>
   
   <PropertyGroup Condition="$(FullBuild) == 'true'">
@@ -164,6 +165,7 @@
     <OrleansClientVersion>$(VersionPrefix)</OrleansClientVersion>
     <OrleansServerVersion>$(VersionPrefix)</OrleansServerVersion>
     <OrleansCodegenVersion>$(VersionPrefix)</OrleansCodegenVersion>
+    <OrleansEventHubProviderVersion>$(VersionPrefix)</OrleansEventHubProviderVersion>
   </PropertyGroup>
 
   <!-- Set output folder for created NuGet packages -->
