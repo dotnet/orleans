@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
+﻿
 namespace Orleans.Transactions
 {
     /// <summary>
@@ -38,6 +35,4 @@ namespace Orleans.Transactions
         /// <returns>true if there are no orphans, false otherwise</returns>
         bool ReconcilePending(out int numberOrphans);
     }
-
-
 }

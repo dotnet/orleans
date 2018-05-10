@@ -28,17 +28,12 @@ namespace Orleans.Transactions.Tests
         }
 
         [SkippableTheory]
-        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, true)]
-        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, true)]
-        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain, true)]
-        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, false)]
-        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, false)]
-        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain, false)]
-        public Task TransactionWillRecoverAfterRandomSiloFailure(string transactionTestGrainClassName,
-            bool killSiloWhichRunsTm)
+        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
+        public Task TransactionWillRecoverAfterRandomSiloFailure(string transactionTestGrainClassName)
         {
-            return this.testRunner.TransactionWillRecoverAfterRandomSiloFailure(transactionTestGrainClassName,
-                killSiloWhichRunsTm);
+            return this.testRunner.TransactionWillRecoverAfterRandomSiloFailure(transactionTestGrainClassName);
         }
     }
 }

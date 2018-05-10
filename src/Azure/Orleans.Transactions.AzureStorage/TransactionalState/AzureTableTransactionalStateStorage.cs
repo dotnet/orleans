@@ -14,16 +14,18 @@ namespace Orleans.Transactions.AzureStorage
     {
         private readonly CloudTable table;
         private readonly string partition;
+        private readonly string stateName;
         private readonly JsonSerializerSettings jsonSettings;
         private readonly ILogger logger;
 
         private KeyEntity key;
-        private List<StateEntity> states;
+        private List<KeyValuePair<long, StateEntity>> states;
 
-        public AzureTableTransactionalStateStorage(CloudTable table, string partition, JsonSerializerSettings JsonSettings, ILogger<AzureTableTransactionalStateStorage<TState>> logger)
+        public AzureTableTransactionalStateStorage(CloudTable table, string partition, string stateName, JsonSerializerSettings JsonSettings, ILogger<AzureTableTransactionalStateStorage<TState>> logger)
         {
             this.table = table;
             this.partition = partition;
+            this.stateName = stateName;
             this.jsonSettings = JsonSettings;
             this.logger = logger;
         }
@@ -32,98 +34,187 @@ namespace Orleans.Transactions.AzureStorage
         {
             try
             {
-                Task<KeyEntity> keyTask = ReadKey();
-                Task<List<StateEntity>> statesTask = ReadStates();
-                this.key = await keyTask.ConfigureAwait(false);
-                this.states = await statesTask.ConfigureAwait(false);
-                if (string.IsNullOrEmpty(this.key.ETag))
+                var keyTask = ReadKey();
+                var statesTask = ReadStates();
+                key = await keyTask.ConfigureAwait(false);
+                states = await statesTask.ConfigureAwait(false);
+
+                if (string.IsNullOrEmpty(key.ETag))
                 {
+                    if (logger.IsEnabled(LogLevel.Debug))
+                        logger.LogDebug($"{partition} Loaded v0, fresh");
+
+                    // first time load
                     return new TransactionalStorageLoadResponse<TState>();
                 }
-                TState commitedState = (!string.IsNullOrEmpty(this.key.CommittedTransactionId)) ? FindState(this.key.CommittedTransactionId) : new TState();
-                if (commitedState == null)
+                else
                 {
-                    this.logger.LogCritical("Transactional state non-recoverable error.  Commited state for transaction {TransactionId} not found.", this.key.CommittedTransactionId);
-                    throw new InvalidOperationException($"Transactional state non-recoverable error.  Commited state for transaction {this.key.CommittedTransactionId} not found.");
+                    if (!FindState(this.key.CommittedSequenceId, out var pos))
+                    {
+                        var error = $"Storage state corrupted: no record for committed state";
+                        logger.LogCritical(error);
+                        throw new InvalidOperationException(error);
+                    }
+                    var committedState = states[pos].Value.GetState<TState>(this.jsonSettings);
+
+                    var PrepareRecordsToRecover = new List<PendingTransactionState<TState>>();
+                    for (int i = 0; i < states.Count; i++)
+                    {
+                        var kvp = states[i];
+
+                        // pending states for already committed transactions can be ignored
+                        if (kvp.Key <= key.CommittedSequenceId)
+                            continue;
+
+                        // upon recovery, local non-committed transactions are considered aborted
+                        if (kvp.Value.TransactionManager == null)
+                            break;
+
+                        PrepareRecordsToRecover.Add(new PendingTransactionState<TState>()
+                        {
+                            SequenceId = kvp.Key,
+                            State = kvp.Value.GetState<TState>(this.jsonSettings),
+                            TimeStamp = kvp.Value.TransactionTimestamp,
+                            TransactionId = kvp.Value.TransactionId,
+                            TransactionManager = kvp.Value.TransactionManager
+                        });
+                    }
+
+                    // clear the state strings... no longer needed, ok to GC now
+                    for (int i = 0; i < states.Count; i++)
+                    {
+                        states[i].Value.StateJson = null;
+                    }
+
+                    if (logger.IsEnabled(LogLevel.Debug))
+                        logger.LogDebug($"{partition} Loaded v{this.key.CommittedSequenceId} rows={string.Join(",", states.Select(s => s.Key.ToString("x16")))}");
+
+                    return new TransactionalStorageLoadResponse<TState>(this.key.ETag, committedState, this.key.CommittedSequenceId, this.key.Metadata, PrepareRecordsToRecover);
                 }
-                var pendingStates = states.Select(s => new PendingTransactionState<TState>(s.TransactionId, s.SequenceId, s.GetState<TState>(this.jsonSettings))).ToList();
-                return new TransactionalStorageLoadResponse<TState>(this.key.ETag, commitedState, this.key.Metadata, pendingStates);
-            } catch(Exception ex)
+            }
+            catch (Exception ex)
             {
                 this.logger.LogError("Transactional state load failed {Exception}.", ex);
                 throw;
             }
         }
 
-        public async Task<string> Persist(string expectedETag, string metadata, List<PendingTransactionState<TState>> statesToPrepare)
+
+        public async Task<string> Store(string expectedETag, string metadata, List<PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter)
         {
-            try
+            if (this.key.ETag != expectedETag)
+                throw new ArgumentException(nameof(expectedETag), "Etag does not match");
+
+            // assemble all storage operations into a single batch
+            // these operations must commit in sequence, but not necessarily atomically
+            // so we can split this up if needed
+            var batchOperation = new BatchOperation(logger, key, table);
+
+            // first, clean up aborted records
+            if (abortAfter.HasValue && states.Count != 0)
             {
-                var batchOperation = new TableBatchOperation();
-
-                this.key.ETag = expectedETag;
-                this.key.Metadata = metadata;
-                if (string.IsNullOrEmpty(this.key.ETag))
-                    batchOperation.Insert(this.key);
-                else
-                    batchOperation.Replace(this.key);
-
-                // add new states
-                List<Tuple<string,long>> stored = this.states.Select(s => Tuple.Create(s.TransactionId, s.SequenceId)).ToList();
-                List<StateEntity> newStates = new List<StateEntity>();
-                foreach (PendingTransactionState<TState> pendingState in statesToPrepare.Where(p => !stored.Contains(Tuple.Create(p.TransactionId, p.SequenceId))))
+                while (states.Count > 0 && states[states.Count - 1].Key > abortAfter)
                 {
-                    var newState = StateEntity.Create(this.jsonSettings, this.partition, pendingState);
-                    newStates.Add(newState);
-                    batchOperation.Insert(newState);
-                }
+                    var entity = states[states.Count - 1].Value;
+                    await batchOperation.Add(TableOperation.Delete(entity)).ConfigureAwait(false);
+                    states.RemoveAt(states.Count - 1);
 
-                if (batchOperation.Count > AzureTableConstants.MaxBatchSize)
-                {
-                    this.logger.LogError("Too many pending states. PendingStateCount {PendingStateCount}.", batchOperation.Count);
-                    throw new InvalidOperationException($"Too many pending states. PendingStateCount {batchOperation.Count}");
+                    if (logger.IsEnabled(LogLevel.Trace))
+                        logger.LogTrace($"{partition}.{states[states.Count - 1].Key:x16} Delete {entity.TransactionId}");
                 }
-
-                await table.ExecuteBatchAsync(batchOperation).ConfigureAwait(false);
-                this.states.AddRange(newStates);
-                return this.key.ETag;
             }
-            catch (Exception ex)
+
+            // second, persist non-obsolete prepare records
+            var obsoleteBefore = commitUpTo.HasValue ? commitUpTo.Value : key.CommittedSequenceId;
+            if (statesToPrepare != null)
+                foreach (var s in statesToPrepare)
+                    if (s.SequenceId >= obsoleteBefore)
+                    {
+                        if (FindState(s.SequenceId, out var pos))
+                        {
+                            // overwrite with new pending state
+                            var existing = states[pos].Value;
+                            existing.TransactionId = s.TransactionId;
+                            existing.TransactionTimestamp = s.TimeStamp;
+                            existing.TransactionManager = s.TransactionManager;
+                            existing.SetState(s.State, this.jsonSettings);
+                            await batchOperation.Add(TableOperation.Replace(existing)).ConfigureAwait(false);
+                            states.RemoveAt(pos);
+
+                            if (logger.IsEnabled(LogLevel.Trace))
+                                logger.LogTrace($"{partition}.{existing.SequenceId:x16} Update {existing.TransactionId}");
+                        }
+                        else
+                        {
+                            var entity = StateEntity.Create(this.jsonSettings, this.partition, s);
+                            await batchOperation.Add(TableOperation.Insert(entity)).ConfigureAwait(false);
+                            states.Insert(pos, new KeyValuePair<long, StateEntity>(s.SequenceId, entity));
+
+                            if (logger.IsEnabled(LogLevel.Trace))
+                                logger.LogTrace($"{partition}.{s.SequenceId:x16} Insert {entity.TransactionId}");
+                        }
+                    }
+
+            // third, persist metadata and commit position
+            key.Metadata = metadata;
+            if (commitUpTo.HasValue && commitUpTo.Value > key.CommittedSequenceId)
             {
-                this.logger.LogError("Transactional state persist failed {Exception}.", ex);
-                throw;
+                key.CommittedSequenceId = commitUpTo.Value;
             }
+            if (string.IsNullOrEmpty(this.key.ETag))
+            {
+                await batchOperation.Add(TableOperation.Insert(this.key)).ConfigureAwait(false);
+
+                if (logger.IsEnabled(LogLevel.Trace))
+                    logger.LogTrace($"{partition}.k Insert");
+            }
+            else
+            {
+                await batchOperation.Add(TableOperation.Replace(this.key)).ConfigureAwait(false);
+
+                if (logger.IsEnabled(LogLevel.Trace))
+                    logger.LogTrace($"{partition}.k Update");
+            }
+
+            // fourth, remove obsolete records
+            if (states.Count > 0 && states[0].Key < obsoleteBefore)
+            {
+                FindState(obsoleteBefore, out var pos);
+                for (int i = 0; i < pos; i++)
+                {
+                    await batchOperation.Add(TableOperation.Delete(states[i].Value)).ConfigureAwait(false);
+
+                    if (logger.IsEnabled(LogLevel.Trace))
+                        logger.LogTrace($"{partition}.{states[i].Key:x16} Delete {states[i].Value.TransactionId}");
+                }
+                states.RemoveRange(0, pos);
+            }
+
+            await batchOperation.Flush().ConfigureAwait(false);
+
+            if (logger.IsEnabled(LogLevel.Debug))
+                logger.LogDebug($"{partition} Stored v{this.key.CommittedSequenceId} eTag={key.ETag}");
+
+            return key.ETag;
         }
 
-        public async Task<string> Confirm(string expectedETag, string metadata, string transactionIdToCommit)
+        private bool FindState(long sequenceId, out int pos)
         {
-            try
+            pos = 0;
+            while (pos < states.Count)
             {
-                // only update storage if transaction id is greater then previously committed
-                if (string.Compare(transactionIdToCommit, this.key.CommittedTransactionId) <= 0)
-                    return this.key.ETag;
-
-                TState state = FindState(transactionIdToCommit);
-                if (state == null)
+                switch (states[pos].Key.CompareTo(sequenceId))
                 {
-                    this.logger.LogCritical("Transactional state non-recoverable error.  Attempting to confirm a transaction {TransactionId} for which no state exists.", transactionIdToCommit);
-                    throw new InvalidOperationException($"Transactional state non-recoverable error.  Attempting to confirm a transaction {transactionIdToCommit} for which no state exists.");
+                    case 0:
+                        return true;
+                    case -1:
+                        pos++;
+                        continue;
+                    case 1:
+                        break;
                 }
-
-                this.key.ETag = expectedETag;
-                this.key.Metadata = metadata;
-                this.key.CommittedTransactionId = transactionIdToCommit;
-                await WriteKey().ConfigureAwait(false);
-                var dead = this.states.Where(p => string.Compare(p.TransactionId, transactionIdToCommit) <0).ToList();
-                this.states = this.states.Where(p => string.Compare(p.TransactionId, transactionIdToCommit) >= 0).ToList();
-                Cleanup(dead).Ignore();
-                return this.key.ETag;
             }
-            catch (Exception ex)
-            {
-                this.logger.LogError("Transactional state confirm failed {Exception}.", ex);
-                throw;
-            }
+            return false;
         }
 
         private async Task<KeyEntity> ReadKey()
@@ -136,82 +227,100 @@ namespace Orleans.Transactions.AzureStorage
                 : queryResult.Results[0];
         }
 
-        private async Task WriteKey()
-        {
-            Task write = (string.IsNullOrEmpty(this.key.ETag))
-                ? this.table.ExecuteAsync(TableOperation.Insert(this.key))
-                : this.table.ExecuteAsync(TableOperation.Replace(this.key));
-            await write.ConfigureAwait(false);
-        }
-
-        private async Task<List<StateEntity>> ReadStates()
+        private async Task<List<KeyValuePair<long, StateEntity>>> ReadStates()
         {
             var query = new TableQuery<StateEntity>()
-                .Where(AzureStorageUtils.RangeQuery(this.partition, StateEntity.RKMin, StateEntity.RKMax));
+                .Where(AzureStorageUtils.RangeQuery(this.partition, StateEntity.RK_MIN, StateEntity.RK_MAX));
             TableContinuationToken continuationToken = null;
-            List<StateEntity> results = new List<StateEntity>();
+            var results = new List<KeyValuePair<long, StateEntity>>();
             do
             {
                 TableQuerySegment<StateEntity> queryResult = await table.ExecuteQuerySegmentedAsync(query, continuationToken).ConfigureAwait(false);
-                results.AddRange(queryResult.Results);
+                foreach (var x in queryResult.Results)
+                {
+                    results.Add(new KeyValuePair<long, StateEntity>(x.SequenceId, x));
+                };
                 continuationToken = queryResult.ContinuationToken;
             } while (continuationToken != null);
             return results;
         }
 
-        private TState FindState(string transactionId)
+        private class BatchOperation
         {
-            StateEntity entity = this.states.FirstOrDefault(s => s.TransactionId == transactionId);
-            return entity?.GetState<TState>(this.jsonSettings);
-        }
+            private readonly TableBatchOperation batchOperation;
+            private readonly ILogger logger;
+            private readonly KeyEntity key;
+            private readonly CloudTable table;
 
-        private async Task Cleanup(List<StateEntity> deadStates)
-        {
-            var batchOperation = new TableBatchOperation();
-            var pendingTasks = new List<Task>();
-            const int MaxInFlight = 3;
-            foreach (StateEntity deadState in deadStates)
+            private bool batchContainsKey;
+
+            public BatchOperation(ILogger logger, KeyEntity key, CloudTable table)
             {
-                batchOperation.Delete(deadState);
-                // if batch is full, execute and make new batch
-                if (batchOperation.Count == AzureTableConstants.MaxBatchSize)
+                this.batchOperation = new TableBatchOperation();
+                this.logger = logger;
+                this.key = key;
+                this.table = table;
+            }
+
+            public async Task Add(TableOperation operation)
+            {
+                batchOperation.Add(operation);
+
+                if (operation.Entity == key)
                 {
-                    pendingTasks.Add(table.ExecuteBatchAsync(batchOperation));
-                    // if we've more than MaxInFlight storage calls in flight, wait for those to execute before continuing and clear pending tasks
-                    if (pendingTasks.Count == MaxInFlight)
+                    batchContainsKey = true;
+                }
+
+                if (batchOperation.Count == AzureTableConstants.MaxBatchSize - (batchContainsKey ? 0 : 1))
+                {
+                    // the key serves as a synchronizer, to prevent modification by multiple grains under edge conditions,
+                    // like duplicate activations or deployments.Every batch write needs to include the key, 
+                    // even if the key values don't change.
+
+                    if (!batchContainsKey)
                     {
-                        try
-                        {
-                            await Task.WhenAll(pendingTasks).ConfigureAwait(false);
-                        }
-                        catch (Exception ex)
-                        {
-                            this.logger.LogInformation("Error cleaning up transactional states {Exception}.  Ignoring", ex);
-                        }
-                        pendingTasks.Clear();
+                        if (string.IsNullOrEmpty(key.ETag))
+                            batchOperation.Insert(key);
+                        else
+                            batchOperation.Replace(key);
                     }
-                    batchOperation = new TableBatchOperation();
+
+                    await Flush().ConfigureAwait(false);
+
+                    batchOperation.Clear();
+                    batchContainsKey = false;
                 }
             }
 
-            if (batchOperation.Count != 0)
+            public async Task Flush()
             {
-                pendingTasks.Add(table.ExecuteBatchAsync(batchOperation));
-                batchOperation = new TableBatchOperation();
-            }
+                if (batchOperation.Count > 0)
+                    try
+                    {
+                        await table.ExecuteBatchAsync(batchOperation).ConfigureAwait(false);
 
-            if (pendingTasks.Count != 0)
-            {
-                try
-                {
-                    await Task.WhenAll(pendingTasks).ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    this.logger.LogInformation("Error cleaning up transactional states {Exception}.  Ignoring", ex);
-                }
-                pendingTasks.Clear();
+                        batchOperation.Clear();
+                        batchContainsKey = false;
+
+                        if (logger.IsEnabled(LogLevel.Trace))
+                        {
+                            for (int i = 0; i < batchOperation.Count; i++)
+                                logger.LogTrace($"batch-op ok     {i} PK={batchOperation[i].Entity.PartitionKey} RK={batchOperation[i].Entity.RowKey}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        if (logger.IsEnabled(LogLevel.Trace))
+                        {
+                            for (int i = 0; i < batchOperation.Count; i++)
+                                logger.LogTrace($"batch-op failed {i} PK={batchOperation[i].Entity.PartitionKey} RK={batchOperation[i].Entity.RowKey}");
+                        }
+
+                        this.logger.LogError("Transactional state store failed {Exception}.", ex);
+                        throw;
+                    }
             }
         }
+
     }
 }

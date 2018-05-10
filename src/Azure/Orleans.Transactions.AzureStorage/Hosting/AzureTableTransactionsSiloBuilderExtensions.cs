@@ -3,9 +3,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Configuration;
 using Orleans.Transactions.Abstractions;
-using Orleans.Transactions.AzureStorage.TransactionalState;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Providers;
+using Orleans.Transactions.AzureStorage;
 
 namespace Orleans.Hosting
 {
@@ -48,16 +48,9 @@ namespace Orleans.Hosting
         {
             configureOptions?.Invoke(services.AddOptions<AzureTableTransactionalStateOptions>(name));
 
-            // single TM
-            services.ConfigureNamedOptionForLogging<AzureTableTransactionalStateOptions>(name);
             services.TryAddSingleton<ITransactionalStateStorageFactory>(sp => sp.GetServiceByName<ITransactionalStateStorageFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
             services.AddSingletonNamedService<ITransactionalStateStorageFactory>(name, AzureTableTransactionalStateStorageFactory.Create);
             services.AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<ITransactionalStateStorageFactory>(n));
-
-            // distributed TM
-            services.TryAddSingleton<Orleans.Transactions.DistributedTM.ITransactionalStateStorageFactory>(sp => sp.GetServiceByName<Orleans.Transactions.DistributedTM.ITransactionalStateStorageFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
-            services.AddSingletonNamedService<Orleans.Transactions.DistributedTM.ITransactionalStateStorageFactory>(name, Orleans.Transactions.DistributedTM.AzureStorage.AzureTableTransactionalStateStorageFactory.Create);
-            services.AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<Orleans.Transactions.DistributedTM.ITransactionalStateStorageFactory>(n));
 
             return services; 
         }

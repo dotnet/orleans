@@ -1,7 +1,7 @@
 ﻿
-using Orleans.Concurrency;
 using System;
 using System.Threading.Tasks;
+using Orleans.Concurrency;
 
 namespace Orleans.Transactions
 {

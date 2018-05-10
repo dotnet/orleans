@@ -9,13 +9,15 @@ namespace Orleans.Transactions.Tests
 {
     public abstract class GrainFaultTransactionTestRunner : TransactionTestRunnerBase
     {
-        public GrainFaultTransactionTestRunner(IGrainFactory grainFactory, ITestOutputHelper output, bool distributedTm = false)
-        : base(grainFactory, output, distributedTm)
+        public GrainFaultTransactionTestRunner(IGrainFactory grainFactory, ITestOutputHelper output)
+        : base(grainFactory, output)
         { }
 
         [SkippableTheory]
-        [InlineData(TransactionTestConstants.TransactionGrainStates.SingleStateTransaction)]
-        public async Task AbortTransactionOnExceptions(TransactionTestConstants.TransactionGrainStates grainStates)
+        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
+        public async Task AbortTransactionOnExceptions(string grainStates)
         {
             const int expected = 5;
 
@@ -36,8 +38,10 @@ namespace Orleans.Transactions.Tests
         }
 
         [SkippableTheory]
-        [InlineData(TransactionTestConstants.TransactionGrainStates.SingleStateTransaction)]
-        public async Task MultiGrainAbortTransactionOnExceptions(TransactionTestConstants.TransactionGrainStates grainStates)
+        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
+        public async Task MultiGrainAbortTransactionOnExceptions(string grainStates)
         {
             const int grainCount = TransactionTestConstants.MaxCoordinatedTransactions - 1;
             const int expected = 5;
@@ -69,8 +73,10 @@ namespace Orleans.Transactions.Tests
         }
 
         [SkippableTheory(Skip = "Intermittent failure, jbragg investigating")]
-        [InlineData(TransactionTestConstants.TransactionGrainStates.SingleStateTransaction)]
-        public async Task AbortTransactionOnOrphanCalls(TransactionTestConstants.TransactionGrainStates grainStates)
+        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
+        public async Task AbortTransactionOnOrphanCalls(string grainStates)
         {
             const int expected = 5;
 

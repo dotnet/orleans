@@ -1,13 +1,12 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using Orleans.Transactions.Abstractions;
 using Orleans.Core;
 using Orleans.Runtime;
 using Orleans.Storage;
+using Microsoft.Extensions.Logging;
 using Orleans.Utilities;
+using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions
 {
@@ -22,6 +21,7 @@ namespace Orleans.Transactions
         private IStorage<TransactionalStateRecord<TState>> stateStorage;
         private IStorage<TransactionalStateRecord<TState>> StateStorage => stateStorage ?? (stateStorage = GetStateStorage());
 
+
         public TransactionalStateStorageProviderWrapper(IGrainStorage grainStorage, string stateName, IGrainActivationContext context, ILoggerFactory loggerFactory)
         {
             this.grainStorage = grainStorage;
@@ -33,36 +33,60 @@ namespace Orleans.Transactions
         public async Task<TransactionalStorageLoadResponse<TState>> Load()
         {
             await this.StateStorage.ReadStateAsync();
-            return new TransactionalStorageLoadResponse<TState>(this.StateStorage.Etag, this.StateStorage.State.CommittedState, this.StateStorage.State.Metadata, this.StateStorage.State.PendingStates);
+            return new TransactionalStorageLoadResponse<TState>(stateStorage.Etag, stateStorage.State.CommittedState, stateStorage.State.CommittedSequenceId, stateStorage.State.Metadata, stateStorage.State.PendingStates);
         }
 
-        public async Task<string> Persist(string expectedETag, string metadata, List<PendingTransactionState<TState>> statesToPrepare)
+        public async Task<string> Store(string expectedETag, string metadata, List<PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter)
         {
             if (this.StateStorage.Etag != expectedETag)
                 throw new ArgumentException(nameof(expectedETag), "Etag does not match");
-            this.StateStorage.State.Metadata = metadata;
-            foreach(PendingTransactionState<TState> pendingState in statesToPrepare.Where(s => !this.StateStorage.State.PendingStates.Contains(s)))
-            {
-                this.StateStorage.State.PendingStates.Add(pendingState);
-            }
-            await this.StateStorage.WriteStateAsync();
-            return this.StateStorage.Etag;
-        }
+            stateStorage.State.Metadata = metadata;
 
-        public async Task<string> Confirm(string expectedETag, string metadata, string transactionIdToCommit)
-        {
-            if (this.StateStorage.Etag != expectedETag)
-                throw new ArgumentException(nameof(expectedETag), "Etag does not match");
-            this.StateStorage.State.Metadata = metadata;
-            PendingTransactionState<TState> committedState = this.StateStorage.State.PendingStates.FirstOrDefault(pending => transactionIdToCommit == pending.TransactionId);
-            if (committedState != null)
+            var pendinglist = stateStorage.State.PendingStates;
+
+            // abort
+            if (abortAfter.HasValue && pendinglist.Count != 0)
             {
-                this.StateStorage.State.CommittedTransactionId = committedState.TransactionId;
-                this.StateStorage.State.CommittedState = committedState.State;
-                this.StateStorage.State.PendingStates = StateStorage.State.PendingStates.Where(pending => pending.SequenceId > committedState.SequenceId).ToList();
+                var pos = pendinglist.FindIndex(t => t.SequenceId > abortAfter.Value);
+                if (pos != -1)
+                {
+                    pendinglist.RemoveRange(pos, pendinglist.Count - pos);
+                }
             }
-            await this.StateStorage.WriteStateAsync();
-            return this.StateStorage.Etag;
+
+            // prepare
+            if (statesToPrepare?.Count > 0)
+            {
+                if (pendinglist.Count != 0)
+                {
+                    // remove prepare records that are being overwritten
+                    while (pendinglist[pendinglist.Count - 1].SequenceId >= statesToPrepare[0].SequenceId)
+                    {
+                        pendinglist.RemoveAt(pendinglist.Count - 1);
+                    }
+                }
+                pendinglist.AddRange(statesToPrepare);
+            }
+
+            // commit
+            if (commitUpTo.HasValue && commitUpTo.Value > stateStorage.State.CommittedSequenceId)
+            {
+                var pos = pendinglist.FindIndex(t => t.SequenceId == commitUpTo.Value);
+                if (pos != -1)
+                {
+                    var committedState = pendinglist[pos];            
+                    stateStorage.State.CommittedSequenceId = committedState.SequenceId;
+                    stateStorage.State.CommittedState = committedState.State;
+                    pendinglist.RemoveRange(0, pos + 1);
+                }
+                else
+                {
+                    throw new InvalidOperationException($"Transactional state corrupted. Missing prepare record (SequenceId={commitUpTo.Value}) for committed transaction.");
+                }
+            }
+
+            await stateStorage.WriteStateAsync();
+            return stateStorage.Etag;
         }
 
         private IStorage<TransactionalStateRecord<TState>> GetStateStorage()
@@ -79,7 +103,7 @@ namespace Orleans.Transactions
     {
         public TState CommittedState { get; set; } = new TState();
 
-        public string CommittedTransactionId { get; set; }
+        public long CommittedSequenceId { get; set; }
 
         public string Metadata { get; set; }
 

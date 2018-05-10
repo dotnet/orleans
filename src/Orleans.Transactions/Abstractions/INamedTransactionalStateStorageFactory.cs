@@ -1,6 +1,4 @@
 ﻿
-using System;
-
 namespace Orleans.Transactions.Abstractions
 {
     /// <summary>
