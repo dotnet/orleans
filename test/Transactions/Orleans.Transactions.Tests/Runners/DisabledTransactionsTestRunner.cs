@@ -13,7 +13,7 @@ namespace Orleans.Transactions.Tests
         : base(grainFactory, output) { }
 
         [SkippableTheory]
-        [InlineData(TransactionTestConstants.TransactionOrchestrationGrain)]
+        [InlineData(TransactionTestConstants.NoStateTransactionalGrain)]
         public virtual async Task TransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName)
         {
             const int delta = 5;
@@ -23,7 +23,7 @@ namespace Orleans.Transactions.Tests
         }
 
         [SkippableTheory]
-        [InlineData(TransactionTestConstants.TransactionOrchestrationGrain)]
+        [InlineData(TransactionTestConstants.NoStateTransactionalGrain)]
         public virtual async Task MultiTransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName)
         {
             const int delta = 5;

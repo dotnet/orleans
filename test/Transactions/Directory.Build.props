@@ -110,17 +110,4 @@
     </Otherwise>
   </Choose>
 
-  <Choose>
-    <When Condition="$(OrleansTransactionsVersion) == $(VersionPrefix)">
-      <ItemGroup >
-        <ProjectReference Include="..\..\..\src\AWS\Orleans.Transactions.DynamoDB\Orleans.Transactions.DynamoDB.csproj" />
-      </ItemGroup>
-    </When>
-    <Otherwise>
-      <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.Transactions.DynamoDB" Version="$(OrleansTransactionsVersion)"/>
-      </ItemGroup>
-    </Otherwise>
-  </Choose>
-
 </Project>

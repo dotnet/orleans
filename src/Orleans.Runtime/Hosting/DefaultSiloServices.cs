@@ -229,11 +229,10 @@ namespace Orleans.Hosting
             services.AddFromExisting<IKeyedSerializer, BinaryFormatterISerializableSerializer>();
             services.AddSingleton<ILBasedSerializer>();
             services.AddFromExisting<IKeyedSerializer, ILBasedSerializer>();
-            
+
             // Transactions
-            services.TryAddSingleton<ITransactionAgent, TransactionAgent>();
+            services.TryAddSingleton<ITransactionAgent,DisabledTransactionAgent>();
             services.TryAddSingleton<Factory<ITransactionAgent>>(sp => () => sp.GetRequiredService<ITransactionAgent>());
-            services.TryAddSingleton<ITransactionManagerService, DisabledTransactionManagerService>();
 
             // Application Parts
             var applicationPartManager = context.GetApplicationPartManager();

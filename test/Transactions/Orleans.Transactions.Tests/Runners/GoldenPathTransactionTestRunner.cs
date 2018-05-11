@@ -9,14 +9,14 @@ namespace Orleans.Transactions.Tests
 {
     public abstract class GoldenPathTransactionTestRunner : TransactionTestRunnerBase
     {
-        protected GoldenPathTransactionTestRunner(IGrainFactory grainFactory, ITestOutputHelper output, bool distributedTm = false)
-        : base(grainFactory, output, distributedTm) { }
+        protected GoldenPathTransactionTestRunner(IGrainFactory grainFactory, ITestOutputHelper output)
+        : base(grainFactory, output) { }
 
         [SkippableTheory]
-        [InlineData(TransactionTestConstants.TransactionGrainStates.SingleStateTransaction)]
-        [InlineData(TransactionTestConstants.TransactionGrainStates.DoubleStateTransaction)]
-        [InlineData(TransactionTestConstants.TransactionGrainStates.MaxStateTransaction)]
-        public virtual async Task SingleGrainReadTransaction(TransactionTestConstants.TransactionGrainStates grainStates)
+        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
+        public virtual async Task SingleGrainReadTransaction(string grainStates)
         {
             const int expected = 0;
 
@@ -30,10 +30,10 @@ namespace Orleans.Transactions.Tests
         }
 
         [SkippableTheory]
-        [InlineData(TransactionTestConstants.TransactionGrainStates.SingleStateTransaction)]
-        [InlineData(TransactionTestConstants.TransactionGrainStates.DoubleStateTransaction)]
-        [InlineData(TransactionTestConstants.TransactionGrainStates.MaxStateTransaction)]
-        public virtual async Task SingleGrainWriteTransaction(TransactionTestConstants.TransactionGrainStates grainStates)
+        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
+        public virtual async Task SingleGrainWriteTransaction(string grainStates)
         {
             const int delta = 5;
             ITransactionTestGrain grain = RandomTestGrain(grainStates);
@@ -45,10 +45,10 @@ namespace Orleans.Transactions.Tests
         }
 
         [SkippableTheory]
-        [InlineData(TransactionTestConstants.TransactionGrainStates.SingleStateTransaction)]
-        [InlineData(TransactionTestConstants.TransactionGrainStates.DoubleStateTransaction)]
-        [InlineData(TransactionTestConstants.TransactionGrainStates.MaxStateTransaction)]
-        public virtual async Task MultiGrainWriteTransaction(TransactionTestConstants.TransactionGrainStates grainStates)
+        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
+        public virtual async Task MultiGrainWriteTransaction(string grainStates)
         {
             const int expected = 5;
             const int grainCount = TransactionTestConstants.MaxCoordinatedTransactions;
@@ -73,10 +73,10 @@ namespace Orleans.Transactions.Tests
         }
 
         [SkippableTheory]
-        [InlineData(TransactionTestConstants.TransactionGrainStates.SingleStateTransaction)]
-        [InlineData(TransactionTestConstants.TransactionGrainStates.DoubleStateTransaction)]
-        [InlineData(TransactionTestConstants.TransactionGrainStates.MaxStateTransaction)]
-        public virtual async Task MultiGrainReadWriteTransaction(TransactionTestConstants.TransactionGrainStates grainStates)
+        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
+        public virtual async Task MultiGrainReadWriteTransaction(string grainStates)
         {
             const int delta = 5;
             const int grainCount = TransactionTestConstants.MaxCoordinatedTransactions;
@@ -104,10 +104,10 @@ namespace Orleans.Transactions.Tests
         }
 
         [SkippableTheory]
-        [InlineData(TransactionTestConstants.TransactionGrainStates.SingleStateTransaction)]
-        [InlineData(TransactionTestConstants.TransactionGrainStates.DoubleStateTransaction)]
-        [InlineData(TransactionTestConstants.TransactionGrainStates.MaxStateTransaction)]
-        public virtual async Task RepeatGrainReadWriteTransaction(TransactionTestConstants.TransactionGrainStates grainStates)
+        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
+        public virtual async Task RepeatGrainReadWriteTransaction(string grainStates)
         {
             const int repeat = 10;
             const int delta = 5;
@@ -142,10 +142,10 @@ namespace Orleans.Transactions.Tests
         }
 
         [SkippableTheory]
-        [InlineData(TransactionTestConstants.TransactionGrainStates.SingleStateTransaction)]
-        [InlineData(TransactionTestConstants.TransactionGrainStates.DoubleStateTransaction)]
-        [InlineData(TransactionTestConstants.TransactionGrainStates.MaxStateTransaction)]
-        public virtual async Task MultiWriteToSingleGrainTransaction(TransactionTestConstants.TransactionGrainStates grainStates)
+        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
+        public virtual async Task MultiWriteToSingleGrainTransaction(string grainStates)
         {
             const int delta = 5;
             const int concurrentWrites = 3;

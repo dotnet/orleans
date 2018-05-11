@@ -11,7 +11,7 @@ using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Transactions.Abstractions;
 
-namespace Orleans.Transactions.AzureStorage.TransactionalState
+namespace Orleans.Transactions.AzureStorage
 {
     public class AzureTableTransactionalStateStorageFactory : ITransactionalStateStorageFactory, ILifecycleParticipant<ISiloLifecycle>
     {
@@ -40,7 +40,7 @@ namespace Orleans.Transactions.AzureStorage.TransactionalState
         public ITransactionalStateStorage<TState> Create<TState>(string stateName, IGrainActivationContext context) where TState : class, new()
         {
             string partitionKey = MakePartitionKey(context, stateName);
-            return ActivatorUtilities.CreateInstance<AzureTableTransactionalStateStorage<TState>>(context.ActivationServices, this.table, partitionKey, this.jsonSettings);
+            return ActivatorUtilities.CreateInstance<AzureTableTransactionalStateStorage<TState>>(context.ActivationServices, this.table, partitionKey, stateName, this.jsonSettings);
         }
 
         public void Participate(ISiloLifecycle lifecycle)

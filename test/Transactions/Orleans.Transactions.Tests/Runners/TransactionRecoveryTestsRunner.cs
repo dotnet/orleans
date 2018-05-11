@@ -1,10 +1,6 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
@@ -25,8 +21,8 @@ namespace Orleans.Transactions.Tests
         private readonly TestCluster testCluster;
         private readonly ILogger logger;
         private static TimeSpan RecoveryTimeout = TimeSpan.FromSeconds(60);
-        public TransactionRecoveryTestsRunner(TestCluster testCluster, ITestOutputHelper output, bool distributedTM = false)
-            : base(testCluster.GrainFactory, output, distributedTM)
+        public TransactionRecoveryTestsRunner(TestCluster testCluster, ITestOutputHelper output)
+            : base(testCluster.GrainFactory, output)
         {
             this.testCluster = testCluster;
             this.logger = this.testCluster.ServiceProvider.GetService<ILogger<TransactionRecoveryTestsRunner>>();
@@ -42,8 +38,7 @@ namespace Orleans.Transactions.Tests
             }
         }
 
-        //For distributedTM
-        public virtual async Task TransactionWillRecoverAfterRandomSiloFailure(TransactionTestConstants.TransactionGrainStates transactionTestGrainClassName)
+        public virtual async Task TransactionWillRecoverAfterRandomSiloFailure(string transactionTestGrainClassName)
         {
             const int grainCount = 100;
             var txGrains = Enumerable.Range(0, grainCount)
@@ -56,39 +51,20 @@ namespace Orleans.Transactions.Tests
             await TestingUtils.WaitUntilAsync(lastTry => CheckTxResult(txGrains, lastTry), RecoveryTimeout);
         }
 
-        //For singleTM , only in singleTM we have the need of test two scenarios, whic is kill silo which runs the TM and ramdom silo which doesn't 
-        public virtual async Task TransactionWillRecoverAfterRandomSiloFailure(string transactionTestGrainClassName, bool killSiloWhichRunsTm)
-        {
-            const int grainCount = 100;
-            var txGrains = Enumerable.Range(0, grainCount)
-                .Select(i => RandomTestGrain(transactionTestGrainClassName))
-                .ToList();
-            var txSucceedBeforeInterruption = await AllTxSucceed(txGrains);
-            this.logger.LogInformation($"Tx succeed before interruption : {txSucceedBeforeInterruption}");
-            if(killSiloWhichRunsTm)
-                await KillSilo(location => location.ActiveInCurrentSilo);
-            else
-            {
-                await KillSilo(location => !location.ActiveInCurrentSilo);
-            }
-            await TestingUtils.WaitUntilAsync(lastTry => CheckTxResult(txGrains, lastTry), RecoveryTimeout);
-        }
-
         //given a predicate, whether to kill a silo
-        private async Task KillSilo(Func<TMGrainLocator.TMGrainLocation, bool> predicate)
+        private async Task KillRandomSilo()
         {
             var mgmt = this.testCluster.GrainFactory.GetGrain<IManagementGrain>(0);
 
             object[] results = await mgmt.SendControlCommandToProvider(typeof(TMGrainLocator).FullName, typeof(TMGrainLocator).Name, 1);
-            this.logger.LogInformation($"Current TMGrainLocator list : {String.Join(";", results.Select(re => re.As<TMGrainLocator.TMGrainLocation>().ToString()))}");
-            var murderCandidates = results.Where(re => predicate(re as TMGrainLocator.TMGrainLocation));
-            if (murderCandidates.Count() == 0)
+            this.logger.LogInformation($"Current TMGrainLocator list : {String.Join(";", results.Select(re => re.As<SiloAddress>().ToString()))}");
+            if (results.Length == 0)
                 throw new Exception("No silo fits the predicate, potential test configuration issues");
-            var murderTarget = murderCandidates.ElementAt(this.seed.Next(murderCandidates.Count())) as TMGrainLocator.TMGrainLocation;
+            var murderTarget = results.ElementAt(this.seed.Next(results.Length)) as SiloAddress;
             this.logger.LogInformation($"Current hard kill target is {murderTarget}");
             foreach (var siloHanle in this.testCluster.Silos)
             {
-                if(siloHanle.SiloAddress.Equals(murderTarget.CurrentSiloAddress))
+                if(siloHanle.SiloAddress.Equals(murderTarget))
                     siloHanle.StopSilo(false);
             }
         }
@@ -103,22 +79,7 @@ namespace Orleans.Transactions.Tests
 
             public Task<object> ExecuteCommand(int command, object arg)
             {
-                return Task.FromResult<object>(new TMGrainLocation()
-                {
-                    ActiveInCurrentSilo = TransactionManagerGrain.IsActive,
-                    CurrentSiloAddress = this.siloDetails.SiloAddress
-                });
-            }
-
-            public class TMGrainLocation
-            {
-                public bool ActiveInCurrentSilo { get; set; }
-                public SiloAddress CurrentSiloAddress { get; set; }
-
-                public override string ToString()
-                {
-                    return $"{nameof(ActiveInCurrentSilo)} : {this.ActiveInCurrentSilo}, {nameof(CurrentSiloAddress)} : {this.CurrentSiloAddress}";
-                }
+                return Task.FromResult<object>(this.siloDetails.SiloAddress);
             }
         }
 
@@ -148,6 +109,7 @@ namespace Orleans.Transactions.Tests
             }
             catch (Exception)
             {
+                base.output.WriteLine($"Some transactions failed. {tasks.Count(t => t.IsFaulted)} out of {tasks.Count} failed");
                 return false;
             }
 

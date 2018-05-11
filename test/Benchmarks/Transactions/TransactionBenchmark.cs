@@ -1,9 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using System.Linq;
-using Orleans.Runtime.Configuration;
 using Orleans.Hosting;
-using Orleans.Hosting.Development;
 using Orleans.TestingHost;
 using BenchmarkGrainInterfaces.Transaction;
 
@@ -80,10 +78,7 @@ namespace Benchmarks.Transactions
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
-                hostBuilder
-                    .UseInClusterTransactionManager()
-                    .UseInMemoryTransactionLog()
-                    .UseTransactionalState();
+                hostBuilder.UseDistributedTM();
             }
         }
     }
