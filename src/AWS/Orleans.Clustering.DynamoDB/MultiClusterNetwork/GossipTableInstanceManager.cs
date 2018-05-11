@@ -44,8 +44,8 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
 
             var instance = new GossipTableInstanceManager(globalServiceId, storageConnectionString, loggerFactory);
 
-            await InitializeTableAsync(instance._confStorage, CONF_TABLE_NAME, GossipConfiguration.Keys, GossipConfiguration.Attributes);
-            await InitializeTableAsync(instance._gatewayStorage, GATEWAY_TABLE_NAME, GossipGateway.Keys, GossipGateway.Attributes);
+            await InitializeTableAsync(instance._confStorage, CONF_TABLE_NAME, GossipConfigurationMapper.Keys, GossipConfigurationMapper.Attributes);
+            await InitializeTableAsync(instance._gatewayStorage, GATEWAY_TABLE_NAME, GossipGatewayMapper.Keys, GossipGatewayMapper.Attributes);
 
             return instance;
         }
@@ -74,8 +74,8 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
         {
             return await _confStorage.ReadSingleEntryAsync(
                 CONF_TABLE_NAME,
-                GossipConfiguration.KeyAttributes(_globalServiceId),
-                fields => new GossipConfiguration(fields)).ConfigureAwait(false);
+                GossipConfigurationMapper.KeyAttributes(_globalServiceId),
+                GossipConfigurationMapper.ToConfiguration).ConfigureAwait(false);
         }
 
         public async Task TryCreateConfigurationEntryAsync(MultiClusterConfiguration config)
@@ -107,9 +107,9 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
         {
             return await TryOperation(() => _confStorage.UpsertEntryAsync(
                 CONF_TABLE_NAME,
-                GossipConfiguration.KeyAttributes(_globalServiceId),
+                GossipConfigurationMapper.KeyAttributes(_globalServiceId),
                 data.ToAttributes(true),
-                data.ToConditionalExpression(),
+                GossipConfigurationMapper.ConditionalExpression,
                 data.ToConditionalAttributes()), operation);
         }
 
@@ -124,16 +124,16 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
             return await _gatewayStorage.ReadSingleEntryAsync(
                 GATEWAY_TABLE_NAME,
                 gw.ToKeyAttributes(),
-                fields => new GossipGateway(fields)).ConfigureAwait(false);
+                GossipGatewayMapper.ToGateway).ConfigureAwait(false);
         }
 
         public async Task<Dictionary<SiloAddress, GossipGateway>> ReadGatewayEntriesAsync()
         {
             var result = await _gatewayStorage.QueryAsync(
                 GATEWAY_TABLE_NAME,
-                GossipGateway.ToQueryAttributes(_globalServiceId),
-                GossipGateway.ToQueryExpression(),
-                r => new GossipGateway(r));
+                GossipGatewayMapper.ToQueryAttributes(_globalServiceId),
+                GossipGatewayMapper.QueryExpression,
+                GossipGatewayMapper.ToGateway);
 
             return result.results.ToDictionary(
                 r => r.OrleansSiloAddress,
@@ -163,7 +163,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
                 GATEWAY_TABLE_NAME,
                 gw.ToKeyAttributes(),
                 gw.ToAttributes(true),
-                gw.ToConditionalExpresssion(),
+                GossipGatewayMapper.ConditionalExpresssion,
                 gw.ToConditionalAttributes());
         }
 
