@@ -29,8 +29,8 @@ namespace BenchmarkGrains.Transaction
             List<Task> pending = new List<Task>();
             Report report = new Report();
             Stopwatch sw = Stopwatch.StartNew();
-            int generated = run * transactions;
-            int max = (run + 1) * transactions;
+            int generated = run * transactions * 2;
+            int max = generated + transactions;
             while (generated < max)
             {
                 while (generated < max && pending.Count < conncurrent)

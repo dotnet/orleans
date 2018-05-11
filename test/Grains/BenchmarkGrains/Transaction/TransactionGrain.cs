@@ -25,10 +25,9 @@ namespace BenchmarkGrains.Transaction
             this.info = info ?? throw new ArgumentNullException(nameof(info));
         }
 
-        public Task Run()
+        public async Task Run()
         {
-            this.info.PerformUpdate(s => s.Value += 1);
-            return Task.CompletedTask;
+            await this.info.PerformUpdate(s => s.Value += 1);
         }
     }
 }
