@@ -21,4 +21,13 @@ namespace Orleans.Transactions.Tests
             }
         }
     }
+
+    public class SkewedClockMemoryTransactionsFixture : MemoryTransactionsFixture
+    {
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        {
+            builder.AddSiloBuilderConfigurator<SkewedClockConfigurator>();
+            base.ConfigureTestCluster(builder);
+        }
+    }
 }

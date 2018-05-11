@@ -9,10 +9,10 @@ using Xunit.Abstractions;
 namespace Orleans.Transactions.Azure.Tests
 {
     [TestCategory("Transactions")]
-    public class TransactionRecoveryAzureTests : TestClusterPerTest
+    public class TransactionRecoveryTests : TestClusterPerTest
     {
         private readonly TransactionRecoveryTestsRunner testRunner;
-        public TransactionRecoveryAzureTests(ITestOutputHelper helper)
+        public TransactionRecoveryTests(ITestOutputHelper helper)
         {
             this.testRunner = new TransactionRecoveryTestsRunner(this.HostedCluster, helper);
         }

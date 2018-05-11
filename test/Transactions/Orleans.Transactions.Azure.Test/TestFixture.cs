@@ -62,4 +62,13 @@ namespace Orleans.Transactions.AzureStorage.Tests
             }
         }
     }
+
+    public class SkewedClockTestFixture : TestFixture
+    {
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        {
+            builder.AddSiloBuilderConfigurator<SkewedClockConfigurator>();
+            base.ConfigureTestCluster(builder);
+        }
+    }
 }

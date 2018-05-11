@@ -13,40 +13,22 @@ namespace Orleans.Transactions
     [Reentrant]
     internal class TransactionAgent : ITransactionAgent
     {
-        private readonly ILogger logger;
-        private Stopwatch stopwatch = new Stopwatch();
-        private DateTime clock;
-        private Object lockable = new object();
-
         private const bool selectTMByBatchSize = true;
 
-        public DateTime ReadClock()
-        {
-            lock (lockable)
-                return (clock = new DateTime(Math.Max(clock.Ticks + 1, DateTime.UtcNow.Ticks)));
-        }
+        private readonly ILogger logger;
+        private readonly Stopwatch stopwatch = Stopwatch.StartNew();
+        private readonly TransactionClock clock;
 
-        public DateTime MergeAndReadClock(DateTime dt)
+        public TransactionAgent(IClock clock, ILoggerFactory loggerFactory, ILocalSiloDetails siloDetails)
         {
-            lock (lockable)
-                return (clock = new DateTime(Math.Max(Math.Max(clock.Ticks + 1, dt.Ticks + 1), DateTime.UtcNow.Ticks)));
-        }
-
-        public TransactionAgent(ILoggerFactory loggerFactory, ILocalSiloDetails siloDetails)
-        {
-            logger = loggerFactory.CreateLogger(this.GetType().Name);
-        }
-
-        public Task Start()
-        {
-            stopwatch.Start();
-            return Task.CompletedTask;
+            this.clock = new TransactionClock(clock);
+            this.logger = loggerFactory.CreateLogger(this.GetType().Name);
         }
 
         public Task<ITransactionInfo> StartTransaction(bool readOnly, TimeSpan timeout)
         {
             var guid = Guid.NewGuid();
-            var ts = ReadClock();
+            DateTime ts = this.clock.UtcNow();
 
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.Trace($"{stopwatch.Elapsed.TotalMilliseconds:f2} start transaction {guid} at {ts:o}");
@@ -58,7 +40,7 @@ namespace Orleans.Transactions
         {
             var transactionInfo = (TransactionInfo)info;
 
-            transactionInfo.TimeStamp = MergeAndReadClock(transactionInfo.TimeStamp);
+            transactionInfo.TimeStamp = this.clock.MergeUtcNow(transactionInfo.TimeStamp);
 
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.Trace($"{stopwatch.Elapsed.TotalMilliseconds:f2} prepare {transactionInfo}");

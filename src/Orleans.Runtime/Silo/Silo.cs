@@ -447,15 +447,6 @@ namespace Orleans.Runtime
         {
             var stopWatch = Stopwatch.StartNew();
 
-            await StartAsyncTaskWithPerfAnalysis("Init transaction agent", InitTransactionAgent, stopWatch);
-            async Task InitTransactionAgent()
-            {
-                ITransactionAgent transactionAgent = this.Services.GetRequiredService<ITransactionAgent>();
-                ISchedulingContext transactionAgentContext = (transactionAgent as SystemTarget)?.SchedulingContext;
-                await scheduler.QueueTask(transactionAgent.Start, transactionAgentContext)
-                    .WithTimeout(initTimeout, $"Starting TransactionAgent failed due to timeout {initTimeout}");
-            }
-
             // Load and init grain services before silo becomes active.
             await StartAsyncTaskWithPerfAnalysis("Init grain services",
                 () => CreateGrainServices(), stopWatch);
