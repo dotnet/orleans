@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
-using System.Text;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 
@@ -13,12 +13,12 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
         private static readonly char[] ClustersListSeparatorChars = ClustersListSeparator.ToCharArray();
 
         private const string SERVICE_ID_PROPERTY_NAME = "ServiceId";
-        private const string COMMENT_PROPERTY_NAME = "Comment";
-        private const string VERSION_PROPERTY_NAME = "Version";
-        private const string TIMESTAMP_PROPERTY_NAME = "Timestamps";
-        private const string CLUSTERS_PROPERTY_NAME = "Clusters";
+        private const string COMMENT_PROPERTY_NAME = "ServiceComment";
+        private const string VERSION_PROPERTY_NAME = "ServiceVersion";
+        private const string TIMESTAMP_PROPERTY_NAME = "ServiceTimestamp";
+        private const string CLUSTERS_PROPERTY_NAME = "ServiceClusters";
 
-        public static string ConditionalExpression =>  $"{VERSION_PROPERTY_NAME} = :current{VERSION_PROPERTY_NAME}";
+        public static string ConditionalExpression => $"{VERSION_PROPERTY_NAME} = :current{VERSION_PROPERTY_NAME}";
 
         public static List<KeySchemaElement> Keys => new List<KeySchemaElement>
         {
@@ -44,7 +44,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
                 conf.Version = int.Parse(fields[VERSION_PROPERTY_NAME].S);
 
             if (fields.ContainsKey(TIMESTAMP_PROPERTY_NAME))
-                conf.GossipTimestamp = DateTime.Parse(fields[TIMESTAMP_PROPERTY_NAME].S);
+                conf.GossipTimestamp = DateTime.Parse(fields[TIMESTAMP_PROPERTY_NAME].S, null, DateTimeStyles.AdjustToUniversal);
 
             if (fields.ContainsKey(CLUSTERS_PROPERTY_NAME))
                 conf.Clusters = fields[CLUSTERS_PROPERTY_NAME].S.Split(ClustersListSeparatorChars).ToList();
@@ -59,7 +59,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
                 [SERVICE_ID_PROPERTY_NAME] = new AttributeValue(serviceId)
             };
         }
-        
+
         public static Dictionary<string, AttributeValue> ToConditionalAttributes(this GossipConfiguration conf)
         {
             return new Dictionary<string, AttributeValue>
@@ -68,15 +68,22 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
             };
         }
 
-        public static Dictionary<string, AttributeValue> ToAttributes(this GossipConfiguration conf, bool incrementVersion = false)
+        public static Dictionary<string, AttributeValue> ToAttributes(this GossipConfiguration conf, bool update = false)
         {
-            return new Dictionary<string, AttributeValue>
+            var attributes = new Dictionary<string, AttributeValue>
             {
                 [COMMENT_PROPERTY_NAME] = new AttributeValue(conf.Comment),
-                [VERSION_PROPERTY_NAME] = new AttributeValue((incrementVersion ? conf.Version + 1 : conf.Version).ToString()),
+                [VERSION_PROPERTY_NAME] = new AttributeValue((update ? conf.Version + 1 : conf.Version).ToString()),
                 [TIMESTAMP_PROPERTY_NAME] = new AttributeValue(conf.GossipTimestamp.ToString("u")),
                 [CLUSTERS_PROPERTY_NAME] = new AttributeValue(string.Join(ClustersListSeparator, conf.Clusters))
             };
+
+            if (!update)
+            {
+                attributes[SERVICE_ID_PROPERTY_NAME] = new AttributeValue(conf.ServiceId);
+            }
+
+            return attributes;
         }
     }
 }

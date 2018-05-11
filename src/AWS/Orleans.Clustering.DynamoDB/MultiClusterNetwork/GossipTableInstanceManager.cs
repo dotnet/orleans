@@ -82,13 +82,14 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
         {
             var conf = new GossipConfiguration(config)
             {
-                Version = 0
+                Version = 0,
+                ServiceId = _globalServiceId
             };
 
             await _confStorage.PutEntryAsync(CONF_TABLE_NAME, conf.ToAttributes()).ConfigureAwait(false);
         }
 
-        public async Task<bool> TryUpdateConfigurationEntryAsync(MultiClusterConfiguration configuration, GossipConfiguration configInStorage)
+        public async Task<bool> TryUpdateConfigurationEntryAsync(MultiClusterConfiguration configuration, GossipConfiguration configInStorage, [CallerMemberName]string operation = null)
         {
             if (configuration == null) throw new ArgumentNullException("configuration");
 
@@ -97,7 +98,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
             configInStorage.Comment = configuration.Comment ?? "";
             configInStorage.Version = configInStorage.Version;
 
-            return await TryUpdateTableEntryAsync(configInStorage).ConfigureAwait(false);
+            return await TryOperation(() => TryUpdateTableEntryAsync(configInStorage), operation);
         }
 
         /// <summary>
@@ -152,7 +153,8 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
             await _gatewayStorage.DeleteEntryAsync(
                 GATEWAY_TABLE_NAME,
                 gatewayInfoInStorage.ToKeyAttributes(),
-                conditionValues: gatewayInfoInStorage.ToConditionalAttributes());
+                GossipGatewayMapper.ConditionalExpression,
+                gatewayInfoInStorage.ToConditionalAttributes());
         }
 
         public async Task TryUpdateGatewayEntryAsync(GatewayEntry gatewayInfo, GossipGateway gatewayInfoInStorage)
@@ -163,7 +165,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
                 GATEWAY_TABLE_NAME,
                 gw.ToKeyAttributes(),
                 gw.ToAttributes(true),
-                GossipGatewayMapper.ConditionalExpresssion,
+                GossipGatewayMapper.ConditionalExpression,
                 gw.ToConditionalAttributes());
         }
 

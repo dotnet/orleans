@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Globalization;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 
@@ -6,16 +8,17 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
 {
     internal static class GossipGatewayMapper
     {
-        private const string STATUS_PROPERTY_NAME = "Status";
-        private const string VERSION_PROPERTY_NAME = "Version";
-        private const string CLUSTER_ID_PROPERTY_NAME = "ClusterId";
-        private const string SILO_ADDRESS_PROPERTY_NAME = "SiloAddress";
-        private const string SERVICE_ID_PROPERTY_NAME = "ServiceId";
-        private const string SILO_PORT_PROPERTY_NAME = "SiloPort";
-        private const string SILO_GENERATION_PROPERTY_NAME = "SiloGeneration";
-        private const string ROW_KEY_PROPERTY_NAME = "RowKey";
+        private const string STATUS_PROPERTY_NAME = "GatewayStatus";
+        private const string VERSION_PROPERTY_NAME = "GatewayVersion";
+        private const string CLUSTER_ID_PROPERTY_NAME = "GatewayClusterId";
+        private const string SILO_ADDRESS_PROPERTY_NAME = "GatewaySiloAddress";
+        private const string SERVICE_ID_PROPERTY_NAME = "GatewayServiceId";
+        private const string SILO_PORT_PROPERTY_NAME = "GatewaySiloPort";
+        private const string SILO_GENERATION_PROPERTY_NAME = "GatewaySiloGeneration";
+        private const string TIMESTAMP_PROPERTY_NAME = "GatewaySiloTimestamp";
+        private const string ROW_KEY_PROPERTY_NAME = "GatewayRowKey";
 
-        public static string ConditionalExpresssion => $"{VERSION_PROPERTY_NAME} = :current{VERSION_PROPERTY_NAME}";
+        public static string ConditionalExpression => $"{VERSION_PROPERTY_NAME} = :current{VERSION_PROPERTY_NAME}";
 
         public static string QueryExpression => $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME}";
 
@@ -56,6 +59,9 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
             if (fields.ContainsKey(SILO_GENERATION_PROPERTY_NAME))
                 gw.SiloGeneration = int.Parse(fields[SILO_GENERATION_PROPERTY_NAME].S);
 
+            if (fields.ContainsKey(TIMESTAMP_PROPERTY_NAME))
+                gw.GossipTimestamp = DateTime.Parse(fields[TIMESTAMP_PROPERTY_NAME].S, null, DateTimeStyles.AdjustToUniversal);
+
             return gw;
         }
 
@@ -66,20 +72,27 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
                 [$":{SERVICE_ID_PROPERTY_NAME}"] = new AttributeValue(serviceId)
             };
         }
-        
-        public static Dictionary<string, AttributeValue> ToAttributes(this GossipGateway gateway, bool incrementVersion = false)
+
+        public static Dictionary<string, AttributeValue> ToAttributes(this GossipGateway gateway, bool update = false)
         {
-            return new Dictionary<string, AttributeValue>
+            var attributes = new Dictionary<string, AttributeValue>
             {
-                [SERVICE_ID_PROPERTY_NAME] = new AttributeValue(gateway.ServiceId),
-                [ROW_KEY_PROPERTY_NAME] = new AttributeValue($"{gateway.ClusterId}_{gateway.SiloAddress}_{gateway.SiloPort}"),
                 [STATUS_PROPERTY_NAME] = new AttributeValue(gateway.Status),
-                [VERSION_PROPERTY_NAME] = new AttributeValue((incrementVersion ? gateway.Version + 1 : gateway.Version).ToString()),
-                [CLUSTER_ID_PROPERTY_NAME] = new AttributeValue(gateway.ClusterId),
-                [SILO_ADDRESS_PROPERTY_NAME] = new AttributeValue(gateway.SiloAddress),
-                [SILO_PORT_PROPERTY_NAME] = new AttributeValue(gateway.SiloPort.ToString()),
-                [SILO_GENERATION_PROPERTY_NAME] = new AttributeValue(gateway.SiloGeneration.ToString())
+                [VERSION_PROPERTY_NAME] = new AttributeValue((update ? gateway.Version + 1 : gateway.Version).ToString()),
+                [SILO_GENERATION_PROPERTY_NAME] = new AttributeValue(gateway.SiloGeneration.ToString()),
+                [TIMESTAMP_PROPERTY_NAME] = new AttributeValue(gateway.GossipTimestamp.ToString("u"))
             };
+
+            if (!update)
+            {
+                attributes[ROW_KEY_PROPERTY_NAME] = new AttributeValue($"{gateway.ClusterId}_{gateway.SiloAddress}_{gateway.SiloPort}");
+                attributes[SERVICE_ID_PROPERTY_NAME] = new AttributeValue(gateway.ServiceId);
+                attributes[CLUSTER_ID_PROPERTY_NAME] = new AttributeValue(gateway.ClusterId);
+                attributes[SILO_ADDRESS_PROPERTY_NAME] = new AttributeValue(gateway.SiloAddress);
+                attributes[SILO_PORT_PROPERTY_NAME] = new AttributeValue(gateway.SiloPort.ToString());
+            }
+
+            return attributes;
         }
 
         public static Dictionary<string, AttributeValue> ToKeyAttributes(this GossipGateway gateway)

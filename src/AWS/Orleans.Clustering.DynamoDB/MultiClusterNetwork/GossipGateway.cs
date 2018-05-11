@@ -1,8 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Net;
-using Amazon.DynamoDBv2;
-using Amazon.DynamoDBv2.Model;
 using Orleans.MultiCluster;
 using Orleans.Runtime;
 using Orleans.Runtime.MultiClusterNetwork;
@@ -11,7 +8,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
 {
     internal class GossipGateway
     {
-        public DateTime GossipTimestamp { get; }
+        public DateTime GossipTimestamp { get; set; }
 
         public string Status { get; set; }
 
@@ -35,7 +32,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
 
         public GossipGateway()
         {
-            
+
         }
 
         public GossipGateway(GatewayEntry gatewayInfo, string serviceId)
