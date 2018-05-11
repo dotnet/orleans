@@ -23,7 +23,7 @@ There are several packages, one for each different project type (interfaces, gra
 
 In the grain interfaces project:
 ```
-PM> Install-Package Microsoft.Orleans.OrleansCodeGenerator.Build
+PM> Install-Package Microsoft.Orleans.Core.Abstractions
 ```
 In the grain implementations project:
 ```
