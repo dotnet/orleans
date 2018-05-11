@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using Amazon.DynamoDBv2.Model;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.MultiCluster;
@@ -43,17 +44,17 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
 
             var instance = new GossipTableInstanceManager(globalServiceId, storageConnectionString, loggerFactory);
 
-            await InitializeTableAsync(instance._confStorage, CONF_TABLE_NAME);
-            await InitializeTableAsync(instance._gatewayStorage, GATEWAY_TABLE_NAME);
+            await InitializeTableAsync(instance._confStorage, CONF_TABLE_NAME, GossipConfiguration.Keys, GossipConfiguration.Attributes);
+            await InitializeTableAsync(instance._gatewayStorage, GATEWAY_TABLE_NAME, GossipGateway.Keys, GossipGateway.Attributes);
 
             return instance;
         }
 
-        private static async Task InitializeTableAsync(DynamoDBStorage storage, string tableName)
+        private static async Task InitializeTableAsync(DynamoDBStorage storage, string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes)
         {
             try
             {
-                await storage.InitializeTable(tableName, null, null).ConfigureAwait(false);
+                await storage.InitializeTable(tableName, keys, attributes).ConfigureAwait(false);
             }
             catch (TimeoutException te)
             {
@@ -108,7 +109,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
                 CONF_TABLE_NAME,
                 GossipConfiguration.KeyAttributes(_globalServiceId),
                 data.ToAttributes(true),
-                "",
+                data.ToConditionalExpression(),
                 data.ToConditionalAttributes()), operation);
         }
 
@@ -130,8 +131,8 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
         {
             var result = await _gatewayStorage.QueryAsync(
                 GATEWAY_TABLE_NAME,
-                GossipConfiguration.KeyAttributes(_globalServiceId),
-                "",
+                GossipGateway.ToQueryAttributes(_globalServiceId),
+                GossipGateway.ToQueryExpression(),
                 r => new GossipGateway(r));
 
             return result.results.ToDictionary(
@@ -162,7 +163,8 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
                 GATEWAY_TABLE_NAME,
                 gw.ToKeyAttributes(),
                 gw.ToAttributes(true),
-                conditionValues: gw.ToConditionalAttributes());
+                gw.ToConditionalExpresssion(),
+                gw.ToConditionalAttributes());
         }
 
         #endregion

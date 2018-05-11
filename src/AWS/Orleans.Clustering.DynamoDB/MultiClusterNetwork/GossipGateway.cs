@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net;
+using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Orleans.MultiCluster;
 using Orleans.Runtime;
@@ -17,6 +18,18 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
         private const string SERVICE_ID_PROPERTY_NAME = "ServiceId";
         private const string SILO_PORT_PROPERTY_NAME = "SiloPort";
         private const string SILO_GENERATION_PROPERTY_NAME = "SiloGeneration";
+        private const string ROW_KEY_PROPERTY_NAME = "RowKey";
+
+        internal static List<KeySchemaElement> Keys => new List<KeySchemaElement>
+        {
+            new KeySchemaElement { AttributeName = SERVICE_ID_PROPERTY_NAME, KeyType = KeyType.HASH },
+            new KeySchemaElement { AttributeName = ROW_KEY_PROPERTY_NAME, KeyType = KeyType.RANGE },
+        };
+        internal static List<AttributeDefinition> Attributes => new List<AttributeDefinition>
+        {
+            new AttributeDefinition { AttributeName = SERVICE_ID_PROPERTY_NAME, AttributeType =  ScalarAttributeType.S},
+            new AttributeDefinition { AttributeName = ROW_KEY_PROPERTY_NAME, AttributeType = ScalarAttributeType.S },
+        };
 
         public DateTime GossipTimestamp { get; }
 
@@ -32,7 +45,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
 
         // Primary Key
         public string ServiceId { get; }
-        
+
         // Primary Key
         public int SiloPort { get; }
 
@@ -90,11 +103,12 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
         {
             return new Dictionary<string, AttributeValue>
             {
+                [SERVICE_ID_PROPERTY_NAME] = new AttributeValue(ServiceId),
+                [ROW_KEY_PROPERTY_NAME] = new AttributeValue($"{ClusterId}_{SiloAddress}_{SiloPort}"),
                 [STATUS_PROPERTY_NAME] = new AttributeValue(Status),
                 [VERSION_PROPERTY_NAME] = new AttributeValue((incrementVersion ? Version + 1 : Version).ToString()),
                 [CLUSTER_ID_PROPERTY_NAME] = new AttributeValue(ClusterId),
                 [SILO_ADDRESS_PROPERTY_NAME] = new AttributeValue(SiloAddress),
-                [SERVICE_ID_PROPERTY_NAME] = new AttributeValue(ServiceId),
                 [SILO_PORT_PROPERTY_NAME] = new AttributeValue(SiloPort.ToString()),
                 [SILO_GENERATION_PROPERTY_NAME] = new AttributeValue(SiloGeneration.ToString())
             };
@@ -104,10 +118,8 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
         {
             return new Dictionary<string, AttributeValue>
             {
-                [CLUSTER_ID_PROPERTY_NAME] = new AttributeValue(ClusterId),
-                [SILO_ADDRESS_PROPERTY_NAME] = new AttributeValue(SiloAddress),
                 [SERVICE_ID_PROPERTY_NAME] = new AttributeValue(ServiceId),
-                [SILO_PORT_PROPERTY_NAME] = new AttributeValue(SiloPort.ToString()),
+                [ROW_KEY_PROPERTY_NAME] = new AttributeValue($"{ClusterId}_{SiloAddress}_{SiloPort}"),
             };
         }
 
@@ -115,8 +127,26 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
         {
             return new Dictionary<string, AttributeValue>
             {
-                [VERSION_PROPERTY_NAME] = new AttributeValue(Version.ToString())
+                [$":current{VERSION_PROPERTY_NAME}"] = new AttributeValue(Version.ToString())
             };
+        }
+
+        internal string ToConditionalExpresssion()
+        {
+            return $"{VERSION_PROPERTY_NAME} = :current{VERSION_PROPERTY_NAME}";
+        }
+
+        internal static Dictionary<string, AttributeValue> ToQueryAttributes(string serviceId)
+        {
+            return new Dictionary<string, AttributeValue>
+            {
+                [$":{SERVICE_ID_PROPERTY_NAME}"] = new AttributeValue(serviceId)
+            };
+        }
+
+        internal static string ToQueryExpression()
+        {
+            return $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME}";
         }
     }
 }

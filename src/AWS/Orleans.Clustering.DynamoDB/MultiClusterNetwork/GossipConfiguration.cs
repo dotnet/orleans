@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Orleans.MultiCluster;
 
@@ -16,6 +17,15 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
         private const string VERSION_PROPERTY_NAME = "Version";
         private const string TIMESTAMP_PROPERTY_NAME = "Timestamps";
         private const string CLUSTERS_PROPERTY_NAME = "Clusters";
+
+        internal static List<KeySchemaElement> Keys => new List<KeySchemaElement>
+        {
+            new KeySchemaElement { AttributeName = SERVICE_ID_PROPERTY_NAME, KeyType = KeyType.HASH }
+        };
+        internal static List<AttributeDefinition> Attributes => new List<AttributeDefinition>
+        {
+            new AttributeDefinition{ AttributeName = SERVICE_ID_PROPERTY_NAME, AttributeType =  ScalarAttributeType.S}
+        };
 
         public GossipConfiguration(IReadOnlyDictionary<string, AttributeValue> fields)
         {
@@ -80,8 +90,13 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
         {
             return new Dictionary<string, AttributeValue>
             {
-                [VERSION_PROPERTY_NAME] = new AttributeValue(Version.ToString())
+                [$":current{VERSION_PROPERTY_NAME}"] = new AttributeValue(Version.ToString())
             };
+        }
+
+        public string ToConditionalExpression()
+        {
+            return $"{VERSION_PROPERTY_NAME} = :current{VERSION_PROPERTY_NAME}";
         }
     }
 }
