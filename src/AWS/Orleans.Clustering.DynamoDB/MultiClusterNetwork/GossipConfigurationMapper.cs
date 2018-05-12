@@ -7,6 +7,9 @@ using Amazon.DynamoDBv2.Model;
 
 namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
 {
+    /// <summary>
+    /// Conversion tools between <see cref="GossipConfiguration"/> and its representation in DynamoDB
+    /// </summary>
     internal static class GossipConfigurationMapper
     {
         private const string ClustersListSeparator = ","; // safe because clusterid cannot contain commas
@@ -18,18 +21,32 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
         private const string TIMESTAMP_PROPERTY_NAME = "ServiceTimestamp";
         private const string CLUSTERS_PROPERTY_NAME = "ServiceClusters";
 
+        /// <summary>
+        /// Provides required condition expression for item's update
+        /// </summary>
         public static string ConditionalExpression => $"{VERSION_PROPERTY_NAME} = :current{VERSION_PROPERTY_NAME}";
 
+        /// <summary>
+        /// Primary Key elements, for table creation
+        /// </summary>
         public static List<KeySchemaElement> Keys => new List<KeySchemaElement>
         {
             new KeySchemaElement { AttributeName = SERVICE_ID_PROPERTY_NAME, KeyType = KeyType.HASH }
         };
 
+        /// <summary>
+        /// Primary Key elements definitions, for table creation
+        /// </summary>
         public static List<AttributeDefinition> Attributes => new List<AttributeDefinition>
         {
             new AttributeDefinition{ AttributeName = SERVICE_ID_PROPERTY_NAME, AttributeType =  ScalarAttributeType.S}
         };
 
+        /// <summary>
+        /// Creates a new <see cref="GossipConfiguration"/> out of a DynamoDB item
+        /// </summary>
+        /// <param name="fields"></param>
+        /// <returns>Newly created configuration</returns>
         public static GossipConfiguration ToConfiguration(IReadOnlyDictionary<string, AttributeValue> fields)
         {
             var conf = new GossipConfiguration();
@@ -52,7 +69,12 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
             return conf;
         }
 
-        public static Dictionary<string, AttributeValue> KeyAttributes(string serviceId)
+        /// <summary>
+        /// Provides primary key attributes
+        /// </summary>
+        /// <param name="serviceId"></param>
+        /// <returns></returns>
+        public static Dictionary<string, AttributeValue> ToKeyAttributes(string serviceId)
         {
             return new Dictionary<string, AttributeValue>
             {
@@ -60,6 +82,13 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
             };
         }
 
+        #region GossipConfiguration Extension Methods
+
+        /// <summary>
+        /// Provides required conditions for item's update
+        /// </summary>
+        /// <param name="conf"></param>
+        /// <returns></returns>
         public static Dictionary<string, AttributeValue> ToConditionalAttributes(this GossipConfiguration conf)
         {
             return new Dictionary<string, AttributeValue>
@@ -68,6 +97,12 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
             };
         }
 
+        /// <summary>
+        /// Provides attributes to be updated
+        /// </summary>
+        /// <param name="conf"></param>
+        /// <param name="update">If yes, updatable attributes are returned. If no, item will be created and all attributes are returned</param>
+        /// <returns></returns>
         public static Dictionary<string, AttributeValue> ToAttributes(this GossipConfiguration conf, bool update = false)
         {
             var attributes = new Dictionary<string, AttributeValue>
@@ -85,5 +120,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
 
             return attributes;
         }
+
+        #endregion
     }
 }

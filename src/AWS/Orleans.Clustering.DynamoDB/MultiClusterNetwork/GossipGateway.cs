@@ -6,6 +6,10 @@ using Orleans.Runtime.MultiClusterNetwork;
 
 namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
 {
+    /// <summary>
+    /// Represents a Gossip Gateway, as stored in DynamoDB
+    /// <para>Primary key is the combinaison of <see cref="ServiceId"/>, <see cref="SiloAddress"/>, <see cref="SiloPort"/> and <see cref="ClusterId"/></para>
+    /// </summary>
     internal class GossipGateway
     {
         public DateTime GossipTimestamp { get; set; }
@@ -13,17 +17,13 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
         public string Status { get; set; }
 
         public int Version { get; set; }
-
-        // Primary Key
+        
         public string ClusterId { get; set; }
-
-        // Primary Key
+        
         public string SiloAddress { get; set; }
-
-        // Primary Key
+        
         public string ServiceId { get; set; }
-
-        // Primary Key
+        
         public int SiloPort { get; set; }
 
         public int SiloGeneration { get; set; }

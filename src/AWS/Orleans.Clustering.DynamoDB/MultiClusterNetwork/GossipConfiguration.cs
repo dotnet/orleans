@@ -5,6 +5,10 @@ using Orleans.MultiCluster;
 
 namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
 {
+    /// <summary>
+    /// Represents a Gossip COnfiguration, as stored in DynamoDB
+    /// <para>Its primary key is <see cref="ServiceId"/></para>
+    /// </summary>
     internal class GossipConfiguration
     {
         public GossipConfiguration()

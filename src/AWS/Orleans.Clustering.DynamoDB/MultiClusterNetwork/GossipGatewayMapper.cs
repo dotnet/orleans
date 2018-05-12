@@ -6,6 +6,9 @@ using Amazon.DynamoDBv2.Model;
 
 namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
 {
+    /// <summary>
+    /// Conversion tools between <see cref="GossipGateway"/> and its representation in DynamoDB
+    /// </summary>
     internal static class GossipGatewayMapper
     {
         private const string STATUS_PROPERTY_NAME = "GatewayStatus";
@@ -18,22 +21,39 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
         private const string TIMESTAMP_PROPERTY_NAME = "GatewaySiloTimestamp";
         private const string ROW_KEY_PROPERTY_NAME = "GatewayRowKey";
 
+        /// <summary>
+        /// Provides required condition expression for item's update
+        /// </summary>
         public static string ConditionalExpression => $"{VERSION_PROPERTY_NAME} = :current{VERSION_PROPERTY_NAME}";
 
+        /// <summary>
+        /// Provide required condition expression for items query
+        /// </summary>
         public static string QueryExpression => $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME}";
 
+        /// <summary>
+        /// Primary Key elements, for table creation
+        /// </summary>
         public static List<KeySchemaElement> Keys => new List<KeySchemaElement>
         {
             new KeySchemaElement { AttributeName = SERVICE_ID_PROPERTY_NAME, KeyType = KeyType.HASH },
             new KeySchemaElement { AttributeName = ROW_KEY_PROPERTY_NAME, KeyType = KeyType.RANGE },
         };
 
+        /// <summary>
+        /// Primary Key element definitions, for table creation
+        /// </summary>
         public static List<AttributeDefinition> Attributes => new List<AttributeDefinition>
         {
             new AttributeDefinition { AttributeName = SERVICE_ID_PROPERTY_NAME, AttributeType =  ScalarAttributeType.S},
             new AttributeDefinition { AttributeName = ROW_KEY_PROPERTY_NAME, AttributeType = ScalarAttributeType.S },
         };
 
+        /// <summary>
+        /// Creates a new <see cref="GossipGateway"/> out of a DynamoDB item
+        /// </summary>
+        /// <param name="fields"></param>
+        /// <returns>Newly created gateway</returns>
         public static GossipGateway ToGateway(IReadOnlyDictionary<string, AttributeValue> fields)
         {
             var gw = new GossipGateway();
@@ -65,6 +85,13 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
             return gw;
         }
 
+        #region GossipGateway Extension Methods
+
+        /// <summary>
+        /// Provides required conditions for items query
+        /// </summary>
+        /// <param name="serviceId"></param>
+        /// <returns></returns>
         public static Dictionary<string, AttributeValue> ToQueryAttributes(string serviceId)
         {
             return new Dictionary<string, AttributeValue>
@@ -73,6 +100,12 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
             };
         }
 
+        /// <summary>
+        /// Provides attributes to be updated
+        /// </summary>
+        /// <param name="gateway"></param>
+        /// <param name="update">If yes, updatable attributes are returned. If no, item will be created and all attributes are returned</param>
+        /// <returns></returns>
         public static Dictionary<string, AttributeValue> ToAttributes(this GossipGateway gateway, bool update = false)
         {
             var attributes = new Dictionary<string, AttributeValue>
@@ -95,6 +128,11 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
             return attributes;
         }
 
+        /// <summary>
+        /// Provides primary key attributes
+        /// </summary>
+        /// <param name="gateway"></param>
+        /// <returns></returns>
         public static Dictionary<string, AttributeValue> ToKeyAttributes(this GossipGateway gateway)
         {
             return new Dictionary<string, AttributeValue>
@@ -104,6 +142,11 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
             };
         }
 
+        /// <summary>
+        /// Provides required conditions for item's update
+        /// </summary>
+        /// <param name="gateway"></param>
+        /// <returns></returns>
         public static Dictionary<string, AttributeValue> ToConditionalAttributes(this GossipGateway gateway)
         {
             return new Dictionary<string, AttributeValue>
@@ -111,5 +154,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
                 [$":current{VERSION_PROPERTY_NAME}"] = new AttributeValue(gateway.Version.ToString())
             };
         }
+
+        #endregion
     }
 }
