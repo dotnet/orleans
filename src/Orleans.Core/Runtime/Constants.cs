@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace Orleans.Runtime
@@ -19,6 +19,8 @@ namespace Orleans.Runtime
 
         public const string ORLEANS_CLUSTERING_AZURESTORAGE = "Orleans.Clustering.AzureStorage";
         public const string ORLEANS_REMINDERS_AZURESTORAGE = "Orleans.Reminders.AzureStorage";
+
+        public const string ORLEANS_CLUSTERING_DYNAMODB = "Orleans.Clustering.DynamoDB";
 
         public const string ORLEANS_CLUSTERING_ADONET = "Orleans.Clustering.AdoNet";
         public const string ORLEANS_REMINDERS_ADONET = "Orleans.Reminders.AdoNet";

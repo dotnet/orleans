@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace Orleans.Configuration
@@ -15,6 +15,9 @@ namespace Orleans.Configuration
 
             /// <summary>An Azure Table serving as a channel. </summary>
             public const string AzureTable = "AzureTable";
+
+            /// <summary>A DynamoDB table serving as a channel. </summary>
+            public const string DynamoDB = "DynamoDB";
         }
 
         /// <summary>

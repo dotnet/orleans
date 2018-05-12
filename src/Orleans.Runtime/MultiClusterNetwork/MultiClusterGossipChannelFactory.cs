@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -16,8 +16,8 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
         public MultiClusterGossipChannelFactory(
             IOptions<ClusterOptions> clusterOptions,
-            IOptions<MultiClusterOptions> multiClusterOptions, 
-            IServiceProvider serviceProvider, 
+            IOptions<MultiClusterOptions> multiClusterOptions,
+            IServiceProvider serviceProvider,
             ILogger<MultiClusterGossipChannelFactory> logger)
         {
             this.clusterOptions = clusterOptions.Value;
@@ -30,7 +30,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
         {
             List<IGossipChannel> gossipChannels = new List<IGossipChannel>();
 
-            foreach(KeyValuePair<string,string> channelConfig in this.multiClusterOptions.GossipChannels)
+            foreach (KeyValuePair<string, string> channelConfig in this.multiClusterOptions.GossipChannels)
             {
                 if (!string.IsNullOrWhiteSpace(channelConfig.Key))
                 {
@@ -42,7 +42,11 @@ namespace Orleans.Runtime.MultiClusterNetwork
                             await tableChannel.Initialize(this.clusterOptions.ServiceId, channelConfig.Value);
                             gossipChannels.Add(tableChannel);
                             break;
-
+                        case MultiClusterOptions.BuiltIn.DynamoDB:
+                            var dynamoChannel = AssemblyLoader.LoadAndCreateInstance<IGossipChannel>(Constants.ORLEANS_CLUSTERING_DYNAMODB, logger, this.serviceProvider);
+                            await dynamoChannel.Initialize(this.clusterOptions.ServiceId, channelConfig.Value);
+                            gossipChannels.Add(dynamoChannel);
+                            break;
                         default:
                             break;
                     }
