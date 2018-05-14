@@ -5,7 +5,7 @@ title: Global-Single-Instance Grains
 
 ### Grain Coordination Attributes
 
-Developers can indicate when and how clusters should coordinate their grain directories with respect to a particular grain class. The  `[GlobalSingleInstance]` attribute means we want the same behavior as as when running Orleans in a single global cluster: that is, route all calls to a single activation of the grain. Conversely, the `[OneInstancePerCluster]` attribute indicates that each cluster can have its own independent activation. This is appropriate if communication between clusters is undesired.
+Developers can indicate when and how clusters should coordinate their grain directories with respect to a particular grain class. The  `[GlobalSingleInstance]` attribute means we want the same behavior as when running Orleans in a single global cluster: that is, route all calls to a single activation of the grain. Conversely, the `[OneInstancePerCluster]` attribute indicates that each cluster can have its own independent activation. This is appropriate if communication between clusters is undesired.
 
 The attributes are placed on grain implementations. For example: 
 ```csharp
