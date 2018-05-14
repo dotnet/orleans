@@ -14,14 +14,6 @@ namespace Orleans.Transactions
     public interface ITransactionAgent
     {
         /// <summary>
-        /// Starts the Transaction Agent
-        /// </summary>
-        /// <remarks>
-        /// This must be called before any other method is called on the Transaction Agent.
-        /// </remarks>
-        Task Start();
-
-        /// <summary>
         /// Starts a new transaction
         /// </summary>
         /// <param name="readOnly">Whether it is a read-only transaction</param>

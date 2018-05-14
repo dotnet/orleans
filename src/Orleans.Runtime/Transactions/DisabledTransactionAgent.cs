@@ -18,11 +18,6 @@ namespace Orleans.Transactions
             throw new OrleansTransactionsDisabledException();
         }
 
-        public Task Start()
-        {
-            return Task.CompletedTask;
-        }
-
         public Task<ITransactionInfo> StartTransaction(bool readOnly, TimeSpan timeout)
         {
             throw new OrleansStartTransactionFailedException(new OrleansTransactionsDisabledException());
