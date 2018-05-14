@@ -15,7 +15,7 @@ namespace Benchmarks.Transactions
         public void Setup()
         {
             var builder = new TestClusterBuilder();
-            builder.AddSiloBuilderConfigurator<SiloStorageConfigurator>();
+            builder.AddSiloBuilderConfigurator<SiloMemoryStorageConfigurator>();
             builder.AddSiloBuilderConfigurator<SiloTransactionConfigurator>();
             this.host = builder.Build();
             this.host.Deploy();
@@ -30,7 +30,7 @@ namespace Benchmarks.Transactions
             this.host.Deploy();
         }
 
-        public class SiloStorageConfigurator : ISiloBuilderConfigurator
+        public class SiloMemoryStorageConfigurator : ISiloBuilderConfigurator
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
