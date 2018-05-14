@@ -17,12 +17,12 @@ namespace Orleans.Transactions
 
         private readonly ILogger logger;
         private readonly Stopwatch stopwatch = Stopwatch.StartNew();
-        private readonly TransactionClock clock;
+        private readonly CausalClock clock;
 
-        public TransactionAgent(IClock clock, ILoggerFactory loggerFactory, ILocalSiloDetails siloDetails)
+        public TransactionAgent(IClock clock, ILogger<TransactionAgent> logger)
         {
-            this.clock = new TransactionClock(clock);
-            this.logger = loggerFactory.CreateLogger(this.GetType().Name);
+            this.clock = new CausalClock(clock);
+            this.logger = logger;
         }
 
         public Task<ITransactionInfo> StartTransaction(bool readOnly, TimeSpan timeout)

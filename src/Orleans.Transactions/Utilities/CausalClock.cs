@@ -3,13 +3,13 @@ using System;
 
 namespace Orleans.Transactions
 {
-    public class TransactionClock
+    public class CausalClock
     {
         private readonly Object lockable = new object();
         private readonly IClock clock;
         private long previous;
 
-        public TransactionClock(IClock clock)
+        public CausalClock(IClock clock)
         {
             this.clock = clock ?? throw new ArgumentNullException(nameof(clock));
         }
@@ -18,6 +18,12 @@ namespace Orleans.Transactions
         {
             lock (this.lockable) return new DateTime(
                 previous = Math.Max(previous + 1, this.clock.UtcNow().Ticks));
+        }
+
+        public DateTime Merge(DateTime timestamp)
+        {
+            lock (this.lockable) return new DateTime(
+                previous = Math.Max(previous, timestamp.Ticks));
         }
 
         public DateTime MergeUtcNow(DateTime timestamp)

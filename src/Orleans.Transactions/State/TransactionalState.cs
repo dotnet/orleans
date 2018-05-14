@@ -87,7 +87,7 @@ namespace Orleans.Transactions
         // processes confirmation tasks
         private BatchWorker confirmationWorker;
 
-        private DateTime clock;
+        private CausalClock clock;
 
         // collection tasks
         private Dictionary<DateTime, PMessages> unprocessedPreparedMessages;
@@ -95,17 +95,6 @@ namespace Orleans.Transactions
         {
             public int Count;
             public TransactionalStatus Status;
-        }
-
-        // clock read and merge
-        private DateTime MergeAndReadClock(DateTime other)
-        {
-            return clock = new DateTime(Math.Max(Math.Max(clock.Ticks + 1, other.Ticks + 1), DateTime.UtcNow.Ticks));
-        }
-        private void MergeClock(DateTime other)
-        {
-            if (other > clock)
-                clock = other;
         }
 
         public TransactionalState(
@@ -116,7 +105,9 @@ namespace Orleans.Transactions
             IProviderRuntime runtime, 
             ILoggerFactory loggerFactory, 
             ITypeResolver typeResolver,
-            IGrainFactory grainFactory)
+            IGrainFactory grainFactory,
+            IClock clock
+            )
         {
             this.config = transactionalStateConfiguration;
             this.context = context;
@@ -124,6 +115,7 @@ namespace Orleans.Transactions
             this.transactionAgent = transactionAgent;
             this.runtime = runtime;
             this.loggerFactory = loggerFactory;
+            this.clock = new CausalClock(clock);
 
             lockWorker = new BatchWorkerFromDelegate(LockWork);
             storageWorker = new BatchWorkerFromDelegate(StorageWork);
@@ -207,7 +199,7 @@ namespace Orleans.Transactions
                 logger.Debug($"Load v{stableSequenceNumber} {loadresponse.PendingStates.Count}p {storageBatch.MetaData.CommitRecords.Count}c");
 
             // ensure clock is consistent with loaded state
-            MergeClock(storageBatch.MetaData.TimeStamp);
+            this.clock.Merge(storageBatch.MetaData.TimeStamp);
 
             // resume prepared transactions (not TM)
             foreach (var pr in loadresponse.PendingStates.OrderBy(ps => ps.TimeStamp))

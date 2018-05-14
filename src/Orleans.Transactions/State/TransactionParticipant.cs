@@ -419,7 +419,7 @@ namespace Orleans.Transactions
                     }
 
                     // merge the current clock into the transaction time stamp
-                    record.Timestamp = MergeAndReadClock(info.TimeStamp);
+                    record.Timestamp = this.clock.MergeUtcNow(info.TimeStamp);
 
                     // link to the latest state
                     if (record.State == null)
@@ -509,7 +509,7 @@ namespace Orleans.Transactions
                      }
 
                      // merge the current clock into the transaction time stamp
-                     record.Timestamp = MergeAndReadClock(info.TimeStamp);
+                     record.Timestamp = this.clock.MergeUtcNow(info.TimeStamp);
 
                      if (record.State == null)
                      {
@@ -576,7 +576,7 @@ namespace Orleans.Transactions
             }
             else
             {
-                MergeClock(record.Timestamp);
+                this.clock.Merge(record.Timestamp);
             }
 
             lockWorker.Notify();
@@ -601,7 +601,7 @@ namespace Orleans.Transactions
             }
             else
             {
-                MergeClock(record.Timestamp);
+                clock.Merge(record.Timestamp);
             }
 
             lockWorker.Notify();
@@ -623,7 +623,7 @@ namespace Orleans.Transactions
             }
             else
             {
-                MergeClock(record.Timestamp);
+                this.clock.Merge(record.Timestamp);
             }
 
             lockWorker.Notify();
