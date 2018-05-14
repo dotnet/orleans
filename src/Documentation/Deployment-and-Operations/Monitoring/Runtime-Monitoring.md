@@ -31,7 +31,7 @@ siloHostBuilder.Configure<TelemetryOptions>(options => options.AddConsumer<AITel
 
 client configuration code look like this: 
 ```c#
-var clientBuilder = newClientBuilder();
+var clientBuilder = new ClientBuilder();
 //configure the clientBuilder with AITelemetryConsumer
 clientBuilder.Configure<TelemetryOptions>(options => options.AddConsumer<AITelemetryConsumer>);
 ```
