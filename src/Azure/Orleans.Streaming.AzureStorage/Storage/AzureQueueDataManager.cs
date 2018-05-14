@@ -386,6 +386,7 @@ namespace Orleans.AzureUtils
                 .Replace('&', '-')
                 .Replace('+', '-')
                 .Replace(':', '-')
+                .Replace('.', '-')
                 .Replace('%', '-');
             return tmp;
         }
