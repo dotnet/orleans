@@ -31,7 +31,7 @@ namespace Benchmarks
             {
                 BenchmarkRunner.Run<SerializationBenchmarks>();
             },
-            ["Transactions"] = () =>
+            ["Transactions.Memory"] = () =>
             {
                 RunBenchmark(
                 "Running Transactions benchmark",
@@ -39,6 +39,19 @@ namespace Benchmarks
                 {
                     var benchmark = new TransactionBenchmark();
                     benchmark.Setup();
+                    return benchmark;
+                },
+                benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
+                benchmark => benchmark.Teardown());
+            },
+            ["Transactions.Azure"] = () =>
+            {
+                RunBenchmark(
+                "Running Transactions benchmark",
+                () =>
+                {
+                    var benchmark = new TransactionBenchmark();
+                    benchmark.AzureSetup();
                     return benchmark;
                 },
                 benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),

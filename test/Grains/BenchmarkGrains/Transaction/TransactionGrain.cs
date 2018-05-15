@@ -27,8 +27,7 @@ namespace BenchmarkGrains.Transaction
 
         public Task Run()
         {
-            this.info.PerformUpdate(s => s.Value += 1);
-            return Task.CompletedTask;
+            return this.info.PerformUpdate(s => s.Value += 1);
         }
     }
 }

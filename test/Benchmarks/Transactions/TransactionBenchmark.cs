@@ -4,6 +4,7 @@ using System.Linq;
 using Orleans.Hosting;
 using Orleans.TestingHost;
 using BenchmarkGrainInterfaces.Transaction;
+using TestExtensions;
 
 namespace Benchmarks.Transactions
 {
@@ -14,17 +15,37 @@ namespace Benchmarks.Transactions
         public void Setup()
         {
             var builder = new TestClusterBuilder();
-            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
-            builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+            builder.AddSiloBuilderConfigurator<SiloMemoryStorageConfigurator>();
+            builder.AddSiloBuilderConfigurator<SiloTransactionConfigurator>();
             this.host = builder.Build();
             this.host.Deploy();
         }
 
-        public class SiloConfigurator : ISiloBuilderConfigurator
+        public void AzureSetup()
+        {
+            var builder = new TestClusterBuilder();
+            builder.AddSiloBuilderConfigurator<SiloAzureStorageConfigurator>();
+            builder.AddSiloBuilderConfigurator<SiloTransactionConfigurator>();
+            this.host = builder.Build();
+            this.host.Deploy();
+        }
+
+        public class SiloMemoryStorageConfigurator : ISiloBuilderConfigurator
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder.AddMemoryGrainStorageAsDefault();
+            }
+        }
+
+        public class SiloAzureStorageConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder.AddAzureTableTransactionalStateStorageAsDefault(options =>
+                {
+                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                });
             }
         }
 
@@ -38,7 +59,7 @@ namespace Benchmarks.Transactions
 
         private async Task FullRunAsync()
         {
-            Report[] reports = await Task.WhenAll(Enumerable.Range(0, 20).Select(i => RunAsync(i, 5000, 300)));
+            Report[] reports = await Task.WhenAll(Enumerable.Range(0, 10).Select(i => RunAsync(i, 2000, 500)));
             Report finalReport = new Report();
             foreach (Report report in reports)
             {
@@ -74,7 +95,7 @@ namespace Benchmarks.Transactions
             host.StopAllSilos();
         }
 
-        public sealed class SiloBuilderConfigurator : ISiloBuilderConfigurator
+        public sealed class SiloTransactionConfigurator : ISiloBuilderConfigurator
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
