@@ -21,7 +21,6 @@ namespace Orleans.Transactions.Azure.Tests
         {
             builder.Options.InitialSilosCount = 5;
             builder.CreateSilo = AppDomainSiloHandle.Create;
-            builder.AddSiloBuilderConfigurator<TransactionRecoveryTestsRunner.SiloBuilderConfigurator>();
             builder.AddSiloBuilderConfigurator<TestFixture.SiloBuilderConfigurator>();
         }
 

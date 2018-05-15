@@ -29,15 +29,6 @@ namespace Orleans.Transactions.Tests
             this.seed = new Random();
         }
 
-        // this is only needed for singleTM tests
-        public class SiloBuilderConfigurator : ISiloBuilderConfigurator
-        {
-            public void Configure(ISiloHostBuilder hostBuilder)
-            {
-                hostBuilder.ConfigureServices(services => services.AddTransientNamedService<IControllable, TMGrainLocator>(typeof(TMGrainLocator).Name));
-            }
-        }
-
         public virtual async Task TransactionWillRecoverAfterRandomSiloFailure(string transactionTestGrainClassName)
         {
             const int grainCount = 100;
@@ -47,40 +38,8 @@ namespace Orleans.Transactions.Tests
             var txSucceedBeforeInterruption = await AllTxSucceed(txGrains);
             this.logger.LogInformation($"Tx succeed before interruption : {txSucceedBeforeInterruption}");
             //randomly ungraceful shut down one silo
-            this.testCluster.KillSilo(this.testCluster.Silos[this.seed.Next(this.testCluster.Silos.Count)]);
+            this.testCluster.StopSilo(this.testCluster.Silos[this.seed.Next(this.testCluster.Silos.Count)]);
             await TestingUtils.WaitUntilAsync(lastTry => CheckTxResult(txGrains, lastTry), RecoveryTimeout);
-        }
-
-        //given a predicate, whether to kill a silo
-        private async Task KillRandomSilo()
-        {
-            var mgmt = this.testCluster.GrainFactory.GetGrain<IManagementGrain>(0);
-
-            object[] results = await mgmt.SendControlCommandToProvider(typeof(TMGrainLocator).FullName, typeof(TMGrainLocator).Name, 1);
-            this.logger.LogInformation($"Current TMGrainLocator list : {String.Join(";", results.Select(re => re.As<SiloAddress>().ToString()))}");
-            if (results.Length == 0)
-                throw new Exception("No silo fits the predicate, potential test configuration issues");
-            var murderTarget = results.ElementAt(this.seed.Next(results.Length)) as SiloAddress;
-            this.logger.LogInformation($"Current hard kill target is {murderTarget}");
-            foreach (var siloHanle in this.testCluster.Silos)
-            {
-                if(siloHanle.SiloAddress.Equals(murderTarget))
-                    siloHanle.StopSilo(false);
-            }
-        }
-
-        public class TMGrainLocator : IControllable
-        {
-            private ILocalSiloDetails siloDetails;
-            public TMGrainLocator(ILocalSiloDetails siloDetails)
-            {
-                this.siloDetails = siloDetails;
-            }
-
-            public Task<object> ExecuteCommand(int command, object arg)
-            {
-                return Task.FromResult<object>(this.siloDetails.SiloAddress);
-            }
         }
 
         private async Task<bool> CheckTxResult(IList<ITransactionTestGrain> txGrains, bool assertIsTrue)
