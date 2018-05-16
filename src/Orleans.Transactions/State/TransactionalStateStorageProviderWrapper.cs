@@ -57,13 +57,10 @@ namespace Orleans.Transactions
             // prepare
             if (statesToPrepare?.Count > 0)
             {
-                if (pendinglist.Count != 0)
+                // remove prepare records that are being overwritten
+                while (pendinglist.Count != 0 && pendinglist[pendinglist.Count - 1].SequenceId >= statesToPrepare[0].SequenceId)
                 {
-                    // remove prepare records that are being overwritten
-                    while (pendinglist[pendinglist.Count - 1].SequenceId >= statesToPrepare[0].SequenceId)
-                    {
-                        pendinglist.RemoveAt(pendinglist.Count - 1);
-                    }
+                    pendinglist.RemoveAt(pendinglist.Count - 1);
                 }
                 pendinglist.AddRange(statesToPrepare);
             }
