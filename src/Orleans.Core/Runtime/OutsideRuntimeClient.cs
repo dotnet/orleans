@@ -67,8 +67,11 @@ namespace Orleans
         private IPAddress localAddress;
         private IGatewayListProvider gatewayListProvider;
         private readonly ILoggerFactory loggerFactory;
+        private readonly IOptions<StatisticsOptions> statisticsOptions;
 
         private SerializationManager serializationManager;
+        private ApplicationRequestsStatisticsGroup appRequestStatistics;
+        private StageAnalysisStatisticsGroup schedulerStageStatistics;
 
         public ActivationAddress CurrentActivationAddress
         {
@@ -96,9 +99,11 @@ namespace Orleans
         public OutsideRuntimeClient(
             ILoggerFactory loggerFactory, 
             IOptions<ClientMessagingOptions> clientMessagingOptions,
-            IOptions<TypeManagementOptions> typeManagementOptions)
+            IOptions<TypeManagementOptions> typeManagementOptions,
+            IOptions<StatisticsOptions> statisticsOptions)
         {
             this.loggerFactory = loggerFactory;
+            this.statisticsOptions = statisticsOptions;
             this.logger = loggerFactory.CreateLogger<OutsideRuntimeClient>();
             this.handshakeClientId = GrainId.NewClientId();
             tryResendMessage = TryResendMessage;
@@ -135,8 +140,8 @@ namespace Orleans
 
             this.GrainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
 
-            var statisticsOptions = this.ServiceProvider.GetRequiredService<IOptions<ClientStatisticsOptions>>().Value;
-            StatisticsCollector.Initialize(statisticsOptions.CollectionLevel);
+            this.schedulerStageStatistics = this.ServiceProvider.GetRequiredService<StageAnalysisStatisticsGroup>();
+            this.appRequestStatistics = this.ServiceProvider.GetRequiredService<ApplicationRequestsStatisticsGroup>();
 
             BufferPool.InitGlobalBufferPool(this.clientMessagingOptions);
 
@@ -163,9 +168,10 @@ namespace Orleans
 
                 this.gatewayListProvider = this.ServiceProvider.GetRequiredService<IGatewayListProvider>();
 
-                if (StatisticsCollector.CollectThreadTimeTrackingStats)
+                var statisticsLevel = statisticsOptions.Value.CollectionLevel;
+                if (statisticsLevel.CollectThreadTimeTrackingStats())
                 {
-                    incomingMessagesThreadTimeTracking = new ThreadTrackingStatistic("ClientReceiver", this.loggerFactory);
+                    incomingMessagesThreadTimeTracking = new ThreadTrackingStatistic("ClientReceiver", this.loggerFactory, this.statisticsOptions, this.schedulerStageStatistics);
                 }
             }
             catch (Exception exc)
@@ -292,10 +298,8 @@ namespace Orleans
 
         private void RunClientMessagePump(CancellationToken ct)
         {
-            if (StatisticsCollector.CollectThreadTimeTrackingStats)
-            {
-                incomingMessagesThreadTimeTracking.OnStartExecution();
-            }
+            incomingMessagesThreadTimeTracking?.OnStartExecution();
+
             while (listenForMessages)
             {
                 var message = transport.WaitMessage(Message.Categories.Application, ct);
@@ -352,10 +356,8 @@ namespace Orleans
                         }
 #endif
             }
-            if (StatisticsCollector.CollectThreadTimeTrackingStats)
-            {
-                incomingMessagesThreadTimeTracking.OnStopExecution();
-            }
+
+            incomingMessagesThreadTimeTracking?.OnStopExecution();
         }
 
         private void DispatchToLocalObject(Message message)
@@ -639,7 +641,8 @@ namespace Orleans
                     unregisterCallback,
                     this.clientMessagingOptions,
                     this.callBackDataLogger,
-                    this.timerLogger);
+                    this.timerLogger,
+                    this.appRequestStatistics);
                 callbacks.TryAdd(message.Id, callbackData);
                 callbackData.StartTimer(responseTimeout);
             }
@@ -727,10 +730,7 @@ namespace Orleans
             }, logger, "Client.clientProviderRuntime.Reset");
             Utils.SafeExecute(() =>
             {
-                if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                {
-                    incomingMessagesThreadTimeTracking.OnStopExecution();
-                }
+                incomingMessagesThreadTimeTracking?.OnStopExecution();
             }, logger, "Client.incomingMessagesThreadTimeTracking.OnStopExecution");
             Utils.SafeExecute(() =>
             {

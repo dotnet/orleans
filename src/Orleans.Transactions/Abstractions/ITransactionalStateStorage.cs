@@ -5,22 +5,29 @@ using System.Threading.Tasks;
 
 namespace Orleans.Transactions.Abstractions
 {
+    /// <summary>
+    /// Storage interface for transactional state
+    /// </summary>
+    /// <typeparam name="TState">the type of the state</typeparam>
     public interface ITransactionalStateStorage<TState>
         where TState : class, new()
     {
-        Task<TransactionalStorageLoadResponse<TState>> Load(string stateName);
+        Task<TransactionalStorageLoadResponse<TState>> Load();
 
-        Task<string> Persist(
-            string stateName,
+        Task<string> Store(
+
             string expectedETag,
             string metadata,
-            List<PendingTransactionState<TState>> statesToPrepare);
 
-        Task<string> Confirm(
-            string stateName,
-            string expectedETag,
-            string metadata,
-            string transactionIdToCommit);
+            // a list of transactions to prepare.
+            List<PendingTransactionState<TState>> statesToPrepare,
+
+            // if non-null, commit all pending transaction up to and including this sequence number.
+            long? commitUpTo,
+
+            // if non-null, abort all pending transactions with sequence numbers strictly larger than this one.
+            long? abortAfter
+        );
     }
 
     [Serializable]
@@ -28,18 +35,35 @@ namespace Orleans.Transactions.Abstractions
     public class PendingTransactionState<TState>
         where TState : class, new()
     {
-        public PendingTransactionState(string transactionId, long sequenceId, TState state)
-        {
-            this.TransactionId = transactionId;
-            this.SequenceId = sequenceId;
-            this.State = state;
-        }
+        /// <summary>
+        /// Transactions are given dense local sequence numbers 1,2,3,4...
+        /// If a new transaction is prepared with the same sequence number as a 
+        /// previously prepared transaction, it replaces it.
+        /// </summary>
+        public long SequenceId { get; set; }
 
-        public string TransactionId { get; }
+        /// <summary>
+        /// A globally unique identifier of the transaction. 
+        /// </summary>
+        public string TransactionId { get; set; }
 
-        public long SequenceId { get; }
+        /// <summary>
+        /// The logical timestamp of the transaction.
+        /// Timestamps are guaranteed to be monotonically increasing.
+        /// </summary>
+        public DateTime TimeStamp { get; set; }
 
-        public TState State { get; }
+        /// <summary>
+        /// The transaction manager that knows about the status of this prepared transaction,
+        /// or null if this is the transaction manager.
+        /// Used during recovery to inquire about the fate of the transaction.
+        /// </summary>
+        public string TransactionManager { get; set; }
+
+        /// <summary>
+        /// A snapshot of the state after this transaction executed
+        /// </summary>
+        public TState State { get; set; }
     }
 
     [Serializable]
@@ -47,20 +71,34 @@ namespace Orleans.Transactions.Abstractions
     public class TransactionalStorageLoadResponse<TState>
         where TState : class, new()
     {
-        public TransactionalStorageLoadResponse(string etag, TState committedState, string metadata, IReadOnlyList<PendingTransactionState<TState>> pendingStates)
+        public TransactionalStorageLoadResponse() : this(null, new TState(), 0, null, Array.Empty<PendingTransactionState<TState>>()) { }
+
+        public TransactionalStorageLoadResponse(string etag, TState committedState, long committedSequenceId, string metadata, IReadOnlyList<PendingTransactionState<TState>> pendingStates)
         {
             this.ETag = etag;
             this.CommittedState = committedState;
+            this.CommittedSequenceId = committedSequenceId;
             this.Metadata = metadata;
             this.PendingStates = pendingStates;
         }
 
-        public string ETag { get; }
+        public string ETag { get; set; }
 
-        public TState CommittedState { get; }
+        public TState CommittedState { get; set; }
 
-        public string Metadata { get;  }
+        /// <summary>
+        /// The local sequence id of the last committed transaction, or zero if none
+        /// </summary>
+        public long CommittedSequenceId { get; set; }
 
-        public IReadOnlyList<PendingTransactionState<TState>> PendingStates { get; }
+        /// <summary>
+        /// Additional state maintained by the transaction algorithm, such as commit records
+        /// </summary>
+        public string Metadata { get; set; }
+
+        /// <summary>
+        /// List of pending states, ordered by sequence id
+        /// </summary>
+        public IReadOnlyList<PendingTransactionState<TState>> PendingStates { get; set; }
     }
 }

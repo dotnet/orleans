@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -12,6 +15,8 @@ namespace Orleans.Runtime.Messaging
         private readonly ILogger log;
 
         private readonly QueueTrackingStatistic[] queueTracking;
+
+        private readonly StatisticsLevel statisticsLevel;
 
         private bool disposed;
 
@@ -30,19 +35,20 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        internal InboundMessageQueue(ILoggerFactory loggerFactory)
+        internal InboundMessageQueue(ILoggerFactory loggerFactory, IOptions<StatisticsOptions> statisticsOptions)
         {
             int n = Enum.GetValues(typeof(Message.Categories)).Length;
             this.messageQueues = new BlockingCollection<Message>[n];
             this.queueTracking = new QueueTrackingStatistic[n];
             int i = 0;
+            this.statisticsLevel = statisticsOptions.Value.CollectionLevel;
             foreach (var category in Enum.GetValues(typeof(Message.Categories)))
             {
                 this.messageQueues[i] = new BlockingCollection<Message>();
-                if (StatisticsCollector.CollectQueueStats)
+                if (this.statisticsLevel.CollectQueueStats())
                 {
                     var queueName = "IncomingMessageAgent." + category;
-                    this.queueTracking[i] = new QueueTrackingStatistic(queueName);
+                    this.queueTracking[i] = new QueueTrackingStatistic(queueName, statisticsOptions);
                     this.queueTracking[i].OnStartExecution();
                 }
 
@@ -60,7 +66,7 @@ namespace Orleans.Runtime.Messaging
                 q.CompleteAdding();
             }
 
-            if (!StatisticsCollector.CollectQueueStats)
+            if (!this.statisticsLevel.CollectQueueStats())
             {
                 return;
             }

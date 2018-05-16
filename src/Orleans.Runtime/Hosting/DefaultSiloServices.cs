@@ -80,6 +80,11 @@ namespace Orleans.Hosting
 
             services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
             services.TryAddSingleton<IHostEnvironmentStatistics, NoOpHostEnvironmentStatistics>();
+            services.TryAddSingleton<SiloStatisticsManager>();
+            services.TryAddSingleton<ApplicationRequestsStatisticsGroup>();
+            services.TryAddSingleton<StageAnalysisStatisticsGroup>();
+            services.TryAddSingleton<SchedulerStatisticsGroup>();
+            services.TryAddSingleton<SerializationStatisticsGroup>();
             services.TryAddSingleton<OverloadDetector>();
 
             services.TryAddSingleton<ExecutorService>();
@@ -108,7 +113,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<LocalGrainDirectory>();
             services.TryAddFromExisting<ILocalGrainDirectory, LocalGrainDirectory>();
             services.TryAddSingleton(sp => sp.GetRequiredService<LocalGrainDirectory>().GsiActivationMaintainer);
-            services.TryAddSingleton<SiloStatisticsManager>();
             services.TryAddSingleton<GrainTypeManager>();
             services.TryAddSingleton<MessageCenter>();
             services.TryAddFromExisting<IMessageCenter, MessageCenter>();
@@ -155,6 +159,7 @@ namespace Orleans.Hosting
             services.AddPlacementDirector<RandomPlacement, RandomPlacementDirector>();
             services.AddPlacementDirector<PreferLocalPlacement, PreferLocalPlacementDirector>();
             services.AddPlacementDirector<StatelessWorkerPlacement, StatelessWorkerDirector>();
+            services.Replace(new ServiceDescriptor(typeof(StatelessWorkerPlacement), sp => new StatelessWorkerPlacement(), ServiceLifetime.Singleton));
             services.AddPlacementDirector<ActivationCountBasedPlacement, ActivationCountPlacementDirector>();
             services.AddPlacementDirector<HashBasedPlacement, HashBasedPlacementDirector>();
 
@@ -224,11 +229,10 @@ namespace Orleans.Hosting
             services.AddFromExisting<IKeyedSerializer, BinaryFormatterISerializableSerializer>();
             services.AddSingleton<ILBasedSerializer>();
             services.AddFromExisting<IKeyedSerializer, ILBasedSerializer>();
-            
+
             // Transactions
-            services.TryAddSingleton<ITransactionAgent, TransactionAgent>();
+            services.TryAddSingleton<ITransactionAgent,DisabledTransactionAgent>();
             services.TryAddSingleton<Factory<ITransactionAgent>>(sp => () => sp.GetRequiredService<ITransactionAgent>());
-            services.TryAddSingleton<ITransactionManagerService, DisabledTransactionManagerService>();
 
             // Application Parts
             var applicationPartManager = context.GetApplicationPartManager();
@@ -257,13 +261,14 @@ namespace Orleans.Hosting
             services.ConfigureFormatter<GrainVersioningOptions>();
             services.ConfigureFormatter<ConsistentRingOptions>();
             services.ConfigureFormatter<MultiClusterOptions>();
-            services.ConfigureFormatter<SiloStatisticsOptions>();
+            services.ConfigureFormatter<StatisticsOptions>();
             services.ConfigureFormatter<TelemetryOptions>();
             services.ConfigureFormatter<LoadSheddingOptions>();
             services.ConfigureFormatter<EndpointOptions>();
 
             // This validator needs to construct the IMembershipOracle and the IMembershipTable
             // so move it in the end so other validator are called first
+            services.AddTransient<IConfigurationValidator, ClusterOptionsValidator>();
             services.AddTransient<IConfigurationValidator, SiloClusteringValidator>();
         }
     }

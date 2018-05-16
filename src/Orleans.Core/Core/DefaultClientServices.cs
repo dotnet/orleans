@@ -27,6 +27,11 @@ namespace Orleans
             services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();
             services.TryAddSingleton<IHostEnvironmentStatistics, NoOpHostEnvironmentStatistics>();
             services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
+            services.TryAddSingleton<ClientStatisticsManager>();
+            services.TryAddSingleton<ApplicationRequestsStatisticsGroup>();
+            services.TryAddSingleton<StageAnalysisStatisticsGroup>();
+            services.TryAddSingleton<SchedulerStatisticsGroup>();
+            services.TryAddSingleton<SerializationStatisticsGroup>();
             services.AddLogging();
             services.TryAddSingleton<ExecutorService>();
             services.TryAddSingleton<TypeMetadataCache>();
@@ -41,7 +46,6 @@ namespace Orleans
             services.TryAddFromExisting<IGrainReferenceConverter, GrainFactory>();
             services.TryAddSingleton<ClientProviderRuntime>();
             services.TryAddSingleton<MessageFactory>();
-            services.TryAddSingleton<ClientStatisticsManager>();
             services.TryAddFromExisting<IStreamProviderRuntime, ClientProviderRuntime>();
             services.TryAddFromExisting<IProviderRuntime, ClientProviderRuntime>();
             services.TryAddSingleton<IStreamSubscriptionManagerAdmin, StreamSubscriptionManagerAdmin>();
@@ -73,8 +77,9 @@ namespace Orleans
             services.ConfigureFormatter<ClusterOptions>();
             services.ConfigureFormatter<ClientMessagingOptions>();
             services.ConfigureFormatter<NetworkingOptions>();
-            services.ConfigureFormatter<ClientStatisticsOptions>();
-            
+            services.ConfigureFormatter<StatisticsOptions>();
+
+            services.AddTransient<IConfigurationValidator, ClusterOptionsValidator>();
             services.AddTransient<IConfigurationValidator, ClientClusteringValidator>();
         }
     }

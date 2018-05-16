@@ -2,7 +2,7 @@
 using Orleans.Concurrency;
 using Orleans.Runtime;
 
-namespace Orleans.Transactions
+namespace Orleans.Transactions.Abstractions
 {
     /// <summary>
     /// This is a grain extension interface that allows a grain to take part in transaction orchestration.

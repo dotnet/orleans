@@ -14,14 +14,6 @@ namespace Orleans.Transactions
     public interface ITransactionAgent
     {
         /// <summary>
-        /// Starts the Transaction Agent
-        /// </summary>
-        /// <remarks>
-        /// This must be called before any other method is called on the Transaction Agent.
-        /// </remarks>
-        Task Start();
-
-        /// <summary>
         /// Starts a new transaction
         /// </summary>
         /// <param name="readOnly">Whether it is a read-only transaction</param>
@@ -49,19 +41,5 @@ namespace Orleans.Transactions
         /// <returns>None.</returns>
         /// <remarks>This method is exception-free</remarks>
         void Abort(ITransactionInfo transactionInfo, OrleansTransactionAbortedException reason);
-
-        /// <summary>
-        /// Check if a transaction is known to have aborted.
-        /// </summary>
-        /// <param name="transactionId">the id of the transaction</param>
-        /// <returns>true if the transaction is known to have aborted, false otherwise</returns>
-        /// <remarks>
-        /// Note that the transaction could have aborted but this still returns false, if the agent
-        /// did not learn about the outcome yet.
-        /// This method is exception-free.
-        /// </remarks>
-        bool IsAborted(long transactionId);
-
-        long ReadOnlyTransactionId { get; }
     }
 }

@@ -21,6 +21,8 @@ namespace Orleans.Streaming.EventHubs
 namespace Orleans.Tests.AzureUtils
 #elif ORLEANS_HOSTING_CLOUDSERVICES // Temporary until azure silo/client is refactored
 namespace Orleans.Hosting.AzureCloudServices
+#elif ORLEANS_TRANSACTIONS
+namespace Orleans.Transactions.AzureStorage
 #else
 // No default namespace intentionally to cause compile errors if something is not defined
 #endif
@@ -53,28 +55,27 @@ namespace Orleans.Hosting.AzureCloudServices
         static AzureTableDefaultPolicies()
         {
             MaxTableCreationRetries = 60;
-            PauseBetweenTableCreationRetries = TimeSpan.FromSeconds(1);
+            PauseBetweenTableCreationRetries = (!Debugger.IsAttached)
+                ? TimeSpan.FromSeconds(1)
+                : TimeSpan.FromSeconds(100);
 
             MaxTableOperationRetries = 5;
-            PauseBetweenTableOperationRetries = TimeSpan.FromMilliseconds(100);
+            PauseBetweenTableOperationRetries = (!Debugger.IsAttached)
+                ? TimeSpan.FromMilliseconds(100)
+                : TimeSpan.FromSeconds(10);
 
             MaxBusyRetries = 120;
-            PauseBetweenBusyRetries = TimeSpan.FromMilliseconds(500);
-
-            if (Debugger.IsAttached)
-            {
-                PauseBetweenTableCreationRetries = PauseBetweenTableCreationRetries.Multiply(100);
-                PauseBetweenTableOperationRetries = PauseBetweenTableOperationRetries.Multiply(100);
-                PauseBetweenBusyRetries = PauseBetweenBusyRetries.Multiply(10);
-            }
+            PauseBetweenBusyRetries = (!Debugger.IsAttached)
+                ? TimeSpan.FromMilliseconds(500)
+                : TimeSpan.FromSeconds(5);
 
             TableCreationRetryPolicy = new LinearRetry(PauseBetweenTableCreationRetries, MaxTableCreationRetries); // 60 x 1s
-            TableCreationTimeout = PauseBetweenTableCreationRetries.Multiply(MaxTableCreationRetries).Multiply(3);    // 3 min
+            TableCreationTimeout = TimeSpan.FromMilliseconds(PauseBetweenTableCreationRetries.TotalMilliseconds * MaxTableCreationRetries * 3);    // 3 min
 
             TableOperationRetryPolicy = new LinearRetry(PauseBetweenTableOperationRetries, MaxTableOperationRetries); // 5 x 100ms
-            TableOperationTimeout = PauseBetweenTableOperationRetries.Multiply(MaxTableOperationRetries).Multiply(6);    // 3 sec
+            TableOperationTimeout = TimeSpan.FromMilliseconds(PauseBetweenTableOperationRetries.TotalMilliseconds * MaxTableOperationRetries *6);    // 3 sec
 
-            BusyRetriesTimeout = PauseBetweenBusyRetries.Multiply(MaxBusyRetries);  // 1 minute
+            BusyRetriesTimeout = TimeSpan.FromMilliseconds(PauseBetweenBusyRetries.TotalMilliseconds * MaxBusyRetries);  // 1 minute
         }
     }
 }

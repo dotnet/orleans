@@ -14,12 +14,12 @@ namespace Orleans.Transactions.Tests
             this.grainFactory = grainFactory;
         }
 
-        protected ITransactionTestGrain RandomTestGrain(string transactionTestGrainClassName)
+        protected ITransactionTestGrain RandomTestGrain(string transactionTestGrainClassNames)
         {
-            return TestGrain(transactionTestGrainClassName, Guid.NewGuid());
+            return TestGrain(transactionTestGrainClassNames, Guid.NewGuid());
         }
 
-        protected ITransactionTestGrain TestGrain(string transactionTestGrainClassName, Guid id)
+        protected virtual ITransactionTestGrain TestGrain(string transactionTestGrainClassName, Guid id)
         {
             return grainFactory.GetGrain<ITransactionTestGrain>(id, transactionTestGrainClassName);
         }

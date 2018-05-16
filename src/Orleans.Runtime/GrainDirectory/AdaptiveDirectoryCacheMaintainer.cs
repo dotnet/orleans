@@ -80,7 +80,7 @@ namespace Orleans.Runtime.GrainDirectory
                     {
                         // we found our owned entry in the cache -- it is not supposed to happen unless there were 
                         // changes in the membership
-                        Log.Warn(ErrorCode.Runtime_Error_100185, "Grain {0} owned by {1} was found in the cache of {1}", grain, owner, owner);
+                        Log.Warn(ErrorCode.Runtime_Error_100185, "Grain {grain} owned by {owner} was found in the cache of {owner}", grain, owner, owner);
                         cache.Remove(grain);
                         cnt1++;                             // for debug
                     }

@@ -15,11 +15,13 @@ namespace Orleans.Transactions.Tests
 
         [SkippableTheory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
-        public async Task AbortTransactionOnExceptions(string transactionTestGrainClassName)
+        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
+        public async Task AbortTransactionOnExceptions(string grainStates)
         {
             const int expected = 5;
 
-            ITransactionTestGrain grain = RandomTestGrain(transactionTestGrainClassName);
+            ITransactionTestGrain grain = RandomTestGrain(grainStates);
             ITransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
             await coordinator.MultiGrainSet(new List<ITransactionTestGrain> { grain }, expected);
@@ -27,22 +29,27 @@ namespace Orleans.Transactions.Tests
 
             await TestAfterDustSettles(async () =>
             {
-                int actual = await grain.Get();
-                Assert.Equal(expected, actual);
+                int[] actualValues = await grain.Get();
+                foreach (var actual in actualValues)
+                {
+                    Assert.Equal(expected, actual);
+                }
             });
         }
 
         [SkippableTheory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
-        public async Task MultiGrainAbortTransactionOnExceptions(string transactionTestGrainClassName)
+        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
+        public async Task MultiGrainAbortTransactionOnExceptions(string grainStates)
         {
             const int grainCount = TransactionTestConstants.MaxCoordinatedTransactions - 1;
             const int expected = 5;
 
-            ITransactionTestGrain throwGrain = RandomTestGrain(transactionTestGrainClassName);
+            ITransactionTestGrain throwGrain = RandomTestGrain(grainStates);
             List<ITransactionTestGrain> grains =
                 Enumerable.Range(0, grainCount)
-                    .Select(i => RandomTestGrain(transactionTestGrainClassName))
+                    .Select(i => RandomTestGrain(grainStates))
                     .ToList();
             ITransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
@@ -56,19 +63,24 @@ namespace Orleans.Transactions.Tests
             {
                 foreach (var grain in grains)
                 {
-                    int actual = await grain.Get();
-                    Assert.Equal(expected, actual);
+                    int[] actualValues = await grain.Get();
+                    foreach (var actual in actualValues)
+                    {
+                        Assert.Equal(expected, actual);
+                    }
                 }
             });
         }
 
         [SkippableTheory(Skip = "Intermittent failure, jbragg investigating")]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
-        public async Task AbortTransactionOnOrphanCalls(string transactionTestGrainClassName)
+        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
+        public async Task AbortTransactionOnOrphanCalls(string grainStates)
         {
             const int expected = 5;
 
-            ITransactionTestGrain grain = RandomTestGrain(transactionTestGrainClassName);
+            ITransactionTestGrain grain = RandomTestGrain(grainStates);
             ITransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
             await grain.Set(expected);
@@ -78,8 +90,11 @@ namespace Orleans.Transactions.Tests
 
             await TestAfterDustSettles(async () =>
             {
-                int actual = await grain.Get();
-                Assert.Equal(expected, actual);
+                int[] actualValues = await grain.Get();
+                foreach (var actual in actualValues)
+                {
+                    Assert.Equal(expected, actual);
+                }
             });
         }
 

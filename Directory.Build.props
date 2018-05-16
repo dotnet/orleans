@@ -125,8 +125,8 @@
     <OrleansRuntimeAbstractionsVersion>2.0.0</OrleansRuntimeAbstractionsVersion>
     <OrleansCoreVersion>2.1.0</OrleansCoreVersion>
     <OrleansRuntimeVersion>2.1.0</OrleansRuntimeVersion>
-    <OrleansCoreLegacyVersion>2.0.0</OrleansCoreLegacyVersion>
-    <OrleansRuntimeLegacyVersion>2.0.0</OrleansRuntimeLegacyVersion>
+    <OrleansCoreLegacyVersion>2.1.0</OrleansCoreLegacyVersion>
+    <OrleansRuntimeLegacyVersion>2.1.0</OrleansRuntimeLegacyVersion>
     <OrleansProvidersVersion>2.0.0</OrleansProvidersVersion>
     <OrleansExtensionsVersion>2.0.0</OrleansExtensionsVersion>
     <OrleansEventSourcingVersion>2.0.0</OrleansEventSourcingVersion>
@@ -134,13 +134,14 @@
     <OrleansAWSVersion>2.0.0</OrleansAWSVersion>
     <OrleansAzureVersion>2.0.0</OrleansAzureVersion>
     <OrleansTestingHostVersion>2.1.0</OrleansTestingHostVersion>
-    <OrleansTransactionsVersion>2.0.0</OrleansTransactionsVersion>
+    <OrleansTransactionsVersion>2.1.0</OrleansTransactionsVersion>
     <OrleansServiceFabricVersion>2.0.0</OrleansServiceFabricVersion>
     <OrleansSerializersVersion>2.0.0</OrleansSerializersVersion>
     <OrleansToolsVersion>2.0.0</OrleansToolsVersion>
     <OrleansClientVersion>2.0.0</OrleansClientVersion>
     <OrleansServerVersion>2.0.0</OrleansServerVersion>
-    <OrleansCodegenVersion>2.0.0</OrleansCodegenVersion>
+    <OrleansCodegenVersion>2.1.0</OrleansCodegenVersion>
+    <OrleansEventHubProviderVersion>2.1.0</OrleansEventHubProviderVersion>
   </PropertyGroup>
   
   <PropertyGroup Condition="$(FullBuild) == 'true'">
@@ -164,6 +165,7 @@
     <OrleansClientVersion>$(VersionPrefix)</OrleansClientVersion>
     <OrleansServerVersion>$(VersionPrefix)</OrleansServerVersion>
     <OrleansCodegenVersion>$(VersionPrefix)</OrleansCodegenVersion>
+    <OrleansEventHubProviderVersion>$(VersionPrefix)</OrleansEventHubProviderVersion>
   </PropertyGroup>
 
   <!-- Set output folder for created NuGet packages -->

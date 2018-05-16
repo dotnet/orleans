@@ -38,7 +38,7 @@ namespace Orleans.Runtime
         public DeploymentLoadPublisher(
             ILocalSiloDetails siloDetails,
             ISiloStatusOracle siloStatusOracle,
-            IOptions<SiloStatisticsOptions> statisticsOptions,
+            IOptions<DeploymentLoadPublisherOptions> options,
             IInternalGrainFactory grainFactory,
             OrleansTaskScheduler scheduler,
             ILoggerFactory loggerFactory,
@@ -61,7 +61,7 @@ namespace Orleans.Runtime
             this.appEnvironmentStatistics = appEnvironmentStatistics;
             this.hostEnvironmentStatistics = hostEnvironmentStatistics;
             this.loadSheddingOptions = loadSheddingOptions;
-            statisticsRefreshTime = statisticsOptions.Value.DeploymentLoadPublisherRefreshTime;
+            statisticsRefreshTime = options.Value.DeploymentLoadPublisherRefreshTime;
             periodicStats = new ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics>();
             siloStatisticsChangeListeners = new List<ISiloStatisticsChangeListener>();
         }

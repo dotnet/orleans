@@ -15,7 +15,7 @@ using Orleans.TestingHost.Utils;
 
 namespace DependencyInjection.Tests
 {
-    public class DependencyInjectionGrainTestRunner : OrleansTestingBase
+    public abstract class DependencyInjectionGrainTestRunner : OrleansTestingBase
     {
         private readonly BaseTestClusterFixture fixture;
 

@@ -2,6 +2,7 @@
   <PropertyGroup>
     <AssemblyName>TestExtensions</AssemblyName>
     <RootNamespace>TestExtensions</RootNamespace>
+    <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>

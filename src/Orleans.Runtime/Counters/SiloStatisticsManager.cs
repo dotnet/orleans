@@ -11,19 +11,16 @@ namespace Orleans.Runtime.Counters
         private CountersStatistics countersPublisher;
 
         public SiloStatisticsManager(
-            IOptions<SiloStatisticsOptions> statisticsOptions,
-            SerializationManager serializationManager, 
+            IOptions<StatisticsOptions> statisticsOptions,
+            SerializationStatisticsGroup serializationStatistics, 
             ITelemetryProducer telemetryProducer,
             ILoggerFactory loggerFactory)
         {
             MessagingStatisticsGroup.Init(true);
             MessagingProcessingStatisticsGroup.Init();
             NetworkingStatisticsGroup.Init(true);
-            ApplicationRequestsStatisticsGroup.Init();
-            SchedulerStatisticsGroup.Init(loggerFactory);
             StorageStatisticsGroup.Init();
-            TransactionsStatisticsGroup.Init();
-            this.logStatistics = new LogStatistics(statisticsOptions.Value.LogWriteInterval, true, serializationManager, loggerFactory);
+            this.logStatistics = new LogStatistics(statisticsOptions.Value.LogWriteInterval, true, serializationStatistics, loggerFactory);
             this.countersPublisher = new CountersStatistics(statisticsOptions.Value.PerfCountersWriteInterval, telemetryProducer, loggerFactory);
         }
         

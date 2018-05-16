@@ -1,4 +1,7 @@
 ﻿
+using Microsoft.Extensions.Logging;
+using Orleans.Hosting;
+
 namespace Orleans.Transactions.Tests
 {
     public static class TransactionTestConstants
@@ -11,8 +14,22 @@ namespace Orleans.Transactions.Tests
         // storage providers
         public const string TransactionStore = "TransactionStore";
 
-        // grain implementations
-        public const string TransactionOrchestrationGrain = "Orleans.Transactions.Tests.TransactionOrchestrationGrain";
+        // grain implementations singleton TM
+        public const string NoStateTransactionalGrain = "Orleans.Transactions.Tests.NoStateTransactionalGrain";
         public const string SingleStateTransactionalGrain = "Orleans.Transactions.Tests.SingleStateTransactionalGrain";
+        public const string DoubleStateTransactionalGrain = "Orleans.Transactions.Tests.DoubleStateTransactionalGrain";
+        public const string MaxStateTransactionalGrain = "Orleans.Transactions.Tests.MaxStateTransactionalGrain";
+
+
+        // control the tracing of the various components of the transaction mechanism
+        public static ISiloHostBuilder ConfigureTracingForTransactionTests(this ISiloHostBuilder hostBuilder)
+        {
+            return hostBuilder
+                 .ConfigureLogging(builder => builder.AddFilter("SingleStateTransactionalGrain.data", LogLevel.Trace))
+                 .ConfigureLogging(builder => builder.AddFilter("DoubleStateTransactionalGrain.data", LogLevel.Trace))
+                 .ConfigureLogging(builder => builder.AddFilter("MaxStateTransactionalGrain.data", LogLevel.Trace))
+                 .ConfigureLogging(builder => builder.AddFilter("TransactionAgent", LogLevel.Trace))
+                 .ConfigureLogging(builder => builder.AddFilter("Orleans.Transactions.AzureStorage.AzureTableTransactionalStateStorage", LogLevel.Trace));
+        }
     }
 }

@@ -1,30 +1,36 @@
 ﻿using System;
 using System.Threading;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Threading
 {
     internal class ThreadPoolThread
     {
         private readonly CancellationToken cancellationToken;
-
         private readonly ThreadTrackingStatistic threadTracking;
 
         private readonly ILogger log;
+        private readonly StatisticsLevel statisticsLevel;
 
         public ThreadPoolThread(
             string name,
             CancellationToken cancellationToken,
-            ILoggerFactory loggerFactory)
+            ILoggerFactory loggerFactory,
+            IOptions<StatisticsOptions> statisticsOptions,
+            StageAnalysisStatisticsGroup schedulerStageStatistics)
         {
             this.Name = name;
             this.cancellationToken = cancellationToken;
             this.log = loggerFactory.CreateLogger<ThreadPoolThread>();
 
-            if (ExecutorOptions.CollectDetailedThreadStatistics)
+            this.statisticsLevel = statisticsOptions.Value.CollectionLevel;
+            if (this.statisticsLevel.CollectDetailedThreadStatistics())
             {
-                threadTracking = new ThreadTrackingStatistic(name, loggerFactory);
+                threadTracking = new ThreadTrackingStatistic(name, loggerFactory, statisticsOptions, schedulerStageStatistics);
             }
          }
 
@@ -71,9 +77,9 @@ namespace Orleans.Threading
             CounterStatistic.FindOrCreate(StatisticNames.RUNTIME_THREADS_ASYNC_AGENT_TOTAL_THREADS_CREATED).Increment();
             CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.RUNTIME_THREADS_ASYNC_AGENT_PERAGENTTYPE, Name)).Increment();
 
-            log.Info(string.Format(SR.Starting_Thread, Name, Thread.CurrentThread.ManagedThreadId));
+            log.Info(String.Format(SR.Starting_Thread, Name, Thread.CurrentThread.ManagedThreadId));
 
-            if (ExecutorOptions.CollectDetailedThreadStatistics)
+            if (this.statisticsLevel.CollectDetailedThreadStatistics())
             {
                 threadTracking.OnStartExecution();
             }
@@ -85,7 +91,7 @@ namespace Orleans.Threading
 
             log.Info(ErrorCode.Runtime_Error_100328, SR.Stopping_Thread, Name, Thread.CurrentThread.ManagedThreadId);
 
-            if (ExecutorOptions.CollectDetailedThreadStatistics)
+            if (this.statisticsLevel.CollectDetailedThreadStatistics())
             {
                 threadTracking.OnStopExecution();
             }

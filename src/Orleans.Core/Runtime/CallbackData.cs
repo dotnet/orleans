@@ -32,6 +32,7 @@ namespace Orleans.Runtime
         private ITimeInterval timeSinceIssued;
         private readonly ILogger logger;
         private readonly ILogger timerLogger;
+        private readonly ApplicationRequestsStatisticsGroup requestStatistics;
         public ITransactionInfo TransactionInfo { get; set; }
 
         public Message Message { get; set; } // might hold metadata used by response pipeline
@@ -44,7 +45,8 @@ namespace Orleans.Runtime
             Action<Message> unregisterDelegate,
             MessagingOptions messagingOptions,
             ILogger logger,
-            ILogger timerLogger)
+            ILogger timerLogger,
+            ApplicationRequestsStatisticsGroup requestStatistics)
         {
             // We are never called without a callback func, but best to double check.
             if (callback == null) throw new ArgumentNullException(nameof(callback));
@@ -60,6 +62,7 @@ namespace Orleans.Runtime
             this.messagingOptions = messagingOptions;
             this.TransactionInfo = TransactionContext.GetTransactionInfo();
             this.timerLogger = timerLogger;
+            this.requestStatistics = requestStatistics;
         }
 
         /// <summary>
@@ -71,7 +74,7 @@ namespace Orleans.Runtime
             if (time < TimeSpan.Zero)
                 throw new ArgumentOutOfRangeException(nameof(time), "The timeout parameter is negative.");
             timeout = time;
-            if (StatisticsCollector.CollectApplicationRequestsStats)
+            if (this.requestStatistics.CollectApplicationRequestsStats)
             {
                 timeSinceIssued = TimeIntervalFactory.CreateTimeInterval(true);
                 timeSinceIssued.Start();
@@ -142,15 +145,15 @@ namespace Orleans.Runtime
 
                 alreadyFired = true;
                 DisposeTimer();
-                if (StatisticsCollector.CollectApplicationRequestsStats)
+                if (this.requestStatistics.CollectApplicationRequestsStats)
                 {
                     timeSinceIssued.Stop();
                 }
                 unregister?.Invoke(Message);
             }
-            if (StatisticsCollector.CollectApplicationRequestsStats)
+            if (this.requestStatistics.CollectApplicationRequestsStats)
             {
-                ApplicationRequestsStatisticsGroup.OnAppRequestsEnd(timeSinceIssued.Elapsed);
+                this.requestStatistics.OnAppRequestsEnd(timeSinceIssued.Elapsed);
             }
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
             callback(response, context);
@@ -191,7 +194,7 @@ namespace Orleans.Runtime
 
                 alreadyFired = true;
                 DisposeTimer();
-                if (StatisticsCollector.CollectApplicationRequestsStats)
+                if (this.requestStatistics.CollectApplicationRequestsStats)
                 {
                     timeSinceIssued.Stop();
                 }
@@ -199,12 +202,12 @@ namespace Orleans.Runtime
                 unregister?.Invoke(Message);
             }
             
-            if (StatisticsCollector.CollectApplicationRequestsStats)
+            if (this.requestStatistics.CollectApplicationRequestsStats)
             {
-                ApplicationRequestsStatisticsGroup.OnAppRequestsEnd(timeSinceIssued.Elapsed);
+                this.requestStatistics.OnAppRequestsEnd(timeSinceIssued.Elapsed);
                 if (isOnTimeout)
                 {
-                    ApplicationRequestsStatisticsGroup.OnAppRequestsTimedOut();
+                    this.requestStatistics.OnAppRequestsTimedOut();
                 }
             }
 

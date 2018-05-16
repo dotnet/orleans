@@ -18,6 +18,11 @@ namespace Orleans
 
         protected object lockable = new object();
 
+        private bool startingCurrentWorkCycle;
+
+        private DateTime? scheduledNotify = null;
+
+
         /// <summary>
         /// Notify the worker that there is more work.
         /// </summary>
@@ -25,7 +30,7 @@ namespace Orleans
         {
             lock (lockable)
             {
-                if (currentWorkCycle != null)
+                if (currentWorkCycle != null || startingCurrentWorkCycle)
                 {
                     // lets the current work cycle know that there is more work
                     moreWork = true;
@@ -38,9 +43,46 @@ namespace Orleans
             }
         }
 
+        /// <summary>
+        /// Instructs the batch worker to run again to check for work, if
+        /// it has not run again already by then, at specified <paramref name="utcTime"/>.
+        /// </summary>
+        /// <param name="utcTime"></param>
+        public void Notify(DateTime utcTime)
+        {
+            var now = DateTime.UtcNow;
+
+            if (now >= utcTime)
+            {
+                Notify();
+            }
+            else
+            {
+                lock (lockable)
+                {
+                    if (!scheduledNotify.HasValue || scheduledNotify.Value > utcTime)
+                    {
+                        scheduledNotify = utcTime;
+
+                        ScheduleNotify(utcTime, now).Ignore();
+                    }
+                }
+            }
+        }
+
+        private async Task ScheduleNotify(DateTime time, DateTime now)
+        {
+            await Task.Delay(time - now);
+
+            if (scheduledNotify == time)
+            {
+                Notify();
+            }
+        }
+
         // task for the current work cycle, or null if idle
         private volatile Task currentWorkCycle;
- 
+
         // flag is set to indicate that more work has arrived during execution of the task
         private volatile bool moreWork;
 
@@ -50,11 +92,25 @@ namespace Orleans
 
         private void Start()
         {
-            // start the task that is doing the work
-            currentWorkCycle = Work();
+            // indicate that we are starting the worker (to prevent double-starts)
+            startingCurrentWorkCycle = true;
 
-            // chain a continuation that checks for more work, on the same scheduler
-            currentWorkCycle.ContinueWith(t => this.CheckForMoreWork(), TaskScheduler.Current);
+            // clear any scheduled runs
+            scheduledNotify = null;
+
+            try
+            {
+                // start the task that is doing the work
+                currentWorkCycle = Work();
+            }
+            finally
+            {
+                // by now we have started, and stored the task in currentWorkCycle
+                startingCurrentWorkCycle = false;
+
+                // chain a continuation that checks for more work, on the same scheduler
+                currentWorkCycle.ContinueWith(t => this.CheckForMoreWork(), TaskScheduler.Current);
+            }
         }
 
         // executes at the end of each work cycle
@@ -145,7 +201,7 @@ namespace Orleans
 
             lock (lockable)
             {
-                if (currentWorkCycle != null)
+                if (currentWorkCycle != null || startingCurrentWorkCycle)
                 {
                     moreWork = true;
                     if (nextWorkCyclePromise == null)
