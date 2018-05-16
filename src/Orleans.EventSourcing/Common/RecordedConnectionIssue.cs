@@ -40,6 +40,9 @@ namespace Orleans.EventSourcing.Common
                 newIssue.NumberOfConsecutiveFailures = 1;
                 newIssue.RetryDelay = newIssue.ComputeRetryDelay(null);
             }
+
+            Issue = newIssue;
+
             try
             {
                 listener.OnConnectionIssue(newIssue);
