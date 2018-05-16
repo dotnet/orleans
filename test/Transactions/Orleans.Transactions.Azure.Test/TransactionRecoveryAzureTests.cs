@@ -9,7 +9,7 @@ using Xunit.Abstractions;
 
 namespace Orleans.Transactions.Azure.Tests
 {
-    [TestCategory("Transactions")]
+    [TestCategory("Transactions"), TestCategory("Functional")]
     public class TransactionRecoveryTests : TestClusterPerTest
     {
         private readonly TransactionRecoveryTestsRunner testRunner;
