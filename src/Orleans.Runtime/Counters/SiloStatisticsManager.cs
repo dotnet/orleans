@@ -20,7 +20,6 @@ namespace Orleans.Runtime.Counters
             MessagingProcessingStatisticsGroup.Init();
             NetworkingStatisticsGroup.Init(true);
             StorageStatisticsGroup.Init();
-            TransactionsStatisticsGroup.Init();
             this.logStatistics = new LogStatistics(statisticsOptions.Value.LogWriteInterval, true, serializationStatistics, loggerFactory);
             this.countersPublisher = new CountersStatistics(statisticsOptions.Value.PerfCountersWriteInterval, telemetryProducer, loggerFactory);
         }
