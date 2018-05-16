@@ -78,7 +78,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
                 GossipConfigurationMapper.ToConfiguration).ConfigureAwait(false);
         }
 
-        public async Task TryCreateConfigurationEntryAsync(MultiClusterConfiguration config)
+        public async Task<bool> TryCreateConfigurationEntryAsync(MultiClusterConfiguration config)
         {
             var conf = new GossipConfiguration(config)
             {
@@ -86,7 +86,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
                 ServiceId = _globalServiceId
             };
 
-            await _confStorage.PutEntryAsync(CONF_TABLE_NAME, conf.ToAttributes()).ConfigureAwait(false);
+            return await TryOperation(() => _confStorage.PutEntryAsync(CONF_TABLE_NAME, conf.ToAttributes()));
         }
 
         public async Task<bool> TryUpdateConfigurationEntryAsync(MultiClusterConfiguration configuration, GossipConfiguration configInStorage, [CallerMemberName]string operation = null)
@@ -141,32 +141,32 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
                 s => s);
         }
 
-        public async Task TryCreateGatewayEntryAsync(GatewayEntry gatewayInfo)
+        public async Task<bool> TryCreateGatewayEntryAsync(GatewayEntry gatewayInfo)
         {
             var gw = new GossipGateway(gatewayInfo, _globalServiceId) { Version = 0 };
 
-            await _gatewayStorage.PutEntryAsync(GATEWAY_TABLE_NAME, gw.ToAttributes()).ConfigureAwait(false);
+            return await TryOperation(() => _gatewayStorage.PutEntryAsync(GATEWAY_TABLE_NAME, gw.ToAttributes()));
         }
 
-        public async Task TryDeleteGatewayEntryAsync(GossipGateway gatewayInfoInStorage)
+        public async Task<bool> TryDeleteGatewayEntryAsync(GossipGateway gatewayInfoInStorage)
         {
-            await _gatewayStorage.DeleteEntryAsync(
+            return await TryOperation(() => _gatewayStorage.DeleteEntryAsync(
                 GATEWAY_TABLE_NAME,
                 gatewayInfoInStorage.ToKeyAttributes(),
                 GossipGatewayMapper.ConditionalExpression,
-                gatewayInfoInStorage.ToConditionalAttributes());
+                gatewayInfoInStorage.ToConditionalAttributes()));
         }
 
-        public async Task TryUpdateGatewayEntryAsync(GatewayEntry gatewayInfo, GossipGateway gatewayInfoInStorage)
+        public async Task<bool> TryUpdateGatewayEntryAsync(GatewayEntry gatewayInfo, GossipGateway gatewayInfoInStorage)
         {
             var gw = new GossipGateway(gatewayInfo, _globalServiceId) { Version = gatewayInfoInStorage.Version };
 
-            await _gatewayStorage.UpsertEntryAsync(
+            return await TryOperation(() => _gatewayStorage.UpsertEntryAsync(
                 GATEWAY_TABLE_NAME,
                 gw.ToKeyAttributes(),
                 gw.ToAttributes(true),
                 GossipGatewayMapper.ConditionalExpression,
-                gw.ToConditionalAttributes());
+                gw.ToConditionalAttributes()));
         }
 
         #endregion
@@ -183,6 +183,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
                 // todo: improve logged message by parsing AWS specific exceptions
                 if (_logger.IsEnabled(LogLevel.Trace)) _logger.Trace("{0} failed", operation);
 
+                // todo: should we throw an exception here ?
                 throw;
             }
         }
