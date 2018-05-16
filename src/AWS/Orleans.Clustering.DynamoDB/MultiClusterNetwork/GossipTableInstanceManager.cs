@@ -74,7 +74,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
         {
             return await _confStorage.ReadSingleEntryAsync(
                 CONF_TABLE_NAME,
-                GossipConfigurationMapper.KeyAttributes(_globalServiceId),
+                GossipConfigurationMapper.ToKeyAttributes(_globalServiceId),
                 GossipConfigurationMapper.ToConfiguration).ConfigureAwait(false);
         }
 
@@ -108,7 +108,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
         {
             return await TryOperation(() => _confStorage.UpsertEntryAsync(
                 CONF_TABLE_NAME,
-                GossipConfigurationMapper.KeyAttributes(_globalServiceId),
+                GossipConfigurationMapper.ToKeyAttributes(_globalServiceId),
                 data.ToAttributes(true),
                 GossipConfigurationMapper.ConditionalExpression,
                 data.ToConditionalAttributes()), operation);

@@ -84,9 +84,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
 
             return gw;
         }
-
-        #region GossipGateway Extension Methods
-
+        
         /// <summary>
         /// Provides required conditions for items query
         /// </summary>
@@ -99,6 +97,8 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
                 [$":{SERVICE_ID_PROPERTY_NAME}"] = new AttributeValue(serviceId)
             };
         }
+
+        #region GossipGateway Extension Methods
 
         /// <summary>
         /// Provides attributes to be updated

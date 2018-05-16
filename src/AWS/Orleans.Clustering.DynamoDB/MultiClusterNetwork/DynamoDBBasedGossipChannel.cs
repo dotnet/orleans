@@ -12,7 +12,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
 {
     class DynamoDBBasedGossipChannel : IGossipChannel
     {
-        private readonly ILogger logger;
+        private readonly ILogger _logger;
         private static int _sequenceNumber;
         private GossipTableInstanceManager _tableManager;
 
@@ -22,13 +22,13 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
         public DynamoDBBasedGossipChannel(ILoggerFactory loggerFactory)
         {
             Name = "DynamoDBBasedGossipChannel-" + ++_sequenceNumber;
-            logger = loggerFactory.CreateLogger<DynamoDBBasedGossipChannel>();
+            _logger = loggerFactory.CreateLogger<DynamoDBBasedGossipChannel>();
             _loggerFactory = loggerFactory;
         }
 
         public async Task Initialize(string serviceId, string connectionString)
         {
-            logger.Info("Initializing Gossip Channel for ServiceId={0} using connection: {1}",
+            _logger.Info("Initializing Gossip Channel for ServiceId={0} using connection: {1}",
                 serviceId, ConfigUtilities.RedactConnectionStringInfo(connectionString));
 
             _tableManager = await GossipTableInstanceManager.GetManager(serviceId, connectionString, _loggerFactory);
@@ -36,7 +36,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
 
         public async Task Publish(IMultiClusterGossipData data)
         {
-            logger.Debug("-Publish data:{0}", data);
+            _logger.Debug("-Publish data:{0}", data);
             // this is (almost) always called with just one item in data to be written back
             // so we are o.k. with doing individual tasks for each storage read and write
 
@@ -55,7 +55,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
         // compare config with configInStorage, and
         // - write config to storage if it is newer (or do nothing on etag conflict)
         // - return config from store if it is newer
-        internal async Task<MultiClusterConfiguration> DiffAndWriteBackConfigAsync(MultiClusterConfiguration config, GossipConfiguration configInStorage)
+        private async Task<MultiClusterConfiguration> DiffAndWriteBackConfigAsync(MultiClusterConfiguration config, GossipConfiguration configInStorage)
         {
             if (config != null &&
                 (configInStorage == null || configInStorage.GossipTimestamp < config.AdminTimestamp))
@@ -79,7 +79,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
         // - write gatewayInfo to storage if it is newer (or do nothing on etag conflict)
         // - remove expired gateway info from storage
         // - return gatewayInfoInStorage if it is newer
-        internal async Task<GatewayEntry> DiffAndWriteBackGatewayInfoAsync(GatewayEntry gatewayInfo, GossipGateway gatewayInfoInStorage)
+        private async Task<GatewayEntry> DiffAndWriteBackGatewayInfoAsync(GatewayEntry gatewayInfo, GossipGateway gatewayInfoInStorage)
         {
             if ((gatewayInfo != null && !gatewayInfo.Expired)
                 && (gatewayInfoInStorage == null || gatewayInfoInStorage.GossipTimestamp < gatewayInfo.HeartbeatTimestamp))
@@ -114,7 +114,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
 
         public async Task<IMultiClusterGossipData> Synchronize(IMultiClusterGossipData gossipdata)
         {
-            logger.Debug("-Synchronize pushed:{0}", gossipdata);
+            _logger.Debug("-Synchronize pushed:{0}", gossipdata);
 
             try
             {
@@ -152,15 +152,15 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
                 }
                 var delta = new MultiClusterData(gw, configDeltaTask.Result);
 
-                logger.Debug("-Synchronize pulled delta:{0}", delta);
+                _logger.Debug("-Synchronize pulled delta:{0}", delta);
 
                 return delta;
             }
             catch (Exception e)
             {
-                logger.Info("-Synchronize encountered exception {0}", e);
+                _logger.Info("-Synchronize encountered exception {0}", e);
 
-                throw e;
+                throw;
             }
         }
     }
