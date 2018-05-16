@@ -10,6 +10,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
         public TransactionConcurrencyTests(TestFixture fixture, ITestOutputHelper output)
             : base(fixture.GrainFactory, output)
         {
+            fixture.EnsurePreconditionsMet();
         }
     }
 }
