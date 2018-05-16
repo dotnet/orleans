@@ -27,11 +27,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
-                    .ConfigureLogging(builder => builder.AddFilter("SingleStateTransactionalGrain.data", LogLevel.Trace))
-                    .ConfigureLogging(builder => builder.AddFilter("DoubleStateTransactionalGrain.data", LogLevel.Trace))
-                    .ConfigureLogging(builder => builder.AddFilter("MaxStateTransactionalGrain.data", LogLevel.Trace))
-                    .ConfigureLogging(builder => builder.AddFilter("TransactionAgent", LogLevel.Trace))
-                    .ConfigureLogging(builder => builder.AddFilter("Orleans.Transactions.AzureStorage.AzureTableTransactionalStateStorage", LogLevel.Trace))
+                    .ConfigureTracingForTransactionTests()
                     .AddAzureTableTransactionalStateStorage(TransactionTestConstants.TransactionStore, options =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
