@@ -11,7 +11,7 @@ using Xunit.Abstractions;
 
 namespace Orleans.Transactions.Tests
 {
-    [TestCategory("Transactions")]
+    [TestCategory("Transactions"), TestCategory("Functional")]
     public class TransactionRecoveryMemoryTests : TestClusterPerTest
     {
         protected override void CheckPreconditionsOrThrow()
