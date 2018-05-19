@@ -8,7 +8,6 @@ using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
 using Orleans.Runtime.Messaging;
-using Orleans.Runtime.Scheduler;
 using Orleans.Streams;
 
 namespace Orleans.Runtime
@@ -34,12 +33,11 @@ namespace Orleans.Runtime
         private readonly AsyncLock lockable = new AsyncLock();
         private readonly IGrainReferenceRuntime grainReferenceRuntime;
         private readonly InvokableObjectManager invokableObjects;
-        private readonly OrleansTaskScheduler scheduler;
         private readonly IRuntimeClient runtimeClient;
         private readonly ClientObserverRegistrar clientObserverRegistrar;
         private readonly ILogger logger;
         private readonly IInternalGrainFactory grainFactory;
-        private bool disposing;
+        //private bool disposing;
 
         public LocalClient(
             IRuntimeClient runtimeClient,
@@ -50,7 +48,6 @@ namespace Orleans.Runtime
             IInternalGrainFactory grainFactory,
             InvokableObjectManager invokableObjectManager,
             ISiloMessageCenter messageCenter,
-            OrleansTaskScheduler scheduler,
             IOptions<MultiClusterOptions> multiClusterOptions,
             IOptions<ClusterOptions> clusterOptions)
         {
@@ -59,9 +56,8 @@ namespace Orleans.Runtime
             this.grainReferenceRuntime = grainReferenceRuntime;
             this.grainFactory = grainFactory;
             this.invokableObjects = invokableObjectManager;
-            this.scheduler = scheduler;
 
-            this.ClientAddress = CreateClientAddress(siloDetails.SiloAddress, multiClusterOptions, clusterOptions);
+            //this.ClientAddress = CreateClientAddress(siloDetails.SiloAddress, multiClusterOptions, clusterOptions);
             this.logger = logger;
 
             // Register with the directory and message center so that we can receive messages.
@@ -69,15 +65,16 @@ namespace Orleans.Runtime
             this.clientObserverRegistrar.ClientAdded(this.ClientId);
             messageCenter.SetLocalClient(this);
 
+            throw new InvalidOperationException("ERROR! Local Client Should NOT BE USED YET 1");
             // Start pumping messages.
-            this.Start();
+            //this.Start();
         }
 
-        public ActivationAddress ClientAddress { get; }
+        public ActivationAddress ClientAddress => throw new InvalidOperationException("ERROR! Local Client Should NOT BE USED YET 2");
 
-        public GrainId ClientId => this.ClientAddress.Grain;
+        public GrainId ClientId => throw new InvalidOperationException("ERROR! Local Client Should NOT BE USED YET 3");
 
-        public StreamDirectory StreamDirectory { get; } = new StreamDirectory();
+        public StreamDirectory StreamDirectory => throw new InvalidOperationException("ERROR! Local Client Should NOT BE USED YET 4");
 
         private static ActivationAddress CreateClientAddress(SiloAddress localAddress, IOptions<MultiClusterOptions> multiClusterOptions, IOptions<ClusterOptions> clusterOptions)
         {
@@ -91,7 +88,8 @@ namespace Orleans.Runtime
 
         public GrainReference CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker)
         {
-            if (obj is GrainReference) throw new ArgumentException("Argument obj is already a grain reference.");
+            throw new InvalidOperationException("ERROR! Local Client Should NOT BE USED YET 5");
+           /* if (obj is GrainReference) throw new ArgumentException("Argument obj is already a grain reference.");
 
             var grainReference = GrainReference.NewObserverGrainReference(this.ClientAddress.Grain, GuidId.GetNewGuidId(), this.grainReferenceRuntime);
             if (!this.invokableObjects.TryRegister(obj, grainReference.ObserverId, invoker))
@@ -101,24 +99,26 @@ namespace Orleans.Runtime
                     nameof(grainReference));
             }
 
-            return grainReference;
+            return grainReference;*/
         }
 
         public void DeleteObjectReference(IAddressable obj)
         {
-            if (!(obj is GrainReference reference)) throw new ArgumentException("Argument reference is not a grain reference.");
+            throw new InvalidOperationException("ERROR! Local Client Should NOT BE USED YET 6");
+            /*if (!(obj is GrainReference reference)) throw new ArgumentException("Argument reference is not a grain reference.");
 
-            if (!this.invokableObjects.TryDeregister(reference.ObserverId))throw new ArgumentException("Reference is not associated with a local object.", nameof(obj));
+            if (!this.invokableObjects.TryDeregister(reference.ObserverId))throw new ArgumentException("Reference is not associated with a local object.", nameof(obj));*/
         }
 
-        public async Task<Tuple<TExtension, TExtensionInterface>> BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
+        public Task<Tuple<TExtension, TExtensionInterface>> BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
             where TExtension : IGrainExtension
             where TExtensionInterface : IGrainExtension
         {
-            IAddressable addressable;
+            throw new InvalidOperationException("ERROR! Local Client Should NOT BE USED YET 7");
+            /*IAddressable addressable;
             TExtension extension;
 
-            using (await this.lockable.LockAsync())
+            using (await this.lockable.LockAsync().ConfigureAwait(false))
             {
                 if (this.extensionsTable.TryGetValue(typeof(TExtensionInterface), out var entry))
                 {
@@ -144,40 +144,42 @@ namespace Orleans.Runtime
             var typedAddressable = addressable.Cast<TExtensionInterface>();
             // we have to return the extension as well as the IAddressable because the caller needs to root the extension
             // to prevent it from being collected (the IAddressable uses a weak reference).
-            return Tuple.Create(extension, typedAddressable);
+            return Tuple.Create(extension, typedAddressable);*/
         }
 
         void IDisposable.Dispose()
         {
-            if (this.disposing) return;
+            throw new InvalidOperationException("ERROR! Local Client Should NOT BE USED YET 8");
+           /* if (this.disposing) return;
             this.disposing = true;
             Utils.SafeExecute(() => this.clientObserverRegistrar.ClientDropped(this.ClientId));
             Utils.SafeExecute(() => this.clientObserverRegistrar.SetLocalClient(null));
             Utils.SafeExecute(() => this.listeningCts.Cancel(false));
-            Utils.SafeExecute(() => this.listeningCts.Dispose());
+            Utils.SafeExecute(() => this.listeningCts.Dispose());*/
         }
         
         public bool TryDispatchToClient(Message message)
         {
-            if (!this.ClientId.Equals(message.TargetGrain)) return false;
-            if (message.IsExpired)
-            {
-                message.DropExpiredMessage(MessagingStatisticsGroup.Phase.Receive);
-                return true;
-            }
+            throw new InvalidOperationException("ERROR! Local Client Should NOT BE USED YET 9");
+            /*  if (!this.ClientId.Equals(message.TargetGrain)) return false;
+              if (message.IsExpired)
+              {
+                  message.DropExpiredMessage(MessagingStatisticsGroup.Phase.Receive);
+                  return true;
+              }
 
-            if (message.Direction == Message.Directions.Response)
-            {
-                // Requests are made through the runtime client, so deliver responses to the rutnime client so that the request callback can be executed.
-                this.runtimeClient.ReceiveResponse(message);
-            }
-            else
-            {
-                // Requests agrainst client objects are scheduled for execution on the client.
-                this.incomingMessages.Add(message);
-            }
+              if (message.Direction == Message.Directions.Response)
+              {
+                  // Requests are made through the runtime client, so deliver responses to the rutnime client so that the request callback can be executed.
+                  this.runtimeClient.ReceiveResponse(message);
+              }
+              else
+              {
+                  // Requests agrainst client objects are scheduled for execution on the client.
+                  this.incomingMessages.Add(message);
+              }
 
-            return true;
+              return true;*/
         }
 
         private void Start()

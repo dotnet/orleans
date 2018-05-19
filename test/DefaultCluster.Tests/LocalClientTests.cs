@@ -18,7 +18,7 @@ using Xunit;
 
 namespace DefaultCluster.Tests.General
 {
-    [TestCategory("BVT"), TestCategory("LocalClient")]
+    //[TestCategory("BVT"), TestCategory("LocalClient")]
     public class LocalClientTests : IClassFixture<LocalClientTests.LocalClientFixture>
     {
         private readonly TimeSpan timeout = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(10);
