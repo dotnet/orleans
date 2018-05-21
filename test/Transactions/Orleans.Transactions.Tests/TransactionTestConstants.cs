@@ -14,10 +14,10 @@ namespace Orleans.Transactions.Tests
         // storage providers
         public const string TransactionStore = "TransactionStore";
 
-        // grain implementations singleton TM
-        public const string NoStateTransactionalGrain = "Orleans.Transactions.Tests.NoStateTransactionalGrain";
-        public const string SingleStateTransactionalGrain = "Orleans.Transactions.Tests.SingleStateTransactionalGrain";
-        public const string DoubleStateTransactionalGrain = "Orleans.Transactions.Tests.DoubleStateTransactionalGrain";
-        public const string MaxStateTransactionalGrain = "Orleans.Transactions.Tests.MaxStateTransactionalGrain";
+        // grain implementations
+        public const string NoStateTransactionalGrain = "NoStateTransactionalGrain";
+        public const string SingleStateTransactionalGrain = "SingleStateTransactionalGrain";
+        public const string DoubleStateTransactionalGrain = "DoubleStateTransactionalGrain";
+        public const string MaxStateTransactionalGrain = "MaxStateTransactionalGrain";
     }
 }
