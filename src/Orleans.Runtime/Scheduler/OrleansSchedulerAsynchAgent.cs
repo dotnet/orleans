@@ -39,10 +39,10 @@ namespace Orleans.Runtime.Scheduler
 
         protected override void Process(IWorkItem request)
         {
-            RuntimeContext.InitializeThread(scheduler);
+            RuntimeContext.InitializeThread();
             try
             {
-                RuntimeContext.SetExecutionContext(request.SchedulingContext, scheduler);
+                RuntimeContext.SetExecutionContext(request.SchedulingContext);
                 request.Execute();
             }
             finally
