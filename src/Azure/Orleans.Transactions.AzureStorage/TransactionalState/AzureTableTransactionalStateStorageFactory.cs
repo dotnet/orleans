@@ -51,7 +51,7 @@ namespace Orleans.Transactions.AzureStorage
         private string MakePartitionKey(IGrainActivationContext context, string stateName)
         {
             string grainKey = context.GrainInstance.GrainReference.ToShortKeyString();
-            var key = $"ts_{this.clusterOptions.ServiceId}_{grainKey}_{stateName}";
+            var key = $"{grainKey}_{this.clusterOptions.ServiceId}_{stateName}";
             return AzureStorageUtils.SanitizeTableProperty(key);
         }
 
