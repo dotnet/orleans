@@ -270,7 +270,7 @@ namespace Orleans.Hosting
             services.AddTransient<IConfigurationValidator, ClusterOptionsValidator>();
             services.AddTransient<IConfigurationValidator, SiloClusteringValidator>();
 
-            // Local client support
+/*            // Local client support
             services.TryAddSingleton<ILocalClient, LocalClient>();
             services.TryAddSingleton<InvokableObjectManager>();
             services.TryAddSingleton<IClusterClient>(
@@ -282,7 +282,7 @@ namespace Orleans.Hosting
                         throw new InvalidOperationException(
                             $"{nameof(result.Connect)}() method for internal {nameof(IClusterClient)} must complete synchronously.");
                     return result;
-                });
+                });*/
         }
     }
 }
