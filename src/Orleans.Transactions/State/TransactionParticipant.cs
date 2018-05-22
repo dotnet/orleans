@@ -397,7 +397,7 @@ namespace Orleans.Transactions
                 throw new LockRecursionException("cannot perform an update operation from within another operation");
             }
 
-            var info = (TransactionInfo)TransactionContext.GetTransactionInfo();
+            var info = (TransactionInfo)TransactionContext.GetRequiredTransactionInfo<TransactionInfo>();
 
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.Trace($"StartWrite {info}");
@@ -479,7 +479,7 @@ namespace Orleans.Transactions
         }
 
 
-        public string CurrentTransactionId => ((TransactionInfo)TransactionContext.GetTransactionInfo()).Id;
+        public string CurrentTransactionId => TransactionContext.GetRequiredTransactionInfo<TransactionInfo>().Id;
 
         /// <summary>
         /// Read the current state.
@@ -491,7 +491,7 @@ namespace Orleans.Transactions
                 throw new LockRecursionException("cannot perform a read operation from within another operation");
             }
 
-            var info = (TransactionInfo)TransactionContext.GetTransactionInfo();
+            var info = (TransactionInfo)TransactionContext.GetRequiredTransactionInfo<TransactionInfo>();
 
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.Trace($"StartRead {info}");
