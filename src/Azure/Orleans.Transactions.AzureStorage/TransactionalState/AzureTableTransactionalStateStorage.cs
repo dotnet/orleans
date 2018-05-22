@@ -142,7 +142,7 @@ namespace Orleans.Transactions.AzureStorage
                             states.RemoveAt(pos);
 
                             if (logger.IsEnabled(LogLevel.Trace))
-                                logger.LogTrace($"{partition}.{existing.SequenceId:x16} Update {existing.TransactionId}");
+                                logger.LogTrace($"{partition}.{existing.RowKey} Update {existing.TransactionId}");
                         }
                         else
                         {
@@ -151,7 +151,7 @@ namespace Orleans.Transactions.AzureStorage
                             states.Insert(pos, new KeyValuePair<long, StateEntity>(s.SequenceId, entity));
 
                             if (logger.IsEnabled(LogLevel.Trace))
-                                logger.LogTrace($"{partition}.{s.SequenceId:x16} Insert {entity.TransactionId}");
+                                logger.LogTrace($"{partition}.{entity.RowKey} Insert {entity.TransactionId}");
                         }
                     }
 
@@ -166,14 +166,14 @@ namespace Orleans.Transactions.AzureStorage
                 await batchOperation.Add(TableOperation.Insert(this.key)).ConfigureAwait(false);
 
                 if (logger.IsEnabled(LogLevel.Trace))
-                    logger.LogTrace($"{partition}.k Insert");
+                    logger.LogTrace($"{partition}.{KeyEntity.RK} Insert");
             }
             else
             {
                 await batchOperation.Add(TableOperation.Replace(this.key)).ConfigureAwait(false);
 
                 if (logger.IsEnabled(LogLevel.Trace))
-                    logger.LogTrace($"{partition}.k Update");
+                    logger.LogTrace($"{partition}.{KeyEntity.RK} Update");
             }
 
             // fourth, remove obsolete records
@@ -185,7 +185,7 @@ namespace Orleans.Transactions.AzureStorage
                     await batchOperation.Add(TableOperation.Delete(states[i].Value)).ConfigureAwait(false);
 
                     if (logger.IsEnabled(LogLevel.Trace))
-                        logger.LogTrace($"{partition}.{states[i].Key:x16} Delete {states[i].Value.TransactionId}");
+                        logger.LogTrace($"{partition}.{states[i].Value.RowKey} Delete {states[i].Value.TransactionId}");
                 }
                 states.RemoveRange(0, pos);
             }
@@ -305,7 +305,7 @@ namespace Orleans.Transactions.AzureStorage
                         if (logger.IsEnabled(LogLevel.Trace))
                         {
                             for (int i = 0; i < batchOperation.Count; i++)
-                                logger.LogTrace($"batch-op ok     {i} PK={batchOperation[i].Entity.PartitionKey} RK={batchOperation[i].Entity.RowKey}");
+                                logger.LogTrace($"{batchOperation[i].Entity.PartitionKey}.{batchOperation[i].Entity.RowKey} batch-op ok     {i}");
                         }
                     }
                     catch (Exception ex)
@@ -313,7 +313,7 @@ namespace Orleans.Transactions.AzureStorage
                         if (logger.IsEnabled(LogLevel.Trace))
                         {
                             for (int i = 0; i < batchOperation.Count; i++)
-                                logger.LogTrace($"batch-op failed {i} PK={batchOperation[i].Entity.PartitionKey} RK={batchOperation[i].Entity.RowKey}");
+                                logger.LogTrace($"{batchOperation[i].Entity.PartitionKey}.{batchOperation[i].Entity.RowKey} batch-op failed {i}");
                         }
 
                         this.logger.LogError("Transactional state store failed {Exception}.", ex);
