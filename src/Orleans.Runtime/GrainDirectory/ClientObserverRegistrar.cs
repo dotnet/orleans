@@ -44,7 +44,10 @@ namespace Orleans.Runtime
         internal void SetLocalClient(ILocalClient client)
         {
             this.localClient = client;
-            this.scheduler.QueueAction(Start, this.SchedulingContext).Ignore();
+            if (client != null)
+            {
+                this.scheduler.QueueAction(Start, this.SchedulingContext).Ignore();
+            }
         }
 
         internal void SetGateway(Gateway gateway)

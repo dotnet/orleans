@@ -8,7 +8,6 @@ using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
 using Orleans.Runtime.Messaging;
-using Orleans.Runtime.Scheduler;
 using Orleans.Streams;
 
 namespace Orleans.Runtime
@@ -34,11 +33,11 @@ namespace Orleans.Runtime
         private readonly AsyncLock lockable = new AsyncLock();
         private readonly IGrainReferenceRuntime grainReferenceRuntime;
         private readonly InvokableObjectManager invokableObjects;
-        private readonly OrleansTaskScheduler scheduler;
         private readonly IRuntimeClient runtimeClient;
         private readonly ClientObserverRegistrar clientObserverRegistrar;
         private readonly ILogger logger;
         private readonly IInternalGrainFactory grainFactory;
+        private readonly ISiloMessageCenter siloMessageCenter;
         private bool disposing;
 
         public LocalClient(
@@ -50,7 +49,6 @@ namespace Orleans.Runtime
             IInternalGrainFactory grainFactory,
             InvokableObjectManager invokableObjectManager,
             ISiloMessageCenter messageCenter,
-            OrleansTaskScheduler scheduler,
             IOptions<MultiClusterOptions> multiClusterOptions,
             IOptions<ClusterOptions> clusterOptions)
         {
@@ -59,15 +57,15 @@ namespace Orleans.Runtime
             this.grainReferenceRuntime = grainReferenceRuntime;
             this.grainFactory = grainFactory;
             this.invokableObjects = invokableObjectManager;
-            this.scheduler = scheduler;
+            this.siloMessageCenter = messageCenter;
+            this.logger = logger;
 
             this.ClientAddress = CreateClientAddress(siloDetails.SiloAddress, multiClusterOptions, clusterOptions);
-            this.logger = logger;
 
             // Register with the directory and message center so that we can receive messages.
             this.clientObserverRegistrar.SetLocalClient(this);
             this.clientObserverRegistrar.ClientAdded(this.ClientId);
-            messageCenter.SetLocalClient(this);
+            this.siloMessageCenter.SetLocalClient(this);
 
             // Start pumping messages.
             this.Start();
@@ -153,6 +151,7 @@ namespace Orleans.Runtime
             this.disposing = true;
             Utils.SafeExecute(() => this.clientObserverRegistrar.ClientDropped(this.ClientId));
             Utils.SafeExecute(() => this.clientObserverRegistrar.SetLocalClient(null));
+            Utils.SafeExecute(() => this.siloMessageCenter.SetLocalClient(null));
             Utils.SafeExecute(() => this.listeningCts.Cancel(false));
             Utils.SafeExecute(() => this.listeningCts.Dispose());
         }
