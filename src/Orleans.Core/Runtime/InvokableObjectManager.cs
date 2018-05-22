@@ -114,7 +114,12 @@ namespace Orleans
                 // return Task.StartNew(() => ..., new CancellationToken());
                 // We pass these options to Task.Factory.StartNew as they make the call identical
                 // to Task.Run. See: https://blogs.msdn.microsoft.com/pfxteam/2011/10/24/task-run-vs-task-factory-startnew/
-                Task.Run(async () => await this.LocalObjectMessagePumpAsync(objectData)).Ignore();
+                Task.Factory.StartNew(
+                        this.dispatchFunc,
+                        objectData,
+                        CancellationToken.None,
+                        TaskCreationOptions.DenyChildAttach,
+                        TaskScheduler.Default).Ignore();
             }
         }
 
