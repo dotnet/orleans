@@ -119,8 +119,9 @@ namespace Orleans.Transactions.Tests
             {
                 await this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid()).MultiGrainSetBit(grains.Select(v => v.Grain).ToList(), index);
             }
-            catch (Exception)
+            catch (Exception e)
             {
+                base.output.WriteLine($"Some transactions failed. Index: {index}: Exception: {e}");
                 grains.ForEach(g => g.Expected.Set(index, false));
                 throw;
             }
@@ -133,7 +134,7 @@ namespace Orleans.Transactions.Tests
             foreach (ExpectedGrainActivity activity in txGrains)
             {
                 int[][] actual = await activity.Grain.Get();
-                // self consistency check, all resources should be same
+                // self consistency check, all resources should be the same
                 int[] first = actual.FirstOrDefault();
                 Assert.NotNull(first);
                 foreach (int[] result in actual)
@@ -144,7 +145,7 @@ namespace Orleans.Transactions.Tests
                         Assert.Equal(first[i], result[i]);
                     }
                 }
-                // Check agains expecte, only need to check first, since we've already verified all resources are the same.
+                // Check against expected, only need to check first, since we've already verified all resources are the same.
                 int[] expected = activity.Expected.Value;
                 Assert.Equal(first.Length, expected.Length);
                 for (int i = 0; i < first.Length; i++)
