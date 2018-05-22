@@ -211,7 +211,7 @@ namespace Orleans.Transactions.AzureStorage
                         pos++;
                         continue;
                     case 1:
-                        break;
+                        return false;
                 }
             }
             return false;
