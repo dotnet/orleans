@@ -165,7 +165,7 @@ namespace Orleans.Runtime
             Utils.SafeExecute(() => this.siloMessageCenter.SetHostedClient(null));
             Utils.SafeExecute(() => this.listeningCts.Cancel(false));
             Utils.SafeExecute(() => this.listeningCts.Dispose());
-            this.messagePump?.Join();
+            Utils.SafeExecute(() => this.messagePump?.Join());
         }
 
         private void Start()
