@@ -120,7 +120,7 @@ namespace Orleans.Transactions.AzureStorage
                     states.RemoveAt(states.Count - 1);
 
                     if (logger.IsEnabled(LogLevel.Trace))
-                        logger.LogTrace($"{partition}.{states[states.Count - 1].Key:x16} Delete {entity.TransactionId}");
+                        logger.LogTrace($"{partition}.{entity.RowKey} Delete {entity.TransactionId}");
                 }
             }
 
