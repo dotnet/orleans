@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.Serialization;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Serialization;
 using Orleans.CodeGeneration;
 using Orleans.Concurrency;
 using Orleans.Runtime;
@@ -31,7 +33,6 @@ namespace Orleans.Transactions.Abstractions.Extensions
             var serializerSettings = OrleansJsonSerializer.GetDefaultSerializerSettings(typeResolver, grainFactory);
             serializerSettings.TypeNameHandling = TypeNameHandling.Auto;
             serializerSettings.PreserveReferencesHandling = PreserveReferencesHandling.None;
-            serializerSettings.Converters.Add(new TransactionParticipantExtensionWrapper.CustomJsonConverter(grainFactory));
             return serializerSettings;
         }
 
@@ -116,54 +117,6 @@ namespace Orleans.Transactions.Abstractions.Extensions
             }
 
             #endregion
-
-            public class CustomJsonConverter : JsonConverter
-            {
-                private static readonly Type wrapperType;
-                private readonly IGrainFactory grainFactory;
-
-                static CustomJsonConverter()
-                {
-                    wrapperType = typeof(TransactionParticipantExtensionExtensions.TransactionParticipantExtensionWrapper);
-                }
-
-                public CustomJsonConverter(IGrainFactory grainFactory)
-                {
-                    this.grainFactory = grainFactory;
-                }
-
-                public override bool CanConvert(Type objectType)
-                {
-                    return objectType == wrapperType;
-                }
-
-                public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
-                {
-                    var w = (TransactionParticipantExtensionExtensions.TransactionParticipantExtensionWrapper)value;
-
-                    writer.WriteStartObject();
-                    writer.WritePropertyName("grain");
-                    writer.WriteValue((w.extension as GrainReference)?.ToKeyString());
-                    writer.WritePropertyName("facet");
-                    writer.WriteValue(w.resourceId);
-                    writer.WriteEndObject();
-                    writer.Flush();
-                }
-
-                public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
-                {
-                    var jobj = JObject.Load(reader);
-
-                    var key = (string)jobj["grain"];
-                    var resourceId = (string)jobj["facet"];
-
-                    var grainref = Utils.FromKeyString(key, null);
-                    this.grainFactory.BindGrainReference(grainref);
-                    var extension = grainref.AsReference<ITransactionParticipantExtension>();
-
-                    return new TransactionParticipantExtensionExtensions.TransactionParticipantExtensionWrapper(extension, resourceId);
-                }
-            }
         }
     }
 }

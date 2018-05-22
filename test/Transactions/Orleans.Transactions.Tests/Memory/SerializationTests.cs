@@ -44,7 +44,7 @@ namespace Orleans.Transactions.Tests.Memory
             var jsonMetaData = JsonConvert.SerializeObject(metaData, MetaData.SerializerSettings);
 
             var deseriliazedMetaData = JsonConvert.DeserializeObject<MetaData>(jsonMetaData, MetaData.SerializerSettings);
-            Assert.Equal(metaData, deseriliazedMetaData);
+            Assert.Equal(metaData.TimeStamp, deseriliazedMetaData.TimeStamp);
         }
     }
 }
