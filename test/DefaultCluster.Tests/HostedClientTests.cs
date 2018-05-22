@@ -18,17 +18,17 @@ using Xunit;
 
 namespace DefaultCluster.Tests.General
 {
-    [TestCategory("BVT"), TestCategory("LocalClient")]
-    public class LocalClientTests : IClassFixture<LocalClientTests.LocalClientFixture>
+    [TestCategory("BVT"), TestCategory("HostedClient")]
+    public class HostedClientTests : IClassFixture<HostedClientTests.Fixture>
     {
         private readonly TimeSpan timeout = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(10);
         private readonly ISiloHost silo;
 
-        public class LocalClientFixture
+        public class Fixture : IDisposable
         {
             public ISiloHost Silo { get; }
 
-            public LocalClientFixture()
+            public Fixture()
             {
                 this.Silo = new SiloHostBuilder().ConfigureLocalHostPrimarySilo()
                     .Configure<ClusterOptions>(options =>
@@ -41,15 +41,20 @@ namespace DefaultCluster.Tests.General
                     .Build();
                 this.Silo.StartAsync().GetAwaiter().GetResult();
             }
+
+            public void Dispose()
+            {
+                this.Silo?.Dispose();
+            }
         }
 
-        public LocalClientTests(LocalClientFixture fixture)
+        public HostedClientTests(Fixture fixture)
         {
             this.silo = fixture.Silo;
         }
 
         [Fact]
-        public async Task LocalClient_GrainCallTest()
+        public async Task HostedClient_GrainCallTest()
         {
             var client = this.silo.Services.GetRequiredService<IClusterClient>();
 
@@ -60,7 +65,7 @@ namespace DefaultCluster.Tests.General
         }
 
         [Fact]
-        public async Task LocalClient_ReferenceEquality_GrainCallTest()
+        public async Task HostedClient_ReferenceEquality_GrainCallTest()
         {
             var client = this.silo.Services.GetRequiredService<IClusterClient>();
             var grain = client.GetGrain<IGrainWithGenericMethods>(Guid.NewGuid());
@@ -86,7 +91,7 @@ namespace DefaultCluster.Tests.General
         }
 
         [Fact]
-        public async Task LocalClient_ObserverTest()
+        public async Task HostedClient_ObserverTest()
         {
             var client = this.silo.Services.GetRequiredService<IClusterClient>();
 
@@ -138,7 +143,7 @@ namespace DefaultCluster.Tests.General
         }
 
         [Fact]
-        public async Task LocalClient_StreamTest()
+        public async Task HostedClient_StreamTest()
         {
             var client = this.silo.Services.GetRequiredService<IClusterClient>();
 

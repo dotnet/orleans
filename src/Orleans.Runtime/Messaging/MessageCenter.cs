@@ -16,7 +16,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ILogger log;
         private Action<Message> rerouteHandler;
         internal Func<Message, bool> ShouldDrop;
-        private ILocalClient localClient;
+        private IHostedClient hostedClient;
 
         // ReSharper disable NotAccessedField.Local
         private IntValueStatistic sendQueueLengthCounter;
@@ -34,15 +34,15 @@ namespace Orleans.Runtime.Messaging
 
         internal bool IsBlockingApplicationMessages { get; private set; }
 
-        public void SetLocalClient(ILocalClient client) => this.localClient = client;
+        public void SetHostedClient(IHostedClient client) => this.hostedClient = client;
 
-        public bool IsProxying => this.Gateway != null || this.localClient?.ClientId != null;
+        public bool IsProxying => this.Gateway != null || this.hostedClient?.ClientId != null;
 
         public bool TryDeliverToProxy(Message msg)
         {
             if (!msg.TargetGrain.IsClient) return false;
             if (this.Gateway != null && this.Gateway.TryDeliverToProxy(msg)) return true;
-            return this.localClient?.TryDispatchToClient(msg) ?? false;
+            return this.hostedClient?.TryDispatchToClient(msg) ?? false;
         }
         
         // This is determined by the IMA but needed by the OMS, and so is kept here in the message center itself.

@@ -4,28 +4,16 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
-using Orleans.Configuration;
 using Orleans.Runtime.Messaging;
 using Orleans.Streams;
 
 namespace Orleans.Runtime
 {
-    internal interface ILocalClient
-    {
-        ActivationAddress ClientAddress { get; }
-        GrainId ClientId { get; }
-        StreamDirectory StreamDirectory { get; }
-        GrainReference CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker);
-        void DeleteObjectReference(IAddressable obj);
-        Task<Tuple<TExtension, TExtensionInterface>> BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
-            where TExtension : IGrainExtension
-            where TExtensionInterface : IGrainExtension;
-        bool TryDispatchToClient(Message message);
-    }
-
-    internal sealed class LocalClient : IDisposable, ILocalClient
+    /// <summary>
+    /// A client which is hosted within a silo.
+    /// </summary>
+    internal sealed class HostedClient : IDisposable, IHostedClient
     {
         private readonly BlockingCollection<Message> incomingMessages = new BlockingCollection<Message>();
         private readonly CancellationTokenSource listeningCts = new CancellationTokenSource();
@@ -39,18 +27,17 @@ namespace Orleans.Runtime
         private readonly IInternalGrainFactory grainFactory;
         private readonly ISiloMessageCenter siloMessageCenter;
         private bool disposing;
+        private Thread messagePump;
 
-        public LocalClient(
+        public HostedClient(
             IRuntimeClient runtimeClient,
             ClientObserverRegistrar clientObserverRegistrar,
             ILocalSiloDetails siloDetails,
-            ILogger<LocalClient> logger,
+            ILogger<HostedClient> logger,
             IGrainReferenceRuntime grainReferenceRuntime,
             IInternalGrainFactory grainFactory,
             InvokableObjectManager invokableObjectManager,
-            ISiloMessageCenter messageCenter,
-            IOptions<MultiClusterOptions> multiClusterOptions,
-            IOptions<ClusterOptions> clusterOptions)
+            ISiloMessageCenter messageCenter)
         {
             this.runtimeClient = runtimeClient;
             this.clientObserverRegistrar = clientObserverRegistrar;
@@ -60,33 +47,30 @@ namespace Orleans.Runtime
             this.siloMessageCenter = messageCenter;
             this.logger = logger;
 
-            this.ClientAddress = CreateClientAddress(siloDetails.SiloAddress, multiClusterOptions, clusterOptions);
+            this.ClientAddress = ActivationAddress.NewActivationAddress(siloDetails.SiloAddress, GrainId.NewClientId());
 
             // Register with the directory and message center so that we can receive messages.
-            this.clientObserverRegistrar.SetLocalClient(this);
+            this.clientObserverRegistrar.SetHostedClient(this);
             this.clientObserverRegistrar.ClientAdded(this.ClientId);
-            this.siloMessageCenter.SetLocalClient(this);
+            this.siloMessageCenter.SetHostedClient(this);
 
             // Start pumping messages.
             this.Start();
         }
 
+        /// <inheritdoc />
         public ActivationAddress ClientAddress { get; }
 
+        /// <inheritdoc />
         public GrainId ClientId => this.ClientAddress.Grain;
 
+        /// <inheritdoc />
         public StreamDirectory StreamDirectory { get; } = new StreamDirectory();
+        
+        /// <inheritdoc />
+        public override string ToString() => $"{nameof(HostedClient)}_{this.ClientAddress}";
 
-        private static ActivationAddress CreateClientAddress(SiloAddress localAddress, IOptions<MultiClusterOptions> multiClusterOptions, IOptions<ClusterOptions> clusterOptions)
-        {
-            // Set a cluster id only if this cluster is a part of a multi-cluster network.
-            var clusterId = multiClusterOptions.Value.HasMultiClusterNetwork ? clusterOptions.Value.ClusterId : null;
-            var clientId = GrainId.NewClientId(clusterId);
-            return ActivationAddress.NewActivationAddress(localAddress, clientId);
-        }
-
-        public override string ToString() => $"{nameof(LocalClient)}_{this.ClientAddress}";
-
+        /// <inheritdoc />
         public GrainReference CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker)
         {
             if (obj is GrainReference) throw new ArgumentException("Argument obj is already a grain reference.");
@@ -102,6 +86,7 @@ namespace Orleans.Runtime
             return grainReference;
         }
 
+        /// <inheritdoc />
         public void DeleteObjectReference(IAddressable obj)
         {
             if (!(obj is GrainReference reference)) throw new ArgumentException("Argument reference is not a grain reference.");
@@ -109,6 +94,7 @@ namespace Orleans.Runtime
             if (!this.invokableObjects.TryDeregister(reference.ObserverId))throw new ArgumentException("Reference is not associated with a local object.", nameof(obj));
         }
 
+        /// <inheritdoc />
         public async Task<Tuple<TExtension, TExtensionInterface>> BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
             where TExtension : IGrainExtension
             where TExtensionInterface : IGrainExtension
@@ -145,17 +131,7 @@ namespace Orleans.Runtime
             return Tuple.Create(extension, typedAddressable);
         }
 
-        void IDisposable.Dispose()
-        {
-            if (this.disposing) return;
-            this.disposing = true;
-            Utils.SafeExecute(() => this.clientObserverRegistrar.ClientDropped(this.ClientId));
-            Utils.SafeExecute(() => this.clientObserverRegistrar.SetLocalClient(null));
-            Utils.SafeExecute(() => this.siloMessageCenter.SetLocalClient(null));
-            Utils.SafeExecute(() => this.listeningCts.Cancel(false));
-            Utils.SafeExecute(() => this.listeningCts.Dispose());
-        }
-        
+        /// <inheritdoc />
         public bool TryDispatchToClient(Message message)
         {
             if (!this.ClientId.Equals(message.TargetGrain)) return false;
@@ -179,14 +155,27 @@ namespace Orleans.Runtime
             return true;
         }
 
+        /// <inheritdoc />
+        void IDisposable.Dispose()
+        {
+            if (this.disposing) return;
+            this.disposing = true;
+            Utils.SafeExecute(() => this.clientObserverRegistrar.ClientDropped(this.ClientId));
+            Utils.SafeExecute(() => this.clientObserverRegistrar.SetHostedClient(null));
+            Utils.SafeExecute(() => this.siloMessageCenter.SetHostedClient(null));
+            Utils.SafeExecute(() => this.listeningCts.Cancel(false));
+            Utils.SafeExecute(() => this.listeningCts.Dispose());
+            this.messagePump?.Join();
+        }
+
         private void Start()
         {
-            var thread = new Thread(_ => this.RunClientMessagePump())
+            this.messagePump = new Thread(_ => this.RunClientMessagePump())
             {
-                Name = nameof(LocalClient) + "." + nameof(RunClientMessagePump),
+                Name = nameof(HostedClient) + "." + nameof(RunClientMessagePump),
                 IsBackground = true,
             };
-            thread.Start();
+            this.messagePump.Start();
         }
 
         private void RunClientMessagePump()

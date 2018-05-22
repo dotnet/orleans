@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -22,7 +21,7 @@ namespace Orleans.Runtime
         private readonly OrleansTaskScheduler scheduler;
         private readonly SiloMessagingOptions messagingOptions;
         private readonly ILogger logger;
-        private ILocalClient localClient;
+        private IHostedClient hostedClient;
         private Gateway gateway;
         private IDisposable refreshTimer;
         
@@ -41,9 +40,9 @@ namespace Orleans.Runtime
             logger = loggerFactory.CreateLogger<ClientObserverRegistrar>();
         }
 
-        internal void SetLocalClient(ILocalClient client)
+        internal void SetHostedClient(IHostedClient client)
         {
-            this.localClient = client;
+            this.hostedClient = client;
             if (client != null)
             {
                 this.scheduler.QueueAction(Start, this.SchedulingContext).Ignore();
@@ -123,8 +122,8 @@ namespace Orleans.Runtime
             {
                 var clients = new List<GrainId>();
                 if (this.gateway != null) clients.AddRange(gateway.GetConnectedClients());
-                var localClientId = this.localClient?.ClientId;
-                if (localClientId != null) clients.Add(localClientId);
+                var hostedClientId = this.hostedClient?.ClientId;
+                if (hostedClientId != null) clients.Add(hostedClientId);
 
                 var tasks = new List<Task>();
                 foreach (GrainId clientId in clients)

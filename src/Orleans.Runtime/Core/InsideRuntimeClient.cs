@@ -43,9 +43,9 @@ namespace Orleans.Runtime
         private Dispatcher dispatcher;
         private List<IIncomingGrainCallFilter> grainCallFilters;
         private SerializationManager serializationManager;
-        private ILocalClient localClient;
+        private IHostedClient hostedClient;
 
-        private ILocalClient LocalClient => this.localClient ?? (this.localClient = this.ServiceProvider.GetRequiredService<ILocalClient>());
+        private IHostedClient HostedClient => this.hostedClient ?? (this.hostedClient = this.ServiceProvider.GetRequiredService<IHostedClient>());
         private readonly InterfaceToImplementationMappingCache interfaceToImplementationMapping = new InterfaceToImplementationMappingCache();
         public TimeSpan ResponseTimeout { get; private set; }
         private readonly GrainTypeManager typeManager;
@@ -155,7 +155,7 @@ namespace Orleans.Runtime
             ActivationData sendingActivation = null;
             if (schedulingContext == null)
             {
-                var clientAddress = this.LocalClient.ClientAddress;
+                var clientAddress = this.HostedClient.ClientAddress;
                 message.SendingGrain = clientAddress.Grain;
                 message.SendingActivation = clientAddress.Activation;
             }
@@ -643,7 +643,7 @@ namespace Orleans.Runtime
         {
             get
             {
-                if (RuntimeContext.Current == null) return this.LocalClient.ToString();
+                if (RuntimeContext.Current == null) return this.HostedClient.ToString();
 
                 var currentActivation = this.GetCurrentActivationData();
                 return currentActivation.Address.ToString();
@@ -667,7 +667,7 @@ namespace Orleans.Runtime
 
         public GrainReference CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker)
         {
-            if (RuntimeContext.Current == null) return this.LocalClient.CreateObjectReference(obj, invoker);
+            if (RuntimeContext.Current == null) return this.HostedClient.CreateObjectReference(obj, invoker);
             throw new InvalidOperationException("Cannot create a local object reference from a grain.");
         }
 
@@ -675,7 +675,7 @@ namespace Orleans.Runtime
         {
             if (RuntimeContext.Current == null)
             {
-                this.LocalClient.DeleteObjectReference(obj);
+                this.HostedClient.DeleteObjectReference(obj);
             }
             else
             {
@@ -738,7 +738,7 @@ namespace Orleans.Runtime
 
         public StreamDirectory GetStreamDirectory()
         {
-            if (RuntimeContext.Current == null) return this.LocalClient.StreamDirectory;
+            if (RuntimeContext.Current == null) return this.HostedClient.StreamDirectory;
             var currentActivation = GetCurrentActivationData();
             return currentActivation.GetStreamDirectory();
         }
@@ -749,7 +749,7 @@ namespace Orleans.Runtime
         {
             if (RuntimeContext.Current == null)
             {
-                return this.LocalClient.BindExtension<TExtension, TExtensionInterface>(newExtensionFunc);
+                return this.HostedClient.BindExtension<TExtension, TExtensionInterface>(newExtensionFunc);
             }
 
             if (!TryGetExtensionHandler(out TExtension extension))

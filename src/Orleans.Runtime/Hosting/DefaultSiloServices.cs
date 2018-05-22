@@ -271,7 +271,7 @@ namespace Orleans.Hosting
             services.AddTransient<IConfigurationValidator, SiloClusteringValidator>();
 
             // Local client support
-            services.TryAddSingleton<ILocalClient, LocalClient>();
+            services.TryAddSingleton<IHostedClient, HostedClient>();
             services.TryAddSingleton<InvokableObjectManager>();
             services.TryAddSingleton<IClusterClient>(
                 sp =>
