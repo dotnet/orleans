@@ -58,13 +58,23 @@ namespace Orleans.Transactions.Tests
             var txSucceedBeforeInterruption = await AllTxSucceed(txGrains, getIndex());
             await ValidateResults(txGrains);
             this.logger.LogInformation($"Tx succeed before interruption : {txSucceedBeforeInterruption}");
-            if(gracefulShutdown)
+            // have transactions in flight when silo goes down
+            bool killed = false;
+            Task succeeding = RunWhileSucceeding(txGrains, getIndex, () => { return killed; });
+            if (gracefulShutdown)
                 this.testCluster.StopSilo(this.testCluster.Silos[this.random.Next(this.testCluster.Silos.Count)]);
             else
                 this.testCluster.KillSilo(this.testCluster.Silos[this.random.Next(this.testCluster.Silos.Count)]);
+            killed = true;
+            await succeeding;
             await TestingUtils.WaitUntilAsync(lastTry => CheckTxResult(txGrains, getIndex, lastTry), RecoveryTimeout);
             output.WriteLine($"Performed {index} transactions");
             await ValidateResults(txGrains);
+        }
+
+        private async Task RunWhileSucceeding(IList<ExpectedGrainActivity> txGrains, Func<int> getIndex, Func<bool> killed)
+        {
+            while (!killed() && await AllTxSucceed(txGrains, getIndex())) { };
         }
 
         private async Task<bool> CheckTxResult(IList<ExpectedGrainActivity> txGrains, Func<int> getIndex, bool assertIsTrue)

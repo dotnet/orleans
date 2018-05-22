@@ -17,12 +17,12 @@ namespace Orleans.Transactions.Tests.Correctness
 
         public void Set(int index, bool value)
         {
-            if (index >= this.value.Length * BitsInInt)
+            int idx = index / BitsInInt;
+            if (idx >= this.value.Length)
             {
-                Array.Resize(ref this.value, this.value.Length + 1);
+                Array.Resize(ref this.value, idx+1);
             }
-            int idx = this.value.Length / BitsInInt;
-            int shift = 1 >> (this.value.Length % BitsInInt);
+            int shift = 1 << (index % BitsInInt);
             if (value)
             {
                 this.value[idx] |= shift;
@@ -93,7 +93,9 @@ namespace Orleans.Transactions.Tests.Correctness
             {
                 await data.PerformUpdate(state =>
                 {
+                    this.logger.LogInformation($"Setting bit {index} in state {string.Join(",", state.Value.Select(i => i.ToString("x8")))}.");
                     state.Set(index, true);
+                    this.logger.LogInformation($"Set bit {index} in state {string.Join(",", state.Value.Select(i => i.ToString("x8")))}.");
                 });
             }
         }
