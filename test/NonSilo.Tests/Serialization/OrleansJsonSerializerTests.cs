@@ -47,7 +47,7 @@ namespace UnitTests.Serialization
                 return result.ToString();
             }
         }
-        
+
         public class JsonPoco
         {
             [JsonProperty("crazy_name")]
