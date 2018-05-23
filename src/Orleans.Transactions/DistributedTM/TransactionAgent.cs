@@ -93,6 +93,9 @@ namespace Orleans.Transactions
                         if (logger.IsEnabled(LogLevel.Debug))
                             logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} fail {transactionInfo.TransactionId} prepare response status={status}");
 
+                        foreach (var p in participants)
+                            p.Key.Abort(transactionInfo.TransactionId).Ignore();
+
                         throw status.ConvertToUserException(transactionInfo.TransactionId.ToString());
                     }
                 }
@@ -101,6 +104,9 @@ namespace Orleans.Transactions
             {
                 if (logger.IsEnabled(LogLevel.Debug))
                     logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} timeout {transactionInfo.TransactionId} prepare responses");
+
+                foreach(var p in participants)
+                    p.Key.Abort(transactionInfo.TransactionId).Ignore();
 
                 throw new OrleansTransactionAbortedException(transactionInfo.TransactionId.ToString(),
                     "transaction agent timed out waiting for read-only transaction participant responses");

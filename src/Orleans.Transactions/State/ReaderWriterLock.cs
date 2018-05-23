@@ -83,8 +83,7 @@ namespace Orleans.Transactions
 
                     if (currentGroup != null)
                     {
-                        if (logger.IsEnabled(LogLevel.Trace))
-                            logger.Trace($"lock groupsize={currentGroup.Count}");
+                        currentGroup.Deadline = DateTime.UtcNow + LockTimeout;
 
                         // discard expired waiters that have no chance to succeed
                         // because they have been waiting for the lock for a longer timespan than the 
@@ -102,11 +101,6 @@ namespace Orleans.Transactions
                                 if (logger.IsEnabled(LogLevel.Trace))
                                     logger.Trace($"expire-lock-waiter {kvp.Key}");
                             }
-                            else
-                            {
-                                if (logger.IsEnabled(LogLevel.Trace))
-                                    logger.Trace($"enter-lock {kvp.Key}");
-                            }
                         }
 
                         if (expiredWaiters != null)
@@ -115,6 +109,13 @@ namespace Orleans.Transactions
                             {
                                 currentGroup.Remove(guid);
                             }
+                        }
+
+                        if (logger.IsEnabled(LogLevel.Trace))
+                        {
+                            logger.Trace($"lock groupsize={currentGroup.Count} deadline={currentGroup.Deadline:o}");
+                            foreach (var kvp in currentGroup)
+                                logger.Trace($"enter-lock {kvp.Key}");
                         }
 
                         // execute all the read and update tasks

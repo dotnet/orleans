@@ -62,33 +62,35 @@ namespace Orleans.Transactions
                     }
 
                     // store the current storage batch, if it is not empty
+                    StorageBatch<TState> batchBeingSentToStorage = null;
                     if (storageBatch.BatchSize > 0)
                     {
-                        var thisBatch = storageBatch;
-                        var nextBatch = new StorageBatch<TState>(thisBatch);
-
                         // get the next batch in place so it can be filled while we store the old one
-                        storageBatch = nextBatch;
+                        batchBeingSentToStorage = storageBatch;                  
+                        storageBatch = new StorageBatch<TState>(batchBeingSentToStorage);
 
-                        nextBatch.ETag = await thisBatch.Store(storage);
-
-                        if (committableEntries > 0)
-                        {
-                            // update stable state
-                            var lastCommittedEntry = commitQueue[committableEntries - 1];
-                            stableState = lastCommittedEntry.State;
-                            stableSequenceNumber = lastCommittedEntry.SequenceNumber;
-
-                            // remove committed entries from commit queue
-                            commitQueue.RemoveFromFront(committableEntries);
-                        }
-
-                        // run follow-up actions
-                        thisBatch.RunFollowUpActions();
-
-                        storageWorker.Notify(); // re-check for work
+                        // perform the actual store, and record the e-tag
+                        storageBatch.ETag = await batchBeingSentToStorage.Store(storage);
                     }
-                }
+
+                    if (committableEntries > 0)
+                    {
+                        // update stable state
+                        var lastCommittedEntry = commitQueue[committableEntries - 1];
+                        stableState = lastCommittedEntry.State;
+                        stableSequenceNumber = lastCommittedEntry.SequenceNumber;
+
+                        // remove committed entries from commit queue
+                        commitQueue.RemoveFromFront(committableEntries);
+                        storageWorker.Notify();  // we have to re-check for work
+                    }
+
+                    if (batchBeingSentToStorage != null)
+                    { 
+                        batchBeingSentToStorage.RunFollowUpActions();
+                        storageWorker.Notify();  // we have to re-check for work
+                    }
+                 }
                 return;
             }
             catch (InconsistentStateException e)
