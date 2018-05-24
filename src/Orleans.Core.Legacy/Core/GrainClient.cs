@@ -38,6 +38,10 @@ namespace Orleans
 
         /// <summary>delegate to configure logging, default to none logger configured</summary>
         public static Action<ILoggingBuilder> ConfigureLoggingDelegate { get; set; } = builder => { };
+
+        /// <summary>delegate to add some configuration to the client</summary>
+        public static Action<IClientBuilder> ConfigureClientDelegate { get; set; } = builder => { };
+
         private static IGrainFactory GetGrainFactory()
         {
             if (!IsInitialized)
@@ -59,12 +63,7 @@ namespace Orleans
                 Console.WriteLine("Error loading standard client configuration file.");
                 throw new ArgumentException("Error loading standard client configuration file");
             }
-            var orleansClient = (IInternalClusterClient)new ClientBuilder()
-                .ConfigureApplicationParts(parts => parts.ConfigureDefaults())
-                .UseConfiguration(config)
-                .ConfigureLogging(ConfigureLoggingDelegate)
-                .Build();
-            InternalInitialize(orleansClient);
+            InternalInitialize(config);
         }
 
         /// <summary>
@@ -100,12 +99,7 @@ namespace Orleans
                 Console.WriteLine("Error loading client configuration file {0}:", configFile.FullName);
                 throw new ArgumentException(string.Format("Error loading client configuration file {0}:", configFile.FullName), nameof(configFile));
             }
-            var orleansClient = (IInternalClusterClient)new ClientBuilder()
-                .ConfigureApplicationParts(parts => parts.ConfigureDefaults())
-                .UseConfiguration(config)
-                .ConfigureLogging(ConfigureLoggingDelegate)
-                .Build();
-            InternalInitialize(orleansClient);
+            InternalInitialize(config);
         }
 
         /// <summary>
@@ -120,12 +114,7 @@ namespace Orleans
                 Console.WriteLine("Initialize was called with null ClientConfiguration object.");
                 throw new ArgumentException("Initialize was called with null ClientConfiguration object.", nameof(config));
             }
-            var orleansClient = (IInternalClusterClient)new ClientBuilder()
-                .ConfigureApplicationParts(parts => parts.ConfigureDefaults())
-                .UseConfiguration(config)
-                .ConfigureLogging(ConfigureLoggingDelegate)
-                .Build();
-            InternalInitialize(orleansClient);
+            InternalInitialize(config);
         }
 
         /// <summary>
@@ -151,17 +140,20 @@ namespace Orleans
                 config.Gateways.Add(gatewayAddress);
             }
             config.PreferedGatewayIndex = config.Gateways.IndexOf(gatewayAddress);
-            var orleansClient = (IInternalClusterClient)new ClientBuilder()
-                .ConfigureApplicationParts(parts => parts.ConfigureDefaults())
-                .UseConfiguration(config)
-                .ConfigureLogging(ConfigureLoggingDelegate)
-                .Build();
-            InternalInitialize(orleansClient);
+            InternalInitialize(config);
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        private static void InternalInitialize(IInternalClusterClient clusterClient)
+        private static void InternalInitialize(ClientConfiguration config)
         {
+            var builder = new ClientBuilder()
+                .ConfigureApplicationParts(parts => parts.ConfigureDefaults())
+                .UseConfiguration(config)
+                .ConfigureLogging(ConfigureLoggingDelegate);
+            ConfigureClientDelegate?.Invoke(builder);
+
+            var clusterClient = (IInternalClusterClient)builder.Build();
+
             if (TestOnlyNoConnect)
             {
                 Trace.TraceInformation("TestOnlyNoConnect - Returning before connecting to cluster.");

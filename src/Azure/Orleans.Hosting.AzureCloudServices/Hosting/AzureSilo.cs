@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Logging;
 using Orleans.AzureUtils.Utilities;
 using Orleans.Hosting.AzureCloudServices;
+using Orleans.Hosting;
 
 namespace Orleans.Runtime.Host
 {
@@ -44,6 +45,9 @@ namespace Orleans.Runtime.Host
         /// Defaults to <c>OrleansProxyEndpoint</c>
         /// </summary>
         public string ProxyEndpointConfigurationKeyName { get; set; }
+
+        /// <summary>delegate to add some configuration to the client</summary>
+        public Action<ISiloHostBuilder> ConfigureSiloHostDelegate { get; set; }
 
         private SiloHost host;
         private OrleansSiloInstanceManager siloInstanceManager;
@@ -279,6 +283,8 @@ namespace Orleans.Runtime.Host
             host.SetDeploymentId(clusterId, connectionString);
             host.SetSiloEndpoint(myEndpoint, generation);
             host.SetProxyEndpoint(proxyEndpoint);
+
+            host.ConfigureSiloHostDelegate = ConfigureSiloHostDelegate;
 
             host.InitializeOrleansSilo();
             return StartSilo();
