@@ -309,7 +309,7 @@ namespace Orleans.Runtime
             if (id == null) return false;
 
             // don't set expiration for one way, system target and system grain messages.
-            return Direction != Directions.OneWay && !id.IsSystemTarget && !Constants.IsSystemGrain(id);
+            return Direction != Directions.OneWay && !id.IsSystemTarget;
         }
 
         public ITransactionInfo TransactionInfo

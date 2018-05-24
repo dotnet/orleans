@@ -249,7 +249,7 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 DisposeTimers();
-                if (this.membershipTableProvider is GrainBasedMembershipTable)
+                if (this.membershipTableProvider is SystemTargetBasedMembershipTable)
                 {
                     // do not execute KillMyself if using MembershipTableGrain, since it will fail, as we've already stopped app scheduler turns.
                     return;

@@ -127,8 +127,8 @@ namespace Orleans.Hosting
                     configureOptions?.Invoke(services.AddOptions<DevelopmentClusterMembershipOptions>());
                     services.ConfigureFormatter<DevelopmentClusterMembershipOptions>();
                     services
-                        .AddSingleton<GrainBasedMembershipTable>()
-                        .AddFromExisting<IMembershipTable, GrainBasedMembershipTable>();
+                        .AddSingleton<SystemTargetBasedMembershipTable>()
+                        .AddFromExisting<IMembershipTable, SystemTargetBasedMembershipTable>();
                 });
         }
     }

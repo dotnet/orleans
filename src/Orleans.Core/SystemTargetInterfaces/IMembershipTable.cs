@@ -95,12 +95,11 @@ namespace Orleans
     }
 
     /// <summary>
-    /// Membership table interface for grain based implementation.
+    /// Membership table interface for system target based implementation.
     /// </summary>
     [Unordered]
-    public interface IMembershipTableGrain : IGrainWithGuidKey, IMembershipTable
+    public interface IMembershipTableSystemTarget : IMembershipTable, ISystemTarget
     {
-        
     }
 
     [Serializable]

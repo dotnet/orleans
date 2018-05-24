@@ -199,10 +199,11 @@ namespace Orleans.Runtime
             State = ActivationState.Create;
             PlacedUsing = placedUsing;
             RegistrationStrategy = registrationStrategy;
-            if (!Grain.IsSystemTarget && !Constants.IsSystemGrain(Grain))
+            if (!Grain.IsSystemTarget)
             {
                 this.collector = collector;
             }
+
             CollectionAgeLimit = ageLimit;
 
             GrainReference = GrainReference.FromGrainId(addr.Grain, runtimeClient.GrainReferenceRuntime, genericArguments, Grain.IsSystemTarget ? addr.Silo : null);
