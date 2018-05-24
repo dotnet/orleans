@@ -101,6 +101,10 @@ namespace UnitTests
             var result = await grain.SomeMethod(new RuntimeCodeGenPoco());
             Assert.IsType<RuntimeCodeGenPoco>(result);
             Assert.NotNull(result);
+
+            var valueTaskResult = await grain.ValueTaskMethod(new RuntimeCodeGenPoco()).ConfigureAwait(false);
+            Assert.IsType<RuntimeCodeGenPoco>(valueTaskResult);
+            Assert.NotNull(valueTaskResult);
         }
     }
 }
