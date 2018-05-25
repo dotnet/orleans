@@ -317,13 +317,6 @@ namespace Orleans.Runtime
                 RegisterSystemTarget((SystemTarget)multiClusterOracle);
             }
             
-            var transactionAgent = this.Services.GetRequiredService<ITransactionAgent>() as SystemTarget;
-            if (transactionAgent != null)
-            {
-                logger.Debug("Creating {0} System Target", "TransactionAgent");
-                RegisterSystemTarget(transactionAgent);
-            }
-
             logger.Debug("Finished creating System Targets for this silo.");
         }
 

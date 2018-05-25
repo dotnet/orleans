@@ -20,12 +20,6 @@ namespace Orleans.Transactions.Abstractions
         Task<TResult> PerformRead<TResult>(Func<TState, TResult> readFunction);
 
         /// <summary>
-        /// Performs an update operation, without returning any result.
-        /// </summary>
-        /// <param name="updateAction">An action that updates the state.</param>
-        Task PerformUpdate(Action<TState> updateAction);
-
-        /// <summary>
         /// Performs an update operation and returns the result.
         /// </summary>
         /// <typeparam name="TResult">The type of the return value</typeparam>
@@ -37,5 +31,4 @@ namespace Orleans.Transactions.Abstractions
         /// </summary>
         string CurrentTransactionId { get; }
     }
-
 }
