@@ -24,6 +24,8 @@ namespace Orleans.Hosting
         public static IServiceCollection UseDistributedTM(this IServiceCollection services)
         {
             services.TryAddSingleton<IClock,Clock>();
+            services.TryAddSingleton<TransactionAgentStatistics>();
+            services.TryAddSingleton<TransactionOverloadDetector>();
             services.AddSingleton<ITransactionAgent, TransactionAgent>();
             services.TryAddSingleton(typeof(ITransactionDataCopier<>), typeof(DefaultTransactionDataCopier<>));
             services.AddSingleton<IAttributeToFactoryMapper<TransactionalStateAttribute>, TransactionalStateAttributeMapper>();

@@ -5,11 +5,52 @@ using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Concurrency;
 using System.Linq;
+using System.Threading;
+using System.Transactions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions
 {
+    public class TransactionAgentStatistics
+    {
+        public const string TransactionStartedPerSecondMetric = "TransactionAgent.TransactionStartedPerSecond";
+        //TransactionStartedPerSecond for last reporting period
+        public double TransactionStartedPerSecond { get; private set; }
+
+        public long TransactionStartedCounter { get; set; }
+
+        public DateTime LastReportTime { get; private set; } = DateTime.UtcNow;
+        private readonly ITelemetryProducer telemetryProducer;
+        private readonly PeriodicAction monitor;
+        public TransactionAgentStatistics(ITelemetryProducer telemetryProducer, IOptions<StatisticsOptions> options)
+        {
+            this.telemetryProducer = telemetryProducer;
+            this.monitor = new PeriodicAction(options.Value.PerfCountersWriteInterval, this.ReportMetrics);
+        }
+
+        public void TryReportMetrics()
+        {
+            this.monitor.TryAction(DateTime.UtcNow);
+        }
+
+        private void ReportMetrics()
+        {
+            var now = DateTime.UtcNow;
+            var txStarted = TransactionStartedCounter;
+            var timelapseSinceLastReport = now - this.LastReportTime;
+            if (timelapseSinceLastReport.TotalSeconds <= 1)
+                TransactionStartedPerSecond = txStarted;
+            else TransactionStartedPerSecond = txStarted / timelapseSinceLastReport.TotalSeconds;
+            this.telemetryProducer.TrackMetric(TransactionStartedPerSecondMetric, TransactionStartedPerSecond);
+            //reset counters
+            TransactionStartedCounter = 0;
+            LastReportTime = now;
+        }
+    }
+
     [Reentrant]
     internal class TransactionAgent : ITransactionAgent
     {
@@ -18,21 +59,29 @@ namespace Orleans.Transactions
         private readonly ILogger logger;
         private readonly Stopwatch stopwatch = Stopwatch.StartNew();
         private readonly CausalClock clock;
+        private readonly TransactionAgentStatistics statistics;
+        private readonly TransactionOverloadDetector overloadDetector;
 
-        public TransactionAgent(IClock clock, ILogger<TransactionAgent> logger)
+        public TransactionAgent(IClock clock, ILogger<TransactionAgent> logger, TransactionAgentStatistics statistics, TransactionOverloadDetector overloadDetector)
         {
             this.clock = new CausalClock(clock);
             this.logger = logger;
+            this.statistics = statistics;
+            this.overloadDetector = overloadDetector;
         }
 
         public Task<ITransactionInfo> StartTransaction(bool readOnly, TimeSpan timeout)
         {
+            this.statistics.TryReportMetrics();
+            if (overloadDetector.Enabled && overloadDetector.Overloaded())
+                throw new OrleansStartTransactionFailedException(new OrleansTransactionOverloadException());
+
             var guid = Guid.NewGuid();
             DateTime ts = this.clock.UtcNow();
 
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.Trace($"{stopwatch.Elapsed.TotalMilliseconds:f2} start transaction {guid} at {ts:o}");
-
+            this.statistics.TransactionStartedCounter++;
             return Task.FromResult<ITransactionInfo>(new TransactionInfo(guid, ts, ts));
         }
 
