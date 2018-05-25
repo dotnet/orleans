@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
+﻿
 namespace Orleans.Transactions
 {
     /// <summary>
@@ -13,7 +10,7 @@ namespace Orleans.Transactions
         /// <summary>
         /// The transaction identifier.
         /// </summary>
-        long TransactionId { get; }
+        string Id { get; }
 
         /// <summary>
         /// Indicates that the transaction has aborted.
@@ -38,6 +35,4 @@ namespace Orleans.Transactions
         /// <returns>true if there are no orphans, false otherwise</returns>
         bool ReconcilePending(out int numberOrphans);
     }
-
-
 }

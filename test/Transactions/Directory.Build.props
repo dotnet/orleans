@@ -1,0 +1,113 @@
+<Project>
+  <PropertyGroup>
+    <_ParentDirectoryBuildPropsPath Condition="'$(_DirectoryBuildPropsFile)' != ''">$([System.IO.Path]::Combine('..', '$(_DirectoryBuildPropsFile)'))</_ParentDirectoryBuildPropsPath>
+  </PropertyGroup>
+
+  <Import Project="$(_ParentDirectoryBuildPropsPath)" Condition="Exists('$(_ParentDirectoryBuildPropsPath)')"/>
+
+  <PropertyGroup Condition="$(OrleansCoreVersion)!=$(VersionPrefix)">
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <!-- Configure source link: https://github.com/ctaggart/SourceLink -->
+  <PropertyGroup>
+    <SourceLinkCreate>true</SourceLinkCreate>
+    <SourceLinkOriginUrl>https://github.com/dotnet/orleans</SourceLinkOriginUrl>
+  </PropertyGroup>
+
+  <Choose>
+    <When Condition="$(OrleansTestingHostVersion) == $(VersionPrefix)">
+      <ItemGroup >
+        <ProjectReference Include="..\..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.TestingHost" Version="$(OrleansTestingHostVersion)"/>
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
+
+  <Choose>
+    <When Condition="$(OrleansCoreLegacyVersion) == $(VersionPrefix)">
+      <ItemGroup >
+        <ProjectReference Include="..\..\..\src\Orleans.Core.Legacy\Orleans.Core.Legacy.csproj" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.Core.Legacy" Version="$(OrleansCoreLegacyVersion)"/>
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
+
+  <Choose>
+    <When Condition="$(OrleansRuntimeLegacyVersion) == $(VersionPrefix)">
+      <ItemGroup >
+        <ProjectReference Include="..\..\..\src\Orleans.Runtime.Legacy\Orleans.Runtime.Legacy.csproj" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.Runtime.Legacy" Version="$(OrleansRuntimeLegacyVersion)"/>
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
+
+  <Choose>
+    <When Condition="$(OrleansTransactionsVersion) == $(VersionPrefix)">
+      <ItemGroup >
+        <ProjectReference Include="..\..\..\src\Orleans.Transactions\Orleans.Transactions.csproj" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.Transactions" Version="$(OrleansTransactionsVersion)"/>
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
+
+  <Choose>
+    <When Condition="$(OrleansTransactionsVersion) == $(VersionPrefix)">
+      <ItemGroup >
+        <ProjectReference Include="..\..\..\src\Azure\Orleans.Transactions.AzureStorage\Orleans.Transactions.AzureStorage.csproj" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.Transactions.AzureStorage" Version="$(OrleansTransactionsVersion)"/>
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
+
+  <Choose>
+    <When Condition="$(OrleansAzureVersion) == $(VersionPrefix)">
+      <ItemGroup >
+        <ProjectReference Include="..\..\..\src\Azure\Orleans.Persistence.AzureStorage\Orleans.Persistence.AzureStorage.csproj" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.Persistence.AzureStorage" Version="$(OrleansAzureVersion)"/>
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
+
+  <Choose>
+    <When Condition="$(OrleansToolsVersion) == $(VersionPrefix)">
+      <ItemGroup >
+        <ProjectReference Include="..\..\..\src\OrleansCounterControl\OrleansCounterControl.csproj" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.CounterControl" Version="$(OrleansToolsVersion)"/>
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
+
+</Project>

@@ -20,7 +20,6 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("Orleans.TestingHost")]
 [assembly: InternalsVisibleTo("Orleans.TestingHost.AppDomain")]
 [assembly: InternalsVisibleTo("Orleans.TestingHost.Legacy")]
-[assembly: InternalsVisibleTo("Orleans.Transactions.DynamoDB")]
 [assembly: InternalsVisibleTo("OrleansCounterControl")]
 [assembly: InternalsVisibleTo("OrleansManager")]
 [assembly: InternalsVisibleTo("OrleansProviders")]

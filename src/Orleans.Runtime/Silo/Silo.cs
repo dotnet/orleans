@@ -124,12 +124,9 @@ namespace Orleans.Runtime
             // Temporarily still require this. Hopefuly gone when 2.0 is released.
             this.siloDetails = siloDetails;
             this.SystemStatus = SystemStatus.Creating;
-            AsynchAgent.IsStarting = true;
+            AsynchAgent.IsStarting = true; // todo. use ISiloLifecycle instead?
 
             var startTime = DateTime.UtcNow;
-
-            IOptions<SiloStatisticsOptions> statisticsOptions = services.GetRequiredService<IOptions<SiloStatisticsOptions>>();
-            StatisticsCollector.Initialize(statisticsOptions.Value.CollectionLevel);
 
             IOptions<ClusterMembershipOptions> clusterMembershipOptions = services.GetRequiredService<IOptions<ClusterMembershipOptions>>();
             initTimeout = clusterMembershipOptions.Value.MaxJoinAttemptTime;
@@ -450,15 +447,6 @@ namespace Orleans.Runtime
         {
             var stopWatch = Stopwatch.StartNew();
 
-            await StartAsyncTaskWithPerfAnalysis("Init transaction agent", InitTransactionAgent, stopWatch);
-            async Task InitTransactionAgent()
-            {
-                ITransactionAgent transactionAgent = this.Services.GetRequiredService<ITransactionAgent>();
-                ISchedulingContext transactionAgentContext = (transactionAgent as SystemTarget)?.SchedulingContext;
-                await scheduler.QueueTask(transactionAgent.Start, transactionAgentContext)
-                    .WithTimeout(initTimeout, $"Starting TransactionAgent failed due to timeout {initTimeout}");
-            }
-
             // Load and init grain services before silo becomes active.
             await StartAsyncTaskWithPerfAnalysis("Init grain services",
                 () => CreateGrainServices(), stopWatch);
@@ -499,7 +487,7 @@ namespace Orleans.Runtime
 
             try
             {
-                SiloStatisticsOptions statisticsOptions = Services.GetRequiredService<IOptions<SiloStatisticsOptions>>().Value;
+                StatisticsOptions statisticsOptions = Services.GetRequiredService<IOptions<StatisticsOptions>>().Value;
                 StartTaskWithPerfAnalysis("Start silo statistics", () => this.siloStatistics.Start(statisticsOptions), stopWatch);
                 logger.Debug("Silo statistics manager started successfully.");
 

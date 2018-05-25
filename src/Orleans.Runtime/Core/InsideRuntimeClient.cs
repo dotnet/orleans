@@ -51,6 +51,7 @@ namespace Orleans.Runtime
         private readonly Lazy<ITransactionAgent> transactionAgent;
         private IGrainReferenceRuntime grainReferenceRuntime;
         private readonly IGrainCancellationTokenRuntime cancellationTokenRuntime;
+        private readonly ApplicationRequestsStatisticsGroup appRequestStatistics;
         private readonly SchedulingOptions schedulingOptions;
 
         public InsideRuntimeClient(
@@ -64,7 +65,8 @@ namespace Orleans.Runtime
             ILoggerFactory loggerFactory,
             IOptions<SiloMessagingOptions> messagingOptions,
             IGrainCancellationTokenRuntime cancellationTokenRuntime,
-            IOptions<SchedulingOptions> schedulerOptions)
+            IOptions<SchedulingOptions> schedulerOptions,
+            ApplicationRequestsStatisticsGroup appRequestStatistics)
         {
             this.ServiceProvider = serviceProvider;
             this.MySilo = siloDetails.SiloAddress;
@@ -85,6 +87,7 @@ namespace Orleans.Runtime
             this.callbackDataLogger = loggerFactory.CreateLogger<CallbackData>();
             this.timerLogger = loggerFactory.CreateLogger<SafeTimer>();
             this.cancellationTokenRuntime = cancellationTokenRuntime;
+            this.appRequestStatistics = appRequestStatistics;
             this.schedulingOptions = schedulerOptions.Value;
         }
         
@@ -212,7 +215,8 @@ namespace Orleans.Runtime
                     unregisterCallback,
                     messagingOptions,
                     this.callbackDataLogger,
-                    this.timerLogger);
+                    this.timerLogger,
+                    this.appRequestStatistics);
                 callbacks.TryAdd(message.Id, callbackData);
                 callbackData.StartTimer(ResponseTimeout);
             }
@@ -365,9 +369,14 @@ namespace Orleans.Runtime
                 }
                 catch (Exception exc1)
                 {
-                    if (invokeExceptionLogger.IsEnabled(LogLevel.Debug) || message.Direction == Message.Directions.OneWay)
+                    if (message.Direction == Message.Directions.OneWay)
                     {
                         invokeExceptionLogger.Warn(ErrorCode.GrainInvokeException,
+                            "Exception during Grain method call of message: " + message, exc1);
+                    }
+                    else if (invokeExceptionLogger.IsEnabled(LogLevel.Debug))
+                    {
+                        invokeExceptionLogger.Debug(ErrorCode.GrainInvokeException,
                             "Exception during Grain method call of message: " + message, exc1);
                     }
 
@@ -379,7 +388,7 @@ namespace Orleans.Runtime
                         if (startNewTransaction)
                         {
                             var abortException = (exc1 as OrleansTransactionAbortedException) ?? 
-                                new OrleansTransactionAbortedException(transactionInfo.TransactionId.ToString(), exc1);
+                                new OrleansTransactionAbortedException(transactionInfo.Id.ToString(), exc1);
                             this.transactionAgent.Value.Abort(transactionInfo, abortException);
                             exc1 = abortException;
                         }
@@ -412,7 +421,7 @@ namespace Orleans.Runtime
                 transactionInfo = TransactionContext.GetTransactionInfo();
                 if (transactionInfo != null && ! transactionInfo.ReconcilePending(out var numberOrphans))
                 {
-                    var abortException = new OrleansOrphanCallException(transactionInfo.TransactionId.ToString(), numberOrphans);
+                    var abortException = new OrleansOrphanCallException(transactionInfo.Id, numberOrphans);
                     // Can't exit before the transaction completes.
                     TransactionContext.GetTransactionInfo().IsAborted = true;
                     if (startNewTransaction)
@@ -456,7 +465,7 @@ namespace Orleans.Runtime
                         // Must abort the transaction on exceptions
                         TransactionContext.GetTransactionInfo().IsAborted = true;
                         var abortException = (exc2 as OrleansTransactionAbortedException) ??
-                            new OrleansTransactionAbortedException(TransactionContext.GetTransactionInfo().TransactionId.ToString(), exc2);
+                            new OrleansTransactionAbortedException(TransactionContext.GetTransactionInfo().Id, exc2);
                         this.transactionAgent.Value.Abort(TransactionContext.GetTransactionInfo(), abortException);
                     }
                 }

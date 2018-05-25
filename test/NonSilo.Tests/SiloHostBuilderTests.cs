@@ -60,19 +60,31 @@ namespace NonSilo.Tests
     public class SiloHostBuilderTests
     {
         /// <summary>
-        /// Tests that a silo cannot be created without specifying a ClusterId.
+        /// Tests that a silo cannot be created without specifying a ClusterId and a ServiceId.
         /// </summary>
         [Fact]
-        public void SiloHostBuilder_NoClusterIdTest()
+        public void SiloHostBuilder_ClusterOptionsTest()
         {
             Assert.Throws<OrleansConfigurationException>(() => new SiloHostBuilder()
                 .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
                 .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>())
                 .Build());
 
+            Assert.Throws<OrleansConfigurationException>(() => new SiloHostBuilder()
+                .Configure<ClusterOptions>(options => options.ClusterId = "someClusterId")
+                .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
+                .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>())
+                .Build());
+
+            Assert.Throws<OrleansConfigurationException>(() => new SiloHostBuilder()
+                .Configure<ClusterOptions>(options => options.ServiceId = "someServiceId")
+                .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
+                .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>())
+                .Build());
+
             var builder = new SiloHostBuilder()
                 .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
-                .Configure<ClusterOptions>(options => options.ClusterId = "test")
+                .Configure<ClusterOptions>(options => { options.ClusterId = "someClusterId"; options.ServiceId = "someServiceId"; })
                 .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
             using (var silo = builder.Build())
             {

@@ -19,12 +19,6 @@ namespace Orleans.Configuration.Validators
             + "\n  * Microsoft.Orleans.Clustering.ZooKeeper"
             + "\n  * Others, see: https://www.nuget.org/packages?q=Microsoft.Orleans.Clustering.";
 
-        internal static readonly string ClusterIdNotConfigured =
-            $"A cluster id has not been configured. Configure a cluster id by specifying a value for {nameof(ClusterOptions)}.{nameof(ClusterOptions.ClusterId)}." +
-            " For more information, please see the documentation on:" +
-            "\n  * Client Configuration: http://dotnet.github.io/orleans/Documentation/Deployment-and-Operations/Configuration-Guide/Client-Configuration.html" +
-            "\n  * Server Configuration: http://dotnet.github.io/orleans/Documentation/Deployment-and-Operations/Configuration-Guide/Server-Configuration.html";
-
         private readonly IServiceProvider serviceProvider;
 
         public ClientClusteringValidator(IServiceProvider serviceProvider)
@@ -34,12 +28,6 @@ namespace Orleans.Configuration.Validators
 
         public void ValidateConfiguration()
         {
-            var clusterOptions = this.serviceProvider.GetRequiredService<IOptions<ClusterOptions>>();
-            if (string.IsNullOrWhiteSpace(clusterOptions.Value.ClusterId))
-            {
-                throw new OrleansConfigurationException(ClusterIdNotConfigured);
-            }
-
             var gatewayProvider = this.serviceProvider.GetService<IGatewayListProvider>();
             if (gatewayProvider == null)
             {

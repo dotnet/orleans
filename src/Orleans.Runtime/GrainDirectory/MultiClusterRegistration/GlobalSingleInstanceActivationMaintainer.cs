@@ -15,7 +15,7 @@ using System.Threading;
 
 namespace Orleans.Runtime.GrainDirectory
 {
-    internal class GlobalSingleInstanceActivationMaintainer : AsynchAgent, IMultiClusterConfigurationListener
+    internal class GlobalSingleInstanceActivationMaintainer : DedicatedAsynchAgent, IMultiClusterConfigurationListener
     {
         private readonly object lockable = new object();
         private readonly LocalGrainDirectory router;

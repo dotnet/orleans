@@ -1,50 +1,58 @@
 using System;
 using Microsoft.Extensions.Logging;
-
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
 {
     internal class SchedulerStatisticsGroup
     {
-        private static CounterStatistic[] turnsExecutedPerWorkerThreadApplicationTurns;
-        private static CounterStatistic[] turnsExecutedPerWorkerThreadSystemTurns;
-        private static CounterStatistic[] turnsExecutedPerWorkerThreadNull;
-        private static CounterStatistic turnsExecutedByAllWorkerThreadsTotalApplicationTurns;
-        private static CounterStatistic turnsExecutedByAllWorkerThreadsTotalSystemTurns;
-        private static CounterStatistic turnsExecutedByAllWorkerThreadsTotalNullTurns;
+        private CounterStatistic[] turnsExecutedPerWorkerThreadApplicationTurns;
+        private CounterStatistic[] turnsExecutedPerWorkerThreadSystemTurns;
+        private CounterStatistic[] turnsExecutedPerWorkerThreadNull;
+        private readonly CounterStatistic turnsExecutedByAllWorkerThreadsTotalApplicationTurns;
+        private readonly CounterStatistic turnsExecutedByAllWorkerThreadsTotalSystemTurns;
+        private readonly CounterStatistic turnsExecutedByAllWorkerThreadsTotalNullTurns;
 
-        private static CounterStatistic[] turnsExecutedPerWorkItemGroup;
-        private static StringValueStatistic[] workItemGroupStatuses;
-        private static CounterStatistic turnsExecutedByAllWorkItemGroupsTotalApplicationTurns;
-        private static CounterStatistic turnsExecutedByAllWorkItemGroupsTotalSystem;
-        private static CounterStatistic totalPendingWorkItems;
-        private static CounterStatistic turnsExecutedStartTotal;
-        private static CounterStatistic turnsExecutedEndTotal;
+        private CounterStatistic[] turnsExecutedPerWorkItemGroup;
+        private StringValueStatistic[] workItemGroupStatuses;
+        private readonly CounterStatistic turnsExecutedByAllWorkItemGroupsTotalApplicationTurns;
+        private readonly CounterStatistic turnsExecutedByAllWorkItemGroupsTotalSystem;
+        private readonly CounterStatistic totalPendingWorkItems;
+        private readonly CounterStatistic turnsExecutedStartTotal;
+        private readonly CounterStatistic turnsExecutedEndTotal;
 
-        private static CounterStatistic turnsEnQueuedTotal;
-        private static CounterStatistic turnsDeQueuedTotal;
-        private static CounterStatistic turnsDroppedTotal;
-        private static CounterStatistic closureWorkItemsCreated;
-        private static CounterStatistic closureWorkItemsExecuted;
-        internal static CounterStatistic NumLongRunningTurns;
-        internal static CounterStatistic NumLongQueueWaitTimes;
+        private readonly CounterStatistic turnsEnQueuedTotal;
+        private readonly CounterStatistic turnsDeQueuedTotal;
+        private readonly CounterStatistic turnsDroppedTotal;
+        private readonly CounterStatistic closureWorkItemsCreated;
+        private readonly CounterStatistic closureWorkItemsExecuted;
 
-        private static HistogramValueStatistic turnLengthHistogram;
+        private readonly HistogramValueStatistic turnLengthHistogram;
         private const int TURN_LENGTH_HISTOGRAM_SIZE = 31;
 
-        private static int workerThreadCounter;
-        private static int workItemGroupCounter;
-        private static object lockable;
-        private static ILogger logger;
+        private int workerThreadCounter;
+        private int workItemGroupCounter;
+        private readonly object lockable;
+        private readonly ILogger logger;
+        private readonly StatisticsLevel collectionLevel;
 
-        internal static void Init(ILoggerFactory loggerFactory)
+        public SchedulerStatisticsGroup(IOptions<StatisticsOptions> statisticsOptions, ILogger<SchedulerStatisticsGroup> logger)
         {
+            this.logger = logger;
+            this.collectionLevel = statisticsOptions.Value.CollectionLevel;
+            this.CollectGlobalShedulerStats = collectionLevel.CollectGlobalShedulerStats();
+            this.CollectTurnsStats = collectionLevel.CollectTurnsStats();
+            this.CollectPerWorkItemStats = collectionLevel.CollectPerWorkItemStats();
+            this.CollectShedulerQueuesStats = collectionLevel.CollectShedulerQueuesStats();
+
             workItemGroupStatuses = new StringValueStatistic[1];
             workerThreadCounter = 0;
             workItemGroupCounter = 0;
             lockable = new object();
 
-            if (StatisticsCollector.CollectGlobalShedulerStats)
+            if (this.CollectGlobalShedulerStats)
             {
                 totalPendingWorkItems = CounterStatistic.FindOrCreate(StatisticNames.SCHEDULER_PENDINGWORKITEMS, false);
                 turnsEnQueuedTotal = CounterStatistic.FindOrCreate(StatisticNames.SCHEDULER_ITEMS_ENQUEUED_TOTAL);
@@ -53,7 +61,8 @@ namespace Orleans.Runtime
                 closureWorkItemsCreated = CounterStatistic.FindOrCreate(StatisticNames.SCHEDULER_CLOSURE_WORK_ITEMS_CREATED);
                 closureWorkItemsExecuted = CounterStatistic.FindOrCreate(StatisticNames.SCHEDULER_CLOSURE_WORK_ITEMS_EXECUTED);
             }
-            if (StatisticsCollector.CollectTurnsStats)
+
+            if (this.CollectTurnsStats)
             {
                 turnsExecutedByAllWorkerThreadsTotalApplicationTurns = CounterStatistic.FindOrCreate(StatisticNames.SCHEDULER_TURNSEXECUTED_APPLICATION_BYALLWORKERTHREADS);
                 turnsExecutedByAllWorkerThreadsTotalSystemTurns = CounterStatistic.FindOrCreate(StatisticNames.SCHEDULER_TURNSEXECUTED_SYSTEM_BYALLWORKERTHREADS);
@@ -73,10 +82,21 @@ namespace Orleans.Runtime
 
             NumLongRunningTurns = CounterStatistic.FindOrCreate(StatisticNames.SCHEDULER_NUM_LONG_RUNNING_TURNS);
             NumLongQueueWaitTimes = CounterStatistic.FindOrCreate(StatisticNames.SCHEDULER_NUM_LONG_QUEUE_WAIT_TIMES);
-            logger = loggerFactory.CreateLogger<SchedulerStatisticsGroup>();
         }
 
-        internal static int RegisterWorkingThread(string threadName)
+        public bool CollectShedulerQueuesStats { get; }
+
+        public bool CollectPerWorkItemStats { get; }
+
+        public bool CollectTurnsStats { get; }
+
+        public bool CollectGlobalShedulerStats { get; }
+
+        public CounterStatistic NumLongRunningTurns { get; }
+
+        public CounterStatistic NumLongQueueWaitTimes { get; }
+
+        internal int RegisterWorkingThread(string threadName)
         {
             lock (lockable)
             {
@@ -96,7 +116,7 @@ namespace Orleans.Runtime
             }
         }
 
-        internal static int RegisterWorkItemGroup(string workItemGroupName, ISchedulingContext context, Func<string> statusGetter)
+        internal int RegisterWorkItemGroup(string workItemGroupName, ISchedulingContext context, Func<string> statusGetter)
         {
             lock (lockable)
             {
@@ -108,14 +128,21 @@ namespace Orleans.Runtime
                     Array.Resize(ref turnsExecutedPerWorkItemGroup, 2 * turnsExecutedPerWorkItemGroup.Length);
                     Array.Resize(ref workItemGroupStatuses, 2 * workItemGroupStatuses.Length);
                 }
-                CounterStorage storage =  StatisticsCollector.ReportPerWorkItemStats(context) ? CounterStorage.LogAndTable : CounterStorage.DontStore;
+                CounterStorage storage =  ReportPerWorkItemStats(context) ? CounterStorage.LogAndTable : CounterStorage.DontStore;
                 turnsExecutedPerWorkItemGroup[i] = CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.SCHEDULER_ACTIVATION_TURNSEXECUTED_PERACTIVATION, workItemGroupName), storage);
                 workItemGroupStatuses[i] = StringValueStatistic.FindOrCreate(new StatisticName(StatisticNames.SCHEDULER_ACTIVATION_STATUS_PERACTIVATION, workItemGroupName), statusGetter, storage);
                 return i;
             }
+
+            bool ReportPerWorkItemStats(ISchedulingContext schedulingContext)
+            {
+                return SchedulingUtils.IsSystemPriorityContext(schedulingContext)
+                    ? this.collectionLevel >= StatisticsLevel.Verbose2
+                    : this.collectionLevel >= StatisticsLevel.Verbose3;
+            }
         }
 
-        internal static void UnRegisterWorkItemGroup(int workItemGroup)
+        internal void UnRegisterWorkItemGroup(int workItemGroup)
         {
             Utils.SafeExecute(() => CounterStatistic.Delete(turnsExecutedPerWorkItemGroup[workItemGroup].Name),
                 logger,
@@ -127,37 +154,37 @@ namespace Orleans.Runtime
         }
 
         //----------- Global scheduler stats ---------------------//
-        internal static void OnWorkItemEnqueue()
+        internal void OnWorkItemEnqueue()
         {
             totalPendingWorkItems.Increment();
             turnsEnQueuedTotal.Increment();
         }
 
-        internal static void OnWorkItemDequeue()
+        internal void OnWorkItemDequeue()
         {
             totalPendingWorkItems.DecrementBy(1);
             turnsDeQueuedTotal.Increment(); 
         }
 
-        internal static void OnWorkItemDrop(int n)
+        internal void OnWorkItemDrop(int n)
         {
             totalPendingWorkItems.DecrementBy(n);
             turnsDroppedTotal.IncrementBy(n);
         }
 
-        internal static void OnClosureWorkItemsCreated()
+        internal void OnClosureWorkItemsCreated()
         {
             closureWorkItemsCreated.Increment();
         }
 
-        internal static void OnClosureWorkItemsExecuted()
+        internal void OnClosureWorkItemsExecuted()
         {
             closureWorkItemsExecuted.Increment();
         }
 
         //------
 
-        internal static void OnThreadStartsTurnExecution(int workerThread, ISchedulingContext context)
+        internal void OnThreadStartsTurnExecution(int workerThread, ISchedulingContext context)
         {
             turnsExecutedStartTotal.Increment();
             if (context == null)
@@ -177,7 +204,7 @@ namespace Orleans.Runtime
             }
         }
 
-        internal static void OnTurnExecutionStartsByWorkGroup(int workItemGroup, int workerThread, ISchedulingContext context)
+        internal void OnTurnExecutionStartsByWorkGroup(int workItemGroup, int workerThread, ISchedulingContext context)
         {
             turnsExecutedStartTotal.Increment();
             turnsExecutedPerWorkItemGroup[workItemGroup].Increment();
@@ -202,7 +229,7 @@ namespace Orleans.Runtime
             }
         }
 
-        internal static void OnTurnExecutionEnd(TimeSpan timeSpan)
+        internal void OnTurnExecutionEnd(TimeSpan timeSpan)
         {
             turnLengthHistogram.AddData(timeSpan);
             turnsExecutedEndTotal.Increment();

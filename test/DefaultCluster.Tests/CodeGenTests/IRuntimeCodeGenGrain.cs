@@ -19,6 +19,7 @@ namespace Tester.CodeGenTests
         Task<string> Default();
         Task<TGrain> Constraints<TGrain>(TGrain grain) where TGrain : IGrain;
         Task SetValueOnObserver<T>(IGrainObserverWithGenericMethods observer, T value);
+        ValueTask<int> ValueTaskMethod(bool useCache);
     }
 
     public interface IGrainObserverWithGenericMethods : IGrainObserver
@@ -81,6 +82,16 @@ namespace Tester.CodeGenTests
         {
             observer.SetValue<T>(value);
             return Task.FromResult(0);
+        }
+
+        public ValueTask<int> ValueTaskMethod(bool useCache)
+        {
+            if (useCache)
+            {
+                return new ValueTask<int>(1);
+            }
+
+            return new ValueTask<int>(Task.FromResult(2));
         }
     }
 

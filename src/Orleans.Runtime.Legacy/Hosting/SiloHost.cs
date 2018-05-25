@@ -39,6 +39,9 @@ namespace Orleans.Runtime.Host
         /// <summary> Configuration data for this silo. </summary>
         public NodeConfiguration NodeConfig { get; private set; }
 
+        /// <summary>delegate to add some configuration to the client</summary>
+        public Action<ISiloHostBuilder> ConfigureSiloHostDelegate { get; set; }
+
         /// <summary>
         /// Whether the silo config has been loaded and initializing it's runtime config.
         /// </summary>
@@ -111,6 +114,8 @@ namespace Orleans.Runtime.Host
                     builder.UseServiceProviderFactory(services =>
                         StartupBuilder.ConfigureStartup(this.Config.Defaults.StartupTypeName, services));
                 }
+
+                ConfigureSiloHostDelegate?.Invoke(builder);
 
                 var host = builder.Build();
 

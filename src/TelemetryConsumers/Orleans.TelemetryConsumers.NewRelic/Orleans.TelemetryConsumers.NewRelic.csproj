@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.OrleansTelemetryConsumers.NewRelic</PackageId>
+    <Title>Microsoft Orleans Telemetry Consumer - NewRelic</Title>
+    <Description>NewRelic implementation of Orleans Telemetry API.</Description>
+    <PackageTags>$(PackageTags) NewRelic</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net461</TargetFramework>
+    <AssemblyName>Orleans.TelemetryConsumers.NewRelic</AssemblyName>
+    <RootNamespace>Orleans.TelemetryConsumers.NewRelic</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NewRelic.Agent.Api" Version="$(NewRelicAgentApiVersion)" />
+  </ItemGroup>
+  
+</Project>

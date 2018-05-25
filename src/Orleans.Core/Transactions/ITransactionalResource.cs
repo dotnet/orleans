@@ -1,7 +1,7 @@
 ﻿
-using Orleans.Concurrency;
 using System;
 using System.Threading.Tasks;
+using Orleans.Concurrency;
 
 namespace Orleans.Transactions
 {
@@ -84,7 +84,7 @@ namespace Orleans.Transactions
 
         public override string ToString()
         {
-            return $"{TransactionId}#{WriteNumber}";
+            return $"{TransactionId:x16}#{WriteNumber:x8}";
         }
 
         public static bool TryParse(string source, out TransactionalResourceVersion version)

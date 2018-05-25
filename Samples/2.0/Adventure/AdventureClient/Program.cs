@@ -19,6 +19,7 @@ namespace AdventureClient
                     options.ClusterId = "dev";
                     options.ServiceId = "AdventureApp";
                 })
+                .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IRoomGrain).Assembly).WithReferences())
                 .Build();
 
             client.Connect().Wait();

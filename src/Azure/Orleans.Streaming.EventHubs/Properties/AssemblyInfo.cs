@@ -4,4 +4,5 @@ using Orleans.ServiceBus.Providers;
 
 [assembly: InternalsVisibleTo("ServiceBus.Tests")]
 
-[assembly: KnownAssembly(typeof(EventHubSequenceTokenV2), TreatTypesAsSerializable = true)]
+// Fail to build if a serializer is not generated for EventHubSequenceTokenV2
+[assembly: GenerateSerializer(typeof(EventHubSequenceToken))]

@@ -25,6 +25,9 @@ namespace Orleans.Runtime.Host
         /// <summary> delegate to configure logging, default to none logger configured </summary>
         public static Action<ILoggingBuilder> ConfigureLoggingDelegate { get; set; } = builder => { };
 
+        /// <summary>delegate to add some configuration to the client</summary>
+        public static Action<IClientBuilder> ConfigureClientDelegate { get; set; } = builder => { };
+
         /// <summary>
         /// Whether the Orleans Azure client runtime has already been initialized
         /// </summary>
@@ -181,8 +184,8 @@ namespace Orleans.Runtime.Host
             {
                 try
                 {
-                    //parse through ConfigureLoggingDelegate to GrainClient
                     GrainClient.ConfigureLoggingDelegate = ConfigureLoggingDelegate;
+                    GrainClient.ConfigureClientDelegate = ConfigureClientDelegate;
                     // Initialize will throw if cannot find Gateways
                     GrainClient.Initialize(config);
                     initSucceeded = true;

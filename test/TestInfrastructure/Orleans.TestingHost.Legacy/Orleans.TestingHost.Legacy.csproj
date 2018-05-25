@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.TestingHost.Legacy</PackageId>
+    <Title>Microsoft Orleans Testing Host Legacy Library</Title>
+    <Description>Microsoft Orleans library for hosting a silo in a testing project, using legacy configuration methods.</Description>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <AssemblyName>Orleans.TestingHost.Legacy</AssemblyName>
+    <RootNamespace>Orleans.TestingHost.Legacy</RootNamespace>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+</Project>

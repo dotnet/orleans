@@ -249,7 +249,7 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 DisposeTimers();
-                if (this.membershipTableProvider is GrainBasedMembershipTable)
+                if (this.membershipTableProvider is SystemTargetBasedMembershipTable)
                 {
                     // do not execute KillMyself if using MembershipTableGrain, since it will fail, as we've already stopped app scheduler turns.
                     return;
@@ -978,7 +978,11 @@ namespace Orleans.Runtime.MembershipService
             var tuple = table.Get(silo);
             var entry = tuple.Item1;
             string eTag = tuple.Item2;
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("-TryToSuspectOrKill {0}: The current status of {0} in the table is {1}, its entry is {2}", entry.SiloAddress.ToLongString(), entry.Status, entry.ToFullString());
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("-TryToSuspectOrKill {siloAddress}: The current status of {siloAddress} in the table is {status}, its entry is {entry}",
+                entry.SiloAddress.ToLongString(), // First
+                entry.SiloAddress.ToLongString(), // Second
+                entry.Status, 
+                entry.ToFullString());
             // check if the table already knows that this silo is dead
             if (entry.Status == SiloStatus.Dead)
             {

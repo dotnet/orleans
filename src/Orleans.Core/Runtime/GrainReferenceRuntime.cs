@@ -59,15 +59,14 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public Task<T> InvokeMethodAsync<T>(GrainReference reference, int methodId, object[] arguments, InvokeMethodOptions options, SiloAddress silo)
         {
-            object[] argsDeepCopy = null;
             if (arguments != null)
             {
                 CheckForGrainArguments(arguments);
                 SetGrainCancellationTokensTarget(arguments, reference);
-                argsDeepCopy = (object[])this.serializationManager.DeepCopy(arguments);
+                this.serializationManager.DeepCopyElementsInPlace(arguments);
             }
 
-            var request = new InvokeMethodRequest(reference.InterfaceId, reference.InterfaceVersion, methodId, argsDeepCopy);
+            var request = new InvokeMethodRequest(reference.InterfaceId, reference.InterfaceVersion, methodId, arguments);
 
             if (IsUnordered(reference))
                 options |= InvokeMethodOptions.Unordered;

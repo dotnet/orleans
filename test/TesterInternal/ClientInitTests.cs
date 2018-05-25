@@ -7,6 +7,8 @@ using Tester;
 using TestExtensions;
 using Xunit;
 using Orleans.Logging;
+using System.Threading.Tasks;
+using UnitTests.GrainInterfaces;
 
 #pragma warning disable CS0618 // Type or member is obsolete
 namespace UnitTests
@@ -14,6 +16,7 @@ namespace UnitTests
     public class ClientInitTests : OrleansTestingBase, IClassFixture<ClientInitTests.Fixture>
     {
         private readonly Fixture fixture;
+
 
         public class Fixture : BaseTestClusterFixture
         {
@@ -30,6 +33,7 @@ namespace UnitTests
             this.fixture = fixture;
             if (!GrainClient.IsInitialized)
             {
+                GrainClient.ConfigureClientDelegate = null;
                 GrainClient.Initialize(fixture.ClientConfiguration);
             }
         }
@@ -116,6 +120,15 @@ namespace UnitTests
 
             GrainClient.Uninitialize();
             Assert.False(GrainClient.IsInitialized);
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Client")]
+        public void ClientInit_InitializeWithDelegate()
+        {
+            var wasCalled = false;
+            GrainClient.ConfigureClientDelegate = clientBuilder => wasCalled = true;
+            GrainClient.Initialize(this.fixture.ClientConfiguration);
+            Assert.True(wasCalled);
         }
     }
 }

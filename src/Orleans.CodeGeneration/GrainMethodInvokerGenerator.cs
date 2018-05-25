@@ -322,7 +322,21 @@ namespace Orleans.CodeGenerator
                     SF.ReturnStatement(SF.LiteralExpression(SyntaxKind.NullLiteralExpression))
                 };
             }
-            
+
+            if (method.ReturnType.IsGenericType
+                && method.ReturnType.GetGenericTypeDefinition().FullName == "System.Threading.Tasks.ValueTask`1")
+            {
+                var convertToTaskResult = SF.IdentifierName("AsTask");
+
+                // Converting ValueTask method result to Task since "Invoke" method should return Task.
+                // Temporary solution. Need to change when Orleans will be using ValueTask instead of Task.
+                grainMethodCall =
+                    SF.InvocationExpression(
+                        SF.MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
+                            SF.ExpressionStatement(grainMethodCall).Expression, convertToTaskResult));
+            }
+
+
             return new StatementSyntax[]
             {
                 SF.ReturnStatement(SF.AwaitExpression(grainMethodCall))

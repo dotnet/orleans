@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.OrleansGoogleUtils</PackageId>
+    <Title>Microsoft Orleans Google Utilities</Title>
+    <Description>Library of utility types for Google of Microsoft Orleans.</Description>
+    <PackageTags>$(PackageTags) ProtoBuf</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Orleans.Serialization.Protobuf</AssemblyName>
+    <RootNamespace>OrleansGoogleUtils</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" Version="$(GoogleProtobufVersion)" />
+  </ItemGroup>
+
+</Project>

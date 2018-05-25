@@ -62,7 +62,7 @@ namespace Tester
                 .Build();
 
             var client = new ClientBuilder()
-                .UseLocalhostClustering(30001, 30002)
+                .UseLocalhostClustering(new[] {30001, 30002})
                 .Build();
 
             try

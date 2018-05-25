@@ -33,7 +33,8 @@ namespace Orleans.Hosting
                         services.Configure(configureOptions);
                     }
 
-                    services.AddSingleton<IMembershipTable, AzureBasedMembershipTable>();
+                    services.AddSingleton<IMembershipTable, AzureBasedMembershipTable>()
+                    .ConfigureFormatter<AzureStorageClusteringOptions>();
                 });
         }
 
@@ -57,7 +58,8 @@ namespace Orleans.Hosting
                 services =>
                 {
                     configureOptions?.Invoke(services.AddOptions<AzureStorageClusteringOptions>());
-                    services.AddSingleton<IMembershipTable, AzureBasedMembershipTable>();
+                    services.AddSingleton<IMembershipTable, AzureBasedMembershipTable>()
+                    .ConfigureFormatter<AzureStorageClusteringOptions>();
                 });
         }
 
@@ -85,7 +87,8 @@ namespace Orleans.Hosting
                         services.Configure(configureOptions);
                     }
 
-                    services.AddSingleton<IGatewayListProvider, AzureGatewayListProvider>();
+                    services.AddSingleton<IGatewayListProvider, AzureGatewayListProvider>()
+                    .ConfigureFormatter<AzureStorageGatewayOptions>();
                 });
         }
 
@@ -109,7 +112,8 @@ namespace Orleans.Hosting
                 services =>
                 {
                     configureOptions?.Invoke(services.AddOptions<AzureStorageGatewayOptions>());
-                    services.AddSingleton<IGatewayListProvider, AzureGatewayListProvider>();
+                    services.AddSingleton<IGatewayListProvider, AzureGatewayListProvider>()
+                    .ConfigureFormatter<AzureStorageGatewayOptions>();
                 });
         }
     }

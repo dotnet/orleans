@@ -266,10 +266,6 @@ namespace Orleans.Runtime
 
             logger.Error(errorCode, "INTERNAL FAILURE! About to crash! Fail message is: " + message + Environment.NewLine + Environment.StackTrace);
 
-            // Create mini-dump of this failure, for later diagnosis
-            var dumpFile = CrashUtils.CreateMiniDump();
-            logger.Error(ErrorCode.Logger_MiniDumpCreated, "INTERNAL FAILURE! Application mini-dump written to file " + dumpFile.FullName);
-
             // Kill process
             if (Debugger.IsAttached)
             {

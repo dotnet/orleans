@@ -1368,15 +1368,6 @@ namespace Orleans.Runtime
 #endregion
 #region Implementation of ICatalog
 
-        public Task CreateSystemGrain(GrainId grainId, string grainType)
-        {
-            ActivationAddress target = ActivationAddress.NewActivationAddress(LocalSilo, grainId);
-            Task activatedPromise;
-            GetOrCreateActivation(target, true, grainType, null, null, out activatedPromise);
-            return activatedPromise ?? Task.CompletedTask;
-        }
-
-
         public Task DeleteActivations(List<ActivationAddress> addresses)
         {
             return DestroyActivations(TryGetActivationDatas(addresses));

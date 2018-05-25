@@ -5,7 +5,7 @@ using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal class IncomingMessageAgent : AsynchAgent
+    internal class IncomingMessageAgent : DedicatedAsynchAgent
     {
         private readonly IMessageCenter messageCenter;
         private readonly ActivationDirectory directory;
@@ -32,6 +32,7 @@ namespace Orleans.Runtime.Messaging
             this.dispatcher = dispatcher;
             this.messageFactory = messageFactory;
             OnFault = FaultBehavior.RestartOnFault;
+            messageCenter.RegisterLocalMessageHandler(cat, ReceiveMessage);
         }
 
         public override void Start()

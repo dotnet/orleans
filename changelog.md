@@ -7,6 +7,31 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [2.0.3]
+
+- Non-breaking improvements
+  - Test clustering: minor fixups for logging and configuration (#4342)
+  - TestCluster: wait for cluster stabilization before starting tests (#4343)
+  - Avoid continuation in synchronous work item scheduling case (#4422)
+  - Improve Dictionary allocation in `RequestContext` (#4435)
+  - Copy elements in-place in `InvokeMethodAsync` (#4463)
+  - Fix orleans integration with third party DI solution which requires public constructor (#4453, #4573)
+  - Remove unused Stopwatch in `Grain<T>.OnSetupState` (#4472)
+  - Increase diagnostic logging in code generator (#4481)
+  - Clarify `UseDevelopmentClustering` and `UseLocalhostClustering` (#4438)
+
+- Non-breaking bug fixes
+  - Fix telemetry consumer construction (#4392)
+  - Fix client connection retry (#4429)
+  - Azure blob storage provider: respect UseJson setting (#4455)
+  - Fix routing in Silo Gateway (#4483)
+  - Don't generate serializers for foreign types in *Orleans.Streaming.EventHubs* (#4487)
+  - Fix NRE on AWS DynamoDB storage provider (#4513)
+  - Fix Exception thrown in `MembershipOracle.TryToSuspectOrKill` (#4508)
+  - Fix logging level check on Grain exception (#4511)
+  - Add validator for `ClusterOptions` (#4450)
+  - Remove saving of minidumps because that functionality is platform specific. (#4558)
+
 ### [2.0.0] (changes since 2.0.0-rc2)
 
 - Major changes

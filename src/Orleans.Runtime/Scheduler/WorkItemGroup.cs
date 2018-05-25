@@ -2,8 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 
 namespace Orleans.Runtime.Scheduler
@@ -26,18 +29,24 @@ namespace Orleans.Runtime.Scheduler
 
         private long totalItemsEnQueued;    // equals total items queued, + 1
         private long totalItemsProcessed;
-        private readonly QueueTrackingStatistic queueTracking;
         private TimeSpan totalQueuingDelay;
+
+        private Task currentTask;
+        private DateTime currentTaskStarted;
+
+        private readonly QueueTrackingStatistic queueTracking;
         private readonly long quantumExpirations;
         private readonly int workItemGroupStatisticsNumber;
+        private readonly CancellationToken cancellationToken;
+        private readonly SchedulerStatisticsGroup schedulerStatistics;
 
         internal ActivationTaskScheduler TaskRunner { get; private set; }
-        
+
         public DateTime TimeQueued { get; set; }
 
         public TimeSpan TimeSinceQueued
         {
-            get { return Utils.Since(TimeQueued); } 
+            get { return Utils.Since(TimeQueued); }
         }
 
         public ISchedulingContext SchedulingContext { get; set; }
@@ -59,14 +68,24 @@ namespace Orleans.Runtime.Scheduler
             get { lock (lockable) { return WorkItemCount; } }
         }
 
+        private Task CurrentTask
+        {
+            get => currentTask;
+            set
+            {
+                currentTask = value;
+                currentTaskStarted = DateTime.UtcNow;
+            }
+        }
+
         private int WorkItemCount
         {
-            get { return workItems.Count; } 
+            get { return workItems.Count; }
         }
 
         internal float AverageQueueLenght
         {
-            get 
+            get
             {
 #if TRACK_DETAILED_STATS
                 if (StatisticsCollector.CollectShedulerQueuesStats)
@@ -127,10 +146,18 @@ namespace Orleans.Runtime.Scheduler
         //private static readonly int MaxWaitingThreads = 500;
 
 
-        internal WorkItemGroup(OrleansTaskScheduler sched, ISchedulingContext schedulingContext, ILoggerFactory loggerFactory)
+        internal WorkItemGroup(
+            OrleansTaskScheduler sched,
+            ISchedulingContext schedulingContext,
+            ILoggerFactory loggerFactory,
+            CancellationToken ct,
+            SchedulerStatisticsGroup schedulerStatistics,
+            IOptions<StatisticsOptions> statisticsOptions)
         {
             masterScheduler = sched;
             SchedulingContext = schedulingContext;
+            cancellationToken = ct;
+            this.schedulerStatistics = schedulerStatistics;
             state = WorkGroupStatus.Waiting;
             workItems = new Queue<Task>();
             lockable = new Object();
@@ -141,21 +168,21 @@ namespace Orleans.Runtime.Scheduler
             TaskRunner = new ActivationTaskScheduler(this, loggerFactory);
             log = IsSystemPriority ? loggerFactory.CreateLogger($"{this.GetType().Namespace} {Name}.{this.GetType().Name}") : loggerFactory.CreateLogger<WorkItemGroup>();
 
-            if (StatisticsCollector.CollectShedulerQueuesStats)
+            if (schedulerStatistics.CollectShedulerQueuesStats)
             {
-                queueTracking = new QueueTrackingStatistic("Scheduler." + SchedulingContext.Name);
+                queueTracking = new QueueTrackingStatistic("Scheduler." + SchedulingContext.Name, statisticsOptions);
                 queueTracking.OnStartExecution();
             }
 
-            if (StatisticsCollector.CollectPerWorkItemStats)
+            if (schedulerStatistics.CollectPerWorkItemStats)
             {
-                workItemGroupStatisticsNumber = SchedulerStatisticsGroup.RegisterWorkItemGroup(SchedulingContext.Name, SchedulingContext,
+                workItemGroupStatisticsNumber = schedulerStatistics.RegisterWorkItemGroup(SchedulingContext.Name, SchedulingContext,
                     () =>
                     {
                         var sb = new StringBuilder();
                         lock (lockable)
                         {
-                                    
+
                             sb.Append("QueueLength = " + WorkItemCount);
                             sb.Append(String.Format(", State = {0}", state));
                             if (state == WorkGroupStatus.Runnable)
@@ -211,7 +238,7 @@ namespace Orleans.Runtime.Scheduler
 #if DEBUG
                 if (log.IsEnabled(LogLevel.Trace)) log.Trace("Add to RunQueue {0}, #{1}, onto {2}", task, thisSequenceNumber, SchedulingContext);
 #endif
-                masterScheduler.RunQueue.Add(this);
+                masterScheduler.ScheduleExecution(this);
             }
         }
 
@@ -226,7 +253,7 @@ namespace Orleans.Runtime.Scheduler
                 if (IsActive)
                 {
                     ReportWorkGroupProblem(
-                        String.Format("WorkItemGroup is being stoped while still active. workItemCount = {0}." 
+                        String.Format("WorkItemGroup is being stoped while still active. workItemCount = {0}."
                         + "The likely reason is that the task is not being 'awaited' properly.", WorkItemCount),
                         ErrorCode.SchedulerWorkGroupStopping);
                 }
@@ -239,13 +266,13 @@ namespace Orleans.Runtime.Scheduler
 
                 state = WorkGroupStatus.Shutdown;
 
-                if (StatisticsCollector.CollectPerWorkItemStats)
-                    SchedulerStatisticsGroup.UnRegisterWorkItemGroup(workItemGroupStatisticsNumber);
-                
-                if (StatisticsCollector.CollectGlobalShedulerStats)
-                    SchedulerStatisticsGroup.OnWorkItemDrop(WorkItemCount);
+                if (this.schedulerStatistics.CollectPerWorkItemStats)
+                    this.schedulerStatistics.UnRegisterWorkItemGroup(workItemGroupStatisticsNumber);
 
-                if (StatisticsCollector.CollectShedulerQueuesStats)
+                if (this.schedulerStatistics.CollectGlobalShedulerStats)
+                    this.schedulerStatistics.OnWorkItemDrop(WorkItemCount);
+
+                if (this.schedulerStatistics.CollectShedulerQueuesStats)
                     queueTracking.OnStopExecution();
 
                 foreach (Task task in workItems)
@@ -273,7 +300,7 @@ namespace Orleans.Runtime.Scheduler
                 if (state == WorkGroupStatus.Shutdown)
                 {
                     if (!IsActive) return;  // Don't mind if no work has been queued to this work group yet.
-                    
+
                     ReportWorkGroupProblemWithBacktrace(
                         "Cannot execute work items in a work item group that is in a shutdown state.",
                         ErrorCode.SchedulerNotExecuteWhenShutdown); // Throws InvalidOperationException
@@ -282,7 +309,7 @@ namespace Orleans.Runtime.Scheduler
                 state = WorkGroupStatus.Running;
             }
 
-            var thread = WorkerPoolThread.CurrentWorkerThread;
+            var thread = Thread.CurrentThread;
 
             try
             {
@@ -290,24 +317,24 @@ namespace Orleans.Runtime.Scheduler
                 int count = 0;
                 var stopwatch = new Stopwatch();
                 stopwatch.Start();
-                do 
+                do
                 {
                     lock (lockable)
                     {
                         if (state == WorkGroupStatus.Shutdown)
                         {
                             if (WorkItemCount > 0)
-                                log.Warn(ErrorCode.SchedulerSkipWorkStopping, "Thread {0} is exiting work loop due to Shutdown state {1} while still having {2} work items in the queue.", 
+                                log.Warn(ErrorCode.SchedulerSkipWorkStopping, "Thread {0} is exiting work loop due to Shutdown state {1} while still having {2} work items in the queue.",
                                     thread.ToString(), this.ToString(), WorkItemCount);
                             else
-                                if(log.IsEnabled(LogLevel.Debug)) log.Debug("Thread {0} is exiting work loop due to Shutdown state {1}. Has {2} work items in the queue.",
-                                    thread.ToString(), this.ToString(), WorkItemCount);
-                            
+                                if (log.IsEnabled(LogLevel.Debug)) log.Debug("Thread {0} is exiting work loop due to Shutdown state {1}. Has {2} work items in the queue.",
+                                     thread.ToString(), this.ToString(), WorkItemCount);
+
                             break;
                         }
 
                         // Check the cancellation token (means that the silo is stopping)
-                        if (thread.CancelToken.IsCancellationRequested)
+                        if (cancellationToken.IsCancellationRequested)
                         {
                             log.Warn(ErrorCode.SchedulerSkipWorkCancelled, "Thread {0} is exiting work loop due to cancellation token. WorkItemGroup: {1}, Have {2} work items in the queue.",
                                 thread.ToString(), this.ToString(), WorkItemCount);
@@ -320,7 +347,7 @@ namespace Orleans.Runtime.Scheduler
                     lock (lockable)
                     {
                         if (workItems.Count > 0)
-                            task = workItems.Dequeue();
+                            CurrentTask = task = workItems.Dequeue();
                         else // If the list is empty, then we're done
                             break;
                     }
@@ -337,7 +364,6 @@ namespace Orleans.Runtime.Scheduler
 
                     try
                     {
-                        thread.CurrentTask = task;
 #if TRACK_DETAILED_STATS
                         if (StatisticsCollector.CollectTurnsStats)
                             SchedulerStatisticsGroup.OnTurnExecutionStartsByWorkGroup(workItemGroupStatisticsNumber, thread.WorkerThreadStatisticsNumber, SchedulingContext);
@@ -351,25 +377,19 @@ namespace Orleans.Runtime.Scheduler
                     }
                     finally
                     {
-#if TRACK_DETAILED_STATS
-                        if (StatisticsCollector.CollectTurnsStats)
-                            SchedulerStatisticsGroup.OnTurnExecutionEnd(Utils.Since(thread.CurrentStateStarted));
-                        
-                        if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                            thread.threadTracking.IncrementNumberOfProcessed();
-#endif
                         totalItemsProcessed++;
                         var taskLength = stopwatch.Elapsed - taskStart;
                         if (taskLength > OrleansTaskScheduler.TurnWarningLengthThreshold)
                         {
-                            SchedulerStatisticsGroup.NumLongRunningTurns.Increment();
+                            this.schedulerStatistics.NumLongRunningTurns.Increment();
                             log.Warn(ErrorCode.SchedulerTurnTooLong3, "Task {0} in WorkGroup {1} took elapsed time {2:g} for execution, which is longer than {3}. Running on thread {4}",
                                 OrleansTaskExtentions.ToString(task), SchedulingContext.ToString(), taskLength, OrleansTaskScheduler.TurnWarningLengthThreshold, thread.ToString());
                         }
-                        thread.CurrentTask = null;
+
+                        CurrentTask = null;
                     }
                     count++;
-                } 
+                }
                 while (((MaxWorkItemsPerTurn <= 0) || (count <= MaxWorkItemsPerTurn)) &&
                     ((ActivationSchedulingQuantum <= TimeSpan.Zero) || (stopwatch.Elapsed < ActivationSchedulingQuantum)));
                 stopwatch.Stop();
@@ -390,7 +410,7 @@ namespace Orleans.Runtime.Scheduler
                         if (WorkItemCount > 0)
                         {
                             state = WorkGroupStatus.Runnable;
-                            masterScheduler.RunQueue.Add(this);
+                            masterScheduler.ScheduleExecution(this);
                         }
                         else
                         {
@@ -419,7 +439,12 @@ namespace Orleans.Runtime.Scheduler
                 sb.Append(this);
                 sb.AppendFormat(". Currently QueuedWorkItems={0}; Total EnQueued={1}; Total processed={2}; Quantum expirations={3}; ",
                     WorkItemCount, totalItemsEnQueued, totalItemsProcessed, quantumExpirations);
-         
+                if (CurrentTask != null)
+                {
+                    sb.AppendFormat(" Executing Task Id={0} Status={1} for {2}.",
+                        CurrentTask.Id, CurrentTask.Status, Utils.Since(currentTaskStarted));
+                }
+
                 if (AverageQueueLenght > 0)
                 {
                     sb.AppendFormat("average queue length at enqueue: {0}; ", AverageQueueLenght);
@@ -428,7 +453,7 @@ namespace Orleans.Runtime.Scheduler
                         sb.AppendFormat("average queue delay: {0}ms; ", totalQueuingDelay.Divide(totalItemsProcessed).TotalMilliseconds);
                     }
                 }
-                
+
                 sb.AppendFormat("TaskRunner={0}; ", TaskRunner);
                 if (SchedulingContext != null)
                 {

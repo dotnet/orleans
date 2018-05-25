@@ -19,7 +19,7 @@ namespace Tester.ClientConnectionTests
     public class ClusterClientTests : TestClusterPerTest
     {
         /// <summary>
-        /// Ensures that <see "ClusterClient.Connect" /> can be retried.
+        /// Ensures that ClusterClient.Connect can be retried.
         /// </summary>
         [Fact]
         public async Task ConnectIsRetryableTest()
@@ -41,7 +41,7 @@ namespace Tester.ClientConnectionTests
 
             Task<bool> RetryFunc(Exception exception)
             {
-                Assert.IsType<OrleansException>(exception);
+                Assert.IsType<SiloUnavailableException>(exception);
                 exceptions.Add(exception);
                 gatewayProvider.Gateways = new List<Uri> {gwEndpoint.ToGatewayUri()}.AsReadOnly();
                 return Task.FromResult(true);

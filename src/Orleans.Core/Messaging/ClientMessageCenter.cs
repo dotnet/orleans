@@ -94,6 +94,7 @@ namespace Orleans.Messaging
         private readonly ILoggerFactory loggerFactory;
         private readonly TimeSpan openConnectionTimeout;
         private readonly ExecutorService executorService;
+        private StatisticsLevel statisticsLevel;
 
         public ClientMessageCenter(
             IOptions<GatewayOptions> gatewayOptions,
@@ -108,7 +109,8 @@ namespace Orleans.Messaging
             IClusterConnectionStatusListener connectionStatusListener,
             ExecutorService executorService,
             ILoggerFactory loggerFactory,
-            IOptions<NetworkingOptions> networkingOptions)
+            IOptions<NetworkingOptions> networkingOptions,
+            IOptions<StatisticsOptions> statisticsOptions)
         {
             this.loggerFactory = loggerFactory;
             this.openConnectionTimeout = networkingOptions.Value.OpenConnectionTimeout;
@@ -137,16 +139,17 @@ namespace Orleans.Messaging
                         return gatewayConnections.Values.Count(conn => conn.IsLive);
                     }
                 });
-            if (StatisticsCollector.CollectQueueStats)
+            statisticsLevel = statisticsOptions.Value.CollectionLevel;
+            if (statisticsLevel.CollectQueueStats())
             {
-                queueTracking = new QueueTrackingStatistic("ClientReceiver");
+                queueTracking = new QueueTrackingStatistic("ClientReceiver", statisticsOptions);
             }
         }
 
         public void Start()
         {
             Running = true;
-            if (StatisticsCollector.CollectQueueStats)
+            if (this.statisticsLevel.CollectQueueStats())
             {
                 queueTracking.OnStartExecution();
             }
@@ -167,7 +170,7 @@ namespace Orleans.Messaging
                 PendingInboundMessages.CompleteAdding();
             });
 
-            if (StatisticsCollector.CollectQueueStats)
+            if (this.statisticsLevel.CollectQueueStats())
             {
                 queueTracking.OnStopExecution();
             }
@@ -372,6 +375,10 @@ namespace Orleans.Messaging
                 logger.Error(ErrorCode.ProxyClient_ReceiveError, "Unexpected error getting an inbound message", ex);
                 return null;
             }
+        }
+
+        public void RegisterLocalMessageHandler(Message.Categories category, Action<Message> handler)
+        {
         }
 
         internal void QueueIncomingMessage(Message msg)
