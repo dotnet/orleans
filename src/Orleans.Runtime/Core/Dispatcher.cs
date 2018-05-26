@@ -339,8 +339,7 @@ namespace Orleans.Runtime
         /// https://github.com/dotnet/orleans/issues/3184
         /// Checks whether reentrancy is allowed for calls to grains that are already part of the call chain.
         /// Covers following case: grain A calls grain B, and while executing the invoked method B calls back to A. 
-        /// Design: Senders collection `RunningRequestsSenders` contains sending grains references
-        /// during duration of request processing. If target of outgoing request is found in that collection - 
+        /// Design: Each call chain have unique id. If target of outgoing request is already part of the chain - 
         /// such request will be marked as interleaving in order to prevent deadlocks.
         /// </summary>
         private bool IsCallChainReentrancyAllowed(ActivationData targetActivation, Message incoming)
