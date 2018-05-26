@@ -329,7 +329,7 @@ namespace Orleans.Runtime
                    incoming.IsAlwaysInterleave
                 || targetActivation.Running == null
                 || (targetActivation.Running.IsReadOnly && incoming.IsReadOnly)
-                || IsSelfCallChainAllowed(targetActivation, incoming)
+                || IsCallChainReentrancyAllowed(targetActivation, incoming)
                 || catalog.CanInterleave(targetActivation.ActivationId, incoming);
 
             return canInterleave;
@@ -343,37 +343,33 @@ namespace Orleans.Runtime
         /// during duration of request processing. If target of outgoing request is found in that collection - 
         /// such request will be marked as interleaving in order to prevent deadlocks.
         /// </summary>
-        private void MarkSameCallChainMessageAsInterleaving(ActivationData sendingActivation, Message outgoing)
+        private bool IsCallChainReentrancyAllowed(ActivationData targetActivation, Message incoming)
         {
-            if (!schedulingOptions.AllowCallChainReentrancy)
+            if (!schedulingOptions.AllowCallChainReentrancy
+                 || incoming.Direction == Message.Directions.OneWay)
             {
-                return;
+                return false;
             }
 
-            if (outgoing.Direction == Message.Directions.OneWay)
+            if (incoming.CallChainId == null || targetActivation.Running == null)
             {
-                return;
+                return false;
             }
 
-            if (sendingActivation?.RunningRequestsSenders.Contains(outgoing.TargetActivation) == true)
-            {
-                outgoing.IsAlwaysInterleave = true;
-            }
+            var isCallFromOriginatorActivation = incoming.SendingActivation.Equals(targetActivation.Running.SendingActivation);
+            return !isCallFromOriginatorActivation && incoming.CallChainId != null
+                && targetActivation.Running.CallChainId == incoming.CallChainId;
         }
 
-        private bool IsSelfCallChainAllowed(ActivationData targetActivation, Message incoming)
+        private void EnsureCallChainIdIsSet(ActivationData sendingActivation, Message outgoing)
         {
-            if (!schedulingOptions.AllowCallChainReentrancy)
+            if (sendingActivation?.Running == null)
             {
-                return false;
+                return;
             }
 
-            if (incoming.Direction == Message.Directions.OneWay)
-            {
-                return false;
-            }
-
-            return targetActivation.ActivationId.Equals(incoming.SendingActivation);
+            sendingActivation.Running.CallChainId = sendingActivation.Running.CallChainId ?? outgoing.Id;
+            outgoing.CallChainId = sendingActivation.Running.CallChainId;
         }
 
         /// <summary>
@@ -826,7 +822,7 @@ namespace Orleans.Runtime
         /// <param name="sendingActivation"></param>
         public void TransportMessage(Message message, ActivationData sendingActivation = null)
         {
-            MarkSameCallChainMessageAsInterleaving(sendingActivation, message);
+            EnsureCallChainIdIsSet(sendingActivation, message);
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.Dispatcher_Send_AddressedMessage, "Addressed message {0}", message);
             Transport.SendMessage(message);
         }
