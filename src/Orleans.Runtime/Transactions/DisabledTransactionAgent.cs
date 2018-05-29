@@ -13,7 +13,7 @@ namespace Orleans.Transactions
             throw new OrleansTransactionsDisabledException();
         }
 
-        public Task Commit(ITransactionInfo transactionInfo)
+        public Task<TransactionalStatus> Commit(ITransactionInfo transactionInfo)
         {
             throw new OrleansTransactionsDisabledException();
         }

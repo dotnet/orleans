@@ -380,15 +380,16 @@ namespace Orleans.Runtime
                             "Exception during Grain method call of message: " + message, exc1);
                     }
 
-                    transactionInfo = TransactionContext.GetTransactionInfo();
                     if (transactionInfo != null)
                     {
-                        // Must abort the transaction on exceptions
-                        transactionInfo.IsAborted = true;
+                        transactionInfo.ReconcilePending();
+                        
+                        // Record reason for abort, if not alread set
+                        transactionInfo.RecordException(exc1, serializationManager);
+
                         if (startNewTransaction)
                         {
-                            var abortException = (exc1 as OrleansTransactionAbortedException) ?? 
-                                new OrleansTransactionAbortedException(transactionInfo.Id.ToString(), exc1);
+                            var abortException = transactionInfo.MustAbort(serializationManager);
                             this.transactionAgent.Value.Abort(transactionInfo, abortException);
                             exc1 = abortException;
                         }
@@ -412,69 +413,68 @@ namespace Orleans.Runtime
 
                     if (message.Direction != Message.Directions.OneWay)
                     {
-                        TransactionContext.Clear();
                         SafeSendExceptionResponse(message, exc1);
                     }
                     return;
                 }
 
-                transactionInfo = TransactionContext.GetTransactionInfo();
-                if (transactionInfo != null && ! transactionInfo.ReconcilePending(out var numberOrphans))
+                OrleansTransactionException transactionException = null;
+
+                if (transactionInfo != null)
                 {
-                    var abortException = new OrleansOrphanCallException(transactionInfo.Id, numberOrphans);
-                    // Can't exit before the transaction completes.
-                    TransactionContext.GetTransactionInfo().IsAborted = true;
-                    if (startNewTransaction)
+                    try
                     {
-                        this.transactionAgent.Value.Abort(TransactionContext.GetTransactionInfo(), abortException);
-                    }
- 
+                        transactionInfo.ReconcilePending();
+                        transactionException = transactionInfo.MustAbort(serializationManager);
 
-                    if (message.Direction != Message.Directions.OneWay)
+                        // This request started the transaction, so we try to commit before returning,
+                        // or if it must abort, tell participants that it aborted
+                        if (startNewTransaction)
+                        {
+                            if (transactionException == null)
+                            {
+                                var status = await this.transactionAgent.Value.Commit(transactionInfo);
+                                if (status != TransactionalStatus.Ok)
+                                {
+                                    transactionException = status.ConvertToUserException(transactionInfo.Id);
+                                }
+                            }
+                            else
+                            {
+                                this.transactionAgent.Value.Abort(transactionInfo, (OrleansTransactionAbortedException) transactionException);
+                            }
+                            TransactionContext.Clear();
+                        }
+                    }
+                    catch (Exception e)
                     {
-                        TransactionContext.Clear();
-                        SafeSendExceptionResponse(message, abortException);
+                        // we should never hit this, but if we do, the following message will help us diagnose
+                        this.logger.LogError(e, "Error in transaction post-grain-method-invocation code");
+                        throw;
                     }
-
-                    return;
                 }
 
-                if (startNewTransaction)
+                if (message.Direction != Message.Directions.OneWay)
                 {
-                    // This request started the transaction, so we try to commit before returning.
-                    await this.transactionAgent.Value.Commit(transactionInfo);
-                    TransactionContext.Clear();
+                    if (transactionException != null)
+                    {
+                        SafeSendExceptionResponse(message, transactionException);
+                    }
+                    else
+                    {
+                        SafeSendResponse(message, resultObject);
+                    }
                 }
-
-                if (message.Direction == Message.Directions.OneWay) return;
-
-                SafeSendResponse(message, resultObject);
+                return;
             }
             catch (Exception exc2)
             {
                 logger.Warn(ErrorCode.Runtime_Error_100329, "Exception during Invoke of message: " + message, exc2);
 
-                try
-                {
-                    if (exc2 is OrleansTransactionInDoubtException)
-                    {
-                        this.logger.LogError(exc2, "Transaction failed due to in doubt transaction");
-                    }
-                    else if (TransactionContext.GetTransactionInfo() != null)
-                    {
-                        // Must abort the transaction on exceptions
-                        TransactionContext.GetTransactionInfo().IsAborted = true;
-                        var abortException = (exc2 as OrleansTransactionAbortedException) ??
-                            new OrleansTransactionAbortedException(TransactionContext.GetTransactionInfo().Id, exc2);
-                        this.transactionAgent.Value.Abort(TransactionContext.GetTransactionInfo(), abortException);
-                    }
-                }
-                finally
-                {
-                    TransactionContext.Clear();
-                    if (message.Direction != Message.Directions.OneWay)
-                        SafeSendExceptionResponse(message, exc2);
-                }
+                TransactionContext.Clear();
+
+                if (message.Direction != Message.Directions.OneWay)
+                    SafeSendExceptionResponse(message, exc2);
             }
             finally
             {

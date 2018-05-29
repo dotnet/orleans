@@ -36,7 +36,7 @@ namespace Orleans.Transactions
             return Task.FromResult<ITransactionInfo>(new TransactionInfo(guid, ts, ts));
         }
 
-        public async Task Commit(ITransactionInfo info)
+        public Task<TransactionalStatus> Commit(ITransactionInfo info)
         {
             var transactionInfo = (TransactionInfo)info;
 
@@ -60,15 +60,15 @@ namespace Orleans.Transactions
 
             if (writeParticipants == null)
             {
-                await CommitReadOnlyTransaction(transactionInfo);
+                return CommitReadOnlyTransaction(transactionInfo);
             }
             else
             {
-                await CommitReadWriteTransaction(transactionInfo, writeParticipants);
+                return CommitReadWriteTransaction(transactionInfo, writeParticipants);
             }
         }
 
-        private async Task CommitReadOnlyTransaction(TransactionInfo transactionInfo)
+        private async Task<TransactionalStatus> CommitReadOnlyTransaction(TransactionInfo transactionInfo)
         {
             var participants = transactionInfo.Participants;
 
@@ -77,7 +77,6 @@ namespace Orleans.Transactions
             {
                 tasks.Add(p.Key.CommitReadOnly(transactionInfo.TransactionId, p.Value, transactionInfo.TimeStamp));
             }
-            transactionInfo.PrepareMessagesSent = true;
 
             try
             {
@@ -96,7 +95,7 @@ namespace Orleans.Transactions
                         foreach (var p in participants)
                             p.Key.Abort(transactionInfo.TransactionId).Ignore();
 
-                        throw status.ConvertToUserException(transactionInfo.TransactionId.ToString());
+                        return status;
                     }
                 }
             }
@@ -108,22 +107,16 @@ namespace Orleans.Transactions
                 foreach(var p in participants)
                     p.Key.Abort(transactionInfo.TransactionId).Ignore();
 
-                throw new OrleansTransactionAbortedException(transactionInfo.TransactionId.ToString(),
-                    "transaction agent timed out waiting for read-only transaction participant responses");
-            }
-            catch (Exception e)
-            {
-                if (logger.IsEnabled(LogLevel.Debug))
-                    logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} fail {transactionInfo.TransactionId} with {e.GetType().Name}");
-
-                throw;
+                return TransactionalStatus.ParticipantResponseTimeout;
             }
 
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.Trace($"{stopwatch.Elapsed.TotalMilliseconds:f2} finish (reads only) {transactionInfo.TransactionId}");
+
+            return TransactionalStatus.Ok;
         }
 
-        private async Task CommitReadWriteTransaction(TransactionInfo transactionInfo, List<ITransactionParticipant> writeParticipants)
+        private async Task<TransactionalStatus> CommitReadWriteTransaction(TransactionInfo transactionInfo, List<ITransactionParticipant> writeParticipants)
         {
             var tm = selectTMByBatchSize ? transactionInfo.TMCandidate : writeParticipants[0];
             var participants = transactionInfo.Participants;
@@ -141,7 +134,6 @@ namespace Orleans.Transactions
                     p.Key.Prepare(transactionInfo.TransactionId, p.Value, transactionInfo.TimeStamp, tm).Ignore();
                 }
             }
-            transactionInfo.PrepareMessagesSent = true;
 
             try
             {
@@ -166,7 +158,7 @@ namespace Orleans.Transactions
                         }
                     }
 
-                    throw status.ConvertToUserException(transactionInfo.TransactionId.ToString());
+                    return status;
                 }
             }
             catch (TimeoutException)
@@ -174,37 +166,28 @@ namespace Orleans.Transactions
                 if (logger.IsEnabled(LogLevel.Debug))
                     logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} timeout {transactionInfo.TransactionId} TM response");
 
-                throw new OrleansTransactionInDoubtException(transactionInfo.TransactionId.ToString(),
-                    "transaction agent timed out waiting for TM response");
-            }
-            catch (Exception e)
-            {
-                if (logger.IsEnabled(LogLevel.Debug))
-                    logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} fail {transactionInfo.TransactionId} with {e.GetType().Name}");
-
-                throw;
+                return TransactionalStatus.TMResponseTimeout;
             }
 
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.Trace($"{stopwatch.Elapsed.TotalMilliseconds:f2} finish {transactionInfo.TransactionId}");
+
+            return TransactionalStatus.Ok;
         }
 
         public void Abort(ITransactionInfo info, OrleansTransactionAbortedException reason)
         {
             var transactionInfo = (TransactionInfo)info;
 
-            if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace($"abort {transactionInfo} {reason}");
-
             var participants = transactionInfo.Participants.Keys.ToList();
 
-            if (!transactionInfo.PrepareMessagesSent)
+            if (logger.IsEnabled(LogLevel.Trace))
+                logger.Trace($"abort {transactionInfo} {string.Join(",", participants.Select(p => p.ToString()))} {reason}");
+
+            // send one-way abort messages to release the locks and roll back any updates
+            foreach (var p in participants)
             {
-                // send one-way abort messages to release the locks and roll back any updates
-                foreach (var p in participants)
-                {
-                    p.Abort(transactionInfo.TransactionId);
-                }
+                p.Abort(transactionInfo.TransactionId);
             }
         }
     }
