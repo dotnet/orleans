@@ -7,9 +7,9 @@ namespace Orleans.Transactions
     internal enum OrleansTransactionsErrorCode
     {
         /// <summary>
-        /// Start of orlean transactions errocodes
+        /// Start of orleans transactions error codes
         /// </summary>
         OrleansTransactions = 1 << 17,
-        // TODO - jbragg - add error codes for transaction errors - User Story 62
+        // TODO - jbragg - add error codes for transaction errors
     }
 }
