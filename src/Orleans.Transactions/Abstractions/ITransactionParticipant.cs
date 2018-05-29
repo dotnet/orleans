@@ -86,30 +86,7 @@ namespace Orleans.Transactions.Abstractions
     }
 
 
-    /// <summary>
-    /// Used to propagate information about the status of a transaction. Used for transaction orchestration, for diagnostics, 
-    /// and for generating informative user exceptions
-    /// </summary>
-    public enum TransactionalStatus
-    {
-        Ok,
-
-        UserAbort,         // the transactionally executing user code threw an exception
-
-        PrepareTimeout,    // TM could not finish prepare in time
-        CascadingAbort,    // a transaction this transaction depends on aborted
-        BrokenLock,        // a lock was lost due to timeout, wait-die, or failures
-        LockValidationFailed,  // during prepare, recorded accesses did not match
-
-        StorageConflict,   // storage was modified by duplicate grain activation
-
-        PresumedAbort,     // TM never heard of this transaction
-
-        UnknownException,  // an unkown exception was caught
-        AssertionFailed,   // an internal assertion was violated
-    }
-
-
+ 
     /// <summary>
     /// Counts read and write accesses on a transaction participant.
     /// </summary>

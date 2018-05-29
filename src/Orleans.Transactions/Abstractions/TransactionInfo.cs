@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Collections.Concurrent;
 using Orleans.Transactions.Abstractions.Extensions;
+using Orleans.Serialization;
 
 namespace Orleans.Transactions.Abstractions
 {
@@ -20,7 +21,7 @@ namespace Orleans.Transactions.Abstractions
         {
             TransactionId = id;
             IsReadOnly = readOnly;
-            IsAborted = false;
+            OriginalException = null;
             PendingCalls = 0;
             Participants = new Dictionary<ITransactionParticipant, AccessCounter>();
             TimeStamp = timeStamp;
@@ -38,7 +39,7 @@ namespace Orleans.Transactions.Abstractions
         {
             TransactionId = other.TransactionId;
             IsReadOnly = other.IsReadOnly;
-            IsAborted = other.IsAborted;
+            OriginalException = null;
             PendingCalls = 0;
             Participants = new Dictionary<ITransactionParticipant, AccessCounter>();
             TimeStamp = other.TimeStamp;
@@ -61,10 +62,8 @@ namespace Orleans.Transactions.Abstractions
 
         public bool IsReadOnly { get; }
 
-        public bool IsAborted { get; set; }
-
-        public bool PrepareMessagesSent { get; set; }
-
+        public byte[] OriginalException { get; set; }
+        
         // counts how many writes were done per each accessed resource
         // zero means the resource was only read
         public Dictionary<ITransactionParticipant, AccessCounter> Participants { get; }
@@ -86,11 +85,43 @@ namespace Orleans.Transactions.Abstractions
             this.joined.Enqueue((TransactionInfo)x);
         }
 
+        public OrleansTransactionAbortedException MustAbort(SerializationManager sm)
+        {
+
+            if (OriginalException != null)
+            {
+                var reader = new BinaryTokenStreamReader(OriginalException);
+                return sm.Deserialize<OrleansTransactionAbortedException>(reader);
+            }
+            else if (PendingCalls != 0)
+            {
+                return new OrleansOrphanCallException(TransactionId.ToString(), PendingCalls);
+            }
+            else
+            {
+                return null;
+            }
+
+        }
+
+        public void RecordException(Exception e, SerializationManager sm)
+        {
+            if (OriginalException == null)
+            {
+                var exception = (e as OrleansTransactionAbortedException)
+                    ?? new OrleansTransactionAbortedException(TransactionId.ToString(), e);
+
+                var writer = new BinaryTokenStreamWriter();
+                sm.Serialize(exception, writer);
+                OriginalException = writer.ToByteArray();
+            }
+        }
+
         /// <summary>
         /// Reconciles all pending calls that have join the transaction.
         /// </summary>
         /// <returns>true if there are no orphans, false otherwise</returns>
-        public bool ReconcilePending(out int numberOrphans)
+        public void ReconcilePending()
         {
             TransactionInfo transactionInfo;
             while (this.joined.TryDequeue(out transactionInfo))
@@ -98,21 +129,13 @@ namespace Orleans.Transactions.Abstractions
                 Union(transactionInfo);
                 PendingCalls--;
             }
-            numberOrphans = PendingCalls;
-            return numberOrphans == 0;
         }
 
         private void Union(TransactionInfo other)
         {
-            if (TransactionId != other.TransactionId)
+            if (OriginalException == null)
             {
-                IsAborted = true;
-                // TODO: freak out
-            }
-
-            if (other.IsAborted)
-            {
-                IsAborted = true;
+                OriginalException = other.OriginalException;
             }
 
             // Take sum of write counts
@@ -176,7 +199,7 @@ namespace Orleans.Transactions.Abstractions
             return string.Join("",
                 $"{TransactionId} {TimeStamp:o}",
                 (IsReadOnly ? " RO" : ""),
-                (IsAborted ? " Aborted" : ""),
+                (OriginalException != null ? " Aborting" : ""),
                 $" {{{string.Join(" ", Participants.Select(kvp => $"{kvp.Key.ToShortString()}:{kvp.Value.Reads},{kvp.Value.Writes}"))}}}",
                 TMCandidate != null ? $" TM={TMCandidate.ToShortString()}({TMBatchSize})" : ""
             );

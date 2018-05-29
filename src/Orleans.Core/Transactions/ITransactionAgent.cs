@@ -22,16 +22,13 @@ namespace Orleans.Transactions
         Task<ITransactionInfo> StartTransaction(bool readOnly, TimeSpan timeout);
 
         /// <summary>
-        /// Attempt to Commit a transaction. If this returns with no exceptions
-        /// then the transaction is successfully committed.
+        /// Attempt to Commit a transaction. 
         /// </summary>
         /// <param name="transactionInfo">transaction info</param>
-        /// <returns>None.</returns>
-        /// <remarks>
-        /// The method throws OrleansTransactionInDoubtException if the outcome of the Commit cannot be determined.
-        /// If any other exception is thrown then the transaction is aborted.
-        /// </remarks>
-        Task Commit(ITransactionInfo transactionInfo);
+        /// <returns>null if the transaction committed successfully, or an exception otherwise.
+        /// If the exception is OrleansTransactionInDoubtException, it means the outcome of the Commit cannot be determined; otherwise,
+        /// the transaction is guaranteed to not have taken effect.</returns>
+        Task<TransactionalStatus> Commit(ITransactionInfo transactionInfo);
 
         /// <summary>
         /// Abort a transaction.

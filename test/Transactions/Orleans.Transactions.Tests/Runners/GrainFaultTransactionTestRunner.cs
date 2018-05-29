@@ -72,7 +72,7 @@ namespace Orleans.Transactions.Tests
             });
         }
 
-        [SkippableTheory(Skip = "Intermittent failure, jbragg investigating")]
+        [SkippableTheory()]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
