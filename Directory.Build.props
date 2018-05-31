@@ -138,8 +138,8 @@
     <OrleansServiceFabricVersion>2.0.0</OrleansServiceFabricVersion>
     <OrleansSerializersVersion>2.0.0</OrleansSerializersVersion>
     <OrleansToolsVersion>2.0.0</OrleansToolsVersion>
-    <OrleansClientVersion>2.0.0</OrleansClientVersion>
-    <OrleansServerVersion>2.0.0</OrleansServerVersion>
+    <OrleansClientVersion>2.0.3</OrleansClientVersion>
+    <OrleansServerVersion>2.0.3</OrleansServerVersion>
     <OrleansCodegenVersion>2.0.3</OrleansCodegenVersion>
     <OrleansEventHubProviderVersion>2.0.3</OrleansEventHubProviderVersion>
   </PropertyGroup>

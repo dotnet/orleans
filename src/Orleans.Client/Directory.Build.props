@@ -20,6 +20,19 @@
   </PropertyGroup>
 
   <Choose>
+    <When Condition="$(OrleansCoreVersion) == $(VersionPrefix) AND $(OrleansCoreVersion) == $(OrleansServerVersion)">
+      <ItemGroup >
+        <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.Core" Version="$(OrleansCoreVersion)"/>
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
+  
+  <Choose>
     <When Condition="$(OrleansProvidersVersion) == $(VersionPrefix) AND $(OrleansProvidersVersion) == $(OrleansCoreVersion)">
       <ItemGroup >
         <ProjectReference Include="..\OrleansProviders\OrleansProviders.csproj" />
@@ -27,7 +40,7 @@
     </When>
     <Otherwise>
       <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.OrleansProviders" Version="$(OrleansClientVersion)"/>
+        <PackageReference Include="Microsoft.Orleans.OrleansProviders" Version="$(OrleansProvidersVersion)"/>
       </ItemGroup>
     </Otherwise>
   </Choose>
