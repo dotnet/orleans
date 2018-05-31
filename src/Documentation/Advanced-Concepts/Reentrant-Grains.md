@@ -71,7 +71,7 @@ public class SlowpokeGrain : Grain, ISlowpokeGrain
 {
     public async Task GoSlow()
     {
-        await Task.Delay(TimeSpan.FromSeconds(10));
+        await Task.Delay(TimeSpan.FromSeconds(20));
     }
 
     public async Task GoFast()
