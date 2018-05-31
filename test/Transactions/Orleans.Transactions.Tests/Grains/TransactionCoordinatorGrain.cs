@@ -1,8 +1,9 @@
-﻿using Orleans.Concurrency;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Orleans.Concurrency;
+using Orleans.Transactions.Tests.Correctness;
 
 namespace Orleans.Transactions.Tests
 {
@@ -40,6 +41,11 @@ namespace Orleans.Transactions.Tests
         {
             await Task.WhenAll(grains.Select(g => g.Add(numberToAdd)));
             await throwGrain.AddAndThrow(numberToAdd);
+        }
+
+        public Task MultiGrainSetBit(List<ITransactionalBitArrayGrain> grains, int bitIndex)
+        {
+            return Task.WhenAll(grains.Select(g => g.SetBit(bitIndex)));
         }
 
         private async Task Double(ITransactionTestGrain grain)

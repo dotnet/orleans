@@ -16,12 +16,24 @@ namespace Orleans.Transactions.Tests
 
         protected ITransactionTestGrain RandomTestGrain(string transactionTestGrainClassNames)
         {
-            return TestGrain(transactionTestGrainClassNames, Guid.NewGuid());
+            return RandomTestGrain<ITransactionTestGrain>(transactionTestGrainClassNames);
+        }
+
+        protected TGrainInterface RandomTestGrain<TGrainInterface>(string transactionTestGrainClassNames)
+            where TGrainInterface : IGrainWithGuidKey
+        {
+            return TestGrain<TGrainInterface>(transactionTestGrainClassNames, Guid.NewGuid());
         }
 
         protected virtual ITransactionTestGrain TestGrain(string transactionTestGrainClassName, Guid id)
         {
-            return grainFactory.GetGrain<ITransactionTestGrain>(id, transactionTestGrainClassName);
+            return TestGrain<ITransactionTestGrain>(transactionTestGrainClassName, id);
+        }
+
+        protected virtual TGrainInterface TestGrain<TGrainInterface>(string transactionTestGrainClassName, Guid id)
+            where TGrainInterface : IGrainWithGuidKey
+        {
+            return grainFactory.GetGrain<TGrainInterface>(id, $"{typeof(TGrainInterface).Namespace}.{transactionTestGrainClassName}");
         }
     }
 }

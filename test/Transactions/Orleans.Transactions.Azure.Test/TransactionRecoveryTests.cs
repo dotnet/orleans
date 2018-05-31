@@ -8,7 +8,7 @@ using Xunit.Abstractions;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {
-    [TestCategory("Transactions"), TestCategory("Functional")]
+    [TestCategory("Azure"), TestCategory("Transactions"), TestCategory("Functional")]
     public class TransactionRecoveryTests : TestClusterPerTest
     {
         private readonly TransactionRecoveryTestsRunner testRunner;
@@ -33,7 +33,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
             builder.AddClientBuilderConfigurator<TransactionRecoveryTestsRunner.ClientBuilderConfiguratorUsingAzureClustering>();
         }
 
-        [SkippableTheory]
+        [SkippableTheory(Skip = "See https://github.com/dotnet/orleans/issues/4617")]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
@@ -41,7 +41,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
         {
             return this.testRunner.TransactionWillRecoverAfterRandomSiloGracefulShutdown(transactionTestGrainClassName);
         }
-        
+
         [SkippableTheory(Skip = "See https://github.com/dotnet/orleans/issues/4617")]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
