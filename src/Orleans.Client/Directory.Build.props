@@ -27,7 +27,7 @@
     </When>
     <Otherwise>
       <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.OrleansProviders" Version="$(OrleansClientVersion)"/>
+        <PackageReference Include="Microsoft.Orleans.OrleansProviders" Version="$(OrleansProvidersVersion)"/>
       </ItemGroup>
     </Otherwise>
   </Choose>
