@@ -1,7 +1,11 @@
-﻿using Orleans.Concurrency;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans.CodeGeneration;
+using Orleans.Concurrency;
+
+[assembly: GenerateSerializer(typeof(Orleans.Transactions.Abstractions.PendingTransactionState<>))]
+[assembly: GenerateSerializer(typeof(Orleans.Transactions.Abstractions.TransactionalStorageLoadResponse<>))]
 
 namespace Orleans.Transactions.Abstractions
 {

@@ -378,22 +378,9 @@ namespace Orleans.Transactions
         #region ITransactionalState<TState>
 
         /// <inheritdoc/>
-        public Task<TResult> PerformUpdate<TResult>(Func<TState, TResult> operation)
+        public Task<TResult> PerformUpdate<TResult>(Func<TState, TResult> updateAction)
         {
-            if (operation == null) throw new ArgumentNullException(nameof(operation));
-            return PerformUpdate<TResult>(operation, null);
-        }
-
-        /// <inheritdoc/>
-        public Task PerformUpdate(Action<TState> operation)
-        {
-            if (operation == null) throw new ArgumentNullException(nameof(operation));
-            return PerformUpdate<int>(null, operation);
-        }
-
-        // to avoid code duplication, we call this with exactly one of update1, update2 non-null
-        private Task<TResult> PerformUpdate<TResult>(Func<TState, TResult> update1, Action<TState> update2)
-        {
+            if (updateAction == null) throw new ArgumentNullException(nameof(updateAction));
             if (detectReentrancy)
             {
                 throw new LockRecursionException("cannot perform an update operation from within another operation");
@@ -459,13 +446,9 @@ namespace Orleans.Transactions
                     {
                         detectReentrancy = true;
 
-                        if (update1 != null)
+                        if (updateAction != null)
                         {
-                            result = update1(record.State);
-                        }
-                        else if (update2 != null)
-                        {
-                            update2(record.State);
+                            result = updateAction(record.State);
                         }
                         return result;
                     }

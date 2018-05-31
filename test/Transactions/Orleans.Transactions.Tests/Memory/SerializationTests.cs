@@ -1,22 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
+using Xunit;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.Abstractions.Extensions;
 using TestExtensions;
-using Microsoft.Extensions.DependencyInjection;
-using Xunit;
 
 namespace Orleans.Transactions.Tests.Memory
 {
-    [TestCategory("BVT"), TestCategory("Transaction")]
+    [TestCategory("BVT"), TestCategory("Transactions")]
     public class SerializationTests
     {
         private SerializationTestEnvironment environment;

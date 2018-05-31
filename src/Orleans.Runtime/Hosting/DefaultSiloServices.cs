@@ -232,7 +232,6 @@ namespace Orleans.Hosting
 
             // Transactions
             services.TryAddSingleton<ITransactionAgent,DisabledTransactionAgent>();
-            services.TryAddSingleton<Factory<ITransactionAgent>>(sp => () => sp.GetRequiredService<ITransactionAgent>());
 
             // Application Parts
             var applicationPartManager = context.GetApplicationPartManager();

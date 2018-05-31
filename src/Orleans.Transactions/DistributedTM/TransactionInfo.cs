@@ -3,10 +3,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Collections.Concurrent;
+using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.Abstractions.Extensions;
 using Orleans.Serialization;
 
-namespace Orleans.Transactions.Abstractions
+namespace Orleans.Transactions
 {
     [Serializable]
     public class TransactionInfo : ITransactionInfo

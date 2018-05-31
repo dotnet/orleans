@@ -48,7 +48,7 @@ namespace Orleans.Runtime
         public TimeSpan ResponseTimeout { get; private set; }
         private readonly GrainTypeManager typeManager;
         private readonly MessageFactory messageFactory;
-        private readonly Lazy<ITransactionAgent> transactionAgent;
+        private readonly ITransactionAgent transactionAgent;
         private IGrainReferenceRuntime grainReferenceRuntime;
         private readonly IGrainCancellationTokenRuntime cancellationTokenRuntime;
         private readonly ApplicationRequestsStatisticsGroup appRequestStatistics;
@@ -61,7 +61,7 @@ namespace Orleans.Runtime
             OrleansTaskScheduler scheduler,
             IServiceProvider serviceProvider,
             MessageFactory messageFactory,
-            Factory<ITransactionAgent> transactionAgent,
+            ITransactionAgent transactionAgent,
             ILoggerFactory loggerFactory,
             IOptions<SiloMessagingOptions> messagingOptions,
             IGrainCancellationTokenRuntime cancellationTokenRuntime,
@@ -75,7 +75,7 @@ namespace Orleans.Runtime
             this.ResponseTimeout = messagingOptions.Value.ResponseTimeout;
             this.typeManager = typeManager;
             this.messageFactory = messageFactory;
-            this.transactionAgent = new Lazy<ITransactionAgent>(() => transactionAgent());
+            this.transactionAgent = transactionAgent;
             this.Scheduler = scheduler;
             this.ConcreteGrainFactory = new GrainFactory(this, typeMetadataCache);
             this.tryResendMessage = msg => this.Dispatcher.TryResendMessage(msg);
@@ -323,7 +323,7 @@ namespace Orleans.Runtime
                     var transactionTimeout = Debugger.IsAttached ? TimeSpan.FromMinutes(30) : TimeSpan.FromSeconds(10);
 
                     // Start a new transaction
-                    transactionInfo = await this.transactionAgent.Value.StartTransaction(message.IsReadOnly, transactionTimeout);
+                    transactionInfo = await this.transactionAgent.StartTransaction(message.IsReadOnly, transactionTimeout);
                     startNewTransaction = true;
                 }
 
@@ -389,8 +389,8 @@ namespace Orleans.Runtime
 
                         if (startNewTransaction)
                         {
-                            var abortException = transactionInfo.MustAbort(serializationManager);
-                            this.transactionAgent.Value.Abort(transactionInfo, abortException);
+                            OrleansTransactionAbortedException abortException = transactionInfo.MustAbort(serializationManager);
+                            this.transactionAgent.Abort(transactionInfo, abortException);
                             exc1 = abortException;
                         }
                     }
@@ -433,7 +433,7 @@ namespace Orleans.Runtime
                         {
                             if (transactionException == null)
                             {
-                                var status = await this.transactionAgent.Value.Commit(transactionInfo);
+                                var status = await this.transactionAgent.Commit(transactionInfo);
                                 if (status != TransactionalStatus.Ok)
                                 {
                                     transactionException = status.ConvertToUserException(transactionInfo.Id);
@@ -441,7 +441,7 @@ namespace Orleans.Runtime
                             }
                             else
                             {
-                                this.transactionAgent.Value.Abort(transactionInfo, (OrleansTransactionAbortedException) transactionException);
+                                this.transactionAgent.Abort(transactionInfo, (OrleansTransactionAbortedException) transactionException);
                             }
                             TransactionContext.Clear();
                         }

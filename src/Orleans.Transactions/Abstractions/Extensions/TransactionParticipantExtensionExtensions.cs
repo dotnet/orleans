@@ -1,17 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Runtime.Serialization;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using Newtonsoft.Json.Serialization;
 using Orleans.CodeGeneration;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.Serialization;
-using Orleans.Transactions.Abstractions.Extensions;
 
-[assembly: GenerateSerializer(typeof(TransactionParticipantExtensionExtensions.TransactionParticipantExtensionWrapper))]
+[assembly: GenerateSerializer(typeof(Orleans.Transactions.Abstractions.Extensions.TransactionParticipantExtensionExtensions.TransactionParticipantExtensionWrapper))]
 
 namespace Orleans.Transactions.Abstractions.Extensions
 {
