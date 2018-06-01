@@ -155,7 +155,7 @@ namespace UnitTests
         {
             var grain = fixture.GrainFactory.GetGrain<INonReentrantGrain>(0);
             await grain.ScheduleDelayedIncrement(grain, TimeSpan.FromMilliseconds(1));
-            await Task.Delay(TimeSpan.FromMilliseconds(10));
+            await Task.Delay(TimeSpan.FromMilliseconds(200));
             var counter = await grain.GetCounter();
             var expected = 1;
             Assert.Equal(expected, counter);
