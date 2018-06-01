@@ -16,18 +16,18 @@ namespace Orleans.Transactions
 {
     public class TransactionAgentStatistics
     {
-        public const string TransactionStartedPerSecondMetric = "TransactionAgent.TransactionStartedPerSecond";
-        //TransactionStartedPerSecond for last reporting period
-        public double TransactionStartedPerSecond { get; private set; }
-
         public long TransactionStartedCounter { get; set; }
 
-        public DateTime LastReportTime { get; private set; } = DateTime.UtcNow;
+        private const string TransactionStartedPerSecondMetric = "TransactionAgent.TransactionStartedPerSecond";
+        //Transaction started recorded at when metrics was reported last time
+        private long transactionStartedAtLastReported;
+        private DateTime lastReportTime;
         private readonly ITelemetryProducer telemetryProducer;
         private readonly PeriodicAction monitor;
         public TransactionAgentStatistics(ITelemetryProducer telemetryProducer, IOptions<StatisticsOptions> options)
         {
             this.telemetryProducer = telemetryProducer;
+            this.lastReportTime = DateTime.UtcNow;
             this.monitor = new PeriodicAction(options.Value.PerfCountersWriteInterval, this.ReportMetrics);
         }
 
@@ -39,15 +39,16 @@ namespace Orleans.Transactions
         private void ReportMetrics()
         {
             var now = DateTime.UtcNow;
-            var txStarted = TransactionStartedCounter;
-            var timelapseSinceLastReport = now - this.LastReportTime;
+            var txStartedDelta = TransactionStartedCounter - transactionStartedAtLastReported;
+            double transactionStartedPerSecond;
+            var timelapseSinceLastReport = now - this.lastReportTime;
             if (timelapseSinceLastReport.TotalSeconds <= 1)
-                TransactionStartedPerSecond = txStarted;
-            else TransactionStartedPerSecond = txStarted / timelapseSinceLastReport.TotalSeconds;
-            this.telemetryProducer.TrackMetric(TransactionStartedPerSecondMetric, TransactionStartedPerSecond);
-            //reset counters
-            TransactionStartedCounter = 0;
-            LastReportTime = now;
+                transactionStartedPerSecond = txStartedDelta;
+            else transactionStartedPerSecond = txStartedDelta * 1000 / timelapseSinceLastReport.TotalMilliseconds;
+            this.telemetryProducer.TrackMetric(TransactionStartedPerSecondMetric, transactionStartedPerSecond);
+            //record snapshot data of this report
+            transactionStartedAtLastReported = TransactionStartedCounter;
+            lastReportTime = now;
         }
     }
 
@@ -73,7 +74,7 @@ namespace Orleans.Transactions
         public Task<ITransactionInfo> StartTransaction(bool readOnly, TimeSpan timeout)
         {
             this.statistics.TryReportMetrics();
-            if (overloadDetector.Enabled && overloadDetector.Overloaded())
+            if (overloadDetector.IsOverloaded())
                 throw new OrleansStartTransactionFailedException(new OrleansTransactionOverloadException());
 
             var guid = Guid.NewGuid();

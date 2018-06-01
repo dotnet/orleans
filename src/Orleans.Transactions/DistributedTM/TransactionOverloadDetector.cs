@@ -7,50 +7,79 @@ using Microsoft.Extensions.Options;
 
 namespace Orleans.Transactions
 {
-    public class TransactionLoadSheddingOptions
+    public interface ITransactionOverloadDetector
+    {
+        bool IsOverloaded();
+    }
+
+    /// <summary>
+    /// Options for load shedding based on transaction rate 
+    /// </summary>
+    public class TransactionRateLoadSheddingOptions
     {
         /// <summary>
         /// whether to turn on transaction load shedding. Default to false;
         /// </summary>
-        public bool LoadSheddingEnabled { get; set; }
+        public bool Enabled { get; set; } = true;
 
         /// <summary>
         /// Default load shedding limit
         /// </summary>
-        public const double DEFAULT_TRANSACTION_LOADSHEDDING_LIMIT = 700;
+        public const double DEFAULT_LIMIT = 700;
         /// <summary>
         /// Load shedding limit for transaction
         /// </summary>
-        public double TransactionLoadSheddingLimit { get; set; } = DEFAULT_TRANSACTION_LOADSHEDDING_LIMIT;
+        public double Limit { get; set; } = DEFAULT_LIMIT;
     }
 
-    public class TransactionOverloadDetector
+    internal class TransactionOverloadDetector : ITransactionOverloadDetector
     {
         private readonly TransactionAgentStatistics statistics;
-        private readonly TransactionLoadSheddingOptions options;
-        public TransactionOverloadDetector(TransactionAgentStatistics statistics, IOptions<TransactionLoadSheddingOptions> options)
+        private readonly TransactionRateLoadSheddingOptions options;
+        private readonly PeriodicAction monitor;
+        private long transactionStartedAtLastCheck;
+        private double transactionStartedPerSecond;
+        private DateTime lastCheckTime;
+        private static readonly TimeSpan MetricsCheck = TimeSpan.FromSeconds(30);
+        public TransactionOverloadDetector(TransactionAgentStatistics statistics, IOptions<TransactionRateLoadSheddingOptions> options)
         {
             this.statistics = statistics;
             this.options = options.Value;
+            this.monitor = new PeriodicAction(MetricsCheck, this.RecordStatistics);
+            this.lastCheckTime = DateTime.UtcNow;
         }
 
-        public bool Enabled => this.options.LoadSheddingEnabled;
-        public bool Overloaded()
+        private void RecordStatistics()
         {
-            var txPerSecondInLastReportingPeriod = statistics.TransactionStartedPerSecond;
-            var sinceLastReport = DateTime.UtcNow - statistics.LastReportTime;
+            var now = DateTime.UtcNow;
+            var txStartedDelta = this.statistics.TransactionStartedCounter - transactionStartedAtLastCheck;
+            var timelapse = now - this.lastCheckTime;
+            if (timelapse.TotalSeconds <= 1)
+                transactionStartedPerSecond = txStartedDelta;
+            else transactionStartedPerSecond = txStartedDelta * 1000 / timelapse.TotalMilliseconds;
+            transactionStartedAtLastCheck = this.statistics.TransactionStartedCounter;
+            lastCheckTime = now;
+        }
+
+        public bool IsOverloaded()
+        {
+            if (!this.options.Enabled)
+                return false;
+
+            this.monitor.TryAction(DateTime.UtcNow);
+            var txPerSecondInLastReportingPeriod = transactionStartedPerSecond;
+            var sinceLastReport = DateTime.UtcNow - lastCheckTime;
 
             double txPerSecondCurrently;
             if (sinceLastReport.TotalSeconds <= 1)
                 txPerSecondCurrently = txPerSecondInLastReportingPeriod;
             else
-                txPerSecondCurrently = statistics.TransactionStartedCounter /
-                                       sinceLastReport.TotalSeconds;
+                txPerSecondCurrently = (statistics.TransactionStartedCounter - transactionStartedAtLastCheck) * 1000 /
+                                       sinceLastReport.TotalMilliseconds;
             //decaying utilization for tx per second
             var aggregratedTxPerSecond = (txPerSecondInLastReportingPeriod + 2 * txPerSecondCurrently) / 3;
             
-            return this.options.LoadSheddingEnabled &&
-                   aggregratedTxPerSecond > this.options.TransactionLoadSheddingLimit;
+            return aggregratedTxPerSecond > this.options.Limit;
         }
     }
 }
