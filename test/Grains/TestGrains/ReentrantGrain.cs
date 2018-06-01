@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.CodeGeneration;
@@ -87,6 +88,41 @@ namespace UnitTests.Grains
         {
             logger.Info("SetSelf {0}", self);
             Self = self;
+            return Task.CompletedTask;
+        }
+
+        [AlwaysInterleave]
+        public Task<int> Ping(int t)
+        {
+            return Task.FromResult(t);
+        }
+
+        [AlwaysInterleave]
+        public Task<int> PingOther(INonReentrantGrain target, int t)
+        {
+            return target.Ping(t);
+        }
+
+        [AlwaysInterleave]
+        public Task<int> PingSelfThroughOtherInterleaving(INonReentrantGrain target, int t)
+        {
+            return target.PingOther(this, t);
+        }
+
+        public async Task DoAsyncWork(TimeSpan waitTime, GrainCancellationToken gct)
+        {
+            await Task.Delay(waitTime, gct.CancellationToken);
+        }
+
+        public Task ScheduleDelayedIncrement(INonReentrantGrain target, TimeSpan delay)
+        {
+            RegisterTimer(async o =>
+                {
+                    await target.IncrementCounter();
+                },
+                null,
+                delay,
+                TimeSpan.FromMilliseconds(-1));
             return Task.CompletedTask;
         }
     }
