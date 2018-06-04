@@ -32,7 +32,7 @@ namespace Orleans.Transactions
         public double Limit { get; set; } = DEFAULT_LIMIT;
     }
 
-    internal class TransactionOverloadDetector : ITransactionOverloadDetector
+    public class TransactionOverloadDetector : ITransactionOverloadDetector
     {
         private readonly TransactionAgentStatistics statistics;
         private readonly TransactionRateLoadSheddingOptions options;
@@ -40,25 +40,23 @@ namespace Orleans.Transactions
         private long transactionStartedAtLastCheck;
         private double transactionStartedPerSecond;
         private DateTime lastCheckTime;
-        private static readonly TimeSpan MetricsCheck = TimeSpan.FromSeconds(30);
+        private static readonly TimeSpan MetricsCheck = TimeSpan.FromSeconds(15);
         public TransactionOverloadDetector(TransactionAgentStatistics statistics, IOptions<TransactionRateLoadSheddingOptions> options)
         {
             this.statistics = statistics;
             this.options = options.Value;
             this.monitor = new PeriodicAction(MetricsCheck, this.RecordStatistics);
+            this.transactionStartedAtLastCheck = statistics.TransactionStartedCounter;
             this.lastCheckTime = DateTime.UtcNow;
         }
 
         private void RecordStatistics()
         {
-            var now = DateTime.UtcNow;
-            var txStartedDelta = this.statistics.TransactionStartedCounter - transactionStartedAtLastCheck;
-            var timelapse = now - this.lastCheckTime;
-            if (timelapse.TotalSeconds <= 1)
-                transactionStartedPerSecond = txStartedDelta;
-            else transactionStartedPerSecond = txStartedDelta * 1000 / timelapse.TotalMilliseconds;
-            transactionStartedAtLastCheck = this.statistics.TransactionStartedCounter;
-            lastCheckTime = now;
+            long startCounter = this.statistics.TransactionStartedCounter;
+            DateTime now = DateTime.UtcNow;
+            this.transactionStartedPerSecond = CalculateTps(this.transactionStartedAtLastCheck, this.lastCheckTime, startCounter, now);
+            this.transactionStartedAtLastCheck = startCounter;
+            this.lastCheckTime = now;
         }
 
         public bool IsOverloaded()
@@ -66,20 +64,23 @@ namespace Orleans.Transactions
             if (!this.options.Enabled)
                 return false;
 
-            this.monitor.TryAction(DateTime.UtcNow);
-            var txPerSecondInLastReportingPeriod = transactionStartedPerSecond;
-            var sinceLastReport = DateTime.UtcNow - lastCheckTime;
-
-            double txPerSecondCurrently;
-            if (sinceLastReport.TotalSeconds <= 1)
-                txPerSecondCurrently = txPerSecondInLastReportingPeriod;
-            else
-                txPerSecondCurrently = (statistics.TransactionStartedCounter - transactionStartedAtLastCheck) * 1000 /
-                                       sinceLastReport.TotalMilliseconds;
+            DateTime now = DateTime.UtcNow;
+            this.monitor.TryAction(now);
+            long startCounter = this.statistics.TransactionStartedCounter;
+            double txPerSecondCurrently = CalculateTps(this.transactionStartedAtLastCheck, this.lastCheckTime, startCounter, now);
             //decaying utilization for tx per second
-            var aggregratedTxPerSecond = (txPerSecondInLastReportingPeriod + 2 * txPerSecondCurrently) / 3;
+            var aggregratedTxPerSecond = (this.transactionStartedPerSecond + (2.0 * txPerSecondCurrently)) / 3.0;
             
             return aggregratedTxPerSecond > this.options.Limit;
+        }
+
+        private static double CalculateTps(long startCounter, DateTime startTimeUtc, long currentCounter, DateTime curentTimeUtc)
+        {
+            TimeSpan deltaTime = curentTimeUtc - startTimeUtc;
+            long deltaCounter = currentCounter - startCounter;
+            return (deltaTime.TotalMilliseconds < 1000)
+                ? deltaCounter
+                : (deltaCounter * 1000.0) / deltaTime.TotalMilliseconds;
         }
     }
 }
