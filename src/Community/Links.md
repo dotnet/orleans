@@ -76,3 +76,5 @@ title: Links
 [Orleans & Thinking Outside the Box](http://msdevshow.com/2014/05/orleans-and-thinking-outside-the-box/)
 
 [John Azariah & Mahesh Krishnan - Immutability, State and Scale - Functional, Distributed Applications in Azure](http://vimeo.com/97315938)
+
+last edited: 5 June 2018
