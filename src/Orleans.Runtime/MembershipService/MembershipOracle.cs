@@ -648,7 +648,7 @@ namespace Orleans.Runtime.MembershipService
                 else if (siloAddress.Generation > MyAddress.Generation)
                 {
                     // I am the older clone - Newer version of me should survive - I need to kill myself
-                    var msg = string.Format("Detected newer version of myself - I am the older clone so will commit suicide -- Current Me={0} Newer Me={1}, Current entry= {2}",
+                    var msg = string.Format("Detected newer version of myself - I am the older clone so I will stop -- Current Me={0} Newer Me={1}, Current entry= {2}",
                         MyAddress.ToLongString(), siloAddress.ToLongString(), entry.ToFullString());
                     logger.Warn(ErrorCode.MembershipDetectedNewer, msg);
                     await KillMyself();
@@ -679,7 +679,7 @@ namespace Orleans.Runtime.MembershipService
 
         private void KillMyselfLocally(string reason)
         {
-            var msg = "I have been told I am dead, so this silo will commit suicide! " + reason;
+            var msg = "I have been told I am dead, so this silo will stop! " + reason;
             logger.Error(ErrorCode.MembershipKillMyselfLocally, msg);
             bool alreadyStopping = CurrentStatus.IsTerminating();
 
@@ -916,7 +916,7 @@ namespace Orleans.Runtime.MembershipService
             MessagingStatisticsGroup.OnPingReplyMissed(silo);
             if (!probedSilos.ContainsKey(silo))
             {
-                // need this check to avoid races with changed membership (I was watching him, but then read the table, learned he is already dead and thus no longer wtaching him); 
+                // need this check to avoid races with changed membership (I was watching him, but then read the table, learned he is already dead and thus no longer watching him);
                 // otherwise, we might here insert a new entry to the 'probedSilos' dictionary
                 logger.Info(ErrorCode.MembershipPingedSiloNotInWatchList, "-Does not have {0} in the list of probes, ignoring", silo.ToLongString());
                 return;
@@ -1007,7 +1007,7 @@ namespace Orleans.Runtime.MembershipService
                 var str = String.Format("-Silo {0} is suspected by {1} which is more or equal than {2}, but is not marked as dead. This is a bug!!!",
                     entry.SiloAddress.ToLongString(), freshVotes.Count.ToString(), this.clusterMembershipOptions.NumVotesForDeathDeclaration.ToString());
                 logger.Error(ErrorCode.Runtime_Error_100053, str);
-                KillMyselfLocally("Found a bug 1! Will commit suicide.");
+                KillMyselfLocally("Found a bug! Will stop.");
                 return false;
             }
 
