@@ -31,9 +31,9 @@ namespace Orleans.Transactions
             this.monitor = new PeriodicAction(options.Value.PerfCountersWriteInterval, this.ReportMetrics);
         }
 
-        public void TryReportMetrics()
+        public void TryReportMetrics(DateTime timestamp)
         {
-            this.monitor.TryAction(DateTime.UtcNow);
+            this.monitor.TryAction(timestamp);
         }
 
         private void ReportMetrics()
@@ -61,9 +61,9 @@ namespace Orleans.Transactions
         private readonly Stopwatch stopwatch = Stopwatch.StartNew();
         private readonly CausalClock clock;
         private readonly TransactionAgentStatistics statistics;
-        private readonly TransactionOverloadDetector overloadDetector;
+        private readonly ITransactionOverloadDetector overloadDetector;
 
-        public TransactionAgent(IClock clock, ILogger<TransactionAgent> logger, TransactionAgentStatistics statistics, TransactionOverloadDetector overloadDetector)
+        public TransactionAgent(IClock clock, ILogger<TransactionAgent> logger, TransactionAgentStatistics statistics, ITransactionOverloadDetector overloadDetector)
         {
             this.clock = new CausalClock(clock);
             this.logger = logger;
@@ -73,7 +73,7 @@ namespace Orleans.Transactions
 
         public Task<ITransactionInfo> StartTransaction(bool readOnly, TimeSpan timeout)
         {
-            this.statistics.TryReportMetrics();
+            this.statistics.TryReportMetrics(DateTime.UtcNow);
             if (overloadDetector.IsOverloaded())
                 throw new OrleansStartTransactionFailedException(new OrleansTransactionOverloadException());
 

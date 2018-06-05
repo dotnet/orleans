@@ -20,7 +20,7 @@ namespace Orleans.Transactions
         /// <summary>
         /// whether to turn on transaction load shedding. Default to false;
         /// </summary>
-        public bool Enabled { get; set; } = true;
+        public bool Enabled { get; set; }
 
         /// <summary>
         /// Default load shedding limit
