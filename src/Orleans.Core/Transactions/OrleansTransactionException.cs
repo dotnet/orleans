@@ -57,6 +57,18 @@ namespace Orleans.Transactions
     }
 
     /// <summary>
+    /// Signifies that transaction runtime is overloaded
+    /// </summary>
+    [Serializable]
+    public class OrleansTransactionOverloadException : OrleansTransactionException
+    {
+        public OrleansTransactionOverloadException()
+            : base("Transaction is overloaded on current silo, please try again later.")
+        {
+        }
+    }
+
+    /// <summary>
     /// Signifies that the runtime is unable to determine whether a transaction
     /// has committed.
     /// </summary>
