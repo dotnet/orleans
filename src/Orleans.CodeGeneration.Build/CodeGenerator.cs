@@ -8,7 +8,7 @@ using Orleans.CodeGenerator;
 using Orleans.Serialization;
 using Orleans.Runtime;
 using Orleans.Metadata;
-#if NETCOREAPP2_0
+#if NETCOREAPP
 using System.Runtime.Loader;
 #endif
 
@@ -44,7 +44,7 @@ namespace Orleans.CodeGeneration
             // Generate source
             Console.WriteLine($"Orleans-CodeGen - Generating file {outputFileName}");
 
-#if !NETCOREAPP2_0
+#if !NETCOREAPP
             var generatedCode = GenerateCodeInAppDomain(options);
 #else
             var generatedCode = GenerateCodeInternal(options);
@@ -96,7 +96,7 @@ namespace Orleans.CodeGeneration
             }
         }
 
-#if !NETCOREAPP2_0
+#if !NETCOREAPP
         private static string GenerateCodeInAppDomain(CodeGenOptions options)
         {
             AppDomain appDomain = null;
@@ -150,7 +150,7 @@ namespace Orleans.CodeGeneration
             try
             {
                 // Set up assembly resolution.
-#if NETCOREAPP2_0
+#if NETCOREAPP
                 AssemblyLoadContext.Default.Resolving += refResolver.AssemblyLoadContextResolving;
 #else
                 AppDomain.CurrentDomain.AssemblyResolve += refResolver.ResolveAssembly;
@@ -161,7 +161,7 @@ namespace Orleans.CodeGeneration
             finally
             {
                 refResolver.Dispose();
-#if NETCOREAPP2_0
+#if NETCOREAPP
                 AssemblyLoadContext.Default.Resolving -= refResolver.AssemblyLoadContextResolving;
 #else
                 AppDomain.CurrentDomain.AssemblyResolve -= refResolver.ResolveAssembly;

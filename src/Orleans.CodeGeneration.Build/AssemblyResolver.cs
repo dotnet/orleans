@@ -7,7 +7,7 @@ using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.DependencyModel;
 using Microsoft.Extensions.DependencyModel.Resolution;
 using Orleans.Runtime;
-#if NETCOREAPP2_0
+#if NETCOREAPP
 using System.Runtime.Loader;
 #endif
 
@@ -28,7 +28,7 @@ namespace Orleans.CodeGeneration
 
         private readonly DependencyContext dependencyContext;
         private readonly DependencyContext resolverRependencyContext;
-#if NETCOREAPP2_0
+#if NETCOREAPP
         private readonly AssemblyLoadContext loadContext;
 #endif
 
@@ -53,7 +53,7 @@ namespace Orleans.CodeGeneration
                     new PackageCompilationAssemblyResolver()
                 });
 
-#if NETCOREAPP2_0
+#if NETCOREAPP
             this.loadContext = AssemblyLoadContext.GetLoadContext(this.Assembly);
 
             if (this.loadContext == AssemblyLoadContext.Default)
@@ -87,7 +87,7 @@ namespace Orleans.CodeGeneration
 
         public void Dispose()
         {
-#if NETCOREAPP2_0
+#if NETCOREAPP
 
             if (this.loadContext == AssemblyLoadContext.Default)
             {
@@ -120,7 +120,7 @@ namespace Orleans.CodeGeneration
         {
             var context = default(AssemblyLoadContext);
 
-#if NETCOREAPP2_0
+#if NETCOREAPP
             context = AssemblyLoadContext.GetLoadContext(args.RequestingAssembly);
 #endif
 
@@ -185,7 +185,7 @@ namespace Orleans.CodeGeneration
         {
             try
             {
-#if NETCOREAPP2_0
+#if NETCOREAPP
                 return this.loadContext.LoadFromAssemblyPath(path);
 #else
                 return Assembly.LoadFrom(path);
@@ -197,7 +197,7 @@ namespace Orleans.CodeGeneration
             }
         }
 
-#if !NETCOREAPP2_0
+#if !NETCOREAPP
         internal class AssemblyLoadContext
         {
         }
