@@ -7,6 +7,9 @@ SET CMDHOME=%~dp0
 @REM Remove trailing backslash \
 set CMDHOME=%CMDHOME:~0,-1%
 
+:: Disable multilevel lookup https://github.com/dotnet/core-setup/blob/master/Documentation/design-docs/multilevel-sharedfx-lookup.md
+set DOTNET_MULTILEVEL_LOOKUP=0 
+
 call Ensure-DotNetSdk.cmd
 
 pushd "%CMDHOME%"
