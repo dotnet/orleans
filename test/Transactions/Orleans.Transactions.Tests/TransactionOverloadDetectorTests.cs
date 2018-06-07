@@ -25,7 +25,7 @@ namespace Orleans.Transactions.Tests
         public void RateLimitTest(int runTimeInSeconds, double limit)
         {
             TimeSpan runTime = TimeSpan.FromSeconds(runTimeInSeconds);
-            TransactionRateLoadSheddingOptions options = new TransactionRateLoadSheddingOptions { Limit = limit };
+            TransactionRateLoadSheddingOptions options = new TransactionRateLoadSheddingOptions { Enabled = true, Limit = limit };
             TransactionAgentStatistics statistics = new TransactionAgentStatistics(NullTelemetryProducer.Instance, Options.Create(new StatisticsOptions()));
             ITransactionOverloadDetector detector = new TransactionOverloadDetector(statistics, Options.Create(options));
             Stopwatch sw = Stopwatch.StartNew();
