@@ -1,14 +1,57 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
+using System.Threading;
 using System.Threading.Tasks;
+using System.Transactions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Transactions;
 using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions
 {
+    public class TransactionStateStatistics
+    {
+        private const string AvgLockQueueLength = "TransactionalState.AvgLockQueueLength";
+        //Transaction started recorded at when metrics was reported last time
+        private double lockQueueLengthCounter;
+
+        private long lockQueueLengthReportCounter;
+        private readonly ITelemetryProducer telemetryProducer;
+        private readonly PeriodicAction monitor;
+        public TransactionStateStatistics(ITelemetryProducer telemetryProducer, IOptions<StatisticsOptions> options)
+        {
+            this.telemetryProducer = telemetryProducer;
+            this.monitor = new PeriodicAction(options.Value.PerfCountersWriteInterval, this.ReportMetrics);
+        }
+
+        public void ReportLockQueueLengthChange(int newQueueLength)
+        {
+            this.lockQueueLengthCounter += newQueueLength;
+            this.lockQueueLengthReportCounter++;
+        }
+
+        public void TryReportMetrics(DateTime timestamp)
+        {
+            this.monitor.TryAction(timestamp);
+        }
+
+        private void ReportMetrics()
+        {
+            var avgLockQueueLength = lockQueueLengthReportCounter == 0
+                ? 0
+                : lockQueueLengthCounter / lockQueueLengthReportCounter;
+            this.telemetryProducer.TrackMetric(AvgLockQueueLength, avgLockQueueLength);
+            //record snapshot data of this report
+            lockQueueLengthCounter = 0;
+            lockQueueLengthReportCounter = 0;
+        }
+    }
+
     public partial class TransactionalState<TState> : ITransactionalState<TState>, ITransactionParticipant, ILifecycleParticipant<IGrainLifecycle>
        where TState : class, new()
     {
@@ -20,6 +63,13 @@ namespace Orleans.Transactions
         // cache the last known minimum so we don't have to recompute it as much
         private DateTime cachedMin = DateTime.MaxValue;
         private Guid cachedMinId;
+
+        private int lockQueueLength = 0;
+        private TransactionStateStatistics statistics;
+        public TransactionalState(TransactionStateStatistics statistics)
+        {
+            this.statistics = statistics;
+        }
 
         // group of non-conflicting transactions collectively acquiring/releasing the lock
         private class LockGroup : Dictionary<Guid, TransactionRecord<TState>>
@@ -80,7 +130,8 @@ namespace Orleans.Transactions
                 {
                     // the lock is empty, a new group can enter
                     currentGroup = currentGroup.Next;
-
+                    this.lockQueueLength--;
+                    this.statistics.ReportLockQueueLengthChange(this.lockQueueLength);
                     if (currentGroup != null)
                     {
                         currentGroup.Deadline = DateTime.UtcNow + LockTimeout;
@@ -145,6 +196,7 @@ namespace Orleans.Transactions
         private Task<TResult> EnterLock<TResult>(Guid transactionId, DateTime priority,
                                    AccessCounter counter, bool isRead, Task<TResult> task)
         {
+            this.statistics.TryReportMetrics(DateTime.UtcNow);
             bool rollbacksOccurred = false;
 
             // search active transactions
@@ -153,7 +205,8 @@ namespace Orleans.Transactions
                 // check if we lost some reads or writes already
                 if (counter.Reads > record.NumberReads || counter.Writes > record.NumberWrites)
                 {
-                    throw new OrleansBrokenTransactionLockException(transactionId.ToString(), "when re-entering lock");
+                    throw new OrleansBrokenTransactionLockException(transactionId.ToString(),
+                        "when re-entering lock");
                 }
 
                 // check if the operation conflicts with other transactions in the group
@@ -184,7 +237,8 @@ namespace Orleans.Transactions
                 // check if we were supposed to already hold this lock
                 if (counter.Reads + counter.Writes > 0)
                 {
-                    throw new OrleansBrokenTransactionLockException(transactionId.ToString(), "when trying to re-enter lock");
+                    throw new OrleansBrokenTransactionLockException(transactionId.ToString(),
+                        "when trying to re-enter lock");
                 }
 
                 // update the lock deadline
@@ -250,13 +304,17 @@ namespace Orleans.Transactions
             }
 
             return task;
+
         }
 
+        private const int QueueLengthHardLimit = Int32.MaxValue;
         private bool Find(Guid guid, bool isRead, out LockGroup group, out TransactionRecord<TState> record)
         {
             if (currentGroup == null)
             {
                 group = currentGroup = new LockGroup();
+                this.lockQueueLength++;
+                this.statistics.ReportLockQueueLengthChange(this.lockQueueLength);
                 record = null;
                 return false;
             }
@@ -283,15 +341,19 @@ namespace Orleans.Transactions
 
                     if (pos.Next == null) // we did not find this tx.
                     {
+                        //if the queue length is too long, reject this tx, instead of enqueue it.
+                        if(this.lockQueueLength > QueueLengthHardLimit)
+                            throw new OrleansTransactionAbortedException(guid.ToString(), "Too many transaction pending to acquire the lock");
                         // add a new empty group to insert this tx, if we have not found one yet
                         if (group == null)
                         {
                             group = pos.Next = new LockGroup();
+                            this.lockQueueLength++;
+                            this.statistics.ReportLockQueueLengthChange(this.lockQueueLength);
                         }
 
                         return false;
                     }
-
                     pos = pos.Next;
                 }
             }
