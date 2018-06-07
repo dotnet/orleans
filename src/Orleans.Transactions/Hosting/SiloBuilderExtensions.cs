@@ -25,7 +25,7 @@ namespace Orleans.Hosting
         {
             services.TryAddSingleton<IClock,Clock>();
             services.TryAddSingleton<TransactionAgentStatistics>();
-            services.TryAddSingleton<TransactionOverloadDetector>();
+            services.TryAddSingleton<ITransactionOverloadDetector,TransactionOverloadDetector>();
             services.AddSingleton<ITransactionAgent, TransactionAgent>();
             services.TryAddSingleton(typeof(ITransactionDataCopier<>), typeof(DefaultTransactionDataCopier<>));
             services.AddSingleton<IAttributeToFactoryMapper<TransactionalStateAttribute>, TransactionalStateAttributeMapper>();
