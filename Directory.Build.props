@@ -66,7 +66,7 @@
     <MicrosoftExtensionsOptionsVersion>2.0.0</MicrosoftExtensionsOptionsVersion>
 
     <MicrosoftApplicationInsightsVersion>2.4.0</MicrosoftApplicationInsightsVersion>
-    <MicrosoftAzureEventHubsVersion>1.0.3</MicrosoftAzureEventHubsVersion>
+    <MicrosoftAzureEventHubsVersion>[1.0.3]</MicrosoftAzureEventHubsVersion>
     <MicrosoftDataSQLiteVersion>2.0.0</MicrosoftDataSQLiteVersion>
     <MicrosoftPowerShell5ReferenceAssembliesVersion>1.1.0</MicrosoftPowerShell5ReferenceAssembliesVersion>
     <MicrosoftServiceFabricServicesVersion>3.0.472</MicrosoftServiceFabricServicesVersion>
