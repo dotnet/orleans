@@ -56,14 +56,6 @@ namespace Orleans.Configuration
         public const int DEFAULT_MAX_PENDING_ITEMS_SOFT_LIMIT = 0;
 
         /// <summary>
-        /// Per work group limit of how many items can be queued up before work is rejected.
-        /// NOTE: This setting is not in effect.
-        /// TODO: Remove this setting - jbragg
-        /// </summary>
-        public int MaxPendingWorkItemsHardLimit { get; set; } = DEFAULT_MAX_PENDING_ITEMS_HARD_LIMIT;
-        public const int DEFAULT_MAX_PENDING_ITEMS_HARD_LIMIT = 0;
-
-        /// <summary>
         /// For test use only.  Do not alter from default in production services
         /// </summary>
         public bool EnableWorkerThreadInjection { get; set; } = DEFAULT_ENABLE_WORKER_THREAD_INJECTION;

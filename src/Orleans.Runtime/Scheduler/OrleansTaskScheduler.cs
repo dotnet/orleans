@@ -35,7 +35,6 @@ namespace Orleans.Runtime.Scheduler
 
         // This is the maximum number of pending work items for a single activation before we write a warning log.
         internal int MaxPendingItemsSoftLimit { get; private set; }
-        internal int MaxPendingItemsHardLimit { get; private set; }
 
         public int RunQueueLength => systemAgent.Count + mainAgent.Count;
         
@@ -55,7 +54,6 @@ namespace Orleans.Runtime.Scheduler
             applicationTurnsStopped = false;
             TurnWarningLengthThreshold = options.Value.TurnWarningLengthThreshold;
             this.MaxPendingItemsSoftLimit = options.Value.MaxPendingWorkItemsSoftLimit;
-            this.MaxPendingItemsHardLimit = options.Value.MaxPendingWorkItemsHardLimit;
             workgroupDirectory = new ConcurrentDictionary<ISchedulingContext, WorkItemGroup>();
 
             const int maxSystemThreads = 2;
