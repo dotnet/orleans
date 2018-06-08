@@ -14,36 +14,18 @@ namespace Orleans.Runtime.Scheduler
         public ClosureWorkItem(Action closure)
         {
             continuation = closure;
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectGlobalShedulerStats)
-            {
-                SchedulerStatisticsGroup.OnClosureWorkItemsCreated();
-            }
-#endif
         }
 
         public ClosureWorkItem(Action closure, string name)
         {
             continuation = closure;
             this.name = name;
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectGlobalShedulerStats)
-            {
-                SchedulerStatisticsGroup.OnClosureWorkItemsCreated();
-            }
-#endif
         }
 
         #region IWorkItem Members
 
         public override void Execute()
         {
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectGlobalShedulerStats)
-            {
-                SchedulerStatisticsGroup.OnClosureWorkItemsExecuted();
-            }
-#endif
             continuation();
         }
 
@@ -74,23 +56,10 @@ namespace Orleans.Runtime.Scheduler
         {
             this.continuation = closure;
             this.name = name;
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectGlobalShedulerStats)
-            {
-                SchedulerStatisticsGroup.OnClosureWorkItemsCreated();
-            }
-#endif
         }
 
         public override async void Execute()
         {
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectGlobalShedulerStats)
-            {
-                SchedulerStatisticsGroup.OnClosureWorkItemsExecuted();
-            }
-#endif
-
             try
             {
                 RequestContext.Clear();
@@ -119,23 +88,10 @@ namespace Orleans.Runtime.Scheduler
         {
             this.continuation = closure;
             this.name = name;
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectGlobalShedulerStats)
-            {
-                SchedulerStatisticsGroup.OnClosureWorkItemsCreated();
-            }
-#endif
         }
 
         public override async void Execute()
         {
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectGlobalShedulerStats)
-            {
-                SchedulerStatisticsGroup.OnClosureWorkItemsExecuted();
-            }
-#endif
-
             try
             {
                 RequestContext.Clear();

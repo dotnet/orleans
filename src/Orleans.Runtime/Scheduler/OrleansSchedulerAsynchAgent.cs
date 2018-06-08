@@ -54,10 +54,6 @@ namespace Orleans.Runtime.Scheduler
         protected override void OnEnqueue(IWorkItem request)
         {
             base.OnEnqueue(request);
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectGlobalShedulerStats)
-                SchedulerStatisticsGroup.OnWorkItemEnqueue();
-#endif
         }
         
         protected override ThreadPoolExecutorOptions.Builder ExecutorOptionsBuilder => configureExecutorOptionsBuilder(base.ExecutorOptionsBuilder);
@@ -135,43 +131,6 @@ namespace Orleans.Runtime.Scheduler
             public SchedulerStatisticsTracker(OrleansSchedulerAsynchAgent agent)
             {
                 this.agent = agent;
-            }
-
-            public override void OnActionExecuting(ExecutionContext context)
-            {
-                TrackWorkItemDequeue(context);
-            }
-
-            public override void OnActionExecuted(ExecutionContext context)
-            {
-#if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectTurnsStats)
-                {
-                    if (agent.GetWorkItemState(context).ItemType != WorkItemType.WorkItemGroup)
-                    {
-                        SchedulerStatisticsGroup.OnTurnExecutionEnd(Utils.Since(context.WorkItem.ExecutionStart));
-                    }
-                }
-#endif
-            }
-
-            private void TrackWorkItemDequeue(ExecutionContext context)
-            {
-#if TRACK_DETAILED_STATS
-                var todo = agent.GetWorkItemState(context);
-                if (todo.ItemType != WorkItemType.WorkItemGroup)
-                {
-                    if (StatisticsCollector.CollectTurnsStats)
-                    {
-                        SchedulerStatisticsGroup.OnThreadStartsTurnExecution(context.ThreadIndex, todo.SchedulingContext);
-                    }
-                }
-
-                if (StatisticsCollector.CollectGlobalShedulerStats)
-                {
-                    SchedulerStatisticsGroup.OnWorkItemDequeue();
-                }
-#endif
             }
         }
     }

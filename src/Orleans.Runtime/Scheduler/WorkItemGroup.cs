@@ -87,12 +87,6 @@ namespace Orleans.Runtime.Scheduler
         {
             get
             {
-#if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectShedulerQueuesStats)
-                {
-                    return queueTracking.AverageQueueLength;
-                }
-#endif
                 return 0;
             }
         }
@@ -101,12 +95,6 @@ namespace Orleans.Runtime.Scheduler
         {
             get
             {
-#if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectShedulerQueuesStats)
-                {
-                    return queueTracking.NumEnqueuedRequests;
-                }
-#endif
                 return 0;
             }
         }
@@ -115,12 +103,6 @@ namespace Orleans.Runtime.Scheduler
         {
             get
             {
-#if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectShedulerQueuesStats)
-                {
-                    return queueTracking.ArrivalRate;
-                }
-#endif
                 return 0;
             }
         }
@@ -218,13 +200,7 @@ namespace Orleans.Runtime.Scheduler
 
                 long thisSequenceNumber = totalItemsEnQueued++;
                 int count = WorkItemCount;
-#if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectShedulerQueuesStats)
-                    queueTracking.OnEnQueueRequest(1, count);
-                
-                if (StatisticsCollector.CollectGlobalShedulerStats)
-                    SchedulerStatisticsGroup.OnWorkItemEnqueue();
-#endif
+
                 workItems.Enqueue(task);
                 int maxPendingItemsLimit = masterScheduler.MaxPendingItemsSoftLimit;
                 if (maxPendingItemsLimit > 0 && count > maxPendingItemsLimit)
@@ -352,11 +328,6 @@ namespace Orleans.Runtime.Scheduler
                             break;
                     }
 
-#if TRACK_DETAILED_STATS
-                    if (StatisticsCollector.CollectGlobalShedulerStats)
-                        SchedulerStatisticsGroup.OnWorkItemDequeue();
-#endif
-
 #if DEBUG
                     if (log.IsEnabled(LogLevel.Trace)) log.Trace("About to execute task {0} in SchedulingContext={1}", task, SchedulingContext);
 #endif
@@ -364,10 +335,6 @@ namespace Orleans.Runtime.Scheduler
 
                     try
                     {
-#if TRACK_DETAILED_STATS
-                        if (StatisticsCollector.CollectTurnsStats)
-                            SchedulerStatisticsGroup.OnTurnExecutionStartsByWorkGroup(workItemGroupStatisticsNumber, thread.WorkerThreadStatisticsNumber, SchedulingContext);
-#endif
                         TaskRunner.RunTask(task);
                     }
                     catch (Exception ex)
