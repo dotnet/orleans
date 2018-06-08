@@ -48,6 +48,11 @@ namespace Orleans.Runtime
             return FindOrCreateGrainId(key);
         }
 
+        internal static GrainId GetSystemGrainId(Guid guid)
+        {
+            return FindOrCreateGrainId(UniqueKey.NewKey(guid, UniqueKey.Category.SystemGrain));
+        }
+
         // For testing only.
         internal static GrainId GetGrainIdForTesting(Guid guid)
         {
@@ -240,6 +245,9 @@ namespace Orleans.Runtime
                     break;
                 case UniqueKey.Category.SystemTarget:
                     fullString = $"*stg/{Key.N1}/{idString}";
+                    break;
+                case UniqueKey.Category.SystemGrain:
+                    fullString = $"*sgn/{Key.PrimaryKeyToGuid()}/{idString}";
                     break;
                 default:
                     fullString = "???/" + idString;

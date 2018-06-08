@@ -18,6 +18,7 @@ namespace Orleans.Runtime
         {
             None = 0,
             SystemTarget = 1,
+            SystemGrain = 2,
             Grain = 3,
             Client = 4,
             KeyExtGrain = 6,
