@@ -28,12 +28,18 @@ PM> Install-Package Microsoft.Orleans.OrleansCodeGenerator.Build
 Build time support for grain interfaces and implementation projects.
 Add it to your grain interfaces and implementation projects to enable code generation of grain references and serializers.
 
+### [Microsoft Orleans Code Generation](https://www.nuget.org/packages/Microsoft.Orleans.OrleansCodeGenerator/)
+
+```
+PM> Install-Package Microsoft.Orleans.OrleansCodeGenerator
+```
+Includes the run time code generator.
+
 ### [Microsoft Orleans Server Libraries](https://www.nuget.org/packages/Microsoft.Orleans.Server/)
 
 ```
 PM> Install-Package Microsoft.Orleans.Server
 ```
-
 A meta-package for easily building and starting a silo. Includes the following packages:
 * Microsoft.Orleans.Core.Abstractions
 * Microsoft.Orleans.Core
@@ -221,14 +227,7 @@ Includes the stream provider for GCP PubSub service.
 
 
 
-## Additional Packages
-
-### [Microsoft Orleans Code Generation](https://www.nuget.org/packages/Microsoft.Orleans.OrleansCodeGenerator/)
-
-```
-PM> Install-Package Microsoft.Orleans.OrleansCodeGenerator
-```
-Includes the run time code generator.
+## Event-Sourcing Package
 
 ### [Microsoft Orleans Event-Sourcing](https://www.nuget.org/packages/Microsoft.Orleans.EventSourcing/)
 
