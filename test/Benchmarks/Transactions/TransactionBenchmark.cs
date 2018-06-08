@@ -4,6 +4,7 @@ using System.Linq;
 using Orleans.Hosting;
 using Orleans.TestingHost;
 using BenchmarkGrainInterfaces.Transaction;
+using Orleans.Configuration;
 using TestExtensions;
 
 namespace Benchmarks.Transactions
@@ -59,7 +60,7 @@ namespace Benchmarks.Transactions
 
         private async Task FullRunAsync()
         {
-            Report[] reports = await Task.WhenAll(Enumerable.Range(0, 10).Select(i => RunAsync(i, 2000, 500)));
+            Report[] reports = await Task.WhenAll(Enumerable.Range(0, 10).Select(i => RunAsync(i, 6000, 2000)));
             Report finalReport = new Report();
             foreach (Report report in reports)
             {
@@ -99,7 +100,8 @@ namespace Benchmarks.Transactions
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
-                hostBuilder.UseDistributedTM();
+                hostBuilder.UseDistributedTM()
+                    .Configure<TelemetryOptions>(options => options.AddConsumer<LogMetricsTelemetryConsumer>());
             }
         }
     }

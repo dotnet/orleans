@@ -46,7 +46,7 @@ namespace Orleans.Transactions
                 ? 0
                 : lockQueueLengthCounter / lockQueueLengthReportCounter;
             this.telemetryProducer.TrackMetric(AvgLockQueueLength, avgLockQueueLength);
-            //record snapshot data of this report
+            // reset the counters
             lockQueueLengthCounter = 0;
             lockQueueLengthReportCounter = 0;
         }
@@ -65,11 +65,6 @@ namespace Orleans.Transactions
         private Guid cachedMinId;
 
         private int lockQueueLength = 0;
-        private TransactionStateStatistics statistics;
-        public TransactionalState(TransactionStateStatistics statistics)
-        {
-            this.statistics = statistics;
-        }
 
         // group of non-conflicting transactions collectively acquiring/releasing the lock
         private class LockGroup : Dictionary<Guid, TransactionRecord<TState>>
@@ -307,7 +302,7 @@ namespace Orleans.Transactions
 
         }
 
-        private const int QueueLengthHardLimit = Int32.MaxValue;
+        private const int QueueLengthHardLimit = 10;
         private bool Find(Guid guid, bool isRead, out LockGroup group, out TransactionRecord<TState> record)
         {
             if (currentGroup == null)
@@ -351,7 +346,6 @@ namespace Orleans.Transactions
                             this.lockQueueLength++;
                             this.statistics.ReportLockQueueLengthChange(this.lockQueueLength);
                         }
-
                         return false;
                     }
                     pos = pos.Next;

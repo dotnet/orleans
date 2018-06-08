@@ -25,12 +25,8 @@ namespace Orleans.Hosting
         {
             services.TryAddSingleton<IClock,Clock>();
             services.TryAddSingleton<TransactionAgentStatistics>();
-<<<<<<< 2125111a0a59977a70386e590b380d971a933926
             services.TryAddSingleton<ITransactionOverloadDetector,TransactionOverloadDetector>();
-=======
-            services.TryAddSingleton<TransactionStateStatistics>();
-            services.TryAddSingleton<ITransactionOverloadDetector, TransactionOverloadDetector>();
->>>>>>> load shedding based on lock waiting time
+            services.TryAddTransient<TransactionStateStatistics>();
             services.AddSingleton<ITransactionAgent, TransactionAgent>();
             services.TryAddSingleton(typeof(ITransactionDataCopier<>), typeof(DefaultTransactionDataCopier<>));
             services.AddSingleton<IAttributeToFactoryMapper<TransactionalStateAttribute>, TransactionalStateAttributeMapper>();
