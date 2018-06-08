@@ -210,7 +210,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Core-Features/Timers-and-Reminders.html",
-          "hash": "dczJn3TVN1j3kqomRRPF+g=="
+          "hash": "FIyAzeMBIs1uPA0WamfBvA=="
         }
       },
       "is_incremental": false,
@@ -365,7 +365,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Deployment-and-Operations/Service-Fabric.html",
-          "hash": "hk3fUIZSMRTIb3oRMGjK0g=="
+          "hash": "AcJx1VgA6eIWSKh6huXZ9Q=="
         }
       },
       "is_incremental": false,
@@ -389,7 +389,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Deployment-and-Operations/Using-Azure-Web-Apps.html",
-          "hash": "cI5sS8kYoRfuO8odKb3k5A=="
+          "hash": "gqcnrpESWfGLj9PHD7/A6w=="
         }
       },
       "is_incremental": false,
@@ -1859,7 +1859,7 @@
       "output": {
         ".html": {
           "relative_path": "Community/Links.html",
-          "hash": "3qefTX3IsBQBwmUpAMWJnw=="
+          "hash": "lw+5LJr7MhGfOQbseVLdzw=="
         }
       },
       "is_incremental": false,
@@ -2087,7 +2087,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Core-Features/Dependency-Injection.html",
-          "hash": "ADpeys8lWasy+qpDPiFeSg=="
+          "hash": "jKcyoeVXn0Q9qvbWTSSAlg=="
         }
       },
       "is_incremental": false,
@@ -3489,6 +3489,9 @@
       "version": ""
     },
     {
+      "log_codes": [
+        "InvalidYamlHeader"
+      ],
       "type": "index",
       "source_relative_path": "index.md",
       "output": {
@@ -3516,22 +3519,23 @@
   "incremental_info": [
     {
       "status": {
-        "can_incremental": true,
+        "can_incremental": false,
+        "details": "Cannot build incrementally because last build info is missing.",
         "incrementalPhase": "build"
       },
       "processors": {
-        "TocDocumentProcessor": {
-          "can_incremental": false,
-          "details": "Processor TocDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
-          "incrementalPhase": "build"
-        },
         "ResourceDocumentProcessor": {
           "can_incremental": false,
           "details": "Processor ResourceDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
           "incrementalPhase": "build"
         },
+        "TocDocumentProcessor": {
+          "can_incremental": false,
+          "details": "Processor TocDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
+          "incrementalPhase": "build"
+        },
         "ConceptualDocumentProcessor": {
-          "can_incremental": true,
+          "can_incremental": false,
           "incrementalPhase": "build"
         }
       }

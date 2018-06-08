@@ -155,7 +155,7 @@ public class IInjectedServiceTests
     [TestInitialize]
     public void Setup()
     {
-        if (testCluster == null)
+        if (hostedCluster == null)
         {
              var builder = new TestClusterBuilder();
              //use ISiloBuilderConfigurator to configure ISiloHostBuilder, and add the configurator to TestClusterBuilder, 
