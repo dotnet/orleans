@@ -89,9 +89,13 @@ public class FileGrainStorageOptions
 
 The  create a constructor containing two fields, `storageName` to specify which grains should write using this storage `[StorageProvider(ProviderName = "File")]` and `directory` which would be the directory where the grain states will be saved.
 
-`IGrainFactory`, `ITypeResolver` and `JsonSerializerSettings` will be used in the next section where we will initilize the storage.
+`IGrainFactory`, `ITypeResolver` will be used in the next section where we will initilize the storage.
 
 We also take two options as argument, our own `FileGrainStorageOptions` and the `ClusterOptions`. Those will be needed for the implementation of the storage functionalities.
+
+We also need `JsonSerializerSettings` as we are serializing and deserializing in Json format.
+
+_Json is an implementation detail, it is up to the developer to decide what serialization/deserialization protocol would fit the application. Another common format is binary format._
 
 ## Initializing the storage
 
@@ -141,7 +145,10 @@ public async Task ReadStateAsync(string grainType, GrainReference grainReference
 
     var fileInfo = new FileInfo(path);
     if (!fileInfo.Exists)
+    {
+        grainState.State = Activator.CreateInstance(grainState.State.GetType());
         return;
+    }
 
     using (var stream = fileInfo.OpenText())
     {
@@ -188,7 +195,11 @@ public Task ClearStateAsync(string grainType, GrainReference grainReference, IGr
 
     var fileInfo = new FileInfo(path);
     if (fileInfo.Exists)
+    {
+        grainState.ETag = null;
+        grainState.State = Activator.CreateInstance(grainState.State.GetType());
         fileInfo.Delete();
+    }
 
     return Task.CompletedTask;
 }
