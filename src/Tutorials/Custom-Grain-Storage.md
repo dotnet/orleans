@@ -227,17 +227,25 @@ public static class FileSiloBuilderExtensions
 {
     public static ISiloHostBuilder AddFileGrainStorage(this ISiloHostBuilder builder, string providerName, Action<FileGrainStorageOptions> options)
     {
-        return builder.ConfigureServices(services => services.AddFileGrainStorage(providerName, ob => ob.Configure(options)));
+        return builder.ConfigureServices(services => services.AddFileGrainStorage(providerName, options));
     }
 
-    public static IServiceCollection AddFileGrainStorage(this IServiceCollection services, string providerName, Action<OptionsBuilder<FileGrainStorageOptions>> options)
+    public static IServiceCollection AddFileGrainStorage(this IServiceCollection services, string providerName, Action<FileGrainStorageOptions> options)
     {
-        options?.Invoke(services.AddOptions<FileGrainStorageOptions>(providerName));
+        services.AddOptions<FileGrainStorageOptions>(providerName).Configure(options);
         return services
             .AddSingletonNamedService(providerName, FileGrainStorageFactory.Create)
             .AddSingletonNamedService(providerName, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainStorage>(n));
     }
 }
+```
+
+Our `FileGrainStorage` implements two interfaces, `IGrainStorage` and `ILifecycleParticipant<ISiloLifecycle>` therefore we need to register two named services for each interfaces:
+
+```csharp
+return services
+    .AddSingletonNamedService(providerName, FileGrainStorageFactory.Create)
+    .AddSingletonNamedService(providerName, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainStorage>(n));
 ```
 
 This enables us to add the file storage using the extension on the `ISiloHostBuilder`:
