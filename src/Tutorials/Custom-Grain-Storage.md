@@ -91,6 +91,8 @@ The  create a constructor containing two fields, `storageName` to specify which 
 
 `IGrainFactory`, `ITypeResolver` and `JsonSerializerSettings` will be used in the next section where we will initilize the storage.
 
+We also take two options as argument, our own `FileGrainStorageOptions` and the `ClusterOptions`. Those will be needed for the implementation of the storage functionalities.
+
 ## Initializing the storage
 
 To initialize the storage, we register an `Init` function on the `ApplicationServices` lifecycle.
@@ -118,15 +120,24 @@ private Task Init(CancellationToken ct)
 }
 ```
 
+We also provide a common function to construct the filename ensuring uniqueness per service, grain Id and grain type.
+
+```csharp
+private string GetKeyString(string grainType, GrainReference grainReference)
+{
+    return $"{_clusterOptions.ServiceId}.{grainReference.ToKeyString()}.{grainType}";
+}
+```
+
 ## Reading State
 
-To read the state, to ensure uniqueness, we construct the filename using the grain key and the grain type.
+To read a grain state, we get the filename using the function we previously defined and combine it to the root directory coming from the options.
 
 ```csharp
 public async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
 {
-    var fName = grainReference.ToKeyString() + "." + grainType;
-    var path = Path.Combine(_rootDirectory, fName);
+    var fName = GetKeyString(grainType, grainReference);
+    var path = Path.Combine(_options.RootDirectory, fName);
 
     var fileInfo = new FileInfo(path);
     if (!fileInfo.Exists)
@@ -151,8 +162,8 @@ public async Task WriteStateAsync(string grainType, GrainReference grainReferenc
 {
     var storedData = JsonConvert.SerializeObject(grainState.State, _jsonSettings);
 
-    var fName = grainReference.ToKeyString() + "." + grainType;
-    var path = Path.Combine(_rootDirectory, fName);
+    var fName = GetKeyString(grainType, grainReference);
+    var path = Path.Combine(_options.RootDirectory, fName);
 
     var fileInfo = new FileInfo(path);
 
@@ -172,8 +183,8 @@ Clearing the state would be deleting the file if the file exists.
 ```csharp
 public Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
 {
-    var fName = grainReference.ToKeyString() + "." + grainType;
-    var path = Path.Combine(_rootDirectory, fName);
+    var fName = GetKeyString(grainType, grainReference);
+    var path = Path.Combine(_options.RootDirectory, fName);
 
     var fileInfo = new FileInfo(path);
     if (fileInfo.Exists)
