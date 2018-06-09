@@ -306,12 +306,6 @@ namespace Orleans
 
                 if (message == null) // if wait was cancelled
                     break;
-#if TRACK_DETAILED_STATS
-                        if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                        {
-                            incomingMessagesThreadTimeTracking.OnStartProcessing();
-                        }
-#endif
 
                 // when we receive the first message, we update the
                 // clientId for this client because it may have been modified to
@@ -348,13 +342,6 @@ namespace Orleans
                         logger.Error(ErrorCode.Runtime_Error_100327, $"Message not supported: {message}.");
                         break;
                 }
-#if TRACK_DETAILED_STATS
-                        if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                        {
-                            incomingMessagesThreadTimeTracking.OnStopProcessing();
-                            incomingMessagesThreadTimeTracking.IncrementNumberOfProcessed();
-                        }
-#endif
             }
 
             incomingMessagesThreadTimeTracking?.OnStopExecution();

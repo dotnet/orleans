@@ -80,12 +80,6 @@ namespace Orleans.Runtime.Messaging
         /// <inheritdoc />
         public void PostMessage(Message msg)
         {
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectQueueStats)
-            {
-                queueTracking[(int)msg.Category].OnEnQueueRequest(1, messageQueues[(int)msg.Category].Count, msg);
-            }
-#endif
             this.messageQueues[(int)msg.Category].Add(msg);
 
             if (this.log.IsEnabled(LogLevel.Trace))
@@ -99,15 +93,7 @@ namespace Orleans.Runtime.Messaging
         {
             try
             {
-                Message msg = this.messageQueues[(int)type].Take();
-
-#if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectQueueStats)
-                {
-                    queueTracking[(int)msg.Category].OnDeQueueRequest(msg);
-                }
-#endif
-                return msg;
+                return this.messageQueues[(int)type].Take();
             }
             catch (InvalidOperationException)
             {

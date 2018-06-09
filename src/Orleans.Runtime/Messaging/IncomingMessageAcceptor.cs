@@ -647,23 +647,6 @@ namespace Orleans.Runtime.Messaging
 
             public void ProcessReceived(SocketAsyncEventArgs e)
             {
-#if TRACK_DETAILED_STATS
-                ThreadTrackingStatistic tracker = null;
-                if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                {
-                    int id = System.Threading.Thread.CurrentThread.ManagedThreadId;
-                    if (!trackers.TryGetValue(id, out tracker))
-                    {
-                        tracker = new ThreadTrackingStatistic("ThreadPoolThread." + System.Threading.Thread.CurrentThread.ManagedThreadId);
-                        bool added = trackers.TryAdd(id, tracker);
-                        if (added)
-                        {
-                            tracker.OnStartExecution();
-                        }
-                    }
-                    tracker.OnStartProcessing();
-                }
-#endif
                 try
                 {
                     _buffer.UpdateReceivedData(e.Buffer, e.BytesTransferred);
@@ -711,16 +694,6 @@ namespace Orleans.Runtime.Messaging
 
                     throw;
                 }
-#if TRACK_DETAILED_STATS
-                finally
-                {
-                    if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                    {
-                        tracker.IncrementNumberOfProcessed();
-                        tracker.OnStopProcessing();
-                    }
-                }
-#endif
             }
 
             public void Reset()

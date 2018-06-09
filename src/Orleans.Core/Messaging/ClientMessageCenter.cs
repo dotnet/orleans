@@ -339,14 +339,7 @@ namespace Orleans.Messaging
                 }
 
                 // Don't pass CancellationToken to Take. It causes too much spinning.
-                Message msg = PendingInboundMessages.Take();
-#if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectQueueStats)
-                {
-                    queueTracking.OnDeQueueRequest(msg);
-                }
-#endif
-                return msg;
+                return PendingInboundMessages.Take();
             }
             catch (ThreadAbortException exc)
             {
@@ -383,12 +376,6 @@ namespace Orleans.Messaging
 
         internal void QueueIncomingMessage(Message msg)
         {
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectQueueStats)
-            {
-                queueTracking.OnEnQueueRequest(1, PendingInboundMessages.Count, msg);
-            }
-#endif
             PendingInboundMessages.Add(msg);
         }
 
