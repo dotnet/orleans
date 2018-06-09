@@ -35,15 +35,17 @@ namespace GrainStorage
     public class FileGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly string _storageName;
-        private readonly string _rootDirectory;
+        private readonly FileGrainStorageOptions _options;
+        private readonly ClusterOptions _clusterOptions;
         private readonly IGrainFactory _grainFactory;
         private readonly ITypeResolver _typeResolver;
         private JsonSerializerSettings _jsonSettings;
 
-        public FileGrainStorage(string storageName, string rootDirectory, IGrainFactory grainFactory, ITypeResolver typeResolver)
+        public FileGrainStorage(string storageName, FileGrainStorageOptions options, IOptions<ClusterOptions> clusterOptions, IGrainFactory grainFactory, ITypeResolver typeResolver)
         {
             _storageName = storageName;
-            _rootDirectory = rootDirectory;
+            _options = options;
+            _clusterOptions = clusterOptions.Value;
             _grainFactory = grainFactory;
             _typeResolver = typeResolver;
         }
@@ -76,7 +78,16 @@ namespace GrainStorage
 }
 ```
 
-We create a constructor containing two fields, `storageName` to specify which grains should write using this storage `[StorageProvider(ProviderName = "File")]` and `directory` which would be the directory where the grain states will be saved.
+Prior starting the implementation, we create an option class containing the root directory where the grains states files will be stored under. For that we will create an options file `FileGrainStorageOptions`:
+
+```csharp
+public class FileGrainStorageOptions
+{
+    public string RootDirectory { get; set; }
+}
+```
+
+The  create a constructor containing two fields, `storageName` to specify which grains should write using this storage `[StorageProvider(ProviderName = "File")]` and `directory` which would be the directory where the grain states will be saved.
 
 `IGrainFactory`, `ITypeResolver` and `JsonSerializerSettings` will be used in the next section where we will initilize the storage.
 
@@ -174,15 +185,6 @@ public Task ClearStateAsync(string grainType, GrainReference grainReference, IGr
 
 ## Putting it Together
 
-In order to use the storage, we should be able to configure the root directory. For that we will create an options file `FileGrainStorageOptions`:
-
-```csharp
-public class FileGrainStorageOptions
-{
-    public string RootDirectory { get; set; }
-}
-```
-
 After that we will create a factory which will allow us to scope the options setting to the provider name and at the same time create an instance of the `FileGrainStorage` to ease the registration to the service collection.
 
 ```csharp
@@ -191,8 +193,7 @@ public static class FileGrainStorageFactory
     internal static IGrainStorage Create(IServiceProvider services, string name)
     {
         IOptionsSnapshot<FileGrainStorageOptions> optionsSnapshot = services.GetRequiredService<IOptionsSnapshot<FileGrainStorageOptions>>();
-        var options = optionsSnapshot.Get(name);
-        return ActivatorUtilities.CreateInstance<FileGrainStorage>(services, name, options.RootDirectory);
+        return ActivatorUtilities.CreateInstance<FileGrainStorage>(services, name, optionsSnapshot.Get(name), services.GetProviderClusterOptions(name));
     }
 }
 ```
