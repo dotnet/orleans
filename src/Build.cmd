@@ -12,7 +12,7 @@ SET VSWHERE_LOCAL_PATH=%VSWHERE_LOCAL_DIR%\vswhere.exe
 if NOT exist "%VSWHERE_LOCAL_PATH%" (
   if NOT exist "%VSWHERE_LOCAL_DIR%" mkdir %VSWHERE_LOCAL_DIR%
   echo Downloading vswhere.exe from %VSWHERE_REMOTE_PATH%.
-  powershell -NoProfile -ExecutionPolicy unrestricted -Command "$retryCount = 0; $success = $false; do { try { (New-Object Net.WebClient).DownloadFile('%VSWHERE_REMOTE_PATH%', '%VSWHERE_LOCAL_PATH%'); $success = $true; } catch { if ($retryCount -ge 6) { throw; } else { $retryCount++; Start-Sleep -Seconds (5 * $retryCount); } } } while ($success -eq $false);"
+  powershell -NoProfile -ExecutionPolicy unrestricted -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $retryCount = 0; $success = $false; do { try { (New-Object Net.WebClient).DownloadFile('%VSWHERE_REMOTE_PATH%', '%VSWHERE_LOCAL_PATH%'); $success = $true; } catch { if ($retryCount -ge 6) { throw; } else { $retryCount++; Start-Sleep -Seconds (5 * $retryCount); } } } while ($success -eq $false);"
   if NOT exist "%VSWHERE_LOCAL_PATH%" (
     echo ERROR: Could not install vswhere correctly, falling back to environment variables.
     goto :FallbackEnvVar
