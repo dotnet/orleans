@@ -155,8 +155,12 @@ public async Task ReadStateAsync(string grainType, GrainReference grainReference
         var storedData = await stream.ReadToEndAsync();
         grainState.State = JsonConvert.DeserializeObject(storedData, _jsonSettings);
     }
+
+    grainState.ETag = fileInfo.LastWriteTimeUtc.ToString();
 }
 ```
+
+We use the `fileInfo.LastWriteTimeUtc` as a ETag which will be used by other functions for inconsistency checks to prevent data loss.
 
 Note that for the deserialization, we use the `_jsonSettings` which was set on the `Init` function. This is important to be able to serialize/deserialize properly the state.
 
@@ -174,14 +178,23 @@ public async Task WriteStateAsync(string grainType, GrainReference grainReferenc
 
     var fileInfo = new FileInfo(path);
 
+    if (fileInfo.Exists && fileInfo.LastWriteTimeUtc.ToString() != grainState.ETag)
+    {
+        throw new InconsistentStateException($"Version conflict (WriteState): ServiceId={_clusterOptions.ServiceId} ProviderName={_storageName} GrainType={grainType} GrainReference={grainReference.ToKeyString()}.");
+    }
+
     using (var stream = new StreamWriter(fileInfo.Open(FileMode.Create, FileAccess.Write)))
     {
         await stream.WriteAsync(storedData);
     }
+
+    fileInfo.Refresh();
+    grainState.ETag = fileInfo.LastWriteTimeUtc.ToString();
 }
 ```
 
 Similarly as reading, we use `_jsonSettings` to write the state.
+The current ETag is used to check against the last updated time in UTC of the file. If the date is different, it means that another activation of the same grain changed the state concurrently. In this situation, we throw an `InconsistentStateException` which will result in the current activation being killed to prevent overwritting the state previously saved by the other activated grain.
 
 ## Clearing State
 
@@ -196,6 +209,11 @@ public Task ClearStateAsync(string grainType, GrainReference grainReference, IGr
     var fileInfo = new FileInfo(path);
     if (fileInfo.Exists)
     {
+        if (fileInfo.LastWriteTimeUtc.ToString() != grainState.ETag)
+        {
+            throw new InconsistentStateException($"Version conflict (ClearState): ServiceId={_clusterOptions.ServiceId} ProviderName={_storageName} GrainType={grainType} GrainReference={grainReference.ToKeyString()}.");
+        }
+
         grainState.ETag = null;
         grainState.State = Activator.CreateInstance(grainState.State.GetType());
         fileInfo.Delete();
@@ -204,6 +222,8 @@ public Task ClearStateAsync(string grainType, GrainReference grainReference, IGr
     return Task.CompletedTask;
 }
 ```
+
+For the same reason as `WriteState`, we check for inconsistency before proceeding to delete the file and reset the ETag, we check if the current ETag is the same as the last write time UTC.
 
 ## Putting it Together
 
