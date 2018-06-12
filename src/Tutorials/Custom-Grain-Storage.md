@@ -13,7 +13,7 @@ In fact, there are so many that there was no way to support them all.
 Instead, Orleans is designed to let you easily add support for your own form of storage by writing a grain storage.
 
 In this tutorial, we'll walk through how to write a simple file-based grain storage.
-A file system is not necessarily the best place to store data for grains, since it's so local, but it's an easy example to help us illustrate the principles.
+A file system is not the best place to store grains states as it is local, there can be issues with file locks and the last update date is not sufficient to prevent inconsistency. But it's an easy example to help us illustrate the implementation of a `Grain Storage`.
 
 ## Getting Started
 
