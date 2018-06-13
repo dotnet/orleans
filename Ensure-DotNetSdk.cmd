@@ -8,8 +8,6 @@ set /p REQUIRED_DOTNET_VERSION=< "%~dp0DotnetCLIVersion.txt"
 
 echo .Net Core version required: %REQUIRED_DOTNET_VERSION%
 
-for /f "tokens=1 delims=. " %%a in ("%REQUIRED_DOTNET_VERSION%") do set REQUIRED_DOTNET_VERSION_MAJOR=%%a
-
 for /f "tokens=*" %%i in ('where dotnet.exe') do (
   set INSTALLED_DOTNET_EXE=%%i
 
@@ -17,11 +15,7 @@ for /f "tokens=*" %%i in ('where dotnet.exe') do (
 
   for /f "tokens=*" %%j in ('"!INSTALLED_DOTNET_EXE!" --version') do set INSTALLED_DOTNET_VERSION=%%j
 
-  if [!INSTALLED_DOTNET_VERSION!] neq [] (
-    for /f "tokens=1 delims=. " %%a in ("!INSTALLED_DOTNET_VERSION!") do set INSTALLED_DOTNET_VERSION_MAJOR=%%a
-  )
-
-  if [!REQUIRED_DOTNET_VERSION_MAJOR!]==[!INSTALLED_DOTNET_VERSION_MAJOR!] (
+  if [!REQUIRED_DOTNET_VERSION!]==[!INSTALLED_DOTNET_VERSION!] (
 
     echo .Net Core major version is matching !INSTALLED_DOTNET_VERSION!, using the installed version.
 
