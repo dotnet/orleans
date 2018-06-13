@@ -23,7 +23,7 @@
   <!-- Common compile parameters -->
   <PropertyGroup>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <NoWarn>$(NoWarn);1591</NoWarn>
+    <NoWarn>$(NoWarn);1591;2003</NoWarn>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <!-- We use full (Windows PDBs) until cross platform support for source link will get better -->
     <DebugType>full</DebugType>
@@ -142,6 +142,7 @@
     <OrleansServerVersion>2.0.3</OrleansServerVersion>
     <OrleansCodegenVersion>2.0.3</OrleansCodegenVersion>
     <OrleansEventHubProviderVersion>2.0.3</OrleansEventHubProviderVersion>
+    <OrleansTelemetryConsumersVersion>2.0.3</OrleansTelemetryConsumersVersion>
   </PropertyGroup>
   
   <PropertyGroup Condition="$(FullBuild) == 'true'">
