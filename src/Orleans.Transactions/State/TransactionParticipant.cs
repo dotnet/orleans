@@ -706,9 +706,9 @@ namespace Orleans.Transactions
 
             storageBatch.Cancel(commitQueue[pos].SequenceNumber);
 
-            storageWorker.Notify();
-
             AbortCommits(status, pos);
+
+            storageWorker.Notify();
 
             lockWorker.Notify();
 
