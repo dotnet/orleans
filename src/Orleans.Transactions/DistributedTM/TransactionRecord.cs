@@ -47,6 +47,7 @@ namespace Orleans.Transactions
         // the state for this transaction, and the sequence number of this state
         public TState State;
         public long SequenceNumber;
+        public bool HasCopiedState;
 
         public void AddRead()
         {

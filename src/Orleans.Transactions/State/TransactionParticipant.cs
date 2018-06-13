@@ -417,10 +417,11 @@ namespace Orleans.Transactions
                     }
 
                     // if this is the first write, make a deep copy of the state
-                    if (record.NumberWrites == 0)
+                    if (!record.HasCopiedState)
                     {
                         record.State = copier.DeepCopy(record.State);
                         record.SequenceNumber++;
+                        record.HasCopiedState = true;
                     }
 
                     if (logger.IsEnabled(LogLevel.Debug))
