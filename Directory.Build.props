@@ -132,7 +132,7 @@
     <OrleansEventSourcingVersion>2.0.0</OrleansEventSourcingVersion>
     <OrleansAdoNetVersion>2.0.0</OrleansAdoNetVersion>
     <OrleansAWSVersion>2.0.0</OrleansAWSVersion>
-    <OrleansAzureVersion>2.0.0</OrleansAzureVersion>
+    <OrleansAzureVersion>2.0.3</OrleansAzureVersion>
     <OrleansTestingHostVersion>2.0.3</OrleansTestingHostVersion>
     <OrleansTransactionsVersion>2.0.3</OrleansTransactionsVersion>
     <OrleansServiceFabricVersion>2.0.0</OrleansServiceFabricVersion>
