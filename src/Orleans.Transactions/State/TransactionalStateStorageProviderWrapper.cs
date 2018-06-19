@@ -60,12 +60,22 @@ namespace Orleans.Transactions
             // prepare
             if (statesToPrepare?.Count > 0)
             {
-                // remove prepare records that are being overwritten
-                while (pendinglist.Count != 0 && pendinglist[pendinglist.Count - 1].SequenceId >= statesToPrepare[0].SequenceId)
+                foreach (var p in statesToPrepare)
                 {
-                    pendinglist.RemoveAt(pendinglist.Count - 1);
+                    var pos = pendinglist.FindIndex(t => t.SequenceId >= p.SequenceId);
+                    if (pos == -1)
+                    {
+                        pendinglist.Add(p); //append
+                    }
+                    else if (pendinglist[pos].SequenceId == p.SequenceId)
+                    {
+                        pendinglist[pos] = p;  //replace
+                    }
+                    else
+                    {
+                        pendinglist.Insert(pos, p); //insert
+                    }
                 }
-                pendinglist.AddRange(statesToPrepare);
             }
 
             // commit

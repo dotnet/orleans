@@ -139,7 +139,6 @@ namespace Orleans.Transactions.AzureStorage
                             existing.TransactionManager = s.TransactionManager;
                             existing.SetState(s.State, this.jsonSettings);
                             await batchOperation.Add(TableOperation.Replace(existing)).ConfigureAwait(false);
-                            states.RemoveAt(pos);
 
                             if (logger.IsEnabled(LogLevel.Trace))
                                 logger.LogTrace($"{partition}.{existing.RowKey} Update {existing.TransactionId}");
