@@ -32,8 +32,8 @@ namespace Orleans
 
         protected virtual void PerfMeasureOnStart(int? stage, TimeSpan timelapsed)
         {
-            if (this.logger.IsEnabled(LogLevel.Trace))
-                this.logger?.Trace(ErrorCode.SiloStartPerfMeasure, $"Starting lifecycle stage {stage} took {timelapsed.TotalMilliseconds} Milliseconds");
+            if (this.logger != null && this.logger.IsEnabled(LogLevel.Trace))
+                this.logger.Trace(ErrorCode.SiloStartPerfMeasure, $"Starting lifecycle stage {stage} took {timelapsed.TotalMilliseconds} Milliseconds");
         }
 
         public virtual async Task OnStart(CancellationToken ct)
@@ -66,8 +66,8 @@ namespace Orleans
 
         protected virtual void PerfMeasureOnStop(int? stage, TimeSpan timelapsed)
         {
-            if (this.logger.IsEnabled(LogLevel.Trace))
-                this.logger?.Trace(ErrorCode.SiloStartPerfMeasure, $"Stopping lifecycle stage {stage} took {timelapsed.TotalMilliseconds} Milliseconds");
+            if (this.logger != null && this.logger.IsEnabled(LogLevel.Trace))
+                this.logger.Trace(ErrorCode.SiloStartPerfMeasure, $"Stopping lifecycle stage {stage} took {timelapsed.TotalMilliseconds} Milliseconds");
         }
 
         public virtual async Task OnStop(CancellationToken ct)
