@@ -355,6 +355,7 @@ namespace Orleans.Runtime
                 return false;
             }
 
+            // do not allow interleaving between requests which are concurrently sent from the same activation
             var isCallFromOriginatorActivation = incoming.SendingActivation.Equals(targetActivation.Running.SendingActivation);
             return !isCallFromOriginatorActivation && incoming.CallChainId != null
                 && targetActivation.Running.CallChainId == incoming.CallChainId;
