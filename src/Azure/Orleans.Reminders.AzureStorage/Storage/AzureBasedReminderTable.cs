@@ -8,7 +8,7 @@ using Orleans.Configuration;
 
 namespace Orleans.Runtime.ReminderService
 {
-    internal class AzureBasedReminderTable : IReminderTable
+    public class AzureBasedReminderTable : IReminderTable
     {
         private readonly IGrainReferenceConverter grainReferenceConverter;
         private readonly ILogger logger;
