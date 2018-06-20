@@ -270,19 +270,8 @@ namespace Orleans.Hosting
             services.AddTransient<IConfigurationValidator, ClusterOptionsValidator>();
             services.AddTransient<IConfigurationValidator, SiloClusteringValidator>();
 
-            // Local client support
-            services.TryAddSingleton<IHostedClient, HostedClient>();
-            services.TryAddSingleton<InvokableObjectManager>();
-            services.TryAddSingleton<IClusterClient>(
-                sp =>
-                {
-                    var result = ActivatorUtilities.CreateInstance<ClusterClient>(sp);
-                    var task = result.Connect();
-                    if (!task.IsCompleted)
-                        throw new InvalidOperationException(
-                            $"{nameof(result.Connect)}() method for internal {nameof(IClusterClient)} must complete synchronously.");
-                    return result;
-                });
+            // Disable hosted client by default.
+            services.TryAddSingleton<IHostedClient, DisabledHostedClient>();
         }
     }
 }

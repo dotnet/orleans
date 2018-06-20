@@ -131,5 +131,29 @@ namespace Orleans.Hosting
                         .AddFromExisting<IMembershipTable, SystemTargetBasedMembershipTable>();
                 });
         }
+
+        /// <summary>
+        /// Enables support for interacting with the runtime from an external context such as a outside of the context of a grain.
+        /// </summary>
+        public static ISiloHostBuilder EnableExternalContextCalls(
+            this ISiloHostBuilder builder)
+        {
+            return builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IHostedClient>();
+                services.TryAddSingleton<IHostedClient, HostedClient>();
+                services.TryAddSingleton<InvokableObjectManager>();
+                services.TryAddSingleton<IClusterClient>(
+                    sp =>
+                    {
+                        var result = ActivatorUtilities.CreateInstance<ClusterClient>(sp);
+                        var task = result.Connect();
+                        if (!task.IsCompleted)
+                            throw new InvalidOperationException(
+                                $"{nameof(result.Connect)}() method for internal {nameof(IClusterClient)} must complete synchronously.");
+                        return result;
+                    });
+            });
+        }
     }
 }

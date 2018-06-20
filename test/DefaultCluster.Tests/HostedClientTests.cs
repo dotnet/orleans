@@ -11,6 +11,7 @@ using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Streams;
+using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using Tester.CodeGenTests;
 using UnitTests.GrainInterfaces;
@@ -30,7 +31,9 @@ namespace DefaultCluster.Tests.General
 
             public Fixture()
             {
-                this.Silo = new SiloHostBuilder().ConfigureLocalHostPrimarySilo()
+                var (siloPort, gatewayPort) = TestClusterNetworkHelper.GetRandomAvailableServerPorts();
+                this.Silo = new SiloHostBuilder()
+                    .UseLocalhostClustering(siloPort, gatewayPort)
                     .Configure<ClusterOptions>(options =>
                     {
                         options.ClusterId = Guid.NewGuid().ToString();
@@ -38,6 +41,7 @@ namespace DefaultCluster.Tests.General
                     })
                     .AddMemoryGrainStorage("PubSubStore")
                     .AddMemoryStreams<DefaultMemoryMessageBodySerializer>("MemStream")
+                    .EnableExternalContextCalls()
                     .Build();
                 this.Silo.StartAsync().GetAwaiter().GetResult();
             }
@@ -161,7 +165,7 @@ namespace DefaultCluster.Tests.General
             await stream.OnNextAsync(1);
             await stream.OnNextAsync(409);
             Assert.True(await handle.WaitForFinished(timeout));
-            Assert.Equal(new[] {1, 409}, vals);
+            Assert.Equal(new[] { 1, 409 }, vals);
         }
     }
 }
