@@ -135,7 +135,7 @@ namespace Orleans.Hosting
         /// <summary>
         /// Enables support for interacting with the runtime from an external context such as a outside of the context of a grain.
         /// </summary>
-        public static ISiloHostBuilder EnableExternalContextCalls(
+        public static ISiloHostBuilder EnableDirectClient(
             this ISiloHostBuilder builder)
         {
             return builder.ConfigureServices(services =>

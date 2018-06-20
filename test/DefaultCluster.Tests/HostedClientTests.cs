@@ -41,7 +41,7 @@ namespace DefaultCluster.Tests.General
                     })
                     .AddMemoryGrainStorage("PubSubStore")
                     .AddMemoryStreams<DefaultMemoryMessageBodySerializer>("MemStream")
-                    .EnableExternalContextCalls()
+                    .EnableDirectClient()
                     .Build();
                 this.Silo.StartAsync().GetAwaiter().GetResult();
             }
