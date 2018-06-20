@@ -127,6 +127,41 @@ namespace UnitTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        public async Task Callchain_Reentrancy_OneWayMessage_Disabled_2()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<INonReentrantGrain>(1);
+            await grain.SetSelf(grain);
+            var initialCounter = await grain.GetCounter();
+            var counter = await grain.GetCounterAndScheduleIncrement();
+            Assert.Equal(initialCounter, counter);
+            this.fixture.Logger.Info("Callchain_Reentrancy_OneWayMessage_Disabled_2 OK - no reentrancy.");
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        public async Task Callchain_Reentrancy_InterleavingSecondCall_Enabled()
+        {
+            var grain = fixture.GrainFactory.GetGrain<INonReentrantGrain>(0);
+            var target = fixture.GrainFactory.GetGrain<INonReentrantGrain>(1);
+            var gcts = new GrainCancellationTokenSource();
+            grain.DoAsyncWork(TimeSpan.FromHours(1), gcts.Token).Ignore();
+            var i = 1;
+            var pingResult = await grain.PingSelfThroughOtherInterleaving(target, i);
+            Assert.Equal(i, pingResult);
+            await gcts.Cancel();
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        public async Task Callchain_Reentrancy_TimerOrigin_Enabled()
+        {
+            var grain = fixture.GrainFactory.GetGrain<INonReentrantGrain>(0);
+            await grain.ScheduleDelayedIncrement(grain, TimeSpan.FromMilliseconds(1));
+            await Task.Delay(TimeSpan.FromMilliseconds(200));
+            var counter = await grain.GetCounter();
+            var expected = 1;
+            Assert.Equal(expected, counter);
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void Reentrancy_Deadlock_1()
         {
             List<Task> done = new List<Task>();
