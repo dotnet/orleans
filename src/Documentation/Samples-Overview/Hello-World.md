@@ -5,6 +5,21 @@ title: Hello World
 
 # Hello World
 
+## Run the Hello world Sample
+One way run this sample is to download a local copy of HelloWorld from the 2.0 folder of the Orleans project.
+Open two Command Prompt windows and navigate to the HelloWorld folder in each window.
+Build the project.
+Start the silo first one with the command:
+```
+dotnet run --project src\SiloHost
+```
+After the silo is running, start the client in the other window with this: 
+```
+dotnet run --project src\OrleansClient
+```
+The silo and client windows will display greetings to each other.
+
+## How Orleans Says Hello
 In this sample, a client connects with a grain, sends it a greeting and receives a greeting back.
 The client then prints that greeting and that's that.
 Simple enough in theory, but since there's distribution involved, there's a bit more to it.
@@ -79,6 +94,4 @@ var host = builder.Build();
 await host.StartAsync();
 ```
 
-To run the sample, start the silo program first, wait until silo successfully starts, which is normally just a couple seconds, and start the client program.
-The client prograin will connect with the silo, then calling IHello grain.
-You should see the greeting IHello grain send back printed on the console.
+
