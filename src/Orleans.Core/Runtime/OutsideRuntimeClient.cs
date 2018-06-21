@@ -29,7 +29,7 @@ namespace Orleans
         private ClientMessagingOptions clientMessagingOptions;
 
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
-        private readonly ConcurrentDictionary<GuidId, LocalObjectData> localObjects;
+        private InvokableObjectManager localObjects;
 
         private ClientMessageCenter transport;
         private bool listenForMessages;
@@ -69,10 +69,8 @@ namespace Orleans
         private readonly ILoggerFactory loggerFactory;
         private readonly IOptions<StatisticsOptions> statisticsOptions;
 
-        private SerializationManager serializationManager;
         private ApplicationRequestsStatisticsGroup appRequestStatistics;
         private StageAnalysisStatisticsGroup schedulerStageStatistics;
-
         public ActivationAddress CurrentActivationAddress
         {
             get;
@@ -109,7 +107,6 @@ namespace Orleans
             tryResendMessage = TryResendMessage;
             unregisterCallback = msg => UnRegisterCallback(msg.Id);
             callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
-            localObjects = new ConcurrentDictionary<GuidId, LocalObjectData>();
             this.callBackDataLogger = loggerFactory.CreateLogger<CallbackData>();
             this.timerLogger = loggerFactory.CreateLogger<SafeTimer>();
             this.clientMessagingOptions = clientMessagingOptions.Value;
@@ -135,8 +132,11 @@ namespace Orleans
 
             this.InternalGrainFactory = this.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
             this.ClientStatistics = this.ServiceProvider.GetRequiredService<ClientStatisticsManager>();
-            this.serializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
             this.messageFactory = this.ServiceProvider.GetService<MessageFactory>();
+            this.localObjects = new InvokableObjectManager(
+                this,
+                services.GetRequiredService<SerializationManager>(),
+                this.loggerFactory.CreateLogger<InvokableObjectManager>());
 
             this.GrainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
 
@@ -335,7 +335,7 @@ namespace Orleans
                     case Message.Directions.OneWay:
                     case Message.Directions.Request:
                         {
-                            this.DispatchToLocalObject(message);
+                            this.localObjects.Dispatch(message);
                             break;
                         }
                     default:
@@ -346,210 +346,8 @@ namespace Orleans
 
             incomingMessagesThreadTimeTracking?.OnStopExecution();
         }
-
-        private void DispatchToLocalObject(Message message)
-        {
-            LocalObjectData objectData;
-            GuidId observerId = message.TargetObserverId;
-            if (observerId == null)
-            {
-                logger.Error(
-                    ErrorCode.ProxyClient_OGC_TargetNotFound_2,
-                    $"Did not find TargetObserverId header in the message = {message}. A request message to a client is expected to have an observerId.");
-                return;
-            }
-
-            if (localObjects.TryGetValue(observerId, out objectData))
-                this.InvokeLocalObjectAsync(objectData, message);
-            else
-            {
-                logger.Error(
-                    ErrorCode.ProxyClient_OGC_TargetNotFound,
-                    $"Unexpected target grain in request: {message.TargetGrain}. Message={message}");
-            }
-        }
-
-        private void InvokeLocalObjectAsync(LocalObjectData objectData, Message message)
-        {
-            var obj = (IAddressable)objectData.LocalObject.Target;
-            if (obj == null)
-            {
-                //// Remove from the dictionary record for the garbage collected object? But now we won't be able to detect invalid dispatch IDs anymore.
-                logger.Warn(ErrorCode.Runtime_Error_100162,
-                    $"Object associated with Observer ID {objectData.ObserverId} has been garbage collected. Deleting object reference and unregistering it. Message = {message}");
-
-                LocalObjectData ignore;
-                // Try to remove. If it's not there, we don't care.
-                localObjects.TryRemove(objectData.ObserverId, out ignore);
-                return;
-            }
-
-            bool start;
-            lock (objectData.Messages)
-            {
-                objectData.Messages.Enqueue(message);
-                start = !objectData.Running;
-                objectData.Running = true;
-            }
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("InvokeLocalObjectAsync {0} start {1}", message, start);
-            if (start)
-            {
-                // we use Task.Run() to ensure that the message pump operates asynchronously
-                // with respect to the current thread. see
-                // http://channel9.msdn.com/Events/TechEd/Europe/2013/DEV-B317#fbid=aIWUq0ssW74
-                // at position 54:45.
-                //
-                // according to the information posted at:
-                // http://stackoverflow.com/questions/12245935/is-task-factory-startnew-guaranteed-to-use-another-thread-than-the-calling-thr
-                // this idiom is dependent upon the a TaskScheduler not implementing the
-                // override QueueTask as task inlining (as opposed to queueing). this seems
-                // implausible to the author, since none of the .NET schedulers do this and
-                // it is considered bad form (the OrleansTaskScheduler does not do this).
-                //
-                // if, for some reason this doesn't hold true, we can guarantee what we
-                // want by passing a placeholder continuation token into Task.StartNew()
-                // instead. i.e.:
-                //
-                // return Task.StartNew(() => ..., new CancellationToken());
-                Func<Task> asyncFunc =
-                    async () =>
-                        await this.LocalObjectMessagePumpAsync(objectData);
-                Task.Run(asyncFunc).Ignore();
-            }
-        }
-
-        private async Task LocalObjectMessagePumpAsync(LocalObjectData objectData)
-        {
-            while (true)
-            {
-                try
-                {
-                    Message message;
-                    lock (objectData.Messages)
-                    {
-                        if (objectData.Messages.Count == 0)
-                        {
-                            objectData.Running = false;
-                            break;
-                        }
-                        message = objectData.Messages.Dequeue();
-                    }
-
-                    if (ExpireMessageIfExpired(message, MessagingStatisticsGroup.Phase.Invoke))
-                        continue;
-
-                    RequestContextExtensions.Import(message.RequestContextData);
-                    var request = (InvokeMethodRequest)message.GetDeserializedBody(this.serializationManager);
-                    var targetOb = (IAddressable)objectData.LocalObject.Target;
-                    object resultObject = null;
-                    Exception caught = null;
-                    try
-                    {
-                        // exceptions thrown within this scope are not considered to be thrown from user code
-                        // and not from runtime code.
-                        var resultPromise = objectData.Invoker.Invoke(targetOb, request);
-                        if (resultPromise != null) // it will be null for one way messages
-                        {
-                            resultObject = await resultPromise;
-                        }
-                    }
-                    catch (Exception exc)
-                    {
-                        // the exception needs to be reported in the log or propagated back to the caller.
-                        caught = exc;
-                    }
-                    if (caught != null)
-                        this.ReportException(message, caught);
-                    else if (message.Direction != Message.Directions.OneWay)
-                        await this.SendResponseAsync(message, resultObject);
-                }
-                catch (Exception)
-                {
-                    // ignore, keep looping.
-                }
-            }
-        }
-
-        private static bool ExpireMessageIfExpired(Message message, MessagingStatisticsGroup.Phase phase)
-        {
-            if (message.IsExpired)
-            {
-                message.DropExpiredMessage(phase);
-                return true;
-            }
-            return false;
-        }
-
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        private Task
-            SendResponseAsync(
-                Message message,
-                object resultObject)
-        {
-            if (ExpireMessageIfExpired(message, MessagingStatisticsGroup.Phase.Respond))
-                return Task.CompletedTask;
-
-            object deepCopy = null;
-            try
-            {
-                // we're expected to notify the caller if the deep copy failed.
-                deepCopy = this.serializationManager.DeepCopy(resultObject);
-            }
-            catch (Exception exc2)
-            {
-                SendResponse(message, Response.ExceptionResponse(exc2));
-                logger.Warn(
-                    ErrorCode.ProxyClient_OGC_SendResponseFailed,
-                    "Exception trying to send a response.", exc2);
-                return Task.CompletedTask;
-            }
-
-            // the deep-copy succeeded.
-            SendResponse(message, new Response(deepCopy));
-            return Task.CompletedTask;
-        }
-
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        private void ReportException(Message message, Exception exception)
-        {
-            var request = (InvokeMethodRequest)message.GetDeserializedBody(this.serializationManager);
-            switch (message.Direction)
-            {
-                default:
-                    throw new InvalidOperationException();
-                case Message.Directions.OneWay:
-                    {
-                        logger.Error(
-                            ErrorCode.ProxyClient_OGC_UnhandledExceptionInOneWayInvoke,
-                            $"Exception during invocation of notification method {request.MethodId}, interface {request.InterfaceId}. Ignoring exception because this is a one way request.",
-                            exception);
-                        break;
-                    }
-                case Message.Directions.Request:
-                    {
-                        Exception deepCopy = null;
-                        try
-                        {
-                            // we're expected to notify the caller if the deep copy failed.
-                            deepCopy = (Exception)this.serializationManager.DeepCopy(exception);
-                        }
-                        catch (Exception ex2)
-                        {
-                            SendResponse(message, Response.ExceptionResponse(ex2));
-                            logger.Warn(
-                                ErrorCode.ProxyClient_OGC_SendExceptionResponseFailed,
-                                "Exception trying to send an exception response", ex2);
-                            return;
-                        }
-                        // the deep-copy succeeded.
-                        var response = Response.ExceptionResponse(deepCopy);
-                        SendResponse(message, response);
-                        break;
-                    }
-            }
-        }
-
-        private void SendResponse(Message request, Response response)
+        
+        public void SendResponse(Message request, Response response)
         {
             var message = this.messageFactory.CreateResponseMessage(request);
             message.BodyObject = response;
@@ -798,7 +596,7 @@ namespace Orleans
                 throw new ArgumentException("Argument must not be a grain class.", nameof(obj));
 
             GrainReference gr = GrainReference.NewObserverGrainReference(clientId, GuidId.GetNewGuidId(), this.GrainReferenceRuntime);
-            if (!localObjects.TryAdd(gr.ObserverId, new LocalObjectData(obj, gr.ObserverId, invoker)))
+            if (!localObjects.TryRegister(obj, gr.ObserverId, invoker))
             {
                 throw new ArgumentException(String.Format("Failed to add new observer {0} to localObjects collection.", gr), "gr");
             }
@@ -811,8 +609,7 @@ namespace Orleans
                 throw new ArgumentException("Argument reference is not a grain reference.");
 
             var reference = (GrainReference)obj;
-            LocalObjectData ignore;
-            if (!localObjects.TryRemove(reference.ObserverId, out ignore))
+            if (!localObjects.TryDeregister(reference.ObserverId))
                 throw new ArgumentException("Reference is not associated with a local object.", "reference");
         }
 
@@ -834,24 +631,6 @@ namespace Orleans
         private string PrintAppDomainDetails()
         {
             return string.Format("<AppDomain.Id={0}, AppDomain.FriendlyName={1}>", AppDomain.CurrentDomain.Id, AppDomain.CurrentDomain.FriendlyName);
-        }
-
-        private class LocalObjectData
-        {
-            internal WeakReference LocalObject { get; private set; }
-            internal IGrainMethodInvoker Invoker { get; private set; }
-            internal GuidId ObserverId { get; private set; }
-            internal Queue<Message> Messages { get; private set; }
-            internal bool Running { get; set; }
-
-            internal LocalObjectData(IAddressable obj, GuidId observerId, IGrainMethodInvoker invoker)
-            {
-                LocalObject = new WeakReference(obj);
-                ObserverId = observerId;
-                Invoker = invoker;
-                Messages = new Queue<Message>();
-                Running = false;
-            }
         }
 
         public void Dispose()

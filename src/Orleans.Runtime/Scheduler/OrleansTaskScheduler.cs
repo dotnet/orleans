@@ -250,18 +250,17 @@ namespace Orleans.Runtime.Scheduler
             }
 
             workItem.SchedulingContext = context;
-
+            
             // We must wrap any work item in Task and enqueue it as a task to the right scheduler via Task.Start.
+            Task t = TaskSchedulerUtils.WrapWorkItemAsTask(workItem);
+
             // This will make sure the TaskScheduler.Current is set correctly on any task that is created implicitly in the execution of this workItem.
             if (workItemGroup == null)
             {
-                Task t = TaskSchedulerUtils.WrapWorkItemAsTask(workItem, context, this);
                 t.Start(this);
             }
             else
             {
-                // Create Task wrapper for this work item
-                Task t = TaskSchedulerUtils.WrapWorkItemAsTask(workItem, context, workItemGroup.TaskRunner);
                 t.Start(workItemGroup.TaskRunner);
             }
         }
@@ -375,7 +374,7 @@ namespace Orleans.Runtime.Scheduler
 
             if (workItemGroup == null)
             {
-                RuntimeContext.SetExecutionContext(null, this);
+                RuntimeContext.SetExecutionContext(null);
                 bool done = TryExecuteTask(task);
                 if (!done)
                     logger.Warn(ErrorCode.SchedulerTaskExecuteIncomplete2, "RunTask: Incomplete base.TryExecuteTask for Task Id={0} with Status={1}",

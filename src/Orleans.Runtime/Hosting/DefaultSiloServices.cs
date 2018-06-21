@@ -269,6 +269,9 @@ namespace Orleans.Hosting
             // so move it in the end so other validator are called first
             services.AddTransient<IConfigurationValidator, ClusterOptionsValidator>();
             services.AddTransient<IConfigurationValidator, SiloClusteringValidator>();
+
+            // Disable hosted client by default.
+            services.TryAddSingleton<IHostedClient, DisabledHostedClient>();
         }
     }
 }

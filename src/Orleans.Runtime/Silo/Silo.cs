@@ -410,9 +410,6 @@ namespace Orleans.Runtime
 
             StartTaskWithPerfAnalysis("Start local grain directory", LocalGrainDirectory.Start,stopWatch);
 
-            // Set up an execution context for this thread so that the target creation steps can use asynch values.
-            RuntimeContext.InitializeMainThread();
-
             StartTaskWithPerfAnalysis("Init implicit stream subscribe table", InitImplicitStreamSubscribeTable, stopWatch);
             void InitImplicitStreamSubscribeTable()
             {             

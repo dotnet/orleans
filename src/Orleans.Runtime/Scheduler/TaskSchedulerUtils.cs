@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 
 
@@ -5,17 +6,18 @@ namespace Orleans.Runtime.Scheduler
 {
     internal class TaskSchedulerUtils
     {
-        internal static Task WrapWorkItemAsTask(IWorkItem todo, ISchedulingContext context, TaskScheduler sched)
+        private static readonly Action<object> TaskFunc = state => RunWorkItemTask((IWorkItem)state);
+
+        internal static Task WrapWorkItemAsTask(IWorkItem todo)
         {
-            var task = new Task(state => RunWorkItemTask(todo, sched), context);
-            return task;
+            return new Task(TaskFunc, todo);
         }
 
-        private static void RunWorkItemTask(IWorkItem todo, TaskScheduler sched)
+        private static void RunWorkItemTask(IWorkItem todo)
         {
             try
             {
-                RuntimeContext.SetExecutionContext(todo.SchedulingContext, sched);
+                RuntimeContext.SetExecutionContext(todo.SchedulingContext);
                 todo.Execute();
             }
             finally
