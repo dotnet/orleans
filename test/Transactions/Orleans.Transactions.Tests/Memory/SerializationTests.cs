@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
+using Orleans.Providers;
 using Xunit;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -34,13 +36,13 @@ namespace Orleans.Transactions.Tests.Memory
                 Timestamp = DateTime.UtcNow,
                 WriteParticipants = new List<ITransactionParticipant>() { new TransactionParticipantExtension().AsTransactionParticipant("resourceId")}
             });
-            MetaData.SerializerSettings = TransactionParticipantExtensionExtensions.GetJsonSerializerSettings(
+            var serializerSettings = TransactionParticipantExtensionExtensions.GetJsonSerializerSettings(
                 this.environment.Client.ServiceProvider.GetService<ITypeResolver>(),
                 this.environment.GrainFactory);
             //should be able to serialize it
-            var jsonMetaData = JsonConvert.SerializeObject(metaData, MetaData.SerializerSettings);
+            var jsonMetaData = JsonConvert.SerializeObject(metaData, serializerSettings);
 
-            var deseriliazedMetaData = JsonConvert.DeserializeObject<MetaData>(jsonMetaData, MetaData.SerializerSettings);
+            var deseriliazedMetaData = JsonConvert.DeserializeObject<MetaData>(jsonMetaData, serializerSettings);
             Assert.Equal(metaData.TimeStamp, deseriliazedMetaData.TimeStamp);
         }
     }

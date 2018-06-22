@@ -10,6 +10,7 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Transactions.Abstractions;
+using Orleans.Transactions.Abstractions.Extensions;
 
 namespace Orleans.Transactions.AzureStorage
 {
@@ -33,7 +34,9 @@ namespace Orleans.Transactions.AzureStorage
             this.name = name;
             this.options = options;
             this.clusterOptions = clusterOptions.Value;
-            this.jsonSettings = OrleansJsonSerializer.GetDefaultSerializerSettings(typeResolver, grainFactory);
+            this.jsonSettings = TransactionParticipantExtensionExtensions.GetJsonSerializerSettings(
+                typeResolver,
+                grainFactory);
             this.loggerFactory = loggerFactory;
         }
 

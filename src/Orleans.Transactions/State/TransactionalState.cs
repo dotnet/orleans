@@ -89,6 +89,7 @@ namespace Orleans.Transactions
 
         private CausalClock clock;
 
+        private JsonSerializerSettings serializerSettings;
         // collection tasks
         private Dictionary<DateTime, PMessages> unprocessedPreparedMessages;
         private class PMessages
@@ -120,11 +121,8 @@ namespace Orleans.Transactions
             lockWorker = new BatchWorkerFromDelegate(LockWork);
             storageWorker = new BatchWorkerFromDelegate(StorageWork);
             confirmationWorker = new BatchWorkerFromDelegate(ConfirmationWork);
-
-            if (MetaData.SerializerSettings == null)
-            {
-                MetaData.SerializerSettings = TransactionParticipantExtensionExtensions.GetJsonSerializerSettings(typeResolver, grainFactory);
-            }
+            
+            this.serializerSettings = TransactionParticipantExtensionExtensions.GetJsonSerializerSettings(typeResolver, grainFactory);
         }
 
         #region lifecycle
@@ -190,7 +188,8 @@ namespace Orleans.Transactions
 
             var loadresponse = await loadtask;
 
-            storageBatch = new StorageBatch<TState>(loadresponse);
+            storageBatch = new StorageBatch<TState>(loadresponse, this.serializerSettings);
+         
 
             stableState = loadresponse.CommittedState;
             stableSequenceNumber = loadresponse.CommittedSequenceId;
@@ -208,9 +207,8 @@ namespace Orleans.Transactions
                 {
                     if (logger.IsEnabled(LogLevel.Debug))
                         logger.Debug($"recover two-phase-commit {pr.TransactionId}");
-
                     var tm = (pr.TransactionManager == null) ? null :
-                        (ITransactionParticipant) JsonConvert.DeserializeObject<ITransactionParticipant>(pr.TransactionManager, MetaData.SerializerSettings);
+                        (ITransactionParticipant) JsonConvert.DeserializeObject<ITransactionParticipant>(pr.TransactionManager, this.serializerSettings);
 
                     commitQueue.Add(new TransactionRecord<TState>()
                     {

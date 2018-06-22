@@ -3,11 +3,14 @@ using Orleans.Transactions.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 
 namespace Orleans.Transactions
 {
+    [Serializable]
     public class TransactionParticipantExtension : ITransactionParticipantExtension
     {
+        [JsonProperty]
         private readonly Dictionary<string, ITransactionParticipant> localParticipants = new Dictionary<string, ITransactionParticipant>();
 
         public void Register(string resourceId, ITransactionParticipant localTransactionParticipant)

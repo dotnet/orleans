@@ -3,9 +3,7 @@ using Xunit;
 using Orleans.Hosting;
 using Orleans.TestingHost;
 using Orleans.Transactions.Tests;
-using Orleans.TestingHost.Utils;
 using TestExtensions;
-using Microsoft.Extensions.Logging;
 using Tester;
 
 namespace Orleans.Transactions.AzureStorage.Tests
