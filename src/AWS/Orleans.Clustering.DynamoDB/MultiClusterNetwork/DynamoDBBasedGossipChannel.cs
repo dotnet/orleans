@@ -18,7 +18,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
 
         public string Name { get; }
         private readonly ILoggerFactory _loggerFactory;
-
+        
         public DynamoDBBasedGossipChannel(ILoggerFactory loggerFactory)
         {
             Name = "DynamoDBBasedGossipChannel-" + ++_sequenceNumber;
@@ -31,7 +31,14 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
             _logger.Info("Initializing Gossip Channel for ServiceId={0} using connection: {1}",
                 serviceId, ConfigUtilities.RedactConnectionStringInfo(connectionString));
 
-            _tableManager = await GossipTableInstanceManager.GetManager(serviceId, connectionString, _loggerFactory);
+            var builder = new StorageProvider(connectionString);
+
+            await Initialize(serviceId, builder);
+        }
+
+        internal async Task Initialize(string serviceId, IStorageProvider provider)
+        {
+            _tableManager = await GossipTableInstanceManager.GetManager(serviceId, _loggerFactory, provider);
         }
 
         public async Task Publish(IMultiClusterGossipData data)

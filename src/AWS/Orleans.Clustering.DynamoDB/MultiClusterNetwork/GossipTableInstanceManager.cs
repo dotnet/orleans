@@ -10,6 +10,7 @@ using Orleans.MultiCluster;
 using Orleans.Runtime;
 using Orleans.Runtime.MultiClusterNetwork;
 
+[assembly: InternalsVisibleTo("DynamoTest")]
 namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
 {
     internal class GossipTableInstanceManager
@@ -17,32 +18,26 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
         private const string CONF_TABLE_NAME = "OrleansGossipConfigurationTable";
         private const string GATEWAY_TABLE_NAME = "OrleansGossipGatewayTable";
 
-        private readonly DynamoDBStorage _confStorage;
-        private readonly DynamoDBStorage _gatewayStorage;
+        private readonly IDynamoDBStorage _confStorage;
+        private readonly IDynamoDBStorage _gatewayStorage;
         private readonly string _globalServiceId;
         private readonly ILogger _logger;
 
-        private GossipTableInstanceManager(string globalServiceId, string storageConnectionString, ILoggerFactory loggerFactory)
+        private GossipTableInstanceManager(string globalServiceId, ILoggerFactory loggerFactory, IStorageProvider provider)
         {
             _globalServiceId = globalServiceId;
 
             _logger = loggerFactory.CreateLogger<GossipTableInstanceManager>();
 
-            // Using legacy here
-            var options = new DynamoDBClusteringOptions();
-            LegacyDynamoDBMembershipConfigurator.ParseDataConnectionString(storageConnectionString, options);
-
-            _confStorage = new DynamoDBStorage(loggerFactory, options.Service, options.AccessKey, options.SecretKey,
-                options.ReadCapacityUnits, options.WriteCapacityUnits);
-            _gatewayStorage = new DynamoDBStorage(loggerFactory, options.Service, options.AccessKey, options.SecretKey,
-                options.ReadCapacityUnits, options.WriteCapacityUnits);
+            _confStorage = provider.GetConfStorage(loggerFactory);
+            _gatewayStorage = provider.GetGatewayStorage(loggerFactory);
         }
 
-        public static async Task<GossipTableInstanceManager> GetManager(string globalServiceId, string storageConnectionString, ILoggerFactory loggerFactory)
+        public static async Task<GossipTableInstanceManager> GetManager(string globalServiceId, ILoggerFactory loggerFactory, IStorageProvider provider)
         {
             if (loggerFactory == null) throw new ArgumentNullException(nameof(loggerFactory));
 
-            var instance = new GossipTableInstanceManager(globalServiceId, storageConnectionString, loggerFactory);
+            var instance = new GossipTableInstanceManager(globalServiceId, loggerFactory, provider);
 
             await InitializeTableAsync(instance._confStorage, CONF_TABLE_NAME, GossipConfigurationMapper.Keys, GossipConfigurationMapper.Attributes);
             await InitializeTableAsync(instance._gatewayStorage, GATEWAY_TABLE_NAME, GossipGatewayMapper.Keys, GossipGatewayMapper.Attributes);
@@ -50,7 +45,7 @@ namespace Orleans.Clustering.DynamoDB.MultiClusterNetwork
             return instance;
         }
 
-        private static async Task InitializeTableAsync(DynamoDBStorage storage, string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes)
+        private static async Task InitializeTableAsync(IDynamoDBStorage storage, string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes)
         {
             try
             {

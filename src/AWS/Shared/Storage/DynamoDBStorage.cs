@@ -25,9 +25,119 @@ namespace Orleans.Transactions.DynamoDB
 #endif
 {
     /// <summary>
-    /// Wrapper around AWS DynamoDB SDK.
+    /// Wrapper abstraction around AWS DynamoDB SDK.
     /// </summary>
-    internal class DynamoDBStorage
+    internal interface IDynamoDBStorage
+    {
+        /// <summary>
+        /// Create a DynamoDB table if it doesn't exist
+        /// </summary>
+        /// <param name="tableName">The name of the table</param>
+        /// <param name="keys">The keys definitions</param>
+        /// <param name="attributes">The attributes used on the key definition</param>
+        /// <param name="secondaryIndexes">(optional) The secondary index definitions</param>
+        /// <returns></returns>
+        Task InitializeTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null);
+
+        /// <summary>
+        /// Delete a table from DynamoDB
+        /// </summary>
+        /// <param name="tableName">The name of the table to delete</param>
+        /// <returns></returns>
+        Task DeleTableAsync(string tableName);
+
+        /// <summary>
+        /// Create or Replace an entry in a DynamoDB Table
+        /// </summary>
+        /// <param name="tableName">The name of the table to put an entry</param>
+        /// <param name="fields">The fields/attributes to add or replace in the table</param>
+        /// <param name="conditionExpression">Optional conditional expression</param>
+        /// <param name="conditionValues">Optional field/attribute values used in the conditional expression</param>
+        /// <returns></returns>
+        Task PutEntryAsync(string tableName, Dictionary<string, AttributeValue> fields, string conditionExpression = "", Dictionary<string, AttributeValue> conditionValues = null);
+
+        /// <summary>
+        /// Create or update an entry in a DynamoDB Table
+        /// </summary>
+        /// <param name="tableName">The name of the table to upsert an entry</param>
+        /// <param name="keys">The table entry keys for the entry</param>
+        /// <param name="fields">The fields/attributes to add or updated in the table</param>
+        /// <param name="conditionExpression">Optional conditional expression</param>
+        /// <param name="conditionValues">Optional field/attribute values used in the conditional expression</param>
+        /// <param name="extraExpression">Additional expression that will be added in the end of the upsert expression</param>
+        /// <param name="extraExpressionValues">Additional field/attribute that will be used in the extraExpression</param>
+        /// <remarks>The fields dictionary item values will be updated with the values returned from DynamoDB</remarks>
+        /// <returns></returns>
+        Task UpsertEntryAsync(string tableName, Dictionary<string, AttributeValue> keys, Dictionary<string, AttributeValue> fields,
+            string conditionExpression = "", Dictionary<string, AttributeValue> conditionValues = null, string extraExpression = "",
+            Dictionary<string, AttributeValue> extraExpressionValues = null);
+
+        /// <summary>
+        /// Delete an entry from a DynamoDB table
+        /// </summary>
+        /// <param name="tableName">The name of the table to delete an entry</param>
+        /// <param name="keys">The table entry keys for the entry to be deleted</param>
+        /// <param name="conditionExpression">Optional conditional expression</param>
+        /// <param name="conditionValues">Optional field/attribute values used in the conditional expression</param>
+        /// <returns></returns>
+        Task DeleteEntryAsync(string tableName, Dictionary<string, AttributeValue> keys, string conditionExpression = "", Dictionary<string, AttributeValue> conditionValues = null);
+
+        /// <summary>
+        /// Delete multiple entries from a DynamoDB table (Batch delete)
+        /// </summary>
+        /// <param name="tableName">The name of the table to delete entries</param>
+        /// <param name="toDelete">List of key values for each entry that must be deleted in the batch</param>
+        /// <returns></returns>
+        Task DeleteEntriesAsync(string tableName, IReadOnlyCollection<Dictionary<string, AttributeValue>> toDelete);
+
+        /// <summary>
+        /// Read an entry from a DynamoDB table
+        /// </summary>
+        /// <typeparam name="TResult">The result type</typeparam>
+        /// <param name="tableName">The name of the table to search for the entry</param>
+        /// <param name="keys">The table entry keys to search for</param>
+        /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is != null</param>
+        /// <returns>The object translated by the resolver function</returns>
+        Task<TResult> ReadSingleEntryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, Func<Dictionary<string, AttributeValue>, TResult> resolver) where TResult : class;
+
+        /// <summary>
+        /// Query for multiple entries in a DynamoDB table by filtering its keys
+        /// </summary>
+        /// <typeparam name="TResult">The result type</typeparam>
+        /// <param name="tableName">The name of the table to search for the entries</param>
+        /// <param name="keys">The table entry keys to search for</param>
+        /// <param name="keyConditionExpression">the expression that will filter the keys</param>
+        /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is != null and will be called for each entry that match the query and added to the results list</param>
+        /// <param name="indexName">In case a secondary index is used in the keyConditionExpression</param>
+        /// <param name="scanIndexForward">In case an index is used, show if the seek order is ascending (true) or descending (false)</param>
+        /// <param name="lastEvaluatedKey">The primary key of the first item that this operation will evaluate. Use the value that was returned for LastEvaluatedKey in the previous operation</param>
+        /// <returns>The collection containing a list of objects translated by the resolver function and the LastEvaluatedKey for paged results</returns>
+        Task<(List<TResult> results, Dictionary<string, AttributeValue> lastEvaluatedKey)> QueryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver, string indexName = "", bool scanIndexForward = true, Dictionary<string, AttributeValue> lastEvaluatedKey = null) where TResult : class;
+
+        /// <summary>
+        /// Scan a DynamoDB table by querying the entry fields.
+        /// </summary>
+        /// <typeparam name="TResult">The result type</typeparam>
+        /// <param name="tableName">The name of the table to search for the entries</param>
+        /// <param name="attributes">The attributes used on the expression</param>
+        /// <param name="expression">The filter expression</param>
+        /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is != null and will be called for each entry that match the query and added to the results list</param>
+        /// <returns>The collection containing a list of objects translated by the resolver function</returns>
+        Task<List<TResult>> ScanAsync<TResult>(string tableName, Dictionary<string, AttributeValue> attributes, string expression, Func<Dictionary<string, AttributeValue>, TResult> resolver) where TResult : class;
+
+        /// <summary>
+        /// Crete or replace multiple entries in a DynamoDB table (Batch put)
+        /// </summary>
+        /// <param name="tableName">The name of the table to search for the entry</param>
+        /// <param name="toCreate">List of key values for each entry that must be created or replaced in the batch</param>
+        /// <returns></returns>
+        Task PutEntriesAsync(string tableName, IReadOnlyCollection<Dictionary<string, AttributeValue>> toCreate);
+    }
+
+    /// <summary>
+    /// Wrapper  around AWS DynamoDB SDK.
+    /// </summary>
+    internal class DynamoDBStorage : IDynamoDBStorage
     {
         private string accessKey;
 
@@ -64,15 +174,8 @@ namespace Orleans.Transactions.DynamoDB
             Logger = loggerFactory.CreateLogger<DynamoDBStorage>();
             CreateClient();
         }
-
-        /// <summary>
-        /// Create a DynamoDB table if it doesn't exist
-        /// </summary>
-        /// <param name="tableName">The name of the table</param>
-        /// <param name="keys">The keys definitions</param>
-        /// <param name="attributes">The attributes used on the key definition</param>
-        /// <param name="secondaryIndexes">(optional) The secondary index definitions</param>
-        /// <returns></returns>
+        
+        /// <inheritdoc />
         public async Task InitializeTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null)
         {
             try
@@ -172,11 +275,7 @@ namespace Orleans.Transactions.DynamoDB
             }
         }
 
-        /// <summary>
-        /// Delete a table from DynamoDB
-        /// </summary>
-        /// <param name="tableName">The name of the table to delete</param>
-        /// <returns></returns>
+        /// <inheritdoc />
         public Task DeleTableAsync(string tableName)
         {
             try
@@ -190,18 +289,11 @@ namespace Orleans.Transactions.DynamoDB
             }
         }
 
-#endregion
+        #endregion
 
-#region CRUD
+        #region CRUD
 
-        /// <summary>
-        /// Create or Replace an entry in a DynamoDB Table
-        /// </summary>
-        /// <param name="tableName">The name of the table to put an entry</param>
-        /// <param name="fields">The fields/attributes to add or replace in the table</param>
-        /// <param name="conditionExpression">Optional conditional expression</param>
-        /// <param name="conditionValues">Optional field/attribute values used in the conditional expression</param>
-        /// <returns></returns>
+        /// <inheritdoc />
         public Task PutEntryAsync(string tableName, Dictionary<string, AttributeValue> fields, string conditionExpression = "", Dictionary<string, AttributeValue> conditionValues = null)
         {
             if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Creating {0} table entry: {1}", tableName, Utils.DictionaryToString(fields));
@@ -224,18 +316,7 @@ namespace Orleans.Transactions.DynamoDB
             }
         }
 
-        /// <summary>
-        /// Create or update an entry in a DynamoDB Table
-        /// </summary>
-        /// <param name="tableName">The name of the table to upsert an entry</param>
-        /// <param name="keys">The table entry keys for the entry</param>
-        /// <param name="fields">The fields/attributes to add or updated in the table</param>
-        /// <param name="conditionExpression">Optional conditional expression</param>
-        /// <param name="conditionValues">Optional field/attribute values used in the conditional expression</param>
-        /// <param name="extraExpression">Additional expression that will be added in the end of the upsert expression</param>
-        /// <param name="extraExpressionValues">Additional field/attribute that will be used in the extraExpression</param>
-        /// <remarks>The fields dictionary item values will be updated with the values returned from DynamoDB</remarks>
-        /// <returns></returns>
+        /// <inheritdoc />
         public async Task UpsertEntryAsync(string tableName, Dictionary<string, AttributeValue> keys, Dictionary<string, AttributeValue> fields,
             string conditionExpression = "", Dictionary<string, AttributeValue> conditionValues = null, string extraExpression = "",
             Dictionary<string, AttributeValue> extraExpressionValues = null)
@@ -312,14 +393,7 @@ namespace Orleans.Transactions.DynamoDB
             }
         }
 
-        /// <summary>
-        /// Delete an entry from a DynamoDB table
-        /// </summary>
-        /// <param name="tableName">The name of the table to delete an entry</param>
-        /// <param name="keys">The table entry keys for the entry to be deleted</param>
-        /// <param name="conditionExpression">Optional conditional expression</param>
-        /// <param name="conditionValues">Optional field/attribute values used in the conditional expression</param>
-        /// <returns></returns>
+        /// <inheritdoc />
         public Task DeleteEntryAsync(string tableName, Dictionary<string, AttributeValue> keys, string conditionExpression = "", Dictionary<string, AttributeValue> conditionValues = null)
         {
             if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Deleting table {0}  entry with key(s) {1}", tableName, Utils.DictionaryToString(keys));
@@ -348,12 +422,7 @@ namespace Orleans.Transactions.DynamoDB
             }
         }
 
-        /// <summary>
-        /// Delete multiple entries from a DynamoDB table (Batch delete)
-        /// </summary>
-        /// <param name="tableName">The name of the table to delete entries</param>
-        /// <param name="toDelete">List of key values for each entry that must be deleted in the batch</param>
-        /// <returns></returns>
+        /// <inheritdoc />
         public Task DeleteEntriesAsync(string tableName, IReadOnlyCollection<Dictionary<string, AttributeValue>> toDelete)
         {
             if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Deleting {0} table entries", tableName);
@@ -387,14 +456,7 @@ namespace Orleans.Transactions.DynamoDB
             }
         }
 
-        /// <summary>
-        /// Read an entry from a DynamoDB table
-        /// </summary>
-        /// <typeparam name="TResult">The result type</typeparam>
-        /// <param name="tableName">The name of the table to search for the entry</param>
-        /// <param name="keys">The table entry keys to search for</param>
-        /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is != null</param>
-        /// <returns>The object translated by the resolver function</returns>
+        /// <inheritdoc />
         public async Task<TResult> ReadSingleEntryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, Func<Dictionary<string, AttributeValue>, TResult> resolver) where TResult : class
         {
             try
@@ -424,18 +486,7 @@ namespace Orleans.Transactions.DynamoDB
             }
         }
 
-        /// <summary>
-        /// Query for multiple entries in a DynamoDB table by filtering its keys
-        /// </summary>
-        /// <typeparam name="TResult">The result type</typeparam>
-        /// <param name="tableName">The name of the table to search for the entries</param>
-        /// <param name="keys">The table entry keys to search for</param>
-        /// <param name="keyConditionExpression">the expression that will filter the keys</param>
-        /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is != null and will be called for each entry that match the query and added to the results list</param>
-        /// <param name="indexName">In case a secondary index is used in the keyConditionExpression</param>
-        /// <param name="scanIndexForward">In case an index is used, show if the seek order is ascending (true) or descending (false)</param>
-        /// <param name="lastEvaluatedKey">The primary key of the first item that this operation will evaluate. Use the value that was returned for LastEvaluatedKey in the previous operation</param>
-        /// <returns>The collection containing a list of objects translated by the resolver function and the LastEvaluatedKey for paged results</returns>
+        /// <inheritdoc />
         public async Task<(List<TResult> results, Dictionary<string, AttributeValue> lastEvaluatedKey)> QueryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver, string indexName = "", bool scanIndexForward = true, Dictionary<string, AttributeValue> lastEvaluatedKey = null) where TResult : class
         {
             try
@@ -472,15 +523,7 @@ namespace Orleans.Transactions.DynamoDB
             }
         }
 
-        /// <summary>
-        /// Scan a DynamoDB table by querying the entry fields.
-        /// </summary>
-        /// <typeparam name="TResult">The result type</typeparam>
-        /// <param name="tableName">The name of the table to search for the entries</param>
-        /// <param name="attributes">The attributes used on the expression</param>
-        /// <param name="expression">The filter expression</param>
-        /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is != null and will be called for each entry that match the query and added to the results list</param>
-        /// <returns>The collection containing a list of objects translated by the resolver function</returns>
+        /// <inheritdoc />
         public async Task<List<TResult>> ScanAsync<TResult>(string tableName, Dictionary<string, AttributeValue> attributes, string expression, Func<Dictionary<string, AttributeValue>, TResult> resolver) where TResult : class
         {
             try
@@ -511,12 +554,7 @@ namespace Orleans.Transactions.DynamoDB
             }
         }
 
-        /// <summary>
-        /// Crete or replace multiple entries in a DynamoDB table (Batch put)
-        /// </summary>
-        /// <param name="tableName">The name of the table to search for the entry</param>
-        /// <param name="toCreate">List of key values for each entry that must be created or replaced in the batch</param>
-        /// <returns></returns>
+        /// <inheritdoc />
         public Task PutEntriesAsync(string tableName, IReadOnlyCollection<Dictionary<string, AttributeValue>> toCreate)
         {
             if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Put entries {0} table", tableName);
