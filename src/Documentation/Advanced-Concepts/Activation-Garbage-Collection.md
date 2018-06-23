@@ -87,6 +87,6 @@ mySiloHostBuilder.Configure<GrainCollectionOptions>(options =>
   // Set the value of CollectionAge to 10 minutes for all grain
   options.CollectionAge = TimeSpan.FromMinutes(10);
   // Override the value of CollectionAge to 5 minutes for MyGrainImplementation
-  options.ClassSpecificCollectionAge[typeof(MyGrainImplementation).FullTypeName] = TimeSpan.FromMinutes(5);
+  options.ClassSpecificCollectionAge[typeof(MyGrainImplementation).FullName] = TimeSpan.FromMinutes(5);
 })
 ```
