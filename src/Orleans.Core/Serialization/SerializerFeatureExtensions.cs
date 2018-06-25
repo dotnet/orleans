@@ -23,9 +23,10 @@ namespace Orleans.Serialization
         /// <param name="copier">The copy delegate.</param>
         /// <param name="serializer">The serializer delegate.</param>
         /// <param name="deserializer">The deserializer delegate.</param>
-        public static void AddSerializerDelegates(this SerializerFeature serializerFeature, Type type, DeepCopier copier, Serializer serializer, Deserializer deserializer)
+        /// <param name="overrideExisting">Whether or not to override other registrations.</param>
+        public static void AddSerializerDelegates(this SerializerFeature serializerFeature, Type type, DeepCopier copier, Serializer serializer, Deserializer deserializer, bool overrideExisting = true)
         {
-            serializerFeature.SerializerDelegates.Add(new SerializerDelegateMetadata(type, copier, serializer, deserializer));
+            serializerFeature.SerializerDelegates.Add(new SerializerDelegateMetadata(type, copier, serializer, deserializer, overrideExisting));
         }
     }
 }

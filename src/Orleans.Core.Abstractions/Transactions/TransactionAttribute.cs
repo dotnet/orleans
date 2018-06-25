@@ -20,7 +20,7 @@ namespace Orleans
             ReadOnly = false;
         }
 
-        public TransactionOption Requirement { get; set; }
+        public TransactionOption Requirement { get; }
         public bool ReadOnly { get; set; }
     }
 
