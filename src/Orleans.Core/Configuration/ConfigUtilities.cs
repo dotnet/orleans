@@ -349,6 +349,7 @@ namespace Orleans.Runtime.Configuration
             if (string.IsNullOrEmpty(addrOrHost))
             {
                 nodeIps = NetworkInterface.GetAllNetworkInterfaces()
+                            .Where(iface => iface.OperationalStatus == OperationalStatus.Up)
                             .SelectMany(iface => iface.GetIPProperties().UnicastAddresses)
                             .Select(addr => addr.Address)
                             .Where(addr => addr.AddressFamily == family && !IPAddress.IsLoopback(addr))
