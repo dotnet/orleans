@@ -88,7 +88,7 @@ namespace Orleans.Transactions
         private BatchWorker confirmationWorker;
 
         private CausalClock clock;
-
+        private TransactionStateStatistics statistics;
         // collection tasks
         private Dictionary<DateTime, PMessages> unprocessedPreparedMessages;
         private class PMessages
@@ -106,7 +106,8 @@ namespace Orleans.Transactions
             ILoggerFactory loggerFactory, 
             ITypeResolver typeResolver,
             IGrainFactory grainFactory,
-            IClock clock
+            IClock clock,
+            TransactionStateStatistics statistics
             )
         {
             this.config = transactionalStateConfiguration;
@@ -116,7 +117,7 @@ namespace Orleans.Transactions
             this.runtime = runtime;
             this.loggerFactory = loggerFactory;
             this.clock = new CausalClock(clock);
-
+            this.statistics = statistics;
             lockWorker = new BatchWorkerFromDelegate(LockWork);
             storageWorker = new BatchWorkerFromDelegate(StorageWork);
             confirmationWorker = new BatchWorkerFromDelegate(ConfirmationWork);

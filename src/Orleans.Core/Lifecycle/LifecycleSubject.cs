@@ -47,7 +47,7 @@ namespace Orleans
                     Stopwatch stopWatch = Stopwatch.StartNew();
                     await Task.WhenAll(observerGroup.Select(orderedObserver => WrapExecution(ct, orderedObserver.Observer.OnStart)));
                     stopWatch.Stop();
-                    this.logger?.Info(ErrorCode.SiloStartPerfMeasure, $"Starting lifecycle stage {this.highStage} took {stopWatch.ElapsedMilliseconds} Milliseconds");
+                    //this.logger?.Info(ErrorCode.SiloStartPerfMeasure, $"Starting lifecycle stage {this.highStage} took {stopWatch.ElapsedMilliseconds} Milliseconds");
                 }
             }
             catch (Exception ex)
@@ -74,7 +74,7 @@ namespace Orleans
                     Stopwatch stopWatch = Stopwatch.StartNew();
                     await Task.WhenAll(observerGroup.Select(orderedObserver => WrapExecution(ct, orderedObserver.Observer.OnStop)));
                     stopWatch.Stop();
-                    this.logger?.Info(ErrorCode.SiloStartPerfMeasure, $"Stopping lifecycle stage {this.highStage} took {stopWatch.ElapsedMilliseconds} Milliseconds");
+                    //this.logger?.Info(ErrorCode.SiloStartPerfMeasure, $"Stopping lifecycle stage {this.highStage} took {stopWatch.ElapsedMilliseconds} Milliseconds");
                 }
                 catch (Exception ex)
                 {
