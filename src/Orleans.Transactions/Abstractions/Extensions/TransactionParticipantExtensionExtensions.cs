@@ -33,7 +33,6 @@ namespace Orleans.Transactions.Abstractions.Extensions
         [Immutable]
         internal sealed class TransactionParticipantExtensionWrapper : ITransactionParticipant
         {
-            [JsonProperty]
             private readonly ITransactionParticipantExtension extension;
             [JsonProperty]
             private readonly string resourceId;

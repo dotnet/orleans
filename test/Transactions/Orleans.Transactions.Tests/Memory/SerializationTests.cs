@@ -11,34 +11,38 @@ using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.Abstractions.Extensions;
+using Orleans.Transactions.Tests.Correctness;
 using TestExtensions;
+using Xunit.Abstractions;
 
 namespace Orleans.Transactions.Tests.Memory
 {
     [TestCategory("BVT"), TestCategory("Transactions")]
-    public class SerializationTests
+    public class SerializationTests: TransactionTestRunnerBase, IClassFixture<MemoryTransactionsFixture>
     {
-        private SerializationTestEnvironment environment;
-        public SerializationTests()
+        private MemoryTransactionsFixture fixture;
+        public SerializationTests(MemoryTransactionsFixture fixture, ITestOutputHelper output)
+            :base(fixture.GrainFactory, output)
         {
-            var config = new ClientConfiguration { SerializationProviders = { typeof(OrleansJsonSerializer).GetTypeInfo() } };
-            this.environment = SerializationTestEnvironment.InitializeWithDefaults(config);
+            this.fixture = fixture;
         }
 
         [Fact]
         public void JsonConcertCanSerializeMetaData()
         {
+            var grainRef = this.RandomTestGrain(TransactionTestConstants.SingleStateTransactionalGrain);
+            var ext = grainRef.Cast<ITransactionParticipantExtension>();
             var metaData = new MetaData();
             metaData.TimeStamp = DateTime.UtcNow;
             metaData.CommitRecords = new Dictionary<Guid, CommitRecord>();
             metaData.CommitRecords.Add(Guid.NewGuid(), new CommitRecord()
             {
                 Timestamp = DateTime.UtcNow,
-                WriteParticipants = new List<ITransactionParticipant>() { new TransactionParticipantExtension().AsTransactionParticipant("resourceId")}
+                WriteParticipants = new List<ITransactionParticipant>() { ext.AsTransactionParticipant("resourceId")}
             });
             var serializerSettings = TransactionParticipantExtensionExtensions.GetJsonSerializerSettings(
-                this.environment.Client.ServiceProvider.GetService<ITypeResolver>(),
-                this.environment.GrainFactory);
+                this.fixture.Client.ServiceProvider.GetService<ITypeResolver>(),
+                this.grainFactory);
             //should be able to serialize it
             var jsonMetaData = JsonConvert.SerializeObject(metaData, serializerSettings);
 

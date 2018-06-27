@@ -105,8 +105,7 @@ namespace Orleans.Transactions
             ITransactionAgent transactionAgent, 
             IProviderRuntime runtime, 
             ILoggerFactory loggerFactory, 
-            ITypeResolver typeResolver,
-            IGrainFactory grainFactory,
+            JsonSerializerSettings serializerSettings,
             IClock clock
             )
         {
@@ -121,8 +120,8 @@ namespace Orleans.Transactions
             lockWorker = new BatchWorkerFromDelegate(LockWork);
             storageWorker = new BatchWorkerFromDelegate(StorageWork);
             confirmationWorker = new BatchWorkerFromDelegate(ConfirmationWork);
-            
-            this.serializerSettings = TransactionParticipantExtensionExtensions.GetJsonSerializerSettings(typeResolver, grainFactory);
+
+            this.serializerSettings = serializerSettings;
         }
 
         #region lifecycle

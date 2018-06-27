@@ -67,7 +67,7 @@ namespace Orleans.Transactions
                     {
                         // get the next batch in place so it can be filled while we store the old one
                         batchBeingSentToStorage = storageBatch;                  
-                        storageBatch = new StorageBatch<TState>(batchBeingSentToStorage, this.serializerSettings);
+                        storageBatch = new StorageBatch<TState>(batchBeingSentToStorage);
 
                         // perform the actual store, and record the e-tag
                         storageBatch.ETag = await batchBeingSentToStorage.Store(storage);
