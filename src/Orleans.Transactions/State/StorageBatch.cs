@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Orleans.Concurrency;
 using Orleans.Transactions.Abstractions;
+using Orleans.Transactions.Abstractions.Extensions;
 
 namespace Orleans.Transactions
 {
@@ -35,8 +37,6 @@ namespace Orleans.Transactions
         public DateTime TimeStamp { get; set; }
 
         public Dictionary<Guid, CommitRecord> CommitRecords { get; set; }
-
-        public static JsonSerializerSettings SerializerSettings { get; set; }
     }
 
     [Serializable]
@@ -74,21 +74,21 @@ namespace Orleans.Transactions
         private int confirm = 0;
         private int collect = 0;
         private int cancel = 0;
-
+        private readonly JsonSerializerSettings serializerSettings;
         public MetaData MetaData { get; private set; }
 
         public string ETag { get; set; }
 
         public int BatchSize => total;
-
         public override string ToString()
         {
             return $"batchsize={total} [{read}r {prepare}p {commit}c {confirm}cf {collect}cl {cancel}cc]";
         }
 
-        public StorageBatch(TransactionalStorageLoadResponse<TState> loadresponse)
+        public StorageBatch(TransactionalStorageLoadResponse<TState> loadresponse, JsonSerializerSettings serializerSettings)
         {
-            MetaData = ReadMetaData(loadresponse);
+            this.serializerSettings = serializerSettings ?? throw new ArgumentNullException(nameof(serializerSettings));
+            MetaData = ReadMetaData(loadresponse, this.serializerSettings);
             ETag = loadresponse.ETag;
             confirmUpTo = loadresponse.CommittedSequenceId;
             cancelAbove = loadresponse.PendingStates.LastOrDefault()?.SequenceId ?? loadresponse.CommittedSequenceId;
@@ -97,15 +97,16 @@ namespace Orleans.Transactions
 
         public StorageBatch(StorageBatch<TState> previous)
         {
+            this.serializerSettings = previous.serializerSettings;
             MetaData = previous.MetaData;
             confirmUpTo = previous.confirmUpTo;
             cancelAbove = previous.cancelAbove;
             cancelAboveStart = cancelAbove;
         }
 
-        private static MetaData ReadMetaData(TransactionalStorageLoadResponse<TState> loadresponse)
+        private static MetaData ReadMetaData(TransactionalStorageLoadResponse<TState> loadresponse, JsonSerializerSettings serializerSettings)
         {
-            if (string.IsNullOrEmpty(loadresponse.Metadata))
+            if (string.IsNullOrEmpty(loadresponse?.Metadata))
             {
                 // this thing is fresh... did not exist in storage yet
                 return new MetaData()
@@ -116,14 +117,13 @@ namespace Orleans.Transactions
             }
             else
             {
-                return JsonConvert.DeserializeObject<MetaData>(loadresponse.Metadata, MetaData.SerializerSettings);
+                return JsonConvert.DeserializeObject<MetaData>(loadresponse.Metadata, serializerSettings);
             }
         }
 
         public Task<string> Store(ITransactionalStateStorage<TState> storage)
         {
-            var jsonMetaData = JsonConvert.SerializeObject(MetaData, MetaData.SerializerSettings);
-
+            var jsonMetaData = JsonConvert.SerializeObject(MetaData, this.serializerSettings);
             var list = new List<PendingTransactionState<TState>>();
 
             if (prepares != null)
@@ -176,7 +176,7 @@ namespace Orleans.Transactions
                 prepares = new SortedDictionary<long, PendingTransactionState<TState>>();
 
             var tmstring = (transactionManager == null) ? null :
-                JsonConvert.SerializeObject(transactionManager, MetaData.SerializerSettings);
+                JsonConvert.SerializeObject(transactionManager, this.serializerSettings);
 
             prepares[sequenceNumber] = new PendingTransactionState<TState>
             {
