@@ -8,11 +8,11 @@ title: Adventure
 A simple multiplayer text adventure game inspired by old-fashioned, text-based adventure games.
 
 ### Instructions:
-1. Build Adventure.sln
-2. Start your local Silo from a command window using command file  #1.
-3. The game map initialization script, #2
-4. Start the client #3
-5. Reminisce about the good old days before graphical user interfaces
+1. Open the OrleansAdventrure.sln in Visual Studio.
+2. Start the 'AdventureSetup' project.
+3. Once running, start the 'AdventureClient' project.
+4. You will then be prompted for your name on the command line. Enter it begin the game.
+
 
 ### Overview
 The AdventureSetup program reads a game description ("map") from AdventureConfig.txt.
