@@ -45,13 +45,12 @@ namespace Orleans.Transactions.Tests
         }
 
         [SkippableTheory]
-        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
-        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
-        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
-        public virtual async Task MultiGrainWriteTransaction(string grainStates)
+        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions)]
+        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions / 2)]
+        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain, 1)]
+        public virtual async Task MultiGrainWriteTransaction(string grainStates, int grainCount)
         {
             const int expected = 5;
-            const int grainCount = TransactionTestConstants.MaxCoordinatedTransactions;
 
             List<ITransactionTestGrain> grains =
                 Enumerable.Range(0, grainCount)
@@ -73,13 +72,12 @@ namespace Orleans.Transactions.Tests
         }
 
         [SkippableTheory]
-        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
-        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
-        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
-        public virtual async Task MultiGrainReadWriteTransaction(string grainStates)
+        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions)]
+        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions / 2)]
+        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain, 1)]
+        public virtual async Task MultiGrainReadWriteTransaction(string grainStates, int grainCount)
         {
             const int delta = 5;
-            const int grainCount = TransactionTestConstants.MaxCoordinatedTransactions;
 
             List<ITransactionTestGrain> grains =
                 Enumerable.Range(0, grainCount)
@@ -104,14 +102,13 @@ namespace Orleans.Transactions.Tests
         }
 
         [SkippableTheory]
-        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
-        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
-        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
-        public virtual async Task RepeatGrainReadWriteTransaction(string grainStates)
+        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions)]
+        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions/2)]
+        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain, 1)]
+        public virtual async Task RepeatGrainReadWriteTransaction(string grainStates, int grainCount)
         {
             const int repeat = 10;
             const int delta = 5;
-            const int grainCount = TransactionTestConstants.MaxCoordinatedTransactions;
 
             List<Guid> grainIds = Enumerable.Range(0, grainCount)
                     .Select(i => Guid.NewGuid())
