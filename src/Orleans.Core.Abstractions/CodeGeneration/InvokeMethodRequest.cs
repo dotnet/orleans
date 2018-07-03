@@ -67,7 +67,8 @@ namespace Orleans.CodeGeneration
 
         // Transactional method options. 
         // NOTE: keep in sync with TransactionOption enum.
-        TransactionRequired = 0x200,
-        TransactionRequiresNew = 0x400,
+        TransactionNotSupported = 0x200,
+        TransactionRequired = 0x400,
+        TransactionRequiresNew = 0x800,
     }
 }

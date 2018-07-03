@@ -14,6 +14,7 @@ namespace Orleans.Transactions.Tests
             this.minSkew = minSkew;
             this.skewRangeTicks = (int)(maxSkew.Ticks - minSkew.Ticks);
         }
+
         public DateTime UtcNow()
         {
             TimeSpan skew = TimeSpan.FromTicks(minSkew.Ticks + rand.Next(0, skewRangeTicks));

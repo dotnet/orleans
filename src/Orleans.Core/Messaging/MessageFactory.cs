@@ -20,29 +20,32 @@ namespace Orleans.Runtime
 
         public Message CreateMessage(InvokeMethodRequest request, InvokeMethodOptions options)
         {
-            var direction = (options & InvokeMethodOptions.OneWay) != 0 ? Message.Directions.OneWay : Message.Directions.Request;
+            // clear transaction info if transaction operation requires new transaction.
+            ITransactionInfo transactionInfo = (options & InvokeMethodOptions.TransactionRequiresNew) == 0 ? TransactionContext.GetTransactionInfo() : null;
+
+            bool isTransactionRequired = (options & InvokeMethodOptions.TransactionRequiresNew) != 0 || (options & InvokeMethodOptions.TransactionRequired) != 0;
+
             var message = new Message
             {
                 Category = Message.Categories.Application,
-                Direction = direction,
+                Direction = (options & InvokeMethodOptions.OneWay) != 0 ? Message.Directions.OneWay : Message.Directions.Request,
                 Id = CorrelationId.GetNext(),
                 IsReadOnly = (options & InvokeMethodOptions.ReadOnly) != 0,
                 IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
-                IsTransactionRequired = (options & InvokeMethodOptions.TransactionRequiresNew) != 0 || (options & InvokeMethodOptions.TransactionRequired) != 0,
+                IsTransactionRequired = isTransactionRequired,
+                IsAlwaysInterleave = (options & InvokeMethodOptions.AlwaysInterleave) != 0,
                 BodyObject = request,
                 IsUsingInterfaceVersions = request.InterfaceVersion > 0,
+                TransactionInfo = isTransactionRequired ? transactionInfo?.Fork() : null,
+                RequestContextData = RequestContextExtensions.Export(this.serializationManager)
             };
 
-            ITransactionInfo transactionInfo = message.IsTransactionRequired ? TransactionContext.GetTransactionInfo() : null;
-            if (transactionInfo != null)
+            if(!isTransactionRequired || transactionInfo == null)
             {
-                message.TransactionInfo = transactionInfo.Fork();
+                // if we're leaving a transaction context, make sure it's been cleared from the request context.
+                message.RequestContextData?.Remove(TransactionContext.Orleans_TransactionContext_Key);
             }
 
-            if ((options & InvokeMethodOptions.AlwaysInterleave) != 0)
-                message.IsAlwaysInterleave = true;
-
-            message.RequestContextData = RequestContextExtensions.Export(this.serializationManager);
             return message;
         }
 

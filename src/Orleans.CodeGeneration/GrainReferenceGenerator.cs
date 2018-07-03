@@ -281,14 +281,22 @@ namespace Orleans.CodeGenerator
                 options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.AlwaysInterleave.ToString()));
             }
 
-            if (GrainInterfaceUtils.IsNewTransactionRequired(method))
+            if (GrainInterfaceUtils.TryGetTransactionOption(method, out TransactionOption option))
             {
-                options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionRequiresNew.ToString()));
-            }
-
-            if (GrainInterfaceUtils.IsTransactionRequired(method))
-            {
-                options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionRequired.ToString()));
+                switch (option)
+                {
+                    case TransactionOption.NotSupported:
+                        options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionNotSupported.ToString()));
+                        break;
+                    case TransactionOption.Required:
+                        options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionRequired.ToString()));
+                        break;
+                    case TransactionOption.RequiresNew:
+                        options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionRequiresNew.ToString()));
+                        break;
+                    default:
+                        throw new NotSupportedException($"Transaction option {options} is not supported.");
+                }
             }
 
             ExpressionSyntax allOptions;
