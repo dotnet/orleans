@@ -5,7 +5,7 @@
 
   <Import Project="$(_ParentDirectoryBuildPropsPath)" Condition="Exists('$(_ParentDirectoryBuildPropsPath)')"/>
 
-  <PropertyGroup Condition="$(OrleansExtensionsVersion) != $(VersionPrefix)">
+  <PropertyGroup Condition="$(OrleansTelemetryConsumersVersion) != $(VersionPrefix)">
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
@@ -27,7 +27,7 @@
     </When>
     <Otherwise>
       <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.Core" Version="$(OrleansExtensionsVersion)"/>
+        <PackageReference Include="Microsoft.Orleans.Core" Version="$(OrleansCoreVersion)"/>
       </ItemGroup>
     </Otherwise>
   </Choose>
@@ -40,7 +40,7 @@
     </When>
     <Otherwise>
       <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.Runtime.Abstractions" Version="$(OrleansExtensionsVersion)"/>
+        <PackageReference Include="Microsoft.Orleans.Runtime.Abstractions" Version="$(OrleansRuntimeAbstractionsVersion)"/>
       </ItemGroup>
     </Otherwise>
   </Choose>
