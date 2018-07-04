@@ -5,8 +5,8 @@
     <DefineConstants>$(DefineConstants);AWSUTILS_TESTS</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="..\..\..\src\AWS\Shared\AWSUtils.cs" Link="AWSUtils.cs" />
-    <Compile Include="..\..\..\src\AWS\Shared\Storage\DynamoDBStorage.cs" Link="Storage\DynamoDBStorage.cs" />
+    <Compile Include="$(SourceRoot)src\AWS\Shared\AWSUtils.cs" Link="AWSUtils.cs" />
+    <Compile Include="$(SourceRoot)src\AWS\Shared\Storage\DynamoDBStorage.cs" Link="Storage\DynamoDBStorage.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -18,16 +18,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\AWS\OrleansAWSUtils\OrleansAWSUtils.csproj" />
-    <ProjectReference Include="..\..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
-    <ProjectReference Include="..\..\TestInfrastructure\Orleans.TestingHost.Legacy\Orleans.TestingHost.Legacy.csproj" />
-    <ProjectReference Include="..\..\TesterInternal\TesterInternal.csproj" />
-    <ProjectReference Include="..\..\Tester\Tester.csproj" />
-    <ProjectReference Include="..\..\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
-    <ProjectReference Include="..\..\Grains\TestGrains\TestGrains.csproj" />
-    <ProjectReference Include="..\..\Misc\TestInterfaces\TestInterfaces.csproj" />
-    <ProjectReference Include="..\..\Misc\TestInternalDtosRefOrleans\TestInternalDtosRefOrleans.csproj" />
-    <ProjectReference Include="..\..\Grains\TestInternalGrains\TestInternalGrains.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\AWS\OrleansAWSUtils\OrleansAWSUtils.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\Orleans.TestingHost.Legacy\Orleans.TestingHost.Legacy.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TesterInternal\TesterInternal.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Tester\Tester.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Grains\TestGrains\TestGrains.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Misc\TestInterfaces\TestInterfaces.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Misc\TestInternalDtosRefOrleans\TestInternalDtosRefOrleans.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Grains\TestInternalGrains\TestInternalGrains.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

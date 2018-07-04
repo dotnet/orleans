@@ -20,14 +20,14 @@
   </PropertyGroup>
 
   <Choose>
-    <When Condition="$(OrleansExtensionsVersion) == $(VersionPrefix) AND $(OrleansExtensionsVersion) == $(OrleansToolsVersion)">
+    <When Condition="$(OrleansTelemetryConsumersVersion) == $(VersionPrefix) AND $(OrleansTelemetryConsumersVersion) == $(OrleansToolsVersion)">
       <ItemGroup >
         <ProjectReference Include="..\TelemetryConsumers\Orleans.TelemetryConsumers.Counters\Orleans.TelemetryConsumers.Counters.csproj" />
       </ItemGroup>
     </When>
     <Otherwise>
       <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.OrleansTelemetryConsumers.Counters" Version="$(OrleansToolsVersion)"/>
+        <PackageReference Include="Microsoft.Orleans.OrleansTelemetryConsumers.Counters" Version="$(OrleansTelemetryConsumersVersion)"/>
       </ItemGroup>
     </Otherwise>
   </Choose>
