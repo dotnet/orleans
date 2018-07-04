@@ -21,7 +21,7 @@
 
   <Choose>
     <When Condition="$(OrleansTelemetryConsumersVersion) == $(VersionPrefix) AND $(OrleansTelemetryConsumersVersion) == $(OrleansToolsVersion)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="..\TelemetryConsumers\Orleans.TelemetryConsumers.Counters\Orleans.TelemetryConsumers.Counters.csproj" />
       </ItemGroup>
     </When>

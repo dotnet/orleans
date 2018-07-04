@@ -21,7 +21,7 @@
 
   <Choose>
     <When Condition="$(OrleansCoreVersion) == $(VersionPrefix) AND $(OrleansCoreVersion) == $(OrleansSerializersVersion)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="..\..\Orleans.Core\Orleans.Core.csproj" />
       </ItemGroup>
     </When>

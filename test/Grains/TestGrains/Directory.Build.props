@@ -7,7 +7,7 @@
 
   <Choose>
     <When Condition="$(OrleansCoreLegacyVersion) == $(VersionPrefix)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="..\..\..\src\Orleans.Core.Legacy\Orleans.Core.Legacy.csproj" />
       </ItemGroup>
     </When>
@@ -20,7 +20,7 @@
 
   <Choose>
     <When Condition="$(OrleansProvidersVersion) == $(VersionPrefix)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="..\..\..\src\OrleansProviders\OrleansProviders.csproj" />
       </ItemGroup>
     </When>
@@ -33,7 +33,7 @@
 
   <Choose>
     <When Condition="$(OrleansEventSourcingVersion) == $(VersionPrefix)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="..\..\..\src\Orleans.EventSourcing\Orleans.EventSourcing.csproj" />
       </ItemGroup>
     </When>

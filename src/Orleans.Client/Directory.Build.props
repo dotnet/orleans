@@ -34,7 +34,7 @@
   
   <Choose>
     <When Condition="$(OrleansProvidersVersion) == $(VersionPrefix) AND $(OrleansProvidersVersion) == $(OrleansCoreVersion)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="..\OrleansProviders\OrleansProviders.csproj" />
       </ItemGroup>
     </When>

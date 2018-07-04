@@ -7,7 +7,7 @@
 
   <Choose>
     <When Condition="$(OrleansTestingHostVersion) == $(VersionPrefix)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
       </ItemGroup>
     </When>
@@ -20,7 +20,7 @@
 
   <Choose>
     <When Condition="$(OrleansAzureClusteringVersion) == $(VersionPrefix)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="..\..\src\Azure\Orleans.Clustering.AzureStorage\Orleans.Clustering.AzureStorage.csproj" />
       </ItemGroup>
     </When>
@@ -33,7 +33,7 @@
 
   <Choose>
     <When Condition="$(OrleansEventHubProviderVersion) == $(VersionPrefix)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="..\..\src\Azure\Orleans.Streaming.EventHubs\Orleans.Streaming.EventHubs.csproj" />
       </ItemGroup>
     </When>
@@ -46,7 +46,7 @@
 
   <Choose>
     <When Condition="$(OrleansCoreLegacyVersion) == $(VersionPrefix)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="..\..\src\Orleans.Core.Legacy\Orleans.Core.Legacy.csproj" />
       </ItemGroup>
     </When>
@@ -59,7 +59,7 @@
 
   <Choose>
     <When Condition="$(OrleansRuntimeLegacyVersion) == $(VersionPrefix)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="..\..\src\Orleans.Runtime.Legacy\Orleans.Runtime.Legacy.csproj" />
       </ItemGroup>
     </When>
@@ -72,7 +72,7 @@
 
   <Choose>
     <When Condition="$(OrleansProvidersVersion) == $(VersionPrefix)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj" />
       </ItemGroup>
     </When>
@@ -85,7 +85,7 @@
 
   <Choose>
     <When Condition="$(OrleansEventSourcingVersion) == $(VersionPrefix)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="..\..\src\Orleans.EventSourcing\Orleans.EventSourcing.csproj" />
       </ItemGroup>
     </When>
@@ -98,7 +98,7 @@
 
   <Choose>
     <When Condition="$(OrleansAzurePersistenceVersion) == $(VersionPrefix)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="..\..\src\Azure\Orleans.Persistence.AzureStorage\Orleans.Persistence.AzureStorage.csproj" />
       </ItemGroup>
     </When>
@@ -111,7 +111,7 @@
 
   <Choose>
     <When Condition="$(OrleansAzureStreamingVersion) == $(VersionPrefix)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="..\..\src\Azure\Orleans.Streaming.AzureStorage\Orleans.Streaming.AzureStorage.csproj" />
       </ItemGroup>
     </When>

@@ -47,7 +47,7 @@
 
   <Choose>
     <When Condition="$(OrleansRuntimeAbstractionsVersion) == $(VersionPrefix) AND $(OrleansRuntimeAbstractionsVersion) == $(OrleansAzureCloudServicesVersion)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
       </ItemGroup>
     </When>
@@ -60,7 +60,7 @@
 
   <Choose>
     <When Condition="$(OrleansProvidersVersion) == $(VersionPrefix) AND $(OrleansProvidersVersion) == $(OrleansAzureCloudServicesVersion)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="$(SourceRoot)src\OrleansProviders\OrleansProviders.csproj" />
       </ItemGroup>
     </When>
@@ -73,7 +73,7 @@
 
   <Choose>
     <When Condition="$(OrleansRuntimeVersion) == $(VersionPrefix) AND $(OrleansRuntimeVersion) == $(OrleansAzureCloudServicesVersion)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
       </ItemGroup>
     </When>

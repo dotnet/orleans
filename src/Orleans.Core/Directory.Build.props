@@ -21,7 +21,7 @@
 
   <Choose>
     <When Condition="$(OrleansCoreAbstractionsVersion) == $(VersionPrefix) AND $(OrleansCoreAbstractionsVersion) == $(OrleansCoreVersion)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
       </ItemGroup>
     </When>

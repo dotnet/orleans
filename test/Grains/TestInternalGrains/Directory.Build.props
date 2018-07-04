@@ -7,7 +7,7 @@
 
   <Choose>
     <When Condition="$(OrleansRuntimeVersion) == $(VersionPrefix)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="..\..\..\src\Orleans.Runtime\Orleans.Runtime.csproj" />
       </ItemGroup>
     </When>
