@@ -16,6 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Orleans.TestingHost.Legacy\Orleans.TestingHost.Legacy.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\Orleans.TestingHost.Legacy\Orleans.TestingHost.Legacy.csproj" />
   </ItemGroup>
+  
 </Project>

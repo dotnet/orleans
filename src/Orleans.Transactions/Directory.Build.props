@@ -21,7 +21,7 @@
 
   <Choose>
     <When Condition="$(OrleansTransactionsVersion) == $(VersionPrefix) AND $(OrleansTransactionsVersion) == $(OrleansTransactionsVersion)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="..\Orleans.Runtime\Orleans.Runtime.csproj" />
       </ItemGroup>
     </When>
