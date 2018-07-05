@@ -5,7 +5,7 @@
 
   <Import Project="$(_ParentDirectoryBuildPropsPath)" Condition="Exists('$(_ParentDirectoryBuildPropsPath)')"/>
 
-  <PropertyGroup Condition="$(OrleansAzureVersion)!=$(VersionPrefix)">
+  <PropertyGroup Condition="$(OrleansAzureCloudServicesVersion)!=$(VersionPrefix)">
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
@@ -20,9 +20,35 @@
   </PropertyGroup>
 
   <Choose>
-    <When Condition="$(OrleansRuntimeAbstractionsVersion) == $(VersionPrefix) AND $(OrleansRuntimeAbstractionsVersion) == $(OrleansAzureVersion)">
-      <ItemGroup >
-        <ProjectReference Include="..\..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
+    <When Condition="$(OrleansRuntimeLegacyVersion) == $(VersionPrefix) AND $(OrleansRuntimeLegacyVersion) == $(OrleansAzureCloudServicesVersion)">
+      <ItemGroup>
+        <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime.Legacy\Orleans.Runtime.Legacy.csproj" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.Runtime.Legacy" Version="$(OrleansRuntimeLegacyVersion)"/>
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
+
+  <Choose>
+    <When Condition="$(OrleansAzureClusteringVersion) == $(VersionPrefix) AND $(OrleansAzureCloudServicesVersion) == $(OrleansAzureClusteringVersion)">
+      <ItemGroup>
+        <ProjectReference Include="..\Orleans.Clustering.AzureStorage\Orleans.Clustering.AzureStorage.csproj" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" Version="$(OrleansAzureClusteringVersion)"/>
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
+
+  <Choose>
+    <When Condition="$(OrleansRuntimeAbstractionsVersion) == $(VersionPrefix) AND $(OrleansRuntimeAbstractionsVersion) == $(OrleansAzureCloudServicesVersion)">
+      <ItemGroup>
+        <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
       </ItemGroup>
     </When>
     <Otherwise>
@@ -33,9 +59,9 @@
   </Choose>
 
   <Choose>
-    <When Condition="$(OrleansProvidersVersion) == $(VersionPrefix) AND $(OrleansProvidersVersion) == $(OrleansAzureVersion)">
-      <ItemGroup >
-        <ProjectReference Include="..\..\OrleansProviders\OrleansProviders.csproj" />
+    <When Condition="$(OrleansProvidersVersion) == $(VersionPrefix) AND $(OrleansProvidersVersion) == $(OrleansAzureCloudServicesVersion)">
+      <ItemGroup>
+        <ProjectReference Include="$(SourceRoot)src\OrleansProviders\OrleansProviders.csproj" />
       </ItemGroup>
     </When>
     <Otherwise>
@@ -46,9 +72,9 @@
   </Choose>
 
   <Choose>
-    <When Condition="$(OrleansRuntimeVersion) == $(VersionPrefix) AND $(OrleansRuntimeVersion) == $(OrleansAzureVersion)">
-      <ItemGroup >
-        <ProjectReference Include="..\..\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <When Condition="$(OrleansRuntimeVersion) == $(VersionPrefix) AND $(OrleansRuntimeVersion) == $(OrleansAzureCloudServicesVersion)">
+      <ItemGroup>
+        <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
       </ItemGroup>
     </When>
     <Otherwise>

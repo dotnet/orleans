@@ -7,6 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\BenchmarkGrainInterfaces\BenchmarkGrainInterfaces.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Grains\BenchmarkGrainInterfaces\BenchmarkGrainInterfaces.csproj" />
   </ItemGroup>
 </Project>

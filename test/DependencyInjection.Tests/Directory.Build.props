@@ -5,23 +5,9 @@
 
   <Import Project="$(_ParentDirectoryBuildPropsPath)" Condition="Exists('$(_ParentDirectoryBuildPropsPath)')"/>
 
-  <PropertyGroup Condition="$(OrleansCoreVersion)!=$(VersionPrefix)">
-    <IsPackable>false</IsPackable>
-  </PropertyGroup>
-
-  <PropertyGroup>
-    <GenerateDocumentationFile>false</GenerateDocumentationFile>
-  </PropertyGroup>
-
-  <!-- Configure source link: https://github.com/ctaggart/SourceLink -->
-  <PropertyGroup>
-    <SourceLinkCreate>true</SourceLinkCreate>
-    <SourceLinkOriginUrl>https://github.com/dotnet/orleans</SourceLinkOriginUrl>
-  </PropertyGroup>
-
   <Choose>
     <When Condition="$(OrleansTestingHostVersion) == $(VersionPrefix)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
       </ItemGroup>
     </When>
@@ -34,7 +20,7 @@
 
   <Choose>
     <When Condition="$(OrleansRuntimeAbstractionsVersion) == $(VersionPrefix)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="..\..\src\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
       </ItemGroup>
     </When>

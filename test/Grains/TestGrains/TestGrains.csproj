@@ -4,17 +4,12 @@
     <AssemblyName>TestGrains</AssemblyName>
     <TargetFramework>netstandard2.0</TargetFramework>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <NoWarn>;1591;1591;618</NoWarn>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <NoWarn>;1591;1591;618</NoWarn>
+    <NoWarn>$(NoWarn);1591;1591;618</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
-    <ProjectReference Include="..\..\Misc\TestInterfaces\TestInterfaces.csproj" />
-    <ProjectReference Include="..\..\Misc\TestFSharpInterfaces\TestFSharpInterfaces.fsproj" />
+    <ProjectReference Include="$(SourceRoot)test\Grains\TestGrainInterfaces\TestGrainInterfaces.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Misc\TestInterfaces\TestInterfaces.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Misc\TestFSharpInterfaces\TestFSharpInterfaces.fsproj" />
   </ItemGroup>
 </Project>

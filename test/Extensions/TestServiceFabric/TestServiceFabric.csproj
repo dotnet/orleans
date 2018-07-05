@@ -18,9 +18,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Azure\Orleans.Hosting.ServiceFabric\Orleans.Hosting.ServiceFabric.csproj" />
-    <ProjectReference Include="..\..\..\src\Azure\Orleans.Clustering.ServiceFabric\Orleans.Clustering.ServiceFabric.csproj" />
-    <ProjectReference Include="..\..\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Hosting.ServiceFabric\Orleans.Hosting.ServiceFabric.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Clustering.ServiceFabric\Orleans.Clustering.ServiceFabric.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
   </ItemGroup>
 
   <ItemGroup>

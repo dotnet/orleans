@@ -13,8 +13,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Extensions\AWSUtils.Tests\AWSUtils.Tests.csproj" />
-    <ProjectReference Include="..\Orleans.Transactions.Tests\Orleans.Transactions.Tests.csproj" />
-    <ProjectReference Include="..\..\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Extensions\AWSUtils.Tests\AWSUtils.Tests.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Transactions\Orleans.Transactions.Tests\Orleans.Transactions.Tests.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
   </ItemGroup>
+  
 </Project>
