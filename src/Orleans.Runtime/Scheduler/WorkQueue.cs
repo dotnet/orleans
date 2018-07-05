@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Concurrent;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 
@@ -20,8 +21,8 @@ namespace Orleans.Runtime.Scheduler
 
         internal WorkQueue()
         {
-            mainQueue = new BlockingCollection<IWorkItem>(new ConcurrentBag<IWorkItem>());
-            systemQueue = new BlockingCollection<IWorkItem>(new ConcurrentBag<IWorkItem>());
+            mainQueue = CreateWorkQueue();
+            systemQueue = CreateWorkQueue();
             queueArray = new BlockingCollection<IWorkItem>[] { systemQueue, mainQueue };
 
             if (!StatisticsCollector.CollectShedulerQueuesStats) return;
@@ -32,6 +33,24 @@ namespace Orleans.Runtime.Scheduler
             mainQueueTracking.OnStartExecution();
             systemQueueTracking.OnStartExecution();
             tasksQueueTracking.OnStartExecution();
+        }
+        
+        private static BlockingCollection<IWorkItem> CreateWorkQueue()
+        {
+            return new BlockingCollection<IWorkItem>(CreateUnderlyingCollection());
+
+            // As a workaround for https://github.com/dotnet/corefx/issues/30781,
+            // this function uses a ConcurrentQueue when running on .NET Core.
+            // In order to preserve behavior on .NET Framework, however, this
+            // function will return a ConcurrentBag when not running on .NET Core.
+            // See https://github.com/dotnet/orleans/issues/4505
+            IProducerConsumerCollection<IWorkItem> CreateUnderlyingCollection()
+            {
+                if (IsCoreFramework()) return new ConcurrentQueue<IWorkItem>();
+                return new ConcurrentBag<IWorkItem>();
+            }
+
+            bool IsCoreFramework() => RuntimeInformation.FrameworkDescription.StartsWith(".NET Core");
         }
 
         public void Add(IWorkItem workItem)
