@@ -558,7 +558,7 @@ The basic storage provider for Azure Table encodes state data fields into a sing
 
 The principles for ADO.NET backed persistence storage are:
 
-1. Keep business critical data safe an accessible while data, the format of data and code evolve.
+1. Keep business critical data safe and accessible while data, the format of data and code evolve.
 2. Take advantenge of vendor and storage specific functionality.
 
 In practice this means adhering to [ADO.NET implementation goals](../Runtime-Implementation-Details/Relational-Storage.md)
