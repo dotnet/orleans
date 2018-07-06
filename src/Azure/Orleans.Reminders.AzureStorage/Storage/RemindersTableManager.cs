@@ -44,8 +44,7 @@ namespace Orleans.Runtime.ReminderService
             // when comparisons will be done on strings, this will ensure that positive numbers are always greater than negative
             // string grainHash = number < 0 ? string.Format("0{0}", number.ToString("X")) : string.Format("1{0:d16}", number);
 
-            var grainHash = String.Format("{0:X8}", number);
-            return String.Format("{0}_{1}", serviceId, grainHash);
+            return AzureStorageUtils.SanitizeTableProperty($"{serviceId}_{number:X8}");
         }
 
 
