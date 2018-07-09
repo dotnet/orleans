@@ -19,15 +19,6 @@ namespace Orleans.Transactions.Tests
             this.grainFactory = grainFactory;
         }
 
-        /*
-        Suppress,     // Logic is not transactional but can be called from within a transaction.  If called within the context of a transaction, the context will not be passed to the call.
-        CreateOrJoin, // Logic is transactional.  If called within the context of a transaction, it will use that context, else it will create a new context.
-        Create,       // Logic is transactional and will always create a new transaction context, even if called within an existing transaction context.
-        Mandatory,    // Logic is transactional but can only be called within the context of an existing transaction.
-        Supported,    // Logic is not transactional but supports transactions.  If called within the context of a transaction, the context will be passed to the call.
-        Never         // Logic is not transactional and cannot be called from within a transaction.  If called within the context of a transaction, it will throw a not supported exception.
-*/
-
         /// <summary>
         /// Test all attributes that can be called from a non transactional call.  Ensure they all behave correctly.
         /// These include:
