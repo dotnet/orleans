@@ -131,7 +131,7 @@ namespace Orleans.CodeGeneration
 
         public static bool TryGetTransactionOption(MethodInfo methodInfo, out TransactionOption option)
         {
-            option = TransactionOption.NotSupported;
+            option = TransactionOption.Suppress;
             TransactionAttribute transactionAttribute = methodInfo.GetCustomAttribute<TransactionAttribute>(true);
             if (transactionAttribute != null)
             {

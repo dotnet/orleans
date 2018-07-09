@@ -10,7 +10,7 @@ namespace Orleans.Transactions.Tests
         /// </summary>
         /// <param name="newValue"></param>
         /// <returns></returns>
-        [Transaction(TransactionOption.Required)]
+        [Transaction(TransactionOption.CreateOrJoin)]
         Task Set(int newValue);
 
         /// <summary>
@@ -18,17 +18,17 @@ namespace Orleans.Transactions.Tests
         /// </summary>
         /// <param name="numberToAdd"></param>
         /// <returns></returns>
-        [Transaction(TransactionOption.Required)]
+        [Transaction(TransactionOption.CreateOrJoin)]
         Task<int[]> Add(int numberToAdd);
 
         /// <summary>
         /// apply get operation to every transaction state
         /// </summary>
         /// <returns></returns>
-        [Transaction(TransactionOption.Required)]
+        [Transaction(TransactionOption.CreateOrJoin)]
         Task<int[]> Get();
 
-        [Transaction(TransactionOption.Required)]
+        [Transaction(TransactionOption.CreateOrJoin)]
         Task AddAndThrow(int numberToAdd);
 
         Task Deactivate();

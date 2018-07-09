@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -6,31 +7,55 @@ namespace Orleans.Transactions.Tests.Grains
 {
     public class NoAttributionGrain : Grain, INoAttributionGrain
     {
-        public Task<Dictionary<int, List<string>>> GetNestedTransactionIds(int tier, Dictionary<int, List<ITransactionAttributionGrain>> tiers)
+        public Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
         {
             return AttributionGrain.GetNestedTransactionIds(tier, tiers);
         }
     }
 
-    public class NotSupportedAttributionGrain : Grain, INotSupportedAttributionGrain
+    public class SuppressAttributionGrain : Grain, ISuppressAttributionGrain
     {
-        public Task<Dictionary<int, List<string>>> GetNestedTransactionIds(int tier, Dictionary<int, List<ITransactionAttributionGrain>> tiers)
+        public Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
         {
             return AttributionGrain.GetNestedTransactionIds(tier, tiers);
         }
     }
 
-    public class RequiredAttributionGrain : Grain, IRequiredAttributionGrain
+    public class CreateOrJoinAttributionGrain : Grain, ICreateOrJoinAttributionGrain
     {
-        public Task<Dictionary<int, List<string>>> GetNestedTransactionIds(int tier, Dictionary<int, List<ITransactionAttributionGrain>> tiers)
+        public Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
         {
             return AttributionGrain.GetNestedTransactionIds(tier, tiers);
         }
     }
 
-    public class RequiresNewAttributionGrain : Grain, IRequiresNewAttributionGrain
+    public class CreateAttributionGrain : Grain, ICreateAttributionGrain
     {
-        public Task<Dictionary<int, List<string>>> GetNestedTransactionIds(int tier, Dictionary<int, List<ITransactionAttributionGrain>> tiers)
+        public Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
+        {
+            return AttributionGrain.GetNestedTransactionIds(tier, tiers);
+        }
+    }
+
+    public class MandatoryAttributionGrain : Grain, IMandatoryAttributionGrain
+    {
+        public Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
+        {
+            return AttributionGrain.GetNestedTransactionIds(tier, tiers);
+        }
+    }
+
+    public class SupportedAttributionGrain : Grain, ISupportedAttributionGrain
+    {
+        public Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
+        {
+            return AttributionGrain.GetNestedTransactionIds(tier, tiers);
+        }
+    }
+
+    public class NeverAttributionGrain : Grain, INeverAttributionGrain
+    {
+        public Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
         {
             return AttributionGrain.GetNestedTransactionIds(tier, tiers);
         }
@@ -38,30 +63,31 @@ namespace Orleans.Transactions.Tests.Grains
 
     internal static class AttributionGrain
     {
-        static public async Task<Dictionary<int, List<string>>> GetNestedTransactionIds(int tier, Dictionary<int, List<ITransactionAttributionGrain>> tiers)
+        public static async Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
         {
             ITransactionInfo ti = TransactionContext.GetTransactionInfo();
-            Dictionary<int, List<string>> results = new Dictionary<int, List<string>>();
+            List<string>[] results = new List<string>[tier + 1 + tiers.Length];
             results[tier] = new List<string>(new[] { ti?.Id });
 
-            if (tiers.Count == 0)
+            if (tiers.Length == 0)
             {
                 return results;
             }
 
-            KeyValuePair<int, List<ITransactionAttributionGrain>> nextTier = tiers.FirstOrDefault();
-            Dictionary<int, List<ITransactionAttributionGrain>> nextTiers = tiers.OrderBy(kvp => kvp.Key).Skip(1).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-            Dictionary<int, List<string>>[] tiersResults = await Task.WhenAll(nextTier.Value.Select(g => g.GetNestedTransactionIds(nextTier.Key, nextTiers)));
-            foreach (Dictionary<int, List<string>> result in tiersResults)
+            List<ITransactionAttributionGrain> nextTier = tiers.FirstOrDefault();
+            List<ITransactionAttributionGrain>[] nextTiers = tiers.Skip(1).ToArray();
+            List<string>[][] tiersResults = await Task.WhenAll(nextTier.Select(g => g.GetNestedTransactionIds(tier+1, nextTiers)));
+            foreach (List<string>[] result in tiersResults)
             {
-                foreach (KeyValuePair<int, List<string>> kvp in result)
+                if (result.Length != results.Length) throw new ApplicationException("Invalid result length");
+                for (int i = tier + 1; i < results.Length; i++)
                 {
-                    if (results.TryGetValue(kvp.Key, out List<string> ids))
+                    if (results[i] != null)
                     {
-                        ids.AddRange(kvp.Value);
+                        results[i].AddRange(result[i]);
                     }
                     else
-                        results[kvp.Key] = kvp.Value;
+                        results[i] = result[i];
                 }
             }
 

@@ -285,14 +285,22 @@ namespace Orleans.CodeGenerator
             {
                 switch (option)
                 {
-                    case TransactionOption.NotSupported:
-                        options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionNotSupported.ToString()));
+                    case TransactionOption.Suppress:
                         break;
-                    case TransactionOption.Required:
-                        options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionRequired.ToString()));
+                    case TransactionOption.CreateOrJoin:
+                        options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionCreateOrJoin.ToString()));
                         break;
-                    case TransactionOption.RequiresNew:
-                        options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionRequiresNew.ToString()));
+                    case TransactionOption.Create:
+                        options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionCreate.ToString()));
+                        break;
+                    case TransactionOption.Mandatory:
+                        options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionMandatory.ToString()));
+                        break;
+                    case TransactionOption.Supported:
+                        options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionSupported.ToString()));
+                        break;
+                    case TransactionOption.Never:
+                        options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionNever.ToString()));
                         break;
                     default:
                         throw new NotSupportedException($"Transaction option {options} is not supported.");

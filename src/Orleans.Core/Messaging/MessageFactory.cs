@@ -21,9 +21,32 @@ namespace Orleans.Runtime
         public Message CreateMessage(InvokeMethodRequest request, InvokeMethodOptions options)
         {
             // clear transaction info if transaction operation requires new transaction.
-            ITransactionInfo transactionInfo = (options & InvokeMethodOptions.TransactionRequiresNew) == 0 ? TransactionContext.GetTransactionInfo() : null;
+            ITransactionInfo transactionInfo = TransactionContext.GetTransactionInfo();
 
-            bool isTransactionRequired = (options & InvokeMethodOptions.TransactionRequiresNew) != 0 || (options & InvokeMethodOptions.TransactionRequired) != 0;
+            // enforce mandatory transaction calls
+            if((options & InvokeMethodOptions.TransactionMandatory) != 0 && transactionInfo == null)
+            {
+                throw new NotSupportedException("Call cannot be made outside of a transaction.");
+            }
+
+            // enforce never transaction calls
+            if ((options & InvokeMethodOptions.TransactionNever) != 0 && transactionInfo != null)
+            {
+                throw new NotSupportedException("Call cannot be made within a transaction.");
+            }
+
+            // clear transaction context if creating a transaction or transaction is suppressed
+            if ((options & InvokeMethodOptions.TransactionCreate) != 0 ||
+                ((options & InvokeMethodOptions.TransactionCreateOrJoin) == 0 && 
+                 (options & InvokeMethodOptions.TransactionMandatory) == 0 &&
+                 (options & InvokeMethodOptions.TransactionSupported) == 0))
+            {
+                transactionInfo = null;
+            }
+
+            bool isTransactionRequired = (options & InvokeMethodOptions.TransactionCreate) != 0 ||
+                                         (options & InvokeMethodOptions.TransactionCreateOrJoin) != 0 ||
+                                         (options & InvokeMethodOptions.TransactionMandatory) != 0;
 
             var message = new Message
             {
@@ -36,11 +59,11 @@ namespace Orleans.Runtime
                 IsAlwaysInterleave = (options & InvokeMethodOptions.AlwaysInterleave) != 0,
                 BodyObject = request,
                 IsUsingInterfaceVersions = request.InterfaceVersion > 0,
-                TransactionInfo = isTransactionRequired ? transactionInfo?.Fork() : null,
+                TransactionInfo = transactionInfo?.Fork(),
                 RequestContextData = RequestContextExtensions.Export(this.serializationManager)
             };
 
-            if(!isTransactionRequired || transactionInfo == null)
+            if(transactionInfo == null)
             {
                 // if we're leaving a transaction context, make sure it's been cleared from the request context.
                 message.RequestContextData?.Remove(TransactionContext.Orleans_TransactionContext_Key);

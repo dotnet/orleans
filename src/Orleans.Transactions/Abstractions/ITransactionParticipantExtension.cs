@@ -13,39 +13,39 @@ namespace Orleans.Transactions.Abstractions
     public interface ITransactionParticipantExtension : IGrainExtension
     {
         [AlwaysInterleave]
-        [Transaction(TransactionOption.NotSupported)]
+        [Transaction(TransactionOption.Suppress)]
         [OneWay]
         Task Abort(string resourceId, Guid transactionId);
 
         [AlwaysInterleave]
-        [Transaction(TransactionOption.NotSupported)]
+        [Transaction(TransactionOption.Suppress)]
         [OneWay]
         Task Cancel(string resourceId, Guid transactionId, DateTime timeStamp, TransactionalStatus status);
 
         [AlwaysInterleave]
-        [Transaction(TransactionOption.NotSupported)]
+        [Transaction(TransactionOption.Suppress)]
         Task<TransactionalStatus> CommitReadOnly(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp);
 
         [AlwaysInterleave]
-        [Transaction(TransactionOption.NotSupported)]
+        [Transaction(TransactionOption.Suppress)]
         Task Confirm(string resourceId, Guid transactionId, DateTime timeStamp);
 
         [AlwaysInterleave]
-        [Transaction(TransactionOption.NotSupported)]
+        [Transaction(TransactionOption.Suppress)]
         [OneWay]
         Task Ping(string resourceId, Guid transactionId, DateTime timeStamp, ITransactionParticipant participant);
 
         [AlwaysInterleave]
-        [Transaction(TransactionOption.NotSupported)]
+        [Transaction(TransactionOption.Suppress)]
         [OneWay]
         Task Prepare(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ITransactionParticipant transactionManager);
 
         [AlwaysInterleave]
-        [Transaction(TransactionOption.NotSupported)]
+        [Transaction(TransactionOption.Suppress)]
         Task<TransactionalStatus> PrepareAndCommit(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp, List<ITransactionParticipant> writeParticipants, int totalParticipants);
 
         [AlwaysInterleave]
-        [Transaction(TransactionOption.NotSupported)]
+        [Transaction(TransactionOption.Suppress)]
         [OneWay]
         Task Prepared(string resourceId, Guid transactionId, DateTime timestamp, ITransactionParticipant participant, TransactionalStatus status);
     }

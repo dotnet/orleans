@@ -6,31 +6,49 @@ namespace Orleans.Transactions.Tests
 {
     public interface INoAttributionGrain : IGrainWithGuidKey
     {
-        Task<Dictionary<int,List<string>>> GetNestedTransactionIds(int tier, Dictionary<int,List<ITransactionAttributionGrain>> tiers);
+        Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
     }
 
-    public interface INotSupportedAttributionGrain : IGrainWithGuidKey
+    public interface ISuppressAttributionGrain : IGrainWithGuidKey
     {
-        [Transaction(TransactionOption.NotSupported)]
-        Task<Dictionary<int, List<string>>> GetNestedTransactionIds(int tier, Dictionary<int, List<ITransactionAttributionGrain>> tiers);
+        [Transaction(TransactionOption.Suppress)]
+        Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
     }
 
-    public interface IRequiredAttributionGrain : IGrainWithGuidKey
+    public interface ICreateOrJoinAttributionGrain : IGrainWithGuidKey
     {
-        [Transaction(TransactionOption.Required)]
-        Task<Dictionary<int, List<string>>> GetNestedTransactionIds(int tier, Dictionary<int, List<ITransactionAttributionGrain>> tiers);
+        [Transaction(TransactionOption.CreateOrJoin)]
+        Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
     }
 
-    public interface IRequiresNewAttributionGrain : IGrainWithGuidKey
+    public interface ICreateAttributionGrain : IGrainWithGuidKey
     {
-        [Transaction(TransactionOption.RequiresNew)]
-        Task<Dictionary<int, List<string>>> GetNestedTransactionIds(int tier, Dictionary<int, List<ITransactionAttributionGrain>> tiers);
+        [Transaction(TransactionOption.Create)]
+        Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
+    }
+
+    public interface IMandatoryAttributionGrain : IGrainWithGuidKey
+    {
+        [Transaction(TransactionOption.Mandatory)]
+        Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
+    }
+
+    public interface ISupportedAttributionGrain : IGrainWithGuidKey
+    {
+        [Transaction(TransactionOption.Supported)]
+        Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
+    }
+
+    public interface INeverAttributionGrain : IGrainWithGuidKey
+    {
+        [Transaction(TransactionOption.Never)]
+        Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
     }
 
     #region wrappers
     public interface ITransactionAttributionGrain
     {
-        Task<Dictionary<int, List<string>>> GetNestedTransactionIds(int tier, Dictionary<int, List<ITransactionAttributionGrain>> tiers);
+        Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
     }
 
     public static class TransactionAttributionGrainExtensions
@@ -43,12 +61,18 @@ namespace Orleans.Transactions.Tests
             }
             switch(option.Value)
             {
-                case TransactionOption.NotSupported:
-                    return new NotSupportedAttributionGrain(grainFactory.GetGrain<INotSupportedAttributionGrain>(id));
-                case TransactionOption.Required:
-                    return new RequiredAttributionGrain(grainFactory.GetGrain<IRequiredAttributionGrain>(id));
-                case TransactionOption.RequiresNew:
-                    return new RequiresNewAttributionGrain(grainFactory.GetGrain<IRequiresNewAttributionGrain>(id));
+                case TransactionOption.Suppress:
+                    return new SuppressAttributionGrain(grainFactory.GetGrain<ISuppressAttributionGrain>(id));
+                case TransactionOption.CreateOrJoin:
+                    return new CreateOrJoinAttributionGrain(grainFactory.GetGrain<ICreateOrJoinAttributionGrain>(id));
+                case TransactionOption.Create:
+                    return new CreateAttributionGrain(grainFactory.GetGrain<ICreateAttributionGrain>(id));
+                case TransactionOption.Mandatory:
+                    return new MandatoryAttributionGrain(grainFactory.GetGrain<IMandatoryAttributionGrain>(id));
+                case TransactionOption.Supported:
+                    return new SupportedAttributionGrain(grainFactory.GetGrain<ISupportedAttributionGrain>(id));
+                case TransactionOption.Never:
+                    return new NeverAttributionGrain(grainFactory.GetGrain<INeverAttributionGrain>(id));
                 default:
                     throw new NotSupportedException($"Transaction option {option.Value} is not supported.");
             }
@@ -63,52 +87,97 @@ namespace Orleans.Transactions.Tests
                 this.grain = grain;
             }
 
-            public Task<Dictionary<int, List<string>>> GetNestedTransactionIds(int tier, Dictionary<int, List<ITransactionAttributionGrain>> tiers)
+            public Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
             {
                 return this.grain.GetNestedTransactionIds(tier, tiers);
             }
         }
 
-        private class NotSupportedAttributionGrain : ITransactionAttributionGrain
+        private class SuppressAttributionGrain : ITransactionAttributionGrain
         {
-            private INotSupportedAttributionGrain grain;
+            private ISuppressAttributionGrain grain;
 
-            public NotSupportedAttributionGrain(INotSupportedAttributionGrain grain)
+            public SuppressAttributionGrain(ISuppressAttributionGrain grain)
             {
                 this.grain = grain;
             }
 
-            public Task<Dictionary<int, List<string>>> GetNestedTransactionIds(int tier, Dictionary<int, List<ITransactionAttributionGrain>> tiers)
+            public Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
             {
                 return this.grain.GetNestedTransactionIds(tier, tiers);
             }
         }
 
-        private class RequiredAttributionGrain : ITransactionAttributionGrain
+        private class CreateOrJoinAttributionGrain : ITransactionAttributionGrain
         {
-            private IRequiredAttributionGrain grain;
+            private ICreateOrJoinAttributionGrain grain;
 
-            public RequiredAttributionGrain(IRequiredAttributionGrain grain)
+            public CreateOrJoinAttributionGrain(ICreateOrJoinAttributionGrain grain)
             {
                 this.grain = grain;
             }
 
-            public Task<Dictionary<int, List<string>>> GetNestedTransactionIds(int tier, Dictionary<int, List<ITransactionAttributionGrain>> tiers)
+            public Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
             {
                 return this.grain.GetNestedTransactionIds(tier, tiers);
             }
         }
 
-        private class RequiresNewAttributionGrain : ITransactionAttributionGrain
+        private class CreateAttributionGrain : ITransactionAttributionGrain
         {
-            private IRequiresNewAttributionGrain grain;
+            private ICreateAttributionGrain grain;
 
-            public RequiresNewAttributionGrain(IRequiresNewAttributionGrain grain)
+            public CreateAttributionGrain(ICreateAttributionGrain grain)
             {
                 this.grain = grain;
             }
 
-            public Task<Dictionary<int, List<string>>> GetNestedTransactionIds(int tier, Dictionary<int, List<ITransactionAttributionGrain>> tiers)
+            public Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
+            {
+                return this.grain.GetNestedTransactionIds(tier, tiers);
+            }
+        }
+
+        private class MandatoryAttributionGrain : ITransactionAttributionGrain
+        {
+            private IMandatoryAttributionGrain grain;
+
+            public MandatoryAttributionGrain(IMandatoryAttributionGrain grain)
+            {
+                this.grain = grain;
+            }
+
+            public Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
+            {
+                return this.grain.GetNestedTransactionIds(tier, tiers);
+            }
+        }
+
+        private class SupportedAttributionGrain : ITransactionAttributionGrain
+        {
+            private ISupportedAttributionGrain grain;
+
+            public SupportedAttributionGrain(ISupportedAttributionGrain grain)
+            {
+                this.grain = grain;
+            }
+
+            public Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
+            {
+                return this.grain.GetNestedTransactionIds(tier, tiers);
+            }
+        }
+
+        private class NeverAttributionGrain : ITransactionAttributionGrain
+        {
+            private INeverAttributionGrain grain;
+
+            public NeverAttributionGrain(INeverAttributionGrain grain)
+            {
+                this.grain = grain;
+            }
+
+            public Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
             {
                 return this.grain.GetNestedTransactionIds(tier, tiers);
             }
