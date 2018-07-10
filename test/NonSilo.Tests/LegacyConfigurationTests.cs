@@ -23,11 +23,11 @@ using Xunit.Abstractions;
 
 namespace UnitTests
 {
-    public class ConfigTests
+    public class LegacyConfigurationTests
     {
         private readonly ITestOutputHelper output;
 
-        public ConfigTests(ITestOutputHelper output)
+        public LegacyConfigurationTests(ITestOutputHelper output)
         {
             this.output = output;
         }

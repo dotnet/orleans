@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Orleans.ApplicationParts;
 using Orleans.Configuration;
 using Orleans.Configuration.Validators;
@@ -51,6 +53,24 @@ namespace Orleans
             services.TryAddSingleton<IStreamSubscriptionManagerAdmin, StreamSubscriptionManagerAdmin>();
             services.TryAddSingleton<IInternalClusterClient, ClusterClient>();
             services.TryAddFromExisting<IClusterClient, IInternalClusterClient>();
+
+            // Options does not support inheritance, so in order to allow configuration of MessagingOptions on
+            // clients, we must add some registrations to ensure that configuration of the abstract MessagingOptions
+            // type is not ignored.
+            services.AddOptions<ClientMessagingOptions>()
+                .Configure<IEnumerable<IConfigureOptions<MessagingOptions>>, IEnumerable<IPostConfigureOptions<MessagingOptions>>>
+                ((options, configure, postConfigure) =>
+                {
+                    foreach (var opt in configure)
+                    {
+                        opt.Configure(options);
+                    }
+
+                    foreach (var opt in postConfigure)
+                    {
+                        opt.PostConfigure(Options.DefaultName, options);
+                    }
+                });
 
             // Serialization
             services.TryAddSingleton<SerializationManager>();

@@ -75,6 +75,25 @@ namespace Orleans.Hosting
                     options.GatewaySenderQueues = Environment.ProcessorCount;
                 }
             });
+
+            // Options does not support inheritance, so in order to allow configuration of MessagingOptions on
+            // clients, we must add some registrations to ensure that configuration of the abstract MessagingOptions
+            // type is not ignored.
+            services.AddOptions<SiloMessagingOptions>()
+                .Configure<IEnumerable<IConfigureOptions<MessagingOptions>>, IEnumerable<IPostConfigureOptions<MessagingOptions>>>
+                ((options, configure, postConfigure) =>
+                {
+                    foreach (var opt in configure)
+                    {
+                        opt.Configure(options);
+                    }
+
+                    foreach (var opt in postConfigure)
+                    {
+                        opt.PostConfigure(Options.DefaultName, options);
+                    }
+                });
+
             services.TryAddSingleton<TelemetryManager>();
             services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();
 
