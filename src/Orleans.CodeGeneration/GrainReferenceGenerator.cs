@@ -286,6 +286,7 @@ namespace Orleans.CodeGenerator
                 switch (option)
                 {
                     case TransactionOption.Suppress:
+                        options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionSuppress.ToString()));
                         break;
                     case TransactionOption.CreateOrJoin:
                         options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionCreateOrJoin.ToString()));
@@ -293,14 +294,14 @@ namespace Orleans.CodeGenerator
                     case TransactionOption.Create:
                         options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionCreate.ToString()));
                         break;
-                    case TransactionOption.Mandatory:
-                        options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionMandatory.ToString()));
+                    case TransactionOption.Join:
+                        options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionJoin.ToString()));
                         break;
                     case TransactionOption.Supported:
                         options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionSupported.ToString()));
                         break;
-                    case TransactionOption.Never:
-                        options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionNever.ToString()));
+                    case TransactionOption.NotAllowed:
+                        options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionNotAllowed.ToString()));
                         break;
                     default:
                         throw new NotSupportedException($"Transaction option {options} is not supported.");

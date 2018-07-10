@@ -37,7 +37,7 @@ namespace Orleans.Transactions.Tests.Grains
         }
     }
 
-    public class MandatoryAttributionGrain : Grain, IMandatoryAttributionGrain
+    public class JoinAttributionGrain : Grain, IJoinAttributionGrain
     {
         public Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
         {
@@ -53,7 +53,7 @@ namespace Orleans.Transactions.Tests.Grains
         }
     }
 
-    public class NeverAttributionGrain : Grain, INeverAttributionGrain
+    public class NotAllowedAttributionGrain : Grain, INotAllowedAttributionGrain
     {
         public Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
         {

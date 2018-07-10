@@ -27,7 +27,7 @@ namespace Orleans.Transactions.Tests
         /// CreateOrJoin - should have unique transaction context
         /// Create - should have unique transaction context
         /// Supported - should have no transaction context
-        /// Never - should have no transaction context
+        /// NotAllowed - should have no transaction context
         /// </summary>
         [Fact]
         public async Task AllSupportedAttributesFromOutsideTransactionTest()
@@ -41,7 +41,7 @@ namespace Orleans.Transactions.Tests
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.CreateOrJoin),
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create),
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Supported),
-                    this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Never)
+                    this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.NotAllowed)
                     })
             };
 
@@ -75,7 +75,7 @@ namespace Orleans.Transactions.Tests
 
             Assert.Null(subcallTransactionIds[4]); // Supported attribute
 
-            Assert.Null(subcallTransactionIds[5]); // Never attribute
+            Assert.Null(subcallTransactionIds[5]); // NotAllowed attribute
         }
 
         /// <summary>
@@ -85,7 +85,7 @@ namespace Orleans.Transactions.Tests
         /// Suppress - should have no transaction context
         /// CreateOrJoin - should have same transaction context as parent
         /// Create - should have unique transaction context
-        /// Mandatory - should have same transaction context as parent
+        /// Join - should have same transaction context as parent
         /// Supported - should have same transaction context as parent
         /// </summary>
         [Fact]
@@ -99,7 +99,7 @@ namespace Orleans.Transactions.Tests
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Suppress),
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.CreateOrJoin),
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create),
-                    this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Mandatory),
+                    this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Join),
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Supported)
                     })
             };
@@ -134,8 +134,8 @@ namespace Orleans.Transactions.Tests
             // make sure the transaction id's differ
             Assert.NotEqual(subcallTransactionIds[2], subcallTransactionIds[3]);
 
-            Assert.NotNull(subcallTransactionIds[4]); // Mandatory attribute
-            // make sure Mandatory attributed transactionId matches top
+            Assert.NotNull(subcallTransactionIds[4]); // Join attribute
+            // make sure Join attributed transactionId matches top
             Assert.Equal(subcallTransactionIds[4], topTransactionIds.First());
 
             Assert.NotNull(subcallTransactionIds[5]); // Supported attribute
@@ -261,13 +261,13 @@ namespace Orleans.Transactions.Tests
         }
 
         [Fact]
-        public async Task ManadatoryFailTest()
+        public async Task JoinFailTest()
         {
             ITransactionAttributionGrain fail = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid());
             List<ITransactionAttributionGrain>[] tiers =
             {
                 new List<ITransactionAttributionGrain>(new[] {
-                    this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Mandatory),
+                    this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Join),
                     })
             };
 
@@ -275,13 +275,13 @@ namespace Orleans.Transactions.Tests
         }
 
         [Fact]
-        public async Task NeverFailTest()
+        public async Task NotAllowedFailTest()
         {
             ITransactionAttributionGrain fail = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create);
             List<ITransactionAttributionGrain>[] tiers =
             {
                 new List<ITransactionAttributionGrain>(new[] {
-                    this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Never),
+                    this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.NotAllowed),
                     })
             };
 

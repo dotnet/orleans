@@ -68,10 +68,25 @@ namespace Orleans.CodeGeneration
         // Transactional method options. 
         // NOTE: keep in sync with TransactionOption enum.
         // Suppress is default, so no need for flag for it
-        TransactionCreateOrJoin = 0x200,
-        TransactionCreate = 0x400,
-        TransactionMandatory = 0x800,
-        TransactionSupported = 0x1000,
-        TransactionNever = 0x2000,
+        TransactionFlags = 0xE00,
+        TransactionSuppress = 0x200,
+        TransactionCreateOrJoin = 0x400,
+        TransactionCreate = 0x600,
+        TransactionJoin = 0x800,
+        TransactionSupported = 0xA00,
+        TransactionNotAllowed = 0xC00,
+    }
+
+    public static class InvokeMethodOptionsExtensions
+    {
+        public static bool IsTransactional(this InvokeMethodOptions options)
+        {
+            return (options & InvokeMethodOptions.TransactionFlags) != 0;
+        }
+
+        public static bool IsTransactionOption(this InvokeMethodOptions options, InvokeMethodOptions test)
+        {
+            return (options & InvokeMethodOptions.TransactionFlags) == test;
+        }
     }
 }

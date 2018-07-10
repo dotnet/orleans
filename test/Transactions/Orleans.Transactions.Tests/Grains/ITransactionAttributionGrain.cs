@@ -27,9 +27,9 @@ namespace Orleans.Transactions.Tests
         Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
     }
 
-    public interface IMandatoryAttributionGrain : IGrainWithGuidKey
+    public interface IJoinAttributionGrain : IGrainWithGuidKey
     {
-        [Transaction(TransactionOption.Mandatory)]
+        [Transaction(TransactionOptionAlias.Mandatory)]
         Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
     }
 
@@ -39,9 +39,9 @@ namespace Orleans.Transactions.Tests
         Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
     }
 
-    public interface INeverAttributionGrain : IGrainWithGuidKey
+    public interface INotAllowedAttributionGrain : IGrainWithGuidKey
     {
-        [Transaction(TransactionOption.Never)]
+        [Transaction(TransactionOption.NotAllowed)]
         Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
     }
 
@@ -67,12 +67,12 @@ namespace Orleans.Transactions.Tests
                     return new CreateOrJoinAttributionGrain(grainFactory.GetGrain<ICreateOrJoinAttributionGrain>(id));
                 case TransactionOption.Create:
                     return new CreateAttributionGrain(grainFactory.GetGrain<ICreateAttributionGrain>(id));
-                case TransactionOption.Mandatory:
-                    return new MandatoryAttributionGrain(grainFactory.GetGrain<IMandatoryAttributionGrain>(id));
+                case TransactionOption.Join:
+                    return new JoinAttributionGrain(grainFactory.GetGrain<IJoinAttributionGrain>(id));
                 case TransactionOption.Supported:
                     return new SupportedAttributionGrain(grainFactory.GetGrain<ISupportedAttributionGrain>(id));
-                case TransactionOption.Never:
-                    return new NeverAttributionGrain(grainFactory.GetGrain<INeverAttributionGrain>(id));
+                case TransactionOption.NotAllowed:
+                    return new NotAllowedAttributionGrain(grainFactory.GetGrain<INotAllowedAttributionGrain>(id));
                 default:
                     throw new NotSupportedException($"Transaction option {option.Value} is not supported.");
             }
@@ -138,11 +138,11 @@ namespace Orleans.Transactions.Tests
             }
         }
 
-        private class MandatoryAttributionGrain : ITransactionAttributionGrain
+        private class JoinAttributionGrain : ITransactionAttributionGrain
         {
-            private IMandatoryAttributionGrain grain;
+            private IJoinAttributionGrain grain;
 
-            public MandatoryAttributionGrain(IMandatoryAttributionGrain grain)
+            public JoinAttributionGrain(IJoinAttributionGrain grain)
             {
                 this.grain = grain;
             }
@@ -168,11 +168,11 @@ namespace Orleans.Transactions.Tests
             }
         }
 
-        private class NeverAttributionGrain : ITransactionAttributionGrain
+        private class NotAllowedAttributionGrain : ITransactionAttributionGrain
         {
-            private INeverAttributionGrain grain;
+            private INotAllowedAttributionGrain grain;
 
-            public NeverAttributionGrain(INeverAttributionGrain grain)
+            public NotAllowedAttributionGrain(INotAllowedAttributionGrain grain)
             {
                 this.grain = grain;
             }
