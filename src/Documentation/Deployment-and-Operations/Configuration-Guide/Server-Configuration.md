@@ -110,7 +110,7 @@ This method should be sufficient in most cases, but you can customize it further
 [...]
 ```
 
-Internally, the silo will listen on `0.0.0.0:40000` and `0.0.0.0:50000` but the value published in the membership provider will be `172.16.0.42:11111` and ``172.16.0.42:30000`.
+Internally, the silo will listen on `0.0.0.0:40000` and `0.0.0.0:50000` but the value published in the membership provider will be `172.16.0.42:11111` and `172.16.0.42:30000`.
 
 ## Application parts
 
