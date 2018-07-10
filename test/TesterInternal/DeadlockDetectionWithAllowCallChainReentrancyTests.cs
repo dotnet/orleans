@@ -1,18 +1,17 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.Runtime;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Tester;
 using TestExtensions;
+using Orleans.Hosting;
+using Orleans.Configuration;
 
 namespace UnitTests.General
 {
-    public class DeadlockDetectionTests : OrleansTestingBase, IClassFixture<DeadlockDetectionTests.Fixture>
+    public class DeadlockDetectionWithAllowCallChainReentrancyTests : OrleansTestingBase, IClassFixture<DeadlockDetectionWithAllowCallChainReentrancyTests.Fixture>
     {
         private readonly Fixture fixture;
 
@@ -20,17 +19,26 @@ namespace UnitTests.General
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.Globals.PerformDeadlockDetection = true;
-                    legacy.ClusterConfiguration.Globals.AllowCallChainReentrancy = true;
-                });
+                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             }
+
+            private class SiloConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder.Configure<SchedulingOptions>(options =>
+                    {
+                        options.PerformDeadlockDetection = true;
+                        options.AllowCallChainReentrancy = true;
+                    });
+                }
+            }
+
         }
 
         private const int numIterations = 30;
 
-        public DeadlockDetectionTests(Fixture fixture)
+        public DeadlockDetectionWithAllowCallChainReentrancyTests(Fixture fixture)
         {
             this.fixture = fixture;
         }
@@ -38,9 +46,9 @@ namespace UnitTests.General
         // 2 silos, loop across all cases (to force all grains to be local and remote):
         //      Non Reentrant A, B
         //      Reentrant C
-        // 1) Allowed reentrancy A, A
-        // 2) Allowed reentrancy A, B, A
-        // 3) Deadlock C, A, C, A
+        // 1) No Deadlock A, A
+        // 2) No Deadlock A, B, A
+        // 3) No Deadlock C, A, C, A
         // 4) No Deadlock C, C
         // 5) No Deadlock C, A, C
 
