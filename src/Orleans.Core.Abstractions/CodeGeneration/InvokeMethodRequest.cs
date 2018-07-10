@@ -65,10 +65,10 @@ namespace Orleans.CodeGeneration
         /// <summary>The invocation can interleave with any other request type, including write requests.</summary>
         AlwaysInterleave = 0x100,
 
-        // Transactional method options. 
+        // Transactional method options.  
         // NOTE: keep in sync with TransactionOption enum.
-        // Suppress is default, so no need for flag for it
-        TransactionFlags = 0xE00,
+        // We use a mask to define a set of bits we use for transaction options.
+        TransactionMask = 0xE00,
         TransactionSuppress = 0x200,
         TransactionCreateOrJoin = 0x400,
         TransactionCreate = 0x600,
@@ -81,12 +81,12 @@ namespace Orleans.CodeGeneration
     {
         public static bool IsTransactional(this InvokeMethodOptions options)
         {
-            return (options & InvokeMethodOptions.TransactionFlags) != 0;
+            return (options & InvokeMethodOptions.TransactionMask) != 0;
         }
 
         public static bool IsTransactionOption(this InvokeMethodOptions options, InvokeMethodOptions test)
         {
-            return (options & InvokeMethodOptions.TransactionFlags) == test;
+            return (options & InvokeMethodOptions.TransactionMask) == test;
         }
     }
 }
