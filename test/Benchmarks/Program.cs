@@ -90,7 +90,7 @@ namespace Benchmarks
             ["GrainStorage.Memory"] = () =>
             {
                 RunBenchmark(
-                "Running Transactions benchmark",
+                "Running grain storage benchmark against memory",
                 () =>
                 {
                     var benchmark = new GrainStorageBenchmark();
@@ -103,7 +103,7 @@ namespace Benchmarks
             ["GrainStorage.AzureTable"] = () =>
             {
                 RunBenchmark(
-                "Running Transactions benchmark",
+                "Running grain storage benchmark against Azure Table",
                 () =>
                 {
                     var benchmark = new GrainStorageBenchmark();
@@ -116,7 +116,7 @@ namespace Benchmarks
             ["GrainStorage.AzureBlob"] = () =>
             {
                 RunBenchmark(
-                "Running Transactions benchmark",
+                "Running grain storage benchmark against Azure Blob",
                 () =>
                 {
                     var benchmark = new GrainStorageBenchmark();

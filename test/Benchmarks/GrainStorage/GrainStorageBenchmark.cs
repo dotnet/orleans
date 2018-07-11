@@ -83,27 +83,28 @@ namespace Benchmarks.GrainStorage
             await persistentGrain.Set(0);
             int stored = 0;
             int failed = 0;
-            TimeSpan max = TimeSpan.MinValue;
+            TimeSpan maxCalltime = TimeSpan.MinValue;
             Stopwatch sw = Stopwatch.StartNew();
+            Stopwatch calltime = new Stopwatch();
             while (running())
             {
-                Stopwatch time = Stopwatch.StartNew();
+                calltime.Start();
                 try
                 {
                     await persistentGrain.Set(stored);
                     stored++;
-                    time.Stop();
+                    calltime.Stop();
                 }
                 catch (Exception)
                 {
                     failed++;
-                    time.Stop();
+                    calltime.Stop();
                 }
-                max = max < time.Elapsed ? time.Elapsed : max;
+                maxCalltime = maxCalltime < calltime.Elapsed ? calltime.Elapsed : maxCalltime;
             }
             sw.Stop();
             Console.WriteLine($"Performed {stored} persist operations with {failed} failures in {sw.ElapsedMilliseconds}ms.");
-            Console.WriteLine($"Average time in ms per call was {sw.ElapsedMilliseconds/stored}, with longest call taking {max.TotalMilliseconds}ms.");
+            Console.WriteLine($"Average time in ms per call was {sw.ElapsedMilliseconds/stored}, with longest call taking {maxCalltime.TotalMilliseconds}ms.");
         }
 
         public void Teardown()
