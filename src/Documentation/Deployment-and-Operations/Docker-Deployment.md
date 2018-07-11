@@ -14,7 +14,7 @@ Deploying Orleans to Docker can be tricky given the way Docker orchestrators and
 
 Docker containers and networking model were designed to run mostly stateless and immutable containers. So, spinning up a cluster running node.js or nginx applications, is pretty easy. However, if you try to use something more elaborate, like a real clustered or distributed application (like Orleans-based ones) you will eventually have trouble setting it up. It is possible, but not as simple as web-based applications.
 
-Docker clustering consists of putting together multiple hosts to work as a single pool of resource,s managed using a *Container Orchestrator*. *Docker Inc.* provide **Swarm** as their option for Container Orchestration while *Google* has **Kubernetes** (aka **K8s**). There are other Orchestrators like **DC/OS**, **Mesos**, etc., but in this document we will talk about Swarm and K8s as they are more widely used. 
+Docker clustering consists of putting together multiple hosts to work as a single pool of resources, managed using a *Container Orchestrator*. *Docker Inc.* provide **Swarm** as their option for Container Orchestration while *Google* has **Kubernetes** (aka **K8s**). There are other Orchestrators like **DC/OS**, **Mesos**, etc., but in this document we will talk about Swarm and K8s as they are more widely used. 
 
 The same grain interfaces and implementation which run anywhere Orleans is already supported, will run on Docker containers as well, so no special considerations are needed in order to be able to run your application in Docker containers.
 
