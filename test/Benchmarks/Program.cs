@@ -7,6 +7,7 @@ using Benchmarks.MapReduce;
 using Benchmarks.Serialization;
 using Benchmarks.Ping;
 using Benchmarks.Transactions;
+using Benchmarks.GrainStorage;
 
 namespace Benchmarks
 {
@@ -85,6 +86,45 @@ namespace Benchmarks
             ["PingPongForeverSaturate"] = () =>
             {
                 new SequentialPingBenchmark().PingPongForever().GetAwaiter().GetResult();
+            },
+            ["GrainStorage.Memory"] = () =>
+            {
+                RunBenchmark(
+                "Running Transactions benchmark",
+                () =>
+                {
+                    var benchmark = new GrainStorageBenchmark();
+                    benchmark.MemorySetup();
+                    return benchmark;
+                },
+                benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
+                benchmark => benchmark.Teardown());
+            },
+            ["GrainStorage.AzureTable"] = () =>
+            {
+                RunBenchmark(
+                "Running Transactions benchmark",
+                () =>
+                {
+                    var benchmark = new GrainStorageBenchmark();
+                    benchmark.AzureTableSetup();
+                    return benchmark;
+                },
+                benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
+                benchmark => benchmark.Teardown());
+            },
+            ["GrainStorage.AzureBlob"] = () =>
+            {
+                RunBenchmark(
+                "Running Transactions benchmark",
+                () =>
+                {
+                    var benchmark = new GrainStorageBenchmark();
+                    benchmark.AzureBlobSetup();
+                    return benchmark;
+                },
+                benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
+                benchmark => benchmark.Teardown());
             },
         };
 
