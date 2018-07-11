@@ -129,22 +129,14 @@ namespace Orleans.CodeGeneration
                         && declaringTypeInfo.GetRuntimeInterfaceMap(i).TargetMethods.Contains(methodInfo)));
         }
 
-        public static bool IsNewTransactionRequired(MethodInfo methodInfo)
+        public static bool TryGetTransactionOption(MethodInfo methodInfo, out TransactionOption option)
         {
+            option = TransactionOption.Suppress;
             TransactionAttribute transactionAttribute = methodInfo.GetCustomAttribute<TransactionAttribute>(true);
             if (transactionAttribute != null)
             {
-                return transactionAttribute.Requirement == TransactionOption.RequiresNew;
-            }
-            return false;
-        }
-
-        public static bool IsTransactionRequired(MethodInfo methodInfo)
-        {
-            TransactionAttribute transactionAttribute = methodInfo.GetCustomAttribute<TransactionAttribute>(true);
-            if (transactionAttribute != null)
-            {
-                return transactionAttribute.Requirement == TransactionOption.Required;
+                option = transactionAttribute.Requirement;
+                return true;
             }
             return false;
         }

@@ -10,14 +10,14 @@ namespace Orleans.Transactions.Tests.Correctness
         /// </summary>
         /// <param name="newValue"></param>
         /// <returns></returns>
-        [Transaction(TransactionOption.Required)]
+        [Transaction(TransactionOption.CreateOrJoin)]
         Task SetBit(int newValue);
 
         /// <summary>
         /// apply get operation to every transaction state
         /// </summary>
         /// <returns></returns>
-        [Transaction(TransactionOption.Required)]
+        [Transaction(TransactionOption.CreateOrJoin)]
         Task<int[][]> Get();
     }
 }
