@@ -7,11 +7,11 @@ title: Adventure
 
 A simple multiplayer text adventure game inspired by old-fashioned, text-based adventure games.
 
-### Instructions:
-1. Open the OrleansAdventrure.sln in Visual Studio.
+### Instructions
+1. Open OrleansAdventure.sln in Visual Studio.
 2. Start the 'AdventureSetup' project.
-3. Once running, start the 'AdventureClient' project.
-4. You will then be prompted for your name on the command line. Enter it begin the game.
+3. Once AdventureSetup is running, start the 'AdventureClient' project.
+4. You will then be prompted to enter your name on the command line. Enter it and begin the game.
 
 
 ### Overview
@@ -33,7 +33,7 @@ Player and Rooms are modeled as grains. These grains allow us to distribute the 
 
 Things such as keys are modeled as plain old objects - they are really just simple immutable data structures that move around rooms and among players; they don't need to be grains.
 
-### Things for you to do if you are so inclined
+### Possible improvements
 1. Make the map much, much, bigger
 2. Make the brass key unlock something
 3. Allow players to message each other
