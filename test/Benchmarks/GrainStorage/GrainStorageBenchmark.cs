@@ -88,7 +88,7 @@ namespace Benchmarks.GrainStorage
             Stopwatch calltime = new Stopwatch();
             while (running())
             {
-                calltime.Start();
+                calltime.Restart();
                 try
                 {
                     await persistentGrain.Set(stored);
