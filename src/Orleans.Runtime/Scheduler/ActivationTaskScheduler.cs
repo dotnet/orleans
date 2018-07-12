@@ -32,8 +32,6 @@ namespace Orleans.Runtime.Scheduler
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Created {0} with SchedulingContext={1}", this, workerGroup.SchedulingContext);
         }
 
-        #region TaskScheduler methods
-
         /// <summary>Gets an enumerable of the tasks currently scheduled on this scheduler.</summary>
         /// <returns>An enumerable of the tasks currently scheduled.</returns>
         protected override IEnumerable<Task> GetScheduledTasks()
@@ -124,8 +122,6 @@ namespace Orleans.Runtime.Scheduler
 #endif
             return done;
         }
-
-        #endregion TaskScheduler methods
 
         public override string ToString()
         {

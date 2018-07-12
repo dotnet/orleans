@@ -24,8 +24,6 @@ namespace Orleans.AzureUtils
             this.options = options.Value;
         }
 
-        #region Implementation of IGatewayListProvider
-
         public async Task InitializeGatewayListProvider()
         {
             siloInstanceManager = await OrleansSiloInstanceManager.GetManager(this.clusterId, this.options.ConnectionString, this.loggerFactory);
@@ -46,7 +44,5 @@ namespace Orleans.AzureUtils
         {
             get { return true; }
         }
-
-        #endregion
     }
 }

@@ -37,7 +37,6 @@ namespace Orleans.Streams
             DehydrateStaticFunc(pred);
         }
 
-        #region ISerializable methods
         protected FilterPredicateWrapperData(SerializationInfo info, StreamingContext context)
         {
             FilterData = info.GetValue(SER_FIELD_DATA, typeof(object));
@@ -52,7 +51,6 @@ namespace Orleans.Streams
             info.AddValue(SER_FIELD_METHOD, methodName);
             info.AddValue(SER_FIELD_CLASS,  className);
         }
-        #endregion
 
         public bool ShouldReceive(IStreamIdentity stream, object filterData, object item)
         {

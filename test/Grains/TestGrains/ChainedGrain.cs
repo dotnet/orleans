@@ -31,8 +31,6 @@ namespace UnitTests.Grains
             return base.OnActivateAsync();
         }
 
-        #region IChainedGrain Members
-
         Task<IChainedGrain> IChainedGrain.GetNext() { return Task.FromResult(State.Next); } 
 
         Task<int> IChainedGrain.GetId() { return Task.FromResult(State.Id); }
@@ -99,7 +97,5 @@ namespace UnitTests.Grains
         {
             return next.Next.SetNextNested(new ChainGrainHolder { Next = null });
         }
-
-        #endregion
     }
 }

@@ -104,7 +104,6 @@ namespace Orleans.ServiceBus.Providers.Testing
             return partitions;
         }
 
-        #region IControllable interface
         /// <summary>
         /// Commands for IControllable
         /// </summary>
@@ -169,8 +168,7 @@ namespace Orleans.ServiceBus.Providers.Testing
             }
             return Task.FromResult((object)true);
         }
-        #endregion
-        
+
         public new static EventDataGeneratorAdapterFactory Create(IServiceProvider services, string name)
         {
             var generatorOptions= services.GetOptionsByName<EventDataGeneratorStreamOptions>(name);

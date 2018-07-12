@@ -89,8 +89,6 @@ namespace Orleans.Runtime
 
         }
 
-        #region Implementation of ISiloControl
-
         public Task Ping(string message)
         {
             logger.Info("Ping");
@@ -208,7 +206,5 @@ namespace Orleans.Runtime
             this.cachedVersionSelectorManager.ResetCache();
             return Task.CompletedTask;
         }
-
-        #endregion
     }
 }

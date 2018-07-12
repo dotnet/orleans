@@ -1194,8 +1194,7 @@ namespace UnitTests.StorageTests
             int val = await grain.GetValue();
             Assert.Equal(1, val);
         }
-        
-        #region Utility functions
+
         // ---------- Utility functions ----------
         private void SetStoredValue(string providerName, string providerTypeFullName, string grainType, IGrain grain, string fieldName, int newValue)
         {
@@ -1314,7 +1313,6 @@ namespace UnitTests.StorageTests
                 }
             }
         }
-        #endregion
     }
 }
 

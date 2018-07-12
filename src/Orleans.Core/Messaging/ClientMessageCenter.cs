@@ -64,12 +64,9 @@ namespace Orleans.Messaging
     {
         internal readonly SerializationManager SerializationManager;
 
-        #region Constants
-
         internal static readonly TimeSpan MINIMUM_INTERCONNECT_DELAY = TimeSpan.FromMilliseconds(100);   // wait one tenth of a second between connect attempts
         internal const int CONNECT_RETRY_COUNT = 2;                                                      // Retry twice before giving up on a gateway server
 
-        #endregion
         internal GrainId ClientId { get; private set; }
         public IRuntimeClient RuntimeClient { get; }
         internal bool Running { get; private set; }
@@ -416,8 +413,6 @@ namespace Orleans.Messaging
             throw new NotImplementedException("Reconnect");
         }
 
-        #region Random IMessageCenter stuff
-
         public int SendQueueLength
         {
             get { return 0; }
@@ -427,8 +422,6 @@ namespace Orleans.Messaging
         {
             get { return 0; }
         }
-
-        #endregion
 
         private IClusterTypeManager GetTypeManager(SiloAddress destination, IInternalGrainFactory grainFactory)
         {

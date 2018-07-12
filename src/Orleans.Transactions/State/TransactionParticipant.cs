@@ -21,8 +21,6 @@ namespace Orleans.Transactions
     {
         private bool detectReentrancy;
 
- 
-        #region commit queue operations
 
         private async Task StorageWork()
         {
@@ -373,9 +371,6 @@ namespace Orleans.Transactions
             }
         }
 
-        #endregion
-
-        #region ITransactionalState<TState>
 
         /// <inheritdoc/>
         public Task<TResult> PerformUpdate<TResult>(Func<TState, TResult> updateAction)
@@ -527,9 +522,6 @@ namespace Orleans.Transactions
                      return result;
                  }));
         }
-        #endregion
-
-        #region ITransactionParticipant
 
 
         /// <summary>
@@ -742,8 +734,6 @@ namespace Orleans.Transactions
             }
             return Task.CompletedTask; // one-way, no response
         }
-
-         #endregion
 
         private void EnqueueCommit(TransactionRecord<TState> record)
         {

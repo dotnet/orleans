@@ -526,8 +526,6 @@ namespace UnitTests.StreamingTests
     }
 }
 
-#region Azure QueueAction Tests
-
 //public async Task AQ_1_ConsumerJoinsFirstProducerLater()
 //{
 //    logger.Info("\n\n ************************ AQ_1_ConsumerJoinsFirstProducerLater ********************************* \n\n");
@@ -549,8 +547,6 @@ namespace UnitTests.StreamingTests
 //    var consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, streamProviderName, logger);
 //    await BasicTestAsync(producer, consumer);
 //}
-
-#endregion Azure QueueAction Tests
 
 //[Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
 //public async Task StreamTest_2_ProducerJoinsFirstConsumerLater()

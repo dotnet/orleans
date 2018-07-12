@@ -175,8 +175,6 @@ namespace Orleans.AzureUtils
             return sb.ToString();
         }
 
-        #region Silo instance table storage operations
-
         internal Task<string> MergeTableEntryAsync(SiloInstanceTableEntry data)
         {
             return storage.MergeTableEntryAsync(data, AzureStorageUtils.ANY_ETAG); // we merge this without checking eTags.
@@ -334,7 +332,5 @@ namespace Orleans.AzureUtils
                 throw;
             }
         }
-
-        #endregion
     }
 }

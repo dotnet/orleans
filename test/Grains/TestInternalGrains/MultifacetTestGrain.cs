@@ -21,23 +21,15 @@ namespace UnitTests.Grains
             return RuntimeIdentity;
         }
 
-        #region IMultifacetWriter Members
-
         public Task SetValue(int x)
         {
             State.Value = x;
             return Task.CompletedTask;
         }
 
-        #endregion
-
-        #region IMultifacetReader Members
-
         Task<int> IMultifacetReader.GetValue()
         {
             return Task.FromResult(State.Value);
         }
-
-        #endregion
     }
 }

@@ -258,16 +258,12 @@ namespace Orleans.Runtime
                 ((Generation == other.Generation) || (Generation == 0) || (other.Generation == 0));
         }
 
-        #region IEquatable<SiloAddress> Members
-
         /// <summary> IEquatable.Equals method override. </summary>
         public bool Equals(SiloAddress other)
         {
             return other != null && Endpoint.Address.Equals(other.Endpoint.Address) && (Endpoint.Port == other.Endpoint.Port) &&
                 ((Generation == other.Generation));
         }
-
-        #endregion
 
 
         // non-generic version of CompareTo is needed by some contexts. Just calls generic version.

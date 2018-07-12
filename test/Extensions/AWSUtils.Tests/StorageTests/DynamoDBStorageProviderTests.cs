@@ -164,8 +164,6 @@ namespace AWSUtils.Tests.StorageTests
             Assert.Equal(initialState.C, convertedState.C);
         }
 
-        #region Utility functions
-
         private async Task<DynamoDBGrainStorage> InitDynamoDBGrainStorage(DynamoDBStorageOptions options)
         {
             DynamoDBGrainStorage store = ActivatorUtilities.CreateInstance<DynamoDBGrainStorage>(this.providerRuntime.ServiceProvider, options);
@@ -282,7 +280,5 @@ namespace AWSUtils.Tests.StorageTests
             if (!AWSTestConstants.IsDynamoDbAvailable)
                 throw new SkipException("Unable to connect to DynamoDB simulator");
         }
-
-        #endregion Utility functions
     }
 }

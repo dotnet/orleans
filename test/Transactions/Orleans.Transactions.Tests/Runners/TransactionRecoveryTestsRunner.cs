@@ -189,7 +189,6 @@ namespace Orleans.Transactions.Tests
             }
         }
 
-        #region cluster set up related
         public class SiloBuilderConfiguratorUsingAzureClustering : ISiloBuilderConfigurator
         {
             public void Configure(ISiloHostBuilder hostBuilder)
@@ -207,6 +206,5 @@ namespace Orleans.Transactions.Tests
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString);
             }
         }
-        #endregion
     }
 }

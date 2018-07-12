@@ -124,8 +124,6 @@ namespace Orleans.Transactions
             this.serializerSettings = serializerSettings;
         }
 
-        #region lifecycle
-
         public void Participate(IGrainLifecycle lifecycle)
         {
             lifecycle.Subscribe<TransactionalState<TState>>(GrainLifecycleStage.SetupState, OnSetupState);
@@ -149,8 +147,6 @@ namespace Orleans.Transactions
 
             storageWorker.Notify();
         }
-
-        #endregion lifecycle
   
         private string StoredName()
         {

@@ -373,8 +373,6 @@ namespace Orleans
             transport.Reconnect();
         }
 
-        #region Implementation of IRuntimeClient
-
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "CallbackData is IDisposable but instances exist beyond lifetime of this method so cannot Dispose yet.")]
         public void SendRequest(GrainReference target, InvokeMethodRequest request, TaskCompletionSource<object> context, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null)
@@ -600,8 +598,6 @@ namespace Orleans
             if (!localObjects.TryDeregister(reference.ObserverId))
                 throw new ArgumentException("Reference is not associated with a local object.", "reference");
         }
-
-        #endregion Implementation of IRuntimeClient
 
         private void CurrentDomain_DomainUnload(object sender, EventArgs e)
         {

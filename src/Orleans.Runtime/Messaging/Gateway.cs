@@ -343,8 +343,6 @@ namespace Orleans.Runtime.Messaging
                 this.clientDropTimeout = clientDropTimeout;
             }
 
-            #region Overrides of AsynchAgent
-
             protected override void Run()
             {
                 while (!Cts.IsCancellationRequested)
@@ -354,8 +352,6 @@ namespace Orleans.Runtime.Messaging
                     Thread.Sleep(clientDropTimeout);
                 }
             }
-
-            #endregion
         }
 
         // this cache is used to record the addresses of Gateways from which clients connected to.

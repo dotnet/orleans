@@ -150,8 +150,6 @@ namespace Orleans.Transactions
             }
         }
 
-        #region storage events
-
         public void Read(DateTime timestamp)
         {
             read++;
@@ -251,8 +249,6 @@ namespace Orleans.Transactions
 
             MetaData.CommitRecords.Remove(transactionId);
         }
-
-        #endregion
 
         public void FollowUpAction(Action action)
         {

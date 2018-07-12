@@ -163,25 +163,17 @@ namespace Orleans.Streams
             return this.runtimeClient.ServiceProvider.GetRequiredServiceByName<IStreamProvider>(streamId.ProviderName) as IInternalStreamProvider;
         }
 
-        #region IComparable<IAsyncStream<T>> Members
-
         public int CompareTo(IAsyncStream<T> other)
         {
             var o = other as StreamImpl<T>;
             return o == null ? 1 : streamId.CompareTo(o.streamId);
         }
 
-        #endregion
-
-        #region IEquatable<IAsyncStream<T>> Members
-
         public virtual bool Equals(IAsyncStream<T> other)
         {
             var o = other as StreamImpl<T>;
             return o != null && streamId.Equals(o.streamId);
         }
-
-        #endregion
 
         public override bool Equals(object obj)
         {
@@ -198,8 +190,6 @@ namespace Orleans.Streams
         {
             return streamId.ToString();
         }
-                
-        #region ISerializable Members
 
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
@@ -225,6 +215,5 @@ namespace Orleans.Streams
         {
             this.runtimeClient = context?.AdditionalContext as IRuntimeClient;
         }
-        #endregion
     }
 }

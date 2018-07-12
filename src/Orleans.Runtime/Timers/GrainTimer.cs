@@ -204,8 +204,6 @@ namespace Orleans.Runtime
                 dueTime, timerFrequency, logger, GetFullName, ErrorCode.Timer_TimerInsideGrainIsNotTicking, false);
         }
 
-        #region IDisposable Members
-
         public void Dispose()
         {
             Dispose(true);
@@ -232,7 +230,5 @@ namespace Orleans.Runtime
             asyncCallback = null;
             activationData?.OnTimerDisposed(this);
         }
-
-        #endregion
     }
 }

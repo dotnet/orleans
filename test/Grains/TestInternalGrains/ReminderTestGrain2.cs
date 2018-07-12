@@ -219,8 +219,6 @@ namespace UnitTests.Grains
         }
     }
 
-    #region Copy of ReminderTestGrain ... to test reminders for different grain types
-
     // NOTE: do not make changes here ... this is a copy of ReminderTestGrain
     // changes to make when copying:
     //      1. rename logger to ReminderCopyGrain
@@ -394,10 +392,6 @@ namespace UnitTests.Grains
         }
     }
 
-    #endregion
-
-    #region The wrong reminder grain
-
     public class WrongReminderGrain : Grain, IReminderGrainWrong
     {
         private Logger logger;
@@ -417,7 +411,6 @@ namespace UnitTests.Grains
             return true;
         }
     }
-    #endregion
 
 
     internal class UnvalidatedReminderRegistry : GrainServiceClient<IReminderService>, IReminderRegistry

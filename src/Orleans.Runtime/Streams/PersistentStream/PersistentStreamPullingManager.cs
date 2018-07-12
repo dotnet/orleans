@@ -129,8 +129,6 @@ namespace Orleans.Streams
             Log(ErrorCode.PersistentStreamPullingManager_Stopped, "Stopped agents.");
         }
 
-        #region Management of queues
-
         /// <summary>
         /// Actions to take when the queue distribution changes due to a failure or a join.
         /// Since this pulling manager is system target and queue distribution change notifications
@@ -322,8 +320,6 @@ namespace Orleans.Streams
                     PrintQueues(queuesToAgentsMap.Keys));
             }
         }
-
-        #endregion
 
         public async Task<object> ExecuteCommand(PersistentStreamProviderCommand command, object arg)
         {

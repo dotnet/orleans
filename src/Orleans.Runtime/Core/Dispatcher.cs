@@ -63,8 +63,6 @@ namespace Orleans.Runtime
 
         public ISiloRuntimeClient RuntimeClient => this.catalog.RuntimeClient;
 
-        #region Receive path
-
         /// <summary>
         /// Receive a new message:
         /// - validate order constraints, queue (or possibly redirect) if out of order
@@ -645,10 +643,6 @@ namespace Orleans.Runtime
             return message.ForwardCount < messagingOptions.MaxForwardCount;
         }
 
-        #endregion
-
-        #region Send path
-
         /// <summary>
         /// Send an outgoing message, may complete synchronously
         /// - may buffer for transaction completion / commit if it ends a transaction
@@ -827,9 +821,6 @@ namespace Orleans.Runtime
             Transport.SendMessage(message);
         }
 
-        #endregion
-        #region Execution
-
         /// <summary>
         /// Invoked when an activation has finished a transaction and may be ready for additional transactions
         /// </summary>
@@ -889,7 +880,5 @@ namespace Orleans.Runtime
             }
             while (runLoop);
         }
-
-        #endregion
     }
 }

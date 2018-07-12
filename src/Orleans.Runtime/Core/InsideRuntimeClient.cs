@@ -110,8 +110,6 @@ namespace Orleans.Runtime
 
         private Dispatcher Dispatcher => this.dispatcher ?? (this.dispatcher = this.ServiceProvider.GetRequiredService<Dispatcher>());
 
-        #region Implementation of IRuntimeClient
-
         public IGrainReferenceRuntime GrainReferenceRuntime => this.grainReferenceRuntime ?? (this.grainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>());
 
         public void SendRequest(
@@ -667,8 +665,6 @@ namespace Orleans.Runtime
             data.ResetKeepAliveRequest(); // DeactivateOnIdle method would undo / override any current “keep alive” setting, making this grain immideately avaliable for deactivation.
             Catalog.DeactivateActivationOnIdle(data);
         }
-
-        #endregion
 
         private Task OnRuntimeInitializeStop(CancellationToken tc)
         {

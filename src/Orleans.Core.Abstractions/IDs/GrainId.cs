@@ -164,14 +164,10 @@ namespace Orleans.Runtime
             return grainIdInternCache.FindOrCreate(key, k => new GrainId(k));
         }
 
-        #region IEquatable<GrainId> Members
-
         public bool Equals(GrainId other)
         {
             return other != null && Key.Equals(other.Key);
         }
-
-        #endregion
 
         public override bool Equals(UniqueIdentifier obj)
         {
