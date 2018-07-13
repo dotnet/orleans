@@ -28,11 +28,6 @@ namespace Orleans
         // Used to communicate the task for the next work cycle to waiters.
         // This value is non-null only if there are waiters.
         private TaskCompletionSource<Task> nextWorkCyclePromise;
-
-        /// <summary>
-        /// Creates a new worker from the provided delegate.
-        /// </summary>
-        public static BatchWorker Create(Func<Task> work) => new BatchWorkerFromDelegate(work);
         
         /// <summary>Implement this member in derived classes to define what constitutes a work cycle</summary>
         protected abstract Task Work();
@@ -238,20 +233,20 @@ namespace Orleans
                 await waitForTask;
             }
         }
+    }
 
-        private class BatchWorkerFromDelegate : BatchWorker
+    public class BatchWorkerFromDelegate : BatchWorker
+    {
+        private readonly Func<Task> work;
+
+        public BatchWorkerFromDelegate(Func<Task> work)
         {
-            private readonly Func<Task> work;
+            this.work = work;
+        }
 
-            public BatchWorkerFromDelegate(Func<Task> work)
-            {
-                this.work = work;
-            }
-
-            protected override Task Work()
-            {
-                return work();
-            }
+        protected override Task Work()
+        {
+            return work();
         }
     }
 }

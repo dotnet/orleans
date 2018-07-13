@@ -188,7 +188,7 @@ namespace Orleans.EventSourcing.Common
             this.Host = host;
             this.Services = services;
             InitializeConfirmedView(initialstate);
-            worker = BatchWorker.Create(Work);
+            worker = new BatchWorkerFromDelegate(Work);
         }
 
         /// <inheritdoc/>

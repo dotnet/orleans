@@ -117,9 +117,9 @@ namespace Orleans.Transactions
             this.loggerFactory = loggerFactory;
             this.clock = new CausalClock(clock);
 
-            lockWorker = BatchWorker.Create(LockWork);
-            storageWorker = BatchWorker.Create(StorageWork);
-            confirmationWorker = BatchWorker.Create(ConfirmationWork);
+            lockWorker = new BatchWorkerFromDelegate(LockWork);
+            storageWorker = new BatchWorkerFromDelegate(StorageWork);
+            confirmationWorker = new BatchWorkerFromDelegate(ConfirmationWork);
 
             this.serializerSettings = serializerSettings;
         }
