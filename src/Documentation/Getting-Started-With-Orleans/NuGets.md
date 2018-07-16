@@ -17,7 +17,7 @@ PM> Install-Package Microsoft.Orleans.Core.Abstractions
 
 Contains Orleans.Core.Abstractions.dll, which defines Orleans public types that are needed for developing application code (grain interfaces and classes).
 This package is needs to be directly or indirectly referenced by any Orleans project.
-Add it to you projects that define grain interfaces and classes.
+Add it to your projects that define grain interfaces and classes.
 
 ### [Microsoft Orleans Build-time Code Generation](https://www.nuget.org/packages/Microsoft.Orleans.OrleansCodeGenerator.Build/)
 
