@@ -7,9 +7,13 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
+    using System.Collections.Generic;
+
+    using Orleans.CodeGeneration;
+
     public class CollectionTestGrain : Grain, ICollectionTestGrain
     {
-        private DateTime activated;
+        protected DateTime activated;
 
         private ICollectionTestGrain other;
         private Logger logger;
@@ -51,6 +55,12 @@ namespace UnitTests.Grains
             return Task.FromResult(DateTime.UtcNow.Subtract(activated));
         }
 
+        public Task<DateTime> GetActivationTime()
+        {
+            Logger().Info("GetActivationTime.");
+            return Task.FromResult(activated);
+        }
+
         public virtual Task DeactivateSelf()
         {
             Logger().Info("DeactivateSelf.");
@@ -82,7 +92,8 @@ namespace UnitTests.Grains
             Logger().Info("GetGrainReference.");
             return Task.FromResult(this.AsReference<ICollectionTestGrain>());
         }
-        public Task StartTimer(TimeSpan timerPeriod, TimeSpan delayPeriod)
+
+        public virtual Task StartTimer(TimeSpan timerPeriod, TimeSpan delayPeriod)
         {
             RegisterTimer(TimerCallback, delayPeriod, TimeSpan.Zero, timerPeriod);
             return Task.CompletedTask;
@@ -119,6 +130,7 @@ namespace UnitTests.Grains
             logger = this.GetLogger(String.Format("ReentrantCollectionTestGrain {0} {1} on {2}.", Identity, Data.ActivationId, RuntimeIdentity));
             logger.Info("OnActivateAsync.");
             counter = 0;
+            activated = DateTime.UtcNow;
             return Task.CompletedTask;
         }
 
@@ -136,6 +148,62 @@ namespace UnitTests.Grains
             await Task.Delay(TimeSpan.FromMilliseconds(1000));
             Logger().Info("Reentrant:IncrCounter AFTER Delay {0}, staticCounter {1}.", tmpCounter, staticCounter);
             return counter;
+        }
+    }
+	
+    [MayInterleave("MayInterleave")]
+    public class MayInterleaveCollectionTestGrainWithTcs : CollectionTestGrain, ICollectionTestGrain
+    {
+        public static bool MayInterleave(InvokeMethodRequest req) => req.MethodId == 1121447038; // IncrCounter
+
+        private Logger logger;
+        private int counter;
+        
+        readonly List<TaskCompletionSource<int>> buffer = new List<TaskCompletionSource<int>>();
+
+        protected override Logger Logger()
+        {
+            return logger;
+        }
+
+        public override Task OnActivateAsync()
+        {
+            logger = this.GetLogger(String.Format("MayInterleaveCollectionTestGrainWithTcs {0} {1} on {2}.", Identity, Data.ActivationId, RuntimeIdentity));
+            logger.Info("OnActivateAsync.");
+            counter = 0;
+            activated = DateTime.UtcNow;
+            return Task.CompletedTask;
+        }
+
+        public override Task OnDeactivateAsync()
+        {            
+            Logger().Info("OnDeactivateAsync.");
+            return Task.CompletedTask;
+        }
+
+        public override Task StartTimer(TimeSpan timerPeriod, TimeSpan delayPeriod)
+        {
+            RegisterTimer(CompleteBuffer, null, delayPeriod, timerPeriod);
+            return Task.CompletedTask;
+        }
+
+        Task CompleteBuffer(object _)
+        {
+            var items = buffer.ToArray();
+            buffer.Clear();
+
+            foreach (var item in items)
+                item.TrySetResult(counter++);
+            
+            return Task.CompletedTask;
+        }
+
+        public override Task<int> IncrCounter()
+        {
+            var item = new TaskCompletionSource<int>();
+            buffer.Add(item);
+
+            return item.Task;
         }
     }
 }

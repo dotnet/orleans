@@ -8,6 +8,8 @@ namespace UnitTests.GrainInterfaces
     {
         Task<TimeSpan> GetAge();
 
+        Task<DateTime> GetActivationTime();
+
         Task<int> IncrCounter();
 
         Task DeactivateSelf();
