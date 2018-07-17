@@ -4,6 +4,7 @@ using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Streams;
 using System;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans;
 
 namespace Orleans.Streaming
@@ -31,15 +32,10 @@ namespace Orleans.Streaming
             this.Configure<AzureQueueOptions>(configureOptions);
             return this;
         }
+
         public SiloAzureQueueStreamConfigurator<TDataAdapter> ConfigureCache(int cacheSize = SimpleQueueCacheOptions.DEFAULT_CACHE_SIZE)
         {
             this.Configure<SimpleQueueCacheOptions>(ob => ob.Configure(options => options.CacheSize = cacheSize));
-            return this;
-        }
-
-        public SiloAzureQueueStreamConfigurator<TDataAdapter> ConfigurePartitioning(int numOfPartition = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
-        {
-            this.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfPartition));
             return this;
         }
     }

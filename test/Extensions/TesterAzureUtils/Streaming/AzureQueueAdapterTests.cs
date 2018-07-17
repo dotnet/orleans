@@ -29,23 +29,22 @@ namespace Tester.AzureUtils.Streaming
         private readonly TestEnvironmentFixture fixture;
         private const int NumBatches = 20;
         private const int NumMessagesPerBatch = 20;
-        private string clusterId;
         public static readonly string AZURE_QUEUE_STREAM_PROVIDER_NAME = "AQAdapterTests";
         private readonly ILoggerFactory loggerFactory;
         private static readonly SafeRandom Random = new SafeRandom();
+        private static List<string> azureQueueNames = AzureQueueUtilities.GenerateQueueNames($"AzureQueueAdapterTests-{Guid.NewGuid()}", 8);
 
         public AzureQueueAdapterTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;
             this.fixture = fixture;
-            this.clusterId = MakeClusterId();
             this.loggerFactory = this.fixture.Services.GetService<ILoggerFactory>();
             BufferPool.InitGlobalBufferPool(new SiloMessagingOptions());
         }
         
         public void Dispose()
         {
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(this.loggerFactory, AZURE_QUEUE_STREAM_PROVIDER_NAME, this.clusterId, TestDefaultConfiguration.DataConnectionString).Wait();
+            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(this.loggerFactory, azureQueueNames, TestDefaultConfiguration.DataConnectionString).Wait();
         }
 
         [SkippableFact, TestCategory("Functional"), TestCategory("Halo")]
@@ -54,10 +53,10 @@ namespace Tester.AzureUtils.Streaming
             var options = new AzureQueueOptions
             {
                 ConnectionString = TestDefaultConfiguration.DataConnectionString,
-                MessageVisibilityTimeout = TimeSpan.FromSeconds(30)
+                MessageVisibilityTimeout = TimeSpan.FromSeconds(30),
+                QueueNames = azureQueueNames
             };
-            var adapterFactory = new AzureQueueAdapterFactory<AzureQueueDataAdapterV2>(AZURE_QUEUE_STREAM_PROVIDER_NAME, options,
-                new HashRingStreamQueueMapperOptions(), new SimpleQueueCacheOptions(), this.fixture.Services, this.fixture.Services.GetService<IOptions<ClusterOptions>>(), 
+            var adapterFactory = new AzureQueueAdapterFactory<AzureQueueDataAdapterV2>(AZURE_QUEUE_STREAM_PROVIDER_NAME, options, new SimpleQueueCacheOptions(), this.fixture.Services, this.fixture.Services.GetService<IOptions<ClusterOptions>>(), 
                 this.fixture.Services.GetRequiredService<SerializationManager>(), loggerFactory);
             adapterFactory.Init();
             await SendAndReceiveFromQueueAdapter(adapterFactory);

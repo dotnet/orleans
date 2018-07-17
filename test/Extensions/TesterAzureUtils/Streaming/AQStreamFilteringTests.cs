@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -19,7 +20,8 @@ namespace Tester.AzureUtils.Streaming
     [TestCategory("Streaming"), TestCategory("Filters"), TestCategory("Azure")]
     public class StreamFilteringTests_AQ : StreamFilteringTestsBase, IClassFixture<StreamFilteringTests_AQ.Fixture>, IDisposable
     {
-        private readonly string serviceId;
+        private const int queueCount = 8;
+        private readonly Fixture fixture;
         public class Fixture : BaseAzureTestClusterFixture
         {
             public const string StreamProvider = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
@@ -33,11 +35,12 @@ namespace Tester.AzureUtils.Streaming
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamProvider, ob=>ob.Configure(
-                        options =>
-                        {
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        }))
+                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamProvider, ob=>ob.Configure<IOptions<ClusterOptions>>(
+                            (options, dep) =>
+                            {
+                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
+                            }))
                         .AddMemoryGrainStorage("MemoryStore")
                         .AddMemoryGrainStorage("PubSubStore");
                 }
@@ -45,9 +48,9 @@ namespace Tester.AzureUtils.Streaming
 
             public override void Dispose()
             {
-                var clusterId = this.HostedCluster?.Options.ClusterId;
                 base.Dispose();
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, StreamProvider, clusterId, TestDefaultConfiguration.DataConnectionString)
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount), 
+                    TestDefaultConfiguration.DataConnectionString)
                     .Wait();
             }
         }
@@ -55,17 +58,16 @@ namespace Tester.AzureUtils.Streaming
         public StreamFilteringTests_AQ(Fixture fixture) : base(fixture)
         {
             fixture.EnsurePreconditionsMet();
-            this.serviceId = fixture.HostedCluster.Options.ServiceId.ToString();
+            this.fixture = fixture;
             streamProviderName = Fixture.StreamProvider;
         }
 
         public virtual void Dispose()
         {
-                AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(NullLoggerFactory.Instance, 
-                    streamProviderName,
-                    this.serviceId,
+                AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(NullLoggerFactory.Instance,
+                    AzureQueueUtilities.GenerateQueueNames(this.fixture.HostedCluster.Options.ClusterId, queueCount),
                     TestDefaultConfiguration.DataConnectionString).Wait();
-            }
+        }
 
         [SkippableFact, TestCategory("Functional")]
         public async Task AQ_Filter_Basic()
