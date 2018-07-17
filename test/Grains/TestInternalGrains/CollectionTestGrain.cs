@@ -126,7 +126,7 @@ namespace UnitTests.Grains
         }
 
         public override Task OnActivateAsync()
-        {
+        {            
             logger = this.GetLogger(String.Format("ReentrantCollectionTestGrain {0} {1} on {2}.", Identity, Data.ActivationId, RuntimeIdentity));
             logger.Info("OnActivateAsync.");
             counter = 0;
@@ -168,22 +168,19 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger(String.Format("MayInterleaveCollectionTestGrainWithTcs {0} {1} on {2}.", Identity, Data.ActivationId, RuntimeIdentity));
+            logger = this.GetLogger($"MayInterleaveCollectionTestGrainWithTcs {Identity} {Data.ActivationId} on {RuntimeIdentity}.");
             logger.Info("OnActivateAsync.");
+            
             counter = 0;
-            activated = DateTime.UtcNow;
+            activated = DateTime.UtcNow;            
+            RegisterTimer(CompleteBuffer, null, TimeSpan.FromMilliseconds(500), TimeSpan.FromMilliseconds(100));
+
             return Task.CompletedTask;
         }
 
         public override Task OnDeactivateAsync()
         {            
             Logger().Info("OnDeactivateAsync.");
-            return Task.CompletedTask;
-        }
-
-        public override Task StartTimer(TimeSpan timerPeriod, TimeSpan delayPeriod)
-        {
-            RegisterTimer(CompleteBuffer, null, delayPeriod, timerPeriod);
             return Task.CompletedTask;
         }
 

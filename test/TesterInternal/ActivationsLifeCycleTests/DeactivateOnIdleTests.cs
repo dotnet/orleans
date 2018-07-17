@@ -127,9 +127,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             var activated = await a.GetActivationTime();
             Assert.Equal(activated, await a.GetActivationTime());
 
-            await a.StartTimer(TimeSpan.FromMilliseconds(200), TimeSpan.FromMilliseconds(100));
-
-            var pipeline = new AsyncPipeline(10);
+            var pipeline = new AsyncPipeline(50);
             var cts = new CancellationTokenSource();
             var cancellation = cts.Token;
 
@@ -145,7 +143,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             });
 
             // give it some time to fill the queue
-            await Task.Delay(TimeSpan.FromSeconds(1));
+            await Task.Delay(TimeSpan.FromSeconds(3));
 
             output.WriteLine($"Requests (before): {requests.Count}");
             await a.DeactivateSelf();
