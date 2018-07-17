@@ -121,7 +121,7 @@
 
   <!-- Inner dependency versions -->
   <PropertyGroup Condition="$(FullBuild) != 'true'">
-    <OrleansCoreAbstractionsVersion>2.0.0</OrleansCoreAbstractionsVersion>
+    <OrleansCoreAbstractionsVersion>2.1.0</OrleansCoreAbstractionsVersion>
     <OrleansRuntimeAbstractionsVersion>2.0.0</OrleansRuntimeAbstractionsVersion>
     <OrleansCoreVersion>2.1.0</OrleansCoreVersion>
     <OrleansRuntimeVersion>2.1.0</OrleansRuntimeVersion>
