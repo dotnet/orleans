@@ -13,18 +13,15 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure cluster to use the distributed TM algorithm
         /// </summary>
-        public static ISiloHostBuilder UseDistributedTM(this ISiloHostBuilder builder)
+        public static ISiloHostBuilder UseDistributedTM(this ISiloHostBuilder builder, bool withReporter = true)
         {
-            return builder.ConfigureServices(services => services.UseDistributedTM());
+            return builder.ConfigureServices(services => services.UseDistributedTM(withReporter));
         }
 
-        /// <summary>
-        /// Configure cluster to use the distributed TM algorithm
-        /// </summary>
-        public static IServiceCollection UseDistributedTM(this IServiceCollection services)
+        internal static IServiceCollection UseDistributedTM(this IServiceCollection services, bool withReporter)
         {
             services.TryAddSingleton<IClock,Clock>();
-            services.TryAddSingleton<TransactionAgentStatistics>();
+            services.TryAddSingleton<ITransactionAgentStatistics, TransactionAgentStatistics>();
             services.TryAddSingleton<ITransactionOverloadDetector,TransactionOverloadDetector>();
             services.AddSingleton<ITransactionAgent, TransactionAgent>();
             services.TryAddSingleton(typeof(ITransactionDataCopier<>), typeof(DefaultTransactionDataCopier<>));
@@ -32,6 +29,8 @@ namespace Orleans.Hosting
             services.TryAddTransient<ITransactionalStateFactory, TransactionalStateFactory>();
             services.TryAddTransient<INamedTransactionalStateStorageFactory, NamedTransactionalStateStorageFactory>();
             services.AddTransient(typeof(ITransactionalState<>), typeof(TransactionalState<>));
+            if (withReporter)
+                services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, TransactionAgentStatisticsReporter>();
             return services;
         }
     }
