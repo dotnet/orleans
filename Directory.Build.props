@@ -122,24 +122,24 @@
   <!-- Inner dependency versions -->
   <PropertyGroup Condition="$(FullBuild) != 'true'">
     <OrleansCoreAbstractionsVersion>2.1.0</OrleansCoreAbstractionsVersion>
-    <OrleansRuntimeAbstractionsVersion>2.0.0</OrleansRuntimeAbstractionsVersion>
+    <OrleansRuntimeAbstractionsVersion>2.1.0</OrleansRuntimeAbstractionsVersion>
     <OrleansCoreVersion>2.1.0</OrleansCoreVersion>
     <OrleansRuntimeVersion>2.1.0</OrleansRuntimeVersion>
     <OrleansCoreLegacyVersion>2.1.0</OrleansCoreLegacyVersion>
     <OrleansRuntimeLegacyVersion>2.1.0</OrleansRuntimeLegacyVersion>
-    <OrleansProvidersVersion>2.0.0</OrleansProvidersVersion>
-    <OrleansExtensionsVersion>2.0.0</OrleansExtensionsVersion>
-    <OrleansEventSourcingVersion>2.0.0</OrleansEventSourcingVersion>
-    <OrleansAdoNetVersion>2.0.0</OrleansAdoNetVersion>
-    <OrleansAWSVersion>2.0.0</OrleansAWSVersion>
-    <OrleansAzureVersion>2.0.0</OrleansAzureVersion>
+    <OrleansProvidersVersion>2.1.0</OrleansProvidersVersion>
+    <OrleansExtensionsVersion>2.1.0</OrleansExtensionsVersion>
+    <OrleansEventSourcingVersion>2.1.0</OrleansEventSourcingVersion>
+    <OrleansAdoNetVersion>2.1.0</OrleansAdoNetVersion>
+    <OrleansAWSVersion>2.1.0</OrleansAWSVersion>
+    <OrleansAzureVersion>2.1.0</OrleansAzureVersion>
     <OrleansTestingHostVersion>2.1.0</OrleansTestingHostVersion>
     <OrleansTransactionsVersion>2.1.0</OrleansTransactionsVersion>
-    <OrleansServiceFabricVersion>2.0.0</OrleansServiceFabricVersion>
-    <OrleansSerializersVersion>2.0.0</OrleansSerializersVersion>
-    <OrleansToolsVersion>2.0.0</OrleansToolsVersion>
-    <OrleansClientVersion>2.0.0</OrleansClientVersion>
-    <OrleansServerVersion>2.0.0</OrleansServerVersion>
+    <OrleansServiceFabricVersion>2.1.0</OrleansServiceFabricVersion>
+    <OrleansSerializersVersion>2.1.0</OrleansSerializersVersion>
+    <OrleansToolsVersion>2.1.0</OrleansToolsVersion>
+    <OrleansClientVersion>2.1.0</OrleansClientVersion>
+    <OrleansServerVersion>2.1.0</OrleansServerVersion>
     <OrleansCodegenVersion>2.1.0</OrleansCodegenVersion>
     <OrleansEventHubProviderVersion>2.1.0</OrleansEventHubProviderVersion>
   </PropertyGroup>
