@@ -7,6 +7,12 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [2.0.4]
+
+- Non-breaking bug fixes
+  - Workaround for [CoreFx/#30781](https://github.com/dotnet/corefx/issues/30781) when running on .NET Core (#4736)
+  - Fix for .NET Core 2.1 build-time code generation (#4673)
+
 ### [2.0.3]
 
 - Non-breaking improvements
