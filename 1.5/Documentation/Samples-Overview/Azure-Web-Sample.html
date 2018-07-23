@@ -1,0 +1,142 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Azure Web Sample | Microsoft Orleans Website </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Azure Web Sample | Microsoft Orleans Website ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../Images/logo-light.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list"></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+
+<div class="IMPORTANT"><h5>Important</h5><p><strong>You are looking at the 1.5 documentation</strong></p>
+<p>Orleans 2.0 is a significant overhaul from the 1.x versions.
+For 2.0 <a href="/orleans/Documentation/Introduction.html">Documentation</a> and <a href="/orleans/Tutorials/index.html">Tutorials</a>, refer to the respective sections.</p>
+</div>
+<h1 id="azure-web-sample">Azure Web Sample</h1>
+<p><strong>Important note</strong>: Worker and web role instances are not automatically removed or disabled, even when they go unused for a long time. To avoid a nasty surprise when your Azure bill comes, make sure to delete the instances after you have finished testing the application!</p>
+<p>This sample is essentially the same as the <a href="Hello-World.html">Hello World</a> sample, except that it hosts the grains in an Azure Worker Role instead of in the client process itself.</p>
+<p>While the communication interface and grain implementation are identical, three projects replace the client:</p>
+<ul>
+<li><strong>OrleansAzureSample</strong>, which is the Azure configuration project.</li>
+<li><strong>OrleansAzureSilos</strong>, the Worker Role integration logic that hosts the Orleans silo in the cloud.</li>
+<li><strong>WebRole</strong>, which provides a simple HTML UI for the Orleans backend.</li>
+</ul>
+<h2 id="run-azurewebsample-locally">Run AzureWebSample Locally</h2>
+<p>The sample is configured to run inside of the Azure Compute Emulator on your desktop by default, so make sure that <strong>OrleansAzureSample</strong> is set as the <strong>Startup Project</strong> in this solution and just press F5 to build and run the sample locally.</p>
+<p>You do not need to start Visual Studio with administrative privileges to run this sample in the emulator - it is designed to use both <strong>IIS Express</strong> and <strong>Express Emulator</strong>, so make sure these options are selected in OrleansAzureSample-&gt;Properties-&gt;Web.
+You may also need to select the &quot;Use IIS Express for web sites and projects&quot; in Tools-&gt;Options-&gt;Projects and Solutions-&gt;Web Projects.</p>
+<h2 id="run-azurewebsample-in-azure-cloud">Run AzureWebSample in Azure Cloud</h2>
+<p>To get the sample running in the Azure cloud, open the <code>ServiceConfiguration.Cloud.cscfg</code> file in the OrleansAzureSample project.</p>
+<p>Edit the connection strings, replacing <code>MYACCOUNTNAME</code> and <code>MYACCOUNTKEY</code> with data you get from the Azure portal, logged in to your account. It may be useful to set up a new storage account within your subscription just for samples testing. All four connection strings will look exactly the same.</p>
+<p>In the file <code>ServiceDefinition.csdef</code>, the configuration sets up all instances as ExtraSmall to avoid any unpleasant surprises. If you want something else, modify the settings as you see fit.</p>
+<p>Then, build the solution with Visual Studio and right-click on the OrleansAzureSample project, selecting &#39;Publish.&#39; Visual Studio will take you through the process of publishing your project to Azure, which will take a few minutes.</p>
+<p>If things work out, you should see something like this:
+![](AzureSample 3.png)</p>
+<p>This means that the site and its backend are ready. Start a web browser and navigate to the link that VS displayed (or just click on it). You will be greeted by this screen:</p>
+<p>![](AzureSample 1.png)</p>
+<p>Click on &quot;Ask Orleans it&#39;s details&quot; and wait for the response. The first time you interact with the site, it may take a few seconds, since the whole system need to warm up. After that first message, it should go quickly.</p>
+<p>![](AzureSample 2.png)</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

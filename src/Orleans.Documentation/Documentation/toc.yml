@@ -1,0 +1,24 @@
+- name: Documentation
+  href: index.md
+  homepage: index.md
+  items:
+  - name: Benefits
+    href: Benefits.md
+  - name: Orleans 2.0
+    href: Orleans-2.0.md
+  - name: Frequently Asked Questions
+    href: Frequently-Asked-Questions.md
+  - name: What's new in Orleans
+    href: What's-new-in-Orleans.md
+- name: Core Concepts
+  href: core_concepts/toc.yml
+- name: Deployment
+  href: deployment/toc.yml
+- name: Advanced Features
+  href: Advanced-Concepts/toc.yml
+- name: Tutorials and Samples
+  href: Samples-Overview/toc.yml
+- name: Resources
+  href: resources/toc.yml
+
+  

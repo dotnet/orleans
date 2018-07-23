@@ -1,0 +1,524 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Grain Persistence | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Grain Persistence | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../Images/logo-light.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list"></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+
+<div class="IMPORTANT"><h5>Important</h5><p><strong>You are looking at the 1.5 documentation</strong></p>
+<p>Orleans 2.0 is a significant overhaul from the 1.x versions.
+For 2.0 <a href="/orleans/Documentation/Introduction.html">Documentation</a> and <a href="/orleans/Tutorials/index.html">Tutorials</a>, refer to the respective sections.</p>
+</div>
+<h2 id="grain-persistence-goals">Grain Persistence Goals</h2>
+<ol>
+<li>Allow different grain types to use different types of storage providers (e.g., one uses Azure table, and one uses an ADO.NET one) or the same type of storage provider but with different configurations (e.g., both use Azure table, but one uses storage account #1 and one uses storage account #2)</li>
+<li>Allow configuration of a storage provider instance to be swapped (e.g., Dev-Test-Prod) with just config file changes, and no code changes required.</li>
+<li>Provide a framework to allow additional storage providers to be written later, either by the Orleans team or others.</li>
+<li>Provide a minimal set of production-grade storage providers</li>
+<li>Storage providers have complete control over how they store grain state data in persistent backing store. Corollary: Orleans is not providing a comprehensive ORM storage solution, but allows custom storage providers to support specific ORM requirements as and when required.</li>
+</ol>
+<h2 id="grain-persistence-api">Grain Persistence API</h2>
+<p>Grain types can be declared in one of two ways:</p>
+<ul>
+<li>Extend <code>Grain</code> if they do not have any persistent state, or if they will handle all persistent state themselves, or</li>
+<li>Extend <code>Grain&lt;T&gt;</code> if they have some persistent state that they want the Orleans runtime to handle.
+Stated another way, by extending <code>Grain&lt;T&gt;</code> a grain type is automatically opted-in to the Orleans system managed persistence framework.</li>
+</ul>
+<p>For the remainder of this section, we will only be considering Option #2 / <code>Grain&lt;T&gt;</code> because Option #1 grains will continue to run as now without any behavior changes.</p>
+<h2 id="grain-state-stores">Grain State Stores</h2>
+<p>Grain classes that inherit from <code>Grain&lt;T&gt;</code> (where <code>T</code> is an application-specific state data type that needs to be persisted) will have their state loaded automatically from a specified storage.</p>
+<p>Grains will be marked with a <code>[StorageProvider]</code> attribute that specifies a named instance of a storage provider to use for reading / writing the state data for this grain.</p>
+<pre><code class="lang-csharp">[StorageProvider(ProviderName=&quot;store1&quot;)]
+public class MyGrain&lt;MyGrainState&gt; ...
+{
+  ...
+}
+</code></pre><p>The Orleans Provider Manager framework provides a mechanism to specify &amp; register different storage providers and storage options in the silo config file.</p>
+<pre><code class="lang-xml">&lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
+    &lt;Globals&gt;
+    &lt;StorageProviders&gt;
+        &lt;Provider Type=&quot;Orleans.Storage.MemoryStorage&quot; Name=&quot;DevStore&quot; /&gt;
+        &lt;Provider Type=&quot;Orleans.Storage.AzureTableStorage&quot; Name=&quot;store1&quot;
+            DataConnectionString=&quot;DefaultEndpointsProtocol=https;AccountName=data1;AccountKey=SOMETHING1&quot; /&gt;
+        &lt;Provider Type=&quot;Orleans.Storage.AzureBlobStorage&quot; Name=&quot;store2&quot;
+            DataConnectionString=&quot;DefaultEndpointsProtocol=https;AccountName=data2;AccountKey=SOMETHING2&quot;  /&gt;
+    &lt;/StorageProviders&gt;
+</code></pre><h2 id="configuring-storage-providers">Configuring Storage Providers</h2>
+<h3 id="azuretablestorage">AzureTableStorage</h3>
+<pre><code class="lang-xml">&lt;Provider Type=&quot;Orleans.Storage.AzureTableStorage&quot; Name=&quot;TableStore&quot;
+    DataConnectionString=&quot;UseDevelopmentStorage=true&quot; /&gt;
+</code></pre><p>The following attributes can be added to the <code>&lt;Provider /&gt;</code> element to configure the provider:</p>
+<ul>
+<li><strong><code>DataConnectionString=&quot;...&quot;</code></strong> (mandatory) - The Azure storage connection string to use</li>
+<li><strong><code>TableName=&quot;OrleansGrainState&quot;</code></strong> (optional) - The table name to use in table storage, defaults to <code>OrleansGrainState</code></li>
+<li><strong><code>DeleteStateOnClear=&quot;false&quot;</code></strong> (optional) - If true, the record will be deleted when grain state is cleared, otherwise an null record will be written, defaults to <code>false</code></li>
+<li><strong><code>UseJsonFormat=&quot;false&quot;</code></strong> (optional) - If true, the json serializer will be used, otherwise the Orleans binary serializer will be used, defaults to <code>false</code></li>
+<li><strong><code>UseFullAssemblyNames=&quot;false&quot;</code></strong> (optional) - (if <code>UseJsonFormat=&quot;true&quot;</code>) Serializes types with full assembly names (true) or simple (false), defaults to <code>false</code></li>
+<li><strong><code>IndentJSON=&quot;false&quot;</code></strong> (optional) - (if <code>UseJsonFormat=&quot;true&quot;</code>) Indents the serialized json, defaults to <code>false</code></li>
+</ul>
+<blockquote><p><strong>Note:</strong> state should not exceed 64KB, a limit imposed by Table Storage.</p>
+</blockquote>
+<h3 id="azureblobstorage">AzureBlobStorage</h3>
+<pre><code class="lang-xml">&lt;Provider Type=&quot;Orleans.Storage.AzureTableStorage&quot; Name=&quot;BlobStore&quot;
+    DataConnectionString=&quot;UseDevelopmentStorage=true&quot; /&gt;
+</code></pre><p>The following attributes can be added to the <code>&lt;Provider /&gt;</code> element to configure the provider:</p>
+<ul>
+<li><strong><code>DataConnectionString=&quot;...&quot;</code></strong> (mandatory) - The Azure storage connection string to use</li>
+<li><strong><code>ContainerName=&quot;grainstate&quot;</code></strong> (optional) - The blob storage container to use, defaults to <code>grainstate</code></li>
+<li><strong><code>UseFullAssemblyNames=&quot;false&quot;</code></strong> (optional) - Serializes types with full assembly names (true) or simple (false), defaults to <code>false</code></li>
+<li><strong><code>IndentJSON=&quot;false&quot;</code></strong> (optional) - Indents the serialized json, defaults to <code>false</code></li>
+</ul>
+<h3 id="dynamodbstorageprovider">DynamoDBStorageProvider</h3>
+<pre><code class="lang-xml">&lt;Provider Type=&quot;Orleans.Storage.DynamoDBStorageProvider&quot; Name=&quot;DDBStore&quot;
+    DataConnectionString=&quot;Service=us-wes-1;AccessKey=MY_ACCESS_KEY;SecretKey=MY_SECRET_KEY;&quot; /&gt;
+</code></pre><ul>
+<li><strong><code>DataConnectionString=&quot;...&quot;</code></strong> (mandatory) - The DynamoDB storage connection string to use. You can set <code>Service</code>,<code>AccessKey</code>, <code>SecretKey</code>, <code>ReadCapacityUnits</code> and <code>WriteCapacityUnits</code> in it.</li>
+<li><strong><code>TableName=&quot;OrleansGrainState&quot;</code></strong> (optional) - The table name to use in table storage, defaults to <code>OrleansGrainState</code></li>
+<li><strong><code>DeleteStateOnClear=&quot;false&quot;</code></strong> (optional) - If true, the record will be deleted when grain state is cleared, otherwise an null record will be written, defaults to <code>false</code></li>
+<li><strong><code>UseJsonFormat=&quot;false&quot;</code></strong> (optional) - If true, the json serializer will be used, otherwise the Orleans binary serializer will be used, defaults to <code>false</code></li>
+<li><strong><code>UseFullAssemblyNames=&quot;false&quot;</code></strong> (optional) - (if <code>UseJsonFormat=&quot;true&quot;</code>) Serializes types with full assembly names (true) or simple (false), defaults to <code>false</code></li>
+<li><strong><code>IndentJSON=&quot;false&quot;</code></strong> (optional) - (if <code>UseJsonFormat=&quot;true&quot;</code>) Indents the serialized json, defaults to <code>false</code></li>
+</ul>
+<h3 id="adonet-storage-provider-sql-storage-provider">ADO.NET Storage Provider (SQL Storage Provider)</h3>
+<p>The ADO .NET Storage Provider allows you to store grain state in relational databases.
+Currently following databases are supported:</p>
+<ul>
+<li>SQL Server</li>
+<li>MySQL/MariaDB</li>
+<li>PostgreSQL</li>
+<li>Oracle</li>
+</ul>
+<p>First, install the base package:</p>
+<pre><code>Install-Package Microsoft.Orleans.OrleansSqlUtils
+</code></pre><p>Under the folder where the package gets installed alongside your project, you will
+find different SQL scripts for the supported database vendors. You can also get
+them from the <a href="https://github.com/dotnet/orleans/tree/master/src/AdoNet/Shared">OrleansSQLUtils repository</a>.
+Create a database, and then run the appropriate script to create the tables.</p>
+<p>The next steps are to install a second NuGet package (see table below) specific to the
+database vendor you want, and to configure the storage provider either programmatically or
+via XML configuration.</p>
+<table>
+<thead>
+<tr>
+<th>Database</th>
+<th>Script</th>
+<th>NuGet Package</th>
+<th>AdoInvariant</th>
+<th>Remarks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SQL Server</td>
+<td><a href="https://github.com/dotnet/orleans/blob/master/src/AdoNet/Shared/SQLServer-Main.sql">CreateOrleansTables_SQLServer.sql</a></td>
+<td><a href="https://www.nuget.org/packages/System.Data.SqlClient/">System.Data.SqlClient</a></td>
+<td>System.Data.SqlClient</td>
+<td></td>
+</tr>
+<tr>
+<td>MySQL / MariaDB</td>
+<td><a href="https://github.com/dotnet/orleans/blob/master/src/AdoNet/Shared/MySQL-Main.sql">CreateOrleansTables_MySQL.sql</a></td>
+<td><a href="https://www.nuget.org/packages/MySql.Data/">MySql.Data</a></td>
+<td>MySql.Data.MySqlClient</td>
+<td></td>
+</tr>
+<tr>
+<td>PostgreSQL</td>
+<td><a href="https://github.com/dotnet/orleans/blob/master/src/AdoNet/Shared/PostgreSQL-Main.sql">CreateOrleansTables_PostgreSQL.sql</a></td>
+<td><a href="https://www.nuget.org/packages/Npgsql/">Npgsql</a></td>
+<td>Npgsql</td>
+<td></td>
+</tr>
+<tr>
+<td>Oracle</td>
+<td><a href="https://github.com/dotnet/orleans/blob/master/src/AdoNet/Shared/Oracle-Main.sql">CreateOrleansTables_Oracle.sql</a></td>
+<td><a href="https://www.nuget.org/packages/Oracle.ManagedDataAccess/">ODP.net</a></td>
+<td>Oracle.DataAccess.Client</td>
+<td>No .net Core support</td>
+</tr>
+</tbody>
+</table>
+<p>The following is an example of how to configure an ADO .NET Storage Provider using XML configuration:</p>
+<pre><code class="lang-xml">&lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
+  &lt;Globals&gt;
+    &lt;StorageProviders&gt;
+      &lt;Provider Type=&quot;Orleans.Storage.AdoNetStorageProvider&quot;
+                Name=&quot;OrleansStorage&quot;
+                AdoInvariant=&quot;&lt;AdoInvariant&gt;&quot;
+                DataConnectionString=&quot;&lt;ConnectionString&gt;&quot;
+                UseJsonFormat=&quot;true&quot; /&gt;
+    &lt;/StorageProviders&gt;
+  &lt;/Globals&gt;
+&lt;/OrleansConfiguration&gt;
+</code></pre><p>In code, you would need something like the following:</p>
+<pre><code class="lang-csharp">var properties = new Dictionary&lt;string, string&gt;()
+{
+    [&quot;AdoInvariant&quot;] = &quot;&lt;AdoInvariant&gt;&quot;,
+    [&quot;DataConnectionString&quot;] = &quot;&lt;ConnectionString&gt;&quot;,
+    [&quot;UseJsonFormat&quot;] = &quot;true&quot;
+};
+
+config.Globals.RegisterStorageProvider&lt;AdoNetStorageProvider&gt;(&quot;OrleansStorage&quot;, properties);
+</code></pre><p>Essentially, you only need to set the database-vendor-specific connection string and an
+<code>AdoInvariant</code> (see table above) that identifies the vendor. You may also choose the format in which the data
+is saved, which may be either binary (default), JSON, or XML. While binary is the most compact
+option, it is opaque and you will not be able to read or work with the data. JSON is the
+recommended option.</p>
+<p>You can set the following properties:</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Name</td>
+<td>String</td>
+<td>Arbitrary name that persistent grains will use to refer to this storage provider</td>
+</tr>
+<tr>
+<td>Type</td>
+<td>String</td>
+<td>Set to <code>Orleans.Storage.AdoNetStorageProvider</code></td>
+</tr>
+<tr>
+<td>AdoInvariant</td>
+<td>String</td>
+<td>Identifies the database vendor (see above table for values; default is <code>System.Data.SqlClient</code>)</td>
+</tr>
+<tr>
+<td>DataConnectionString</td>
+<td>String</td>
+<td>Vendor-specific database connection string (required)</td>
+</tr>
+<tr>
+<td>UseJsonFormat</td>
+<td>Boolean</td>
+<td>Use JSON format (recommended)</td>
+</tr>
+<tr>
+<td>UseXmlFormat</td>
+<td>Boolean</td>
+<td>Use XML format</td>
+</tr>
+<tr>
+<td>UseBinaryFormat</td>
+<td>Boolean</td>
+<td>Use compact binary format (default)</td>
+</tr>
+</tbody>
+</table>
+<p>The <a href="https://github.com/dotnet/orleans/tree/master/Samples/StorageProviders">StorageProviders</a> sample
+provides some code you can use to quickly test the above, and also showcases some custom storage providers.
+Use the following command in the Package Manager Console to update all Orleans packages to the latest
+version:</p>
+<pre><code>Get-Package | where Id -like &#39;Microsoft.Orleans.*&#39; | foreach { update-package $_.Id }
+</code></pre><p>The ADO.NET persistence has functionality to version data and define arbitrary (de)serializers with arbitrary application rules and streaming, but currently
+there is no method to expose them to application code. More information in <a href="#ADONETPersistenceRationale">ADO.NET Persistence Rationale</a>.</p>
+<h3 id="memorystorage">MemoryStorage</h3>
+<p><code>MemoryStorage</code> is a simple storage provider that does not really use a persistent
+data store underneath. It is convenient to learn to work with Storage Providers
+quickly, but is not intended to be used in real scenarios.</p>
+<blockquote><p><strong>Note:</strong> This provider persists state to volatile memory which is erased at silo shut down. Use only for testing.</p>
+</blockquote>
+<p>To set up the memory storage provider using XML configuration:</p>
+<pre><code class="lang-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
+&lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
+  &lt;Globals&gt;
+    &lt;StorageProviders&gt;
+      &lt;Provider Type=&quot;Orleans.Storage.MemoryStorage&quot;
+                Name=&quot;OrleansStorage&quot;
+                NumStorageGrains=&quot;10&quot; /&gt;
+    &lt;/StorageProviders&gt;
+  &lt;/Globals&gt;
+&lt;/OrleansConfiguration&gt;
+</code></pre><p>To set it up in code:</p>
+<pre><code class="lang-csharp">siloHost.Config.Globals.RegisterStorageProvider&lt;MemoryStorage&gt;(&quot;OrleansStorage&quot;);
+</code></pre><p>You can set the following properties:</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Name</td>
+<td>String</td>
+<td>Arbitrary name that persistent grains will use to refer to this storage provider</td>
+</tr>
+<tr>
+<td>Type</td>
+<td>String</td>
+<td>Set to <code>Orleans.Storage.MemoryStorage</code></td>
+</tr>
+<tr>
+<td>NumStorageGrains</td>
+<td>Integer</td>
+<td>The number of grains to use to store the state, defaults to <code>10</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="shardedstorageprovider">ShardedStorageProvider</h3>
+<pre><code class="lang-xml">&lt;Provider Type=&quot;Orleans.Storage.ShardedStorageProvider&quot; Name=&quot;ShardedStorage&quot;&gt;
+    &lt;Provider /&gt;
+    &lt;Provider /&gt;
+    &lt;Provider /&gt;
+&lt;/Provider&gt;
+</code></pre><p>Simple storage provider for writing grain state data shared across a number of other storage providers.</p>
+<p>A consistent hash function (default is Jenkins Hash) is used to decide which
+shard (in the order they are defined in the config file) is responsible for storing
+state data for a specified grain, then the Read / Write / Clear request
+is bridged over to the appropriate underlying provider for execution.</p>
+<h2 id="notes-on-storage-providers">Notes on Storage Providers</h2>
+<p>If there is no <code>[StorageProvider]</code> attribute specified for a <code>Grain&lt;T&gt;</code> grain class, then a provider named <code>Default</code> will be searched for instead.
+If not found then this is treated as a missing storage provider.</p>
+<p>If there is only one provider in the silo config file, it will be considered to be the <code>Default</code> provider for this silo.</p>
+<p>A grain that uses a storage provider which is not present and defined in the silo configuration when the silo loads will fail to load, but the rest of the grains in that silo can still load and run.
+Any later calls to that grain type will fail with an <code>Orleans.Storage.BadProviderConfigException</code> error specifying that the grain type is not loaded.</p>
+<p>The storage provider instance to use for a given grain type is determined by the combination of the storage provider name defined in the <code>[StorageProvider]</code> attribute on that grain type, plus the provider type and configuration options for that provider defined in the silo config.</p>
+<p>Different grain types can use different configured storage providers, even if both are the same type: for example, two different Azure table storage provider instances, connected to different Azure storage accounts (see config file example above).</p>
+<p>All configuration details for storage providers is defined statically in the silo configuration that is read at silo startup.
+There are <em>no</em> mechanisms provided at this time to dynamically update or change the list of storage providers used by a silo.
+However, this is a prioritization / workload constraint rather than a fundamental design constraint.</p>
+<h2 id="state-storage-apis">State Storage APIs</h2>
+<p>There are two main parts to the grain state / persistence APIs: Grain-to-Runtime and Runtime-to-Storage-Provider.</p>
+<h2 id="grain-state-storage-api">Grain State Storage API</h2>
+<p>The grain state storage functionality in the Orleans Runtime will provide read and write operations to automatically populate / save the <code>GrainState</code> data object for that grain.
+Under the covers, these functions will be connected (within the code generated by Orleans client-gen tool) through to the appropriate persistence provider configured for that grain.</p>
+<h2 id="grain-state-read--write-functions">Grain State Read / Write Functions</h2>
+<p>Grain state will automatically be read when the grain is activated, but grains are responsible for explicitly triggering the write for any changed grain state as and when necessary.
+See the <a href="#FailureModes">Failure Modes</a> section below for details of error handling mechanisms.</p>
+<p><code>GrainState</code> will be read automatically (using the equivalent of <code>base.ReadStateAsync()</code>) <em>before</em> the <code>OnActivateAsync()</code> method is called for that activation.
+<code>GrainState</code> will not be refreshed before any method calls to that grain, unless the grain was activated for this call.</p>
+<p>During any grain method call, a grain can request the Orleans runtime to write the current grain state data for that activation to the designated storage provider by calling <code>base.WriteStateAsync()</code>.
+The grain is responsible for explicitly performing write operations when they make significant updates to their state data.
+Most commonly, the grain method will return the <code>base.WriteStateAsync()</code> <code>Task</code> as the final result <code>Task</code> returned from that grain method, but it is not required to follow this pattern.
+The runtime will not automatically update stored grain state after any grain methods.</p>
+<p>During any grain method or timer callback handler in the grain, the grain can request the Orleans runtime to re-read the current grain state data for that activation from the designated storage provider by calling <code>base.ReadStateAsync()</code>.
+This will completely overwrite any current state data currently stored in the grain state object with the latest values read from persistent store.</p>
+<p>An opaque provider-specific <code>Etag</code> value (<code>string</code>) <em>may</em> be set by a storage provider as part of the grain state metadata populated when state was read.
+Some providers may choose to leave this as <code>null</code> if they do not use <code>Etag</code>s.</p>
+<p>Conceptually, the Orleans Runtime will take a deep copy of the grain state data object for its own use during any write operations. Under the covers, the runtime <em>may</em> use optimization rules and heuristics to avoid performing some or all of the deep copy in some circumstances, provided that the expected logical isolation semantics are preserved.</p>
+<h2 id="sample-code-for-grain-state-read--write-operations">Sample Code for Grain State Read / Write Operations</h2>
+<p>Grains must extend the <code>Grain&lt;T&gt;</code> class in order to participate in the Orleans grain state persistence mechanisms.
+The <code>T</code> in the above definition will be replaced by an application-specific grain state class for this grain; see the example below.</p>
+<p>The grain class should also be annotated with a <code>[StorageProvider]</code> attribute that tells the runtime which storage provider (instance) to use with grains of this type.</p>
+<pre><code class="lang-csharp">public class MyGrainState
+{
+  public int Field1 { get; set; }
+  public string Field2 { get; set; }
+}
+
+[StorageProvider(ProviderName=&quot;store1&quot;)]
+public class MyPersistenceGrain : Grain&lt;MyGrainState&gt;, IMyPersistenceGrain
+{
+  ...
+}
+</code></pre><h2 id="grain-state-read">Grain State Read</h2>
+<p>The initial read of the grain state will occur automatically by the Orleans runtime before the grain’s <code>OnActivateAsync()</code> method is called; no application code is required to make this happen.
+From that point forward, the grain’s state will be available through the <code>Grain&lt;T&gt;.State</code> property inside the grain class.</p>
+<h2 id="grain-state-write">Grain State Write</h2>
+<p>After making any appropriate changes to the grain’s in-memory state, the grain should call the <code>base.WriteStateAsync()</code> method to write the changes to the persistent store via the defined storage provider for this grain type.
+This method is asynchronous and returns a <code>Task</code> that will typically be returned by the grain method as its own completion Task.</p>
+<pre><code class="lang-csharp">public Task DoWrite(int val)
+{
+  State.Field1 = val;
+  return base.WriteStateAsync();
+}
+</code></pre><h2 id="grain-state-refresh">Grain State Refresh</h2>
+<p>If a grain wishes to explicitly re-read the latest state for this grain from backing store, the grain should call the <code>base.ReadStateAsync()</code> method.
+This will reload the grain state from persistent store, via the defined storage provider for this grain type, and any previous in-memory copy of the grain state will be overwritten and replaced when the <code>ReadStateAsync()</code> <code>Task</code> completes.</p>
+<pre><code class="lang-csharp">public async Task&lt;int&gt; DoRead()
+{
+  await base.ReadStateAsync();
+  return State.Field1;
+}
+</code></pre><h2 id="failure-modes-for-grain-state-persistence-operations-a-namefailuremodesa">Failure Modes for Grain State Persistence Operations <a name="FailureModes"></a></h2>
+<h3 id="failure-modes-for-grain-state-read-operations">Failure Modes for Grain State Read Operations</h3>
+<p>Failures returned by the storage provider during the initial read of state data for that particular grain will result in the activate operation for that grain to be failed; in this case, there will <em>not</em> be any call to that grain’s <code>OnActivateAsync()</code> life cycle callback method.
+The original request to that grain which caused the activation will be faulted back to the caller the same way as any other failure during grain activation.
+Failures encountered by the storage provider to read state data for a particular grain will result in the <code>ReadStateAsync()</code> <code>Task</code> to be faulted.
+The grain can choose to handle or ignore that faulted <code>Task</code>, just like any other <code>Task</code> in Orleans.</p>
+<p>Any attempt to send a message to a grain which failed to load at silo startup time due to a missing / bad storage provider config will return the permanent error <code>Orleans.BadProviderConfigException</code>.</p>
+<h3 id="failure-modes-for-grain-state-write-operations">Failure Modes for Grain State Write Operations</h3>
+<p>Failures encountered by the storage provider to write state data for a particular grain will result in the <code>WriteStateAsync()</code> <code>Task</code> to be faulted.
+Usually, this will mean the grain call will be faulted back to the client caller provided the <code>WriteStateAsync()</code> <code>Task</code> is correctly chained in to the final return <code>Task</code> for this grain method.
+However, it will be possible for certain advanced scenarios to write grain code to specifically handle such write errors, just like they can handle any other faulted <code>Task</code>.</p>
+<p>Grains that execute error-handling / recovery code <em>must</em> catch exceptions / faulted <code>WriteStateAsync()</code> <code>Task</code>s and not re-throw to signify that they have successfully handled the write error.</p>
+<h2 id="storage-provider-framework">Storage Provider Framework</h2>
+<p>There is a service provider API for writing additional persistence providers – <code>IStorageProvider</code>.</p>
+<p>The Persistence Provider API covers read and write operations for GrainState data.</p>
+<pre><code class="lang-csharp">public interface IStorageProvider
+{
+  Logger Log { get; }
+  Task Init();
+  Task Close();
+
+  Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState);
+  Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState);
+}
+</code></pre><h2 id="storage-provider-semantics">Storage Provider Semantics</h2>
+<p>Any attempt to perform a write operation when the storage provider detects an <code>Etag</code> constraint violation <em>should</em> cause the write <code>Task</code> to be faulted with transient error <code>Orleans.InconsistentStateException</code> and wrapping the underlying storage exception.</p>
+<pre><code class="lang-csharp">public class InconsistentStateException : AggregateException
+{
+  /// &lt;summary&gt;The Etag value currently held in persistent storage.&lt;/summary&gt;
+  public string StoredEtag { get; private set; }
+  /// &lt;summary&gt;The Etag value currently held in memory, and attempting to be updated.&lt;/summary&gt;
+  public string CurrentEtag { get; private set; }
+
+  public InconsistentStateException(
+    string errorMsg,
+    string storedEtag,
+    string currentEtag,
+    Exception storageException
+    ) : base(errorMsg, storageException)
+  {
+    this.StoredEtag = storedEtag;
+    this.CurrentEtag = currentEtag;
+  }
+
+  public InconsistentStateException(string storedEtag, string currentEtag, Exception storageException)
+    : this(storageException.Message, storedEtag, currentEtag, storageException)
+  { }
+}
+</code></pre><p>Any other failure conditions from a write operation <em>should</em> cause the write <code>Task</code> to be broken with an exception containing the underlying storage exception.</p>
+<h2 id="data-mapping">Data Mapping</h2>
+<p>Individual storage providers should decide how best to store grain state – blob (various formats / serialized forms) or column-per-field are obvious choices.</p>
+<p>The basic storage provider for Azure Table encodes state data fields into a single table column using Orleans binary serialization.</p>
+<h2 id="adonet-persistence-rationale-a-nameadonetpersistencerationalea">ADO.NET Persistence Rationale <a name="ADONETPersistenceRationale"></a></h2>
+<p>The principles for ADO.NET backed persistence storage are:</p>
+<ol>
+<li>Keep business critical data safe an accessible while data, the format of data and code evolve.</li>
+<li>Take advantenge of vendor and storage specific functionality.</li>
+</ol>
+<p>In practice this means adhering to <a href="../Runtime-Implementation-Details/Relational-Storage.html">ADO.NET implementation goals</a>
+and some added implementation logic in ADO.NET specific storage provider that allow evolving the shape of the data in the storage.</p>
+<p>In addition to the usual storage provider capabilities, the ADO.NET provider has built-in capability to</p>
+<ol>
+<li>Change storage data format from one format to another format (e.g. from JSON to binary) when roundtripping state.</li>
+<li>Shape the type to be saved or read from the storage in arbitrary ways. This helps to evolve the version state.</li>
+<li>Stream data out of the database.</li>
+</ol>
+<p>Both <code>1.</code> and <code>2.</code> can be applied on arbitrary decision parameters, such as <em>grain ID</em>, <em>grain type</em>, <em>payload data</em>.</p>
+<p>This happen so that one chooses a format, e.g. <a href="https://github.com/real-logic/simple-binary-encoding">Simple Binary Encoding (SBE)</a> and implements
+<a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/IStorageDeserializer.cs">IStorageDeserializer</a> and <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/IStorageSerializer.cs">IStorageSerializer</a>.
+The built-in (de)serializers have been built using this method. The <a href="https://github.com/dotnet/orleans/tree/master/src/OrleansSQLUtils/Storage/Provider">OrleansStorageDefault<format>(De)Serializer</format></a> can be used as examples
+on how to implement other formats.</p>
+<p>When the (de)serializers have been implemented, they need to ba added to the <code>StorageSerializationPicker</code> property in <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/AdoNetStorageProvider.cs">AdoNetStorageProvider</a>.
+This is an implementation of <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/IStorageSerializationPicker.cs">IStorageSerializationPicker</a>. By default
+<a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/StorageSerializationPicker.cs">StorageSerializationPicker</a> will be used. And example of changing data storage format
+or using (de)serializers can be seen at <a href="https://github.com/dotnet/orleans/blob/master/test/TesterSQLUtils/StorageTests/Relational/RelationalStorageTests.cs">RelationalStorageTests</a>.</p>
+<p>Currently there is no method to expose this to Orleans application consumption as there is no method to access the framework created <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/AdoNetStorageProvider.cs">AdoNetStorageProvider</a> instance.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

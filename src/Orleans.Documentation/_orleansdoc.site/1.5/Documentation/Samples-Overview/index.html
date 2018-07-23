@@ -1,0 +1,147 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Samples Overview | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Samples Overview | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../Images/logo-light.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list"></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+
+<div class="IMPORTANT"><h5>Important</h5><p><strong>You are looking at the 1.5 documentation</strong></p>
+<p>Orleans 2.0 is a significant overhaul from the 1.x versions.
+For 2.0 <a href="/orleans/Documentation/Introduction.html">Documentation</a> and <a href="/orleans/Tutorials/index.html">Tutorials</a>, refer to the respective sections.</p>
+</div>
+<h1 id="samples-overview">Samples Overview</h1>
+<h2 id="what-do-i-need">What do I need?</h2>
+<p>To productively use the Orleans samples, please follow the <a href="../Installation/Prerequisites.html">Prerequisites</a> section for the supported versions of the .NET framework, Visual Studio and Azure SDK.
+An Azure subscription will help with some of the samples, but is not required. For the Azure-based samples, you will need to install the SDK.</p>
+<p>The samples themselves can be downloaded from <a href="https://github.com/dotnet/orleans/tree/master/Samples">GitHub</a>.</p>
+<h2 id="hello-worldhello-worldmd"><a href="Hello-World.html">Hello World</a></h2>
+<p>This is the Orleans version of an old classic. It demonstrates that while there is no such thing as &quot;trivial&quot; when you are dealing with distributed computing, Orleans makes it pretty straight-forward.</p>
+<h2 id="azure-web-sampleazure-web-samplemd"><a href="Azure-Web-Sample.html">Azure Web Sample</a></h2>
+<p>An Azure-hosted version of Hello World.</p>
+<h2 id="adventureadventuremd"><a href="Adventure.html">Adventure</a></h2>
+<p>Before there was graphical user interfaces, before the era of game consoles and massive-multiplayer games, there were VT100 terminals and there was <a href="http://en.wikipedia.org/wiki/Colossal_Cave_Adventure">Colossal Cave Adventure</a>. Possibly lame by today&#39;s standards, back then it was a magical world of monsters, chirping birds, and things you could pick up. It&#39;s the inspiration for this sample.</p>
+<h2 id="presence-servicepresence-servicemd"><a href="Presence-Service.html">Presence Service</a></h2>
+<p>This sample shows the principles behind a typical (though much simplified) presence service, such as you would find in online games and other social applications.</p>
+<h2 id="tic-tac-toetic-tac-toemd"><a href="Tic-Tac-Toe.html">Tic Tac Toe</a></h2>
+<p>This is a simple online version of the classic board game.</p>
+<h2 id="chirperchirpermd"><a href="Chirper.html">Chirper</a></h2>
+<p>A simple social network pub/sub system, with chirp messages being sent from publishers to followers.</p>
+<h2 id="twitter-sentimenttwitter-sentimentmd"><a href="Twitter-Sentiment.html">Twitter Sentiment</a></h2>
+<p>This sample uses Orleans to aggregate and analyze twitter data for a simple sentiment dashboard.
+Twitter Sentiment relies on a Node.js project for some of its functionality, as well as Twitter developer credentials. To use this sample, you will need to:</p>
+<ol>
+<li>Get the Node.js Tools for Visual Studio</li>
+<li>Get a Twitter account</li>
+<li>Sign up as a Twitter Developer.</li>
+</ol>
+<h2 id="gps-trackergps-trackermd"><a href="GPS-Tracker.html">GPS Tracker</a></h2>
+<p>A combination of Orleans and SignalR is used to simulate GPS devices tracked as they move around San Francisco, updating their locations as they change.</p>
+<h2 id="storage-providersstorage-providersmd"><a href="Storage-Providers.html">Storage Providers</a></h2>
+<p>This sample contains sample code for two Orleans storage providers: one that stores data in a regular file system, one that connects to MongoDB.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

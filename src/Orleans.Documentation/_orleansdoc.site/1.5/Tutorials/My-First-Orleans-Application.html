@@ -1,0 +1,215 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>My First Orleans Application | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="My First Orleans Application | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../Images/logo-light.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list"></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="my-first-orleans-application">My First Orleans Application</h1>
+
+<p>In this tutorial, we will walk through the steps to get the simplest possible Orleans application up and running, the all-too-familiar &quot;Hello World!&quot;.
+We&#39;re using VS 2017, but it works equally well with VS 2012, VS 2013 and VS 2015.</p>
+<p>Before we start, there are three Orleans concepts that you will run into in this tutorial: that of a grain, a communication interface, and a silo.</p>
+<h3 id="grains">Grains</h3>
+<p>Grains form the core of the Orleans programming model - they are distributed virtual actors.
+Grains are .NET classes that derive from a particular base class.
+It is easy to think about actors as objects that get dynamically instantiated on different servers and can invoke each other.
+They are distributed because interactions with grains may happen across process and computer boundaries, virtual because a particular grain may not be loaded in memory when another component sends it a message.
+If not present, the grain will be activated on-demand.</p>
+<h3 id="communication-interfaces">Communication interfaces</h3>
+<p>Communication interfaces describe how to communicate with grains.
+They are .NET interfaces extending a particular base interface.</p>
+<h3 id="silos">Silos</h3>
+<p>Silos are containers of grains, potentially millions of grains in a single silo.
+Typically, you will run one silo per machine, but it sometimes make sense to run more than one on a single machine, when testing, for example.</p>
+<h2 id="getting-started">Getting Started</h2>
+<p>Before getting started, make sure the Microsoft Orleans Tools for Visual Studio is installed. The plugin can be downloaded from:
+<a href="https://marketplace.visualstudio.com/items?itemName=sbykov.MicrosoftOrleansToolsforVisualStudio">https://marketplace.visualstudio.com/items?itemName=sbykov.MicrosoftOrleansToolsforVisualStudio</a></p>
+<p>After starting Visual Studio, go to create a new project.
+Under &quot;Visual C#,&quot; you should see the following:</p>
+<p>![](../Images/New DevTest 1.PNG)</p>
+<p>Choose the &quot;Orleans Dev/Test Host&quot; project type, create a directory for the solution, and create the project:</p>
+<p>![](../Images/New DevTest 2.PNG)</p>
+<p>At this point go ahead and compile your project to download the packages.</p>
+<p>The project is just a console application populated with code that helps you host a silo in an environment that is &quot;developer friendly,&quot; i.e. where everything runs in a single process.</p>
+<p>The main code does three things: it creates a silo, initializes the Orleans client runtime, and waits for user input before terminating:</p>
+<pre><code class="lang-csharp">static void Main(string[] args)
+{
+    // First, configure and start a local silo
+    var siloConfig = ClusterConfiguration.LocalhostPrimarySilo();
+    var silo = new SiloHost(&quot;TestSilo&quot;, siloConfig);
+    silo.InitializeOrleansSilo();
+    silo.StartOrleansSilo();
+
+    Console.WriteLine(&quot;Silo started.&quot;);
+
+    // Then configure and connect a client.
+    var clientConfig = ClientConfiguration.LocalhostSilo();
+    var client = new ClientBuilder().UseConfiguration(clientConfig).Build();
+    client.Connect().Wait();
+
+    Console.WriteLine(&quot;Client connected.&quot;);
+
+    //
+    // This is the place for your test code.
+    //
+
+    Console.WriteLine(&quot;\nPress Enter to terminate...&quot;);
+    Console.ReadLine();
+
+    // Shut down
+    client.Close();
+    silo.ShutdownOrleansSilo();
+}
+</code></pre><h2 id="adding-some-grains">Adding Some Grains</h2>
+<p>At this point, we have everything we need except some actual Orleans-based code.
+Next we will create two more projects, one to hold the communication interface, and one to hold our grain.
+Separating the two is a best practice since the interface project is shared between the client and server-side, while the grains are implementation code and should be private to the server side.</p>
+<p>In addition to the Dev/Test host, there are two more Orleans projects, and we should create one of each in our solution:</p>
+<p>![](../Images/New DevTest 4.PNG)</p>
+<p>Once you have them in your solution, make sure to add a reference to the grain interface project from each of the other projects: the host, which will contain our client code, and the grain collection project.</p>
+<p>Add a reference for the grain collection project to the host project, so that it is automatically (re-)built and copied when starting the debugger.</p>
+<p>![](../Images/New DevTest 7.PNG)</p>
+<p>Open the <em>IGrain1.cs</em> file and add a method <code>SayHello()</code> to it.
+We should have something like this:</p>
+<pre><code class="lang-csharp">public interface IGrain1 : IGrainWithIntegerKey
+{
+    Task&lt;string&gt; SayHello();
+}
+</code></pre><p>One of the important things is choosing a Key type for your grains, in this example we are using the Integer Key type.  There are also Guids, strings and various compound keys that may meet your needs.</p>
+<p>Additionally, Orleans relies on TPL tasks in the interface method&#39;s return type -- an essential means to achieving scalability in the lightweight Orleans programming model is to use asynchronous I/O everywhere, and Orleans forces you to do so.
+Use <code>Task</code> or <code>Task&lt;T&gt;</code> as the return type of all methods of communication interfaces.
+Next, we turn our attention to the grain implementation, which is found in <em>Grain1.cs</em>. The first thing to do is make sure that the interface it implements is the right one: it should be <code>MyGrainInterfaces1.IGrain1</code>, unless you renamed the project and/or the interface in the previous step.</p>
+<p>Then, we ask VS to generate the method stub for the one interface method we defined earlier:</p>
+<pre><code class="lang-csharp">public Task&lt;string&gt; SayHello()
+{
+    throw new NotImplementedException();
+}
+</code></pre><p>We&#39;re finally ready to add the much-anticipated &quot;Hello World!&quot; code.
+Just return the string as the contents of a Task:</p>
+<pre><code class="lang-csharp">public Task&lt;string&gt; SayHello()
+{
+    return Task.FromResult(&quot;Hello World!&quot;);
+}
+</code></pre><p>OK, we&#39;re nearly done.
+All we need is a bit of client code. This will go in the <em>Program.cs</em> file in the <em>Host</em> project.
+In place of the comment following the call to <code>GrainClient.Initialize()</code>, add these two lines:</p>
+<pre><code class="lang-csharp">var friend = client.GetGrain&lt;MyGrainInterfaces1.IGrain1&gt;(0);
+Console.WriteLine(&quot;\n\n{0}\n\n&quot;, friend.SayHello().Result);
+</code></pre><p>That&#39;s it!
+Hit F5, let the silo initialization code take its time.
+This will take a few seconds, maybe as much as ten, and there will be a lot of log messages printed.
+At the very end, you should see the printout of the greeting.</p>
+<p>![](../Images/New DevTest 6.PNG)</p>
+<p>These are the essential steps to create and run Orleans-based code: define communication interfaces, implement them using grain classes, and write some client code to communicate with the grains in order to test them.
+In a realistic production environment, the grain code would be deployed in a silo hosted by Windows Azure or Windows Server and the client would most likely be a Web site or service using Orleans for the backend logic.
+However, that is just about making different configuration choices - the code in the simplified environment is the same as in the production environment.</p>
+<h2 id="next">Next</h2>
+<p>Next we&#39;ll see how we can run a minimal Orleans application.</p>
+<p><a href="Minimal-Orleans-Application.html">Minimal Orleans Application</a></p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

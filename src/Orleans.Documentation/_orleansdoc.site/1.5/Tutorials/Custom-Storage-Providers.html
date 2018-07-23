@@ -1,0 +1,279 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Custom Storage Providers | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Custom Storage Providers | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../Images/logo-light.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list"></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="custom-storage-providers">Custom Storage Providers</h1>
+
+<h2 id="writing-a-custom-storage-provider">Writing a Custom Storage Provider</h2>
+<p>In the tutorial on declarative actor storage, we looked at allowing grains to store their state in an Azure table using one of the built-in storage providers.
+While Azure is a great place to squirrel away your data, there are many alternatives.
+In fact, there are so many that there was no way to support them all.
+Instead, Orleans is designed to let you easily add support for your own form of storage by writing a storage provider.</p>
+<p>In this tutorial, we&#39;ll walk through how to write a simple file-based storage provider.
+A file system is not necessarily the best place to store data for grains, since it&#39;s so local, but it&#39;s an easy example to help us illustrate the principles.</p>
+<h2 id="getting-started">Getting Started</h2>
+<p>An Orleans storage provider is simply a class that implements <code>IStorageProvider</code>.
+It should be built into an assembly that is placed in the Orleans binaries folder.
+To move it there on build will require adding a bit of post-build event code.</p>
+<p>We&#39;ll start by creating the project -- it should be a regular .NET class library.
+Once the project is created, let&#39;s also rename the file <em>Class1.cs</em> to <em>FileStorageProvider.cs</em>.
+That should also prompt VS to rename the class we find inside.
+Next, we must add references to <a href="https://www.nuget.org/packages/Microsoft.Orleans.Core/">Microsoft.Orleans.Core NuGet package</a>.</p>
+<p>Assuming, of course, that your project is called <code>StorageProviders</code>, make your silo host project reference it, so that StorageProviders.dll gets copied to the silo folder.</p>
+<p>Our storage provider should implement the interface <code>Orleans.Storage.IStorageProvider</code>.
+With a little bit of massaging of the code, it should look something like this:</p>
+<pre><code class="lang-csharp">using System;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+
+using Orleans;
+using Orleans.Storage;
+using Orleans.Runtime;
+using Newtonsoft.Json;
+using Orleans.Serialization;
+
+namespace StorageProviders
+{
+    public class FileStorageProvider : IStorageProvider
+    {
+        private JsonSerializerSettings _jsonSettings;
+
+        public Logger Log { get; set; }
+
+        public string Name { get; set; }
+
+        public Task Init(string name, Orleans.Providers.IProviderRuntime providerRuntime,
+                      Orleans.Providers.IProviderConfiguration config)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task Close()
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task ReadStateAsync(string grainType,
+                                   GrainReference grainRef,
+                                   IGrainState grainState)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task WriteStateAsync(string grainType,
+                                    GrainReference grainRef,
+                                    IGrainState grainState)
+        {
+             throw new NotImplementedException();
+        }
+
+        public Task ClearStateAsync(string grainType,
+                                    GrainReference grainRef,
+                                    IGrainState grainState)
+        {
+            throw new NotImplementedException();
+        }
+    }
+}
+</code></pre><p>The first thing we have to figure out is what data we need to provide through configuration. 
+The name is a required property, but we will also need the path to the root directory for our file store.
+That is, in fact, the only piece of information we need, so we&#39;ll add a <code>RootDirectory</code> string property and edit the configuration file as in the previous section.
+In doing so, it&#39;s critical to pay attention to the namespace and class name of the provider.
+Add this to the <code>&lt;StorageProviders&gt;</code> element in the <code>OrleansConfiguration.xml</code> configuration file of your silo host project where you will be testing the provider:</p>
+<pre><code> &lt;Provider Type=&quot;StorageProviders.FileStorageProvider&quot;
+          Name=&quot;FileStore&quot;
+          RootDirectory=&quot;.\Storage&quot;/&gt;
+</code></pre><p>Edit the <em>Grain1.cs</em> file to use this storage provider instead of the Azure provider, then set a breakpoint in the <code>Init()</code> method of the storage provider implementation class and start the silo.
+If you have followed the instructions, you should hit the breakpoint during silo initialization.
+There&#39;s no reason to go on debugging, since you will throw an exception right away.</p>
+<h2 id="initializing-the-provider">Initializing the Provider</h2>
+<p>There are four major functions to implement in the provider -- <code>Close()</code> is the only one we won&#39;t need to do anything with.
+As you may have guessed, the starting point is the call to <code>Init()</code>, which provides us with the configuration data and a chance to get things set up properly.
+In our case, we&#39;ll want to set the properties and create the root directory if it doesn&#39;t already exist:</p>
+<pre><code class="lang-csharp">public Task Init(string name,
+                 Orleans.Providers.IProviderRuntime providerRuntime,
+                 Orleans.Providers.IProviderConfiguration config)
+{
+     _jsonSettings = SerializationManager.UpdateSerializerSettings(SerializationManager.GetDefaultJsonSerializerSettings(), config);
+
+    this.Name = name;
+    if (string.IsNullOrWhiteSpace(config.Properties[&quot;RootDirectory&quot;]))
+        throw new ArgumentException(&quot;RootDirectory property not set&quot;);
+
+    var directory = new System.IO.DirectoryInfo(config.Properties[&quot;RootDirectory&quot;]);
+    if (!directory.Exists)
+        directory.Create();
+
+    this.RootDirectory = directory.FullName;
+
+    return TaskDone.Done;
+}
+</code></pre><p>Run the program again.
+This time, you will still crash, but in <code>ReadStateAsync()</code>.
+After running the code, you should find a <em>Storage</em> directory under the <code>bin\Debug</code> directory of the silo host project.
+Make sure you have set the project up to build on F5, or you may not see the edits take effect.</p>
+<h2 id="reading-state">Reading State</h2>
+<p>To store data in the file system (or anywhere, really), we have to devise a convention that generates a unique name for each grain.
+This is easiest done by combining the state type name with the grain id, which combines the grain type and GUID creating a globally unique key.
+Thus, <code>ReadStateAsync()</code> (which, by the way, should be declared as an async method), starts like this:</p>
+<pre><code class="lang-csharp">var collectionName = grainState.GetType().Name;
+var key = grainRef.ToKeyString();
+
+var fName = key + &quot;.&quot; + collectionName;
+var path = System.IO.Path.Combine(RootDirectory, fName);
+
+var fileInfo = new System.IO.FileInfo(path);
+if (!fileInfo.Exists)
+    return;
+</code></pre><p>We also need to decide how the data will be stored.
+To make it easy to inspect the data outside of the application, we&#39;re going to use JSON.
+A more space-conscious design may use a binary serialization format, instead, it&#39;s entirely a choice of the provider designer&#39;s.</p>
+<pre><code class="lang-csharp">using (var stream = fileInfo.OpenText())
+{
+    var storedData = await stream.ReadToEndAsync();
+
+    grainState.State = JsonConvert.DeserializeObject(storedData, grainState.State.GetType(), _jsonSettings);
+}
+</code></pre><h2 id="writing-state">Writing State</h2>
+<p>The format decisions have already been made, so coding up the <code>WriteStateAsync</code> method should be straight-forward: serialize as JSON, construct the file name, then write to the file:</p>
+<pre><code class="lang-csharp">public async Task WriteStateAsync(string grainType, GrainReference grainRef, IGrainState grainState)
+{
+    var storedData = JsonConvert.SerializeObject(grainState.State, _jsonSettings);
+
+    var collectionName = grainState.GetType().Name;
+    var key = grainRef.ToKeyString();
+
+    var fName = key + &quot;.&quot; + collectionName;
+    var path = System.IO.Path.Combine(RootDirectory, fName);
+
+    var fileInfo = new System.IO.FileInfo(path);
+
+    using (var stream = new System.IO.StreamWriter(
+               fileInfo.Open(System.IO.FileMode.Create,
+                             System.IO.FileAccess.Write)))
+    {
+        await stream.WriteAsync(storedData);
+    }
+}
+</code></pre><h2 id="putting-it-together">Putting it Together</h2>
+<p>There&#39;s really just one thing left to do, and that is to test the thing.
+Run the application and let it get to the end, where the greetings are shown, and then terminate it.
+Under the <em>bin\Debug\Storage</em> directory of your silo host project, you should find a file called <em>0.Grain1State</em>, and it should contain something very recognizable:</p>
+<p>![](../Images/Storage Provider 1.PNG)</p>
+<p>Run the application again, and you should see the same behaviour as before, that is, the last greeting of the first session is remembered.</p>
+<h2 id="clearing-state">Clearing State</h2>
+<p>The easiest method to write is the one that deletes grain state, which we didn&#39;t see any use of in the previous tutorial.
+In fact, we don&#39;t need it for our Hello World application, so we&#39;ll just leave its implementation as an exercise.
+It should do the obvious, i.e. delete the file.</p>
+<h2 id="next">Next</h2>
+<p>We&#39;ll look at how you can unit test grains:</p>
+<p><a href="Unit-Testing-Grains.html">Unit Testing Grains</a></p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

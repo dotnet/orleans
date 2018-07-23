@@ -1,0 +1,128 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Code Generation | Microsoft Orleans Website </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Code Generation | Microsoft Orleans Website ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../Images/logo-light.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list"></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+
+<div class="IMPORTANT"><h5>Important</h5><p><strong>You are looking at the 1.5 documentation</strong></p>
+<p>Orleans 2.0 is a significant overhaul from the 1.x versions.
+For 2.0 <a href="/orleans/Documentation/Introduction.html">Documentation</a> and <a href="/orleans/Tutorials/index.html">Tutorials</a>, refer to the respective sections.</p>
+</div>
+<h1 id="code-generation">Code Generation</h1>
+<p><strong>Efficient code generation is one of the pillars of the Orleans Runtime</strong>. The Orleans Runtime makes use of generated code in order to ensure proper serialization of types that are used across the cluster as well as for generating boilerplate which abstracts away the implementation details of method shipping, exception propagation, and other internal runtime concepts.</p>
+<p>There are two modes of <code>OrleansCodeGenerator</code>:</p>
+<ol>
+<li><p><strong>Build-time Codegen</strong> - in this mode, codegen will run every time your project is compiled. A build task is injected into your project&#39;s build pipeline and the code is generated in the project&#39;s intermediate output directory. To activate this mode, add the package <code>Microsoft.Orleans.OrleansCodeGenerator.Build</code> to your <strong>Grain Interface</strong> project. If you edit your <code>.csproj</code> file, you will see that an extra build target was added. This mode allows a user to step-into the generated code while debugging since the file is physically on the disk. However, your build time will be slower than usual if you have big projects. This is the default mode selected when you create a <strong>Grain Interface</strong> project by using the Visual Studio templates.</p>
+</li>
+<li><p><strong>Runtime Codegen</strong> - This mode makes <code>OrleansCodeGenerator</code> to generate code when the Silo is starting. As such, no code is generated during the build. Users can therefore not step-into the generated code while debugging and it will increase silo initialization time. To enable this mode, if you were using the <strong>build-time</strong> codegen, remove the the <code>Microsoft.Orleans.OrleansCodeGenerator.Build</code> package and install <code>Microsoft.Orleans.OrleansCodeGenerator</code> in your <strong>Silo Host</strong> and <strong>Client</strong> projects. If the project was created via the Visual Studio templates then it will already be installed. Otherwise, just install <code>Microsoft.Orleans.OrleansCodeGenerator</code> on your silo &amp; client projects.</p>
+</li>
+</ol>
+<p>Both modes generate the same code with the exception that run-time code generation can only generate code for publicly accessible types.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

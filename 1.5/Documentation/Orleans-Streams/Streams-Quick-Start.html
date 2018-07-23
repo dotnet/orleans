@@ -1,0 +1,166 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Orleans Streams Quick Start | Microsoft Orleans Website </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Orleans Streams Quick Start | Microsoft Orleans Website ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../Images/logo-light.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list"></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+
+<div class="IMPORTANT"><h5>Important</h5><p><strong>You are looking at the 1.5 documentation</strong></p>
+<p>Orleans 2.0 is a significant overhaul from the 1.x versions.
+For 2.0 <a href="/orleans/Documentation/Introduction.html">Documentation</a> and <a href="/orleans/Tutorials/index.html">Tutorials</a>, refer to the respective sections.</p>
+</div>
+<h1 id="orleans-streams-quick-start">Orleans Streams Quick Start</h1>
+<p>This guide will show you a quick way to setup and use Orleans Streams.
+To learn more about the details of the streaming features, read other parts of this documentation.</p>
+<h2 id="required-configurations">Required Configurations</h2>
+<p>In this guide we&#39;ll use a Simple Message based Stream which uses grain messaging to send stream data to subscribers. We will use the in-memory storage provider to store lists of subscriptions so it is not a wise choise for real production applications.</p>
+<pre><code class="lang-xml">&lt;Globals&gt;
+    &lt;StorageProviders&gt;
+      &lt;Provider Type=&quot;Orleans.Storage.MemoryStorage&quot; Name=&quot;Default&quot; /&gt;
+      &lt;Provider Type=&quot;Orleans.Storage.MemoryStorage&quot; Name=&quot;PubSubStore&quot; /&gt;
+    &lt;/StorageProviders&gt;
+    &lt;StreamProviders&gt;
+      &lt;Provider Type=&quot;Orleans.Providers.Streams.SimpleMessageStream.SimpleMessageStreamProvider&quot; Name=&quot;SMSProvider&quot;/&gt;
+    &lt;/StreamProviders&gt;
+</code></pre><p>Now we can create streams, send data using them as producers and also receive data as subscribers.</p>
+<h2 id="producing-events">Producing Events</h2>
+<p>Producing events for streams is relatively easy. You should first get access to the stream provider which you defined in the config above (<code>SMSProvider</code>) and then choose a stream and push data to it.</p>
+<pre><code class="lang-csharp">//Pick a guid for a chat room grain and chat room stream
+var guid = some guid identifying the chat room
+//Get one of the providers which we defined in config
+var streamProvider = GetStreamProvider(&quot;SMSProvider&quot;);
+//Get the reference to a stream
+var stream = streamProvider.GetStream&lt;int&gt;(guid, &quot;RANDOMDATA&quot;);
+</code></pre><p>As you can see our stream has a GUID and a namespace. This will make it easy to identify unique streams. For example, in a chat room namespace can &quot;Rooms&quot; and GUID be the owning RoomGrain&#39;s GUID.</p>
+<p>Here we use the GUID of some known chat room. Now using the <code>OnNext</code> method of the stream we can push data to it. Let&#39;s do it inside a timer and using random numbers. You could use any other data type for the stream as well.</p>
+<pre><code class="lang-csharp">RegisterTimer(s =&gt;
+        {
+            return stream.OnNextAsync(new System.Random().Next());
+        }, null, TimeSpan.FromMilliseconds(1000), TimeSpan.FromMilliseconds(1000));
+</code></pre><h2 id="subscribing-and-receiving-streaming-data">Subscribing and receiving streaming data</h2>
+<p>For receiving data we can use implicit/explicit subscriptions, which are fully described in other pages of the manual. Here we use implicit subscriptions which are easier. When a grain type wants to implicitly subscribe to a stream it uses the attribute <code>ImplicitStreamSubscription (namespace)]</code>.</p>
+<p>For our case we&#39;ll define a ReceiverGrain like this:</p>
+<pre><code class="lang-csharp">[ImplicitStreamSubscription(&quot;RANDOMDATA&quot;)]
+public class ReceiverGrain : Grain, IRandomReceiver
+</code></pre><p>Now whenever some data is pushed to the streams of namespace RANDOMDATA as we have in the timer, a grain of type <code>ReceiverGrain</code> with the same guid of the stream will receive the message. Even if no activations of the grain currently exist, the runtime will automatically create a new one and send the message to it.</p>
+<p>In order for this to work however, we need to complete the subscription process by setting our <code>OnNext</code> method for receiving data. So our <code>ReceiverGrain</code> should call in its <code>OnActivateAsync</code> something like this</p>
+<pre><code class="lang-csharp">//Create a GUID based on our GUID as a grain
+var guid = this.GetPrimaryKey();
+//Get one of the providers which we defined in config
+var streamProvider = GetStreamProvider(&quot;SMSProvider&quot;);
+//Get the reference to a stream
+var stream = streamProvider.GetStream&lt;int&gt;(guid, &quot;RANDOMDATA&quot;);
+//Set our OnNext method to the lambda which simply prints the data, this doesn&#39;t make new subscriptions
+await stream.SubscribeAsync&lt;int&gt;(async (data, token) =&gt; Console.WriteLine(data));
+</code></pre><p>We are all set now. The only requirement is that something triggers our producer grain&#39;s creation and then it will registers the timer and starts sending random ints to all interested parties.</p>
+<p>Again, this guide skips lots of details and is only good for showing the big picture. Read other parts of this manual and other resources on RX to gain a good understanding on what is available and how.</p>
+<p>Reactive programming can be a very powerful approach to solve many problems. You could for example use LINQ in the subscriber to filter numbers and do all sorts of interesting stuff.</p>
+<h2 id="next">Next</h2>
+<p><a href="Streams-Programming-APIs.html">Orleans Streams Programming APIs</a></p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,397 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>On-Premise Deployment | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="On-Premise Deployment | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../Images/logo-light.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list"></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="on-premise-deployment">On-Premise Deployment</h1>
+
+<h2 id="overview">Overview</h2>
+<p>While using Orleans to implement cloud-based services is a core scenario, there is nothing that intrinsically ties it to the cloud as the sole platform.
+Orleans can just as well be deployed to the internal, on-premise, equipment of your organization&#39;s.
+In this tutorial, we describe the steps to take.</p>
+<p>Orleans based services are xcopy-deployable.
+All you need to do to deploy an Orleans based service to a set of machines is copy the following set of file to the target machines and start the <em>OrleansHost.exe</em> host process:</p>
+<ul>
+<li>Contents of the build folder of your host project (it can use <code>Microsoft.Orleans.Host</code> NuGet package or use your own console application running the Silo).</li>
+<li><em>OrleansConfiguration.xml</em> file with configuration for the deployment to replace the default placeholder (If you use file based config).</li>
+<li>Binaries with grain interfaces and grain implementation classes of the service along with any external dependencies to <em>Application&lt;service name&gt;</em> subdirectory of the folder on the target with binaries of the host which should contain Orleans DLLs as well.</li>
+</ul>
+<p>This simple task may be accomplished in many different ways and with different tools, but the Orleans GitHub repo includes a set of PowerShell scripts (<a href="https://github.com/dotnet/orleans/tree/master/misc/scripts/RemoteDeployment">https://github.com/dotnet/orleans/tree/master/misc/scripts/RemoteDeployment</a>) that provide a way to deploy an Orleans based service to a cluster of machines and remote start the hosting processes on them.
+There are also scripts for removing a service, monitoring its performance, starting and stopping it, and collecting logs.
+These are the scripts we found useful for ourselves while building and testing Orleans.</p>
+<h2 id="prerequisites">Prerequisites</h2>
+<p>The following table lists the prerequisites for deploying and running Orleans on a remote machine:</p>
+<h3 id="net-framework-45">.Net Framework 4.5</h3>
+<p>Orleans runs under the .Net Framework 4.5, which can be installed from this link: (<a href="https://www.microsoft.com/en-us/download/details.aspx?id=30653">https://www.microsoft.com/en-us/download/details.aspx?id=30653</a>)</p>
+<h3 id="powershell-20-with-winrm">Powershell 2.0 with WinRM</h3>
+<p>Windows 7 and Windows Server 2008 R2 should have these installed by default.
+For earlier versions of Windows, select the appropriate download from this article: (<a href="https://support.microsoft.com/en-us/help/968929/windows-management-framework-windows-powershell-2.0,-winrm-2.0,-and-bits-4.0">https://support.microsoft.com/en-us/help/968929/windows-management-framework-windows-powershell-2.0,-winrm-2.0,-and-bits-4.0</a>).
+To confirm you are running the required version of PowerShell, start a PowerShell window and type <code>Get-Host</code> – the resulting output needs to say &quot;Version: 2.0&quot;</p>
+<h3 id="winrm-configuration">WinRM Configuration</h3>
+<p>Both the source and target machines must be configured for remote operations: Open a PowerShell window as an Administrator and run the command below on the target machine (enter &#39;y&#39; at the prompts):</p>
+<pre><code> winrm quickconfig
+</code></pre><h3 id="increase-powershell-job-memory">Increase PowerShell job memory</h3>
+<p>Set the memory limit on remotely invoked jobs to 4Gb:</p>
+<pre><code>Set-Item wsman:localhost\Shell\MaxMemoryPerShellMB 4096
+</code></pre><p>To change it on a remote machine, use the following steps:</p>
+<pre><code>Connect-WSMan -ComputerName &lt;string&gt;
+Set-Item wsman:&lt;computerName&gt;\Shell\MaxMemoryPerShellMB
+Disconnect-WSMan –ComputerName &lt;string&gt;
+</code></pre><h3 id="powershell-execution-policy-set-to-run-remote-scripts">PowerShell Execution Policy set to run remote scripts</h3>
+<p>Open a PowerShell window as an Administrator and run the command below on the target machine (enter &#39;y&#39; at the prompt):</p>
+<pre><code>Set-ExecutionPolicy RemoteSigned
+</code></pre><p>This will set the machine to require signing for remote scripts only.</p>
+<p>Note that the user running the scripts must be a member of the Administrators Group on the remote machines.</p>
+<h2 id="deployment-steps">Deployment Steps</h2>
+<p>In this tutorial , we will deploy the <em>HelloWorld</em> sample to a set of servers.
+The Orleans repo includes a <em>RemoteDeployment</em> folder (<a href="https://github.com/dotnet/orleans/tree/master/misc/scripts/RemoteDeployment">https://github.com/dotnet/orleans/tree/master/misc/scripts/RemoteDeployment</a>) where everything we need can be found.
+Start by building the <a href="../Documentation/Samples-Overview/Hello-World.html">Hello World sample</a>, commenting out (or removing) the silo initialization and shutdown code:</p>
+<pre><code class="lang-csharp">static void Main(string[] args)
+{
+    //AppDomain hostDomain =
+    //    AppDomain.CreateDomain(&quot;OrleansHost&quot;, null, new AppDomainSetup
+    //{
+    //    AppDomainInitializer = InitSilo,
+    //    AppDomainInitializerArguments = args,
+    //});
+
+    Orleans.GrainClient.Initialize(&quot;ClientConfiguration.xml&quot;);
+
+    var friend = GrainClient.GrainFactory.GetGrain&lt;HelloWorldInterfaces.IHello&gt;(0);
+    Console.WriteLine(&quot;\n\n{0}\n\n&quot;, friend.SayHello(&quot;Good morning!&quot;).Result);
+
+    Console.WriteLine(&quot;Orleans Silo is running.\nPress Enter to terminate...&quot;);
+    Console.ReadLine();
+
+    //hostDomain.DoCallBack(ShutdownSilo);
+}
+</code></pre><p>Also, start a new PowerShell window as Administrator and move to the <code>RemoteDeployment</code>folder.</p>
+<p>The basic steps to deploy Orleans code are:</p>
+<ul>
+<li>Setup a deployment manifest <em>(Deployment.xml)</em>.</li>
+<li>Adjust the Orleans server-side configuration <em>(OrleansConfiguration.xml)</em> to suit the environment.</li>
+<li>Run the PowerShell deployment scripts to deploy Orleans into your remote environment.</li>
+</ul>
+<h2 id="orleans-deployment-manifest">Orleans Deployment Manifest</h2>
+<p>The Orleans Deployment scripts use a manifest (XML) file to specify details of the deployment, including source and destination locations and local or remote machines to be deployed to.</p>
+<p>By making small changes to an existing deployment manifest xml file (typically by listing the different host machines), the same PowerShell scripts can deploy and run that Orleans system on a set of remote machines with equal ease as deploying and running that system on the local machine.</p>
+<p>The default file name for the manifest is <em>Deployment.xml</em>, and if you just modify this file, which is found in the <em>RemoteDeployment</em> folder, it will not be necessary to specify a different name.
+There are times, such as during testing, it may be advantageous to maintain multiple deployment files that specify a different set of silos.
+These other files may be specified explicitly to the deployment tools as specified in the respective sections below.</p>
+<p>A deployment manifest contains many different items, which collectively allow deployment of the Orleans runtime and applications onto a variety of local and remote configurations:</p>
+<h3 id="source-location-for-the-orleans-system-runtime">Source location for the Orleans system runtime</h3>
+<p>Located in the <code>Path</code> attribute of the <code>&lt;Deployment&gt;&lt;Packages&gt;&lt;Package&gt;</code> element where the <code>Type</code> attribute is set to &quot;System&quot;.</p>
+<pre><code>&lt;Package Name=&quot;Orleans Runtime&quot; Type=&quot;System&quot; Path=&quot;..\Binaries\OrleansServer&quot; /&gt;
+</code></pre><h3 id="source-location-for-additional-orleans-applications">Source location for additional Orleans applications</h3>
+<p>If you have any additional Orleans applications / grains to be included in this Orleans system, they are also located in the <code>&lt;Deployment&gt;&lt;Packages&gt;&lt;Package&gt;</code> nodes.
+The <code>Type</code> attribute must be set to &quot;Application&quot;.</p>
+<pre><code> &lt;Package Name=&quot;HelloWorld&quot; Type=&quot;Application&quot; Path=&quot;..\Binaries\Applications\HelloWorldGrains&quot; /&gt;
+</code></pre><h3 id="source-location-for-the-server-configuration-file-to-be-used-by-the-orleans-host-process">Source location for the server configuration file to be used by the Orleans host process</h3>
+<p>Located in the <code>Path</code> attribute of the <code>&lt;Deployment&gt;&lt;RuntimeConfiguration&gt;</code> element.
+The file name must be &quot;OrleansConfiguration.xml&quot; – if necessary, just change the path.</p>
+<pre><code>&lt;RuntimeConfiguration Path=&quot;.\OrleansConfiguration.xml&quot; /&gt;
+</code></pre><h3 id="target-location-to-install-the-orleans-server-side-binaries-on-each-machine">Target location to install the Orleans server-side binaries on each machine</h3>
+<p>Located in the <code>&lt;Deployment&gt;&lt;TargetLocation&gt;</code> element.
+This must be an absolute local file system path (i.e. no &quot;..&quot; locations) that is valid on all the target hosts.</p>
+<pre><code>&lt;TargetLocation Path=&quot;C:\Orleans&quot; /&gt;
+</code></pre><h3 id="the-set-of-silos-host-machines-and-optional-silo-names-this-orleans-system-should-to-be-deployed-to">The set of silos (host machines and optional silo names) this Orleans system should to be deployed to.</h3>
+<p>Located in the <code>&lt;Deployment&gt;&lt;Nodes&gt;&lt;Node&gt;</code> elements.
+Typically: &quot;Primary&quot; on <em>localhost</em>, or multiple machines with one silo each.
+The <code>HostName</code> attribute specifies the machine name.
+The <code>NodeName</code> attribute specifies the name of the silo.
+Generally, this is arbitrary, with the exception that if multiple silos will run on any one machine, then silo names must be unique.</p>
+<pre><code class="lang-xml">&lt;Nodes&gt;
+    &lt;Node HostName=&quot;MACHINE1&quot; NodeName=&quot;Primary&quot; /&gt;
+    &lt;Node HostName=&quot;MACHINE2&quot; NodeName=&quot;Node2&quot; /&gt;
+    &lt;Node HostName=&quot;MACHINE3&quot; NodeName=&quot;Node3&quot; /&gt;
+&lt;Nodes /&gt;
+</code></pre><h3 id="deployment-group-id">Deployment Group ID</h3>
+<p>This is a GUID which distinguishes one Orleans runtime system from another, even if both Orleans systems are running on the same machines.
+Located in the <code>&lt;Deployment&gt;</code> element.</p>
+<pre><code class="lang-xml">&lt;Deployment
+    Name=&quot;Deployment1&quot;
+    DeploymentGroup=&quot;F219832A-1EE1-45DA-B35D-0BB3060C9FDA&quot;
+    xmlns=&quot;urn:xcg-deployment&quot;&gt;
+</code></pre><h2 id="orleans-silo-configuration">Orleans Silo Configuration</h2>
+<p>Refer to  <a href="../Documentation/Deployment-and-Operations/Configuration-Guide/Server-Configuration.html">Server Configuration</a> for information on silo configuration.</p>
+<h2 id="orleans-powershell-scripts">Orleans Powershell Scripts</h2>
+<p>The following sections detail the PowerShell scripts provided with Orleans to aid with deployment and monitoring.
+(Use the /? option to get the latest usage info directly from the scripts.)</p>
+<table>
+<thead>
+<tr>
+<th>Script Name</th>
+<th>Parameters</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DeployOrleansSilos.ps1</td>
+<td>[$deploymentConfigFile]</td>
+<td>Copies the Orleans files to machines specified in the deploymentConfigFile (default is Deployment.xml).</td>
+</tr>
+<tr>
+<td>UndeployOrleansSilos.ps1</td>
+<td>[$deploymentConfigFile]</td>
+<td>Stops and removes Orleans from the deployment servers deploymentConfigFile (default is Deployment.xml).</td>
+</tr>
+<tr>
+<td>MonitorOrleansSilos.ps1</td>
+<td>[$deploymentConfigFile] [$networkInstance] [$samplesToLog] [$headerInterval] [$repeatHeaderInFile]</td>
+<td>Monitors CPU, Memory, Network Send, and Network Receive performance counters, and logs the data to files both as an aggregate of all data, and in separate files for each server. See usage text for details about the parameters.</td>
+</tr>
+<tr>
+<td>ShowOrleansSilos.ps1</td>
+<td>[$deploymentConfigFile]</td>
+<td>Does a quick survey of the deployment silos and reports if Orleans is running on them.</td>
+</tr>
+<tr>
+<td>GatherOrleansSiloLogs.ps1</td>
+<td>[$deploymentConfigFile] [$outputPath]</td>
+<td>Retrieve all log files from deployment silos and stores them in the specified output folder.</td>
+</tr>
+<tr>
+<td>UtilityFunctions.ps1</td>
+<td>none</td>
+<td>Provides ancillary functionality to the other scripts.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="deploying-orleans-using-powershell-script">Deploying Orleans using Powershell Script</h2>
+<ul>
+<li>Start a separate PowerShell command window as an administrator.</li>
+<li><p>Execute the <em>DeployOrleansSilos.ps1</em> script, providing the location of the deployment configuration file (&quot;deployment.xml&quot; is the default and will be used if you don’t supply a value).</p>
+<p>   .\DeployOrleansSilos.ps1 .\Deployment.xml</p>
+</li>
+</ul>
+<p>The deployment will execute the following steps:</p>
+<ul>
+<li>Stop any running instances of Orleans that are running on the deployment machines.</li>
+<li>Copy the Orleans files and any application files that are listed in the deployment manifest.</li>
+<li>When the copy is completed, start the silos. This will pause after starting the first silo so that it is available for the other silos to register with.</li>
+<li>Pause to allow the start-up to complete.</li>
+<li>Report the progress of the deployment.</li>
+</ul>
+<p>When the deployment is complete, Orleans is ready for clients to connect to it.</p>
+<h2 id="confirming-orleans-status">Confirming Orleans Status</h2>
+<p>To determine if Orleans is running on the servers in the deployment manifest, run the <em>ShowOrleansSilos.ps1</em> script.</p>
+<p>If you have used a deployment manifest file named something other than the default, specify it on the command line.</p>
+<pre><code> .\ShowOrleansSilos.ps1 .\Deployment.xml
+</code></pre><p>If everything works well, you should see something like this:</p>
+<pre><code>PS C:\Orleans\misc\scripts\RemoteDeployment&gt; .\ShowOrleansSilos.ps1 .\Deployment.xml
+
+OrleansHost running on host001:
+     Process 1: 1340
+
+OrleansHost running on host002:
+     Process 1: 4320
+
+2 processes running
+</code></pre><h2 id="running-the-client">Running the Client</h2>
+<p>We&#39;ve edited the Hello World program not to start a silo in-process, but in order to run the client, the client configuration file <em>DevTestClientConfiguratio.xml</em> needs to be edited according to the <a href="../Documentation/Deployment-and-Operations/Configuration-Guide/Client-Configuration.html">Client Configuration</a> section.
+The setup needs to conform to how the server was set up, specifically whether or not Azure Storage is used to keep track of the deployment configuration.
+In the author&#39;s setup, Azure is not involved, so the client configuration looks like this:</p>
+<pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
+    &lt;Gateway Address=&quot;host001&quot; Port=&quot;30000&quot;/&gt;
+    &lt;Gateway Address=&quot;host002&quot; Port=&quot;30000&quot;/&gt;
+    &lt;Statistics MetricsTableWriteInterval=&quot;30s&quot; PerfCounterWriteInterval=&quot;30s&quot; LogWriteInterval=&quot;300s&quot;
+    WriteLogStatisticsToTable=&quot;true&quot;/&gt;
+&lt;/ClientConfiguration&gt;
+</code></pre><p>which corresponds to a server configuration that looks like this (relevant excerpts only):</p>
+<pre><code class="lang-xml">&lt;Globals&gt;
+    &lt;SeedNode Address=&quot;host001&quot; Port=&quot;11111&quot; /&gt;
+    &lt;Liveness LivenessType =&quot;MembershipTableGrain&quot; /&gt;
+    ...
+&lt;/Globals&gt;
+&lt;Defaults&gt;
+    &lt;Networking Address=&quot;&quot; Port=&quot;11111&quot; /&gt;
+    &lt;ProxyingGateway Address=&quot;&quot; Port=&quot;30000&quot; /&gt;
+    ...
+&lt;/Defaults&gt;
+</code></pre><p>Running the client in VS, I see this:</p>
+<p>![](../Images/onpremise 1.PNG)</p>
+<h2 id="monitoring-orleans">Monitoring Orleans</h2>
+<p>Once Orleans is deployed, you can start an optional script that will monitor the Orleans deployment using standard performance counters.
+Run a dedicated PowerShell command prompt as an administrator, and execute the <em>.\MonitorOrleans.ps1</em> script to start monitor performance counters for an Orleans Deployment.</p>
+<p>The following parameters configure the monitoring to suit individual circumstances:</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DeploymentConfigFile</td>
+<td>Deployment.xml</td>
+<td>The deployment manifest used to install Orleans.</td>
+</tr>
+<tr>
+<td>NetworkInstance</td>
+<td>corp</td>
+<td>The name of the network for the network performance counters.</td>
+</tr>
+<tr>
+<td>SamplesToLog</td>
+<td>480</td>
+<td>The number of samples to record in the current run. Use Ctrl-C to stop the script sooner. The default of 480, which taken in one minute intervals should continue for eight hours.</td>
+</tr>
+<tr>
+<td>HeaderInterval</td>
+<td>10</td>
+<td>The number of samples to write before repeating the header.</td>
+</tr>
+<tr>
+<td>RepeatHeaderInFile</td>
+<td></td>
+<td>If this switch is present, the header will be repeated in the log file at the interval specified by the previous parameter.</td>
+</tr>
+</tbody>
+</table>
+<p>The script will store the data in the following types listed below.
+The files will be written to a folder called <em>PerformanceData</em> under the directory where the monitoring script is run from.</p>
+<table>
+<thead>
+<tr>
+<th>File Type</th>
+<th>FileNameBase</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Machine Specific</td>
+<td>“PerfData-” + machine name + Date/Time stamp.</td>
+<td>Contains only the data for a single machine. If there are four machines in the deployment, then there will be four of these files.</td>
+</tr>
+<tr>
+<td>Combined</td>
+<td>“ConsolidatedPerfData-” + Date/Time stamp.</td>
+<td>Contains all of the data for all machines consolidated into a single file.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="gathering-orleans-log-files">Gathering Orleans Log Files</h2>
+<p>To retrieve all log files from deployment silos and store them in the specified output folder, run the <em>GatherOrleansSiloLogs.ps1</em> script.</p>
+<p>If you have used a deployment manifest file named something other than the default, specify it on the command line.
+You may also specify an output folder where the collected log files will be stored otherwise a <em>.\logs</em> subdirectory will be used by default.</p>
+<pre><code>.\GatherOrleansSiloLogs.ps1 .\Deployment.xml
+.\GatherOrleansSiloLogs.ps1 .\Deployment.xml .\MyLogs
+</code></pre><h2 id="removing-orleans">Removing Orleans</h2>
+<p>When it is time to remove an Orleans deployment, use the <em>UndeployOrleansSilos.ps1</em> script.</p>
+<p> If you have used a deployment manifest file named something other than the default, specify it on the command line.</p>
+<pre><code>.\UnDeployOrleansSilos.ps1 .\Deployment.xml
+</code></pre><h2 id="next">Next</h2>
+<p>We&#39;ll write our own storage provider, to save grain state to alternative to file instead of Microsoft Azure:</p>
+<p><a href="Custom-Storage-Providers.html">Custom Storage Providers</a></p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

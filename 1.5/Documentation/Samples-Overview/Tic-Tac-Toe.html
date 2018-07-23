@@ -1,0 +1,180 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Tic Tac Toe | Microsoft Orleans Website </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Tic Tac Toe | Microsoft Orleans Website ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../Images/logo-light.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list"></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+
+<div class="IMPORTANT"><h5>Important</h5><p><strong>You are looking at the 1.5 documentation</strong></p>
+<p>Orleans 2.0 is a significant overhaul from the 1.x versions.
+For 2.0 <a href="/orleans/Documentation/Introduction.html">Documentation</a> and <a href="/orleans/Tutorials/index.html">Tutorials</a>, refer to the respective sections.</p>
+</div>
+<h1 id="tic-tac-toe">Tic Tac Toe</h1>
+<p>TicTacToe is based on the classic board game, also known as &quot;noughts and crosses.&quot; Its game logic is simple, which makes it an excellent sample for showing how a turn-based game could be easily implemented in Orleans.</p>
+<p>A game like this may not at first sight seem a natural fit for Orleans, if you only think about it in terms of a single player game. However, within a social game context, such as a Facebook game, where thousands of players could be playing dozens of games at any one time - some games waiting for the opponent to join, others mid game, waiting for the next move to play out, then it is a much more natural fit. Orleans enables the developer to concentrate on expressing game logic as grains, letting the runtime handle the scale.</p>
+<p>This sample also demonstrates how an Orleans application can be deployed to Windows Azure.</p>
+<p><img src="screenshot.png" alt=""></p>
+<h3 id="running-the-sample">Running the Sample</h3>
+<p>The sample comes complete with a Windows Azure project, so it can be run locally in the Windows Azure local emulator, or deployed as a real cloud service. If running locally, you will need to create multiple &quot;private&quot; browsing sessions, to ensure each browser session is recognized as a new player.</p>
+<p>To run locally without the emulator:</p>
+<ol>
+<li>Open the <code>TicTacToe.sln</code> file in Visual Studio and build the solution.</li>
+<li>Set the TicTacToe.Grains project as the startup project.</li>
+<li>Press F5 to start the application.</li>
+<li>Start the TicTacToe.Web project manually using the Project context menu -&gt; Debug -&gt; Start new instance</li>
+<li>Your browser should open, asking you to enter your name.</li>
+</ol>
+<p>To run locally using the Azure emulator:</p>
+<ol>
+<li>Open the <code>TicTacToe.sln</code> file in Visual Studio and build the solution.</li>
+<li>Set the TicTacToe.Azure project as the startup project.</li>
+<li>Start the Azure Compute Emulator if necessary.</li>
+<li>Press F5 to start the application.</li>
+<li>Your browser should open, asking you to enter your name.</li>
+</ol>
+<p>To run in Windows Azure:</p>
+<ol>
+<li>Open the <code>TicTacToe.sln</code> file in Visual Studio and build the solution.</li>
+<li>Expand the <code>TicTacToe.Azure</code> project, and in the <code>Roles</code> folder, open the properties for <code>TicTacToe.Web</code> and <code>TicTacToe.WorkerRole</code>.</li>
+<li>Set the value for the <code>DataConnectionString</code> setting for both roles to a Windows Azure Storage Account.</li>
+<li>Right click on the <code>TicTacToe.Azure</code> project, and click <code>Publish</code>.</li>
+<li>Follow the instructions in the wizard to deploy the application on Azure.</li>
+<li>The application will deploy, and you will be able to access on <a href="http://YOURCLOUDSERVICE.cloudapp.net/">http://YOURCLOUDSERVICE.cloudapp.net/</a></li>
+</ol>
+<h3 id="how-it-works">How it works</h3>
+<p>There are two main grain types in OrleansXO, one represents a player, the other representing a game.</p>
+<p><strong>User Grain</strong></p>
+<p>A <code>PlayerGrain</code> is activated for each player logging in to the system. A GUID is used to uniquely identify the user, which is stored in a cookie by the MVC web application. The IPlayer interface defines the operations a player can perform:</p>
+<pre><code class="lang-csharp">public interface IPlayer : IGrain
+{
+    Task&lt;List&lt;GameSummary&gt;&gt; GetGameSummaries();
+    Task&lt;Guid&gt; CreateGame();
+    Task&lt;GameState&gt; JoinGame(Guid gameId);
+    Task LeaveGame(Guid gameId, GameOutcome outcome);
+    Task SetUsername(string username);
+    Task&lt;string&gt; GetUsername();
+}
+</code></pre><p>The player grain handles the creating of new games (so another player can then join), leaving a game (once it is over), and tracking the progress of all active games.</p>
+<p><strong>Game Grain</strong></p>
+<p>Each game is also represented by a <code>GameGrain</code>. They are also uniquely identify using a GUID.</p>
+<pre><code class="lang-csharp">public interface IGame : Orleans.IGrain
+{
+    Task&lt;GameState&gt; AddPlayerToGame(Guid player);
+    Task&lt;GameState&gt; GetState();
+    Task&lt;List&lt;GameMove&gt;&gt; GetMoves();
+    Task&lt;GameState&gt; MakeMove(GameMove move);
+    Task&lt;GameSummary&gt; GetSummary(Guid player);
+    Task SetName(string name);  
+}
+</code></pre><p>Once a user grain creates a game, that user is automatically added as one of the players. Once a game is joined by a second player, the game can start. The players make their turns until the game ends with either a draw or a winner.</p>
+<p>The <code>GameGrain</code> maintains the state of the game, the players in the game, whose turn it is next, and whether the game is in play or finished.</p>
+<p>The <code>MakeMove</code> method handles the game logic, checking the validity of a move and, once played, checks if that move ends the game. In the case of the game ending, the player grains are informed of the outcome via the LeaveGame call.</p>
+<p>The game was designed with social gaming in mind, so the main mechanism for inviting other players is an &quot;out of band&quot; from the game, and would probably be an invite to a friend, sending the GUID that represents the game. As an optimization purely for testing, a pairing grain was created that uses MemoryCache to hold a the list of games that are available to join, with an expiry of one hour, to stop &quot;stale&quot; games appearing on the list.</p>
+<p> An ASP.NET MVC application serves an HTML page. JavaScript running in the browser polls the web server, and retrieve JSON data, which it renders using <a href="http://handlebarsjs.com/">Handlebars templates</a>.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

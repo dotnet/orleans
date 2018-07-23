@@ -1,0 +1,16 @@
+- name: Configuration Guide Overview
+  href: index.md
+- name: Local Development Configuration
+  href: Local-Development-Configuration.md
+- name: Client Configuration
+  href: Client-Configuration.md
+- name: Server Configuration
+  href: Server-Configuration.md
+- name: Typical Configurations
+  href: Typical-Configurations.md
+- name: Options Classes
+  href: Options-List.md
+- name: Configuring .NET Garbage Collection
+  href: Configuring-.NET-Garbage-Collection.md
+- name: Configuring ADO.NET Providers
+  href: Configuring-AdoNet-Providers.md

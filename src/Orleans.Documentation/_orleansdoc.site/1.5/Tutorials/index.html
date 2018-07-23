@@ -1,0 +1,166 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Step by Step Tutorials | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Step by Step Tutorials | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../Images/logo-light.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list"></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h2 id="these-tutorials-are-for-the-15-release">These tutorials are for the 1.5 release</h2>
+
+<p>Orleans 2.0 is a significant overhaul from the 1.x versions.</p>
+<h1 id="step-by-step-tutorials">Step by Step Tutorials</h1>
+<p>The collection of technology walkthrough tutorials found here is intended to introduce you to the features of this exciting technology, spanning the programming model, its configuration, deployment, and customization.
+They build on each other, so it is best to go through them in the order outlined below.</p>
+<p>Each walkthrough is focused narrowly on just a couple of specific concepts in isolation from the scenarios that motivate your using Orleans in the first place, they are intended to teach you the mechanics of Orleans, not to explain when or why you should be using them.</p>
+<h2 id="my-first-orleans-applicationmy-first-orleans-applicationmd"><a href="My-First-Orleans-Application.html">My First Orleans Application</a></h2>
+<p>This walkthrough shows you how to create a &quot;Hello World&quot; application using Orleans and run it in the simplest possible single-process environment, one that is convenient for debugging your code.</p>
+<h2 id="minimal-orleans-applicationminimal-orleans-applicationmd"><a href="Minimal-Orleans-Application.html">Minimal Orleans Application</a></h2>
+<p>This walkthrough is an alternative to the <a href="My-First-Orleans-Application.html">My First Orleans Application</a> tutorial. It walks step by step through a basic application, using only the nuget packages.</p>
+<h2 id="running-in-a-stand-alone-silorunning-in-a-stand-alone-silomd"><a href="Running-in-a-Stand-alone-Silo.html">Running in a Stand-Alone Silo</a></h2>
+<p>In this walkthrough, the simple &quot;Hello World&quot; application is modified to use a more typical environment for services: separate processes for the client and service code.
+It is still a development and debugging environment, simpler than a production configuration, which would involve multiple processes on multiple computers.</p>
+<h2 id="actor-identityactor-identitymd"><a href="Actor-Identity.html">Actor Identity</a></h2>
+<p>Actors are a lot like regular objects, but there are a couple of quirks that make them different.
+One is the notion of actor identity, which surfaces in Orleans in the form of grains&#39; primary keys.</p>
+<h2 id="a-service-is-a-collection-of-communicating-actorsa-service-is-a-collection-of-communicating-actorsmd"><a href="A-Service-is-a-Collection-of-Communicating-Actors.html">A Service is a Collection of Communicating Actors</a></h2>
+<p>The previous examples used only a single actor type and instance to demonstrate their concepts.
+In almost all real systems, this is the opposite of what you would want to do; actors are intended to be as light-weight as objects and you would expect hundreds of thousands or millions of them to be active on a single system simultaneously, with as potentially billions waiting inactive in persistent store.</p>
+<p>This walkthrough explains the actor lifecycle and identity, how actors are activated and deactivated.</p>
+<h2 id="concurrencyconcurrencymd"><a href="Concurrency.html">Concurrency</a></h2>
+<p>What distinguishes the actor model from most other (distributed) object models is that it enforces a specific set of rules for concurrent access to state, allowing it to be free of data races by exchanging data between actors using message-passing and only allowing a single thread of execution to access each actor&#39;s internal state at any given point in time.</p>
+<p>On the other hand, there are many situations where data races are not a risk, and the single-threaded model is too conservative.
+Further, single-threaded execution can cause other problems, such as deadlocks.
+Orleans offers a few tools that allow developers to control this behavior, explained in this walkthrough.</p>
+<h2 id="interaction-with-libraries-and-servicesinteraction-with-libraries-and-servicesmd"><a href="Interaction-with-Libraries-and-Services.html">Interaction with Libraries and Services</a></h2>
+<p>Applications using Orleans are regular .NET applications, and can interact freely with other .NET components.
+In order to not undermine the scalability inherent in the actor model, programmers have to take care to follow a few rules, mostly related to using asynchronous APIs whenever they are available.
+This walkthrough demonstrates the basic principles.</p>
+<h2 id="declarative-persistencedeclarative-persistencemd"><a href="Declarative-Persistence.html">Declarative Persistence</a></h2>
+<p>Actors are often transient, i.e., their state lives only for a short period of time, or is reconstructible at will from other actors.
+In many circumstances, however, actor state needs to persist for longer periods of time and be stored in an external database of some sort.
+Orleans offers the developer flexible options on where to store actor state, and this walkthrough will introduce the simplest way to deal with long-lived actor state: declaratively.</p>
+<h2 id="handling-failuresfailure-handlingmd"><a href="Failure-Handling.html">Handling Failures</a></h2>
+<p>Everything is easy and beautiful in a distributed system until something fails and handling failures is one of the hardest  things in any computer program. In this section we will learn how we can handle failures.</p>
+<h2 id="front-ends-for-orleans-servicesfront-ends-for-orleans-servicesmd"><a href="Front-Ends-for-Orleans-Services.html">Front Ends for Orleans Services</a></h2>
+<p>Many Orleans services will be private and available only to front-end services that rely on the Orleans-based code as one of several backend services.
+In some circumstances, what is needed is to put a thin HTTP layer in front of the backend service, essentially making the Orleans service itself publically available via HTTP.
+In this walk-through, the steps of producing a thin HTTP layer based on ASP.NET Web API is described.</p>
+<h2 id="cloud-deploymentcloud-deploymentmd"><a href="Cloud-Deployment.html">Cloud Deployment</a></h2>
+<p>The next walkthrough demonstrates how to get your Orleans application deployed in the cloud using Azure.</p>
+<h2 id="on-premise-deploymenton-premise-deploymentmd"><a href="On-Premise-Deployment.html">On-Premise Deployment</a></h2>
+<p>Orleans applications can be deployed both on your server equipment as well as in the cloud.
+In this walkthrough, you will see how to set up an on premise cluster and deploy your application to it.</p>
+<h2 id="custom-storage-providerscustom-storage-providersmd"><a href="Custom-Storage-Providers.html">Custom Storage Providers</a></h2>
+<p>Defining your own storage provider is the easiest way to extend the persistence choices of your Orleans application.
+While Orleans comes with a couple of storage providers in the box, they are not intended to be the only choices or constrain you unnecessarily.
+Therefore, the library offers a way to extend the set of storage providers to include This walkthrough demonstrates how to extend the choices by building a storage provider based on regular files.</p>
+<h2 id="unit-testing-grainsunit-testing-grainsmd"><a href="Unit-Testing-Grains.html">Unit Testing Grains</a></h2>
+<p>Writing tests is one of the essential parts of the software development process which allows you to maintain your code easily, refactor with ease and sleep well when a new team member is changing 3 years old code. Orleans makes it very easy to write different kinds of tests for your Orleans application.
+this tutorial describes how to write simple unit tests to check if each grain method is having the right behavior.
+More complex scenarios like load testing and object mocking are not described here.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

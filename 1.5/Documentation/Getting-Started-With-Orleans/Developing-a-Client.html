@@ -1,0 +1,247 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Developing a Client | Microsoft Orleans Website </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Developing a Client | Microsoft Orleans Website ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../Images/logo-light.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list"></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+
+<div class="IMPORTANT"><h5>Important</h5><p><strong>You are looking at the 1.5 documentation</strong></p>
+<p>Orleans 2.0 is a significant overhaul from the 1.x versions.
+For 2.0 <a href="/orleans/Documentation/Introduction.html">Documentation</a> and <a href="/orleans/Tutorials/index.html">Tutorials</a>, refer to the respective sections.</p>
+</div>
+<h3 id="what-is-grain-client">What Is Grain Client?</h3>
+<p>The term &quot;Client&quot; or sometimes &quot;Grain Client&quot; is used for application code that interacts with grains but itself is not part of a grain logic.
+Client code runs outside of the cluster of Orleans servers called silos where grains are hosted.
+Hence, a client acts as a connector or conduit to the cluster and to all grains of the application.</p>
+<p><img src="Frontend-Cluster.png" alt=""></p>
+<p>Usually, clients are used on the frontend web servers to connect to an Orleans cluster that serves as a middle tier with grains executing business logic.
+In a typical setup, a frontend web server:</p>
+<ul>
+<li>Receives a web request</li>
+<li>Performs necessary authentication and authorization validation</li>
+<li>Decides which grain(s) should process the request</li>
+<li>Uses Grain Client to make one or more method call to the grain(s)</li>
+<li>Handles successful completion or failures of the grain calls and any returned values</li>
+<li>Sends a response for the web request</li>
+</ul>
+<h3 id="initialization-of-grain-client">Initialization of Grain Client</h3>
+<p>Before a grain client can be used for making calls to grains hosted in an Orleans cluster, it needs to be configured, initialized, and connected to the cluster.</p>
+<p>Configuration is provided via a <code>ClientConfiguration</code> object that contains a hierarchy of configuration properties for programmatically configuring a client.
+There is also a way to configure a client via a XML file, but that option will be deprecated in the future.
+More information is in the <a href="../Deployment-and-Operations/Configuration-Guide/Client-Configuration.html">Client Configuration guide</a>.
+Here we will simply use a helper method that creates a configuration object hardcoded for connecting to a local silo running as <code>localhost</code>.</p>
+<pre><code class="lang-csharp">ClientConfiguration clientConfig = ClientConfiguration.LocalhostSilo(); 
+</code></pre><p>Once we have a configuration object, we can build a client via the <code>ClientBuilder</code> class.</p>
+<pre><code class="lang-csharp">IClusterClient client = new ClientBuilder().UseConfiguration(clientConfig).Build();
+</code></pre><p>Lastly, we need to call <code>Connect()</code> method on the constructed client object to make it connect to the Orleans cluster. It&#39;s an asynchronous method that returns a <code>Task</code>. So we need to wait for its completion with an <code>await</code> or <code>.Wait()</code>.</p>
+<pre><code class="lang-csharp">await client.Connect(); 
+</code></pre><h3 id="making-calls-to-grains">Making Calls to Grains</h3>
+<p>Making calls to grain from a client is really no different from <a href="Developing-a-Grain.html#grain-method-invocation">making such calls from within grain code</a>.
+The same <code>GetGrain&lt;T&gt;(key)</code> method, where <code>T</code> is the target grain interface, is used in both cases <a href="Developing-a-Grain.html#grain-reference">to obtain grain references</a>.
+The slight difference is in through what factory object we invoke <code>GetGrain</code>.
+In client code we do that through the connected client object.</p>
+<pre><code class="lang-csharp">IPlayerGrain player = client.GetGrain&lt;IPlayerGrain&gt;(playerId);
+Task t = player.JoinGame(game)
+await t;
+</code></pre><p>A call to a grain method returns a <code>Task</code> or a<code>Task&lt;T&gt;</code> as required by the <a href="Developing-a-Grain.html#grain-interfaces-and-classes">grain interface rules</a>.
+The client can use the <code>await</code> keyword to asynchronously await the returned <code>Task</code> without blocking the thread, or in some cases the <code>Wait()</code> method to block the current thread of execution.</p>
+<p>The major difference between making calls to grains from client code and from within another grain is the single-threaded execution model of grains.
+Grains are constrained to be single-threaded by the Orleans runtime, while clients may be multi-threaded.
+Orleans does not provide any such guarantee on the client side, and so it is up to the client to manage its own concurrency using whatever synchronization constructs are appropriate for its environment – locks, events, <code>Tasks</code>, etc.</p>
+<h3 id="receiving-notifications">Receiving notifications</h3>
+<p>There are situations in which a simple request-response pattern is not enough, and the client needs to receive asynchronous notifications.
+For example, a user might want to be notified when a new message has been published by someone that she is following.</p>
+<p><a href="../Core-Features/Observers.html">Observers</a> is one such mechanism that enables exposing client side objects as grain-like targets to get invoked by grains.
+Calls to observers do not provide any indication of success or failure, as they are sent as one-way best effort message.
+So it is a responsibility of the application code to build a higher level reliability mechanism on top of observers where necessary. </p>
+<p>Another mechanism that can be used for delivering asynchronous messages to clients is <a href="../Orleans-Streams/index.html">Streams</a>. Streams expose indications of success or failure of delivery of individual messages, and hence enable reliable communication back to the client.</p>
+<h3 id="example">Example</h3>
+<p>Here is an extended version of the example given above of a client application that connects to Orleans, finds the player account, subscribes for updates to the game session the player is part of with an observer, and prints out notifications until the program is manually terminated.</p>
+<pre><code class="lang-csharp">namespace PlayerWatcher
+{
+    class Program
+    {
+        /// &lt;summary&gt;
+        /// Simulates a companion application that connects to the game
+        /// that a particular player is currently part of, and subscribes
+        /// to receive live notifications about its progress.
+        /// &lt;/summary&gt;
+        static void Main(string[] args)
+        {
+            RunWatcher().Wait();
+            // Block main thread so that the process doesn&#39;t exit.
+            // Updates arrive on thread pool threads.
+            Console.ReadLine();
+        }
+
+        static async Task RunWatcher()
+        {
+            try
+
+            {
+                // Connect to local silo
+                var config = ClientConfiguration.LocalhostSilo();
+                var client = new ClientBuilder().UseConfiguration(config).Build();
+                await client.Connect();
+
+                // Hardcoded player ID
+                Guid playerId = new Guid(&quot;{2349992C-860A-4EDA-9590-000000000006}&quot;);
+                IPlayerGrain player = client.GetGrain&lt;IPlayerGrain&gt;(playerId);
+                IGameGrain game = null;
+
+                while (game == null)
+                {
+                    Console.WriteLine(&quot;Getting current game for player {0}...&quot;, playerId);
+
+                    try
+                    {
+                        game = await player.GetCurrentGame();
+                        if (game == null) // Wait until the player joins a game
+                        {
+                            await Task.Delay(5000);
+                        }
+                    }
+                    catch (Exception exc)
+                    {
+                        Console.WriteLine(&quot;Exception: &quot;, exc.GetBaseException());
+                    }
+                }
+
+                Console.WriteLine(&quot;Subscribing to updates for game {0}...&quot;, game.GetPrimaryKey());
+
+                // Subscribe for updates
+                var watcher = new GameObserver();
+                await game.SubscribeForGameUpdates(
+                    await client.CreateObjectReference&lt;IGameObserver&gt;(watcher));
+
+                Console.WriteLine(&quot;Subscribed successfully. Press &lt;Enter&gt; to stop.&quot;);
+            }
+            catch (Exception exc)
+            {
+                Console.WriteLine(&quot;Unexpected Error: {0}&quot;, exc.GetBaseException());
+            }
+        }
+    }
+
+    /// &lt;summary&gt;
+    /// Observer class that implements the observer interface. Need to pass a grain reference to an instance of this class to subscribe for updates.
+    /// &lt;/summary&gt;
+    class GameObserver : IGameObserver
+    {
+        // Receive updates
+        public void UpdateGameScore(string score)
+        {
+            Console.WriteLine(&quot;New game score: {0}&quot;, score);
+        }
+    }
+    }
+}
+</code></pre><h3 id="next">Next</h3>
+<p><a href="Running-the-Application.html">Running the Application</a></p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,133 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Runtime Monitoring | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Runtime Monitoring | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../../favicon.ico">
+    <link rel="stylesheet" href="../../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../../toc.html">
+    <meta property="docfx:tocrel" content="../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../../index.html">
+                <img id="logo" class="svg" src="../../../../Images/logo-light.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list"></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+
+<div class="IMPORTANT"><h5>Important</h5><p><strong>You are looking at the 1.5 documentation</strong></p>
+<p>Orleans 2.0 is a significant overhaul from the 1.x versions.
+For 2.0 <a href="/orleans/Documentation/Introduction.html">Documentation</a> and <a href="/orleans/Tutorials/index.html">Tutorials</a>, refer to the respective sections.</p>
+</div>
+<h1 id="runtime-monitoring">Runtime Monitoring</h1>
+<p>[[THIS IS IN NEED OF REVIEW]]</p>
+<p>There are five ways Orleans deployment can be monitored by an external operator by utilizing the data that Orleans writes automatically to Azure storage.</p>
+<p>The tables mentioned below are desribed in more detail <a href="../../Runtime-Implementation-Details/Runtime-Tables.html">here</a>.</p>
+<p><strong>OrleansSilosTable for cluster membership</strong> - this table lists all silos in the deployment (partition key DeploymentID, row key silo id). The operator can use this table to check cluster health, watch the current set of live silos, or learn why and when a certain silo went down. Orleans&#39; cluster membership protocol uses this table internally and updates it with significant membership events (silos goes up and down).</p>
+<p><strong>OrleansSiloMetrics</strong> table for coarse grain performance statistics - Orleans writes a small number (about 10) of coarse-grain performance stats into this table (partition key DeplomentID, row key silo id). The table is updated automatically every X seconds (configurable) for each silo. The metrics include silo CPU, memory usage, number of grain activations on this silo, number of messages in the send/receive queue, etc. This data can be used to compare silos, check that there are no significant outliers (for example, one silo runs at much higher CPU), or simply check that in general the metrics reported by silos are in the expected range. In addition, this data can be used to decide to add new silos if the system becomes overloaded or reduce the number of silos if the system is mostly idle.</p>
+<p><strong>OrleansSiloStatistics</strong> table - this table includes a much larger number of performance statistics (hundreds of counters) which provide a much more detailed and in-depth view of the internal silo state. This table is currently not recommended for use by external operators. It is mainly for Orleans developers to help them troubleshoot complex production problems, if they occur. The Orleans team is building tools to analyze this data automatically and provide compact recommendations to operators based on it. Such tools can also be built by anyone independently.</p>
+<p><strong>Watching error codes in MDS</strong> - Orleans automatically writes different error messages into logger. This logger can be configured to output its data to various destinations. For example, the Halo team redirects all logs in production to MDS. They have written custom alerts in MDS to watch for specific error codes and count their occurrences, and alert them when those reach a certain threshold. The list of important error codes to watch is specified here:</p>
+<ul>
+<li><p><a href="Silo-Error-Code-Monitoring.html">Silo Error Code Monitoring</a></p>
+</li>
+<li><p><a href="Client-Error-Code-Monitoring.html">Client Error Code Monitoring</a></p>
+</li>
+</ul>
+<p><strong>Windows performance counters</strong> - The Orleans runtime continually updates a number of them. CounterControl.exe helps register the counters, and needs to run with elevated privileges. Obviously, the performance counters can be monitored using any of the standard monitoring tools.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../styles/main.js"></script>
+  </body>
+</html>
