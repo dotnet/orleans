@@ -2,6 +2,7 @@
 using Orleans.Transactions.Abstractions;
 using System;
 using System.Linq;
+using System.Runtime.Serialization;
 using System.Threading.Tasks;
 
 namespace Orleans.Transactions.Tests
@@ -123,13 +124,28 @@ namespace Orleans.Transactions.Tests
         public async Task AddAndThrow(int numberToAdd)
         {
             await Add(numberToAdd);
-            throw new Exception($"{GetType().Name} test exception");
+            throw new AddAndThrowException($"{GetType().Name} test exception");
         }
 
         public Task Deactivate()
         {
             DeactivateOnIdle();
             return Task.CompletedTask;
+        }
+    }
+
+    [Serializable]
+    public class AddAndThrowException : Exception
+    {
+        public AddAndThrowException() : base("Unexpected error.") { }
+
+        public AddAndThrowException(string message) : base(message) { }
+
+        public AddAndThrowException(string message, Exception innerException) : base(message, innerException) { }
+
+        protected AddAndThrowException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        {
         }
     }
 }

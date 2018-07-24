@@ -22,7 +22,7 @@ namespace Orleans.Transactions.Tests
         Task AddAndThrow(ITransactionTestGrain grain, int numberToAdd);
 
         [Transaction(TransactionOption.Create)]
-        Task MultiGrainAddAndThrow(ITransactionTestGrain grain, List<ITransactionTestGrain> grains, int numberToAdd);
+        Task MultiGrainAddAndThrow(List<ITransactionTestGrain> grain, List<ITransactionTestGrain> grains, int numberToAdd);
 
         [Transaction(TransactionOption.Create)]
         Task MultiGrainSetBit(List<ITransactionalBitArrayGrain> grains, int bitIndex);
