@@ -28,7 +28,8 @@ namespace Tester.AzureUtils.Streaming
 
         private readonly ITestOutputHelper output;
         private readonly ClientStreamTestRunner runner;
-        private const int queueCount = 8;
+        private static string serviceId = Guid.NewGuid().ToString();
+
         public AQClientStreamTests(ITestOutputHelper output)
         {
             this.output = output;
@@ -51,11 +52,11 @@ namespace Tester.AzureUtils.Streaming
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
+                    .Configure<ClusterOptions>(op => op.ServiceId = serviceId)
                     .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AQStreamProviderName, ob=>ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                         }));
             }
         }
@@ -65,11 +66,11 @@ namespace Tester.AzureUtils.Streaming
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
+                    .Configure<ClusterOptions>(op => op.ServiceId = serviceId)
                     .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AQStreamProviderName, ob=>ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                         }))
                     .AddMemoryGrainStorage("PubSubStore");
             }
@@ -77,9 +78,8 @@ namespace Tester.AzureUtils.Streaming
 
         public override void Dispose()
         {
-            var clusterId = HostedCluster.Options.ClusterId;
             base.Dispose();
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, AzureQueueUtilities.GenerateQueueNames(clusterId, queueCount),
+            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, AzureQueueStreamProviderUtils.GenerateDefaultAzureQueueNames(serviceId, AQStreamProviderName),
                 TestDefaultConfiguration.DataConnectionString).Wait();
             TestAzureTableStorageStreamFailureHandler.DeleteAll().Wait();
         }

@@ -15,6 +15,19 @@ namespace Orleans.Providers.Streams.AzureQueue
     public class AzureQueueStreamProviderUtils
     {
         /// <summary>
+        /// Generate default azure queue names 
+        /// </summary>
+        /// <param name="serviceId"></param>
+        /// <param name="providerName"></param>
+        /// <returns></returns>
+        public static List<string> GenerateDefaultAzureQueueNames(string serviceId, string providerName)
+        {
+            var defaultQueueMapper = new HashRingBasedStreamQueueMapper(new HashRingStreamQueueMapperOptions(), providerName);
+            return defaultQueueMapper.GetAllQueues()
+                .Select(queueName => $"{serviceId}-{queueName}").ToList();
+        }
+
+        /// <summary>
         /// Helper method for testing. Deletes all the queues used by the specifed stream provider.
         /// </summary>
         /// <param name="loggerFactory">logger factory to use</param>

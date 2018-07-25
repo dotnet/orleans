@@ -16,8 +16,7 @@ namespace Orleans.Providers.Streams.AzureQueue
     {
         protected readonly string ServiceId;
         private readonly SerializationManager serializationManager;
-        protected readonly string DataConnectionString;
-        protected readonly TimeSpan? MessageVisibilityTimeout;
+        protected readonly AzureQueueOptions queueOptions;
         private readonly IAzureStreamQueueMapper streamQueueMapper;
         private readonly ILoggerFactory loggerFactory;
         protected readonly ConcurrentDictionary<QueueId, AzureQueueDataManager> Queues = new ConcurrentDictionary<QueueId, AzureQueueDataManager>();
@@ -38,10 +37,9 @@ namespace Orleans.Providers.Streams.AzureQueue
             string providerName)
         {
             this.serializationManager = serializationManager;
-            DataConnectionString = queueOptions.ConnectionString;
+            this.queueOptions = queueOptions;
             ServiceId = serviceId;
             Name = providerName;
-            MessageVisibilityTimeout = queueOptions.MessageVisibilityTimeout;
             this.streamQueueMapper = streamQueueMapper;
             this.dataAdapter = dataAdapter;
             this.loggerFactory = loggerFactory;
@@ -49,7 +47,8 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
-            return AzureQueueAdapterReceiver.Create(this.serializationManager, this.loggerFactory, this.streamQueueMapper.PartitionToAzureQueue(queueId), DataConnectionString, this.dataAdapter, MessageVisibilityTimeout);
+            return AzureQueueAdapterReceiver.Create(this.serializationManager, this.loggerFactory, this.streamQueueMapper.PartitionToAzureQueue(queueId), 
+                queueOptions.ConnectionString, this.dataAdapter, queueOptions.MessageVisibilityTimeout);
         }
 
         public async Task QueueMessageBatchAsync<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
@@ -59,7 +58,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             AzureQueueDataManager queue;
             if (!Queues.TryGetValue(queueId, out queue))
             {
-                var tmpQueue = new AzureQueueDataManager(this.loggerFactory, this.streamQueueMapper.PartitionToAzureQueue(queueId), DataConnectionString, MessageVisibilityTimeout);
+                var tmpQueue = new AzureQueueDataManager(this.loggerFactory, this.streamQueueMapper.PartitionToAzureQueue(queueId), queueOptions.ConnectionString, queueOptions.MessageVisibilityTimeout);
                 await tmpQueue.InitQueueAsync();
                 queue = Queues.GetOrAdd(queueId, tmpQueue);
             }
