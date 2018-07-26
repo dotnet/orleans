@@ -471,6 +471,27 @@ namespace Orleans.Transactions
             }
         }
 
+        // aborts all queued transactions that are not in the lock yet
+        private void AbortQueuedTransactions()
+        {
+            var pos = currentGroup?.Next;
+            while (pos != null)
+            {
+                if (pos.Tasks != null)
+                {
+                    foreach (var t in pos.Tasks)
+                    {
+                        // running the task will abort the transaction because it is not in currentGroup
+                        t.RunSynchronously();
+                        // look at exception to avoid UnobservedException
+                        var ignore = t.Exception;
+                    }
+                }
+                pos = pos.Next;
+            }
+        }
+
+
         // aborts transaction, if still active
         private void Rollback(Guid guid, string indication, bool notify)
         {

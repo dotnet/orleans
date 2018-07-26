@@ -30,9 +30,28 @@ namespace Orleans.Transactions
             {
                 if (problemFlag != TransactionalStatus.Ok)
                 {
-                    logger.Debug($"restoring state after status={problemFlag}");
+                    // abort active transactions
+                    AbortExecutingTransactions($"due to status={problemFlag}");
 
-                    await Restore();
+                    // abort all entries in the commit queue
+                    foreach (var entry in commitQueue.Elements)
+                    {
+                        NotifyOfAbort(entry, problemFlag);
+                    }
+                    commitQueue.Clear();
+
+                    if (problemFlag == TransactionalStatus.StorageConflict)
+                    {
+                        logger.Debug("deactivating after storage conflict");
+                        grainRuntime.DeactivateOnIdle(context.GrainInstance);
+                        AbortQueuedTransactions();
+                    }
+                    else
+                    {
+                        logger.Debug($"restoring state after status={problemFlag}");
+                        // recover, clear storageFlag, then allow next queued transaction(s) to enter lock
+                        await Restore(); 
+                    }
                 }
                 else
                 {

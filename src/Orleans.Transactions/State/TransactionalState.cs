@@ -22,6 +22,7 @@ namespace Orleans.Transactions
     {
         private readonly ITransactionalStateConfiguration config;
         private readonly IGrainActivationContext context;
+        private readonly IGrainRuntime grainRuntime;
         private readonly ITransactionDataCopier<TState> copier;
         private readonly ITransactionAgent transactionAgent;
         private readonly IProviderRuntime runtime;
@@ -101,6 +102,7 @@ namespace Orleans.Transactions
         public TransactionalState(
             ITransactionalStateConfiguration transactionalStateConfiguration, 
             IGrainActivationContext context, 
+            IGrainRuntime grainRuntime,
             ITransactionDataCopier<TState> copier, 
             ITransactionAgent transactionAgent, 
             IProviderRuntime runtime, 
@@ -111,6 +113,7 @@ namespace Orleans.Transactions
         {
             this.config = transactionalStateConfiguration;
             this.context = context;
+            this.grainRuntime = grainRuntime;
             this.copier = copier;
             this.transactionAgent = transactionAgent;
             this.runtime = runtime;
@@ -172,20 +175,7 @@ namespace Orleans.Transactions
         /// </summary>
         private async Task Restore()
         {
-            // start the load
-            var loadtask = this.storage.Load();
-
-            // abort active transactions, without waking up waiters just yet
-            AbortExecutingTransactions("due to restore");
-
-            // abort all entries in the commit queue
-            foreach (var entry in commitQueue.Elements)
-            {
-                NotifyOfAbort(entry, problemFlag);
-            }
-            commitQueue.Clear();
-
-            var loadresponse = await loadtask;
+            var loadresponse = await storage.Load();
 
             storageBatch = new StorageBatch<TState>(loadresponse, this.serializerSettings);
          
