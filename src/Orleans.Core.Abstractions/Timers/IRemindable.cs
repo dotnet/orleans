@@ -72,8 +72,6 @@ namespace Orleans
             }
         }
 
-        #region App visible exceptions
-
         /// <summary>
         /// Exception related to Orleans Reminder functions or Reminder service.
         /// </summary>
@@ -87,7 +85,5 @@ namespace Orleans
             {
             }
         }
-
-        #endregion
     }
 }

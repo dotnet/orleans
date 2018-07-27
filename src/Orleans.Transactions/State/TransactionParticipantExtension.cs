@@ -16,8 +16,6 @@ namespace Orleans.Transactions
             this.localParticipants.Add(resourceId, localTransactionParticipant);
         }
 
-        #region request forwarding
-
         public Task Abort(string resourceId, Guid transactionId)
         {
             return localParticipants[resourceId].Abort(transactionId);
@@ -57,7 +55,5 @@ namespace Orleans.Transactions
         {
             return localParticipants[resourceId].Prepared(transactionId, timestamp, participant, status);
         }
-
-        #endregion
     }
 }

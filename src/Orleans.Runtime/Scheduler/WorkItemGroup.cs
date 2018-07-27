@@ -259,7 +259,6 @@ namespace Orleans.Runtime.Scheduler
                 workItems.Clear();
             }
         }
-        #region IWorkItem Members
 
         public WorkItemType ItemType
         {
@@ -387,8 +386,6 @@ namespace Orleans.Runtime.Scheduler
                 }
             }
         }
-
-        #endregion
 
         public override string ToString()
         {

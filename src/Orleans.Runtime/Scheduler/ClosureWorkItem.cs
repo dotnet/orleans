@@ -22,16 +22,12 @@ namespace Orleans.Runtime.Scheduler
             this.name = name;
         }
 
-        #region IWorkItem Members
-
         public override void Execute()
         {
             continuation();
         }
 
         public override WorkItemType ItemType => WorkItemType.Closure;
-
-        #endregion
 
         internal static string GetMethodName(Delegate action)
         {

@@ -56,14 +56,10 @@ namespace Orleans.Runtime.Scheduler
             }
         }
 
-        #region IEquatable<ISchedulingContext> Members
-
         public bool Equals(ISchedulingContext other)
         {
             return AreSame(other);
         }
-
-        #endregion
 
         public override bool Equals(object obj)
         {

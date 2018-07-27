@@ -181,8 +181,6 @@ namespace Orleans.Runtime
             }
         }
 
-        #region Implementation of IEnumerable
-
         public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
         {
             return cache.Select(p => new KeyValuePair<TKey, TValue>(p.Key, p.Value.Value)).GetEnumerator();
@@ -192,7 +190,5 @@ namespace Orleans.Runtime
         {
             return GetEnumerator();
         }
-
-        #endregion
     }
 }

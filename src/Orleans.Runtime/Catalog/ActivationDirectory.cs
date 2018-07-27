@@ -179,8 +179,6 @@ namespace Orleans.Runtime
             }
         }
 
-        #region Implementation of IEnumerable
-
         public IEnumerator<KeyValuePair<ActivationId, ActivationData>> GetEnumerator()
         {
             return activations.GetEnumerator();
@@ -190,7 +188,5 @@ namespace Orleans.Runtime
         {
             return GetEnumerator();
         }
-
-        #endregion
     }
 }

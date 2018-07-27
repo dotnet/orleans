@@ -284,7 +284,6 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        #region Handling membership events
         protected void AddServer(SiloAddress silo)
         {
             lock (membershipCache)
@@ -468,8 +467,6 @@ namespace Orleans.Runtime.GrainDirectory
             return this.siloStatusOracle.IsFunctionalDirectory(silo);
         }
 
-        #endregion
-
         /// <summary>
         /// Finds the silo that owns the directory information for the given grain ID.
         /// This routine will always return a non-null silo address unless the excludeThisSiloIfStopping parameter is true,
@@ -540,8 +537,6 @@ namespace Orleans.Runtime.GrainDirectory
             if (log.IsEnabled(LogLevel.Trace)) log.Trace("Silo {0} calculated directory partition owner silo {1} for grain {2}: {3} --> {4}", MyAddress, siloAddress, grainId, hash, siloAddress.GetConsistentHashCode());
             return siloAddress;
         }
-
-        #region Implementation of ILocalGrainDirectory
 
         public SiloAddress CheckIfShouldForward(GrainId grainId, int hopCount, string operationDescription)
         {
@@ -1032,8 +1027,6 @@ namespace Orleans.Runtime.GrainDirectory
             isPrimary = false;
             return backupData;
         }
-
-        #endregion
 
         public override string ToString()
         {

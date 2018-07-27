@@ -34,8 +34,6 @@ namespace Tests.GeoClusterTests
             TestUtils.CheckForAzureStorage();
         }
 
-        #region client wrappers
-
         public class ClientWrapper : Tests.GeoClusterTests.TestingClusterHost.ClientWrapperBase
         {
             public static readonly Func<string, int, string, Action<ClientConfiguration>, Action<IClientBuilder>, ClientWrapper> Factory =
@@ -137,8 +135,6 @@ namespace Tests.GeoClusterTests
             }
 
         }
-
-        #endregion
 
 
         public void StartClustersIfNeeded(int numclusters, ITestOutputHelper output)

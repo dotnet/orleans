@@ -268,8 +268,6 @@ namespace Tester.AzureUtils.Persistence
             Assert.True(typeof(IStorageProvider).IsAssignableFrom(classType), $"Is an IStorageProvider : {classType.FullName}");
         }
 
-        #region Utility functions
-
         private async Task<AzureTableGrainStorage> InitAzureTableGrainStorage(AzureTableStorageOptions options)
         {
             AzureTableGrainStorage store = ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(this.providerRuntime.ServiceProvider, options, "TestStorage");
@@ -390,7 +388,5 @@ namespace Tester.AzureUtils.Persistence
 
             TestUtils.CheckForAzureStorage();
         }
-
-        #endregion Utility functions
     }
 }

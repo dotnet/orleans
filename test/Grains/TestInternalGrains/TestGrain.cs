@@ -32,8 +32,6 @@ namespace UnitTests.Grains
             return base.OnDeactivateAsync();
         }
 
-        #region Implementation of ITestGrain
-
         public Task<long> GetKey()
         {
             return Task.FromResult(this.GetPrimaryKeyLong());
@@ -127,8 +125,6 @@ namespace UnitTests.Grains
             }
             return Task.FromResult(grains.ToList());
         }
-
-        #endregion
     }
 
     internal class GuidTestGrain : Grain, IGuidTestGrain
@@ -147,8 +143,6 @@ namespace UnitTests.Grains
 
             return Task.CompletedTask;
         }
-
-        #region Implementation of ITestGrain
 
         public Task<Guid> GetKey()
         {
@@ -175,8 +169,6 @@ namespace UnitTests.Grains
         {
             return Task.FromResult(Data.ActivationId.ToString());
         }
-
-        #endregion
     }
 
     public class OneWayGrain : Grain, IOneWayGrain

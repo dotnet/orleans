@@ -8,13 +8,11 @@ namespace Orleans.Runtime
 {
     internal class GrainCancellationTokenRuntime : IGrainCancellationTokenRuntime
     {
-        #region cancelCallProperties
         private const int MaxNumCancelErrorTries = 3;
         private readonly TimeSpan _cancelCallMaxWaitTime = TimeSpan.FromSeconds(30);
         private readonly IBackoffProvider _cancelCallBackoffProvider = new FixedBackoff(TimeSpan.FromSeconds(1));
         private readonly Func<Exception, int, bool> _cancelCallRetryExceptionFilter =
             (exception, i) => exception is GrainExtensionNotInstalledException;
-        #endregion
 
         public Task Cancel(Guid id, CancellationTokenSource tokenSource, ConcurrentDictionary<GrainId, GrainReference> grainReferences)
         {

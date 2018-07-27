@@ -9,8 +9,6 @@ namespace UnitTests.Grains
 {
     public class RequestContextTestGrain : Grain, IRequestContextTestGrain
     {
-        #region Implementation of IRequestContextTestGrain
-
         public Task<string> TraceIdEcho()
         {
             return Task.FromResult(RequestContext.Get("TraceId") as string);
@@ -43,8 +41,6 @@ namespace UnitTests.Grains
             if (!RequestContext.PropagateActivityId) throw new InvalidOperationException("ActivityId propagation is not enabled on silo.");
             return Task.FromResult(Trace.CorrelationManager.ActivityId);
         }
-
-#endregion
     }
 
     public class RequestContextTaskGrain : Grain, IRequestContextTaskGrain
@@ -56,8 +52,6 @@ namespace UnitTests.Grains
             logger = this.GetLogger();
             return Task.CompletedTask;
         }
-
-#region Implementation of IRequestContextTaskGrain
 
         public Task<string> TraceIdEcho()
         {
@@ -160,9 +154,6 @@ namespace UnitTests.Grains
             await Task.WhenAll(task, ac);
             return new Tuple<string, string>(bar1, bar2);
         }
-
-
-#endregion
     }
 
     public class RequestContextProxyGrain : Grain, IRequestContextProxyGrain

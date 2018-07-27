@@ -306,7 +306,6 @@ namespace Orleans.ServiceBus.Providers
             return new EventHubReceiverProxy(receiver);
         }
 
-#region EventHubGeneratorStreamProvider related region
         /// <summary>
         /// For test purpose. ConfigureDataGeneratorForStream will configure a data generator for the stream
         /// </summary>
@@ -320,7 +319,6 @@ namespace Orleans.ServiceBus.Providers
         {
             (this.receiver as EventHubPartitionGeneratorReceiver)?.StopProducingOnStream(streamId);
         }
-#endregion
 
         private class StreamActivityNotificationBatch : IBatchContainer
         {

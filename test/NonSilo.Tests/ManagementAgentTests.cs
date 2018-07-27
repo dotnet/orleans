@@ -25,7 +25,6 @@ namespace UnitTests
         //    Console.WriteLine("CheckEventChannelEnvSetup=" + found);
         //}
 
-#region Test support methods
         private static void CheckEquals(object obj, object other)
         {
             Assert.NotNull(obj);
@@ -55,6 +54,5 @@ namespace UnitTests
             Assert.True(obj != other);
             Assert.True(other != obj);
         }
-#endregion
     }
 }

@@ -26,8 +26,6 @@ namespace Orleans.Transactions
         {
         }
 
-        #region execution phase
-
         // a unique identifier for this transaction
         public Guid TransactionId;
 
@@ -57,10 +55,6 @@ namespace Orleans.Transactions
         {
             NumberWrites++;
         }
-
-        #endregion
-
-        #region commit phase
 
         public CommitRole Role;
 
@@ -164,8 +158,6 @@ namespace Orleans.Transactions
                     throw new NotSupportedException($"{Role} is not a supported CommitRole.");
             }
         }
-
-        #endregion
     }
 
 

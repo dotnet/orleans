@@ -160,8 +160,6 @@ namespace Orleans.Statistics
             cpuUsageTimer?.Dispose();
         }
 
-        #region Lifecycle
-
         public Task OnStart(CancellationToken ct)
         {
             if (!countersAvailable)
@@ -265,7 +263,5 @@ namespace Orleans.Statistics
         {
             lifecycle.Subscribe(ServiceLifecycleStage.RuntimeInitialize, this);
         }
-
-        #endregion Lifecycle
     }
 }

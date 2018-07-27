@@ -108,8 +108,6 @@ namespace Orleans.Runtime
         /// <returns></returns>
         Task<string[]> GetActiveGrainTypes(SiloAddress[] hostsIds=null);
 
-        #region MultiCluster Management
-
         /// <summary>
         /// Get the current list of multicluster gateways.
         /// </summary>
@@ -137,7 +135,5 @@ namespace Orleans.Runtime
         /// <param name="checkForLaggingSilosFirst">if true, checks that all clusters are reachable and up-to-date before injecting the new configuration</param>
         /// <returns> The task completes once information has propagated to the gossip channels</returns>
         Task<MultiClusterConfiguration> InjectMultiClusterConfiguration(IEnumerable<string> clusters, string comment = "", bool checkForLaggingSilosFirst = true);
-
-#endregion
     }
 }

@@ -352,8 +352,6 @@ namespace Orleans.Runtime
             return report;
         }
 
-#region MessageTargets
-
         /// <summary>
         /// Register a new object to which messages can be delivered with the local lookup table and scheduler.
         /// </summary>
@@ -402,10 +400,6 @@ namespace Orleans.Runtime
             return numActsBefore;
         }
 
-#endregion
-
-#region Grains
-
         internal bool CanInterleave(ActivationId running, Message message)
         {
             ActivationData target;
@@ -420,10 +414,6 @@ namespace Orleans.Runtime
         {
             GrainTypeManager.GetTypeInfo(typeCode, out grainClass, out placement, out activationStrategy, genericArguments);
         }
-
-#endregion
-
-#region Activations
 
         public int ActivationCount { get { return activations.Count; } }
 
@@ -1296,9 +1286,6 @@ namespace Orleans.Runtime
             // We currently don't have any other case for multiple activations except for StatelessWorker. 
         }
 
-#endregion
-#region Activations - private
-
         /// <summary>
         /// Invoke the activate method on a newly created activation
         /// </summary>
@@ -1315,8 +1302,6 @@ namespace Orleans.Runtime
             return scheduler.QueueTask(() => CallGrainActivate(activation, requestContextData), activation.SchedulingContext); // Target grain's scheduler context);
             // ActivationData will transition out of ActivationState.Activating via Dispatcher.OnActivationCompletedRequest
         }
-#endregion
-#region IPlacementRuntime
 
         public bool FastLookup(GrainId grain, out AddressesAndTag addresses)
         {
@@ -1365,9 +1350,6 @@ namespace Orleans.Runtime
             }
         }
 
-#endregion
-#region Implementation of ICatalog
-
         public Task DeleteActivations(List<ActivationAddress> addresses)
         {
             return DestroyActivations(TryGetActivationDatas(addresses));
@@ -1385,8 +1367,6 @@ namespace Orleans.Runtime
             }
             return datas;
         }
-
-#endregion
 
         private void OnSiloStatusChange(SiloAddress updatedSilo, SiloStatus status)
         { 

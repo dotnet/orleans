@@ -451,8 +451,6 @@ namespace Orleans.TestingHost
             return newInstance;
         }
 
-        #region Private methods
-
         /// <summary>
         /// Initialize the grain client. This should be already done by <see cref="Deploy()"/> or <see cref="DeployAsync"/>
         /// </summary>
@@ -544,10 +542,6 @@ namespace Orleans.TestingHost
             }
         }
 
-        #endregion
-
-        #region Tracing helper functions
-
         public string GetLog()
         {
             return this.log.ToString();
@@ -568,7 +562,5 @@ namespace Orleans.TestingHost
         {
             Console.WriteLine(GetLog());
         }
-
-        #endregion
     }
 }

@@ -70,8 +70,6 @@ namespace Orleans.Transactions.Abstractions.Extensions
                 }
             }
 
-            #region request forwarding
-
             public Task Abort(Guid transactionId)
             {
                 return extension.Abort(resourceId, transactionId);
@@ -110,8 +108,6 @@ namespace Orleans.Transactions.Abstractions.Extensions
             {
                 return extension.Prepared(resourceId, transactionId, timeStamp, participant, status);
             }
-
-            #endregion
         }
     }
 }

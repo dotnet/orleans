@@ -11,7 +11,6 @@ namespace Orleans.Providers.Streams.Common
     /// </summary>
     public interface IObjectPoolMonitor
     {
-        #region Event driven metrics
         /// <summary>
         /// Track every time when an object is allocated
         /// </summary>
@@ -22,10 +21,6 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         void TrackObjectReleased();
 
-        #endregion
-
-        #region Periodically report object pool status 
-
         /// <summary>
         /// Periodically report object pool status
         /// </summary>
@@ -33,7 +28,5 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="availableObjects">Count for objects in the pool which is available for allocating</param>
         /// <param name="claimedObjects">Count for objects which are claimed, hence not available</param>
         void Report(long totalObjects, long availableObjects, long claimedObjects);
-
-        #endregion
     }
 }

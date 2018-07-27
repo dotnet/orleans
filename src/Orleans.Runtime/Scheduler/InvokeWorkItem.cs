@@ -28,8 +28,6 @@ namespace Orleans.Runtime.Scheduler
             activation.IncrementInFlightCount();
         }
 
-        #region Implementation of IWorkItem
-
         public override WorkItemType ItemType
         {
             get { return WorkItemType.Invoke; }
@@ -71,8 +69,6 @@ namespace Orleans.Runtime.Scheduler
             activation.DecrementInFlightCount();
             this.dispatcher.OnActivationCompletedRequest(activation, message);
         }
-
-        #endregion
 
         public override string ToString()
         {

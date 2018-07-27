@@ -370,8 +370,6 @@ namespace Orleans.Runtime.Management
             return this.internalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, silo);
         }
 
-        #region MultiCluster
-
         private IMultiClusterOracle GetMultiClusterOracle()
         {
             if (!this.multiClusterOptions.HasMultiClusterNetwork)
@@ -427,9 +425,5 @@ namespace Orleans.Runtime.Management
             var expected = multiClusterOracle.GetMultiClusterConfiguration();
             return multiClusterOracle.FindLaggingSilos(expected);
         }
-
-        #endregion
-
-
     }
 }

@@ -208,8 +208,6 @@ namespace Orleans
             return (IGrainMethodInvoker)Activator.CreateInstance(invokerType);
         }
 
-        #region Interface Casting
-
         /// <summary>
         /// Casts the provided <paramref name="grain"/> to the specified interface
         /// </summary>
@@ -252,10 +250,6 @@ namespace Orleans
             var grainReferenceType = this.typeCache.GetGrainReferenceType(interfaceType);
             return GrainCasterFactory.CreateGrainReferenceCaster(interfaceType, grainReferenceType);
         }
-
-        #endregion
-
-        #region SystemTargets
 
         /// <summary>
         /// Gets a reference to the specified system target.
@@ -306,7 +300,5 @@ namespace Orleans
         /// <inheritdoc />
         public GrainReference GetGrain(GrainId grainId, string genericArguments)
             => GrainReference.FromGrainId(grainId, this.GrainReferenceRuntime, genericArguments);
-
-        #endregion
     }
 }

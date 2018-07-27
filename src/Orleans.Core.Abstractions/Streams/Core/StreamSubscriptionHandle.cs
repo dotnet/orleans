@@ -35,10 +35,6 @@ namespace Orleans.Streams
         /// </returns>
         public abstract Task<StreamSubscriptionHandle<T>> ResumeAsync(IAsyncObserver<T> observer, StreamSequenceToken token = null);
 
-        #region IEquatable<StreamSubscriptionHandle<T>> Members
-
         public abstract bool Equals(StreamSubscriptionHandle<T> other);
-
-        #endregion
     }
 }

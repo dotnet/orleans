@@ -342,8 +342,6 @@ namespace UnitTests.StreamingTests
                 normalSubscribeCalls: false
             );
         }
-        
-        #region Test execution methods
 
         private Task Test_Stream_Churn_NumStreams_FewPublishers(
             string streamProviderName,
@@ -852,6 +850,5 @@ namespace UnitTests.StreamingTests
                 .Sum();
             return grainCount;
         }
-        #endregion
     }
 }

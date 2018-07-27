@@ -219,8 +219,6 @@ namespace Orleans.Runtime.ReminderService
             }
         }
 
-        #region Table operations
-
         internal async Task DeleteTableEntries()
         {
             if (ServiceId.Equals(Guid.Empty) && ClusterId == null)
@@ -249,7 +247,5 @@ namespace Orleans.Runtime.ReminderService
                 await Task.WhenAll(tasks);
             }
         }
-
-        #endregion
     }
 }

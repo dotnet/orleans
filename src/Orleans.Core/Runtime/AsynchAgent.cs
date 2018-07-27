@@ -137,8 +137,6 @@ namespace Orleans.Runtime
             Log.Debug("Stopped agent");
         }
 
-#region IDisposable Members
-
         public void Dispose()
         {
             Dispose(true);
@@ -157,8 +155,6 @@ namespace Orleans.Runtime
 
             disposed = true;
         }
-
-#endregion
 
         public override string ToString()
         {

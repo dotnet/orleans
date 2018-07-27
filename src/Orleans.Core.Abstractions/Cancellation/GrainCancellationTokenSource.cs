@@ -97,8 +97,6 @@ namespace Orleans
             _grainCancellationToken.Dispose();
         }
 
-        #region Serialization
-
         [SerializerMethod]
         internal static void SerializeGrainCancellationTokenSource(object obj, ISerializationContext context, Type expected)
         {
@@ -116,7 +114,5 @@ namespace Orleans
         {
             throw new NotSupportedException("GrainCancellationTokenSource can not be deep copied");
         }
-
-        #endregion Serialization
     }
 }

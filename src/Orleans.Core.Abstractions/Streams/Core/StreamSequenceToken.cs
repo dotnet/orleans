@@ -10,17 +10,9 @@ namespace Orleans.Streams
     [Serializable]
     public abstract class StreamSequenceToken : IEquatable<StreamSequenceToken>, IComparable<StreamSequenceToken>
     {
-        #region IEquatable<StreamSequenceToken> Members
-
         public abstract bool Equals(StreamSequenceToken other);
 
-        #endregion
-
-        #region IComparable<StreamSequenceToken> Members
-
         public abstract int CompareTo(StreamSequenceToken other);
-
-        #endregion
     }
 
     public static class StreamSequenceTokenUtilities
