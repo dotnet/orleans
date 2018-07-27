@@ -37,7 +37,7 @@ namespace Orleans.Transactions
             Interlocked.Increment(ref this.transactionsThrottled);
         }
 
-        public static TransactionAgentStatistics Create(ITransactionAgentStatistics initialStatistics)
+        public static ITransactionAgentStatistics Copy(ITransactionAgentStatistics initialStatistics)
         {
             return new TransactionAgentStatistics
             {

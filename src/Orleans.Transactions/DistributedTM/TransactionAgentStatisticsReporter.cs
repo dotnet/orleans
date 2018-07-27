@@ -10,23 +10,23 @@ namespace Orleans.Transactions
 {
     public class TransactionAgentStatisticsReporter : ILifecycleParticipant<ISiloLifecycle>
     {
-        private const string TransactionsStartedTotalMetric = "TransactionAgent.TransactionsStarted_Total";
-        private const string TransactionsStartedPerSecondMetric = "TransactionAgent.TransactionsStarted_PerSecond";
+        private const string TransactionsStartedTotalMetric = "TransactionAgent.TransactionsStarted.Total";
+        private const string TransactionsStartedPerSecondMetric = "TransactionAgent.TransactionsStarted.PerSecond";
 
-        private const string SuccessfulTransactionsTotalMetric = "TransactionAgent.SuccessfulTransactions_Total";
-        private const string SuccessfulTransactionsPerSecondMetric = "TransactionAgent.SuccessfulTransactions_PerSecond";
+        private const string SuccessfulTransactionsTotalMetric = "TransactionAgent.SuccessfulTransactions.Total";
+        private const string SuccessfulTransactionsPerSecondMetric = "TransactionAgent.SuccessfulTransactions.PerSecond";
 
-        private const string FailedTransactionsTotalMetric = "TransactionAgent.FailedTransactions_Total";
-        private const string FailedTransactionsPerSecondMetric = "TransactionAgent.FailedTransactions_PerSecond";
+        private const string FailedTransactionsTotalMetric = "TransactionAgent.FailedTransactions.Total";
+        private const string FailedTransactionsPerSecondMetric = "TransactionAgent.FailedTransactions.PerSecond";
 
-        private const string ThrottledTransactionsTotalMetric = "TransactionAgent.ThrottledTransactions_Total";
-        private const string ThrottledTransactionsPerSecondMetric = "TransactionAgent.ThrottledTransactions_PerSecond";
+        private const string ThrottledTransactionsTotalMetric = "TransactionAgent.ThrottledTransactions.Total";
+        private const string ThrottledTransactionsPerSecondMetric = "TransactionAgent.ThrottledTransactions.PerSecond";
 
         private readonly ITransactionAgentStatistics statistics;
         private readonly ITelemetryProducer telemetryProducer;
         private readonly StatisticsOptions statisticsOptions;
 
-        private TransactionAgentStatistics lastReported;
+        private ITransactionAgentStatistics lastReported;
         private DateTime lastReportTime;
         private IDisposable timer;
 
@@ -35,7 +35,7 @@ namespace Orleans.Transactions
             this.statistics = statistics ?? throw new ArgumentNullException(nameof(statistics));
             this.telemetryProducer = telemetryProducer ?? throw new ArgumentNullException(nameof(statistics));
             this.statisticsOptions = options.Value;
-            this.lastReported = TransactionAgentStatistics.Create(statistics);
+            this.lastReported = TransactionAgentStatistics.Copy(statistics);
             this.lastReportTime = DateTime.UtcNow;
         }
 
@@ -60,20 +60,21 @@ namespace Orleans.Transactions
 
         private void ReportMetrics(object ignore)
         {
+            ITransactionAgentStatistics currentReported = TransactionAgentStatistics.Copy(statistics);
             var now = DateTime.UtcNow;
-            var currentReported = TransactionAgentStatistics.Create(statistics);
+            TimeSpan reportPeriod = now - this.lastReportTime;
 
             this.telemetryProducer.TrackMetric(TransactionsStartedTotalMetric, currentReported.TransactionsStarted);
-            this.telemetryProducer.TrackMetric(TransactionsStartedPerSecondMetric, PerSecond(this.lastReported.TransactionsStarted, currentReported.TransactionsStarted, now - lastReportTime));
+            this.telemetryProducer.TrackMetric(TransactionsStartedPerSecondMetric, PerSecond(this.lastReported.TransactionsStarted, currentReported.TransactionsStarted, reportPeriod));
 
             this.telemetryProducer.TrackMetric(SuccessfulTransactionsTotalMetric, currentReported.TransactionsSucceeded);
-            this.telemetryProducer.TrackMetric(SuccessfulTransactionsPerSecondMetric, PerSecond(this.lastReported.TransactionsSucceeded, currentReported.TransactionsSucceeded, now - lastReportTime));
+            this.telemetryProducer.TrackMetric(SuccessfulTransactionsPerSecondMetric, PerSecond(this.lastReported.TransactionsSucceeded, currentReported.TransactionsSucceeded, reportPeriod));
 
             this.telemetryProducer.TrackMetric(FailedTransactionsTotalMetric, currentReported.TransactionsFailed);
-            this.telemetryProducer.TrackMetric(FailedTransactionsPerSecondMetric, PerSecond(this.lastReported.TransactionsFailed, currentReported.TransactionsFailed, now - lastReportTime));
+            this.telemetryProducer.TrackMetric(FailedTransactionsPerSecondMetric, PerSecond(this.lastReported.TransactionsFailed, currentReported.TransactionsFailed, reportPeriod));
 
             this.telemetryProducer.TrackMetric(ThrottledTransactionsTotalMetric, currentReported.TransactionsThrottled);
-            this.telemetryProducer.TrackMetric(ThrottledTransactionsPerSecondMetric, PerSecond(this.lastReported.TransactionsThrottled, currentReported.TransactionsThrottled, now - lastReportTime));
+            this.telemetryProducer.TrackMetric(ThrottledTransactionsPerSecondMetric, PerSecond(this.lastReported.TransactionsThrottled, currentReported.TransactionsThrottled, reportPeriod));
 
             this.lastReportTime = now;
             this.lastReported = currentReported;

@@ -13,9 +13,12 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure cluster to use the distributed TM algorithm
         /// </summary>
-        public static ISiloHostBuilder UseDistributedTM(this ISiloHostBuilder builder, bool withReporter = true)
+        /// <param name="builder">Silo host builder</param>
+        /// <param name="withStatisticsReporter">Configure a transaction statistics reporter.  Set to false if you want to configure your own transaction statistics reporting or don't want transaction statistics reported</param>
+        /// <returns></returns>
+        public static ISiloHostBuilder UseDistributedTM(this ISiloHostBuilder builder, bool withStatisticsReporter = true)
         {
-            return builder.ConfigureServices(services => services.UseDistributedTM(withReporter));
+            return builder.ConfigureServices(services => services.UseDistributedTM(withStatisticsReporter));
         }
 
         internal static IServiceCollection UseDistributedTM(this IServiceCollection services, bool withReporter)

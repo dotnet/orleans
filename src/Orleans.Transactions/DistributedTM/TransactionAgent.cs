@@ -68,16 +68,22 @@ namespace Orleans.Transactions
                 }
             }
 
-            TransactionalStatus status = (writeParticipants == null)
-                ? await CommitReadOnlyTransaction(transactionInfo)
-                : await CommitReadWriteTransaction(transactionInfo, writeParticipants);
-
-            if (status == TransactionalStatus.Ok)
-                this.statistics.TrackTransactionSucceeded();
-            else
+            try
+            {
+                TransactionalStatus status = (writeParticipants == null)
+                    ? await CommitReadOnlyTransaction(transactionInfo)
+                    : await CommitReadWriteTransaction(transactionInfo, writeParticipants);
+                if (status == TransactionalStatus.Ok)
+                    this.statistics.TrackTransactionSucceeded();
+                else
+                    this.statistics.TrackTransactionFailed();
+                return status;
+            }
+            catch (Exception)
+            {
                 this.statistics.TrackTransactionFailed();
-
-            return status;
+                throw;
+            }
         }
 
         private async Task<TransactionalStatus> CommitReadOnlyTransaction(TransactionInfo transactionInfo)

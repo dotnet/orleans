@@ -34,7 +34,7 @@ namespace Orleans.Transactions
         private readonly ITransactionAgentStatistics statistics;
         private readonly TransactionRateLoadSheddingOptions options;
         private readonly PeriodicAction monitor;
-        private TransactionAgentStatistics lastStatistics;
+        private ITransactionAgentStatistics lastStatistics;
         private double transactionStartedPerSecond;
         private DateTime lastCheckTime;
         private static readonly TimeSpan MetricsCheck = TimeSpan.FromSeconds(15);
@@ -43,13 +43,13 @@ namespace Orleans.Transactions
             this.statistics = statistics;
             this.options = options.Value;
             this.monitor = new PeriodicAction(MetricsCheck, this.RecordStatistics);
-            this.lastStatistics = TransactionAgentStatistics.Create(statistics);
+            this.lastStatistics = TransactionAgentStatistics.Copy(statistics);
             this.lastCheckTime = DateTime.UtcNow;
         }
 
         private void RecordStatistics()
         {
-            TransactionAgentStatistics current = TransactionAgentStatistics.Create(this.statistics);
+            ITransactionAgentStatistics current = TransactionAgentStatistics.Copy(this.statistics);
             DateTime now = DateTime.UtcNow;
 
             this.transactionStartedPerSecond = CalculateTps(this.lastStatistics.TransactionsStarted, this.lastCheckTime, current.TransactionsStarted, now);
