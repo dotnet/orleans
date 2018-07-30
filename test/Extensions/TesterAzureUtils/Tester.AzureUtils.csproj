@@ -52,7 +52,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Utilities\" />
     <Folder Include="Storage\" />
   </ItemGroup>
 </Project>

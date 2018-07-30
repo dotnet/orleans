@@ -23,7 +23,7 @@ namespace Tester.AzureUtils.Streaming
     public class SampleAzureQueueStreamingTests : TestClusterPerTest
     {
         private const string StreamProvider = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
-
+        private const int queueCount = 8;
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             TestUtils.CheckForAzureStorage();
@@ -35,10 +35,11 @@ namespace Tester.AzureUtils.Streaming
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
-                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamProvider, ob=>ob.Configure(
-                        options =>
+                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamProvider, ob=>ob.Configure<IOptions<ClusterOptions>>(
+                        (options, dep) =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                         }))
                     .AddMemoryGrainStorage("PubSubStore");
             }
@@ -46,11 +47,9 @@ namespace Tester.AzureUtils.Streaming
 
         public override void Dispose()
         {
-            var clusterId = HostedCluster?.Options.ClusterId;
-            if (clusterId != null)
-            {
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, StreamProvider, clusterId, TestDefaultConfiguration.DataConnectionString).Wait();
-            }
+            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, 
+                AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount), 
+                TestDefaultConfiguration.DataConnectionString).Wait();
         }
 
         [SkippableFact, TestCategory("Functional")]

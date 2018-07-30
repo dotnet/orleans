@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.AzureUtils;
 using Orleans.Configuration;
+using Orleans.Streaming.AzureStorage.Providers.Streams.AzureQueue;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.AzureQueue
@@ -14,55 +15,52 @@ namespace Orleans.Providers.Streams.AzureQueue
     public class AzureQueueStreamProviderUtils
     {
         /// <summary>
+        /// Generate default azure queue names 
+        /// </summary>
+        /// <param name="serviceId"></param>
+        /// <param name="providerName"></param>
+        /// <returns></returns>
+        public static List<string> GenerateDefaultAzureQueueNames(string serviceId, string providerName)
+        {
+            var defaultQueueMapper = new HashRingBasedStreamQueueMapper(new HashRingStreamQueueMapperOptions(), providerName);
+            return defaultQueueMapper.GetAllQueues()
+                .Select(queueName => $"{serviceId}-{queueName}").ToList();
+        }
+
+        /// <summary>
         /// Helper method for testing. Deletes all the queues used by the specifed stream provider.
         /// </summary>
         /// <param name="loggerFactory">logger factory to use</param>
-        /// <param name="providerName">The Azure Queue stream privider name.</param>
-        /// <param name="deploymentId">The deployment ID hosting the stream provider.</param>
+        /// <param name="azureQueueNames">azure queue names to be deleted.</param>
         /// <param name="storageConnectionString">The azure storage connection string.</param>
-        public static async Task DeleteAllUsedAzureQueues(ILoggerFactory loggerFactory, string providerName, string deploymentId, string storageConnectionString)
+        public static async Task DeleteAllUsedAzureQueues(ILoggerFactory loggerFactory, List<string> azureQueueNames, string storageConnectionString)
         {
-            if (deploymentId != null)
+            var deleteTasks = new List<Task>();
+            foreach (var queueName in azureQueueNames)
             {
-                // TODO: Do not assume defaults !? - jbragg
-                var queueMapper = new HashRingBasedStreamQueueMapper(new HashRingStreamQueueMapperOptions(), providerName);
-                List<QueueId> allQueues = queueMapper.GetAllQueues().ToList();
-
-                var deleteTasks = new List<Task>();
-                foreach (var queueId in allQueues)
-                {
-                    var manager = new AzureQueueDataManager(loggerFactory, queueId.ToString(), deploymentId, storageConnectionString);
-                    deleteTasks.Add(manager.DeleteQueue());
-                }
-
-                await Task.WhenAll(deleteTasks);
+                var manager = new AzureQueueDataManager(loggerFactory, queueName, storageConnectionString);
+                deleteTasks.Add(manager.DeleteQueue());
             }
+
+            await Task.WhenAll(deleteTasks);
         }
 
         /// <summary>
         /// Helper method for testing. Clears all messages in all the queues used by the specifed stream provider.
         /// </summary>
         /// <param name="loggerFactory">logger factory to use</param>
-        /// <param name="providerName">The Azure Queue stream privider name.</param>
-        /// <param name="deploymentId">The deployment ID hosting the stream provider.</param>
+        /// <param name="azureQueueNames">The deployment ID hosting the stream provider.</param>
         /// <param name="storageConnectionString">The azure storage connection string.</param>
-        public static async Task ClearAllUsedAzureQueues(ILoggerFactory loggerFactory, string providerName, string deploymentId, string storageConnectionString)
+        public static async Task ClearAllUsedAzureQueues(ILoggerFactory loggerFactory, List<string> azureQueueNames, string storageConnectionString)
         {
-            if (deploymentId != null)
+            var deleteTasks = new List<Task>();
+            foreach (var queueName in azureQueueNames)
             {
-                // TODO: Do not assume defaults !? - jbragg
-                var queueMapper = new HashRingBasedStreamQueueMapper(new HashRingStreamQueueMapperOptions(), providerName);
-                List<QueueId> allQueues = queueMapper.GetAllQueues().ToList();
-
-                var deleteTasks = new List<Task>();
-                foreach (var queueId in allQueues)
-                {
-                    var manager = new AzureQueueDataManager(loggerFactory, queueId.ToString(), deploymentId, storageConnectionString);
-                    deleteTasks.Add(manager.ClearQueue());
-                }
-
-                await Task.WhenAll(deleteTasks);
+                var manager = new AzureQueueDataManager(loggerFactory, queueName, storageConnectionString);
+                deleteTasks.Add(manager.ClearQueue());
             }
+
+            await Task.WhenAll(deleteTasks);
         }
     }
 }

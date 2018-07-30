@@ -38,7 +38,7 @@ namespace Tester.AzureUtils
 
         private async Task<AzureQueueDataManager> GetTableManager(string qName, TimeSpan? visibilityTimeout = null)
         {
-            AzureQueueDataManager manager = new AzureQueueDataManager(this.loggerFactory, qName, DeploymentId, TestDefaultConfiguration.DataConnectionString, visibilityTimeout);
+            AzureQueueDataManager manager = new AzureQueueDataManager(this.loggerFactory, $"{qName}-{DeploymentId}", TestDefaultConfiguration.DataConnectionString, visibilityTimeout);
             await manager.InitQueueAsync();
             return manager;
         }

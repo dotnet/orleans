@@ -23,6 +23,7 @@ using Xunit.Abstractions;
 using Tester;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Tester.AzureUtils.Streaming;
 
 // ReSharper disable ConvertToConstant.Local
 // ReSharper disable CheckNamespace
@@ -35,7 +36,7 @@ namespace UnitTests.Streaming.Reliability
         private readonly ITestOutputHelper output;
         public const string SMS_STREAM_PROVIDER_NAME = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
         public const string AZURE_QUEUE_STREAM_PROVIDER_NAME = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
-
+        private const int queueCount = 8;
         private Guid _streamId;
         private string _streamProviderName;
         private int numExpectedSilos;
@@ -64,10 +65,11 @@ namespace UnitTests.Streaming.Reliability
                 {
                     gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                 })
-                .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AZURE_QUEUE_STREAM_PROVIDER_NAME, ob => ob.Configure(
-                    options =>
+                .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AZURE_QUEUE_STREAM_PROVIDER_NAME, ob => ob.Configure<IOptions<ClusterOptions>>(
+                    (options, dep) =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                     }))
                 .AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME)
                 .Configure<GatewayOptions>(options => options.GatewayListRefreshPeriod = TimeSpan.FromSeconds(5));
@@ -95,16 +97,18 @@ namespace UnitTests.Streaming.Reliability
                     options.DeleteStateOnClear = true;
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                 }))
-                .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AZURE_QUEUE_STREAM_PROVIDER_NAME, ob=>ob.Configure(
-                    options =>
-                    {
-                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                    }))
-                .AddAzureQueueStreams<AzureQueueDataAdapterV2>("AzureQueueProvider2", ob=>ob.Configure(
-                    options =>
-                    {
-                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                    }));
+                .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AZURE_QUEUE_STREAM_PROVIDER_NAME, ob => ob.Configure<IOptions<ClusterOptions>>(
+                (options, dep) =>
+                {
+                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
+                }))
+            .AddAzureQueueStreams<AzureQueueDataAdapterV2>("AzureQueueProvider2", ob => ob.Configure<IOptions<ClusterOptions>>(
+                (options, dep) =>
+                {
+                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    options.QueueNames = AzureQueueUtilities.GenerateQueueNames($"{dep.Value.ClusterId}2", queueCount);
+                }));
             }
         }
 
@@ -127,12 +131,13 @@ namespace UnitTests.Streaming.Reliability
             }
             Task.WhenAll(promises).Wait();
 #endif
-            var clusterId = HostedCluster.Options.ClusterId;
             base.Dispose();
-            if (_streamProviderName != null && _streamProviderName.Equals(AZURE_QUEUE_STREAM_PROVIDER_NAME))
-            {
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, _streamProviderName, clusterId, TestDefaultConfiguration.DataConnectionString).Wait();
-            }
+            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
+                TestDefaultConfiguration.DataConnectionString).Wait();
+            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount),
+                TestDefaultConfiguration.DataConnectionString).Wait();
         }
 
         [SkippableFact, TestCategory("Functional")]
