@@ -1,9 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Threading;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions
 {
@@ -34,28 +31,29 @@ namespace Orleans.Transactions
 
     public class TransactionOverloadDetector : ITransactionOverloadDetector
     {
-        private readonly TransactionAgentStatistics statistics;
+        private readonly ITransactionAgentStatistics statistics;
         private readonly TransactionRateLoadSheddingOptions options;
         private readonly PeriodicAction monitor;
-        private long transactionStartedAtLastCheck;
+        private ITransactionAgentStatistics lastStatistics;
         private double transactionStartedPerSecond;
         private DateTime lastCheckTime;
         private static readonly TimeSpan MetricsCheck = TimeSpan.FromSeconds(15);
-        public TransactionOverloadDetector(TransactionAgentStatistics statistics, IOptions<TransactionRateLoadSheddingOptions> options)
+        public TransactionOverloadDetector(ITransactionAgentStatistics statistics, IOptions<TransactionRateLoadSheddingOptions> options)
         {
             this.statistics = statistics;
             this.options = options.Value;
             this.monitor = new PeriodicAction(MetricsCheck, this.RecordStatistics);
-            this.transactionStartedAtLastCheck = statistics.TransactionStartedCounter;
+            this.lastStatistics = TransactionAgentStatistics.Copy(statistics);
             this.lastCheckTime = DateTime.UtcNow;
         }
 
         private void RecordStatistics()
         {
-            long startCounter = this.statistics.TransactionStartedCounter;
+            ITransactionAgentStatistics current = TransactionAgentStatistics.Copy(this.statistics);
             DateTime now = DateTime.UtcNow;
-            this.transactionStartedPerSecond = CalculateTps(this.transactionStartedAtLastCheck, this.lastCheckTime, startCounter, now);
-            this.transactionStartedAtLastCheck = startCounter;
+
+            this.transactionStartedPerSecond = CalculateTps(this.lastStatistics.TransactionsStarted, this.lastCheckTime, current.TransactionsStarted, now);
+            this.lastStatistics = current;
             this.lastCheckTime = now;
         }
 
@@ -66,8 +64,7 @@ namespace Orleans.Transactions
 
             DateTime now = DateTime.UtcNow;
             this.monitor.TryAction(now);
-            long startCounter = this.statistics.TransactionStartedCounter;
-            double txPerSecondCurrently = CalculateTps(this.transactionStartedAtLastCheck, this.lastCheckTime, startCounter, now);
+            double txPerSecondCurrently = CalculateTps(this.lastStatistics.TransactionsStarted, this.lastCheckTime, this.statistics.TransactionsStarted, now);
             //decaying utilization for tx per second
             var aggregratedTxPerSecond = (this.transactionStartedPerSecond + (2.0 * txPerSecondCurrently)) / 3.0;
             

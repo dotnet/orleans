@@ -2,56 +2,14 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using System.Linq;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Concurrency;
-using System.Linq;
-using System.Threading;
-using System.Transactions;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
 using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions
 {
-    public class TransactionAgentStatistics
-    {
-        public long TransactionStartedCounter { get; set; }
-
-        private const string TransactionStartedPerSecondMetric = "TransactionAgent.TransactionStartedPerSecond";
-        //Transaction started recorded at when metrics was reported last time
-        private long transactionStartedAtLastReported;
-        private DateTime lastReportTime;
-        private readonly ITelemetryProducer telemetryProducer;
-        private readonly PeriodicAction monitor;
-        public TransactionAgentStatistics(ITelemetryProducer telemetryProducer, IOptions<StatisticsOptions> options)
-        {
-            this.telemetryProducer = telemetryProducer;
-            this.lastReportTime = DateTime.UtcNow;
-            this.monitor = new PeriodicAction(options.Value.PerfCountersWriteInterval, this.ReportMetrics);
-        }
-
-        public void TryReportMetrics(DateTime timestamp)
-        {
-            this.monitor.TryAction(timestamp);
-        }
-
-        private void ReportMetrics()
-        {
-            var now = DateTime.UtcNow;
-            var txStartedDelta = TransactionStartedCounter - transactionStartedAtLastReported;
-            double transactionStartedPerSecond;
-            var timelapseSinceLastReport = now - this.lastReportTime;
-            if (timelapseSinceLastReport.TotalSeconds <= 1)
-                transactionStartedPerSecond = txStartedDelta;
-            else transactionStartedPerSecond = txStartedDelta * 1000 / timelapseSinceLastReport.TotalMilliseconds;
-            this.telemetryProducer.TrackMetric(TransactionStartedPerSecondMetric, transactionStartedPerSecond);
-            //record snapshot data of this report
-            transactionStartedAtLastReported = TransactionStartedCounter;
-            lastReportTime = now;
-        }
-    }
-
     [Reentrant]
     internal class TransactionAgent : ITransactionAgent
     {
@@ -60,10 +18,10 @@ namespace Orleans.Transactions
         private readonly ILogger logger;
         private readonly Stopwatch stopwatch = Stopwatch.StartNew();
         private readonly CausalClock clock;
-        private readonly TransactionAgentStatistics statistics;
+        private readonly ITransactionAgentStatistics statistics;
         private readonly ITransactionOverloadDetector overloadDetector;
 
-        public TransactionAgent(IClock clock, ILogger<TransactionAgent> logger, TransactionAgentStatistics statistics, ITransactionOverloadDetector overloadDetector)
+        public TransactionAgent(IClock clock, ILogger<TransactionAgent> logger, ITransactionAgentStatistics statistics, ITransactionOverloadDetector overloadDetector)
         {
             this.clock = new CausalClock(clock);
             this.logger = logger;
@@ -73,20 +31,22 @@ namespace Orleans.Transactions
 
         public Task<ITransactionInfo> StartTransaction(bool readOnly, TimeSpan timeout)
         {
-            this.statistics.TryReportMetrics(DateTime.UtcNow);
             if (overloadDetector.IsOverloaded())
+            {
+                this.statistics.TrackTransactionThrottled();
                 throw new OrleansStartTransactionFailedException(new OrleansTransactionOverloadException());
+            }
 
             var guid = Guid.NewGuid();
             DateTime ts = this.clock.UtcNow();
 
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.Trace($"{stopwatch.Elapsed.TotalMilliseconds:f2} start transaction {guid} at {ts:o}");
-            this.statistics.TransactionStartedCounter++;
+            this.statistics.TrackTransactionStarted();
             return Task.FromResult<ITransactionInfo>(new TransactionInfo(guid, ts, ts));
         }
 
-        public Task<TransactionalStatus> Commit(ITransactionInfo info)
+        public async Task<TransactionalStatus> Commit(ITransactionInfo info)
         {
             var transactionInfo = (TransactionInfo)info;
 
@@ -108,13 +68,21 @@ namespace Orleans.Transactions
                 }
             }
 
-            if (writeParticipants == null)
+            try
             {
-                return CommitReadOnlyTransaction(transactionInfo);
+                TransactionalStatus status = (writeParticipants == null)
+                    ? await CommitReadOnlyTransaction(transactionInfo)
+                    : await CommitReadWriteTransaction(transactionInfo, writeParticipants);
+                if (status == TransactionalStatus.Ok)
+                    this.statistics.TrackTransactionSucceeded();
+                else
+                    this.statistics.TrackTransactionFailed();
+                return status;
             }
-            else
+            catch (Exception)
             {
-                return CommitReadWriteTransaction(transactionInfo, writeParticipants);
+                this.statistics.TrackTransactionFailed();
+                throw;
             }
         }
 
@@ -188,7 +156,7 @@ namespace Orleans.Transactions
             try
             {
                 // wait for the TM to commit the transaction
-                var status = await tmPrepareAndCommitTask;
+                TransactionalStatus status = await tmPrepareAndCommitTask;
 
                 if (status != TransactionalStatus.Ok)
                 {
@@ -227,9 +195,10 @@ namespace Orleans.Transactions
 
         public void Abort(ITransactionInfo info, OrleansTransactionAbortedException reason)
         {
+            this.statistics.TrackTransactionFailed();
             var transactionInfo = (TransactionInfo)info;
 
-            var participants = transactionInfo.Participants.Keys.ToList();
+            List<ITransactionParticipant> participants = transactionInfo.Participants.Keys.ToList();
 
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.Trace($"abort {transactionInfo} {string.Join(",", participants.Select(p => p.ToString()))} {reason}");

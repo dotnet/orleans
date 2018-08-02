@@ -38,8 +38,21 @@ namespace Benchmarks
                 "Running Transactions benchmark",
                 () =>
                 {
-                    var benchmark = new TransactionBenchmark();
-                    benchmark.Setup();
+                    var benchmark = new TransactionBenchmark(2, 20000, 5000);
+                    benchmark.MemorySetup();
+                    return benchmark;
+                },
+                benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
+                benchmark => benchmark.Teardown());
+            },
+            ["Transactions.Memory.Throttled"] = () =>
+            {
+                RunBenchmark(
+                "Running Transactions benchmark",
+                () =>
+                {
+                    var benchmark = new TransactionBenchmark(2, 200000, 15000);
+                    benchmark.MemoryThrottledSetup();
                     return benchmark;
                 },
                 benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
@@ -51,7 +64,33 @@ namespace Benchmarks
                 "Running Transactions benchmark",
                 () =>
                 {
-                    var benchmark = new TransactionBenchmark();
+                    var benchmark = new TransactionBenchmark(2, 20000, 5000);
+                    benchmark.AzureSetup();
+                    return benchmark;
+                },
+                benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
+                benchmark => benchmark.Teardown());
+            },
+            ["Transactions.Azure.Throttled"] = () =>
+            {
+                RunBenchmark(
+                "Running Transactions benchmark",
+                () =>
+                {
+                    var benchmark = new TransactionBenchmark(2, 200000, 15000);
+                    benchmark.AzureThrottledSetup();
+                    return benchmark;
+                },
+                benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
+                benchmark => benchmark.Teardown());
+            },
+            ["Transactions.Azure.Overloaded"] = () =>
+            {
+                RunBenchmark(
+                "Running Transactions benchmark",
+                () =>
+                {
+                    var benchmark = new TransactionBenchmark(2, 200000, 15000);
                     benchmark.AzureSetup();
                     return benchmark;
                 },
@@ -159,8 +198,8 @@ namespace Benchmarks
             var stopWatch = Stopwatch.StartNew();
             benchmarkAction(bench);
             Console.WriteLine($"Elapsed milliseconds: {stopWatch.ElapsedMilliseconds}");
-            tearDown(bench);
             Console.WriteLine("Press any key to continue ...");
+            tearDown(bench);
             Console.ReadLine();
         }
     }

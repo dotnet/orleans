@@ -3,8 +3,7 @@ using System.Diagnostics;
 using Microsoft.Extensions.Options;
 using Xunit.Abstractions;
 using Xunit;
-using Orleans.Configuration;
-using Orleans.TestingHost.Utils;
+using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.Tests
 {
@@ -26,7 +25,7 @@ namespace Orleans.Transactions.Tests
         {
             TimeSpan runTime = TimeSpan.FromSeconds(runTimeInSeconds);
             TransactionRateLoadSheddingOptions options = new TransactionRateLoadSheddingOptions { Enabled = true, Limit = limit };
-            TransactionAgentStatistics statistics = new TransactionAgentStatistics(NullTelemetryProducer.Instance, Options.Create(new StatisticsOptions()));
+            ITransactionAgentStatistics statistics = new TransactionAgentStatistics();
             ITransactionOverloadDetector detector = new TransactionOverloadDetector(statistics, Options.Create(options));
             Stopwatch sw = Stopwatch.StartNew();
             long total = 0;
@@ -35,12 +34,12 @@ namespace Orleans.Transactions.Tests
                 total++;
                 if (!detector.IsOverloaded())
                 {
-                    statistics.TransactionStartedCounter++;
+                    statistics.TrackTransactionStarted();
                 }
             }
             sw.Stop();
-            double averageRate = (statistics.TransactionStartedCounter * 1000) / sw.ElapsedMilliseconds;
-            this.output.WriteLine($"Average of {averageRate}, with target of {options.Limit}.  Performed {statistics.TransactionStartedCounter} transactions of a max of {total} in {sw.ElapsedMilliseconds}ms.");
+            double averageRate = (statistics.TransactionsStarted * 1000) / sw.ElapsedMilliseconds;
+            this.output.WriteLine($"Average of {averageRate}, with target of {options.Limit}.  Performed {statistics.TransactionsStarted} transactions of a max of {total} in {sw.ElapsedMilliseconds}ms.");
             // check to make sure average rate is withing rate +- 10%
             Assert.True(options.Limit * 0.9 <= averageRate);
             Assert.True(options.Limit * 1.1 >= averageRate);
