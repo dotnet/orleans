@@ -147,7 +147,7 @@
     <OrleansToolsVersion>2.0.4</OrleansToolsVersion>
     <OrleansClientVersion>2.0.3</OrleansClientVersion>
     <OrleansServerVersion>2.0.4</OrleansServerVersion>
-    <OrleansCodegenVersion>2.0.3</OrleansCodegenVersion>
+    <OrleansCodegenVersion>2.0.4</OrleansCodegenVersion>
     <OrleansEventHubProviderVersion>2.0.3</OrleansEventHubProviderVersion>
     <OrleansTelemetryConsumersVersion>2.0.4</OrleansTelemetryConsumersVersion>
   </PropertyGroup>
