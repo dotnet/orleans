@@ -326,8 +326,8 @@ namespace Orleans.Runtime
                     var invoker = invokable.GetInvoker(typeManager, request.InterfaceId, message.GenericGrainType);
 
                     if (invoker is IGrainExtensionMethodInvoker &&
-                        !(target is IGrainExtension)                         &&
-                        !TryInstallExtension(request.InterfaceId, invokable, message.GenericGrainType, invoker, out invoker))
+                        !(target is IGrainExtension) &&
+                        !TryInstallExtension(request.InterfaceId, invokable, message.GenericGrainType, ref invoker))
                     {
                         // We are trying the invoke a grain extension method on a grain 
                         // -- most likely reason is that the dynamic extension is not installed for this grain
@@ -465,15 +465,22 @@ namespace Orleans.Runtime
             }
         }
 
-        private bool TryInstallExtension(int interfaceId, IInvokable invokable, string genericGrainType, IGrainMethodInvoker defaultInvoker, out IGrainMethodInvoker invoker)
+        private bool TryInstallExtension(int interfaceId, IInvokable invokable, string genericGrainType, ref IGrainMethodInvoker invoker)
         {
-            invoker = defaultInvoker;
             ActivationData activationData = GetCurrentActivationData();
-            IGrainExtension extension = activationData.ActivationServices.GetServiceByKey<int,IGrainExtension>(interfaceId);
+            IGrainExtension extension = activationData.ActivationServices.GetServiceByKey<int, IGrainExtension>(interfaceId);
+
             if (extension == null)
+            {
                 return false;
+            }
+
             if (!TryAddExtension(extension))
+            {
                 return false;
+            }
+
+            // Get the newly installed invoker for the grain extension.
             invoker = invokable.GetInvoker(typeManager, interfaceId, genericGrainType);
             return true;
         }

@@ -31,7 +31,7 @@ namespace DefaultCluster.Tests
             {
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
-                    hostBuilder.AddGrainExtension<IAutoExtension,AutoExtension>();
+                    hostBuilder.AddGrainExtension<IAutoExtension, AutoExtension>();
                 }
             }
         }
