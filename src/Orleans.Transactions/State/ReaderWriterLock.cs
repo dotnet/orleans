@@ -251,7 +251,7 @@ namespace Orleans.Transactions.State
 
         private Task LockWork()
         {
-            logger.Trace("/LockWork");
+            if (this.logger.IsEnabled(LogLevel.Trace)) logger.Trace("/LockWork");
 
             if (currentGroup != null)
             {
@@ -350,7 +350,7 @@ namespace Orleans.Transactions.State
                 }
             }
 
-            logger.Trace($"\\LockWork");
+            if (this.logger.IsEnabled(LogLevel.Trace)) logger.Trace("\\LockWork");
 
             return Task.CompletedTask;
         }

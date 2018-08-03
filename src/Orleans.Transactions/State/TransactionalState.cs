@@ -35,9 +35,6 @@ namespace Orleans.Transactions
         private TransactionalResource<TState> resource;
         private TransactionManager<TState> transactionManager;
 
-        private string stateName;
-        private string StateName => stateName ?? (stateName = StoredName());
-
         public string CurrentTransactionId => TransactionContext.GetRequiredTransactionInfo<TransactionInfo>().Id;
 
         private bool detectReentrancy;
@@ -216,7 +213,7 @@ namespace Orleans.Transactions
                     info.RecordWrite(this.thisParticipant, record.Timestamp);
 
                     // record this participant as a TM candidate
-                    if (info.TMCandidate != resource)
+                    if (info.TMCandidate == null || !info.TMCandidate.Equals(this.thisParticipant))
                     {
                         int batchsize = this.queue.BatchableOperationsCount();
                         if (info.TMCandidate == null || batchsize > info.TMBatchSize)
@@ -227,21 +224,16 @@ namespace Orleans.Transactions
                     }
 
                     // perform the write
-                    TResult result = default(TResult);
                     try
                     {
                         detectReentrancy = true;
 
-                        if (updateAction != null)
-                        {
-                            result = updateAction(record.State);
-                        }
-                        return result;
+                        return updateAction(record.State);
                     }
                     finally
                     {
                         if (logger.IsEnabled(LogLevel.Trace))
-                            logger.Trace($"EndWrite {info} {result} {record.State}");
+                            logger.Trace($"EndWrite {info} {record.State}");
 
                         detectReentrancy = false;
                     }

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -25,7 +24,7 @@ namespace Orleans.Transactions.State
         private readonly BatchWorker confirmationWorker;
         private readonly ILogger logger;
         private readonly Dictionary<Guid, TransactionRecord<TState>> confirmationTasks;
-        private CommitQueue<TState> commitQueue;
+        private CommitQueue<TState> commitQueue = new CommitQueue<TState>();
 
         private StorageBatch<TState> storageBatch;
 
@@ -242,7 +241,7 @@ namespace Orleans.Transactions.State
 
                         // tell remote participants
                         foreach (var p in entry.WriteParticipants)
-                            if (p != resource)
+                            if (!p.Equals(resource))
                             {
                                 p.Cancel(entry.TransactionId, entry.Timestamp, status).Ignore();
                             }
@@ -363,7 +362,7 @@ namespace Orleans.Transactions.State
                     if (logger.IsEnabled(LogLevel.Debug))
                         logger.Debug($"recover two-phase-commit {pr.TransactionId}");
                     var tm = (pr.TransactionManager == null) ? null :
-                        (ITransactionParticipant)JsonConvert.DeserializeObject<ITransactionParticipant>(pr.TransactionManager, this.serializerSettings);
+                        JsonConvert.DeserializeObject<ITransactionParticipant>(pr.TransactionManager, this.serializerSettings);
 
                     commitQueue.Add(new TransactionRecord<TState>()
                     {
@@ -739,7 +738,7 @@ namespace Orleans.Transactions.State
 
                 foreach (var p in record.WriteParticipants)
                 {
-                    if (p != resource)
+                    if (!p.Equals(resource))
                     {
                         tasks.Add(p.Confirm(record.TransactionId, record.Timestamp));
                     }

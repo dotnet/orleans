@@ -12,7 +12,7 @@ namespace Orleans.Transactions.State
 
         public TransactionManager(TransactionQueue<TState> queue)
         {
-            this.queue = queue;
+            this.queue = queue ?? throw new ArgumentNullException(nameof(queue));
         }
 
         public Task<TransactionalStatus> CommitReadOnly(Guid transactionId, AccessCounter accessCount, DateTime timeStamp)
