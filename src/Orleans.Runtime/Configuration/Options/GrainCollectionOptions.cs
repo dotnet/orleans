@@ -25,5 +25,8 @@ namespace Orleans.Configuration
         /// Period of inactivity necessary for a grain to be available for collection and deactivation by grain type.
         /// </summary>
         public Dictionary<string, TimeSpan> ClassSpecificCollectionAge { get; set; } = new Dictionary<string, TimeSpan>();
+
+        public long CollectionMemoryThresholdInMegabytes { get; set; } = DEFAULT_COLLECTION_MEMORY_THRESHOLD_IN_MEGABYTES;
+        public static readonly long DEFAULT_COLLECTION_MEMORY_THRESHOLD_IN_MEGABYTES = 0;
     }
 }

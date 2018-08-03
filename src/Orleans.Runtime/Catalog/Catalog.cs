@@ -34,7 +34,7 @@ namespace Orleans.Runtime
 
             public NonExistentActivationException() : base("NonExistentActivationException") { }
             public NonExistentActivationException(string msg) : base(msg) { }
-            public NonExistentActivationException(string message, Exception innerException) 
+            public NonExistentActivationException(string message, Exception innerException)
                 : base(message, innerException) { }
 
             public NonExistentActivationException(string msg, ActivationAddress nonExistentActivation, bool isStatelessWorker)
@@ -96,6 +96,7 @@ namespace Orleans.Runtime
         private readonly ILoggerFactory loggerFactory;
         private readonly IOptions<GrainCollectionOptions> collectionOptions;
         private readonly IOptions<SiloMessagingOptions> messagingOptions;
+        private readonly long memoryThresholdInMegabytes;
         public Catalog(
             ILocalSiloDetails localSiloDetails,
             ILocalGrainDirectory grainDirectory,
@@ -132,6 +133,7 @@ namespace Orleans.Runtime
             this.providerRuntime = providerRuntime;
             this.serviceProvider = serviceProvider;
             this.collectionOptions = collectionOptions;
+            this.memoryThresholdInMegabytes = this.collectionOptions.Value.CollectionMemoryThresholdInMegabytes;
             this.messagingOptions = messagingOptions;
             this.logger = loggerFactory.CreateLogger<Catalog>();
             this.activationCollector = activationCollector;
@@ -150,8 +152,8 @@ namespace Orleans.Runtime
                 schedulingOptions);
             GC.GetTotalMemory(true); // need to call once w/true to ensure false returns OK value
 
-// TODO: figure out how to read config change notification from options. - jbragg
-//            config.OnConfigChange("Globals/Activation", () => scheduler.RunOrQueueAction(Start, SchedulingContext), false);
+            // TODO: figure out how to read config change notification from options. - jbragg
+            //            config.OnConfigChange("Globals/Activation", () => scheduler.RunOrQueueAction(Start, SchedulingContext), false);
             IntValueStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_COUNT, () => activations.Count);
             activationsCreated = CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_CREATED);
             activationsDestroyed = CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_DESTROYED);
@@ -244,21 +246,31 @@ namespace Orleans.Runtime
             watch.Start();
             var number = Interlocked.Increment(ref collectionNumber);
             long memBefore = GC.GetTotalMemory(false) / (1024 * 1024);
-            logger.Info(ErrorCode.Catalog_BeforeCollection, "Before collection#{0}: memory={1}MB, #activations={2}, collector={3}.",
-                number, memBefore, activations.Count, this.activationCollector.ToString());
-            List<ActivationData> list = scanStale ? this.activationCollector.ScanStale() : this.activationCollector.ScanAll(ageLimit);
-            collectionCounter.Increment();
-            var count = 0;
-            if (list != null && list.Count > 0)
+
+            if (memoryThresholdInMegabytes != 0L && memBefore < memoryThresholdInMegabytes)
             {
-                count = list.Count;
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("CollectActivations{0}", list.ToStrings(d => d.Grain.ToString() + d.ActivationId));
-                await DeactivateActivationsFromCollector(list);
+                watch.Stop();
+                logger.Info(ErrorCode.Catalog_CollectionSuppressed,
+                    $"Collection suppressed#{number}: memory={memBefore}MB, #activations={activations.Count}, memoryPressureThreshold={memoryThresholdInMegabytes}, suppression time={watch.Elapsed}.");
             }
-            long memAfter = GC.GetTotalMemory(false) / (1024 * 1024);
-            watch.Stop();
-            logger.Info(ErrorCode.Catalog_AfterCollection, "After collection#{0}: memory={1}MB, #activations={2}, collected {3} activations, collector={4}, collection time={5}.",
-                number, memAfter, activations.Count, count, this.activationCollector.ToString(), watch.Elapsed);
+            else
+            {
+                logger.Info(ErrorCode.Catalog_BeforeCollection, "Before collection#{0}: memory={1}MB, #activations={2}, collector={3}.",
+                    number, memBefore, activations.Count, this.activationCollector.ToString());
+                List<ActivationData> list = scanStale ? this.activationCollector.ScanStale() : this.activationCollector.ScanAll(ageLimit);
+                collectionCounter.Increment();
+                var count = 0;
+                if (list != null && list.Count > 0)
+                {
+                    count = list.Count;
+                    if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("CollectActivations{0}", list.ToStrings(d => d.Grain.ToString() + d.ActivationId));
+                    await DeactivateActivationsFromCollector(list);
+                }
+                long memAfter = GC.GetTotalMemory(false) / (1024 * 1024);
+                watch.Stop();
+                logger.Info(ErrorCode.Catalog_AfterCollection, "After collection#{0}: memory={1}MB, #activations={2}, collected {3} activations, collector={4}, collection time={5}.",
+                    number, memAfter, activations.Count, count, this.activationCollector.ToString(), watch.Elapsed);
+            }
         }
 
         public List<Tuple<GrainId, string, int>> GetGrainStatistics()
@@ -273,7 +285,7 @@ namespace Orleans.Runtime
 
                     // TODO: generic type expansion
                     var grainTypeName = TypeUtils.GetFullName(data.GrainInstanceType);
-                    
+
                     Dictionary<GrainId, int> grains;
                     int n;
                     if (!counts.TryGetValue(grainTypeName, out grains))
@@ -291,7 +303,7 @@ namespace Orleans.Runtime
                 .ToList();
         }
 
-        public List<DetailedGrainStatistic> GetDetailedGrainStatistics(string[] types=null)
+        public List<DetailedGrainStatistic> GetDetailedGrainStatistics(string[] types = null)
         {
             var stats = new List<DetailedGrainStatistic>();
             lock (activations)
@@ -301,7 +313,7 @@ namespace Orleans.Runtime
                     ActivationData data = activation.Value;
                     if (data == null || data.GrainInstance == null) continue;
 
-                    if (types==null || types.Contains(TypeUtils.GetFullName(data.GrainInstanceType)))
+                    if (types == null || types.Contains(TypeUtils.GetFullName(data.GrainInstanceType)))
                     {
                         stats.Add(new DetailedGrainStatistic()
                         {
@@ -346,8 +358,8 @@ namespace Orleans.Runtime
             }
 
             List<ActivationData> acts = activations.FindTargets(grain);
-            report.LocalActivations = acts != null ? 
-                acts.Select(activationData => activationData.ToDetailedString()).ToList() : 
+            report.LocalActivations = acts != null ?
+                acts.Select(activationData => activationData.ToDetailedString()).ToList() :
                 new List<string>();
             return report;
         }
@@ -396,7 +408,7 @@ namespace Orleans.Runtime
             int numActsBefore = acts.Count;
             foreach (var act in acts)
                 UnregisterMessageTarget(act);
-            
+
             return numActsBefore;
         }
 
@@ -448,7 +460,7 @@ namespace Orleans.Runtime
                 {
                     return result;
                 }
-                
+
                 int typeCode = address.Grain.TypeCode;
                 string actualGrainType = null;
                 MultiClusterRegistrationStrategy activationStrategy;
@@ -477,9 +489,9 @@ namespace Orleans.Runtime
                     // create a dummy activation that will queue up messages until the real data arrives
                     // We want to do this (RegisterMessageTarget) under the same lock that we tested TryGetActivationData. They both access ActivationDirectory.
                     result = new ActivationData(
-                        address, 
-                        genericArguments, 
-                        placement, 
+                        address,
+                        genericArguments,
+                        placement,
                         activationStrategy,
                         this.activationCollector,
                         ageLimit,
@@ -501,7 +513,7 @@ namespace Orleans.Runtime
                 CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_NON_EXISTENT_ACTIVATIONS).Increment();
                 throw new NonExistentActivationException(msg, address, placement is StatelessWorkerPlacement);
             }
-   
+
             SetupActivationInstance(result, grainType, genericArguments);
             activatedPromise = InitActivation(result, grainType, genericArguments, requestContextData);
             return result;
@@ -713,15 +725,15 @@ namespace Orleans.Runtime
                 data.SetupContext(grainTypeData, this.serviceProvider);
 
                 Grain grain = grainCreator.CreateGrainInstance(data);
-                
+
                 //if grain implements IStreamSubscriptionObserver, then install stream consumer extension on it
-                if(grain is IStreamSubscriptionObserver)
+                if (grain is IStreamSubscriptionObserver)
                     InstallStreamConsumerExtension(data, grain as IStreamSubscriptionObserver);
 
                 grain.Data = data;
                 data.SetGrainInstance(grain);
             }
-            
+
             activations.IncrementGrainCounter(grainClassName);
 
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("CreateGrainInstance {0}{1}", data.Grain, data.ActivationId);
@@ -1000,7 +1012,7 @@ namespace Orleans.Runtime
                 //logger.Info(ErrorCode.Catalog_DestroyActivations_Done, "Starting FinishDestroyActivations #{0} - with {1} Activations.", number, list.Count);
                 // step 3 - UnregisterManyAsync
                 try
-                {            
+                {
                     List<ActivationAddress> activationsToDeactivate = list.
                         Where((ActivationData d) => d.IsUsingGrainDirectory).
                         Select((ActivationData d) => ActivationAddress.GetAddress(LocalSilo, d.Grain, d.ActivationId)).ToList();
@@ -1072,7 +1084,8 @@ namespace Orleans.Runtime
                     tcs.SetMultipleResults(list.Count);
                 }
                 logger.Info(ErrorCode.Catalog_DestroyActivations_Done, "Done FinishDestroyActivations #{0} - Destroyed {1} Activations.", number, list.Count);
-            }catch (Exception exc)
+            }
+            catch (Exception exc)
             {
                 logger.Error(ErrorCode.Catalog_FinishDeactivateActivation_Exception, String.Format("FinishDestroyActivations #{0} failed with {1} Activations.", number, list.Count), exc);
             }
@@ -1160,7 +1173,7 @@ namespace Orleans.Runtime
                 //   exception caused activation to fail, with no indication that it occured durring activation
                 //   rather than the grain call.
                 OrleansLifecycleCanceledException canceledException = exc as OrleansLifecycleCanceledException;
-                if(canceledException?.InnerException != null)
+                if (canceledException?.InnerException != null)
                 {
                     ExceptionDispatchInfo.Capture(canceledException.InnerException).Throw();
                 }
@@ -1213,7 +1226,7 @@ namespace Orleans.Runtime
                     await ((ILogConsistencyProtocolParticipant)activation.GrainInstance).DeactivateProtocolParticipant();
                 }
             }
-            catch(Exception exc)
+            catch (Exception exc)
             {
                 logger.Error(ErrorCode.Catalog_FinishGrainDeactivateAndCleanupStreams_Exception, String.Format("CallGrainDeactivateAndCleanupStreams Activation = {0} failed.", activation), exc);
             }
@@ -1230,7 +1243,7 @@ namespace Orleans.Runtime
             /// </summary>
             public static readonly ActivationRegistrationResult Success = new ActivationRegistrationResult
             {
-                IsSuccess = true       
+                IsSuccess = true
             };
 
             public ActivationRegistrationResult(ActivationAddress existingActivationAddress)
@@ -1239,7 +1252,7 @@ namespace Orleans.Runtime
                 ExistingActivationAddress = existingActivationAddress;
                 IsSuccess = false;
             }
-            
+
             /// <summary>
             /// Returns true if this instance represents a successful registration, false otheriwse.
             /// </summary>
@@ -1264,9 +1277,9 @@ namespace Orleans.Runtime
             // Among those that are registered in the directory, we currently do not have any multi activations.
             if (activation.IsUsingGrainDirectory)
             {
-                var result = await scheduler.RunOrQueueTask(() => directory.RegisterAsync(address, singleActivation:true), this.SchedulingContext);
+                var result = await scheduler.RunOrQueueTask(() => directory.RegisterAsync(address, singleActivation: true), this.SchedulingContext);
                 if (address.Equals(result.Address)) return ActivationRegistrationResult.Success;
-               
+
                 return new ActivationRegistrationResult(existingActivationAddress: result.Address);
             }
             else
@@ -1345,7 +1358,8 @@ namespace Orleans.Runtime
 
         public SiloStatus LocalSiloStatus
         {
-            get {
+            get
+            {
                 return SiloStatusOracle.CurrentStatus;
             }
         }
@@ -1369,7 +1383,7 @@ namespace Orleans.Runtime
         }
 
         private void OnSiloStatusChange(SiloAddress updatedSilo, SiloStatus status)
-        { 
+        {
             // ignore joining events and also events on myself.
             if (updatedSilo.Equals(LocalSilo)) return;
 
