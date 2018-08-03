@@ -42,6 +42,14 @@ namespace UnitTests.Grains
             return Task.FromResult(someString);
         }
     }
+    
+    public class AutoExtension : IAutoExtension
+    {
+        public Task<string> CheckExtension()
+        {
+            return Task.FromResult("whoot!");
+        }
+    }
 
     public class GenericTestExtension<T> : IGenericTestExtension<T>
     {

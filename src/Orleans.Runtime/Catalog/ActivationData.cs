@@ -239,7 +239,8 @@ namespace Orleans.Runtime
 
         internal bool TryAddExtension(IGrainExtensionMethodInvoker invoker, IGrainExtension extension)
         {
-            if(extensionInvoker == null)
+            this.lastInvoker = null;
+            if (extensionInvoker == null)
                 extensionInvoker = new ExtensionInvoker();
 
             return extensionInvoker.TryAddExtension(invoker, extension);
@@ -247,6 +248,7 @@ namespace Orleans.Runtime
 
         internal void RemoveExtension(IGrainExtension extension)
         {
+            this.lastInvoker = null;
             if (extensionInvoker != null)
             {
                 if (extensionInvoker.Remove(extension))
