@@ -247,7 +247,7 @@ namespace Orleans.Runtime
             var number = Interlocked.Increment(ref collectionNumber);
             long memBefore = GC.GetTotalMemory(false) / (1024 * 1024);
 
-            if (memoryThresholdInMegabytes != 0L && memBefore < memoryThresholdInMegabytes)
+            if (memBefore < memoryThresholdInMegabytes)
             {
                 watch.Stop();
                 logger.Info(ErrorCode.Catalog_CollectionSuppressed,
