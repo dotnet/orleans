@@ -26,6 +26,9 @@ namespace Orleans.Configuration
         /// </summary>
         public Dictionary<string, TimeSpan> ClassSpecificCollectionAge { get; set; } = new Dictionary<string, TimeSpan>();
 
+        /// <summary>
+        /// Threshold in megabytes of memory used for deciding whether to suppress grain collection.
+        /// </summary>
         public long CollectionMemoryThresholdInMegabytes { get; set; } = DEFAULT_COLLECTION_MEMORY_THRESHOLD_IN_MEGABYTES;
         public static readonly long DEFAULT_COLLECTION_MEMORY_THRESHOLD_IN_MEGABYTES = 0;
     }
