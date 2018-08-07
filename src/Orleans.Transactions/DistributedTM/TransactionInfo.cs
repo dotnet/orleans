@@ -4,8 +4,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Collections.Concurrent;
 using Orleans.Transactions.Abstractions;
-using Orleans.Transactions.Abstractions.Extensions;
 using Orleans.Serialization;
+using Orleans.Runtime;
+using Orleans.Concurrency;
 
 namespace Orleans.Transactions
 {
@@ -14,21 +15,17 @@ namespace Orleans.Transactions
     {
         public TransactionInfo()
         {
+            this.Participants = new Dictionary<ParticipantId, AccessCounter>(ParticipantId.Comparer);
             this.joined = new ConcurrentQueue<TransactionInfo>();
         }
 
         public TransactionInfo(Guid id, DateTime timeStamp, DateTime priority, bool readOnly = false)
         : this()
         {
-            TransactionId = id;
-            IsReadOnly = readOnly;
-            OriginalException = null;
-            PendingCalls = 0;
-            Participants = new Dictionary<ITransactionParticipant, AccessCounter>();
-            TimeStamp = timeStamp;
-            Priority = priority;
-            TMCandidate = null;
-            TMBatchSize = 0;
+            this.TransactionId = id;
+            this.IsReadOnly = readOnly;
+            this.TimeStamp = timeStamp;
+            this.Priority = priority;
         }
 
         /// <summary>
@@ -38,15 +35,12 @@ namespace Orleans.Transactions
         public TransactionInfo(TransactionInfo other)
         : this()
         {
-            TransactionId = other.TransactionId;
-            IsReadOnly = other.IsReadOnly;
-            OriginalException = null;
-            PendingCalls = 0;
-            Participants = new Dictionary<ITransactionParticipant, AccessCounter>();
-            TimeStamp = other.TimeStamp;
-            Priority = other.Priority;
-            TMCandidate = other.TMCandidate;
-            TMBatchSize = other.TMBatchSize;
+            this.TransactionId = other.TransactionId;
+            this.IsReadOnly = other.IsReadOnly;
+            this.TimeStamp = other.TimeStamp;
+            this.Priority = other.Priority;
+            this.TMCandidate = other.TMCandidate;
+            this.TMBatchSize = other.TMBatchSize;
         }
 
         public string Id => TransactionId.ToString();
@@ -57,17 +51,17 @@ namespace Orleans.Transactions
 
         public DateTime Priority { get; set; }
 
-        public ITransactionParticipant TMCandidate { get; set; }
+        public ParticipantId TMCandidate { get; set; }
 
         public int TMBatchSize { get; set; }
 
         public bool IsReadOnly { get; }
 
         public byte[] OriginalException { get; set; }
-        
+
         // counts how many writes were done per each accessed resource
         // zero means the resource was only read
-        public Dictionary<ITransactionParticipant, AccessCounter> Participants { get; }
+        public Dictionary<ParticipantId, AccessCounter> Participants { get; }
 
         [NonSerialized]
         public int PendingCalls;
@@ -140,15 +134,15 @@ namespace Orleans.Transactions
             }
 
             // Take sum of write counts
-            foreach (var grain in other.Participants.Keys)
+            foreach (KeyValuePair<ParticipantId, AccessCounter> participant in other.Participants)
             {
-                if (!Participants.ContainsKey(grain))
+                if(!this.Participants.Keys.Contains(participant.Key))
                 {
-                    Participants[grain] = other.Participants[grain];
+                    this.Participants[participant.Key] = participant.Value;
                 }
                 else
                 {
-                    Participants[grain] += other.Participants[grain];
+                    this.Participants[participant.Key] += participant.Value;
                 }
             }
 
@@ -157,20 +151,20 @@ namespace Orleans.Transactions
                 TimeStamp = other.TimeStamp;
 
             // take the TM candidate with the larger batchsize
-            if (TMCandidate == null || other.TMBatchSize > TMBatchSize)
+            if (TMCandidate.Reference == null || other.TMBatchSize > TMBatchSize)
             {
                 TMCandidate = other.TMCandidate;
                 TMBatchSize = other.TMBatchSize;
             }
         }
 
-        public void RecordRead(ITransactionParticipant transactionalResource, DateTime minTime)
+        public void RecordRead(ParticipantId id, DateTime minTime)
         {
-            Participants.TryGetValue(transactionalResource, out var count);
+            this.Participants.TryGetValue(id, out AccessCounter count);
 
             count.Reads++;
 
-            Participants[transactionalResource] = count;
+            this.Participants[id] = count;
 
             if (minTime > TimeStamp)
             {
@@ -178,13 +172,13 @@ namespace Orleans.Transactions
             }
         }
 
-        public void RecordWrite(ITransactionParticipant transactionalResource, DateTime minTime)
+        public void RecordWrite(ParticipantId id, DateTime minTime)
         {
-            Participants.TryGetValue(transactionalResource, out var count);
+            this.Participants.TryGetValue(id, out AccessCounter count);
 
             count.Writes++;
 
-            Participants[transactionalResource] = count;
+            this.Participants[id] = count;
 
             if (minTime > TimeStamp)
             {
@@ -201,9 +195,48 @@ namespace Orleans.Transactions
                 $"{TransactionId} {TimeStamp:o}",
                 (IsReadOnly ? " RO" : ""),
                 (OriginalException != null ? " Aborting" : ""),
-                $" {{{string.Join(" ", Participants.Select(kvp => $"{kvp.Key.ToShortString()}:{kvp.Value.Reads},{kvp.Value.Writes}"))}}}",
-                TMCandidate != null ? $" TM={TMCandidate.ToShortString()}({TMBatchSize})" : ""
+                $" {{{string.Join(" ", this.Participants.Select(kvp => $"{kvp.Key}:{kvp.Value.Reads},{kvp.Value.Writes}"))}}}",
+                TMCandidate.Reference != null ? $" TM={TMCandidate.GetHashCode()}({TMBatchSize})" : ""
             );
+        }
+    }
+
+    [Serializable]
+    [Immutable]
+    public readonly struct ParticipantId
+    {
+        public static readonly IEqualityComparer<ParticipantId> Comparer = new IdComparer();
+
+        public string Name { get; }
+        public GrainReference Reference { get; }
+
+        public ParticipantId(string name, GrainReference reference)
+        {
+            this.Name = name;
+            this.Reference = reference;
+        }
+
+        public override string ToString()
+        {
+            return $"ParticipantId.{Name}.{Reference}";
+        }
+
+        private class IdComparer : IEqualityComparer<ParticipantId>
+        {
+            public bool Equals(ParticipantId x, ParticipantId y)
+            {
+                return string.CompareOrdinal(x.Name,y.Name) == 0 && Equals(x.Reference, y.Reference);
+            }
+
+            public int GetHashCode(ParticipantId obj)
+            {
+                unchecked
+                {
+                    var idHashCode = (obj.Name != null) ? obj.Name.GetHashCode() : 0;
+                    var referenceHashCode = (obj.Reference != null) ? obj.Reference.GetHashCode() : 0;
+                    return (idHashCode * 397) ^ (referenceHashCode);
+                }
+            }
         }
     }
 }

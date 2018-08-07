@@ -1,4 +1,5 @@
-﻿using Orleans.Transactions.Abstractions;
+﻿using Orleans.Runtime;
+using Orleans.Transactions.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -62,10 +63,10 @@ namespace Orleans.Transactions
         public TaskCompletionSource<TransactionalStatus> PromiseForTA;
 
         // used for local and remote commit
-        public ITransactionParticipant TransactionManager;
+        public ParticipantId TransactionManager;
 
         // used for local commit
-        public List<ITransactionParticipant> WriteParticipants;
+        public List<ParticipantId> WriteParticipants;
         public int WaitCount;
         public DateTime WaitingSince;
         public DateTime? LastConfirmationAttempt;
