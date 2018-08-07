@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using Orleans.Transactions.Abstractions;
 using Orleans.Serialization;
 using Orleans.Runtime;
+using Orleans.Concurrency;
 
 namespace Orleans.Transactions
 {
@@ -200,23 +201,31 @@ namespace Orleans.Transactions
         }
     }
 
-    public struct ParticipantId
+    [Serializable]
+    [Immutable]
+    public readonly struct ParticipantId
     {
-        public static IEqualityComparer<ParticipantId> Comparer = new IdComparer();
+        public static readonly IEqualityComparer<ParticipantId> Comparer = new IdComparer();
 
-        public GrainReference Reference;
-        public string Name;
+        public string Name { get; }
+        public GrainReference Reference { get; }
+
+        public ParticipantId(string name, GrainReference reference)
+        {
+            this.Name = name;
+            this.Reference = reference;
+        }
 
         public override string ToString()
         {
-            return $"ParticipantId.{Reference}.{Name}";
+            return $"ParticipantId.{Name}.{Reference}";
         }
 
         private class IdComparer : IEqualityComparer<ParticipantId>
         {
             public bool Equals(ParticipantId x, ParticipantId y)
             {
-                return x.Name == y.Name && Equals(x.Reference, y.Reference);
+                return string.CompareOrdinal(x.Name,y.Name) == 0 && Equals(x.Reference, y.Reference);
             }
 
             public int GetHashCode(ParticipantId obj)

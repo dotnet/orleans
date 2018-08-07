@@ -29,7 +29,7 @@ namespace Orleans.Transactions.Tests.Memory
             metaData.CommitRecords.Add(Guid.NewGuid(), new CommitRecord()
             {
                 Timestamp = DateTime.UtcNow,
-                WriteParticipants = new List<ParticipantId>() { new ParticipantId { Reference = reference, Name = "bob" } }
+                WriteParticipants = new List<ParticipantId>() { new ParticipantId("bob", reference) }
             });
             JsonSerializerSettings serializerSettings = TransactionalStateFactory.GetJsonSerializerSettings(
                 this.fixture.Client.ServiceProvider.GetService<ITypeResolver>(),

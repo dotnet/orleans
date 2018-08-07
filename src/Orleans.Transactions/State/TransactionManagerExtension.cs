@@ -21,38 +21,31 @@ namespace Orleans.Transactions
 
         public Task<TransactionalStatus> CommitReadOnly(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp)
         {
-            if (!this.managers.TryGetValue(resourceId, out ITransactionManager manager))
-            {
-                this.managers[resourceId] = manager = this.factories[resourceId].Invoke();
-            }
-            return manager.CommitReadOnly(transactionId, accessCount, timeStamp);
+            return GetManager(resourceId).CommitReadOnly(transactionId, accessCount, timeStamp);
         }
 
         public Task Ping(string resourceId, Guid transactionId, DateTime timeStamp, ParticipantId resource)
         {
-            if (!this.managers.TryGetValue(resourceId, out ITransactionManager manager))
-            {
-                this.managers[resourceId] = manager = this.factories[resourceId].Invoke();
-            }
-            return manager.Ping(transactionId, timeStamp, resource);
+            return GetManager(resourceId).Ping(transactionId, timeStamp, resource);
         }
 
         public Task<TransactionalStatus> PrepareAndCommit(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp, List<ParticipantId> writeResources, int totalResources)
         {
-            if (!this.managers.TryGetValue(resourceId, out ITransactionManager manager))
-            {
-                this.managers[resourceId] = manager = this.factories[resourceId].Invoke();
-            }
-            return manager.PrepareAndCommit(transactionId, accessCount, timeStamp, writeResources, totalResources);
+            return GetManager(resourceId).PrepareAndCommit(transactionId, accessCount, timeStamp, writeResources, totalResources);
         }
 
         public Task Prepared(string resourceId, Guid transactionId, DateTime timestamp, ParticipantId resource, TransactionalStatus status)
+        {
+            return GetManager(resourceId).Prepared(transactionId, timestamp, resource, status);
+        }
+
+        private ITransactionManager GetManager(string resourceId)
         {
             if (!this.managers.TryGetValue(resourceId, out ITransactionManager manager))
             {
                 this.managers[resourceId] = manager = this.factories[resourceId].Invoke();
             }
-            return manager.Prepared(transactionId, timestamp, resource, status);
+            return manager;
         }
     }
 }

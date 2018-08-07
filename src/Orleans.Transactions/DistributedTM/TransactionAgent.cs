@@ -217,7 +217,8 @@ namespace Orleans.Transactions
             foreach (var p in participants)
             {
                 p.Reference.AsReference<ITransactionalResourceExtension>()
-                 .Abort(p.Name, transactionInfo.TransactionId);
+                 .Abort(p.Name, transactionInfo.TransactionId)
+                 .Ignore();
             }
         }
     }

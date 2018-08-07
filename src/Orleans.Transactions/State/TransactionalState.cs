@@ -207,8 +207,7 @@ namespace Orleans.Transactions
         {
             if (ct.IsCancellationRequested) return;
 
-            this.participantId.Reference = this.context.GrainInstance.GrainReference;
-            this.participantId.Name = this.config.StateName;
+            this.participantId = new ParticipantId(this.config.StateName, this.context.GrainInstance.GrainReference);
 
             this.logger = loggerFactory.CreateLogger($"{context.GrainType.Name}.{this.config.StateName}.{this.context.GrainIdentity.IdentityString}");
 

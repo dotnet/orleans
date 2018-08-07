@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Orleans.Runtime;
+using Orleans.Utilities;
 
 namespace Orleans.Transactions.State
 {
@@ -10,8 +11,8 @@ namespace Orleans.Transactions.State
     {
         public static void RegisterResourceFactory<T>(this IGrainActivationContext context, string name, Func<T> factory)
         {
-            ResourceFactoryRegistry<T> registery = context.GetResourceFactoryRegistry<T>(true);
-            registery[name] = factory;
+            ResourceFactoryRegistry<T> registry = context.GetResourceFactoryRegistry<T>(true);
+            registry[name] = factory;
         }
 
         public static ResourceFactoryRegistry<T> GetResourceFactoryRegistry<T>(this IGrainActivationContext context, bool createIfNotExists = false)
@@ -27,6 +28,6 @@ namespace Orleans.Transactions.State
             return result;
         }
 
-        private static string ResourceFactoryRegistryName<T>() => $"{typeof(T).FullName}+ResourceFactoryRegistry";
+        private static string ResourceFactoryRegistryName<T>() => $"{RuntimeTypeNameFormatter.Format(typeof(T))}+ResourceFactoryRegistry";
     }
 }
