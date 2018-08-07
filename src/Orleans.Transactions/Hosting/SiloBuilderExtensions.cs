@@ -18,7 +18,9 @@ namespace Orleans.Hosting
         /// <returns></returns>
         public static ISiloHostBuilder UseDistributedTM(this ISiloHostBuilder builder, bool withStatisticsReporter = true)
         {
-            return builder.ConfigureServices(services => services.UseDistributedTM(withStatisticsReporter));
+            return builder.ConfigureServices(services => services.UseDistributedTM(withStatisticsReporter))
+                          .AddGrainExtension<ITransactionManagerExtension, TransactionManagerExtension>()
+                          .AddGrainExtension<ITransactionalResourceExtension, TransactionalResourceExtension>();
         }
 
         internal static IServiceCollection UseDistributedTM(this IServiceCollection services, bool withReporter)

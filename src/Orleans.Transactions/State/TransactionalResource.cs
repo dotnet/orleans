@@ -1,6 +1,6 @@
-﻿using Orleans.Transactions.Abstractions;
-using System;
+﻿using System;
 using System.Threading.Tasks;
+using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.State
 {
@@ -35,7 +35,7 @@ namespace Orleans.Transactions.State
             await this.queue.NotifyOfConfirm(transactionId, timeStamp);
         }
 
-        public Task Prepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ITransactionParticipant transactionManager)
+        public Task Prepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager)
         {
             var valid = this.queue.RWLock.ValidateLock(transactionId, accessCount, out var status, out var record);
 

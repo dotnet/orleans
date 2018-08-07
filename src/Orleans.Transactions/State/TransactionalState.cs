@@ -1,24 +1,23 @@
-﻿using System.Threading;
+﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
-using Newtonsoft.Json;
-using Orleans.Transactions.Abstractions.Extensions;
 using Orleans.Transactions.State;
-using System;
-using System.Collections.Generic;
 using Orleans.Configuration;
-using Microsoft.Extensions.Options;
 
 namespace Orleans.Transactions
 {
     /// <summary>
     /// Stateful facet that respects Orleans transaction semantics
     /// </summary>
-    public class TransactionalState<TState> : ITransactionalState<TState>, ITransactionParticipant, ILifecycleParticipant<IGrainLifecycle>
+    public class TransactionalState<TState> : ITransactionalState<TState>, ILifecycleParticipant<IGrainLifecycle>
         where TState : class, new()
     {
         private readonly ITransactionalStateConfiguration config;
@@ -30,10 +29,8 @@ namespace Orleans.Transactions
         private readonly JsonSerializerSettings serializerSettings;
 
         private ILogger logger;
-        private ITransactionParticipant thisParticipant;
+        private ParticipantId participantId;
         private TransactionQueue<TState> queue;
-        private TransactionalResource<TState> resource;
-        private TransactionManager<TState> transactionManager;
 
         public string CurrentTransactionId => TransactionContext.GetRequiredTransactionInfo<TransactionInfo>().Id;
 
@@ -58,46 +55,6 @@ namespace Orleans.Transactions
             this.serializerSettings = serializerSettings;
         }
 
-        public Task Prepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ITransactionParticipant transactionManager)
-        {
-            return this.resource.Prepare(transactionId, accessCount, timeStamp, transactionManager);
-        }
-
-        public Task Abort(Guid transactionId)
-        {
-            return this.resource.Abort(transactionId);
-        }
-
-        public Task Cancel(Guid transactionId, DateTime timeStamp, TransactionalStatus status)
-        {
-            return this.resource.Cancel(transactionId, timeStamp, status);
-        }
-
-        public Task Confirm(Guid transactionId, DateTime timeStamp)
-        {
-            return this.resource.Confirm(transactionId, timeStamp);
-        }
-
-        public Task<TransactionalStatus> CommitReadOnly(Guid transactionId, AccessCounter accessCount, DateTime timeStamp)
-        {
-            return this.transactionManager.CommitReadOnly(transactionId, accessCount, timeStamp);
-        }
-
-        public Task<TransactionalStatus> PrepareAndCommit(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, List<ITransactionParticipant> writeParticipants, int totalParticipants)
-        {
-            return this.transactionManager.PrepareAndCommit(transactionId, accessCount, timeStamp, writeParticipants, totalParticipants);
-        }
-
-        public Task Prepared(Guid transactionId, DateTime timeStamp, ITransactionParticipant participant, TransactionalStatus status)
-        {
-            return this.transactionManager.Prepared(transactionId,  timeStamp, participant, status);
-        }
-
-        public Task Ping(Guid transactionId, DateTime timeStamp, ITransactionParticipant participant)
-        {
-            return this.transactionManager.Ping(transactionId, timeStamp, participant);
-        }
-
         /// <summary>
         /// Read the current state.
         /// </summary>
@@ -113,7 +70,7 @@ namespace Orleans.Transactions
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.Trace($"StartRead {info}");
 
-            info.Participants.TryGetValue(this.thisParticipant, out var recordedaccesses);
+            info.Participants.TryGetValue(this.participantId, out var recordedaccesses);
 
             // schedule read access to happen under the lock
             return this.queue.RWLock.EnterLock<TResult>(info.TransactionId, info.Priority, recordedaccesses, true,
@@ -137,7 +94,7 @@ namespace Orleans.Transactions
                          logger.Debug($"update-lock read v{record.SequenceNumber} {record.TransactionId} {record.Timestamp:o}");
 
                      // record this read in the transaction info data structure
-                     info.RecordRead(this.thisParticipant, record.Timestamp);
+                     info.RecordRead(this.participantId, record.Timestamp);
 
                      // perform the read 
                      TResult result = default(TResult);
@@ -178,7 +135,7 @@ namespace Orleans.Transactions
                 throw new OrleansReadOnlyViolatedException(info.Id);
             }
 
-            info.Participants.TryGetValue(this.thisParticipant, out var recordedaccesses);
+            info.Participants.TryGetValue(this.participantId, out var recordedaccesses);
 
             return this.queue.RWLock.EnterLock<TResult>(info.TransactionId, info.Priority, recordedaccesses, false,
                 new Task<TResult>(() =>
@@ -210,15 +167,15 @@ namespace Orleans.Transactions
                         logger.Debug($"update-lock write v{record.SequenceNumber} {record.TransactionId} {record.Timestamp:o}");
 
                     // record this write in the transaction info data structure
-                    info.RecordWrite(this.thisParticipant, record.Timestamp);
+                    info.RecordWrite(this.participantId, record.Timestamp);
 
                     // record this participant as a TM candidate
-                    if (info.TMCandidate == null || !info.TMCandidate.Equals(this.thisParticipant))
+                    if (info.TMCandidate.Reference == null || !info.TMCandidate.Equals(this.participantId.Reference))
                     {
                         int batchsize = this.queue.BatchableOperationsCount();
-                        if (info.TMCandidate == null || batchsize > info.TMBatchSize)
+                        if (info.TMCandidate.Reference == null || batchsize > info.TMBatchSize)
                         {
-                            info.TMCandidate = this.thisParticipant;
+                            info.TMCandidate = this.participantId;
                             info.TMBatchSize = batchsize;
                         }
                     }
@@ -246,43 +203,32 @@ namespace Orleans.Transactions
             lifecycle.Subscribe<TransactionalState<TState>>(GrainLifecycleStage.SetupState, OnSetupState);
         }
 
-        public bool Equals(ITransactionParticipant other)
-        {
-            return thisParticipant.Equals(other);
-        }
-
-        public override string ToString()
-        {
-            return $"{this.context.GrainInstance}.{this.config.StateName}";
-        }
-
         private async Task OnSetupState(CancellationToken ct)
         {
             if (ct.IsCancellationRequested) return;
 
-            var boundExtension = await this.runtime.BindExtension<TransactionParticipantExtension, ITransactionParticipantExtension>(() => new TransactionParticipantExtension());
-            boundExtension.Item1.Register(this.config.StateName, this);
-            this.thisParticipant = boundExtension.Item2.AsTransactionParticipant(this.config.StateName);
+            this.participantId.Reference = this.context.GrainInstance.GrainReference;
+            this.participantId.Name = this.config.StateName;
 
-            this.logger = loggerFactory.CreateLogger($"{context.GrainType.Name}.{this.config.StateName}.{this.thisParticipant.ToShortString()}");
+            this.logger = loggerFactory.CreateLogger($"{context.GrainType.Name}.{this.config.StateName}.{this.context.GrainIdentity.IdentityString}");
 
             var storageFactory = this.context.ActivationServices.GetRequiredService<INamedTransactionalStateStorageFactory>();
             ITransactionalStateStorage<TState> storage = storageFactory.Create<TState>(this.config.StorageName, this.config.StateName);
 
+            // setup transaction processing pipe
             Action deactivate = () => grainRuntime.DeactivateOnIdle(context.GrainInstance);
             var options = this.context.ActivationServices.GetRequiredService<IOptions<TransactionalStateOptions>>();
             var clock = this.context.ActivationServices.GetRequiredService<IClock>();
-            this.queue = new TransactionQueue<TState>(options, this.thisParticipant, deactivate, storage, this.serializerSettings, clock, logger);
-            this.resource = new TransactionalResource<TState>(this.queue);
-            this.transactionManager = new TransactionManager<TState>(this.queue);
+            this.queue = new TransactionQueue<TState>(options, this.participantId, deactivate, storage, this.serializerSettings, clock, logger);
+
+            // Add resources factory to the grain context
+            this.context.RegisterResourceFactory<ITransactionalResource>(this.config.StateName, () => new TransactionalResource<TState>(this.queue));
+
+            // Add tm factory to the grain context
+            this.context.RegisterResourceFactory<ITransactionManager>(this.config.StateName, () => new TransactionManager<TState>(this.queue));
 
             // recover state
             await this.queue.NotifyOfRestore();
-        }
-
-        private string StoredName()
-        {
-            return $"{this.context.GrainInstance.GetType().FullName}-{this.config.StateName}";
         }
     }
 }

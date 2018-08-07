@@ -16,7 +16,7 @@ namespace Orleans.Transactions.State
         where TState : class, new()
     {
         private readonly TransactionalStateOptions options;
-        private readonly ITransactionParticipant resource;
+        private readonly ParticipantId resource;
         private readonly Action deactivate;
         private readonly ITransactionalStateStorage<TState> storage;
         private readonly JsonSerializerSettings serializerSettings;
@@ -49,7 +49,7 @@ namespace Orleans.Transactions.State
 
         public TransactionQueue(
             IOptions<TransactionalStateOptions> options,
-            ITransactionParticipant resource,
+            ParticipantId resource,
             Action deactivate,
             ITransactionalStateStorage<TState> storage,
             JsonSerializerSettings serializerSettings,
@@ -138,7 +138,9 @@ namespace Orleans.Transactions.State
                                 if (behindRemoteEntryBySameTM)
                                 {
                                     // can send prepared message immediately after persisting prepare record
-                                    record.TransactionManager.Prepared(record.TransactionId, record.Timestamp, this.resource, TransactionalStatus.Ok).Ignore();
+                                    record.TransactionManager.Reference.AsReference<ITransactionManagerExtension>()
+                                          .Prepared(record.TransactionManager.Name, record.TransactionId, record.Timestamp, this.resource, TransactionalStatus.Ok)
+                                          .Ignore();
                                     record.LastSent = DateTime.UtcNow;
                                 }
                             });
@@ -228,7 +230,9 @@ namespace Orleans.Transactions.State
                         if (entry.LastSent.HasValue)
                             return; // cannot abort anymore if we already sent prepare-ok message
 
-                        entry.TransactionManager.Prepared(entry.TransactionId, entry.Timestamp, resource, status).Ignore();
+                        entry.TransactionManager.Reference.AsReference<ITransactionManagerExtension>()
+                             .Prepared(entry.TransactionManager.Name, entry.TransactionId, entry.Timestamp, resource, status)
+                             .Ignore();
                         break;
                     }
                 case CommitRole.LocalCommit:
@@ -243,7 +247,9 @@ namespace Orleans.Transactions.State
                         foreach (var p in entry.WriteParticipants)
                             if (!p.Equals(resource))
                             {
-                                p.Cancel(entry.TransactionId, entry.Timestamp, status).Ignore();
+                                p.Reference.AsReference<ITransactionalResourceExtension>()
+                                 .Cancel(p.Name, entry.TransactionId, entry.Timestamp, status)
+                                 .Ignore();
                             }
 
                         break;
@@ -266,7 +272,7 @@ namespace Orleans.Transactions.State
             }
         }
 
-        public void NotifyOfPing(Guid transactionId, DateTime timeStamp, ITransactionParticipant participant)
+        public void NotifyOfPing(Guid transactionId, DateTime timeStamp, ParticipantId resource)
         {
             if (this.commitQueue.Find(transactionId, timeStamp) != -1)
             {
@@ -287,7 +293,8 @@ namespace Orleans.Transactions.State
                 else
                 {
                     // we never heard of this transaction - so it must have aborted
-                    participant.Cancel(transactionId, timeStamp, TransactionalStatus.PresumedAbort);
+                    resource.Reference.AsReference<ITransactionalResourceExtension>()
+                            .Cancel(resource.Name, transactionId, timeStamp, TransactionalStatus.PresumedAbort);
                 }
             }
         }
@@ -361,8 +368,9 @@ namespace Orleans.Transactions.State
                 {
                     if (logger.IsEnabled(LogLevel.Debug))
                         logger.Debug($"recover two-phase-commit {pr.TransactionId}");
-                    var tm = (pr.TransactionManager == null) ? null :
-                        JsonConvert.DeserializeObject<ITransactionParticipant>(pr.TransactionManager, this.serializerSettings);
+
+                    ParticipantId tm = (pr.TransactionManager == null) ? new ParticipantId() :
+                        JsonConvert.DeserializeObject<ParticipantId>(pr.TransactionManager, this.serializerSettings);
 
                     commitQueue.Add(new TransactionRecord<TState>()
                     {
@@ -576,7 +584,9 @@ namespace Orleans.Transactions.State
                             if (bottom.PrepareIsPersisted && !bottom.LastSent.HasValue)
                             {
                                 // send PreparedMessage to remote TM
-                                bottom.TransactionManager.Prepared(bottom.TransactionId, bottom.Timestamp, resource, TransactionalStatus.Ok).Ignore();                                
+                                bottom.TransactionManager.Reference.AsReference<ITransactionManagerExtension>()
+                                      .Prepared(bottom.TransactionManager.Name, bottom.TransactionId, bottom.Timestamp, resource, TransactionalStatus.Ok)
+                                      .Ignore();                                
                                     
                                 bottom.LastSent = now;
 
@@ -595,7 +605,8 @@ namespace Orleans.Transactions.State
 
                                 if (bottom.LastSent + this.options.RemoteTransactionPingFrequency <= now)
                                 {
-                                    bottom.TransactionManager.Ping(bottom.TransactionId, bottom.Timestamp, resource);
+                                    bottom.TransactionManager.Reference.AsReference<ITransactionManagerExtension>()
+                                          .Ping(bottom.TransactionManager.Name, bottom.TransactionId, bottom.Timestamp, resource);
                                     bottom.LastSent = now;
                                 }
                                 else
@@ -740,7 +751,8 @@ namespace Orleans.Transactions.State
                 {
                     if (!p.Equals(resource))
                     {
-                        tasks.Add(p.Confirm(record.TransactionId, record.Timestamp));
+                        tasks.Add(p.Reference.AsReference<ITransactionalResourceExtension>()
+                                   .Confirm(p.Name, record.TransactionId, record.Timestamp));
                     }
                 }
 

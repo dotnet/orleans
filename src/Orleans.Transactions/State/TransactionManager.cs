@@ -37,16 +37,16 @@ namespace Orleans.Transactions.State
             return record.PromiseForTA.Task;
         }
 
-        public Task<TransactionalStatus> PrepareAndCommit(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, List<ITransactionParticipant> writeParticipants, int totalParticipants)
+        public Task<TransactionalStatus> PrepareAndCommit(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, List<ParticipantId> writeResources, int totalResources)
         {
             // validate the lock
             var valid = this.queue.RWLock.ValidateLock(transactionId, accessCount, out var status, out var record);
 
             record.Timestamp = timeStamp;
             record.Role = CommitRole.LocalCommit; // we are the TM
-            record.WaitCount = totalParticipants - 1;
+            record.WaitCount = totalResources - 1;
             record.WaitingSince = DateTime.UtcNow;
-            record.WriteParticipants = writeParticipants;
+            record.WriteParticipants = writeResources;
             record.PromiseForTA = new TaskCompletionSource<TransactionalStatus>();
 
             if (!valid)
@@ -62,15 +62,15 @@ namespace Orleans.Transactions.State
             return record.PromiseForTA.Task;
         }
 
-        public Task Prepared(Guid transactionId, DateTime timeStamp, ITransactionParticipant participant, TransactionalStatus status)
+        public Task Prepared(Guid transactionId, DateTime timeStamp, ParticipantId resource, TransactionalStatus status)
         {
             this.queue.NotifyOfPrepared(transactionId, timeStamp, status);
             return Task.CompletedTask;
         }
 
-        public Task Ping(Guid transactionId, DateTime timeStamp, ITransactionParticipant participant)
+        public Task Ping(Guid transactionId, DateTime timeStamp, ParticipantId resource)
         {
-            this.queue.NotifyOfPing(transactionId, timeStamp, participant);
+            this.queue.NotifyOfPing(transactionId, timeStamp, resource);
             return Task.CompletedTask;
         }
     }
