@@ -57,11 +57,38 @@ namespace Tester.Forwarding
             await promisesAfterShutdown;
         }
 
+        [Fact, TestCategory("GracefulShutdown"), TestCategory("Functional")]
+        public async Task SiloGracefulShutdown_PendingRequestTimers()
+        {
+            var grain = await GetTimerRequestGrainOnSecondary();
+
+            var promise = grain.StartAndWaitTimerTick(TimeSpan.FromSeconds(10));
+
+            await Task.Delay(500);
+            HostedCluster.StopSilo(HostedCluster.SecondarySilos.First());
+
+            await promise;
+        }
+
         private async Task<ILongRunningTaskGrain<T>> GetLongRunningTaskGrainOnSecondary<T>()
         {
             while (true)
             {
                 var grain = GrainFactory.GetGrain<ILongRunningTaskGrain<T>>(Guid.NewGuid());
+                var instanceId = await grain.GetRuntimeInstanceId();
+                if (instanceId.Contains(HostedCluster.SecondarySilos[0].SiloAddress.Endpoint.ToString()))
+                {
+                    return grain;
+                }
+            }
+        }
+
+        private async Task<ITimerRequestGrain> GetTimerRequestGrainOnSecondary()
+        {
+            var i = 0;
+            while (true)
+            {
+                var grain = GrainFactory.GetGrain<ITimerRequestGrain>(i++);
                 var instanceId = await grain.GetRuntimeInstanceId();
                 if (instanceId.Contains(HostedCluster.SecondarySilos[0].SiloAddress.Endpoint.ToString()))
                 {
