@@ -388,7 +388,8 @@ namespace Orleans.Runtime
         {
             SetState(ActivationState.Deactivating);
             deactivationStartTime = DateTime.UtcNow;
-            StopAllTimers();
+            if (!IsCurrentlyExecuting)
+                StopAllTimers();
         }
 
         /// <summary>
