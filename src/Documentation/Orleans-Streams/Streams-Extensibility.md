@@ -111,13 +111,13 @@ public class AzureQueueOptions
 - **ConfigureCache** configures cache size. Only available on `SiloAzureQueueStreamConfigurator`, not available on `ClusterClientAzureQueueStreamConfigurator`.
 - **ConfigurePartitioning** configures the number of queue counts to use. 
 
-Additional configuration options can be provided. For example, in some scenarios developers might want more control over queue names used by the Queue Adapter. This is currently abstracted away with [`IStreamQueueMapper`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IStreamQueueMapper.cs), but there is currently no way to configure which `IStreamQueueMapper` to use without writing new code. We would be happy to provide such an option, if needed. So please consider adding more configuration options to existing stream providers before writing a new provider.
+Additional configuration options can be provided. For example, in some scenarios developers might want more control over queue names used by the Queue Adapter. This is currently abstracted away with [`IStreamQueueMapper`](https://github.com/dotnet/orleans/blob/master/src/Orleans.Core/Streams/QueueAdapters/IStreamQueueMapper.cs), but there is currently no way to configure which `IStreamQueueMapper` to use without writing new code. We would be happy to provide such an option, if needed. So please consider adding more configuration options to existing stream providers before writing a new provider.
 
 ## Writing a Custom Queue Adapter
 
-If you want to use a different queueing technology, you need to write a queue adapter that abstracts away the access to that queue. Below we provide details on how this should be done. Please refer to [`AzureQueueAdapterFactory`](https://github.com/dotnet/orleans/blob/master/src/OrleansProviders/Streams/AzureQueue/AzureQueueAdapterFactory.cs) for an example.
+If you want to use a different queueing technology, you need to write a queue adapter that abstracts away the access to that queue. Below we provide details on how this should be done. Please refer to [`AzureQueueAdapterFactory`](https://github.com/dotnet/orleans/blob/master/src/Azure/Orleans.Streaming.AzureStorage/Providers/Streams/AzureQueue/AzureQueueAdapterFactory.cs) for an example.
 
-- Start by defining a `MyQueueFactory` class that implements [**`IQueueAdapterFactory`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IQueueAdapterFactory.cs). You need to:
+- Start by defining a `MyQueueFactory` class that implements [**`IQueueAdapterFactory`**](https://github.com/dotnet/orleans/blob/master/src/Orleans.Core/Streams/QueueAdapters/IQueueAdapterFactory.cs). You need to:
 
      a. Initialize the factory: read the passed config values, potentially allocate some data structures if you need to, etc.
 
@@ -129,9 +129,9 @@ If you want to use a different queueing technology, you need to write a queue ad
 
      e. Implement a static factory method which takes `IServiceProvider` and `streamProviderName` string as input parameters, returns a `MyQueueFactory`. Its signature should look like `public static MyQueueFactory Create(IServiceProvider services, string name)`. It will used in **Configuration** below as the factory delegate which the streaming runtime will be using to create `MyQueueFactory`. 
 
-- Implement `MyQueueAdapter` class that implements the [**`IQueueAdapter`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IQueueAdapter.cs) interface, which is an interfaces that manages access to a **sharded queue**. `IQueueAdapter` manages access to a set of queues/queue partitions (those are the queues that were returned by `IStreamQueueMapper`). It provides an ability to enqueue a message in a specified the queue and create an `IQueueAdapterReceiver` for a particular queue.
+- Implement `MyQueueAdapter` class that implements the [**`IQueueAdapter`**](https://github.com/dotnet/orleans/blob/master/src/Orleans.Core/Streams/QueueAdapters/IQueueAdapter.cs) interface, which is an interfaces that manages access to a **sharded queue**. `IQueueAdapter` manages access to a set of queues/queue partitions (those are the queues that were returned by `IStreamQueueMapper`). It provides an ability to enqueue a message in a specified the queue and create an `IQueueAdapterReceiver` for a particular queue.
 
-- Implement a `MyQueueAdapterReceiver` class that implements [**`IQueueAdapterReceiver`**](https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IQueueAdapterReceiver.cs), which is an interface that manages access to **one queue (one queue partition)**. In addition to initialization and shutdown, it provides one method: retrieve up to `maxCount` messages from the queue.
+- Implement a `MyQueueAdapterReceiver` class that implements [**`IQueueAdapterReceiver`**](https://github.com/dotnet/orleans/blob/master/src/Orleans.Core/Streams/QueueAdapters/IQueueAdapterReceiver.cs), which is an interface that manages access to **one queue (one queue partition)**. In addition to initialization and shutdown, it provides one method: retrieve up to `maxCount` messages from the queue.
 
 - **Configuration**: in order to load and use you new stream provider you need to configure it properly via `ISiloHostBuilder`. If you need to use it on the client, you need to configure it similarly with `IClientBuilder`. Below is an example of configuring using `ISiloHostBuilder`:
 
