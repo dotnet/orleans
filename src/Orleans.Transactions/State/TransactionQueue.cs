@@ -381,7 +381,8 @@ namespace Orleans.Transactions.State
                         TransactionManager = tm,
                         PrepareIsPersisted = true,
                         LastSent = default(DateTime),
-                        ConfirmationResponsePromise = null
+                        ConfirmationResponsePromise = null,
+                        NumberWrites = 1 // was a writing transaction
                     });
                 }
             }
