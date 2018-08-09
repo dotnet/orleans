@@ -169,17 +169,6 @@ namespace Orleans.Transactions
                     // record this write in the transaction info data structure
                     info.RecordWrite(this.participantId, record.Timestamp);
 
-                    // record this participant as a TM candidate
-                    if (info.TMCandidate.Reference == null || !info.TMCandidate.Equals(this.participantId.Reference))
-                    {
-                        int batchsize = this.queue.BatchableOperationsCount();
-                        if (info.TMCandidate.Reference == null || batchsize > info.TMBatchSize)
-                        {
-                            info.TMCandidate = this.participantId;
-                            info.TMBatchSize = batchsize;
-                        }
-                    }
-
                     // perform the write
                     try
                     {
@@ -207,7 +196,7 @@ namespace Orleans.Transactions
         {
             if (ct.IsCancellationRequested) return;
 
-            this.participantId = new ParticipantId(this.config.StateName, this.context.GrainInstance.GrainReference);
+            this.participantId = new ParticipantId(this.config.StateName, this.context.GrainInstance.GrainReference, ParticipantId.Role.Resource | ParticipantId.Role.Manager);
 
             this.logger = loggerFactory.CreateLogger($"{context.GrainType.Name}.{this.config.StateName}.{this.context.GrainIdentity.IdentityString}");
 

@@ -14,6 +14,28 @@ namespace Orleans.Transactions.State
             this.queue = queue;
         }
 
+        public Task<TransactionalStatus> CommitReadOnly(Guid transactionId, AccessCounter accessCount, DateTime timeStamp)
+        {
+            // validate the lock
+            var valid = this.queue.RWLock.ValidateLock(transactionId, accessCount, out var status, out var record);
+
+            record.Timestamp = timeStamp;
+            record.Role = CommitRole.ReadOnly;
+            record.PromiseForTA = new TaskCompletionSource<TransactionalStatus>();
+
+            if (!valid)
+            {
+                this.queue.NotifyOfAbort(record, status);
+            }
+            else
+            {
+                this.queue.Clock.Merge(record.Timestamp);
+            }
+
+            this.queue.RWLock.Notify();
+            return record.PromiseForTA.Task;
+        }
+
         public Task Abort(Guid transactionId)
         {
             // release the lock

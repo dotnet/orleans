@@ -13,8 +13,6 @@ namespace Orleans.Transactions
     [Reentrant]
     internal class TransactionAgent : ITransactionAgent
     {
-        private const bool selectTMByBatchSize = true;
-
         private readonly ILogger logger;
         private readonly Stopwatch stopwatch = Stopwatch.StartNew();
         private readonly CausalClock clock;
@@ -56,7 +54,7 @@ namespace Orleans.Transactions
                 logger.Trace($"{stopwatch.Elapsed.TotalMilliseconds:f2} prepare {transactionInfo}");
 
             List<ParticipantId> writeParticipants = null;
-            foreach (var p in transactionInfo.Participants)
+            foreach (KeyValuePair<ParticipantId,AccessCounter> p in transactionInfo.Participants.SelectResources())
             {
                 if (p.Value.Writes > 0)
                 {
@@ -88,13 +86,13 @@ namespace Orleans.Transactions
 
         private async Task<TransactionalStatus> CommitReadOnlyTransaction(TransactionInfo transactionInfo)
         {
-            var participants = transactionInfo.Participants;
+            var resources = transactionInfo.Participants.SelectResources().ToList();
 
             var tasks = new List<Task<TransactionalStatus>>();
-            foreach (var p in participants)
+            foreach (KeyValuePair<ParticipantId,AccessCounter> resource in resources)
             {
-                tasks.Add(p.Key.Reference.AsReference<ITransactionManagerExtension>()
-                               .CommitReadOnly(p.Key.Name, transactionInfo.TransactionId, p.Value, transactionInfo.TimeStamp));
+                tasks.Add(resource.Key.Reference.AsReference<ITransactionalResourceExtension>()
+                               .CommitReadOnly(resource.Key.Name, transactionInfo.TransactionId, resource.Value, transactionInfo.TimeStamp));
             }
 
             try
@@ -111,7 +109,7 @@ namespace Orleans.Transactions
                         if (logger.IsEnabled(LogLevel.Debug))
                             logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} fail {transactionInfo.TransactionId} prepare response status={status}");
 
-                        foreach (var p in participants)
+                        foreach (var p in resources)
                             p.Key.Reference.AsReference<ITransactionalResourceExtension>()
                                  .Abort(p.Key.Name, transactionInfo.TransactionId)
                                  .Ignore();
@@ -125,9 +123,9 @@ namespace Orleans.Transactions
                 if (logger.IsEnabled(LogLevel.Debug))
                     logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} timeout {transactionInfo.TransactionId} prepare responses");
 
-                foreach(var p in participants)
-                    p.Key.Reference.AsReference<ITransactionalResourceExtension>()
-                         .Abort(p.Key.Name, transactionInfo.TransactionId)
+                foreach(KeyValuePair<ParticipantId,AccessCounter> resource in resources)
+                    resource.Key.Reference.AsReference<ITransactionalResourceExtension>()
+                         .Abort(resource.Key.Name, transactionInfo.TransactionId)
                          .Ignore();
 
                 return TransactionalStatus.ParticipantResponseTimeout;
@@ -141,30 +139,24 @@ namespace Orleans.Transactions
 
         private async Task<TransactionalStatus> CommitReadWriteTransaction(TransactionInfo transactionInfo, List<ParticipantId> writeResources)
         {
-            ParticipantId tm = selectTMByBatchSize ? transactionInfo.TMCandidate : writeResources[0];
+            KeyValuePair<ParticipantId,AccessCounter> manager = SelectManager(transactionInfo);
             Dictionary<ParticipantId, AccessCounter> participants = transactionInfo.Participants;
 
-            Task<TransactionalStatus> tmPrepareAndCommitTask = null;
-            foreach (var p in participants)
+            foreach (var p in participants
+                .SelectResources()
+                .Where(kvp => !kvp.Key.Equals(manager.Key)))
             {
-                if (p.Key.Equals(tm))
-                {
-                    tmPrepareAndCommitTask = p.Key.Reference.AsReference<ITransactionManagerExtension>()
-                        .PrepareAndCommit(p.Key.Name, transactionInfo.TransactionId, p.Value, transactionInfo.TimeStamp, writeResources, participants.Count);
-                }
-                else
-                {
-                    // one-way prepare message
-                    p.Key.Reference.AsReference<ITransactionalResourceExtension>()
-                         .Prepare(p.Key.Name, transactionInfo.TransactionId, p.Value, transactionInfo.TimeStamp, tm)
-                         .Ignore();
-                }
+                // one-way prepare message
+                p.Key.Reference.AsReference<ITransactionalResourceExtension>()
+                        .Prepare(p.Key.Name, transactionInfo.TransactionId, p.Value, transactionInfo.TimeStamp, manager.Key)
+                        .Ignore();
             }
 
             try
             {
                 // wait for the TM to commit the transaction
-                TransactionalStatus status = await tmPrepareAndCommitTask;
+                TransactionalStatus status = await manager.Key.Reference.AsReference<ITransactionManagerExtension>()
+                    .PrepareAndCommit(manager.Key.Name, transactionInfo.TransactionId, manager.Value, transactionInfo.TimeStamp, writeResources, participants.Count);
 
                 if (status != TransactionalStatus.Ok)
                 {
@@ -176,7 +168,7 @@ namespace Orleans.Transactions
                     {
                         foreach (var p in writeResources)
                         {
-                            if (!p.Equals(tm))
+                            if (!p.Equals(manager.Key))
                             {
                                 // one-way cancel message
                                 p.Reference.AsReference<ITransactionalResourceExtension>()
@@ -220,6 +212,26 @@ namespace Orleans.Transactions
                  .Abort(p.Name, transactionInfo.TransactionId)
                  .Ignore();
             }
+        }
+
+        // TODO: make overridable - jbragg
+        private KeyValuePair<ParticipantId,AccessCounter> SelectManager(TransactionInfo transactionInfo)
+        {
+            List<KeyValuePair<ParticipantId, AccessCounter>> priorityManagers = transactionInfo.Participants.SelectPriorityManagers().ToList();
+            if(priorityManagers.Count > 1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(transactionInfo), "Only one priority transaction manager allowed in transaction");
+            }
+            if(priorityManagers.Count == 1)
+            {
+                return priorityManagers[0];
+            }
+            KeyValuePair<ParticipantId, AccessCounter> manager = transactionInfo.Participants.FirstOrDefault(kvp => kvp.Key.IsManager());
+            if(manager.Key.Reference == null)
+            {
+                throw new ArgumentOutOfRangeException(nameof(transactionInfo), "At least one transaction manager is required in transaction");
+            }
+            return manager;
         }
     }
 }

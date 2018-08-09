@@ -9,6 +9,10 @@ namespace Orleans.Transactions.Abstractions
     {
         [AlwaysInterleave]
         [Transaction(TransactionOption.Suppress)]
+        Task<TransactionalStatus> CommitReadOnly(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp);
+
+        [AlwaysInterleave]
+        [Transaction(TransactionOption.Suppress)]
         [OneWay]
         Task Abort(string resourceId, Guid transactionId);
 

@@ -8,16 +8,6 @@ namespace Orleans.Transactions.Abstractions
     public interface ITransactionManager
     {
         /// <summary>
-        /// Request sent by TA to all participants of a read-only transaction (one-phase commit). 
-        /// Participants respond after committing or aborting the read.
-        /// </summary>
-        /// <param name="transactionId">the id of the transaction to prepare</param>
-        /// <param name="accessCount">number of reads/writes performed on this participant by this transaction</param>
-        /// <param name="timeStamp">the commit timestamp for this transaction</param>
-        /// <returns></returns>
-        Task<TransactionalStatus> CommitReadOnly(Guid transactionId, AccessCounter accessCount, DateTime timeStamp);
-
-        /// <summary>
         /// Request sent by TA to TM. The TM responds after committing or aborting the transaction.
         /// </summary>
         /// <param name="transactionId">the id of the transaction to prepare</param>
