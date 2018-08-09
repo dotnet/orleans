@@ -49,13 +49,21 @@ namespace Orleans.Transactions.AzureStorage
                 }
                 else
                 {
-                    if (!FindState(this.key.CommittedSequenceId, out var pos))
+                    TState committedState;
+                    if (this.key.CommittedSequenceId == 0)
                     {
-                        var error = $"Storage state corrupted: no record for committed state";
-                        logger.LogCritical(error);
-                        throw new InvalidOperationException(error);
+                        committedState = new TState();
                     }
-                    var committedState = states[pos].Value.GetState<TState>(this.jsonSettings);
+                    else
+                    {
+                        if (!FindState(this.key.CommittedSequenceId, out var pos))
+                        {
+                            var error = $"Storage state corrupted: no record for committed state v{this.key.CommittedSequenceId}";
+                            logger.LogCritical($"{partition} {error}");
+                            throw new InvalidOperationException(error);
+                        }
+                        committedState = states[pos].Value.GetState<TState>(this.jsonSettings);
+                    }
 
                     var PrepareRecordsToRecover = new List<PendingTransactionState<TState>>();
                     for (int i = 0; i < states.Count; i++)
