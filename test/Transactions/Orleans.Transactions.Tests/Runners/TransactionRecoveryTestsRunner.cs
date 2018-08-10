@@ -27,6 +27,7 @@ namespace Orleans.Transactions.Tests
         {
             public ITransactionalBitArrayGrain Grain { get; set; }
             public BitArrayState Expected { get; } = new BitArrayState();
+            public BitArrayState Unambiguous { get; } = new BitArrayState();
         }
 
         public TransactionRecoveryTestsRunner(TestCluster testCluster, ITestOutputHelper output)
@@ -119,13 +120,22 @@ namespace Orleans.Transactions.Tests
             {
                 await this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid()).MultiGrainSetBit(grains.Select(v => v.Grain).ToList(), index);
             }
+            catch (OrleansTransactionAbortedException e)
+            {
+                base.output.WriteLine($"Some transactions failed. Index: {index}: Exception: {e.GetType().Name}");
+                grains.ForEach(g => g.Expected.Set(index, false));
+                grains.ForEach(g => g.Unambiguous.Set(index, true));
+                throw;
+            }
             catch (Exception e)
             {
-                base.output.WriteLine($"Some transactions failed. Index: {index}: Exception: {e}");
+                base.output.WriteLine($"Ambiguous transaction failure. Index: {index}: Exception: {e.GetType().Name}");
                 grains.ForEach(g => g.Expected.Set(index, false));
+                grains.ForEach(g => g.Unambiguous.Set(index, false));
                 throw;
             }
             grains.ForEach(g => g.Expected.Set(index, true));
+            grains.ForEach(g => g.Unambiguous.Set(index, true));
         }
 
         private async Task ValidateResults(List<ExpectedGrainActivity> txGrains)
@@ -145,12 +155,15 @@ namespace Orleans.Transactions.Tests
                         Assert.Equal(first[i], result[i]);
                     }
                 }
-                // Check against expected, only need to check first, since we've already verified all resources are the same.
+                // Check against expected.
+                // Only need to check if behavior was not ambiguous.
+                // Only need to check first, since we've already verified all resources are the same.
                 int[] expected = activity.Expected.Value;
+                int[] unambigous = activity.Unambiguous.Value;
                 Assert.Equal(first.Length, expected.Length);
                 for (int i = 0; i < first.Length; i++)
                 {
-                    Assert.Equal(first[i], expected[i]);
+                    Assert.Equal(expected[i] & unambigous[i], first[i] & unambigous[i]);
                 }
             }
         }
@@ -161,6 +174,7 @@ namespace Orleans.Transactions.Tests
             foreach (ExpectedGrainActivity activity in txGrains)
             {
                 int[] expected = activity.Expected.Value;
+                int[] unambiguous = activity.Unambiguous.Value;
                 int[][] actual = await activity.Grain.Get();
                 int[] first = actual.FirstOrDefault();
                 if(first == null)
@@ -180,9 +194,9 @@ namespace Orleans.Transactions.Tests
                 j = 0;
                 foreach (int[] result in actual)
                 {
-                    badIndexes = result.Select((v, idx) => v == expected[idx] ? -1 : idx).Where(v => v != -1).ToList();
+                    badIndexes = result.Select((v, idx) => (v & unambiguous[idx]) == (expected[idx] & unambiguous[idx]) ? -1 : idx).Where(v => v != -1).ToList();
                     if (badIndexes.Count != 0)
-                        output.WriteLine($"Activity on {i},{j} did not match expected at these indexs: {string.Join(",", badIndexes.Select(idx => $"{idx}: {expected[idx]}!={result[idx]}"))}");
+                        output.WriteLine($"Activity on {i},{j} did not match expected at these indexs: {string.Join(",", badIndexes.Select(idx => $"{idx}: {expected[idx] & unambiguous[idx]}!={result[idx] & unambiguous[idx]}"))}");
                     j++;
                 }
                 i++;
