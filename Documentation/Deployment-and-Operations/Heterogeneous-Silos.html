@@ -80,7 +80,7 @@
 <h2 id="overview">Overview</h2>
 <p>On a given cluster, silos can support a different set of grain types:
 <img src="Heterogeneous.png" alt=""></p>
-<p>In this example the cluster support grain of type <code>A</code>, <code>B</code>, <code>C</code>, <code>D</code>, <code>E</code>:</p>
+<p>In this example the cluster supports grains of type <code>A</code>, <code>B</code>, <code>C</code>, <code>D</code>, <code>E</code>:</p>
 <ul>
 <li>Grain types<code>A</code>and<code>B</code>can be placed on Silo 1 and 2. </li>
 <li>Grain type<code>C</code>can be placed on Silo 1, 2 or 3. </li>
@@ -88,8 +88,8 @@
 <li>Grain Type<code>E</code>can be only placed on Silo 4.</li>
 </ul>
 <p>All silos should reference interfaces of all grain types of the cluster, but grain classes should only be referenced by the silos that will host them.</p>
-<p>The client does not know which silo support a given Grain Type.</p>
-<p><strong>A given Grain Type implementation must be the same on each silo that support it. The following scenario is NOT valid:</strong></p>
+<p>The client does not know which silo supports a given Grain Type.</p>
+<p><strong>A given Grain Type implementation must be the same on each silo that supports it. The following scenario is NOT valid:</strong></p>
 <p>On Silo 1 and 2:</p>
 <pre><code class="lang-csharp">public class C: Grain, IMyGrainInterface
 {
@@ -104,15 +104,15 @@
 </code></pre><h2 id="configuration">Configuration</h2>
 <p>No configuration is needed, you can deploy different binaries on each silo in your cluster.
 However, if necessary, you can change the interval that silos and clients check for changes in types supported with the property <code>TypeMapRefreshInterval</code> from <code>TypeManagementOptions</code></p>
-<p>For testing purpose, you can use the property <code>ExcludedGrainTypes</code> in <code>GrainClassOptions</code>, which is a list names of the types you want to exclude on the silos.</p>
+<p>For testing purposes, you can use the property <code>ExcludedGrainTypes</code> in <code>GrainClassOptions</code>, which is a list names of the types you want to exclude on the silos.</p>
 <h2 id="limitations">Limitations</h2>
 <ul>
 <li>Connected clients will not be notified if the set of supported Grain Types changed. In the previous example:<ul>
-<li>If Silo 4 leave the cluster, the client will still try to make calls to grain of type <code>E</code>. It will fail at runtime with a OrleansException.</li>
+<li>If Silo 4 leaves the cluster, the client will still try to make calls to grain of type <code>E</code>. It will fail at runtime with a OrleansException.</li>
 <li>If the client was connected to the cluster before Silo 4 joined it, the client will not be able to make calls to grain of type <code>E</code>. It will fail will a ArgumentException</li>
 </ul>
 </li>
-<li>Stateless grains is not supported: all silos in the cluster must support the same set of stateless grains.</li>
+<li>Stateless grains are not supported: all silos in the cluster must support the same set of stateless grains.</li>
 </ul>
 </article>
           </div>

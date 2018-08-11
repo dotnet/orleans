@@ -77,6 +77,16 @@
             <article class="content wrap" id="_content" data-uid="">
 <h1 id="hello-world">Hello World</h1>
 
+<h2 id="run-the-hello-world-sample">Run the Hello World sample</h2>
+<p>One way to run this sample is to download a local copy of HelloWorld from <a href="https://github.com/dotnet/orleans/tree/master/Samples/2.0/HelloWorld/">the Samples/2.0/HelloWorld/ folder</a>.</p>
+<p>Open two Command Prompt windows and navigate to the HelloWorld folder in each one.</p>
+<p>Build the project.</p>
+<p>Start the silo in one window with the command:</p>
+<pre><code>dotnet run --project src\SiloHost
+</code></pre><p>After the silo is running, start the client in the other window with this: </p>
+<pre><code>dotnet run --project src\OrleansClient
+</code></pre><p>The silo and client windows will display greetings to each other.</p>
+<h2 id="how-orleans-says-hello">How Orleans says Hello</h2>
 <p>In this sample, a client connects with a grain, sends it a greeting and receives a greeting back.
 The client then prints that greeting and that&#39;s that.
 Simple enough in theory, but since there&#39;s distribution involved, there&#39;s a bit more to it.</p>
@@ -132,10 +142,7 @@ var builder = new SiloHostBuilder()
 var host = builder.Build();
 //start the silo
 await host.StartAsync();
-</code></pre><p>To run the sample, start the silo program first, wait until silo successfully starts, which is normally just a couple seconds, and start the client program.
-The client prograin will connect with the silo, then calling IHello grain.
-You should see the greeting IHello grain send back printed on the console.</p>
-</t></article>
+</code></pre></t></article>
           </div>
           
           <div class="hidden-sm col-md-2" role="complementary">

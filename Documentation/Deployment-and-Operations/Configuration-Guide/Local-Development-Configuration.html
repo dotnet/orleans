@@ -144,7 +144,7 @@ After you get comfortable with the API, you can pick and choose which exact pack
 <p>After these steps are completed, we can build the client and <code>Connect()</code> method on it to connect to the cluster.</p>
 <p>You can create an empty console application project targeting .NET Framework 4.6.1 or higher for running a client or reuse the console application project you created for hosting a silo.</p>
 <p>Here is an example of how a client can connect to a local silo:</p>
-<pre><code class="lang-csharp">client = new ClientBuilder()
+<pre><code class="lang-csharp">var builder = new ClientBuilder()
     // Use localhost clustering for a single local silo
     .UseLocalhostClustering()
     // Configure ClusterId and ServiceId

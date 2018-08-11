@@ -228,7 +228,7 @@ This ability is essential in making the programming model a smooth transition fr
         return TaskDone.Done;
     }
 </code></pre><p>Executing it, you should see something like this:</p>
-<p><img src="../Images/Multiple%20Actors1.PNG" alt=""></p>
+<p>![](../Images/Multiple Actors1.PNG)</p>
 <p>The use of a GUID to represent the name of a person leaves something for you to fix, as an exercise. If you want to do this exercise, please keep the rule for always using asynchronous code inside grains. The Result of a Task will block execution if the task hasn’t completed. This should be avoided in Orleans grains; tasks should always be awaited before Result is read.</p>
 <p><code>TaskDone.Done</code>, used in the code above, is a convenience object defined by Orleans to allow code to succinctly return an already completed <code>Task</code>.</p>
 <h3 id="asynchrony-bites-us">Asynchrony Bites Us!</h3>
