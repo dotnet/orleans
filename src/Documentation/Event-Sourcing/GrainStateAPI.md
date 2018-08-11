@@ -5,7 +5,7 @@ title: JournaledGrain API
 
 # JournaledGrain Basics
 
-Journaled grains derive from `<JournaledGrain<StateType,EventType>`, with the following type parameters:
+Journaled grains derive from `JournaledGrain<StateType,EventType>`, with the following type parameters:
 
 * The `StateType` represents the state of the grain. It must be a class with a public default constructor.  
 * `EventType` is a common supertype for all the events that can be raised for this grain, and can be any class or interface. 
@@ -75,7 +75,7 @@ The transition methods are assumed to have no side effects other than modifying 
 
 When, exactly, the runtime calls the transition methods depends on the chosen log consistency provider and its configuration. It is best for applications not to rely on a particular timing, except when specifically guaranteed by the log consistency provider. 
 
-Some providers, such as the `LogStorage` log-consistency provider, replay the event sequence every time the grain is loaded. Therefore, as long as the event objects can still be properly deserialized from storage, it is possibly to radically modify the GrainState class and the transition methods. But for other providers, such as the `StateStorage` log-consistency provider, only the `GrainState` object is persisted, so developers must ensure that it can be deserialized correctly when read from storage. 
+Some providers, such as the `LogStorage` log-consistency provider, replay the event sequence every time the grain is loaded. Therefore, as long as the event objects can still be properly deserialized from storage, it is possible to radically modify the GrainState class and the transition methods. But for other providers, such as the `StateStorage` log-consistency provider, only the `GrainState` object is persisted, so developers must ensure that it can be deserialized correctly when read from storage. 
 
 
 ## Raising Multiple Events
