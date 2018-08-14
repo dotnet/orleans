@@ -15,21 +15,9 @@ namespace Tester.Forwarding
     {
         public const int NumberOfSilos = 2;
 
-        private class SiloBuilderConfigurator : ISiloBuilderConfigurator
-        {
-            public void Configure(ISiloHostBuilder hostBuilder)
-            {
-                hostBuilder.AddAzureBlobGrainStorage("MemoryStore", (AzureBlobStorageOptions options) =>
-                {
-                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                });
-            }
-        }
-
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             Assert.True(StorageEmulator.TryStart());
-            builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
             builder.Options.InitialSilosCount = NumberOfSilos;
             builder.ConfigureLegacyConfiguration(legacy =>
             {
