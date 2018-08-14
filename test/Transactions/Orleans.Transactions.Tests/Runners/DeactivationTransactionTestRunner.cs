@@ -70,7 +70,7 @@ namespace Orleans.Transactions.Tests
                 await coordinator.MultiGrainAddAndDeactivate(grains, addval);
             }
 
-            //if transactional state loaded correctly, then following should pass
+            //if transactional state loaded correctly after reactivation, then following should pass
             foreach (var grain in grains)
             {
                 int actual = await grain.Get();
@@ -104,7 +104,7 @@ namespace Orleans.Transactions.Tests
                 // activated again 
                 await coordinator.MultiGrainAddAndDeactivate(grains, addval);
             }
-            //if transactional state loaded correctly, then following should pass
+            //if transactional state loaded correctly after reactivation, then following should pass
             foreach (var grain in grains)
             {
                 int actual = await grain.Get();
@@ -138,7 +138,7 @@ namespace Orleans.Transactions.Tests
                 // activated again 
                 await coordinator.MultiGrainAddAndDeactivate(grains, addval);
             }
-            //if transactional state loaded correctly, then following should pass
+            //if transactional state loaded correctly after reactivation, then following should pass
             foreach (var grain in grains)
             {
                 int actual = await grain.Get();
@@ -172,7 +172,7 @@ namespace Orleans.Transactions.Tests
                 // activated again 
                 await coordinator.MultiGrainAddAndDeactivate(grains, addval);
             }
-            //if transactional state loaded correctly, then following should pass
+            //if transactional state loaded correctly after reactivation, then following should pass
             foreach (var grain in grains)
             {
                 int actual = await grain.Get();
