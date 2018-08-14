@@ -59,8 +59,18 @@ namespace Orleans.Transactions.Tests
             IDeactivatingTransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<IDeactivatingTransactionCoordinatorGrain>(Guid.NewGuid());
 
             await coordinator.MultiGrainSet(grains, setval);
-            await coordinator.MultiGrainAddAndDeactivate(grains, addval, TransactionDeactivationPhase.AfterPrepare);
+            try
+            {
+                await coordinator.MultiGrainAddAndDeactivate(grains, addval, TransactionDeactivationPhase.AfterPrepare);
+            }
+            catch (OrleansTransactionException)
+            {
+                //if failed due to timeout or other legitimate transaction exception, try again. This should succeed since the deactivated grains should be 
+                // activated again 
+                await coordinator.MultiGrainAddAndDeactivate(grains, addval);
+            }
 
+            //if transactional state loaded correctly, then following should pass
             foreach (var grain in grains)
             {
                 int actual = await grain.Get();
@@ -84,8 +94,17 @@ namespace Orleans.Transactions.Tests
             IDeactivatingTransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<IDeactivatingTransactionCoordinatorGrain>(Guid.NewGuid());
 
             await coordinator.MultiGrainSet(grains, setval);
-            await coordinator.MultiGrainAddAndDeactivate(grains, addval, TransactionDeactivationPhase.AfterPrepareAndCommit);
-
+            try
+            {
+                await coordinator.MultiGrainAddAndDeactivate(grains, addval, TransactionDeactivationPhase.AfterPrepareAndCommit);
+            }
+            catch (OrleansTransactionException)
+            {
+                //if failed due to timeout or other legitimate transaction exception, try again. This should succeed since the deactivated grains should be 
+                // activated again 
+                await coordinator.MultiGrainAddAndDeactivate(grains, addval);
+            }
+            //if transactional state loaded correctly, then following should pass
             foreach (var grain in grains)
             {
                 int actual = await grain.Get();
@@ -109,8 +128,17 @@ namespace Orleans.Transactions.Tests
             IDeactivatingTransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<IDeactivatingTransactionCoordinatorGrain>(Guid.NewGuid());
 
             await coordinator.MultiGrainSet(grains, setval);
-            await coordinator.MultiGrainAddAndDeactivate(grains, addval, TransactionDeactivationPhase.AfterPrepared);
-
+            try
+            {
+                await coordinator.MultiGrainAddAndDeactivate(grains, addval, TransactionDeactivationPhase.AfterPrepared);
+            }
+            catch (OrleansTransactionException)
+            {
+                //if failed due to timeout or other legitimate transaction exception, try again. This should succeed since the deactivated grains should be 
+                // activated again 
+                await coordinator.MultiGrainAddAndDeactivate(grains, addval);
+            }
+            //if transactional state loaded correctly, then following should pass
             foreach (var grain in grains)
             {
                 int actual = await grain.Get();
@@ -134,8 +162,17 @@ namespace Orleans.Transactions.Tests
             IDeactivatingTransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<IDeactivatingTransactionCoordinatorGrain>(Guid.NewGuid());
 
             await coordinator.MultiGrainSet(grains, setval);
-            await coordinator.MultiGrainAddAndDeactivate(grains, addval, TransactionDeactivationPhase.AfterConfirm);
-
+            try
+            {
+                await coordinator.MultiGrainAddAndDeactivate(grains, addval, TransactionDeactivationPhase.AfterConfirm);
+            }
+            catch (OrleansTransactionException)
+            {
+                //if failed due to timeout or other legitimate transaction exception, try again. This should succeed since the deactivated grains should be 
+                // activated again 
+                await coordinator.MultiGrainAddAndDeactivate(grains, addval);
+            }
+            //if transactional state loaded correctly, then following should pass
             foreach (var grain in grains)
             {
                 int actual = await grain.Get();
