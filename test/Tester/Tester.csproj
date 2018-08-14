@@ -13,13 +13,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\TestInfrastructure\Orleans.TestingHost.AppDomain\Orleans.TestingHost.AppDomain.csproj" />
-    <ProjectReference Include="..\TestInfrastructure\Orleans.TestingHost.Legacy\Orleans.TestingHost.Legacy.csproj" />
-    <ProjectReference Include="..\Grains\TestGrains\TestGrains.csproj" />
-    <ProjectReference Include="..\Grains\TestInternalGrains\TestInternalGrains.csproj" />
-    <ProjectReference Include="..\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
-    <ProjectReference Include="..\Grains\TestVersionGrains\TestVersionGrains.csproj" />
-    <ProjectReference Include="..\Grains\TestFSharp\TestFSharp.fsproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\Orleans.TestingHost.AppDomain\Orleans.TestingHost.AppDomain.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\Orleans.TestingHost.Legacy\Orleans.TestingHost.Legacy.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Grains\TestGrains\TestGrains.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Grains\TestInternalGrains\TestInternalGrains.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Grains\TestVersionGrains\TestVersionGrains.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Grains\TestFSharp\TestFSharp.fsproj" />
   </ItemGroup>
 
   <ItemGroup>

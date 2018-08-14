@@ -24,6 +24,5 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Hosting.ServiceFabric\Orleans.Hosting.ServiceFabric.csproj" />
-    <ProjectReference Include="..\..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
   </ItemGroup>
 </Project>
