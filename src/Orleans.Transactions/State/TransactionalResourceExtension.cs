@@ -19,6 +19,11 @@ namespace Orleans.Transactions
             this.resources = new Dictionary<string, ITransactionalResource>();
         }
 
+        public Task<TransactionalStatus> CommitReadOnly(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp)
+        {
+            return GetResource(resourceId).CommitReadOnly(transactionId, accessCount, timeStamp);
+        }
+
         public Task Abort(string resourceId, Guid transactionId)
         {
             return GetResource(resourceId).Abort(transactionId);

@@ -19,11 +19,6 @@ namespace Orleans.Transactions
             this.managers = new Dictionary<string, ITransactionManager>();
         }
 
-        public Task<TransactionalStatus> CommitReadOnly(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp)
-        {
-            return GetManager(resourceId).CommitReadOnly(transactionId, accessCount, timeStamp);
-        }
-
         public Task Ping(string resourceId, Guid transactionId, DateTime timeStamp, ParticipantId resource)
         {
             return GetManager(resourceId).Ping(transactionId, timeStamp, resource);
