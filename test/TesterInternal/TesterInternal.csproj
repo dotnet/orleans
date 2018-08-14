@@ -22,17 +22,17 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\TestInfrastructure\Orleans.TestingHost.AppDomain\Orleans.TestingHost.AppDomain.csproj" />
-    <ProjectReference Include="..\TestInfrastructure\Orleans.TestingHost.Legacy\Orleans.TestingHost.Legacy.csproj" />
-    <ProjectReference Include="..\Tester\Tester.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\Orleans.TestingHost.AppDomain\Orleans.TestingHost.AppDomain.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\Orleans.TestingHost.Legacy\Orleans.TestingHost.Legacy.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Tester\Tester.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <None Include="App.config" />
-    <Content Include="..\..\src\Orleans.TestingHost\ClientConfigurationForTesting.xml" Link="ClientConfigurationForTesting.xml">
+    <Content Include="$(SourceRoot)src\Orleans.TestingHost\ClientConfigurationForTesting.xml" Link="ClientConfigurationForTesting.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\src\Orleans.TestingHost\OrleansConfigurationForTesting.xml" Link="OrleansConfigurationForTesting.xml">
+    <Content Include="$(SourceRoot)src\Orleans.TestingHost\OrleansConfigurationForTesting.xml" Link="OrleansConfigurationForTesting.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="TesterInternal.xunit.runner.json">

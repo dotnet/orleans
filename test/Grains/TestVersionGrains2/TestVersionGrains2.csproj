@@ -6,13 +6,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\TestVersionGrains\VersionGrainsSiloBuilderfactory.cs" Link="VersionGrainsSiloBuilderfactory.cs" />
+    <Compile Include="$(SourceRoot)test\Grains\TestVersionGrains\VersionGrainsSiloBuilderfactory.cs" Link="VersionGrainsSiloBuilderfactory.cs" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\TestInfrastructure\Orleans.TestingHost.AppDomain\Orleans.TestingHost.AppDomain.csproj" />
-    <ProjectReference Include="..\..\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
-    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
-    <ProjectReference Include="..\TestGrains\TestGrains.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\Orleans.TestingHost.AppDomain\Orleans.TestingHost.AppDomain.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Grains\TestGrainInterfaces\TestGrainInterfaces.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Grains\TestGrains\TestGrains.csproj" />
   </ItemGroup>
 </Project>

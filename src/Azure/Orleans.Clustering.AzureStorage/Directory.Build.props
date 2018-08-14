@@ -5,24 +5,14 @@
 
   <Import Project="$(_ParentDirectoryBuildPropsPath)" Condition="Exists('$(_ParentDirectoryBuildPropsPath)')"/>
 
-  <PropertyGroup  Condition="$(OrleansGoogleCloudProviderVersion) != $(VersionPrefix)">
+  <PropertyGroup Condition="$(OrleansAzureClusteringVersion)!=$(VersionPrefix)">
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
-  <PropertyGroup>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-  </PropertyGroup>
-
-  <!-- Configure source link: https://github.com/ctaggart/SourceLink -->
-  <PropertyGroup>
-    <SourceLinkCreate>true</SourceLinkCreate>
-    <SourceLinkOriginUrl>https://github.com/dotnet/orleans</SourceLinkOriginUrl>
-  </PropertyGroup>
-
   <Choose>
-    <When Condition="$(OrleansRuntimeAbstractionsVersion) == $(VersionPrefix) AND $(OrleansRuntimeAbstractionsVersion) == $(OrleansGoogleCloudProviderVersion)">
+    <When Condition="$(OrleansRuntimeAbstractionsVersion) == $(VersionPrefix) AND $(OrleansRuntimeAbstractionsVersion) == $(OrleansAzureClusteringVersion)">
       <ItemGroup>
-        <ProjectReference Include="..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
+        <ProjectReference Include="..\..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
       </ItemGroup>
     </When>
     <Otherwise>
@@ -33,9 +23,9 @@
   </Choose>
 
   <Choose>
-    <When Condition="$(OrleansProvidersVersion) == $(VersionPrefix) AND $(OrleansProvidersVersion) == $(OrleansGoogleCloudProviderVersion)">
+    <When Condition="$(OrleansProvidersVersion) == $(VersionPrefix) AND $(OrleansProvidersVersion) == $(OrleansAzureClusteringVersion)">
       <ItemGroup>
-        <ProjectReference Include="..\OrleansProviders\OrleansProviders.csproj" />
+        <ProjectReference Include="..\..\OrleansProviders\OrleansProviders.csproj" />
       </ItemGroup>
     </When>
     <Otherwise>
