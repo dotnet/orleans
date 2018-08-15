@@ -42,6 +42,13 @@ Lastly, we need to call `Connect()` method on the constructed client object to m
 await client.Connect(); 
 ```
 
+#### Client lifetime
+
+ The connected client can be safely reused in the application. For ASP.NET Core applications it can be registered as a singleton 
+```csharp
+services.AddSingleton(client);
+```
+
 ### Making Calls to Grains
 
 Making calls to grain from a client is really no different from [making such calls from within grain code](Developing-a-Grain.md#grain-method-invocation).
