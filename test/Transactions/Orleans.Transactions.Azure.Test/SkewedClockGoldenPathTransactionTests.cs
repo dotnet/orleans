@@ -12,5 +12,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
         {
             fixture.EnsurePreconditionsMet();
         }
+
+        protected override bool StorageAdaptorHasLimitedCommitSpace => true;
     }
 }

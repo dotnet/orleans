@@ -44,4 +44,15 @@ namespace Orleans.Transactions.AzureStorage.Tests
             base.ConfigureTestCluster(builder);
         }
     }
+
+
+    public class FaultInjectedTestFixture : TestFixture
+    {
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        {
+            builder.AddSiloBuilderConfigurator<ErrorInjectorConfigurator>();
+            base.ConfigureTestCluster(builder);
+        }
+    }
+
 }
