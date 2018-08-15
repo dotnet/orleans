@@ -28,19 +28,6 @@ namespace Orleans.Transactions.Tests.DeactivatingInjection
             this.context = activationContext;
         }
 
-        public async Task<TransactionalStatus> CommitReadOnly(Guid transactionId, AccessCounter accessCount, DateTime timeStamp)
-        {
-            this.logger.Info($"Grain {this.context.GrainInstance} started CommitReadOnly transaction {transactionId}");
-            var result = await this.tm.CommitReadOnly(transactionId, accessCount, timeStamp);
-            if (this.deactivationPhaseReference.DeactivationPhase == TransactionDeactivationPhase.AfterCommitReadOnly)
-            {
-                this.grainRuntime.DeactivateOnIdle((context.GrainInstance));
-                this.deactivationPhaseReference.DeactivationPhase = TransactionDeactivationPhase.None;
-                this.logger.Info($"Grain {this.context.GrainInstance} deactivating after transaction {transactionId} CommitReadOnly");
-            }
-            return result;
-        }
-
         public async Task<TransactionalStatus> PrepareAndCommit(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, List<ParticipantId> writeParticipants, int totalParticipants)
         {
             this.logger.Info($"Grain {this.context.GrainInstance} started PrepareAndCommit transaction {transactionId}");
@@ -96,6 +83,19 @@ namespace Orleans.Transactions.Tests.DeactivatingInjection
             this.deactivationPhaseReference = deactivationPhaseReference;
             this.logger = logger;
             this.context = activationContext;
+        }
+
+        public async Task<TransactionalStatus> CommitReadOnly(Guid transactionId, AccessCounter accessCount, DateTime timeStamp)
+        {
+            this.logger.Info($"Grain {this.context.GrainInstance} started CommitReadOnly transaction {transactionId}");
+            var result = await this.tResource.CommitReadOnly(transactionId, accessCount, timeStamp);
+            if (this.deactivationPhaseReference.DeactivationPhase == TransactionDeactivationPhase.AfterCommitReadOnly)
+            {
+                this.grainRuntime.DeactivateOnIdle((context.GrainInstance));
+                this.deactivationPhaseReference.DeactivationPhase = TransactionDeactivationPhase.None;
+                this.logger.Info($"Grain {this.context.GrainInstance} deactivating after transaction {transactionId} CommitReadOnly");
+            }
+            return result;
         }
 
         public async Task Abort(Guid transactionId)
