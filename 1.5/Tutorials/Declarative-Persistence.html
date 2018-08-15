@@ -210,15 +210,15 @@ It should look like this:</p>
 </code></pre><p>Let&#39;s try this out!</p>
 <p>Set a breakpoint in <code>Employee.Promote()</code>.</p>
 <p>When we run the client code the first time and hit the breakpoint, the level field should be <code>0</code> and the newLevel parameter either <code>10</code> or <code>11</code>:</p>
-<p>![](../Images/Persistence 2.PNG)</p>
+<p><img src="../Images/Persistence%202.PNG" alt=""></p>
 <p>Let the application finish (reach the &#39;Hit Enter...&#39; prompt) and exit.
 Run it again, and compare what happens when you look at state this second time around:</p>
-<p>![](../Images/Persistence 3.PNG)</p>
+<p><img src="../Images/Persistence%203.PNG" alt=""></p>
 <h2 id="just-making-sure">Just Making Sure...</h2>
 <p>It&#39;s worth checking what Azure thinks about the data.
 Using a storage explorer such as Azure Storage Explorer (ASE) or the one built in to Server Explorer in Visual Studio 2013, open the storage account (or developer storage of the emulator) and find the &#39;OrleansGrainState&#39; table.
 It should look something like this (you have to hit &#39;Query&#39; in ASE):</p>
-<p>![](../Images/Persistence 4.PNG)</p>
+<p><img src="../Images/Persistence%204.PNG" alt=""></p>
 <p>If everything is working correctly, the grain keys should appear in the <code>PartitionKey</code> column, and the qualified class name of the grains should appear in the <code>RowKey</code> column.</p>
 <h2 id="mixing-things">Mixing Things</h2>
 <p>A grain may contain a combination of persisted and transient state.

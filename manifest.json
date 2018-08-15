@@ -1,6 +1,6 @@
 {
   "homepages": [],
-  "source_base_path": "C:/GitHub/dotnet/orleans/src",
+  "source_base_path": "c:/GitHub/dotnet/orleans/src",
   "xrefmap": "xrefmap.yml",
   "files": [
     {
@@ -829,7 +829,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Orleans-Streams/index.html",
-          "hash": "7zqC4rasbWXRfleL7ABLSw=="
+          "hash": "IspiBC+Q7z3iPFmfGJ+5CQ=="
         }
       },
       "is_incremental": false,
@@ -841,7 +841,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Presentations/index.html",
-          "hash": "zVqhyh7Qnj4tO/F+IcoMhg=="
+          "hash": "Lx8/39NIQXpDYCyEjAvT0A=="
         }
       },
       "is_incremental": false,
@@ -877,7 +877,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Runtime-Implementation-Details/Load-Balancing.html",
-          "hash": "rZW9RSrvHZGU3R5osSxNig=="
+          "hash": "0dxDWebSsQPdGvw+auQPdQ=="
         }
       },
       "is_incremental": false,
@@ -949,7 +949,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Samples-Overview/Azure-Web-Sample.html",
-          "hash": "op61kkRl/RyeiL5kfnhcZA=="
+          "hash": "Zb82XSSF4HzJNG2l59o4bg=="
         }
       },
       "is_incremental": false,
@@ -1619,7 +1619,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/A-Service-is-a-Collection-of-Communicating-Actors.html",
-          "hash": "huwcRcDHoWtxjrhG+c+NYQ=="
+          "hash": "CnkhX+cmLCR4MBJqEw2NLA=="
         }
       },
       "is_incremental": false,
@@ -1667,7 +1667,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/Custom-Storage-Providers.html",
-          "hash": "aIPqlFHwjpiwPLc+xU9lYQ=="
+          "hash": "AGSEJOez8GOWLOHjr3hBmw=="
         }
       },
       "is_incremental": false,
@@ -1679,7 +1679,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/Declarative-Persistence.html",
-          "hash": "n9dF9lw+MeyYNnct+BZOLQ=="
+          "hash": "QDBVq3fVBnZ2B5w6eijvFQ=="
         }
       },
       "is_incremental": false,
@@ -1739,7 +1739,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/My-First-Orleans-Application.html",
-          "hash": "Y8uZjsY9H0I2505l5BD8pg=="
+          "hash": "s/9DFG7564oJUX7gixmvcA=="
         }
       },
       "is_incremental": false,
@@ -1751,7 +1751,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/On-Premise-Deployment.html",
-          "hash": "GLZbmFDE7YjitI/y0zpyWg=="
+          "hash": "Wdcjg3A5QByxhP9xhnsEHw=="
         }
       },
       "is_incremental": false,
@@ -1763,7 +1763,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/Running-in-a-Stand-alone-Silo.html",
-          "hash": "sZz08hf50JIL3RZuIxB5oA=="
+          "hash": "xhgHUOZJAXV1XdJ26qjHxA=="
         }
       },
       "is_incremental": false,
@@ -2493,7 +2493,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Getting-Started-With-Orleans/Developing-a-Client.html",
-          "hash": "wrfp2TZ4j+ALQK6swNk/XA=="
+          "hash": "RaQ5gPhSdSsjuTto6mfo8A=="
         }
       },
       "is_incremental": false,
@@ -2850,7 +2850,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Orleans-Streams/index.html",
-          "hash": "9NovzQB8SXbFoKrRY+5eRg=="
+          "hash": "7KoUar8M5t/71Io3E6Gkaw=="
         }
       },
       "is_incremental": false,
@@ -2862,7 +2862,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Presentations/index.html",
-          "hash": "duku3Q0AUIdrqlguvpYUKw=="
+          "hash": "jvGDj6hyXwxr1ueokKYSQw=="
         }
       },
       "is_incremental": false,
@@ -2898,7 +2898,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Runtime-Implementation-Details/Load-Balancing.html",
-          "hash": "k7O73GqHm93EksAzgckKNA=="
+          "hash": "pVmPHE9VFzD8kFWm+O6VUg=="
         }
       },
       "is_incremental": false,
@@ -3470,7 +3470,7 @@
       "output": {
         ".html": {
           "relative_path": "Tutorials/Declarative-Persistence.html",
-          "hash": "VzLxWuSxDoK11xA+cCwumg=="
+          "hash": "myDwsjHGccBmZyI4HGYP8g=="
         }
       },
       "is_incremental": false,
@@ -3501,6 +3501,9 @@
       "version": ""
     },
     {
+      "log_codes": [
+        "InvalidYamlHeader"
+      ],
       "type": "index",
       "source_relative_path": "index.md",
       "output": {
@@ -3528,22 +3531,23 @@
   "incremental_info": [
     {
       "status": {
-        "can_incremental": true,
+        "can_incremental": false,
+        "details": "Cannot build incrementally because last build info is missing.",
         "incrementalPhase": "build"
       },
       "processors": {
-        "TocDocumentProcessor": {
-          "can_incremental": false,
-          "details": "Processor TocDocumentProcessor cannot support incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
-          "incrementalPhase": "build"
-        },
         "ResourceDocumentProcessor": {
           "can_incremental": false,
-          "details": "Processor ResourceDocumentProcessor cannot support incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
+          "details": "Processor ResourceDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
+          "incrementalPhase": "build"
+        },
+        "TocDocumentProcessor": {
+          "can_incremental": false,
+          "details": "Processor TocDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
           "incrementalPhase": "build"
         },
         "ConceptualDocumentProcessor": {
-          "can_incremental": true,
+          "can_incremental": false,
           "incrementalPhase": "build"
         }
       }

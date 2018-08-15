@@ -97,9 +97,9 @@ Typically, you will run one silo per machine, but it sometimes make sense to run
 <a href="https://marketplace.visualstudio.com/items?itemName=sbykov.MicrosoftOrleansToolsforVisualStudio">https://marketplace.visualstudio.com/items?itemName=sbykov.MicrosoftOrleansToolsforVisualStudio</a></p>
 <p>After starting Visual Studio, go to create a new project.
 Under &quot;Visual C#,&quot; you should see the following:</p>
-<p>![](../Images/New DevTest 1.PNG)</p>
+<p><img src="../Images/New%20DevTest%201.PNG" alt=""></p>
 <p>Choose the &quot;Orleans Dev/Test Host&quot; project type, create a directory for the solution, and create the project:</p>
-<p>![](../Images/New DevTest 2.PNG)</p>
+<p><img src="../Images/New%20DevTest%202.PNG" alt=""></p>
 <p>At this point go ahead and compile your project to download the packages.</p>
 <p>The project is just a console application populated with code that helps you host a silo in an environment that is &quot;developer friendly,&quot; i.e. where everything runs in a single process.</p>
 <p>The main code does three things: it creates a silo, initializes the Orleans client runtime, and waits for user input before terminating:</p>
@@ -136,10 +136,10 @@ Under &quot;Visual C#,&quot; you should see the following:</p>
 Next we will create two more projects, one to hold the communication interface, and one to hold our grain.
 Separating the two is a best practice since the interface project is shared between the client and server-side, while the grains are implementation code and should be private to the server side.</p>
 <p>In addition to the Dev/Test host, there are two more Orleans projects, and we should create one of each in our solution:</p>
-<p>![](../Images/New DevTest 4.PNG)</p>
+<p><img src="../Images/New%20DevTest%204.PNG" alt=""></p>
 <p>Once you have them in your solution, make sure to add a reference to the grain interface project from each of the other projects: the host, which will contain our client code, and the grain collection project.</p>
 <p>Add a reference for the grain collection project to the host project, so that it is automatically (re-)built and copied when starting the debugger.</p>
-<p>![](../Images/New DevTest 7.PNG)</p>
+<p><img src="../Images/New%20DevTest%207.PNG" alt=""></p>
 <p>Open the <em>IGrain1.cs</em> file and add a method <code>SayHello()</code> to it.
 We should have something like this:</p>
 <pre><code class="lang-csharp">public interface IGrain1 : IGrainWithIntegerKey
@@ -170,7 +170,7 @@ Console.WriteLine(&quot;\n\n{0}\n\n&quot;, friend.SayHello().Result);
 Hit F5, let the silo initialization code take its time.
 This will take a few seconds, maybe as much as ten, and there will be a lot of log messages printed.
 At the very end, you should see the printout of the greeting.</p>
-<p>![](../Images/New DevTest 6.PNG)</p>
+<p><img src="../Images/New%20DevTest%206.PNG" alt=""></p>
 <p>These are the essential steps to create and run Orleans-based code: define communication interfaces, implement them using grain classes, and write some client code to communicate with the grains in order to test them.
 In a realistic production environment, the grain code would be deployed in a silo hosted by Windows Azure or Windows Server and the client would most likely be a Web site or service using Orleans for the backend logic.
 However, that is just about making different configuration choices - the code in the simplified environment is the same as in the production environment.</p>
