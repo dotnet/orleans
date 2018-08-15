@@ -15,22 +15,22 @@ Orleans transactions are opt-in.  A silo must be configured to use transactions.
 
 ### Transaction Manager
 
-Orleans transactions requires a transaction manager which is authoritative on the state of a transaction.  Currently, the transaction manager is run within the cluster and must be configured.  This can be programmatically configured on the silo host builder using UseInClusterTransactionManager and TransactionsConfiguration.
+Orleans transactions requires a transaction manager, which is the authoritative source of information about the state of a transaction.  Currently, the transaction manager is run within the cluster and must be configured.  This can be programmatically configured on the silo host builder using UseInClusterTransactionManager and TransactionsConfiguration.
 
 The TransactionsConfiguration contains the following configurable values:
-* TransactionIdAllocationBatchSize - To avoid a storage call on every transaction start, transaction Ids are allocated in batches. This is the number of new transaction Ids allocated per transaction Id generation request (storage call).
-* AvailableTransactionIdThreshold - A new batch of transaction Ids will be automatically allocated if the available ids drop below this threshold.
+* TransactionIdAllocationBatchSize - To avoid a storage call on every transaction start, transaction Ids are allocated in batches. This is the number of new transaction Ids allocated per transaction Id generation request (which does a storage call).
+* AvailableTransactionIdThreshold - A new batch of transaction Ids will be automatically allocated if the number of available ids drops below this threshold.
 * TransactionRecordPreservationDuration - How long to preserve a transaction record in the TM memory after the transaction has completed.  This is used to answer queries about the outcome of the transaction.
 
-It is suggested that you use the defaults for these values unless they demonstrate themselves as insufficient.
+It is suggested that you use the defaults for these values unless you have evidence they are insufficient.
 
 ### Transaction Log
 
-The transaction manager must persist transaction results for recoverability purposes.  To support a range of backend storage solutions an abstraction has been provided for log storage.  We currently support an azure storage version of the log storage, and an in-memory version for development and test purposes.  This can be programmatically configured on the silo host builder using UseAzureTransactionLog or UseInMemoryTransactionLog.
+The transaction manager must persist transaction results for recoverability purposes.  To support a range of backend storage solutions an abstraction has been provided for log storage.  We currently support an Azure storage version of the log storage, and an in-memory version for development and test purposes.  This can be programmatically configured on the silo host builder using UseAzureTransactionLog or UseInMemoryTransactionLog.
 
 ### Transactional State
 
-To support various transactional storage patterns the grain facing interface and supporting logic is pluggable.  We currently only support ITransactionalState.  This can be programmatically enabled on the silo host builder using UseTransactionalState.  To use a transactional state, a storage provider needs also be configured.
+To support various transactional storage patterns, the grain-facing interface and supporting logic is pluggable.  We currently only support ITransactionalState.  This can be programmatically enabled on the silo host builder using UseTransactionalState.  To use a transactional state, a storage provider also needs to be configured.
 
 Example:
 
@@ -48,7 +48,7 @@ await host.StartAsync();
 
 ## Programming Model
 
-For a grain to support transactions, transactional operations on a grain must be marked as being part of a transaction using the “Transaction” attribute.  Calls can be marked as “Required”, meaning the call can take part in a transaction among multiple other grains or as “RequiresNew” indicating that it will already start its own transaction.
+For a grain to support transactions, transactional operations on a grain must be marked as being part of a transaction using the “Transaction” attribute.  A call can be marked as “Required”, meaning that the call will take part in the caller's transaction, or if the caller is not running a transaction, then the call will start a new transaction. If a call is marked as “RequiresNew”, then it will always start a new transaction, even if the caller is executing within a transaction.
 
 Example:
 
@@ -60,7 +60,7 @@ public interface IATMGrain : IGrainWithIntegerKey
 }
 ```
 
-The Transfer operation in the above atm grain will always start a new transaction which involves the two referenced accounts.
+The Transfer operation in the above ATM grain will always start a new transaction that involves the two referenced accounts.
 
 ``` csharp
 public interface IAccountGrain : IGrainWithGuidKey
@@ -76,9 +76,9 @@ public interface IAccountGrain : IGrainWithGuidKey
 }
 ```
 
-The Withdraw and Deposit operations in the above account grain can take part in transactional operations, like the Transfer operation in the ATM grain, with other transactional grains.
+The Withdraw and Deposit operations in the above account grain can take part in other transactional grains' transactional operations, such as the Transfer operation in the ATM grain.
 
-To use a transactional state within a grain, one needs only define a serializable state class to be persisted and declare the state in the grains constructor.
+To use a transactional state within a grain, one need only define a serializable state class to be persisted and declare the state in the grain's constructor.
 
 Example:
 
@@ -114,5 +114,5 @@ public class AccountGrain : Grain, IAccountGrain
 }
 ```
 
-In the above example the attribute TransactionalState is used to declare that the ‘balance’ construction argument should be associated with a transactional state named “balance”.  With this declaration Orleans will wire up an ITransactionalState<Balance> instance with a state loaded from the default storage provider for the grain to use.  The state can be accessed and modified via the State property.  Any changes to the state need be recorded by calling ‘Save()’.  The transaction infrastructure will ensure that any such changes performed as part of a transaction, even among multiple grains distributed over an Orleans cluster, will either all be committed or reverted together.
+In the above example the attribute TransactionalState is used to declare that the ‘balance’ construction argument should be associated with a transactional state named “balance”.  With this declaration Orleans will wire up an ITransactionalState<Balance> instance with a state loaded from the default storage provider for the grain to use.  The state can be accessed and modified via the State property.  Changes to the state need be recorded by calling ‘Save()’.  The transaction infrastructure will ensure that any such changes performed as part of a transaction, even among multiple grains distributed over an Orleans cluster, will either all be committed or all be undone.
 
