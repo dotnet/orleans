@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -472,14 +473,14 @@ namespace Orleans.Runtime
                 {
                     TimeSpan ageLimit = this.collectionOptions.Value.ClassSpecificCollectionAge.TryGetValue(grainType, out TimeSpan limit)
                         ? limit
-                        : collectionOptions.Value.CollectionAge;
+                        : GetDefaultOrCollectionAgeLimit(grainType);
 
                     // create a dummy activation that will queue up messages until the real data arrives
                     // We want to do this (RegisterMessageTarget) under the same lock that we tested TryGetActivationData. They both access ActivationDirectory.
                     result = new ActivationData(
-                        address, 
-                        genericArguments, 
-                        placement, 
+                        address,
+                        genericArguments,
+                        placement,
                         activationStrategy,
                         this.activationCollector,
                         ageLimit,
@@ -505,6 +506,18 @@ namespace Orleans.Runtime
             SetupActivationInstance(result, grainType, genericArguments);
             activatedPromise = InitActivation(result, grainType, genericArguments, requestContextData);
             return result;
+        }
+
+        private TimeSpan GetDefaultOrCollectionAgeLimit(string grainType)
+        {
+            GrainTypeData grainTypeData = GrainTypeManager[grainType];
+
+            CollectionAgeLimitAttribute attr = grainTypeData
+                .Type
+                .GetType()
+                .GetCustomAttributes<CollectionAgeLimitAttribute>(true)
+                .FirstOrDefault();
+            return (attr == null) ? CollectionAgeLimitConstants.DefaultCollectionAgeLimit : attr.Time;
         }
 
         private void SetupActivationInstance(ActivationData result, string grainType, string genericArguments)
