@@ -11,6 +11,7 @@ using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using Orleans.Hosting;
 using Orleans.Transactions.Tests.Correctness;
+using Orleans.Transactions.Tests.Grains;
 using TestExtensions;
 
 namespace Orleans.Transactions.Tests
@@ -22,6 +23,12 @@ namespace Orleans.Transactions.Tests
         private readonly Random random;
         private readonly TestCluster testCluster;
         private readonly ILogger logger;
+
+        protected void Log(string message)
+        {
+            this.output.WriteLine($"[{DateTime.Now}] {message}");
+            this.logger.LogInformation(message);
+        }
 
         private class ExpectedGrainActivity
         {
@@ -51,37 +58,48 @@ namespace Orleans.Transactions.Tests
         protected virtual async Task TransactionWillRecoverAfterRandomSiloFailure(string transactionTestGrainClassName, bool gracefulShutdown)
         {
             const int grainCount = 100;
-            int index = 0;
-            Func<int> getIndex = () => { return index++; };
+            var index = new[] { 0 };
+            Func<int> getIndex = () => index[0]++;
             List<ExpectedGrainActivity> txGrains = Enumerable.Range(0, grainCount)
                 .Select(i => new ExpectedGrainActivity { Grain = RandomTestGrain<ITransactionalBitArrayGrain>(transactionTestGrainClassName) })
                 .ToList();
             var txSucceedBeforeInterruption = await AllTxSucceed(txGrains, getIndex());
+            Assert.True(txSucceedBeforeInterruption);
             await ValidateResults(txGrains);
-            this.logger.LogInformation($"Tx succeed before interruption : {txSucceedBeforeInterruption}");
+
             // have transactions in flight when silo goes down
-            bool killed = false;
-            Task succeeding = RunWhileSucceeding(txGrains, getIndex, () => { return killed; });
+            Task succeeding = RunWhileSucceeding(txGrains, getIndex);
+
+            var siloToTerminate = this.testCluster.Silos[this.random.Next(this.testCluster.Silos.Count)];
+            this.Log($"Warmup transaction succeeded. {(gracefulShutdown ? "Stopping" : "Killing")} silo {siloToTerminate.SiloAddress} ({siloToTerminate.Name}) and continuing");
+            
             if (gracefulShutdown)
-                this.testCluster.StopSilo(this.testCluster.Silos[this.random.Next(this.testCluster.Silos.Count)]);
+                this.testCluster.StopSilo(siloToTerminate);
             else
-                this.testCluster.KillSilo(this.testCluster.Silos[this.random.Next(this.testCluster.Silos.Count)]);
-            killed = true;
+                this.testCluster.KillSilo(siloToTerminate);
+
+            this.Log("Waiting for transactions to stop completing successfully");
             await succeeding;
+
+            this.Log($"Waiting for system to recover. Performed {index[0]} transactions on each group.");
             await TestingUtils.WaitUntilAsync(lastTry => CheckTxResult(txGrains, getIndex, lastTry), RecoveryTimeout);
-            output.WriteLine($"Performed {index} transactions");
+            this.Log($"Recovery completed. Performed {index[0]} transactions on each group. Validating results.");
             await ValidateResults(txGrains);
         }
 
-        private async Task RunWhileSucceeding(IList<ExpectedGrainActivity> txGrains, Func<int> getIndex, Func<bool> killed)
+        private async Task RunWhileSucceeding(IList<ExpectedGrainActivity> txGrains, Func<int> getIndex)
         {
-            while (!killed() && await AllTxSucceed(txGrains, getIndex())) { };
+            var startTime = DateTime.Now;
+            while (await AllTxSucceed(txGrains, getIndex()) && DateTime.Now - startTime < TimeSpan.FromSeconds(10))
+            {
+                // Loop until failure.
+            }
         }
 
         private async Task<bool> CheckTxResult(IList<ExpectedGrainActivity> txGrains, Func<int> getIndex, bool assertIsTrue)
         {
             var succeed = await AllTxSucceed(txGrains, getIndex());
-            this.logger.LogInformation($"All transactions succeed after interruption : {succeed}");
+            this.Log($"All transactions succeed after interruption : {succeed}");
             if (assertIsTrue)
             {
                 //consider it recovered if all tx succeed
@@ -107,7 +125,9 @@ namespace Orleans.Transactions.Tests
             }
             catch (Exception)
             {
-                base.output.WriteLine($"Some transactions failed. {tasks.Count(t => t.IsFaulted)} out of {tasks.Count} failed");
+                // Collect the indices of the pairs which failed their transactions for diagnostics.
+                var failedGroups = tasks.Select((task, i) => new {task, i}).Where(t => t.task.IsFaulted).Select(t => t.i).ToList();
+                this.Log($"Some transactions failed. Index: {index}. {failedGroups.Count} out of {tasks.Count} failed. Failed groups: {string.Join(", ", failedGroups)}");
                 return false;
             }
 
@@ -119,23 +139,32 @@ namespace Orleans.Transactions.Tests
             try
             {
                 await this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid()).MultiGrainSetBit(grains.Select(v => v.Grain).ToList(), index);
+                grains.ForEach(g =>
+                {
+                    g.Expected.Set(index, true);
+                    g.Unambiguous.Set(index, true);
+                });
             }
             catch (OrleansTransactionAbortedException e)
             {
-                base.output.WriteLine($"Some transactions failed. Index: {index}: Exception: {e.GetType().Name}");
-                grains.ForEach(g => g.Expected.Set(index, false));
-                grains.ForEach(g => g.Unambiguous.Set(index, true));
+                this.Log($"Some transactions failed. Index: {index}: Exception: {e.GetType().Name}");
+                grains.ForEach(g =>
+                {
+                    g.Expected.Set(index, false);
+                    g.Unambiguous.Set(index, true);
+                });
                 throw;
             }
             catch (Exception e)
             {
-                base.output.WriteLine($"Ambiguous transaction failure. Index: {index}: Exception: {e.GetType().Name}");
-                grains.ForEach(g => g.Expected.Set(index, false));
-                grains.ForEach(g => g.Unambiguous.Set(index, false));
+                this.Log($"Ambiguous transaction failure. Index: {index}: Exception: {e.GetType().Name}");
+                grains.ForEach(g =>
+                {
+                    g.Expected.Set(index, false);
+                    g.Unambiguous.Set(index, false);
+                });
                 throw;
             }
-            grains.ForEach(g => g.Expected.Set(index, true));
-            grains.ForEach(g => g.Unambiguous.Set(index, true));
         }
 
         private async Task ValidateResults(List<ExpectedGrainActivity> txGrains)
@@ -143,28 +172,39 @@ namespace Orleans.Transactions.Tests
             await ReportResults(txGrains);
             foreach (ExpectedGrainActivity activity in txGrains)
             {
-                int[][] actual = await activity.Grain.Get();
+                var grain = activity.Grain;
+                List<BitArrayState> actual = await grain.Get();
                 // self consistency check, all resources should be the same
-                int[] first = actual.FirstOrDefault();
+                BitArrayState first = actual.FirstOrDefault();
                 Assert.NotNull(first);
-                foreach (int[] result in actual)
+                foreach (BitArrayState result in actual)
                 {
                     Assert.Equal(first.Length, result.Length);
-                    for(int i = 0; i< first.Length; i++)
-                    {
-                        Assert.Equal(first[i], result[i]);
-                    }
+                    Assert.Equal(first.ToString(), result.ToString());
                 }
+
                 // Check against expected.
                 // Only need to check if behavior was not ambiguous.
                 // Only need to check first, since we've already verified all resources are the same.
-                int[] expected = activity.Expected.Value;
-                int[] unambigous = activity.Unambiguous.Value;
+                var expected = activity.Expected;
+                var unambigous = activity.Unambiguous;
                 Assert.Equal(first.Length, expected.Length);
-                for (int i = 0; i < first.Length; i++)
+
+                var unambiguousExpected = expected & unambigous;
+                var unambiguousFirst = first & unambigous;
+                var difference = unambiguousFirst ^ unambiguousExpected;
+
+                if (unambiguousExpected != unambiguousFirst)
                 {
-                    Assert.Equal(expected[i] & unambigous[i], first[i] & unambigous[i]);
+                    this.Log("Inconsistent results:\n" +
+                             $"{first} Actual state\n" +
+                             $"{expected} Expected state\n" +
+                             $"{unambigous} Unambiguous bits\n" +
+                             $"{difference} Inconsistencies\n" +
+                             $"Grain: {grain}");
                 }
+
+                Assert.Equal(unambiguousExpected.ToString(), unambiguousFirst.ToString());
             }
         }
 
@@ -173,32 +213,55 @@ namespace Orleans.Transactions.Tests
             int i = 0;
             foreach (ExpectedGrainActivity activity in txGrains)
             {
-                int[] expected = activity.Expected.Value;
-                int[] unambiguous = activity.Unambiguous.Value;
-                int[][] actual = await activity.Grain.Get();
-                int[] first = actual.FirstOrDefault();
+                var expected = activity.Expected;
+                var unambiguous = activity.Unambiguous;
+                var grain = activity.Grain;
+                var actual = await grain.Get();
+                var first = actual.FirstOrDefault();
                 if(first == null)
                 {
-                    output.WriteLine($"No activity for {i}");
+                    this.Log($"No activity for {i} ({grain})");
                     return;
                 }
+
                 int j = 0;
-                List<int> badIndexes;
-                foreach (int[] result in actual)
+                foreach (var result in actual)
                 {
-                    badIndexes = result.Select((v, idx) => v == first[idx] ? -1 : idx).Where(v => v != -1).ToList();
-                    if(badIndexes.Count != 0)
-                        output.WriteLine($"Activity on {i},{j} did not match first at these indexs: {string.Join(",", badIndexes.Select(idx => $"{idx}: {first[idx]}!={result[idx]}"))}");
+                    // Check if each state is identical to the first state.
+                    var difference = result ^ first;
+                    if (difference.Value.Any(v => v != 0))
+                    {
+                        this.Log($"Activity on grain {i}, state {j} did not match 'first':\n"
+                                 + $"  {first}\n"
+                                 + $"^ {result}\n"
+                                 + $"= {difference}\n"
+                                 + $"Activation: {grain}");
+                    }
+
                     j++;
                 }
+
                 j = 0;
-                foreach (int[] result in actual)
+                foreach (var result in actual)
                 {
-                    badIndexes = result.Select((v, idx) => (v & unambiguous[idx]) == (expected[idx] & unambiguous[idx]) ? -1 : idx).Where(v => v != -1).ToList();
-                    if (badIndexes.Count != 0)
-                        output.WriteLine($"Activity on {i},{j} did not match expected at these indexs: {string.Join(",", badIndexes.Select(idx => $"{idx}: {expected[idx] & unambiguous[idx]}!={result[idx] & unambiguous[idx]}"))}");
+                    // Check if the unambiguous portions of the results match.
+                    var unambiguousResult = result & unambiguous;
+                    var unambuguousExpected = expected & unambiguous;
+                    var difference = result ^ first;
+
+                    if (difference.Value.Any(v => v != 0))
+                    {
+                        this.Log(
+                            $"Activity on grain {i}, state {j} did not match 'expected':\n"
+                            + $"  {unambuguousExpected}\n"
+                            + $"^ {unambiguousResult}\n"
+                            + $"= {difference}\n"
+                            + $"Activation: {grain}");
+                    }
+
                     j++;
                 }
+
                 i++;
             }
         }
