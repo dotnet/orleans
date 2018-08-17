@@ -102,6 +102,9 @@ Here we will simply use a helper method that creates a configuration object hard
 <pre><code class="lang-csharp">IClusterClient client = new ClientBuilder().UseConfiguration(clientConfig).Build();
 </code></pre><p>Lastly, we need to call <code>Connect()</code> method on the constructed client object to make it connect to the Orleans cluster. It&#39;s an asynchronous method that returns a <code>Task</code>. So we need to wait for its completion with an <code>await</code> or <code>.Wait()</code>.</p>
 <pre><code class="lang-csharp">await client.Connect(); 
+</code></pre><h4 id="client-lifetime">Client lifetime</h4>
+<p> The connected client can be safely reused in the application. For ASP.NET Core applications it can be registered as a singleton </p>
+<pre><code class="lang-csharp">services.AddSingleton(client);
 </code></pre><h3 id="making-calls-to-grains">Making Calls to Grains</h3>
 <p>Making calls to grain from a client is really no different from <a href="Developing-a-Grain.html#grain-method-invocation">making such calls from within grain code</a>.
 The same <code>GetGrain&lt;T&gt;(key)</code> method, where <code>T</code> is the target grain interface, is used in both cases <a href="Developing-a-Grain.html#grain-reference">to obtain grain references</a>.

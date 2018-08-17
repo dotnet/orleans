@@ -77,7 +77,7 @@
             <article class="content wrap" id="_content" data-uid="">
 <h1 id="journaledgrain-basics">JournaledGrain Basics</h1>
 
-<p>Journaled grains derive from <code>&lt;JournaledGrain&lt;StateType,EventType&gt;</code>, with the following type parameters:</p>
+<p>Journaled grains derive from <code>JournaledGrain&lt;StateType,EventType&gt;</code>, with the following type parameters:</p>
 <ul>
 <li>The <code>StateType</code> represents the state of the grain. It must be a class with a public default constructor.  </li>
 <li><code>EventType</code> is a common supertype for all the events that can be raised for this grain, and can be any class or interface. </li>
@@ -118,7 +118,7 @@ await ConfirmEvents();
 }
 </code></pre><p>The transition methods are assumed to have no side effects other than modifying the state object, and should be deterministic (otherwise, the effects are unpredictable).  If the transition code throws an exception, that exception is caught and included in a warning in the Orleans log, issued by the log-consistency provider.  </p>
 <p>When, exactly, the runtime calls the transition methods depends on the chosen log consistency provider and its configuration. It is best for applications not to rely on a particular timing, except when specifically guaranteed by the log consistency provider. </p>
-<p>Some providers, such as the <code>LogStorage</code> log-consistency provider, replay the event sequence every time the grain is loaded. Therefore, as long as the event objects can still be properly deserialized from storage, it is possibly to radically modify the GrainState class and the transition methods. But for other providers, such as the <code>StateStorage</code> log-consistency provider, only the <code>GrainState</code> object is persisted, so developers must ensure that it can be deserialized correctly when read from storage. </p>
+<p>Some providers, such as the <code>LogStorage</code> log-consistency provider, replay the event sequence every time the grain is loaded. Therefore, as long as the event objects can still be properly deserialized from storage, it is possible to radically modify the GrainState class and the transition methods. But for other providers, such as the <code>StateStorage</code> log-consistency provider, only the <code>GrainState</code> object is persisted, so developers must ensure that it can be deserialized correctly when read from storage. </p>
 <h2 id="raising-multiple-events">Raising Multiple Events</h2>
 <p>It is possible to make multiple calls to RaiseEvent before calling ConfirmEvents:</p>
 <pre><code class="lang-csharp">RaiseEvent(e1);

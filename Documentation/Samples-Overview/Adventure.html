@@ -78,13 +78,12 @@
 <h1 id="adventure">Adventure</h1>
 
 <p>A simple multiplayer text adventure game inspired by old-fashioned, text-based adventure games.</p>
-<h3 id="instructions">Instructions:</h3>
+<h3 id="instructions">Instructions</h3>
 <ol>
-<li>Build Adventure.sln</li>
-<li>Start your local Silo from a command window using command file  #1.</li>
-<li>The game map initialization script, #2</li>
-<li>Start the client #3</li>
-<li>Reminisce about the good old days before graphical user interfaces</li>
+<li>Open OrleansAdventure.sln in Visual Studio.</li>
+<li>Start the &#39;AdventureSetup&#39; project.</li>
+<li>Once AdventureSetup is running, start the &#39;AdventureClient&#39; project.</li>
+<li>You will then be prompted to enter your name on the command line. Enter it and begin the game.</li>
 </ol>
 <h3 id="overview">Overview</h3>
 <p>The AdventureSetup program reads a game description (&quot;map&quot;) from AdventureConfig.txt.</p>
@@ -97,7 +96,7 @@
 <h3 id="how-is-it-modeled">How is it modeled?</h3>
 <p>Player and Rooms are modeled as grains. These grains allow us to distribute the game with each grain modelling state and functionality.</p>
 <p>Things such as keys are modeled as plain old objects - they are really just simple immutable data structures that move around rooms and among players; they don&#39;t need to be grains.</p>
-<h3 id="things-for-you-to-do-if-you-are-so-inclined">Things for you to do if you are so inclined</h3>
+<h3 id="possible-improvements">Possible improvements</h3>
 <ol>
 <li>Make the map much, much, bigger</li>
 <li>Make the brass key unlock something</li>

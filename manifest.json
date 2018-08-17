@@ -1,6 +1,6 @@
 {
   "homepages": [],
-  "source_base_path": "c:/GitHub/sergeybykov/orleans-2/src",
+  "source_base_path": "C:/GitHub/dotnet/orleans/src",
   "xrefmap": "xrefmap.yml",
   "files": [
     {
@@ -829,7 +829,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Orleans-Streams/index.html",
-          "hash": "IspiBC+Q7z3iPFmfGJ+5CQ=="
+          "hash": "7zqC4rasbWXRfleL7ABLSw=="
         }
       },
       "is_incremental": false,
@@ -841,7 +841,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Presentations/index.html",
-          "hash": "Lx8/39NIQXpDYCyEjAvT0A=="
+          "hash": "zVqhyh7Qnj4tO/F+IcoMhg=="
         }
       },
       "is_incremental": false,
@@ -877,7 +877,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Runtime-Implementation-Details/Load-Balancing.html",
-          "hash": "0dxDWebSsQPdGvw+auQPdQ=="
+          "hash": "rZW9RSrvHZGU3R5osSxNig=="
         }
       },
       "is_incremental": false,
@@ -949,7 +949,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Samples-Overview/Azure-Web-Sample.html",
-          "hash": "Zb82XSSF4HzJNG2l59o4bg=="
+          "hash": "op61kkRl/RyeiL5kfnhcZA=="
         }
       },
       "is_incremental": false,
@@ -1211,7 +1211,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/toc.html",
-          "hash": "lwadD/qXyanoIGYkMUNPaw=="
+          "hash": "PLD7oNj7n4dZyAxVYZjDOQ=="
         }
       },
       "is_incremental": false,
@@ -1619,7 +1619,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/A-Service-is-a-Collection-of-Communicating-Actors.html",
-          "hash": "CnkhX+cmLCR4MBJqEw2NLA=="
+          "hash": "huwcRcDHoWtxjrhG+c+NYQ=="
         }
       },
       "is_incremental": false,
@@ -1667,7 +1667,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/Custom-Storage-Providers.html",
-          "hash": "AGSEJOez8GOWLOHjr3hBmw=="
+          "hash": "aIPqlFHwjpiwPLc+xU9lYQ=="
         }
       },
       "is_incremental": false,
@@ -1679,7 +1679,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/Declarative-Persistence.html",
-          "hash": "QDBVq3fVBnZ2B5w6eijvFQ=="
+          "hash": "n9dF9lw+MeyYNnct+BZOLQ=="
         }
       },
       "is_incremental": false,
@@ -1739,7 +1739,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/My-First-Orleans-Application.html",
-          "hash": "s/9DFG7564oJUX7gixmvcA=="
+          "hash": "Y8uZjsY9H0I2505l5BD8pg=="
         }
       },
       "is_incremental": false,
@@ -1751,7 +1751,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/On-Premise-Deployment.html",
-          "hash": "Wdcjg3A5QByxhP9xhnsEHw=="
+          "hash": "GLZbmFDE7YjitI/y0zpyWg=="
         }
       },
       "is_incremental": false,
@@ -1763,7 +1763,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/Running-in-a-Stand-alone-Silo.html",
-          "hash": "xhgHUOZJAXV1XdJ26qjHxA=="
+          "hash": "sZz08hf50JIL3RZuIxB5oA=="
         }
       },
       "is_incremental": false,
@@ -1799,7 +1799,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/toc.html",
-          "hash": "y456d2TuRFG5timd5R3gjA=="
+          "hash": "+vjQGagRJXwSgnJ+PEHWfw=="
         }
       },
       "is_incremental": false,
@@ -1919,7 +1919,7 @@
       "output": {
         ".html": {
           "relative_path": "Community/toc.html",
-          "hash": "ks2APo4uodUdaLFspXTkNQ=="
+          "hash": "2sl4DvfAGFG1L8PqBMtYKw=="
         }
       },
       "is_incremental": false,
@@ -1931,7 +1931,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Advanced-Concepts/Activation-Garbage-Collection.html",
-          "hash": "ArZkOmTWYg6rrJ1p6bRPtQ=="
+          "hash": "b9IdPYVXbgIa897ME3Ayww=="
         }
       },
       "is_incremental": false,
@@ -2051,7 +2051,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Advanced-Concepts/Transactions.html",
-          "hash": "/WR0+kisPSyhZWBvGp8eZQ=="
+          "hash": "CgDcEnnp5QM4jfHhaDtsdA=="
         }
       },
       "is_incremental": false,
@@ -2099,7 +2099,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Core-Features/Grain-Persistence.html",
-          "hash": "8WXoIAfZpqRG6uFKppEmrw=="
+          "hash": "38qpDKeKrNFYr7GnHT/Wmg=="
         }
       },
       "is_incremental": false,
@@ -2171,7 +2171,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Configuration-Guide/Configuring-AdoNet-Providers.html",
-          "hash": "Ciw6Qc+gG1HQ2VJ4R/IfWw=="
+          "hash": "X9hZbaoZiChj4b2/Q8w8ZA=="
         }
       },
       "is_incremental": false,
@@ -2183,7 +2183,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Configuration-Guide/Local-Development-Configuration.html",
-          "hash": "jClnzP6EmvcjIoKmpNVleQ=="
+          "hash": "Knk79qFaswpSLjPkokccIg=="
         }
       },
       "is_incremental": false,
@@ -2207,7 +2207,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Configuration-Guide/Server-Configuration.html",
-          "hash": "X4CoYgPt8yWmSZC/IqPBrA=="
+          "hash": "ZljGP96YNH5Xb1gl62bZPQ=="
         }
       },
       "is_incremental": false,
@@ -2243,7 +2243,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Docker-Deployment.html",
-          "hash": "6P/U1CoFj0GWVolmzz+Y+w=="
+          "hash": "gCmteRwoQB6NeZoqDZgDFQ=="
         }
       },
       "is_incremental": false,
@@ -2255,7 +2255,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Deployment-and-Operations/Heterogeneous-Silos.html",
-          "hash": "9LZDo1htbF2dHXpLGrtBbA=="
+          "hash": "U7QtkkxyryBZNG0qBs7AYA=="
         }
       },
       "is_incremental": false,
@@ -2397,7 +2397,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Event-Sourcing/GrainStateAPI.html",
-          "hash": "Em35i7OK/oBCsroPWmu/Qw=="
+          "hash": "/Ke4cfzlLKRVTGj2EyO72Q=="
         }
       },
       "is_incremental": false,
@@ -2493,7 +2493,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Getting-Started-With-Orleans/Developing-a-Client.html",
-          "hash": "wrfp2TZ4j+ALQK6swNk/XA=="
+          "hash": "RaQ5gPhSdSsjuTto6mfo8A=="
         }
       },
       "is_incremental": false,
@@ -2540,7 +2540,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Getting-Started-With-Orleans/NuGets.html",
-          "hash": "YAdgbhMi3/1nqwhlGtBzwA=="
+          "hash": "ywaK+Q2oTO4uWQWeoGtY3w=="
         }
       },
       "is_incremental": false,
@@ -2588,7 +2588,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Grain-Versioning/Compatible-grains.html",
-          "hash": "pOJIPjet/8cVZpDSWJ/cAg=="
+          "hash": "FabeU4zkIerITqfp0w2s/A=="
         }
       },
       "is_incremental": false,
@@ -2778,7 +2778,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Orleans-Streams/Stream-Providers.html",
-          "hash": "5mEgVN8lEYs6TOVIHkKT4g=="
+          "hash": "JISuPQjnRAPlQAdB2xESNA=="
         }
       },
       "is_incremental": false,
@@ -2790,7 +2790,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Orleans-Streams/Streams-Extensibility.html",
-          "hash": "PhjKUtSkD8zrTWps+nCSRQ=="
+          "hash": "lw+M3JoArveYAXUzl/HBcQ=="
         }
       },
       "is_incremental": false,
@@ -2850,7 +2850,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Orleans-Streams/index.html",
-          "hash": "7KoUar8M5t/71Io3E6Gkaw=="
+          "hash": "9NovzQB8SXbFoKrRY+5eRg=="
         }
       },
       "is_incremental": false,
@@ -2862,7 +2862,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Presentations/index.html",
-          "hash": "jvGDj6hyXwxr1ueokKYSQw=="
+          "hash": "duku3Q0AUIdrqlguvpYUKw=="
         }
       },
       "is_incremental": false,
@@ -2874,7 +2874,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Runtime-Implementation-Details/Cluster-Management.html",
-          "hash": "2V91gx5qeQnrAVJ37NzJWA=="
+          "hash": "9ztLuPaYdepjgXMPsD5GrQ=="
         }
       },
       "is_incremental": false,
@@ -2898,7 +2898,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Runtime-Implementation-Details/Load-Balancing.html",
-          "hash": "pVmPHE9VFzD8kFWm+O6VUg=="
+          "hash": "k7O73GqHm93EksAzgckKNA=="
         }
       },
       "is_incremental": false,
@@ -2958,7 +2958,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Samples-Overview/Adventure.html",
-          "hash": "zDmKXyxvhyuD1fYPaTaTVg=="
+          "hash": "bgQ5ME0+4mNWv7w2JMhr/A=="
         }
       },
       "is_incremental": false,
@@ -2970,7 +2970,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Samples-Overview/Hello-World.html",
-          "hash": "BCJhayVeZwRNLrnce0989A=="
+          "hash": "Jex6ahnplDZk4q+31zXyGQ=="
         }
       },
       "is_incremental": false,
@@ -3050,7 +3050,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/toc.html",
-          "hash": "FWmjlKSFbI+2vQuO3/wrtw=="
+          "hash": "io/uan+8L23Cj/mxYRKC0A=="
         }
       },
       "is_incremental": false,
@@ -3454,11 +3454,23 @@
     },
     {
       "type": "Conceptual",
+      "source_relative_path": "Tutorials/Custom-Grain-Storage.md",
+      "output": {
+        ".html": {
+          "relative_path": "Tutorials/Custom-Grain-Storage.html",
+          "hash": "xpIVKO6Ewe5zj8MI1cYUpQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
       "source_relative_path": "Tutorials/Declarative-Persistence.md",
       "output": {
         ".html": {
           "relative_path": "Tutorials/Declarative-Persistence.html",
-          "hash": "myDwsjHGccBmZyI4HGYP8g=="
+          "hash": "VzLxWuSxDoK11xA+cCwumg=="
         }
       },
       "is_incremental": false,
@@ -3482,7 +3494,7 @@
       "output": {
         ".html": {
           "relative_path": "Tutorials/toc.html",
-          "hash": "r/Hxx2/35r5Iox6VNTNlGQ=="
+          "hash": "XX6gEKxaJPiAFN6Kr25fLg=="
         }
       },
       "is_incremental": false,
@@ -3509,7 +3521,7 @@
       "output": {
         ".html": {
           "relative_path": "toc.html",
-          "hash": "MgoQy4DMlFbVh9aHZIaQrw=="
+          "hash": "pUKZgp/j/haU/Ovdg4bmjg=="
         }
       },
       "is_incremental": false,
@@ -3524,14 +3536,14 @@
         "incrementalPhase": "build"
       },
       "processors": {
-        "ResourceDocumentProcessor": {
-          "can_incremental": false,
-          "details": "Processor ResourceDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
-          "incrementalPhase": "build"
-        },
         "TocDocumentProcessor": {
           "can_incremental": false,
-          "details": "Processor TocDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
+          "details": "Processor TocDocumentProcessor cannot support incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
+          "incrementalPhase": "build"
+        },
+        "ResourceDocumentProcessor": {
+          "can_incremental": false,
+          "details": "Processor ResourceDocumentProcessor cannot support incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
           "incrementalPhase": "build"
         },
         "ConceptualDocumentProcessor": {

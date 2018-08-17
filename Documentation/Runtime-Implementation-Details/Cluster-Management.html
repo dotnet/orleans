@@ -94,10 +94,9 @@ In addition to the <code>MembershipTable</code> each silo participates in fully 
 <p> 5.1 Suspicion is written to the <code>MembershipTable</code>, in a special column in the row corresponding to P. When S suspects P it writes: “at time TTT S suspected P”.</p>
 <p> 5.2 One suspicion is not enough to declare P as dead. You need Z suspicions from different silos in a configurable time window T, typically 3 minutes, to declare P as dead. The suspicion is written using optimistic concurrency control provided by the <code>MembershipTable</code>.</p>
 <p> 5.3 The suspecting silo S reads P&#39;s row.</p>
-<pre><code> 5.4 If S is the last suspector (there have already been Z-1 suspectors within time period T, as written in the suspicion column), S decides to declare P as Dead. In this case, S adds itself to list of suspectors and also writes in P&#39;s Status column that P is Dead.
-
- 5.5 Otherwise, if S is not the last suspector, S just adds itself to the suspectors column.
-</code></pre><p> 5.6 In either case the write back uses the version number or etag that was read, so the updates to this row are serialized. In case the write has failed due to version/etag mismatch, S retries (read again, and try to write, unless P was already marked dead).</p>
+<p> 5.4 If S is the last suspector (there have already been Z-1 suspectors within time period T, as written in the suspicion column), S decides to declare P as Dead. In this case, S adds itself to list of suspectors and also writes in P&#39;s Status column that P is Dead.</p>
+<p> 5.5 Otherwise, if S is not the last suspector, S just adds itself to the suspectors column.</p>
+<p> 5.6 In either case the write back uses the version number or etag that was read, so the updates to this row are serialized. In case the write has failed due to version/etag mismatch, S retries (read again, and try to write, unless P was already marked dead).</p>
 <p> 5.7 At a high level this sequence of &quot;read, local modify, write back&quot; is a transaction. However, we are not using storage transactions to do that. “Transaction” code executes locally on a server and we use optimistic concurrency provided by the <code>MembershipTable</code> to ensure isolation and atomicity.</p>
 </li>
 <li><p>Every silo periodically reads the entire membership table for its deployment. That way silos learn about new silos joining and about other silos being declared dead.</p>

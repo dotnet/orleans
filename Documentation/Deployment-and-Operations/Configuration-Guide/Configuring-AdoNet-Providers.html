@@ -115,7 +115,7 @@ siloHostBuilder.UseAdoNetClustering(options =&gt;
 </code></pre><p>Where the <code>ConnectionString</code> is set to a valid AdoNet Server connection string. </p>
 <p>In order to use ADO.NET providers for persistence, reminders or clustering, there are scripts for creating database artifacts, to which all servers that will be hosting Orleans silos need to have access.
 Lack of access to the target database is a typical mistake we see developers making.</p>
-<p>The scripts will be copied to project directory \OrleansAdoNetContent where each supported ADO.NET extensions has its own directory, after you install or do a nuget restore on the AdoNet extension nugets. We splited AdoNet nugets into per feature nugets:
+<p>The scripts will be copied to project directory \OrleansAdoNetContent where each supported ADO.NET extensions has its own directory, after you install or do a nuget restore on the AdoNet extension nugets. We split AdoNet nugets into per feature nugets:
 <code>Microsoft.Orleans.Clustering.AdoNet</code> for clustering, <code>Microsoft.Orleans.Persistence.AdoNet</code> for persistence and <code>Microsoft.Orleans.Reminders.AdoNet</code> for reminders.</p>
 </article>
           </div>

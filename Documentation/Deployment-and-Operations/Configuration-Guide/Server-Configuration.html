@@ -156,7 +156,7 @@ Option classes in Orleans follow the <a href="https://docs.microsoft.com/en-us/a
 
 })
 [...]
-</code></pre><p>Internally, the silo will listen on <code>0.0.0.0:40000</code> and <code>0.0.0.0:50000</code> but the value published in the membership provider will be <code>172.16.0.42:11111</code> and <code>`172.16.0.42:30000</code>.</p>
+</code></pre><p>Internally, the silo will listen on <code>0.0.0.0:40000</code> and <code>0.0.0.0:50000</code> but the value published in the membership provider will be <code>172.16.0.42:11111</code> and <code>172.16.0.42:30000</code>.</p>
 <h2 id="application-parts">Application parts</h2>
 <pre><code class="lang-csharp">    [...]
     // Application parts: just reference one of the grain implementations that we use
