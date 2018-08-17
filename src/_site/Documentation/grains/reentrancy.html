@@ -1,0 +1,241 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Reentrancy | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Reentrancy | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../Images/logo-light.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list"></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="reentrancy">Reentrancy</h1>
+
+<p>Grain activations are single-threaded and, by default, process each request from beginning to completion before the next request can begin being processing. In some circumstances, it may be desirable for an activation to process other requests while one request is waiting for an asynchronous operation to complete. For this and other reasons, Orleans gives the developer some control over the request interleaving behavior. Multiple requests may be interleaved in the following cases:</p>
+<ul>
+<li>The grain class is marked as <code>[Reentrant]</code></li>
+<li>The interface method is marked as <code>[AlwaysInterleave]</code></li>
+<li>The requests within the same call chain</li>
+<li>The grain&#39;s <em>MayInterleave</em> predicate returns <code>true</code></li>
+</ul>
+<p>Each of those cases are discussed in the following sections.</p>
+<h2 id="reentrant-grains">Reentrant grains</h2>
+<p><code>Grain</code> implementation classes may be marked with the <code>[Reentrant]</code> attribute to indicate that different requests may be freely interleaved.</p>
+<p>In other words, a reentrant activation may start executing another request while a previous request has not finished processing.
+Execution is still limited to a single thread, so the activation is still executing one turn at a time, and each turn is executing on behalf of only one of the activation’s requests.</p>
+<p>Reentrant grain code will never run multiple pieces of grain code in parallel (execution of grain code will always be single-threaded), but reentrant grains <strong>may</strong> see the execution of code for different requests interleaving. That is, the continuation turns from different requests may interleave.</p>
+<p>For example, with the below pseudo-code, when Foo and Bar are 2 methods of the same grain class:</p>
+<pre><code class="lang-csharp">Task Foo()
+{
+    await task1;    // line 1
+    return Do2();   // line 2
+}
+
+Task Bar()
+{
+    await task2;   // line 3
+    return Do2();  // line 4
+}
+</code></pre><p>If this grain is marked <code>[Reentrant]</code>, the execution of Foo and Bar may interleave.</p>
+<p>For example, the following order of execution is possible:</p>
+<p>Line 1, line 3, line 2 and line 4. That is, the turns from different requests interleave.</p>
+<p>If the grain was not reentrant, the only possible executions would be: line 1, line 2, line 3, line 4 OR: line 3, line 4, line 1, line 2 (new request cannot start before the previous one finished).</p>
+<p>The main tradeoff in choosing between reentrant and non-reentrant grains is the code complexity to make interleaving work correctly and the difficulty to reason about it.</p>
+<p>In a trivial case when the grains are stateless and the logic is simple, fewer (but not too few, so that all the hardware threads are used) reentrant grains should be in general slightly more efficient.</p>
+<p>If the code is more complex, then a larger number of non-reentrant grains, even if slightly less efficient overall, should save you a lot of grief of figuring out non-obvious interleaving issues.</p>
+<p>In the end answer will depend on the specifics of the application.</p>
+<h2 id="interleaving-methods">Interleaving methods</h2>
+<p>Grain interface methods marked with <code>[AlwaysInterleave]</code> will be interleaved regardless of whether the grain is reentrant or not. Consider the following example:</p>
+<pre><code class="lang-csharp">public interface ISlowpokeGrain : IGrainWithIntegerKey
+{
+    Task GoSlow();
+
+    [AlwaysInterleave]
+    Task GoFast();
+}
+
+public class SlowpokeGrain : Grain, ISlowpokeGrain
+{
+    public async Task GoSlow()
+    {
+        await Task.Delay(TimeSpan.FromSeconds(10));
+    }
+
+    public async Task GoFast()
+    {
+        await Task.Delay(TimeSpan.FromSeconds(10));
+    }
+}
+</code></pre><p>Now consider the call flow initiated by the following client request:</p>
+<pre><code class="lang-csharp">var slowpoke = client.GetGrain&lt;ISlowpokeGrain&gt;(0);
+
+// A) This will take around 20 seconds
+await Task.WhenAll(slowpoke.GoSlow(), slowpoke.GoSlow());
+
+// B) This will take around 10 seconds.
+await Task.WhenAll(slowpoke.GoFast(), slowpoke.GoFast(), slowpoke.GoFast());
+</code></pre><p>Calls to <code>GoSlow</code> will not be interleaved, so the execution of the two <code>GoSlow()</code> calls will take around 20 seconds.
+On the other hand, because <code>GoFast</code> is marked <code>[AlwaysInterleave]</code>, the three calls to it will be executed concurrently and will complete in approximately 10 seconds total instead of requiring at least 30 seconds to complete.</p>
+<h2 id="reentrancy-within-a-call-chain">Reentrancy within a call chain</h2>
+<p>In order to avoid deadlocks, the scheduler allows reentrancy within a given call chain. Consider the following example of two grains which have mutually recursive methods, <code>IsEven</code> and <code>IsOdd</code>:</p>
+<pre><code class="lang-csharp">public interface IEvenGrain : IGrainWithIntegerKey
+{
+    Task&lt;bool&gt; IsEven(int num);
+}
+
+public interface IOddGrain : IGrainWithIntegerKey
+{
+    Task&lt;bool&gt; IsOdd(int num);
+}
+
+public class EvenGrain : Grain, IEvenGrain
+{
+    public async Task&lt;bool&gt; IsEven(int num)
+    {
+        if (num == 0) return true;
+        var oddGrain = this.GrainFactory.GetGrain&lt;IOddGrain&gt;(0);
+        return await oddGrain.IsOdd(num - 1);
+    }
+}
+
+public class OddGrain : Grain, IOddGrain
+{
+    public async Task&lt;bool&gt; IsOdd(int num)
+    {
+        if (num == 0) return false;
+        var evenGrain = this.GrainFactory.GetGrain&lt;IEvenGrain&gt;(0);
+        return await evenGrain.IsEven(num - 1);
+    }
+}
+</code></pre><p>Now consider the call flow initiated by the following client request:</p>
+<pre><code class="lang-csharp">var evenGrain = client.GetGrain&lt;IEvenGrain&gt;(0);
+await evenGrain.IsEven(2);
+</code></pre><p>The above code calls <code>IEvenGrain.IsEven(2)</code>, which calls <code>IOddGrain.IsOdd(1)</code>, which calls <code>IEvenGrain.IsEven(0)</code>, which returns <code>true</code> back up the call chain to the client. Without call chain reentrancy, the above code will result in a deadlock when <code>IOddGrain</code> calls <code>IEvenGrain.IsEven(0)</code>. With call chain reentrancy, however, the call is allowed to proceed as it is deemed to be the intention of the developer.</p>
+<p>This behavior can be disabled by setting <code>SchedulingOptions.AllowCallChainReentrancy</code> to <code>false</code>. For example:</p>
+<pre><code class="lang-csharp">siloHostBuilder.Configure&lt;SchedulingOptions&gt;(
+    options =&gt; options.AllowCallChainReentrancy = false);
+</code></pre><h2 id="reentrancy-using-a-predicate">Reentrancy using a predicate</h2>
+<p>Grain classes can specify a predicate used to determine interleaving on a call-by-call basis by inspecting the request. The <code>[MayInterleave(string methodName)]</code> attribute provides this functionality. The argument to the attribute is the name of a static method within the grain class which accepts an <code>InvokeMethodRequest</code> object and returns a <code>bool</code> indicating whether or not the request should be interleaved.</p>
+<p>Here is an example which allows interleaving if the request argument type has the <code>[Interleave]</code> attribute:</p>
+<pre><code class="lang-csharp">[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
+public sealed class InterleaveAttribute : Attribute { }
+
+// Specify the may-interleave predicate.
+[MayInterleave(nameof(ArgHasInterleaveAttribute))]
+public class MyGrain : Grain, IMyGrain
+{
+    public static bool ArgHasInterleaveAttribute(InvokeMethodRequest req)
+    {
+        // Returning true indicates that this call should be interleaved with other calls.
+        // Returning false indicates the opposite.
+        return req.Arguments.Length == 1
+            &amp;&amp; req.Arguments[0]?.GetType().GetCustomAttribute&lt;InterleaveAttribute&gt;() != null;
+    }
+
+    public Task Process(object payload)
+    {
+        // Process the object.
+    }
+}
+</code></pre></article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>
