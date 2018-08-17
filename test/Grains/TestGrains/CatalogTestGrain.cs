@@ -7,7 +7,7 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    //[CollectionAgeLimit(TimeSpan.FromDays(1))]
+    [CollectionAgeLimit(AgeInMinutes = 1)]
     public class CatalogTestGrain : Grain, ICatalogTestGrain
     {
         public override Task OnActivateAsync()

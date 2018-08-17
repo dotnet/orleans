@@ -8,29 +8,22 @@ namespace Orleans.Configuration
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
     public class CollectionAgeLimitAttribute : Attribute
     {
-        private TimeSpan time = CollectionAgeLimitConstants.DefaultCollectionAgeLimit;
+        private double timeInMinutes = CollectionAgeLimitConstants.DefaultCollectionAgeLimitInMinutes;
 
-        public TimeSpan Age { get; set; }
-
-        public CollectionAgeLimitAttribute(TimeSpan Age) { }
-        //{
-        //    get
-        //    {
-        //        return time;
-        //    }
-        //    set
-        //    {
-        //        if (value <= TimeSpan.Zero)
-        //        {
-        //            throw new ArgumentOutOfRangeException("Collection Age Limit must be a positive number.");
-        //        }
-        //        time = value;
-        //    }
-        //}
-
-        //public CollectionAgeLimitAttribute(TimeSpan time)
-        //{
-        //    this.time = time;
-        //}
+        public double AgeInMinutes
+        {
+            get
+            {
+                return timeInMinutes;
+            }
+            set
+            {
+                if (value <= 0d)
+                {
+                    throw new ArgumentOutOfRangeException("Collection Age Limit must be a positive number.");
+                }
+                this.timeInMinutes = value;
+            }
+        }
     }
 }

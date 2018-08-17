@@ -514,10 +514,16 @@ namespace Orleans.Runtime
 
             CollectionAgeLimitAttribute attr = grainTypeData
                 .Type
-                .GetType()
                 .GetCustomAttributes<CollectionAgeLimitAttribute>(true)
                 .FirstOrDefault();
-            return (attr == null) ? CollectionAgeLimitConstants.DefaultCollectionAgeLimit : attr.Time;
+            if (attr == null)
+            {
+                return TimeSpan.FromMinutes(CollectionAgeLimitConstants.DefaultCollectionAgeLimitInMinutes);
+            }
+
+            // Add to the ClassSpecificCollectionAge so that we don't need to use the reflection from next activation onwards
+            this.collectionOptions.Value.ClassSpecificCollectionAge.Add(grainType, TimeSpan.FromMinutes(attr.AgeInMinutes));
+            return TimeSpan.FromMinutes(attr.AgeInMinutes);
         }
 
         private void SetupActivationInstance(ActivationData result, string grainType, string genericArguments)
