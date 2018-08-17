@@ -189,10 +189,19 @@ namespace Orleans.Transactions
 
         public void Participate(IGrainLifecycle lifecycle)
         {
-            lifecycle.Subscribe<TransactionalState<TState>>(GrainLifecycleStage.SetupState, OnSetupState);
+            lifecycle.Subscribe<TransactionalState<TState>>(GrainLifecycleStage.SetupState, (ct) => OnSetupState(ct, SetupResourceFactory));
         }
 
-        private async Task OnSetupState(CancellationToken ct)
+        private static void SetupResourceFactory(IGrainActivationContext context, string stateName, TransactionQueue<TState> queue)
+        {
+            // Add resources factory to the grain context
+            context.RegisterResourceFactory<ITransactionalResource>(stateName, () => new TransactionalResource<TState>(queue));
+
+            // Add tm factory to the grain context
+            context.RegisterResourceFactory<ITransactionManager>(stateName, () => new TransactionManager<TState>(queue));
+        }
+
+        internal async Task OnSetupState(CancellationToken ct, Action<IGrainActivationContext, string, TransactionQueue<TState>> setupResourceFactory)
         {
             if (ct.IsCancellationRequested) return;
 
@@ -209,11 +218,7 @@ namespace Orleans.Transactions
             var clock = this.context.ActivationServices.GetRequiredService<IClock>();
             this.queue = new TransactionQueue<TState>(options, this.participantId, deactivate, storage, this.serializerSettings, clock, logger);
 
-            // Add resources factory to the grain context
-            this.context.RegisterResourceFactory<ITransactionalResource>(this.config.StateName, () => new TransactionalResource<TState>(this.queue));
-
-            // Add tm factory to the grain context
-            this.context.RegisterResourceFactory<ITransactionManager>(this.config.StateName, () => new TransactionManager<TState>(this.queue));
+            setupResourceFactory(this.context, this.config.StateName, queue);
 
             // recover state
             await this.queue.NotifyOfRestore();
