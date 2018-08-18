@@ -13,55 +13,55 @@ using Orleans.Transactions.Tests.DeactivatingInjection;
 
 namespace Orleans.Transactions.Tests.DeactivationTransaction
 {
-    public interface IDeactivationTransactionalStateConfiguration : ITransactionalStateConfiguration
+    public interface IFaultInjectionTransactionalStateConfiguration : ITransactionalStateConfiguration
     {
     }
 
     [AttributeUsage(AttributeTargets.Parameter)]
-    public class DeactivationTransactionalStateAttribute : Attribute, IFacetMetadata, IDeactivationTransactionalStateConfiguration
+    public class FaultInjectionTransactionalStateAttribute : Attribute, IFacetMetadata, IFaultInjectionTransactionalStateConfiguration
     {
         public string StateName { get; }
         public string StorageName { get; }
 
-        public DeactivationTransactionalStateAttribute(string stateName, string storageName = null)
+        public FaultInjectionTransactionalStateAttribute(string stateName, string storageName = null)
         {
             this.StateName = stateName;
             this.StorageName = storageName;
         }
     }
 
-    public interface IDeactivationTransactionalStateFactory
+    public interface IFaultInjectionTransactionalStateFactory
     {
-        IDeactivationTransactionalState<TState> Create<TState>(IDeactivationTransactionalStateConfiguration config) where TState : class, new();
+        IFaultInjectionTransactionalState<TState> Create<TState>(IFaultInjectionTransactionalStateConfiguration config) where TState : class, new();
     }
 
-    public class DeactivationalTransactionalStateFactory : IDeactivationTransactionalStateFactory
+    public class FaultInjectionTransactionalStateFactory : IFaultInjectionTransactionalStateFactory
     {
         private IGrainActivationContext context;
         private JsonSerializerSettings serializerSettings;
-        public DeactivationalTransactionalStateFactory(IGrainActivationContext context, ITypeResolver typeResolver, IGrainFactory grainFactory)
+        public FaultInjectionTransactionalStateFactory(IGrainActivationContext context, ITypeResolver typeResolver, IGrainFactory grainFactory)
         {
             this.context = context;
             this.serializerSettings =
                 TransactionalStateFactory.GetJsonSerializerSettings(typeResolver, grainFactory);
         }
 
-        public IDeactivationTransactionalState<TState> Create<TState>(IDeactivationTransactionalStateConfiguration config) where TState : class, new()
+        public IFaultInjectionTransactionalState<TState> Create<TState>(IFaultInjectionTransactionalStateConfiguration config) where TState : class, new()
         {
             TransactionalState<TState> transactionalState = ActivatorUtilities.CreateInstance<TransactionalState<TState>>(this.context.ActivationServices, config as ITransactionalStateConfiguration, this.serializerSettings, this.context);
-            DeactivationTransactionalState<TState> deactivationTransactionalState = ActivatorUtilities.CreateInstance<DeactivationTransactionalState<TState>>(this.context.ActivationServices, transactionalState, this.context);
+            FaultInjectionTransactionalState<TState> deactivationTransactionalState = ActivatorUtilities.CreateInstance<FaultInjectionTransactionalState<TState>>(this.context.ActivationServices, transactionalState, this.context);
             deactivationTransactionalState.Participate(context.ObservableLifecycle);
             return deactivationTransactionalState;
         }
     }
 
-    public class DeactivationTransactionalStateAttributeMapper : IAttributeToFactoryMapper<DeactivationTransactionalStateAttribute>
+    public class FaultInjectionTransactionalStateAttributeMapper : IAttributeToFactoryMapper<FaultInjectionTransactionalStateAttribute>
     {
         private static readonly MethodInfo create =
-            typeof(IDeactivationTransactionalStateFactory).GetMethod("Create");
-        public Factory<IGrainActivationContext, object> GetFactory(ParameterInfo parameter, DeactivationTransactionalStateAttribute attribute)
+            typeof(IFaultInjectionTransactionalStateFactory).GetMethod("Create");
+        public Factory<IGrainActivationContext, object> GetFactory(ParameterInfo parameter, FaultInjectionTransactionalStateAttribute attribute)
         {
-            IDeactivationTransactionalStateConfiguration config = attribute;
+            IFaultInjectionTransactionalStateConfiguration config = attribute;
             // use generic type args to define collection type.
             MethodInfo genericCreate = create.MakeGenericMethod(parameter.ParameterType.GetGenericArguments());
             object[] args = new object[] { config };
@@ -70,7 +70,7 @@ namespace Orleans.Transactions.Tests.DeactivationTransaction
 
         private object Create(IGrainActivationContext context, MethodInfo genericCreate, object[] args)
         {
-            IDeactivationTransactionalStateFactory factory = context.ActivationServices.GetRequiredService<IDeactivationTransactionalStateFactory>();
+            IFaultInjectionTransactionalStateFactory factory = context.ActivationServices.GetRequiredService<IFaultInjectionTransactionalStateFactory>();
             return genericCreate.Invoke(factory, args);
         }
     }

@@ -10,10 +10,10 @@ using Xunit.Abstractions;
 
 namespace Orleans.Transactions.Azure.Tests
 {
-    [TestCategory("Azure"), TestCategory("Transactions"), TestCategory("Functional")]
-    public class TransactionDeactivationTests : GrainDeactivationTransactionTestRunner, IClassFixture<DeactivationTestFixture>
+    [TestCategory("Azure"), TestCategory("Transactions")]
+    public class TransactionFaultInjectionTests : FaultInjectionTransactionTestRunner, IClassFixture<FaultInjectionTestFixture>
     {
-        public TransactionDeactivationTests(DeactivationTestFixture fixture, ITestOutputHelper output)
+        public TransactionFaultInjectionTests(FaultInjectionTestFixture fixture, ITestOutputHelper output)
             : base(fixture.GrainFactory, output)
         {
             fixture.EnsurePreconditionsMet();
