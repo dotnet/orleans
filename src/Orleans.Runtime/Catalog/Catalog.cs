@@ -1275,12 +1275,10 @@ namespace Orleans.Runtime
             }
             else if (activation.PlacedUsing is StatelessWorkerPlacement stPlacement)
             {
-                // Stateless workers are not registered in the directory and can have multiple local activations.
                 int maxNumLocalActivations = stPlacement.MaxLocal;
                 lock (activations)
                 {
-                    List<ActivationData> local;
-                    if (!LocalLookup(address.Grain, out local) || local.Count <= maxNumLocalActivations)
+                    if (!LocalLookup(address.Grain, out var local) || local.Count <= maxNumLocalActivations)
                         return ActivationRegistrationResult.Success;
 
                     var id = StatelessWorkerDirector.PickRandom(local).Address;
@@ -1289,9 +1287,10 @@ namespace Orleans.Runtime
             }
             else
             {
-                // Some other non-directory, single-activation placement.
+                // Some other non-directory placement.
                 lock (activations)
                 {
+                    // The activation will have already been added to the local activation directory, so we expect 1 activation.
                     var exists = LocalLookup(address.Grain, out var local);
                     if (exists && local.Count == 1 && local[0].ActivationId.Equals(activation.ActivationId))
                     {

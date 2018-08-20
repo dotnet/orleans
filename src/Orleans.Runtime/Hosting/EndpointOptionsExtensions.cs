@@ -80,24 +80,24 @@ namespace Orleans.Hosting
             return builder.ConfigureEndpoints(null, siloPort, gatewayPort, addressFamily, listenOnAnyHostAddress);
         }
 
-        internal static IPEndPoint GetPublicSiloEndpoint(this EndpointOptions options)
+        public static IPEndPoint GetPublicSiloEndpoint(this EndpointOptions options)
         {
             return new IPEndPoint(options.AdvertisedIPAddress, options.SiloPort);
         }
 
-        internal static IPEndPoint GetPublicProxyEndpoint(this EndpointOptions options)
+        public static IPEndPoint GetPublicProxyEndpoint(this EndpointOptions options)
         {
             return options.GatewayPort != 0 
                 ? new IPEndPoint(options.AdvertisedIPAddress, options.GatewayPort)
                 : null;
         }
 
-        internal static IPEndPoint GetListeningSiloEndpoint(this EndpointOptions options)
+        public static IPEndPoint GetListeningSiloEndpoint(this EndpointOptions options)
         {
             return options.SiloListeningEndpoint ?? options.GetPublicSiloEndpoint();
         }
 
-        internal static IPEndPoint GetListeningProxyEndpoint(this EndpointOptions options)
+        public static IPEndPoint GetListeningProxyEndpoint(this EndpointOptions options)
         {
             if (options.GatewayPort == 0)
                 return null;

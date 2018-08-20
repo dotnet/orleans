@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 
 namespace Orleans.Clustering.ServiceFabric
@@ -24,5 +25,10 @@ namespace Orleans.Clustering.ServiceFabric
         /// </summary>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         Task Refresh();
+
+        /// <summary>
+        /// Gets the Service Fabric ServiceName of this service.
+        /// </summary>
+        Uri ServiceName { get; }
     }
 }

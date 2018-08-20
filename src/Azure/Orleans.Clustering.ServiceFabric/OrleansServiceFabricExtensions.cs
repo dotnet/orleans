@@ -2,11 +2,15 @@
 using System.Fabric;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.ServiceFabric.Data;
 using Microsoft.ServiceFabric.Services.Client;
+using Orleans.Clustering.ServiceFabric.Stateful;
 using Orleans.Clustering.ServiceFabric.Utilities;
 using Orleans.Hosting;
 using Orleans.Messaging;
+using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Storage;
 
 namespace Orleans.Clustering.ServiceFabric
 {
@@ -103,11 +107,42 @@ namespace Orleans.Clustering.ServiceFabric
             // Use Service Fabric for cluster membership.
             services.TryAddSingleton<IFabricServiceSiloResolver>(
                     sp => ActivatorUtilities.CreateInstance<FabricServiceSiloResolver>(sp, context.ServiceName));
-            services.TryAddSingleton<IMembershipOracle, FabricMembershipOracle>();
-            services.TryAddSingleton<IGatewayListProvider, FabricGatewayProvider>();
             services.TryAddSingleton<ISiloStatusOracle>(provider => provider.GetService<IMembershipOracle>());
             services.TryAddSingleton<ServiceContext>(context);
-            services.TryAddSingleton<UnknownSiloMonitor>();
+
+            if (context is StatefulServiceContext stateful)
+            {
+                services.TryAddSingleton<StatefulServiceContext>(stateful);
+                services.TryAddSingleton<IMembershipOracle, FabricMembershipOracle>();
+                services.TryAddSingleton<UnknownSiloMonitor>();
+                services.AddPlacementDirector<StatefulServicePlacement, StatefulServicePlacementDirector>();
+            }
+            else if (context is StatelessServiceContext stateless)
+            {
+                services.TryAddSingleton<StatelessServiceContext>(stateless);
+                services.TryAddSingleton<IMembershipOracle, FabricMembershipOracle>();
+                services.TryAddSingleton<UnknownSiloMonitor>();
+            }
+            else
+            {
+                throw new NotSupportedException($"Services with context of type {context.GetType()} are not supported.");
+            }
+        }
+
+        public static ISiloHostBuilder AddReliableDictionaryGrainStorage(this ISiloHostBuilder builder, IReliableStateManager stateManager, string name = null)
+        {
+            builder.ConfigureServices(services =>
+            {
+                name = name ?? ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME;
+                if (name != null)
+                {
+                    services.AddSingletonNamedService<IGrainStorage>(
+                            name,
+                            (sp, n) => ActivatorUtilities.CreateInstance<ReliableDictionaryGrainStorage>(sp, name, stateManager));
+                }
+            });
+
+            return builder;
         }
     }
 }

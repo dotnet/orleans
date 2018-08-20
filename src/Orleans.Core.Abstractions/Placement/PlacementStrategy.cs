@@ -10,5 +10,7 @@ namespace Orleans.Runtime
         /// the grain directory.
         /// </summary>
         public virtual bool IsUsingGrainDirectory => true;
+
+        public virtual bool IsDeterministicActivationId => false;
     }
 }

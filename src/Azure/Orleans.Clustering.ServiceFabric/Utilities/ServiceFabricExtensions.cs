@@ -77,7 +77,7 @@ namespace Orleans.Clustering.ServiceFabric.Utilities
                         $"Partition kind {left.Kind} is not supported");
             }
         }
-        
+
         /// <summary>
         /// Returns the partition key for the provided partition.
         /// </summary>
@@ -98,6 +98,17 @@ namespace Orleans.Clustering.ServiceFabric.Utilities
                         nameof(partitionInformation),
                         $"Partition kind {partitionInformation.Kind} is not supported");
             }
+        }
+
+        /// <summary>
+        /// Returns the partition key for the provided partition.
+        /// </summary>
+        /// <param name="partitionInformation">The partition.</param>
+        /// <returns>The partition key for the provided partition.</returns>
+        public static string GetPartitionKeyString(this ServicePartitionInformation partitionInformation)
+        {
+            var key = partitionInformation.GetPartitionKey();
+            return $"{key.Kind}/{key.Value?.ToString() ?? "Singleton"}";
         }
 
         /// <summary>

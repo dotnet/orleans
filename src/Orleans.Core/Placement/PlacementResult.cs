@@ -44,12 +44,35 @@ namespace Orleans.Runtime
 
             return
                 new PlacementResult
-                    {
-                        Activation = ActivationId.NewId(),
-                        Silo = silo,
-                        PlacementStrategy = placement,
-                        GrainType = grainType
-                    };
+                {
+                    Activation = ActivationId.NewId(),
+                    Silo = silo,
+                    PlacementStrategy = placement,
+                    GrainType = grainType
+                };
+        }
+        public static PlacementResult
+            SpecifyCreation(
+                SiloAddress silo,
+                GrainId grainId,
+                PlacementStrategy placement,
+                string grainType)
+        {
+            if (silo == null)
+                throw new ArgumentNullException("silo");
+            if (placement == null)
+                throw new ArgumentNullException("placement");
+            if (string.IsNullOrWhiteSpace(grainType))
+                throw new ArgumentException("'grainType' must contain a valid typename.");
+
+            return
+                new PlacementResult
+                {
+                    Activation = ActivationId.GetActivationId(grainId.Key),
+                    Silo = silo,
+                    PlacementStrategy = placement,
+                    GrainType = grainType
+                };
         }
 
         public ActivationAddress ToAddress(GrainId grainId)

@@ -24,6 +24,9 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("OrleansManager")]
 [assembly: InternalsVisibleTo("OrleansProviders")]
 
+// For PlacementResult and related types.
+[assembly: InternalsVisibleTo("Orleans.Clustering.ServiceFabric")]
+
 [assembly: InternalsVisibleTo("AWSUtils.Tests")]
 [assembly: InternalsVisibleTo("DefaultCluster.Tests")]
 [assembly: InternalsVisibleTo("GoogleUtils.Tests")]

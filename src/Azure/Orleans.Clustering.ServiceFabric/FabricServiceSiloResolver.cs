@@ -16,7 +16,6 @@ namespace Orleans.Clustering.ServiceFabric
     /// </summary>
     internal class FabricServiceSiloResolver : IFabricServiceSiloResolver
     {
-        private readonly Uri serviceName;
         private readonly IFabricQueryManager queryManager;
         private readonly ILogger log;
         private readonly object updateLock = new object();
@@ -38,11 +37,14 @@ namespace Orleans.Clustering.ServiceFabric
             IFabricQueryManager queryManager,
             ILogger<FabricServiceSiloResolver> logger)
         {
-            this.serviceName = serviceName;
+            this.ServiceName = serviceName;
             this.queryManager = queryManager;
             this.log = logger;
             this.partitionChangeHandler = this.OnPartitionChange;
         }
+
+        /// <inheritdoc />
+        public Uri ServiceName { get; }
 
         /// <inheritdoc />
         public void Subscribe(IFabricServiceStatusListener handler)
@@ -59,8 +61,8 @@ namespace Orleans.Clustering.ServiceFabric
         /// <inheritdoc />
         public async Task Refresh()
         {
-            if (this.log.IsEnabled(LogLevel.Debug)) this.log.Debug($"Refreshing silos for service {this.serviceName}");
-            var result = await this.queryManager.ResolveSilos(this.serviceName);
+            if (this.log.IsEnabled(LogLevel.Debug)) this.log.Debug($"Refreshing silos for service {this.ServiceName}");
+            var result = await this.queryManager.ResolveSilos(this.ServiceName);
             lock (this.updateLock)
             {
                 this.silos = result;
@@ -71,18 +73,19 @@ namespace Orleans.Clustering.ServiceFabric
                 foreach (var partition in this.silos)
                 {
                     var partitionInfo = partition.Partition;
-                    if (oldRegistrations != null && oldRegistrations.ContainsKey(partitionInfo.Id))
+                    if (oldRegistrations != null && oldRegistrations.ContainsKey(partitionInfo.Info.Id))
                     {
-                        updatedRegistrations[partitionInfo.Id] = oldRegistrations[partitionInfo.Id];
-                        oldRegistrations.Remove(partitionInfo.Id);
-                        if (this.log.IsEnabled(LogLevel.Debug)) this.log.Debug($"Partition change handler for partition {partition.Partition} already registered.");
+                        updatedRegistrations[partitionInfo.Info.Id] = oldRegistrations[partitionInfo.Info.Id];
+                        oldRegistrations.Remove(partitionInfo.Info.Id);
+                        if (this.log.IsEnabled(LogLevel.Trace)) this.log.Trace($"Partition change handler for partition {partition.Partition.Info.GetPartitionKeyString()} already registered.");
                         continue;
                     }
-                    var registrationId = updatedRegistrations[partitionInfo.Id] = this.queryManager.RegisterPartitionChangeHandler(
-                        this.serviceName,
+
+                    var registrationId = updatedRegistrations[partitionInfo.Info.Id] = this.queryManager.RegisterPartitionChangeHandler(
+                        this.ServiceName,
                         partitionInfo,
                         this.partitionChangeHandler);
-                    if (this.log.IsEnabled(LogLevel.Debug)) this.log.Debug($"Registering partition change handler 0x{registrationId:X} for partition {partition.Partition}");
+                    if (this.log.IsEnabled(LogLevel.Debug)) this.log.Debug($"Registering partition change handler 0x{registrationId:X} for partition {partition.Partition.Info.GetPartitionKeyString()}");
                 }
 
                 // Remove old registrations.
@@ -108,10 +111,14 @@ namespace Orleans.Clustering.ServiceFabric
         /// <param name="args">The handler event.</param>
         private void OnPartitionChange(long handlerId, FabricPartitionResolutionChange args)
         {
+            if (this.log.IsEnabled(LogLevel.Debug))
+            {
+                this.log.LogDebug($"Received partition change notification: {args}");
+            }
             if (args.HasException)
             {
                 this.log.Warn(
-                    (int) ErrorCode.ServiceFabric_Resolver_PartitionResolutionException,
+                    (int)Utilities.ErrorCode.ServiceFabric_Resolver_PartitionResolutionException,
                     "Exception resolving partition change.",
                     args.Exception);
                 return;
@@ -136,10 +143,10 @@ namespace Orleans.Clustering.ServiceFabric
 
             if (!found)
             {
-                var knownPartitions = string.Join(", ", this.silos.Select(s => s.Partition));
+                var knownPartitions = string.Join(", ", this.silos.Select(s => s.Partition.Info.GetPartitionKeyString()));
                 this.log.Warn(
-                    (int) ErrorCode.ServiceFabric_Resolver_PartitionNotFound,
-                    $"Received update for partition {updated.Partition}, but found no matching partition. Known partitions: {knownPartitions}");
+                    (int)Utilities.ErrorCode.ServiceFabric_Resolver_PartitionNotFound,
+                    $"Received update for partition {updated.Partition.Info.GetPartitionKeyString()}, but found no matching partition. Known partitions: {knownPartitions}");
             }
             else if (this.log.IsEnabled(LogLevel.Debug))
             {
@@ -149,7 +156,7 @@ namespace Orleans.Clustering.ServiceFabric
                     newSilos.Append($"\n* {silo}");
                 }
 
-                this.log.Debug($"Received update for partition {updated.Partition}. Updated values: {newSilos}");
+                this.log.Debug($"Received update for partition {updated.Partition.Info.GetPartitionKeyString()}. Updated values: {newSilos}");
             }
         }
 
@@ -158,10 +165,10 @@ namespace Orleans.Clustering.ServiceFabric
         /// </summary>
         private void NotifySubscribers()
         {
-            var copy = this.silos.SelectMany(_ => _.Silos).ToArray();
+            var alias = this.silos;
             foreach (var observer in this.subscribers.Values)
             {
-                observer.OnUpdate(copy);
+                observer.OnUpdate(alias);
             }
         }
     }

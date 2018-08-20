@@ -109,10 +109,19 @@ namespace Orleans.Runtime.Placement
                 throw new InvalidOperationException("Client grains are not activated using the placement subsystem.");
 
             var director = ResolveDirector(strategy);
-            return PlacementResult.SpecifyCreation(
-                await director.OnAddActivation(strategy, target, context), 
-                strategy, 
-                context.GetGrainTypeName(target.GrainIdentity.TypeCode));
+            var siloAddress = await director.OnAddActivation(strategy, target, context);
+            var grainTypeName = context.GetGrainTypeName(target.GrainIdentity.TypeCode);
+            if (strategy.IsDeterministicActivationId)
+            {
+                return PlacementResult.SpecifyCreation(siloAddress, (GrainId) target.GrainIdentity, strategy, grainTypeName);
+            }
+            else
+            {
+                return PlacementResult.SpecifyCreation(
+                    siloAddress,
+                    strategy,
+                    grainTypeName);
+            }
         }
 
         private void ResolveBuiltInStrategies()

@@ -1,3 +1,4 @@
+using Orleans.Clustering.ServiceFabric.Models;
 using Orleans.ServiceFabric;
 
 namespace Orleans.Clustering.ServiceFabric
@@ -11,6 +12,6 @@ namespace Orleans.Clustering.ServiceFabric
         /// Notifies this instance of an update to cluster members.
         /// </summary>
         /// <param name="silos">The updated set of silos.</param>
-        void OnUpdate(FabricSiloInfo[] silos);
+        void OnUpdate(ServicePartitionSilos[] silos);
     }
 }

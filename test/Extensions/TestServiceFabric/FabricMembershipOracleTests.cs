@@ -1,11 +1,14 @@
-﻿using System;
+﻿/*
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Clustering.ServiceFabric;
+using Orleans.Clustering.ServiceFabric.Models;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.ServiceFabric;
@@ -356,8 +359,9 @@ namespace TestServiceFabric
 
             public void Notify(FabricSiloInfo[] update)
             {
-                foreach (var handler in this.Handlers) handler.OnUpdate(update);
+                foreach (var handler in this.Handlers) handler.OnUpdate(new[] {new ServicePartitionSilos(null, update.ToList())});
             }
         }
     }
 }
+*/

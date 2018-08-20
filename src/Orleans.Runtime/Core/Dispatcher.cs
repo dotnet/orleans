@@ -542,8 +542,18 @@ namespace Orleans.Runtime
             bool forwardingSucceded = true;
             try
             {
-
-                logger.Info(ErrorCode.Messaging_Dispatcher_TryForward, $"Trying to forward after {failedOperation}, ForwardCount = {message.ForwardCount}. Message {message}.");
+                if (logger.IsEnabled(LogLevel.Information))
+                {
+                    logger.LogInformation(
+                        (int)ErrorCode.Messaging_Dispatcher_TryForward,
+                        "Trying to forward after {FailedOperation}, ForwardCount = {ForwardCount}. OldAddress = {OldAddress}, ForwardingAddress = {ForwardingAddress}, Message {Message}, Exception: {Exception}.",
+                        failedOperation,
+                        message.ForwardCount,
+                        oldAddress,
+                        forwardingAddress,
+                        message,
+                        exc);
+                }
 
                 // if this message is from a different cluster and hit a non-existing activation
                 // in this cluster (which can happen due to stale cache or directory states)

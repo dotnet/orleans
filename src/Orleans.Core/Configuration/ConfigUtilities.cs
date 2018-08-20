@@ -339,7 +339,7 @@ namespace Orleans.Runtime.Configuration
             return new IPEndPoint(addr, port);
         }
 
-        internal static async Task<IPAddress> ResolveIPAddress(string addrOrHost, byte[] subnet, AddressFamily family)
+        public static async Task<IPAddress> ResolveIPAddress(string addrOrHost, byte[] subnet, AddressFamily family)
         {
             var loopback = family == AddressFamily.InterNetwork ? IPAddress.Loopback : IPAddress.IPv6Loopback;
             IList<IPAddress> nodeIps;

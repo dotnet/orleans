@@ -38,19 +38,10 @@ namespace Orleans.Clustering.ServiceFabric.Utilities
         /// <inheritdoc />
         public long RegisterPartitionChangeHandler(
             Uri serviceName,
-            IResolvedServicePartition servicePartition,
+            ResolvedServicePartition servicePartition,
             FabricPartitionResolutionChangeHandler handler)
         {
-            var partition = servicePartition as ResolvedServicePartitionWrapper;
-            if (partition == null)
-            {
-                throw new ArgumentException(
-                    string.Format(
-                        "Only partitions of type {0} are supported. Provided type {1} is not supported.",
-                        nameof(ResolvedServicePartitionWrapper),
-                        servicePartition.GetType()),
-                    nameof(servicePartition));
-            }
+            var partition = servicePartition;
             
             // Wrap the provided handler so that it's compatible with Service Fabric.
             void ChangeHandler(FabricClient source, long id, ServicePartitionResolutionChange args)
@@ -58,33 +49,31 @@ namespace Orleans.Clustering.ServiceFabric.Utilities
                 ServicePartitionSilos result = null;
                 if (!args.HasException)
                 {
-                    result = new ServicePartitionSilos(
-                        new ResolvedServicePartitionWrapper(args.Result),
-                        args.Result.GetPartitionEndpoints());
+                    result = new ServicePartitionSilos(args.Result);
                 }
 
                 handler(id, new FabricPartitionResolutionChange(result, args.Exception));
             }
 
             var sm = this.fabricClient.ServiceManager;
-            switch (servicePartition.Kind)
+            switch (servicePartition.Info.Kind)
             {
                 case ServicePartitionKind.Int64Range:
                     return sm.RegisterServicePartitionResolutionChangeHandler(
                         serviceName,
-                        ((Int64RangePartitionInformation) partition.Partition.Info).LowKey,
+                        ((Int64RangePartitionInformation) partition.Info).LowKey,
                         ChangeHandler);
                 case ServicePartitionKind.Named:
                     return sm.RegisterServicePartitionResolutionChangeHandler(
                         serviceName,
-                        ((NamedPartitionInformation) partition.Partition.Info).Name,
+                        ((NamedPartitionInformation) partition.Info).Name,
                         ChangeHandler);
                 case ServicePartitionKind.Singleton:
                     return sm.RegisterServicePartitionResolutionChangeHandler(serviceName, ChangeHandler);
                 default:
                     throw new ArgumentOutOfRangeException(
                         nameof(servicePartition),
-                        $"Partition kind {servicePartition.Kind} is not supported");
+                        $"Partition kind {servicePartition.Info.Kind} is not supported");
             }
         }
 
@@ -136,9 +125,7 @@ namespace Orleans.Clustering.ServiceFabric.Utilities
                 partitionKey,
                 _ => result,
                 (key, existing) => existing.CompareVersion(result) < 0 ? result : existing);
-            return new ServicePartitionSilos(
-                new ResolvedServicePartitionWrapper(result),
-                result.GetPartitionEndpoints());
+            return new ServicePartitionSilos(result);
 
             ConcurrentDictionary<ServicePartitionKey, ResolvedServicePartition> CreateCache(Uri uri)
             {
@@ -166,36 +153,10 @@ namespace Orleans.Clustering.ServiceFabric.Utilities
             return partitions;
         }
 
-        private class ResolvedServicePartitionWrapper : IResolvedServicePartition
-        {
-            public ResolvedServicePartitionWrapper(ResolvedServicePartition partition)
-            {
-                this.Partition = partition;
-            }
-
-            public ResolvedServicePartition Partition { get; }
-
-            public Guid Id => this.Partition.Info.Id;
-
-            public ServicePartitionKind Kind => this.Partition.Info.Kind;
-
-            public bool IsSamePartitionAs(IResolvedServicePartition other)
-            {
-                if (other is ResolvedServicePartitionWrapper otherWrapper)
-                {
-                    return this.Partition.IsSamePartitionAs(otherWrapper.Partition);
-                }
-
-                return false;
-            }
-
-            public override string ToString() => this.Partition.ToPartitionString();
-        }
-
         /// <summary>
         /// Equality comparer for <see cref="ServicePartitionKey"/>.
         /// </summary>
-        private struct ServicePartitionKeyComparer : IEqualityComparer<ServicePartitionKey>
+        private class ServicePartitionKeyComparer : IEqualityComparer<ServicePartitionKey>
         {
             /// <summary>
             /// Gets a singleton instance of this class.
@@ -243,7 +204,6 @@ namespace Orleans.Clustering.ServiceFabric.Utilities
             private static void ThrowKindOutOfRange(ServicePartitionKey x)
             {
                 throw new ArgumentOutOfRangeException(nameof(x), $"Partition kind {x.Kind} is not supported");
-
             }
         }
     }

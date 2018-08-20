@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net471</TargetFramework>
+    <IsServiceFabricServiceProject>True</IsServiceFabricServiceProject>
+    <RuntimeIdentifier>win7-x64</RuntimeIdentifier>
+    <TargetLatestRuntimePatch>False</TargetLatestRuntimePatch>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="2.1.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="2.1.1" />
+    <PackageReference Include="Microsoft.ServiceFabric.Services" Version="3.2.162" />
+    <PackageReference Include="Seq.Extensions.Logging" Version="4.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\src\Azure\Orleans.Clustering.ServiceFabric\Orleans.Clustering.ServiceFabric.csproj" />
+    <ProjectReference Include="..\src\Azure\Orleans.Hosting.ServiceFabric\Orleans.Hosting.ServiceFabric.csproj" />
+    <ProjectReference Include="..\src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\src\Orleans.Core\Orleans.Core.csproj" />
+    <ProjectReference Include="..\src\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
+    <ProjectReference Include="..\src\Orleans.Runtime\Orleans.Runtime.csproj" />
+  </ItemGroup>
+
+</Project>

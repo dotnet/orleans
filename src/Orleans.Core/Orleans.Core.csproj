@@ -46,6 +46,7 @@
     <PackageReference Include="System.Runtime.Serialization.Formatters" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Runtime.Serialization.Primitives" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Security.Cryptography.Algorithms" Version="$(SystemRuntimeVersion)" />
+    <PackageReference Include="System.Threading.Tasks.Extensions" Version="$(SystemThreadingTasksExtensionsVersion)" />
     <PackageReference Include="System.Threading.Thread" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Threading.ThreadPool" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.ValueTuple" Version="$(SystemValueTupleVersion)" />

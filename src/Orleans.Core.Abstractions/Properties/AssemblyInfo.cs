@@ -6,6 +6,9 @@
 [assembly: InternalsVisibleTo("Orleans.TestingHost.AppDomain")]
 [assembly: InternalsVisibleTo("OrleansManager")]
 
+// For GrainId
+[assembly: InternalsVisibleTo("Orleans.Clustering.ServiceFabric")]
+
 [assembly: InternalsVisibleTo("DefaultCluster.Tests")]
 [assembly: InternalsVisibleTo("NonSilo.Tests")]
 [assembly: InternalsVisibleTo("Tester.AzureUtils")]
