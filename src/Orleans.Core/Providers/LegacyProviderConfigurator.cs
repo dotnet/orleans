@@ -49,9 +49,10 @@ namespace Orleans.Providers
                 }
                 else if (providerGroup.Key == ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME)
                 {
-                    services.TryAddSingleton<IGrainStorage>(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
                     foreach (IProviderConfiguration providerConfig in providerGroup.SelectMany(kvp => kvp.Value.Providers.Values))
                     {
+                        if (string.Equals(providerConfig.Name, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME))
+                            services.TryAddSingleton<IGrainStorage>(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
                         RegisterProvider<IGrainStorage>(providerConfig, services, DefaultStage);
                     }
                 }
