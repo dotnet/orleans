@@ -636,40 +636,13 @@ namespace Orleans.Transactions.State
             // collect events for batch
             for (int i = 0; i < batchsize; i++)
             {
-                var entry = commitQueue[i];
+                TransactionRecord<TState> entry = commitQueue[i];
 
                 switch (entry.Role)
                 {
                     case CommitRole.LocalCommit:
                         {
-                            this.storageBatch.Prepare(entry.SequenceNumber, entry.TransactionId, entry.Timestamp, entry.TransactionManager, entry.State);
-                            this.storageBatch.Commit(entry.TransactionId, entry.Timestamp, entry.WriteParticipants);
-                            this.storageBatch.Confirm(entry.SequenceNumber);
-
-                            // after store, send response back to TA
-                            this.storageBatch.FollowUpAction(() =>
-                            {
-                                if (logger.IsEnabled(LogLevel.Trace))
-                                {
-                                    logger.Trace($"committed {entry.Timestamp:o}");
-                                }
-                                entry.PromiseForTA.TrySetResult(TransactionalStatus.Ok);
-                            });
-
-                            if (entry.WriteParticipants.Count > 1)
-                            {
-                                // after committing, we need to run a task to confirm and collect
-                                this.storageBatch.FollowUpAction(() =>
-                                {
-                                    confirmationTasks.Add(entry.TransactionId, entry);
-                                    confirmationWorker.Notify();
-                                });
-                            }
-                            else
-                            {
-                                // there are no remote write participants to notify, so we can finish it all in one shot
-                                this.storageBatch.Collect(entry.TransactionId);
-                            }
+                            OnLocalCommit(entry);
                             break;
                         }
 
@@ -712,6 +685,38 @@ namespace Orleans.Transactions.State
                             throw new NotSupportedException($"{entry.Role} is not a supported CommitRole.");
                         }
                 }
+            }
+        }
+
+        protected virtual void OnLocalCommit(TransactionRecord<TState> entry)
+        {
+            this.storageBatch.Prepare(entry.SequenceNumber, entry.TransactionId, entry.Timestamp, entry.TransactionManager, entry.State);
+            this.storageBatch.Commit(entry.TransactionId, entry.Timestamp, entry.WriteParticipants);
+            this.storageBatch.Confirm(entry.SequenceNumber);
+
+            // after store, send response back to TA
+            this.storageBatch.FollowUpAction(() =>
+            {
+                if (logger.IsEnabled(LogLevel.Trace))
+                {
+                    logger.Trace($"committed {entry.Timestamp:o}");
+                }
+                entry.PromiseForTA.TrySetResult(TransactionalStatus.Ok);
+            });
+
+            if (entry.WriteParticipants.Count > 1)
+            {
+                // after committing, we need to run a task to confirm and collect
+                this.storageBatch.FollowUpAction(() =>
+                {
+                    confirmationTasks.Add(entry.TransactionId, entry);
+                    confirmationWorker.Notify();
+                });
+            }
+            else
+            {
+                // there are no remote write participants to notify, so we can finish it all in one shot
+                this.storageBatch.Collect(entry.TransactionId);
             }
         }
 

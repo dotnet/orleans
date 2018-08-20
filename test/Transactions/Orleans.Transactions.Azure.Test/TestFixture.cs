@@ -1,5 +1,4 @@
-using System;
-using Xunit;
+using Orleans.Runtime;
 using Orleans.Hosting;
 using Orleans.TestingHost;
 using Orleans.Transactions.Tests;
@@ -27,6 +26,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
+                    .ConfigureServices(services => services.AddSingletonNamedService<IRemoteCommitService, RemoteCommitService>(TransactionTestConstants.RemoteCommitService))
                     .ConfigureTracingForTransactionTests()
                     .AddAzureTableTransactionalStateStorage(TransactionTestConstants.TransactionStore, options =>
                     {
