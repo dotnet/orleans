@@ -121,27 +121,35 @@
 
   <!-- Inner dependency versions -->
   <PropertyGroup Condition="$(FullBuild) != 'true'">
-    <OrleansCoreAbstractionsVersion>2.0.0</OrleansCoreAbstractionsVersion>
-    <OrleansRuntimeAbstractionsVersion>2.0.0</OrleansRuntimeAbstractionsVersion>
+    <OrleansCoreAbstractionsVersion>2.1.0</OrleansCoreAbstractionsVersion>
+    <OrleansRuntimeAbstractionsVersion>2.1.0</OrleansRuntimeAbstractionsVersion>
     <OrleansCoreVersion>2.1.0</OrleansCoreVersion>
     <OrleansRuntimeVersion>2.1.0</OrleansRuntimeVersion>
     <OrleansCoreLegacyVersion>2.1.0</OrleansCoreLegacyVersion>
     <OrleansRuntimeLegacyVersion>2.1.0</OrleansRuntimeLegacyVersion>
-    <OrleansProvidersVersion>2.0.0</OrleansProvidersVersion>
-    <OrleansExtensionsVersion>2.0.0</OrleansExtensionsVersion>
-    <OrleansEventSourcingVersion>2.0.0</OrleansEventSourcingVersion>
-    <OrleansAdoNetVersion>2.0.0</OrleansAdoNetVersion>
-    <OrleansAWSVersion>2.0.0</OrleansAWSVersion>
-    <OrleansAzureVersion>2.0.0</OrleansAzureVersion>
+    <OrleansProvidersVersion>2.1.0</OrleansProvidersVersion>
+    <OrleansExtensionsVersion>2.1.0</OrleansExtensionsVersion>
+    <OrleansEventSourcingVersion>2.1.0</OrleansEventSourcingVersion>
+    <OrleansAdoNetVersion>2.1.0</OrleansAdoNetVersion>
+    <OrleansAWSVersion>2.1.0</OrleansAWSVersion>
+    <OrleansAzureClusteringVersion>2.1.0</OrleansAzureClusteringVersion>
+    <OrleansAzureStreamingVersion>2.1.0</OrleansAzureStreamingVersion>
+    <OrleansAzureEventHubsVersion>2.1.0</OrleansAzureEventHubsVersion>
+    <OrleansAzurePersistenceVersion>2.1.0</OrleansAzurePersistenceVersion>
+    <OrleansAzureRemindersVersion>2.1.0</OrleansAzureRemindersVersion>
+    <OrleansAzureMetapackageVersion>2.1.0</OrleansAzureMetapackageVersion>
+    <OrleansGoogleCloudProviderVersion>2.1.0</OrleansGoogleCloudProviderVersion>
+    <OrleansAzureCloudServicesVersion>2.1.0</OrleansAzureCloudServicesVersion>
     <OrleansTestingHostVersion>2.1.0</OrleansTestingHostVersion>
     <OrleansTransactionsVersion>2.1.0</OrleansTransactionsVersion>
-    <OrleansServiceFabricVersion>2.0.0</OrleansServiceFabricVersion>
-    <OrleansSerializersVersion>2.0.0</OrleansSerializersVersion>
-    <OrleansToolsVersion>2.0.0</OrleansToolsVersion>
-    <OrleansClientVersion>2.0.0</OrleansClientVersion>
-    <OrleansServerVersion>2.0.0</OrleansServerVersion>
+    <OrleansServiceFabricVersion>2.1.0</OrleansServiceFabricVersion>
+    <OrleansSerializersVersion>2.1.0</OrleansSerializersVersion>
+    <OrleansToolsVersion>2.1.0</OrleansToolsVersion>
+    <OrleansClientVersion>2.1.0</OrleansClientVersion>
+    <OrleansServerVersion>2.1.0</OrleansServerVersion>
     <OrleansCodegenVersion>2.1.0</OrleansCodegenVersion>
     <OrleansEventHubProviderVersion>2.1.0</OrleansEventHubProviderVersion>
+    <OrleansTelemetryConsumersVersion>2.1.0</OrleansTelemetryConsumersVersion>
   </PropertyGroup>
   
   <PropertyGroup Condition="$(FullBuild) == 'true'">
@@ -156,7 +164,14 @@
     <OrleansEventSourcingVersion>$(VersionPrefix)</OrleansEventSourcingVersion>
     <OrleansAdoNetVersion>$(VersionPrefix)</OrleansAdoNetVersion>
     <OrleansAWSVersion>$(VersionPrefix)</OrleansAWSVersion>
-    <OrleansAzureVersion>$(VersionPrefix)</OrleansAzureVersion>
+    <OrleansAzureClusteringVersion>$(VersionPrefix)</OrleansAzureClusteringVersion>
+    <OrleansAzureStreamingVersion>$(VersionPrefix)</OrleansAzureStreamingVersion>
+    <OrleansAzureEventHubsVersion>$(VersionPrefix)</OrleansAzureEventHubsVersion>
+    <OrleansAzurePersistenceVersion>$(VersionPrefix)</OrleansAzurePersistenceVersion>
+    <OrleansAzureRemindersVersion>$(VersionPrefix)</OrleansAzureRemindersVersion>
+    <OrleansAzureMetapackageVersion>$(VersionPrefix)</OrleansAzureMetapackageVersion>
+    <OrleansGoogleCloudProviderVersion>$(VersionPrefix)</OrleansGoogleCloudProviderVersion>
+    <OrleansAzureCloudServicesVersion>$(VersionPrefix)</OrleansAzureCloudServicesVersion>
     <OrleansTestingHostVersion>$(VersionPrefix)</OrleansTestingHostVersion>
     <OrleansTransactionsVersion>$(VersionPrefix)</OrleansTransactionsVersion>
     <OrleansServiceFabricVersion>$(VersionPrefix)</OrleansServiceFabricVersion>
@@ -166,6 +181,7 @@
     <OrleansServerVersion>$(VersionPrefix)</OrleansServerVersion>
     <OrleansCodegenVersion>$(VersionPrefix)</OrleansCodegenVersion>
     <OrleansEventHubProviderVersion>$(VersionPrefix)</OrleansEventHubProviderVersion>
+    <OrleansTelemetryConsumersVersion>$(VersionPrefix)</OrleansTelemetryConsumersVersion>
   </PropertyGroup>
 
   <!-- Set output folder for created NuGet packages -->

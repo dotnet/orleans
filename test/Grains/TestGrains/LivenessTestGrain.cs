@@ -32,8 +32,6 @@ namespace UnitTests.Grains
             return base.OnDeactivateAsync();
         }
 
-        #region Implementation of ILivenessTestGrain
-
         public Task<string> GetLabel()
         {
             return Task.FromResult(label);
@@ -74,7 +72,5 @@ namespace UnitTests.Grains
         {
             return Task.FromResult(this.AsReference<ILivenessTestGrain>());
         }
-
-        #endregion
     }
 }

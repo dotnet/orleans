@@ -21,13 +21,13 @@
 
   <Choose>
     <When Condition="$(OrleansCoreLegacyVersion) == $(VersionPrefix) AND $(OrleansCoreLegacyVersion) == $(OrleansToolsVersion)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="..\Orleans.Core.Legacy\Orleans.Core.Legacy.csproj" />
       </ItemGroup>
     </When>
     <Otherwise>
       <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.Core.Legacy" Version="$(OrleansToolsVersion)"/>
+        <PackageReference Include="Microsoft.Orleans.Core.Legacy" Version="$(OrleansCoreLegacyVersion)"/>
       </ItemGroup>
     </Otherwise>
   </Choose>

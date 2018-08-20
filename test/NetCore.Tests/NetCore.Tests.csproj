@@ -11,8 +11,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Grains\TestGrainInterfaces\TestGrainInterfaces.csproj" />
-    <ProjectReference Include="..\Grains\TestGrains\TestGrains.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Grains\TestGrainInterfaces\TestGrainInterfaces.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Grains\TestGrains\TestGrains.csproj" />
   </ItemGroup>
   
 </Project>

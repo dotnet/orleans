@@ -87,8 +87,6 @@ namespace Orleans.Transactions.DynamoDB
             }
         }
 
-#region Table Management Operations
-        
         private void CreateClient()
         {
             if (service.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
@@ -189,10 +187,6 @@ namespace Orleans.Transactions.DynamoDB
                 throw;
             }
         }
-
-#endregion
-
-#region CRUD
 
         /// <summary>
         /// Create or Replace an entry in a DynamoDB Table
@@ -549,7 +543,5 @@ namespace Orleans.Transactions.DynamoDB
                 throw;
             }
         }
-
-#endregion
     }
 }

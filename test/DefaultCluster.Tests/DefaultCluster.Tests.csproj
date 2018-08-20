@@ -20,12 +20,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\TestInfrastructure\Orleans.TestingHost.Legacy\Orleans.TestingHost.Legacy.csproj" />
-    <ProjectReference Include="..\Tester\Tester.csproj" />
-    <ProjectReference Include="..\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
-    <ProjectReference Include="..\Grains\TestGrains\TestGrains.csproj" />
-    <ProjectReference Include="..\Misc\TestInternalDtosRefOrleans\TestInternalDtosRefOrleans.csproj" />
-    <ProjectReference Include="..\Grains\TestInternalGrains\TestInternalGrains.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\Orleans.TestingHost.Legacy\Orleans.TestingHost.Legacy.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Tester\Tester.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Grains\TestGrains\TestGrains.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Misc\TestInternalDtosRefOrleans\TestInternalDtosRefOrleans.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Grains\TestInternalGrains\TestInternalGrains.csproj" />
   </ItemGroup>
 
   <ItemGroup>

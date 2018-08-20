@@ -160,8 +160,6 @@ namespace Orleans.Runtime.Host
             return config;
         }
 
-        #region Azure RoleEntryPoint methods
-
         /// <summary>
         /// Initialize this Orleans silo for execution. Config data will be read from silo config file as normal
         /// </summary>
@@ -320,8 +318,6 @@ namespace Orleans.Runtime.Host
             host.ShutdownOrleansSilo();
             logger.Info(ErrorCode.Runtime_Error_100291, "Orleans silo '{0}' shutdown.", host.Name);
         }
-
-        #endregion
 
         private bool StartSilo()
         {

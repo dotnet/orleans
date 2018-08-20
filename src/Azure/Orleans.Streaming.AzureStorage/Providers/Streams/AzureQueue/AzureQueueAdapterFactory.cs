@@ -8,6 +8,7 @@ using Orleans.Streams;
 using Orleans.Providers.Streams.Common;
 using Orleans.Configuration;
 using Orleans.Configuration.Overrides;
+using Orleans.Streaming.AzureStorage.Providers.Streams.AzureQueue;
 
 namespace Orleans.Providers.Streams.AzureQueue
 {
@@ -20,7 +21,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         private readonly ClusterOptions clusterOptions;
         private readonly ILoggerFactory loggerFactory;
         private readonly Func<TDataAdapter> dataAadaptorFactory;
-        private HashRingBasedStreamQueueMapper streamQueueMapper;
+        private IAzureStreamQueueMapper streamQueueMapper;
         private IQueueAdapterCache adapterCache;
         /// <summary>
         /// Gets the serialization manager.
@@ -36,7 +37,6 @@ namespace Orleans.Providers.Streams.AzureQueue
         public AzureQueueAdapterFactory(
             string name,
             AzureQueueOptions options, 
-            HashRingStreamQueueMapperOptions queueMapperOptions,
             SimpleQueueCacheOptions cacheOptions,
             IServiceProvider serviceProvider, 
             IOptions<ClusterOptions> clusterOptions, 
@@ -49,7 +49,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             this.SerializationManager = serializationManager ?? throw new ArgumentNullException(nameof(serializationManager));
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
             this.dataAadaptorFactory = () => ActivatorUtilities.GetServiceOrCreateInstance<TDataAdapter>(serviceProvider);
-            this.streamQueueMapper = new HashRingBasedStreamQueueMapper(queueMapperOptions, providerName);
+            this.streamQueueMapper = new AzureStreamQueueMapper(options.QueueNames, providerName);
             this.adapterCache = new SimpleQueueAdapterCache(cacheOptions, this.providerName, this.loggerFactory);
         }
 
@@ -68,10 +68,9 @@ namespace Orleans.Providers.Streams.AzureQueue
                 this.SerializationManager, 
                 this.streamQueueMapper, 
                 this.loggerFactory, 
-                this.options.ConnectionString, 
+                this.options,
                 this.clusterOptions.ServiceId, 
-                this.providerName, 
-                this.options.MessageVisibilityTimeout);
+                this.providerName);
             return Task.FromResult<IQueueAdapter>(adapter);
         }
 
@@ -100,10 +99,9 @@ namespace Orleans.Providers.Streams.AzureQueue
         public static AzureQueueAdapterFactory<TDataAdapter> Create(IServiceProvider services, string name)
         {
             var azureQueueOptions = services.GetOptionsByName<AzureQueueOptions>(name);
-            var queueMapperOptions = services.GetOptionsByName<HashRingStreamQueueMapperOptions>(name);
             var cacheOptions = services.GetOptionsByName<SimpleQueueCacheOptions>(name);
             IOptions<ClusterOptions> clusterOptions = services.GetProviderClusterOptions(name);
-            var factory = ActivatorUtilities.CreateInstance<AzureQueueAdapterFactory<TDataAdapter>>(services, name, azureQueueOptions, queueMapperOptions, cacheOptions, clusterOptions);
+            var factory = ActivatorUtilities.CreateInstance<AzureQueueAdapterFactory<TDataAdapter>>(services, name, azureQueueOptions, cacheOptions, clusterOptions);
             factory.Init();
             return factory;
         }

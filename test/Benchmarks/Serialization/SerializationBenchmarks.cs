@@ -44,7 +44,7 @@ namespace Benchmarks.Serialization
             }
 
             var client = new ClientBuilder()
-                .ConfigureDefaults()
+                .UseLocalhostClustering()
                 .Configure<ClusterOptions>(options =>
                 {
                     options.ClusterId = nameof(SerializationBenchmarks);

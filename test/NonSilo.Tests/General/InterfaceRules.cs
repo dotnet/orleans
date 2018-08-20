@@ -11,8 +11,6 @@ using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
 
 namespace UnitTests.General
 {
-    #region simple interfaces
-
     public interface ITestGrain_VoidMethod : IAddressable
     {
         void VoidMethod();
@@ -57,10 +55,6 @@ namespace UnitTests.General
     {
         ValueTask<int> Method(int parameter);
     }
-
-    #endregion
-
-    #region inheritance
 
     public interface IBaseGrain : IAddressable
     {
@@ -118,8 +112,6 @@ namespace UnitTests.General
         Task<IBaseTaskGrain> GetGrain();
     }
 
-    #endregion
-
     /// <summary>
     /// Summary description for InterfaceRules
     /// </summary>
@@ -155,8 +147,6 @@ namespace UnitTests.General
 
             Assert.True(isConcreteGrainClass, $"IsConcreteGrainClass {grainClass}");
         }
-
-        #region simple interfaces
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         public void InterfaceRules_VoidMethod()
@@ -220,10 +210,6 @@ namespace UnitTests.General
             GrainInterfaceUtils.ValidateInterface(typeof(ITestGrain_ValueTask));
         }
 
-        #endregion
-
-        #region inheritence
-
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         public void InterfaceRules_ObserverGrain_VoidMethod()
         {
@@ -251,7 +237,5 @@ namespace UnitTests.General
             Assert.Throws<GrainInterfaceUtils.RulesViolationException>(() =>
             GrainInterfaceUtils.ValidateInterface(typeof(IInheritedGrain_ObserverGrain_PropertySetter)));
         }
-
-        #endregion
     }
 }

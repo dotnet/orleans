@@ -41,8 +41,6 @@ namespace Tester.AzureUtils.TimerTests
             TestUtils.ConfigureClientThreadPoolSettingsForStorageTests(1000);
         }
 
-        #region Extra tests / experiments
-
         [SkippableFact, TestCategory("Reminders"), TestCategory("Performance")]
         public async Task Reminders_AzureTable_InsertRate()
         {
@@ -123,7 +121,6 @@ namespace Tester.AzureUtils.TimerTests
             TimeSpan dur = DateTime.UtcNow - startedAt;
             this.log.Info("Inserted {0} rows in {1}, i.e., {2:f2} upserts/sec", numOfInserts, dur, (numOfInserts / dur.TotalSeconds));
         }
-        #endregion
 
         private ReminderEntry NewReminderEntry()
         {

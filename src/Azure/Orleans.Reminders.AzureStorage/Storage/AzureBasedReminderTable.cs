@@ -35,8 +35,6 @@ namespace Orleans.Runtime.ReminderService
             this.remTableManager = await RemindersTableManager.GetManager(this.clusterOptions.ServiceId, this.clusterOptions.ClusterId, this.storageOptions.ConnectionString, this.loggerFactory);
         }
 
-        #region Utility methods
-        
         private ReminderTableData ConvertFromTableEntryList(IEnumerable<Tuple<ReminderTableEntry, string>> entries)
         {
             var remEntries = new List<ReminderEntry>();
@@ -113,8 +111,6 @@ namespace Orleans.Runtime.ReminderService
             };
         }
 
-        #endregion 
-        
         public Task TestOnlyClearTable()
         {
             return this.remTableManager.DeleteTableEntries();

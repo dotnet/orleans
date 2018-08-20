@@ -216,7 +216,6 @@ namespace Orleans.Runtime
             }
         }
 
-        #region IDisposable Support
         private bool disposedValue = false; // To detect redundant calls
 
         protected virtual void Dispose(bool disposing)
@@ -246,6 +245,5 @@ namespace Orleans.Runtime
             // TODO: uncomment the following line if the finalizer is overridden above.
             // GC.SuppressFinalize(this);
         }
-        #endregion
     }
 }

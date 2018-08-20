@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
@@ -17,6 +18,7 @@ using Orleans.Hosting;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Providers.Streams.AzureQueue;
+using Tester.AzureUtils.Streaming;
 
 namespace UnitTests.StreamingTests
 {
@@ -37,7 +39,7 @@ namespace UnitTests.StreamingTests
 
         private string StreamNamespace;
         private readonly ITestOutputHelper output;
-
+        private const int queueCount = 8;
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             TestUtils.CheckForAzureStorage();
@@ -61,15 +63,17 @@ namespace UnitTests.StreamingTests
                         options.DeleteStateOnClear = true;
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     }))
-                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName, ob => ob.Configure(
-                        options =>
+                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName, ob => ob.Configure<IOptions<ClusterOptions>>(
+                        (options, dep) =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                         }))
-                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>("AzureQueueProvider2", ob=>ob.Configure(
-                        options =>
+                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>("AzureQueueProvider2", ob=>ob.Configure<IOptions<ClusterOptions>>(
+                        (options, dep) =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.QueueNames = AzureQueueUtilities.GenerateQueueNames($"{dep.Value.ClusterId}2", queueCount);
                         }))
                     .AddMemoryGrainStorage("MemoryStore", options => options.NumStorageGrains = 1);
             }
@@ -81,7 +85,17 @@ namespace UnitTests.StreamingTests
             StreamNamespace = StreamTestsConstants.StreamLifecycleTestsNamespace;
             this.mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
         }
-        
+
+        public override void Dispose()
+        {
+            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
+                TestDefaultConfiguration.DataConnectionString).Wait();
+            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount),
+                TestDefaultConfiguration.DataConnectionString).Wait();
+            base.Dispose();
+        }
         [SkippableFact]
         public async Task SMS_Limits_FindMax_Consumers()
         {
@@ -342,8 +356,6 @@ namespace UnitTests.StreamingTests
                 normalSubscribeCalls: false
             );
         }
-        
-        #region Test execution methods
 
         private Task Test_Stream_Churn_NumStreams_FewPublishers(
             string streamProviderName,
@@ -852,6 +864,5 @@ namespace UnitTests.StreamingTests
                 .Sum();
             return grainCount;
         }
-        #endregion
     }
 }

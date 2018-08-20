@@ -95,8 +95,6 @@ namespace UnitTests.General
             VerifyRing(rings);
         }
 
-        #region Util methods
-
         private Dictionary<SiloAddress, ConsistentRingProvider> CreateServers(int n)
         {
             Dictionary<SiloAddress, ConsistentRingProvider> rings = new Dictionary<SiloAddress, ConsistentRingProvider>();
@@ -205,8 +203,6 @@ namespace UnitTests.General
                 }
             }
         }
-
-        #endregion
     }
 
     internal class RangeBreakable

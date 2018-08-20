@@ -37,10 +37,10 @@ namespace Orleans.Transactions.Tests
             throw new Exception("This should abort the transaction");
         }
 
-        public async Task MultiGrainAddAndThrow(ITransactionTestGrain throwGrain, List<ITransactionTestGrain> grains, int numberToAdd)
+        public async Task MultiGrainAddAndThrow(List<ITransactionTestGrain> throwGrains, List<ITransactionTestGrain> grains, int numberToAdd)
         {
             await Task.WhenAll(grains.Select(g => g.Add(numberToAdd)));
-            await throwGrain.AddAndThrow(numberToAdd);
+            await Task.WhenAll(throwGrains.Select(tg => tg.AddAndThrow(numberToAdd)));
         }
 
         public Task MultiGrainSetBit(List<ITransactionalBitArrayGrain> grains, int bitIndex)

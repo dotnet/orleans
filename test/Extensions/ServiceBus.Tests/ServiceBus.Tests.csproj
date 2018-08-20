@@ -12,14 +12,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Azure\Orleans.Streaming.EventHubs\Orleans.Streaming.EventHubs.csproj" />
-    <ProjectReference Include="..\..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
-    <ProjectReference Include="..\..\TestInfrastructure\Orleans.TestingHost.Legacy\Orleans.TestingHost.Legacy.csproj" />
-    <ProjectReference Include="..\..\Tester\Tester.csproj" />
-    <ProjectReference Include="..\..\Grains\TestGrains\TestGrains.csproj" />
-    <ProjectReference Include="..\..\Misc\TestInternalDtosRefOrleans\TestInternalDtosRefOrleans.csproj" />
-    <ProjectReference Include="..\..\Grains\TestInternalGrains\TestInternalGrains.csproj" />
-    <ProjectReference Include="..\..\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Streaming.EventHubs\Orleans.Streaming.EventHubs.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\Orleans.TestingHost.Legacy\Orleans.TestingHost.Legacy.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Tester\Tester.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Grains\TestGrains\TestGrains.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Misc\TestInternalDtosRefOrleans\TestInternalDtosRefOrleans.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Grains\TestInternalGrains\TestInternalGrains.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
   </ItemGroup>
 
   <ItemGroup>

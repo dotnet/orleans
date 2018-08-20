@@ -82,30 +82,6 @@ namespace Orleans.AzureUtils
         }
 
         /// <summary>
-        /// Constructor.
-        /// </summary>
-        /// <param name="queueName">Name of the queue to be connected to.</param>
-        /// <param name="serviceId">The service id of the silo. It will be concatenated to the queueName.</param>
-        /// <param name="storageConnectionString">Connection string for the Azure storage account used to host this table.</param>
-        /// <param name="visibilityTimeout">A TimeSpan specifying the visibility timeout interval</param>
-        /// <param name="loggerFactory">logger factory used to create loggers</param>
-        public AzureQueueDataManager(ILoggerFactory loggerFactory, string queueName, string serviceId, string storageConnectionString, TimeSpan? visibilityTimeout = null)
-        {
-            logger = loggerFactory.CreateLogger<AzureQueueDataManager>();
-            QueueName = serviceId + "-" + queueName;
-            QueueName = SanitizeQueueName(QueueName);
-            ValidateQueueName(QueueName);
-            connectionString = storageConnectionString;
-            messageVisibilityTimeout = visibilityTimeout;
-
-            queueOperationsClient = GetCloudQueueClient(
-                connectionString,
-                AzureQueueDefaultPolicies.QueueOperationRetryPolicy,
-                AzureQueueDefaultPolicies.QueueOperationTimeout,
-                logger);
-        }
-
-        /// <summary>
         /// Initializes the connection to the queue.
         /// </summary>
         public async Task InitQueueAsync()

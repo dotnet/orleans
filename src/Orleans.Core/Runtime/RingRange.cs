@@ -94,14 +94,10 @@ namespace Orleans.Runtime
             return ((double)RangeSize() / (double)RangeFactory.RING_SIZE) * ((double)100.0);
         }
 
-        #region IEquatable<SingleRange> Members
-
         public bool Equals(SingleRange other)
         {
             return other != null && begin == other.begin && end == other.end;
         }
-
-        #endregion
 
         public override bool Equals(object obj)
         {

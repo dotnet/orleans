@@ -34,8 +34,6 @@ namespace Orleans.Clustering.DynamoDB
             this.maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
         }
 
-        #region Implementation of IGatewayListProvider
-
         public Task InitializeGatewayListProvider()
         {
             this.storage = new DynamoDBStorage(this.loggerFactory, this.options.Service, this.options.AccessKey, this.options.SecretKey,
@@ -90,7 +88,5 @@ namespace Orleans.Clustering.DynamoDB
         {
             get { return true; }
         }
-
-        #endregion
     }
 }

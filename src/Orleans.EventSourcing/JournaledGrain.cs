@@ -281,9 +281,6 @@ namespace Orleans.EventSourcing
         }
 
 
-
-        #region internal plumbing
-
         /// <summary>
         /// Adaptor for log consistency protocol.
         /// Is installed by the log-consistency provider.
@@ -389,9 +386,6 @@ namespace Orleans.EventSourcing
         {
             OnConnectionIssueResolved(connectionIssue);
         }
-
-        #endregion
-
     }
 
 }

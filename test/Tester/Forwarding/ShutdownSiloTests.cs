@@ -15,21 +15,9 @@ namespace Tester.Forwarding
     {
         public const int NumberOfSilos = 2;
 
-        private class SiloBuilderConfigurator : ISiloBuilderConfigurator
-        {
-            public void Configure(ISiloHostBuilder hostBuilder)
-            {
-                hostBuilder.AddAzureBlobGrainStorage("MemoryStore", (AzureBlobStorageOptions options) =>
-                {
-                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                });
-            }
-        }
-
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             Assert.True(StorageEmulator.TryStart());
-            builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
             builder.Options.InitialSilosCount = NumberOfSilos;
             builder.ConfigureLegacyConfiguration(legacy =>
             {
@@ -57,11 +45,38 @@ namespace Tester.Forwarding
             await promisesAfterShutdown;
         }
 
+        [Fact, TestCategory("GracefulShutdown"), TestCategory("Functional")]
+        public async Task SiloGracefulShutdown_PendingRequestTimers()
+        {
+            var grain = await GetTimerRequestGrainOnSecondary();
+
+            var promise = grain.StartAndWaitTimerTick(TimeSpan.FromSeconds(10));
+
+            await Task.Delay(500);
+            HostedCluster.StopSilo(HostedCluster.SecondarySilos.First());
+
+            await promise;
+        }
+
         private async Task<ILongRunningTaskGrain<T>> GetLongRunningTaskGrainOnSecondary<T>()
         {
             while (true)
             {
                 var grain = GrainFactory.GetGrain<ILongRunningTaskGrain<T>>(Guid.NewGuid());
+                var instanceId = await grain.GetRuntimeInstanceId();
+                if (instanceId.Contains(HostedCluster.SecondarySilos[0].SiloAddress.Endpoint.ToString()))
+                {
+                    return grain;
+                }
+            }
+        }
+
+        private async Task<ITimerRequestGrain> GetTimerRequestGrainOnSecondary()
+        {
+            var i = 0;
+            while (true)
+            {
+                var grain = GrainFactory.GetGrain<ITimerRequestGrain>(i++);
                 var instanceId = await grain.GetRuntimeInstanceId();
                 if (instanceId.Contains(HostedCluster.SecondarySilos[0].SiloAddress.Endpoint.ToString()))
                 {

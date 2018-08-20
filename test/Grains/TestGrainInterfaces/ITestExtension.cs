@@ -1,25 +1,29 @@
 ﻿using System.Threading.Tasks;
-using Orleans;
 using Orleans.Runtime;
 
 namespace UnitTests.GrainInterfaces
 {
-    public interface ITestExtension : IGrainWithIntegerKey, IGrainExtension
+    public interface ITestExtension : IGrainExtension
     {
         Task<string> CheckExtension_1();
 
         Task<string> CheckExtension_2();
     }
 
-    public interface IGenericTestExtension<T> : IGrainWithIntegerKey, IGrainExtension
+    public interface IGenericTestExtension<T> : IGrainExtension
     {
         Task<T> CheckExtension_1();
 
         Task<string> CheckExtension_2();
     }
 
-    public interface ISimpleExtension : IGrainWithIntegerKey, IGrainExtension
+    public interface ISimpleExtension : IGrainExtension
     {
         Task<string> CheckExtension_1();
+    }
+
+    public interface IAutoExtension : IGrainExtension
+    {
+        Task<string> CheckExtension();
     }
 }

@@ -21,8 +21,8 @@
 
   <Choose>
     <When Condition="$(OrleansRuntimeAbstractionsVersion) == $(VersionPrefix) AND $(OrleansRuntimeAbstractionsVersion) == $(OrleansTestingHostVersion)">
-      <ItemGroup >
-        <ProjectReference Include="..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
+      <ItemGroup>
+        <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
       </ItemGroup>
     </When>
     <Otherwise>
@@ -34,8 +34,8 @@
 
   <Choose>
     <When Condition="$(OrleansProvidersVersion) == $(VersionPrefix) AND $(OrleansProvidersVersion) == $(OrleansTestingHostVersion)">
-      <ItemGroup >
-        <ProjectReference Include="..\OrleansProviders\OrleansProviders.csproj" />
+      <ItemGroup>
+        <ProjectReference Include="$(SourceRoot)src\OrleansProviders\OrleansProviders.csproj" />
       </ItemGroup>
     </When>
     <Otherwise>
@@ -47,13 +47,13 @@
 
   <Choose>
     <When Condition="$(OrleansRuntimeVersion) == $(VersionPrefix) AND $(OrleansRuntimeVersion) == $(OrleansTestingHostVersion)">
-      <ItemGroup >
-        <ProjectReference Include="..\Orleans.Runtime\Orleans.Runtime.csproj" />
+      <ItemGroup>
+        <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
       </ItemGroup>
     </When>
     <Otherwise>
       <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.OrleansRuntime" Version="$(OrleansTestingHostVersion)"/>
+        <PackageReference Include="Microsoft.Orleans.OrleansRuntime" Version="$(OrleansRuntimeVersion)"/>
       </ItemGroup>
     </Otherwise>
   </Choose>

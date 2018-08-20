@@ -8,9 +8,7 @@ using Microsoft.WindowsAzure.Storage.Table;
 using Newtonsoft.Json;
 using Orleans.Configuration;
 using Orleans.Runtime;
-using Orleans.Serialization;
 using Orleans.Transactions.Abstractions;
-using Orleans.Transactions.Abstractions.Extensions;
 
 namespace Orleans.Transactions.AzureStorage
 {
@@ -34,7 +32,7 @@ namespace Orleans.Transactions.AzureStorage
             this.name = name;
             this.options = options;
             this.clusterOptions = clusterOptions.Value;
-            this.jsonSettings = TransactionParticipantExtensionExtensions.GetJsonSerializerSettings(
+            this.jsonSettings = TransactionalStateFactory.GetJsonSerializerSettings(
                 typeResolver,
                 grainFactory);
             this.loggerFactory = loggerFactory;

@@ -64,8 +64,6 @@ namespace UnitTests.TimerTests
             controlProxy.EraseReminderTable().WaitWithThrow(TestConstants.InitTimeout);
         }
 
-        #region Test methods
-        #region Basic test
         public async Task Test_Reminders_Basic_StopByRef()
         {
             IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -137,9 +135,7 @@ namespace UnitTests.TimerTests
                 Assert.Equal(2,  curr); // string.Format("Incorrect ticks for {0}_{1}", DR, i));
             }
         }
-        #endregion
 
-        #region Single join ... multi grain, multi reminders
         public async Task Test_Reminders_1J_MultiGrainMultiReminders()
         {
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -167,7 +163,6 @@ namespace UnitTests.TimerTests
             //Block until all tasks complete.
             await Task.WhenAll(tasks).WithTimeout(ENDWAIT);
         }
-        #endregion
 
         public async Task Test_Reminders_ReminderNotFound()
         {
@@ -178,9 +173,6 @@ namespace UnitTests.TimerTests
            Assert.Null(reminder);
         }
 
-        #endregion
-
-        #region Multiple joins ... multi grain, multi reminders
         internal async Task<bool> PerGrainMultiReminderTestChurn(IReminderTestGrain2 g)
         {
             // for churn cases, we do execute start and stop reminders with retries as we don't have the queue-ing 
@@ -257,9 +249,7 @@ namespace UnitTests.TimerTests
 
             return true;
         }
-        #endregion
 
-        #region Multi grains multi reminders/grain test
         protected async Task<bool> PerGrainMultiReminderTest(IReminderTestGrain2 g)
         {
             TimeSpan period = await g.GetReminderPeriod(DR);
@@ -328,9 +318,7 @@ namespace UnitTests.TimerTests
 
             return true;
         }
-        #endregion
 
-        #region Multiple grain types
         protected async Task<bool> PerCopyGrainFailureTest(IReminderTestCopyGrain grain)
         {
             TimeSpan period = await grain.GetReminderPeriod(DR);
@@ -349,10 +337,7 @@ namespace UnitTests.TimerTests
 
             return true;
         }
-        #endregion
 
-        #region Utility methods
-        
         protected static string Time()
         {
             return DateTime.UtcNow.ToString("hh:mm:ss.fff");
@@ -436,8 +421,6 @@ namespace UnitTests.TimerTests
 
             return false;
         }
-
-        #endregion
     }
 }
 // ReSharper restore InconsistentNaming

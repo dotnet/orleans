@@ -1,8 +1,12 @@
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
+using FluentAssertions.Common;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -24,6 +28,8 @@ namespace Tester.AzureUtils.Streaming
 
         private readonly ITestOutputHelper output;
         private readonly ClientStreamTestRunner runner;
+        private static string serviceId = Guid.NewGuid().ToString();
+
         public AQClientStreamTests(ITestOutputHelper output)
         {
             this.output = output;
@@ -46,8 +52,9 @@ namespace Tester.AzureUtils.Streaming
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AQStreamProviderName, ob=>ob.Configure(
-                        options =>
+                    .Configure<ClusterOptions>(op => op.ServiceId = serviceId)
+                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AQStreamProviderName, ob=>ob.Configure<IOptions<ClusterOptions>>(
+                        (options, dep) =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         }));
@@ -59,8 +66,9 @@ namespace Tester.AzureUtils.Streaming
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
-                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AQStreamProviderName, ob=>ob.Configure(
-                        options =>
+                    .Configure<ClusterOptions>(op => op.ServiceId = serviceId)
+                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AQStreamProviderName, ob=>ob.Configure<IOptions<ClusterOptions>>(
+                        (options, dep) =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         }))
@@ -70,9 +78,8 @@ namespace Tester.AzureUtils.Streaming
 
         public override void Dispose()
         {
-            var clusterId = HostedCluster.Options.ClusterId;
             base.Dispose();
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, AQStreamProviderName, clusterId,
+            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, AzureQueueStreamProviderUtils.GenerateDefaultAzureQueueNames(serviceId, AQStreamProviderName),
                 TestDefaultConfiguration.DataConnectionString).Wait();
             TestAzureTableStorageStreamFailureHandler.DeleteAll().Wait();
         }

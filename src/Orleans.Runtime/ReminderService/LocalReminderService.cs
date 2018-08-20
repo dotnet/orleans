@@ -47,8 +47,6 @@ namespace Orleans.Runtime.ReminderService
             this.logger = this.loggerFactory.CreateLogger<LocalReminderService>();
         }
 
-        #region Public methods
-
         /// <summary>
         /// Attempt to retrieve reminders, that are my responsibility, from the global reminder table when starting this silo (reminder service instance)
         /// </summary>
@@ -163,8 +161,6 @@ namespace Orleans.Runtime.ReminderService
             return tableData.Reminders.Select(entry => entry.ToIGrainReminder()).ToList();
         }
 
-        #endregion
-
         /// <summary>
         /// Attempt to retrieve reminders from the global reminder table
         /// </summary>
@@ -202,7 +198,6 @@ namespace Orleans.Runtime.ReminderService
             if (logger.IsEnabled(LogLevel.Information) && remindersOutOfRange.Length > 0) logger.Info($"Removed {remindersOutOfRange.Length} local reminders that are now out of my range.");
         }
 
-        #region Change in membership, e.g., failure of predecessor
         public override async Task OnRangeChange(IRingRange oldRange, IRingRange newRange, bool increased)
         {
             await base.OnRangeChange(oldRange, newRange, increased);
@@ -211,9 +206,6 @@ namespace Orleans.Runtime.ReminderService
             else
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Ignoring range change until ReminderService is Started -- Current status = {0}", Status);
         }
-        #endregion
-
-        #region Internal implementation methods
 
         protected override async Task StartInBackground()
         {
@@ -429,8 +421,6 @@ namespace Orleans.Runtime.ReminderService
             return true;
         }
 
-        #endregion
-
         /// <summary>
         /// Local timer expired ... notify it as a 'tick' to the grain who registered this reminder
         /// </summary>
@@ -446,8 +436,6 @@ namespace Orleans.Runtime.ReminderService
             ticksDeliveredStat.Increment();
             await reminder.OnTimerTick(tardinessStat, logger);
         }
-
-        #region Utility (less useful) methods
 
         private async Task DoResponsibilitySanityCheck(GrainReference grainRef, string debugInfo)
         {
@@ -502,8 +490,6 @@ namespace Orleans.Runtime.ReminderService
             logger.Trace(str);
         }
 
-        #endregion
-        
         private static GrainId GetGrainId()
         {
             var typeCode = GrainInterfaceUtils.GetGrainClassTypeCode(typeof(IReminderService));

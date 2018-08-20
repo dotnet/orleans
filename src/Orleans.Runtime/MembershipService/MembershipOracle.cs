@@ -55,8 +55,6 @@ namespace Orleans.Runtime.MembershipService
             timerLogger = this.loggerFactory.CreateLogger<GrainTimer>();
         }
 
-        #region ISiloStatusOracle Members
-
         public async Task Start()
         {
             try
@@ -318,10 +316,6 @@ namespace Orleans.Runtime.MembershipService
             return membershipOracleData.UnSubscribeFromSiloStatusEvents(observer);
         }
 
-        #endregion
-
-
-        #region IMembershipService Members
 
         // Treat this gossip msg as a trigger to read the table (and just ignore the input parameters).
         // This simplified a lot of the races when we get gossip info which is outdated with the table truth.
@@ -349,10 +343,6 @@ namespace Orleans.Runtime.MembershipService
             // do not do anything here -- simply returning back will indirectly notify the prober that this silo is alive
             return Task.CompletedTask;
         }
-
-        #endregion
-
-        #region Table update/insert processing
 
         private Task<bool> MembershipExecuteWithRetries(
             Func<int, Task<bool>> taskFunction, 
@@ -529,8 +519,6 @@ namespace Orleans.Runtime.MembershipService
                 throw;
             }
         }
-
-        #endregion
 
         private async Task ProcessTableUpdate(MembershipTableData table, string caller, bool logAtInfoLevel = false)
         {
@@ -1141,8 +1129,6 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        #region Implementation of IHealthCheckParticipant
-
         public bool CheckHealth(DateTime lastCheckTime)
         {
             bool ok = (timerGetTableUpdates != null) && timerGetTableUpdates.CheckTimerFreeze(lastCheckTime);
@@ -1150,8 +1136,6 @@ namespace Orleans.Runtime.MembershipService
             ok &= (timerIAmAliveUpdateInTable != null) && timerIAmAliveUpdateInTable.CheckTimerFreeze(lastCheckTime);
             return ok;
         }
-
-        #endregion
 
         private IMembershipService GetOracleReference(SiloAddress silo)
         {

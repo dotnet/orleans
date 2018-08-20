@@ -1,23 +1,45 @@
 ﻿using System;
 using System.Threading.Tasks;
+using Xunit;
 using Orleans;
+using Orleans.Hosting;
 using Orleans.Runtime;
+using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
-using Xunit;
+using UnitTests.Grains;
 
 namespace DefaultCluster.Tests
 {
-    public class ProviderTests : HostedTestClusterEnsureDefaultStarted
+    public class ProviderTests : OrleansTestingBase, IClassFixture<ProviderTests.Fixture>
     {
-        public ProviderTests(DefaultClusterFixture fixture) : base(fixture)
+        private readonly Fixture fixture;
+
+        public ProviderTests(Fixture fixture)
         {
+            this.fixture = fixture;
+        }
+
+        public class Fixture : BaseTestClusterFixture
+        {
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            {
+                builder.AddSiloBuilderConfigurator<Configurator>();
+            }
+
+            private class Configurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder.AddGrainExtension<IAutoExtension, AutoExtension>();
+                }
+            }
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Providers")]
         public void Providers_TestExtensions()
         {
-            IExtensionTestGrain grain = this.GrainFactory.GetGrain<IExtensionTestGrain>(GetRandomGrainId());
+            IExtensionTestGrain grain = this.fixture.GrainFactory.GetGrain<IExtensionTestGrain>(GetRandomGrainId());
             ITestExtension extension = grain.AsReference<ITestExtension>();
             bool exceptionThrown = true;
 
@@ -82,7 +104,7 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("Functional"), TestCategory("Providers"), TestCategory("BVT"), TestCategory("Cast"), TestCategory("Generics")]
         public async Task Providers_ActivateNonGenericExtensionOfGenericInterface()
         {
-            var grain = this.GrainFactory.GetGrain<IGenericGrainWithNonGenericExtension<int>>(GetRandomGrainId());
+            var grain = this.fixture.GrainFactory.GetGrain<IGenericGrainWithNonGenericExtension<int>>(GetRandomGrainId());
             var extension = grain.AsReference<ISimpleExtension>(); //generic base grain not yet activated - virt refs only
 
             try
@@ -99,7 +121,7 @@ namespace DefaultCluster.Tests
 
         [Fact, TestCategory("Functional"), TestCategory("Providers"), TestCategory("BVT"), TestCategory("Cast"), TestCategory("Generics")]
         public async Task Providers_ReferenceNonGenericExtensionOfGenericInterface() {
-            var grain = this.GrainFactory.GetGrain<IGenericGrainWithNonGenericExtension<int>>(GetRandomGrainId());
+            var grain = this.fixture.GrainFactory.GetGrain<IGenericGrainWithNonGenericExtension<int>>(GetRandomGrainId());
             await grain.DoSomething(); //original generic grain activates here
 
             var extension = grain.AsReference<ISimpleExtension>();
@@ -111,6 +133,16 @@ namespace DefaultCluster.Tests
             }
 
             Assert.True(true);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Providers")]
+        public async Task Providers_AutoInstallExtensionTest()
+        {
+            INoOpTestGrain grain = this.fixture.GrainFactory.GetGrain<INoOpTestGrain>(GetRandomGrainId());
+            ISimpleExtension uninstalled = grain.AsReference<ISimpleExtension>();
+            IAutoExtension autoInstalled = grain.AsReference<IAutoExtension>();
+            await Assert.ThrowsAsync<GrainExtensionNotInstalledException>(() => uninstalled.CheckExtension_1());
+            await autoInstalled.CheckExtension();
         }
     }
 }

@@ -244,8 +244,6 @@ namespace Orleans.Runtime.Configuration
             set => this.ClusterId = value;
         }
 
-        #region MultiClusterNetwork
-
         /// <summary>
         /// Whether this cluster is configured to be part of a multicluster network
         /// </summary>
@@ -287,8 +285,6 @@ namespace Orleans.Runtime.Configuration
         /// A list of connection strings for gossip channels.
         /// </summary>
         public IReadOnlyList<GossipChannelConfiguration> GossipChannels { get; set; }
-
-        #endregion
 
         /// <summary>
         /// Connection string for the underlying data provider for liveness and reminders. eg. Azure Storage, ZooKeeper, SQL Server, ect.

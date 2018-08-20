@@ -77,8 +77,6 @@ namespace Orleans.Runtime.ConsistentRing
             return FindPredecessors(MyAddress, n);
         }
 
-        #region Handling the membership
-
         private void Start()
         {
             isRunning = true;
@@ -241,8 +239,6 @@ namespace Orleans.Runtime.ConsistentRing
             }
         }
 
-        #region Notification related
-        
         public bool SubscribeToRangeChangeEvents(IRingRangeListener observer)
         {
             lock (statusListeners)
@@ -285,8 +281,6 @@ namespace Orleans.Runtime.ConsistentRing
             }
         }
 
-        #endregion
-
         public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
         {
             // This silo's status has changed
@@ -309,7 +303,6 @@ namespace Orleans.Runtime.ConsistentRing
                 }
             }
         }
-        #endregion
 
         /// <summary>
         /// Finds the silo that owns the given hash value.

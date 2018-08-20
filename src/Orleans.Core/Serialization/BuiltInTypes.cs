@@ -16,13 +16,8 @@ namespace Orleans.Serialization
 {
     internal static class BuiltInTypes
     {
-        #region Constants
-
         private static readonly Type objectType = typeof(object);
 
-        #endregion
-
-        #region Generic collections
         internal static void SerializeGenericReadOnlyCollection(object original, ISerializationContext context, Type expected)
         {
             Type t = original.GetType();
@@ -92,8 +87,6 @@ namespace Orleans.Serialization
             return retVal;
         }
 
-        #region Lists
-
         internal static void SerializeGenericList(object original, ISerializationContext context, Type expected)
         {
             Type t = original.GetType();
@@ -158,10 +151,6 @@ namespace Orleans.Serialization
             retVal.AddRange(list.Select(element => (T)SerializationManager.DeepCopyInner(element, context)));
             return retVal;
         }
-
-        #endregion
-
-        #region LinkedLists
 
         /// <summary>
         /// 
@@ -234,10 +223,6 @@ namespace Orleans.Serialization
             }
             return retVal;
         }
-
-        #endregion
-
-        #region HashSets
 
         internal static void SerializeGenericHashSet(object original, ISerializationContext context, Type expected)
         {
@@ -378,9 +363,6 @@ namespace Orleans.Serialization
             }
             return retVal;
         }
-        #endregion
-
-        #region Queues
 
         internal static void SerializeGenericQueue(object original, ISerializationContext context, Type expected)
         {
@@ -447,10 +429,6 @@ namespace Orleans.Serialization
             }
             return retVal;
         }
-
-        #endregion
-
-        #region Stacks
 
         internal static void SerializeGenericStack(object original, ISerializationContext context, Type expected)
         {
@@ -524,10 +502,6 @@ namespace Orleans.Serialization
             }
             return retVal;
         }
-
-        #endregion
-
-        #region Dictionaries
 
         internal static void SerializeGenericDictionary(object original, ISerializationContext context, Type expected)
         {
@@ -705,10 +679,6 @@ namespace Orleans.Serialization
             return result;
         }
 
-        #endregion
-
-        #region SortedDictionaries
-
         internal static void SerializeGenericSortedDictionary(object original, ISerializationContext context, Type expected)
         {
             Type t = original.GetType();
@@ -774,10 +744,6 @@ namespace Orleans.Serialization
             return result;
         }
 
-        #endregion
-
-        #region SortedLists
-
         internal static void SerializeGenericSortedList(object original, ISerializationContext context, Type expected)
         {
             Type t = original.GetType();
@@ -842,12 +808,6 @@ namespace Orleans.Serialization
 
             return result;
         }
-
-        #endregion
-
-        #endregion
-
-        #region Immutable Collections
 
         internal static void SerializeGenericImmutableDictionary(object original, ISerializationContext context, Type expected)
         {
@@ -1219,11 +1179,6 @@ namespace Orleans.Serialization
 
             return queues;
         }
-        #endregion
-
-        #region Other generics
-
-        #region Tuples
 
         internal static void SerializeTuple(object raw, ISerializationContext context, Type expected)
         {
@@ -1447,10 +1402,6 @@ namespace Orleans.Serialization
             var item7 = (T7)SerializationManager.DeserializeInner(typeof(T7), context);
             return new Tuple<T1, T2, T3, T4, T5, T6, T7>(item1, item2, item3, item4, item5, item6, item7);
         }
-
-        #endregion
-
-        #region ValueTuples
 
         internal static void SerializeValueTuple(object raw, ISerializationContext context, Type expected)
         {
@@ -1729,10 +1680,6 @@ namespace Orleans.Serialization
             return new ValueTuple<T1, T2, T3, T4, T5, T6, T7, T8>(item1, item2, item3, item4, item5, item6, item7, rest);
         }
 
-        #endregion
-
-        #region KeyValuePairs
-
         internal static void SerializeGenericKeyValuePair(object original, ISerializationContext context, Type expected)
         {
             Type t = original.GetType();
@@ -1779,10 +1726,6 @@ namespace Orleans.Serialization
             context.RecordCopy(original, result);
             return result;
         }
-
-        #endregion
-
-        #region Nullables
 
         internal static void SerializeGenericNullable(object original, ISerializationContext context, Type expected)
         {
@@ -1834,10 +1777,6 @@ namespace Orleans.Serialization
             return original;    // Everything is a struct, so a direct copy is fine
         }
 
-        #endregion
-
-        #region Immutables
-
         internal static void SerializeGenericImmutable(object original, ISerializationContext context, Type expected)
         {
             Type t = original.GetType();
@@ -1875,14 +1814,6 @@ namespace Orleans.Serialization
             return original;    // Immutable means never having to make a copy...
         }
 
-        #endregion
-
-        #endregion
-
-        #region Other System types
-
-        #region TimeSpan
-
         internal static void SerializeTimeSpan(object obj, ISerializationContext context, Type expected)
         {
             var ts = (TimeSpan)obj;
@@ -1898,10 +1829,6 @@ namespace Orleans.Serialization
         {
             return obj; // TimeSpan is a value type 
         }
-
-        #endregion
-
-        #region DateTimeOffset
 
         internal static void SerializeDateTimeOffset(object obj, ISerializationContext context, Type expected)
         {
@@ -1919,10 +1846,6 @@ namespace Orleans.Serialization
         {
             return obj; // DateTimeOffset is a value type 
         }
-
-        #endregion
-
-        #region Type
 
         internal class DefaultTypeSerializer
         {
@@ -1951,10 +1874,6 @@ namespace Orleans.Serialization
             }
         }
 
-        #endregion Type
-
-        #region GUID
-
         internal static void SerializeGuid(object obj, ISerializationContext context, Type expected)
         {
             var guid = (Guid)obj;
@@ -1971,10 +1890,6 @@ namespace Orleans.Serialization
         {
             return obj; // Guids are value types
         }
-
-        #endregion
-
-        #region URIs
 
         [ThreadStatic]
         static private TypeConverter uriConverter;
@@ -1996,10 +1911,6 @@ namespace Orleans.Serialization
             return obj; // URIs are immutable
         }
 
-        #endregion
-
-        #region CultureInfo
-
         internal static void SerializeCultureInfo(object obj, ISerializationContext context, Type expected)
         {
             var cultureInfo = (CultureInfo)obj;
@@ -2015,14 +1926,6 @@ namespace Orleans.Serialization
         {
             return obj;
         }
-
-        #endregion
-
-        #endregion
-
-        #region Internal Orleans types
-
-        #region Basic types
 
         internal static void SerializeGrainId(object obj, ISerializationContext context, Type expected)
         {
@@ -2142,10 +2045,6 @@ namespace Orleans.Serialization
             return original;
         }
 
-        #endregion
-
-        #region InvokeMethodRequest
-
         internal static void SerializeInvokeMethodRequest(object obj, ISerializationContext context, Type expected)
         {
             var request = (InvokeMethodRequest)obj;
@@ -2204,10 +2103,6 @@ namespace Orleans.Serialization
             return result;
         }
 
-        #endregion
-
-        #region Response
-
         internal static void SerializeOrleansResponse(object obj, ISerializationContext context, Type expected)
         {
             var resp = (Response)obj;
@@ -2234,12 +2129,6 @@ namespace Orleans.Serialization
             context.RecordCopy(original, result);
             return result;
         }
-
-        #endregion
-
-        #endregion
-
-        #region Utilities
 
         private static Tuple<Serializer, Deserializer, DeepCopier>
             RegisterConcreteMethods(SerializationManager serializationManager, Type t, string serializerName, string deserializerName, string copierName, Type[] genericArgs = null)
@@ -2292,7 +2181,5 @@ namespace Orleans.Serialization
 
             return new Tuple<Serializer, Deserializer, DeepCopier>(serializer, deserializer, copier);
         }
-
-        #endregion
     }
 }

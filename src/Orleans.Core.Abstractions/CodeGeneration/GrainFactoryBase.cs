@@ -34,8 +34,6 @@ namespace Orleans.CodeGeneration
             }
         }
 
-        #region Utility functions
-
         internal static void DisallowNullOrWhiteSpaceKeyExtensions(string keyExt)
         {
             if (!string.IsNullOrWhiteSpace(keyExt)) return;
@@ -47,7 +45,5 @@ namespace Orleans.CodeGeneration
             
             throw new ArgumentException("Key extension is empty or white space.", "keyExt");
         }
-
-        #endregion
     }
 }

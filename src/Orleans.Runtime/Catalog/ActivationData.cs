@@ -216,8 +216,6 @@ namespace Orleans.Runtime
 
         public IServiceProvider ActivationServices => this.serviceScope.ServiceProvider;
 
-        #region Method invocation
-
         private ExtensionInvoker extensionInvoker;
         public IGrainMethodInvoker GetInvoker(GrainTypeManager typeManager, int interfaceId, string genericGrainType = null)
         {
@@ -241,7 +239,8 @@ namespace Orleans.Runtime
 
         internal bool TryAddExtension(IGrainExtensionMethodInvoker invoker, IGrainExtension extension)
         {
-            if(extensionInvoker == null)
+            this.lastInvoker = null;
+            if (extensionInvoker == null)
                 extensionInvoker = new ExtensionInvoker();
 
             return extensionInvoker.TryAddExtension(invoker, extension);
@@ -249,6 +248,7 @@ namespace Orleans.Runtime
 
         internal void RemoveExtension(IGrainExtension extension)
         {
+            this.lastInvoker = null;
             if (extensionInvoker != null)
             {
                 if (extensionInvoker.Remove(extension))
@@ -263,8 +263,6 @@ namespace Orleans.Runtime
             result = null;
             return extensionInvoker != null && extensionInvoker.TryGetExtensionHandler(extensionType, out result);
         }
-
-        #endregion
 
         public ISchedulingContext SchedulingContext { get; }
 
@@ -339,7 +337,6 @@ namespace Orleans.Runtime
             await streamDirectory.Cleanup(true, false);
         }
 
-        #region IActivationData
         GrainReference IActivationData.GrainReference
         {
             get { return GrainReference; }
@@ -373,10 +370,6 @@ namespace Orleans.Runtime
             AddTimer(timer);
         }
 
-        #endregion
-
-        #region Catalog
-
         internal readonly GrainReference GrainReference;
 
         public SiloAddress Silo { get { return Address.Silo;  } }
@@ -395,7 +388,8 @@ namespace Orleans.Runtime
         {
             SetState(ActivationState.Deactivating);
             deactivationStartTime = DateTime.UtcNow;
-            StopAllTimers();
+            if (!IsCurrentlyExecuting)
+                StopAllTimers();
         }
 
         /// <summary>
@@ -446,10 +440,6 @@ namespace Orleans.Runtime
 
             CollectionTicket = ticket;
         }
-
-        #endregion
-
-        #region Dispatcher
 
         public PlacementStrategy PlacedUsing { get; private set; }
 
@@ -673,10 +663,6 @@ namespace Orleans.Runtime
             }
         }
 
-        #endregion
-        
-        #region Activation collection
-
         public bool IsInactive
         {
             get
@@ -768,9 +754,6 @@ namespace Orleans.Runtime
             }
         }
 
-        #endregion
-
-        #region In-grain Timers
         internal void AddTimer(IGrainTimer timer)
         {
             lock(this)
@@ -823,9 +806,6 @@ namespace Orleans.Runtime
                 return Task.WhenAll(tasks);
             }
         }
-        #endregion
-
-        #region Printing functions
 
         public string DumpStatus()
         {
@@ -903,8 +883,6 @@ namespace Orleans.Runtime
             return GrainInstanceType == null ? placement :
                 String.Format(" #GrainType={0} Placement={1}", GrainInstanceType.FullName, placement);
         }
-
-        #endregion
 
         public void Dispose()
         {

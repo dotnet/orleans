@@ -25,30 +25,25 @@ namespace Orleans.Providers.Streams.AzureQueue
         private readonly IAzureQueueDataAdapter dataAdapter;
         private readonly List<PendingDelivery> pending;
 
-        public QueueId Id { get; }
+        private readonly string azureQueueName;
 
-        public static IQueueAdapterReceiver Create(SerializationManager serializationManager, ILoggerFactory loggerFactory, QueueId queueId, string dataConnectionString, string serviceId, IAzureQueueDataAdapter dataAdapter, TimeSpan? messageVisibilityTimeout = null)
+        public static IQueueAdapterReceiver Create(SerializationManager serializationManager, ILoggerFactory loggerFactory, string azureQueueName, string dataConnectionString, IAzureQueueDataAdapter dataAdapter, TimeSpan? messageVisibilityTimeout = null)
         {
-            if (queueId == null) throw new ArgumentNullException(nameof(queueId));
+            if (azureQueueName == null) throw new ArgumentNullException(nameof(azureQueueName));
             if (string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException(nameof(dataConnectionString));
-            if (string.IsNullOrEmpty(serviceId)) throw new ArgumentNullException(nameof(serviceId));
             if (dataAdapter == null) throw new ArgumentNullException(nameof(dataAdapter));
             if (serializationManager == null) throw new ArgumentNullException(nameof(serializationManager));
 
-            var queue = new AzureQueueDataManager(loggerFactory, queueId.ToString(), serviceId, dataConnectionString, messageVisibilityTimeout);
-            return new AzureQueueAdapterReceiver(serializationManager, loggerFactory, queueId, queue, dataAdapter);
+            var queue = new AzureQueueDataManager(loggerFactory, azureQueueName, dataConnectionString, messageVisibilityTimeout);
+            return new AzureQueueAdapterReceiver(serializationManager, azureQueueName, loggerFactory, queue, dataAdapter);
         }
 
-        private AzureQueueAdapterReceiver(SerializationManager serializationManager, ILoggerFactory loggerFactory, QueueId queueId, AzureQueueDataManager queue, IAzureQueueDataAdapter dataAdapter)
+        private AzureQueueAdapterReceiver(SerializationManager serializationManager, string azureQueueName, ILoggerFactory loggerFactory, AzureQueueDataManager queue, IAzureQueueDataAdapter dataAdapter)
         {
-            if (queueId == null) throw new ArgumentNullException(nameof(queueId));
-            if (queue == null) throw new ArgumentNullException(nameof(queue));
-            if (dataAdapter == null) throw new ArgumentNullException(nameof(queue));
-
-            Id = queueId;
+            this.azureQueueName = azureQueueName ?? throw new ArgumentNullException(nameof(azureQueueName));
             this.serializationManager = serializationManager;
-            this.queue = queue;
-            this.dataAdapter = dataAdapter;
+            this.queue = queue?? throw new ArgumentNullException(nameof(queue));
+            this.dataAdapter = dataAdapter?? throw new ArgumentNullException(nameof(dataAdapter));
             this.logger = loggerFactory.CreateLogger<AzureQueueAdapterReceiver>();
             this.pending = new List<PendingDelivery>();
         }
@@ -139,7 +134,7 @@ namespace Orleans.Providers.Streams.AzureQueue
                 catch (Exception exc)
                 {
                     logger.Warn((int)AzureQueueErrorCode.AzureQueue_15,
-                        $"Exception upon DeleteQueueMessage on queue {Id}. Ignoring.", exc);
+                        $"Exception upon DeleteQueueMessage on queue {this.azureQueueName}. Ignoring.", exc);
                 }
             }
             finally

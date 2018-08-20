@@ -572,8 +572,6 @@ namespace Orleans.Transactions.AzureStorage
             }
         }
 
-#region Internal functions
-
         internal async Task<Tuple<string, string>> InsertTwoTableEntriesConditionallyAsync(T data1, T data2, string data2Etag)
         {
             const string operation = "InsertTableEntryConditionally";
@@ -737,8 +735,6 @@ namespace Orleans.Transactions.AzureStorage
                 Logger.Warn((int)Utilities.ErrorCode.AzureTable_15, "Slow access to Azure Table {0} for {1}, which took {2}.", TableName, operation, timeSpan);
             }
         }
-
-#endregion
 
         /// <summary>
         /// Helper functions for building table queries.

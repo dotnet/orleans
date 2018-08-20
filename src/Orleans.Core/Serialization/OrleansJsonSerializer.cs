@@ -156,8 +156,6 @@ namespace Orleans.Serialization
         }
     }
 
-#region JsonConverters
-
     public class IPAddressConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
@@ -335,6 +333,4 @@ namespace Orleans.Serialization
             return grainRef;
         }
     }
-
-    #endregion
 }

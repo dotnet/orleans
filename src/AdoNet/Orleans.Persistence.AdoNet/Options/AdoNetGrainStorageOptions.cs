@@ -39,7 +39,6 @@ namespace Orleans.Configuration
         /// </summary>
         public string Invariant { get; set; } = DEFAULT_ADONET_INVARIANT;
 
-        #region json serialization related settings
         /// <summary>
         /// Whether storage string payload should be formatted in JSON.
         /// <remarks>If neither <see cref="UseJsonFormat"/> nor <see cref="UseXmlFormat"/> is set to true, then BinaryFormatSerializer will be configured to format storage string payload.</remarks>
@@ -48,7 +47,7 @@ namespace Orleans.Configuration
         public bool UseFullAssemblyNames { get; set; }
         public bool IndentJson { get; set; }
         public TypeNameHandling? TypeNameHandling { get; set; }
-        #endregion
+
         /// <summary>
         /// Whether storage string payload should be formatted in Xml.
         /// <remarks>If neither <see cref="UseJsonFormat"/> nor <see cref="UseXmlFormat"/> is set to true, then BinaryFormatSerializer will be configured to format storage string payload.</remarks>

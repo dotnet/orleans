@@ -65,7 +65,6 @@ namespace Tester.AzureUtils.TimerTests
             await Test_Reminders_ReminderNotFound();
         }
 
-        #region Basic test
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_Basic()
         {
@@ -112,18 +111,14 @@ namespace Tester.AzureUtils.TimerTests
             AssertIsInRange(curr, 2, 3, grain, DR, sleepFor);
             await grain.StopReminder(DR); // cleanup
         }
-        #endregion
 
-        #region Basic single grain multi reminders test
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_MultipleReminders()
         {
             IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             await PerGrainMultiReminderTest(grain);
         }
-        #endregion
 
-        #region Multiple joins ... multi grain, multi reminders
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_2J_MultiGrainMultiReminders()
         {
@@ -155,9 +150,7 @@ namespace Tester.AzureUtils.TimerTests
             //Block until all tasks complete.
             await Task.WhenAll(tasks).WithTimeout(ENDWAIT);
         }
-        #endregion
 
-        #region Multi grains multi reminders/grain test
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_MultiGrainMultiReminders()
         {
@@ -179,9 +172,6 @@ namespace Tester.AzureUtils.TimerTests
             //Block until all tasks complete.
             await Task.WhenAll(tasks).WithTimeout(ENDWAIT);
         }
-        #endregion
-
-        #region Secondary failure ... Basic test
 
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_1F_Basic()
@@ -199,9 +189,7 @@ namespace Tester.AzureUtils.TimerTests
 
             await test; // Block until test completes.
         }
-        #endregion
 
-        #region Multiple failures ... multiple grains
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_2F_MultiGrain()
         {
@@ -235,9 +223,7 @@ namespace Tester.AzureUtils.TimerTests
 
             await Task.WhenAll(tasks).WithTimeout(ENDWAIT); // Block until all tasks complete.
         }
-        #endregion
 
-        #region 1 join 1 failure simulateneously ... multiple grains
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_1F1J_MultiGrain()
         {
@@ -282,9 +268,7 @@ namespace Tester.AzureUtils.TimerTests
             await Task.WhenAll(tasks).WithTimeout(ENDWAIT); // Block until all tasks complete.
             log.Info("\n\n\nReminderTest_1F1J_MultiGrain passed OK.\n\n\n");
         }
-        #endregion
 
-        #region Register same reminder multiple times
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_RegisterSameReminderTwice()
         {
@@ -296,9 +280,7 @@ namespace Tester.AzureUtils.TimerTests
             //Assert.NotEqual(promise1.Result, promise2.Result);
             // TODO: write tests where period of a reminder is changed
         }
-        #endregion
 
-        #region Multiple grain types
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_GT_Basic()
         {
@@ -364,11 +346,7 @@ namespace Tester.AzureUtils.TimerTests
 
             await Task.WhenAll(tasks).WithTimeout(ENDWAIT); // Block until all tasks complete.
         }
-        #endregion       
 
-        #region Testing things that should fail
-
-        #region Lower than allowed reminder period
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_Wrong_LowerThanAllowedPeriod()
         {
@@ -376,9 +354,7 @@ namespace Tester.AzureUtils.TimerTests
             await Assert.ThrowsAsync<ArgumentException>(() =>
                 grain.StartReminder(DR, TimeSpan.FromMilliseconds(3000), true));
         }
-        #endregion
 
-        #region The wrong reminder grain
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_Wrong_Grain()
         {
@@ -387,9 +363,6 @@ namespace Tester.AzureUtils.TimerTests
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 grain.StartReminder(DR));
         }
-        #endregion
-
-        #endregion
     }
 
 }

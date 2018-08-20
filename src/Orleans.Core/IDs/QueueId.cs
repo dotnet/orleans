@@ -53,8 +53,6 @@ namespace Orleans.Streams
             return uniformHashCache;
         }
 
-        #region IComparable<QueueId> Members
-
         public int CompareTo(QueueId other)
         {
             int cmp = queueId.CompareTo(other.queueId);
@@ -66,10 +64,6 @@ namespace Orleans.Streams
             return uniformHashCache.CompareTo(other.uniformHashCache);
         }
 
-        #endregion
-
-        #region IEquatable<QueueId> Members
-
         public virtual bool Equals(QueueId other)
         {
             return other != null 
@@ -77,8 +71,6 @@ namespace Orleans.Streams
                 && String.Equals(queueNamePrefix, other.queueNamePrefix, StringComparison.Ordinal) 
                 && uniformHashCache == other.uniformHashCache;
         }
-
-        #endregion
 
         public override bool Equals(object obj)
         {

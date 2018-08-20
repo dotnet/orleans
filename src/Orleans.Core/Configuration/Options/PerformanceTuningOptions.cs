@@ -6,7 +6,6 @@ namespace Orleans.Configuration
     /// </summary>
     public class PerformanceTuningOptions
     {
-#region ServicePointManager related settings
         /// <summary>
         /// ServicePointManager related settings
         /// </summary>
@@ -16,7 +15,7 @@ namespace Orleans.Configuration
         public bool Expect100Continue { get; set; }
 
         public bool UseNagleAlgorithm { get; set; }
-#endregion
+
         /// <summary>
         /// Minimum number of DotNet threads.
         /// </summary>

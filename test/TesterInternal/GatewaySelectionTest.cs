@@ -131,8 +131,6 @@ namespace UnitTests.MessageCenterTests
                 list = gatewayUris;
             }
 
-#region Implementation of IGatewayListProvider
-
             public Task<IList<Uri>> GetGateways()
             {
                 return Task.FromResult(list);
@@ -151,10 +149,6 @@ namespace UnitTests.MessageCenterTests
             {
                 return Task.CompletedTask;
             }
-
-#endregion
-
-
         }
     }
 }

@@ -13,18 +13,20 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure cluster to use the distributed TM algorithm
         /// </summary>
-        public static ISiloHostBuilder UseDistributedTM(this ISiloHostBuilder builder)
+        /// <param name="builder">Silo host builder</param>
+        /// <param name="withStatisticsReporter">Configure a transaction statistics reporter.  Set to false if you want to configure your own transaction statistics reporting or don't want transaction statistics reported</param>
+        /// <returns></returns>
+        public static ISiloHostBuilder UseDistributedTM(this ISiloHostBuilder builder, bool withStatisticsReporter = true)
         {
-            return builder.ConfigureServices(services => services.UseDistributedTM());
+            return builder.ConfigureServices(services => services.UseDistributedTM(withStatisticsReporter))
+                          .AddGrainExtension<ITransactionManagerExtension, TransactionManagerExtension>()
+                          .AddGrainExtension<ITransactionalResourceExtension, TransactionalResourceExtension>();
         }
 
-        /// <summary>
-        /// Configure cluster to use the distributed TM algorithm
-        /// </summary>
-        public static IServiceCollection UseDistributedTM(this IServiceCollection services)
+        internal static IServiceCollection UseDistributedTM(this IServiceCollection services, bool withReporter)
         {
             services.TryAddSingleton<IClock,Clock>();
-            services.TryAddSingleton<TransactionAgentStatistics>();
+            services.TryAddSingleton<ITransactionAgentStatistics, TransactionAgentStatistics>();
             services.TryAddSingleton<ITransactionOverloadDetector,TransactionOverloadDetector>();
             services.AddSingleton<ITransactionAgent, TransactionAgent>();
             services.TryAddSingleton(typeof(ITransactionDataCopier<>), typeof(DefaultTransactionDataCopier<>));
@@ -32,6 +34,8 @@ namespace Orleans.Hosting
             services.TryAddTransient<ITransactionalStateFactory, TransactionalStateFactory>();
             services.TryAddTransient<INamedTransactionalStateStorageFactory, NamedTransactionalStateStorageFactory>();
             services.AddTransient(typeof(ITransactionalState<>), typeof(TransactionalState<>));
+            if (withReporter)
+                services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, TransactionAgentStatisticsReporter>();
             return services;
         }
     }

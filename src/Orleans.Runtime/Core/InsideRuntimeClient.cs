@@ -110,8 +110,6 @@ namespace Orleans.Runtime
 
         private Dispatcher Dispatcher => this.dispatcher ?? (this.dispatcher = this.ServiceProvider.GetRequiredService<Dispatcher>());
 
-        #region Implementation of IRuntimeClient
-
         public IGrainReferenceRuntime GrainReferenceRuntime => this.grainReferenceRuntime ?? (this.grainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>());
 
         public void SendRequest(
@@ -327,8 +325,9 @@ namespace Orleans.Runtime
 
                     var invoker = invokable.GetInvoker(typeManager, request.InterfaceId, message.GenericGrainType);
 
-                    if (invoker is IGrainExtensionMethodInvoker
-                        && !(target is IGrainExtension))
+                    if (invoker is IGrainExtensionMethodInvoker &&
+                        !(target is IGrainExtension) &&
+                        !TryInstallExtension(request.InterfaceId, invokable, message.GenericGrainType, ref invoker))
                     {
                         // We are trying the invoke a grain extension method on a grain 
                         // -- most likely reason is that the dynamic extension is not installed for this grain
@@ -464,6 +463,26 @@ namespace Orleans.Runtime
             {
                 TransactionContext.Clear();
             }
+        }
+
+        private bool TryInstallExtension(int interfaceId, IInvokable invokable, string genericGrainType, ref IGrainMethodInvoker invoker)
+        {
+            ActivationData activationData = GetCurrentActivationData();
+            IGrainExtension extension = activationData.ActivationServices.GetServiceByKey<int, IGrainExtension>(interfaceId);
+
+            if (extension == null)
+            {
+                return false;
+            }
+
+            if (!TryAddExtension(extension))
+            {
+                return false;
+            }
+
+            // Get the newly installed invoker for the grain extension.
+            invoker = invokable.GetInvoker(typeManager, interfaceId, genericGrainType);
+            return true;
         }
 
         private void SafeSendResponse(Message message, object resultObject)
@@ -667,8 +686,6 @@ namespace Orleans.Runtime
             data.ResetKeepAliveRequest(); // DeactivateOnIdle method would undo / override any current “keep alive” setting, making this grain immideately avaliable for deactivation.
             Catalog.DeactivateActivationOnIdle(data);
         }
-
-        #endregion
 
         private Task OnRuntimeInitializeStop(CancellationToken tc)
         {

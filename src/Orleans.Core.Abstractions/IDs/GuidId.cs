@@ -40,23 +40,15 @@ namespace Orleans.Runtime
             return guidIdInternCache.Value.FindOrCreate(guid, g => new GuidId(g));
         }
 
-        #region IComparable<GuidId> Members
-
         public int CompareTo(GuidId other)
         {
             return this.Guid.CompareTo(other.Guid);
         }
 
-        #endregion
-
-        #region IEquatable<GuidId> Members
-
         public bool Equals(GuidId other)
         {
             return other != null && this.Guid.Equals(other.Guid);
         }
-
-        #endregion
 
         public override bool Equals(object obj)
         {
@@ -100,8 +92,6 @@ namespace Orleans.Runtime
             return GuidId.GetGuidId(guid);
         }
 
-        #region Operators
-
         public static bool operator ==(GuidId a, GuidId b)
         {
             if (ReferenceEquals(a, b)) return true;
@@ -115,10 +105,6 @@ namespace Orleans.Runtime
             return !(a == b);
         }
 
-        #endregion
-
-        #region ISerializable Members
-
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("Guid", Guid, typeof(Guid));
@@ -129,7 +115,5 @@ namespace Orleans.Runtime
         {
             Guid = (Guid) info.GetValue("Guid", typeof(Guid));
         }
-
-        #endregion
     }
 }
