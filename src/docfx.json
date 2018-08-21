@@ -4,7 +4,13 @@
       {
         "files": [
           "Documentation/**/**.yml",
-          "Documentation/**/**.md"
+          "Documentation/**/**.md",
+          "Tutorials/**.yml",
+          "Tutorials/**.md",
+          "Community/**.yml",
+          "Community/**.md",
+          "1.5/**.yml",
+          "1.5/**.md"
         ]
       },
       {
@@ -22,10 +28,16 @@
       {
         "files": [
           "images/**",
+          "1.5/images/**",
           "logo.svg",
           "logo-light.svg",
           "Documentation/**/**.png",
-          "Documentation/**/**.gif"
+          "Documentation/**/**.gif",
+          "Tutorials/**.png",
+          "1.5/Documentation/**/**.png",
+          "1.5/Documentation/**/**.gif",
+          "1.5/Tutorials/**.png",
+          "Community/**.png"
         ],
         "exclude": [
           "obj/**",
@@ -43,7 +55,7 @@
         ]
       }
     ],
-    "dest": "./_site",
+    "dest": "../",
     "template": [
       "default", "template"
     ],
@@ -53,7 +65,7 @@
       "_enableSearch": true,
       "_gitContribute": {
         "repo": "https://github.com/dotnet/orleans",
-        "branch": "master",
+        "branch": "gh-pages",
       },
 	  "_gitUrlPattern": "github",
     "_docfxVersion": "2"
