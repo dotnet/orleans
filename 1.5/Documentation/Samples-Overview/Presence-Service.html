@@ -1,0 +1,185 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Presence Service | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Presence Service | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../Images/logo-light.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list"></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+
+<div class="IMPORTANT"><h5>Important</h5><p><strong>You are looking at the 1.5 documentation</strong></p>
+<p>Orleans 2.0 is a significant overhaul from the 1.x versions.
+You can find 2.0 documentation <a href="/orleans/Documentation/index.html">here</a>.</p>
+</div>
+<h1 id="presence-service">Presence Service</h1>
+<p>A presence service serves as the hub of many social applications, including multi-player games and chats. Its essential function is to know who is online at given point in time and alert other users of their online presence. Each logged-in player sends a &quot;heartbeat pulse&quot; at regular intervals, </p>
+<p>In this section we walk through the steps involved in defining and using a new <code>Player</code> grain type.
+The grain type we define will have one property that returns a reference to the game the player is currently in, and two methods for joining and leaving a game.</p>
+<p>We will create three separate pieces of code: the grain interface definition, the grain implementation, and a standard C# class that uses the grain.
+Each of these belongs in a different project, built into a different DLL: the interface needs to be available on both the &quot;client&quot; and &quot;server&quot; sides, while the implementation class should be hidden from the client, and the client class from the server.</p>
+<p>The interface project should be created using the Visual Studio &quot;Orleans Grain Interface Collection&quot; template that is included in the Orleans SDK, and the grain implementation project should be created using the Visual Studio &quot;Orleans Grain Class Collection&quot; template.
+The grain client project can use any standard .NET code project template, such as the standard Console Application or Class Library templates.</p>
+<p>A grain cannot be explicitly created or deleted.
+It always exists &quot;virtually&quot; and is activated automatically when a request is sent to it.
+A grain has either a GUID, string or a long integer key within the grain type.
+Application code creates a reference to a grain by calling the <code>GetGrain&lt;TGrainType&gt;(Guid id)</code> or <code>GetGrain&lt;TGrainType&gt;(long id)</code> or other overloads of a generic grain factory methods for a specific grain identity.
+The <code>GetGrain()</code> call is a purely local operation to create a grain reference.
+It does not trigger creation of a grain activation and has not impact on its life cycle.
+A grain activation is automatically created by the Orleans runtime upon a first request sent to the grain.</p>
+<p>A grain interface must inherit from one of the <code>IGrainWithXKey</code>.interfaces where X is the type of the key used.
+The GUID, string or long integer key of a grain can later be retrieved via the <code>GetPrimaryKey()</code> or <code>GetPrimaryKeyLong()</code> extension methods, respectively.</p>
+<h2 id="defining-the-grain-interface">Defining the Grain Interface</h2>
+<p>A grain type is defined by an interface that inherits from one of the <code>IGrainWithXKey</code> marker interfaces like &#39;IGrainWithGuidKey&#39; or &#39;IGrainWithStringKey&#39;.</p>
+<p>All of the methods in the grain interface must return a <code>Task</code> or a <code>Task&lt;T&gt;</code>.
+The underlying type <code>T</code> for value <code>Task</code> must be serializable.</p>
+<p> Example:</p>
+<pre><code class="lang-csharp">public interface IPlayerGrain : IGrainWithGuidKey
+{
+  Task&lt;IGameGrain&gt; GetCurrentGame();
+  Task JoinGame(IGameGrain game);
+  Task LeaveGame(IGameGrain game);
+}
+</code></pre><h2 id="using-the-grain-factory">Using the Grain Factory</h2>
+<p>After the grain interface has been defined, building the project originally created with the Orleans Visual Studio project template will use the Orleans-specific MSBuild targets to generate a client proxy classes corresponding to the user-defined grain interfaces and to merge this additional code back into the interface DLL.</p>
+<p>Application should use the generic grain factory class to get references to grains. Inside the grain code, the factory is available via the protected GrainFactory class member property. On the client side the factory is available via the <code>GrainClient.GrainFactory</code> static field.</p>
+<p>When running inside a grain the following code should be used to get the grain reference:</p>
+<pre><code class="lang-csharp">    this.GrainFactory.GetGrain&lt;IPlayerGrain&gt;(grainKey);
+</code></pre><p>When running on the Orleans client side the following code should be used to get the grain reference:</p>
+<pre><code class="lang-csharp">    GrainClient.GrainFactory.GetGrain&lt;IPlayerGrain&gt;(grainKey);
+</code></pre><h2 id="the-implementation-class">The Implementation Class</h2>
+<p>A grain type is materialized by a class that implements the grain type’s interface and inherits directly or indirectly from <code>Orleans.Grain</code>.</p>
+<p>The <code>PlayerGrain</code> grain class implements the <code>IPlayerGrain</code> interface.</p>
+<pre><code class="lang-csharp">public class PlayerGrain : Grain, IPlayerGrain
+{
+    private IGameGrain currentGame;
+
+    // Game the player is currently in. May be null.
+    public Task&lt;IGameGrain&gt; GetCurrentGameAsync()
+    {
+       return Task.FromResult(currentGame);
+    }
+
+    // Game grain calls this method to notify that the player has joined the game.
+    public Task JoinGameAsync(IGameGrain game)
+    {
+       currentGame = game;
+       Console.WriteLine(&quot;Player {0} joined game {1}&quot;, this.GetPrimaryKey(), game.GetPrimaryKey());
+       return TaskDone.Done;
+    }
+
+   // Game grain calls this method to notify that the player has left the game.
+   public Task LeaveGameAsync(IGameGrain game)
+   {
+       currentGame = null;
+       Console.WriteLine(&quot;Player {0} left game {1}&quot;, this.GetPrimaryKey(), game.GetPrimaryKey());
+       return TaskDone.Done;
+   }
+}
+</code></pre></article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/1.5/Documentation/Samples-Overview/Presence-Service.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

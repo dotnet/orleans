@@ -1,0 +1,196 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Client Observers | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Client Observers | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../Images/logo-light.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list"></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+
+<div class="IMPORTANT"><h5>Important</h5><p><strong>You are looking at the 1.5 documentation</strong></p>
+<p>Orleans 2.0 is a significant overhaul from the 1.x versions.
+You can find 2.0 documentation <a href="/orleans/Documentation/index.html">here</a>.</p>
+</div>
+<p>There are situations in which a simple message/response pattern is not enough, and the client needs to receive asynchronous notifications.
+For example, a user might want to be notified when a new instant message has been published by a friend.</p>
+<p>Client observers is a mechanism that allows notifying clients asynchronously.
+An observer is a one-way asynchronous interface that inherits from <code>IGrainObserver</code>, and all its methods must be void.
+The grain sends a notification to the observer by invoking it like a grain interface method, except that it has no return value, and so the grain need not depend on the result.
+The Orleans runtime will ensure one-way delivery of the notifications.
+A grain that publishes such notifications should provide an API to add or remove observers.
+In addition, it is usually convenient to expose a method that allows an existing subscription to be cancelled.
+Grain developers may use the Orleans <code>ObserverSubscriptionManager&lt;T&gt;</code> generic class to simplify development of observed grain types.</p>
+<p>To subscribe to a notification, the client must first create a local C# object that implements the observer interface.
+It then calls a static method on the observer factory, <code>CreateObjectReference()</code>, to turn the C# object into a grain reference, which can then be passed to the subscription method on the notifying grain.</p>
+<p>This model can also be used by other grains to receive asynchronous notifications.
+Unlike in the client subscription case, the subscribing grain simply implements the observer interface as a facet, and passes in a reference to itself (e.g. <code>this.AsReference&lt;IMyGrainObserverInterface&gt;</code>).</p>
+<h2 id="code-example">Code Example</h2>
+<p>Let&#39;s assume that we have a grain that periodicaly sends messages to clients. For simplicity, the message in our example will be a  string. We first define the interface on the client that will receive the message.</p>
+<p>the interface will look like this</p>
+<pre><code class="lang-csharp">public interface IChat : IGrainObserver
+{
+    void ReceiveMessage(string message);
+}
+</code></pre><p>The only special thing is that the interface should inherit from <code>IGrainObserver</code>. Now any client that wants to observe those messages should implement a class which implements <code>IChat</code>.</p>
+<p>The simplest case would be something like this:</p>
+<pre><code class="lang-csharp">public class Chat : IChat
+{
+    public void ReceiveMessage(string message)
+    {
+        Console.WriteLine(message);
+    }
+}
+</code></pre><p>Now on the server we should have a Grain which sends these chat messages to clients. The Grain also should have a mechanism for clients to subscribe and unsubscribe themselves to receive notifications. For subscription the Grain can use the utility class <code>ObserverSubscriptionManager</code>:</p>
+<pre><code class="lang-csharp">class HelloGrain : Grain, IHello
+{
+    private ObserverSubscriptionManager&lt;IChat&gt; _subsManager;
+
+    public override async Task OnActivateAsync()
+    {
+        // We created the utility at activation time.
+        _subsManager = new ObserverSubscriptionManager&lt;IChat&gt;();
+        await base.OnActivateAsync();
+    }
+
+    // Clients call this to subscribe.
+    public Task Subscribe(IChat observer)
+    {
+        _subsManager.Subscribe(observer);
+        return TaskDone.Done;
+    }
+
+    //Also clients use this to unsubscribe themselves to no longer receive the messages.
+    public Task UnSubscribe(IChat observer)
+    {
+        _subsManager.Unsubscribe(observer);
+        return TaskDone.Done;
+    }
+}
+</code></pre><p>To send the message to clients the <code>Notify</code> method of the <code>ObserverSubscriptionManager&lt;IChat&gt;</code> instance can be used. The method takes an <code>Action&lt;T&gt;</code> method or lambda expression (where <code>T</code> is of type <code>IChat</code> here). You can call any method on the interface to send it to clients. In our case we only have one method <code>ReceiveMessage</code> and our sending code on the server would look like this:</p>
+<pre><code class="lang-csharp">public Task SendUpdateMessage(string message)
+{
+    _subsManager.Notify(s =&gt; s.ReceiveMessage(message));
+    return TaskDone.Done;
+}
+</code></pre><p>Now our server has a method to send messages to observer clients, two methods for subscribing/unsubscribing and the client implemented a class to be able to observe the grain messages. The last step is to create an observer reference on the client using our previously implemented <code>Chat</code> class and let it receive the messages after subscribing it.</p>
+<p>The code would look like this:</p>
+<pre><code class="lang-csharp">//First create the grain reference
+var friend = GrainClient.GrainFactory.GetGrain&lt;IHello&gt;(0);
+Chat c = new Chat();
+
+//Create a reference for chat usable for subscribing to the observable grain.
+var obj = await GrainClient.GrainFactory.CreateObjectReference&lt;IChat&gt;(c);
+//Subscribe the instance to receive messages.
+await friend.Subscribe(obj);
+</code></pre><p>Now whenever our grain on the server calls the <code>SendUpdateMessage</code> method, all subscribed clients will receive the message. In our client code, the <code>Chat</code> instance in variable <code>c</code> will receive the message and output it to the console.</p>
+<p><strong>Note:</strong> Objects passed to <code>CreateObjectReference</code> are held via a <a href="https://msdn.microsoft.com/en-us/library/system.weakreference"><code>WeakReference&lt;T&gt;</code></a> and will therefore be garbage collected if no other references exist. Users should maintain a reference for each observer which they do not want to be collected.</p>
+<p><strong>Note:</strong> Observers are inherently unreliable since you don&#39;t get any response back to know if the message is received and processed or simply failed due to any condition which might arise in a distributed system. Because of that your observers should poll the grain periodically or use any other mechanism to ensure that they received all messages which they should have received.
+In some situations you can afford to lose some messages and you don&#39;t need any additional mechanism but if you need to make sure that all observers are always receiving the messages and are receiving all of them, both periodic resubscriptions and polling the observer grain, can help to ensure eventual processing of all messages.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/1.5/Documentation/Core-Features/Observers.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

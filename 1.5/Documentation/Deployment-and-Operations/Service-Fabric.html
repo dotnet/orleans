@@ -1,0 +1,203 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Service Fabric Hosting | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Service Fabric Hosting | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../Images/logo-light.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list"></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+
+<div class="IMPORTANT"><h5>Important</h5><p><strong>You are looking at the 1.5 documentation</strong></p>
+<p>Orleans 2.0 is a significant overhaul from the 1.x versions.
+You can find 2.0 documentation <a href="/orleans/Documentation/index.html">here</a>.</p>
+</div>
+<h1 id="service-fabric-hosting">Service Fabric Hosting</h1>
+<h2 id="overview">Overview</h2>
+<p>Orleans can be hosted on Service Fabric. There are currently two points of integration with Service Fabric:</p>
+<ul>
+<li><strong>Hosting</strong>: Silos can be hosted on Service Fabric inside of a Service Fabric Reliable Service. Silos should be hosted as unpartitioned, stateless services since Orleans manages distribution of grains itself using fine-grained, dynamic distribution. Other hosting options (partitioned, stateful) are currently untested and unsupported.</li>
+<li><strong>Clustering</strong> (beta): Silos and clients can leverage Service Fabric&#39;s Service Discovery mechanisms to form clusters. This option requires Service Fabric Hosting, however Service Fabric Hosting does not require Service Fabric Clustering.</li>
+</ul>
+<p>A sample which demonstrates hosting and clustering is present at <a href="https://github.com/dotnet/orleans/tree/master/Samples/ServiceFabric">Samples/ServiceFabric</a>.</p>
+<h2 id="hosting">Hosting</h2>
+<p>Hosting support is available in the <code>Microsoft.Orleans.Hosting.ServiceFabric</code> package. It allows an Orleans Silo to run as a Service Fabric <code>ICommunicationListener</code>. The Silo lifecycle follows the typical communication listener lifecycle: it is initialized via the <code>ICommunicationListener.OpenAsync</code> method and is gracefully terminated via the <code>ICommunicationListener.CloseAsync</code> method or abruptly terminated via the <code>ICommunicationListener.Abort</code> method.</p>
+<p><code>OrleansCommunicationListener</code> provides the <code>ICommunicationListener</code> implementation. The recommended approach is to create the communication listener using <code>OrleansServiceListener.CreateStateless(Action&lt;StatelessServiceContext, ISiloHostBuilder&gt; configure)</code> in the <code>Orleans.Hosting.ServiceFabric</code> namespace. This ensures that the listener has the endpoint name required by <strong>Clustering</strong> (described below).</p>
+<p>Each time the communication listener is opened, the <code>configure</code> delegate passed to <code>CreateStateless</code> is invoked to configure the new Silo.</p>
+<p>Hosting can be used in conjunction with the Service Fabric Clustering provider, however other clustering providers can be used instead.</p>
+<h3 id="example-configuring-service-fabric-hosting">Example: Configuring Service Fabric hosting.</h3>
+<p>The following example demonstrates a Service Fabric <code>StatelessService</code> class which hosts an Orleans silo. The full sample can be found in the <a href="https://github.com/dotnet/orleans/tree/master/Samples/ServiceFabric">Samples/ServiceFabric</a> directory of the Orleans repository.</p>
+<pre><code class="lang-csharp">internal sealed class StatelessCalculatorService : StatelessService
+{
+    public StatelessCalculatorService(StatelessServiceContext context)
+        : base(context)
+    {
+    }
+
+    protected override IEnumerable&lt;ServiceInstanceListener&gt; CreateServiceInstanceListeners()
+    {
+        // Listeners can be opened and closed multiple times over the lifetime of a service
+        // instance. A new Orleans silo will be both created and initialized each time the
+        // listener is opened and will be shutdown when the listener is closed.
+        var listener = OrleansServiceListener.CreateStateless(
+            (serviceContext, builder) =&gt;
+            {
+                // Optional: use Service Fabric for cluster membership.
+                builder.UseServiceFabricClustering(serviceContext);
+
+                // Alternative: use Azure Storage for cluster membership.
+                builder.UseAzureTableMembership(options =&gt;
+                {
+                    /* Configure connection string*/
+                });
+
+                // Optional: configure logging.
+                builder.ConfigureLogging(logging =&gt; logging.AddDebug());
+
+                var config = new ClusterConfiguration();
+                config.Globals.RegisterBootstrapProvider&lt;BootstrapProvider&gt;(&quot;poke_grains&quot;);
+                config.Globals.ReminderServiceType =
+                    GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain;
+
+                // Service Fabric manages port allocations, so update the configuration using
+                // those ports.
+                config.Defaults.ConfigureServiceFabricSiloEndpoints(serviceContext);
+
+                // Tell Orleans to use this configuration.
+                builder.UseConfiguration(config);
+
+                // Add your application assemblies.
+                builder.ConfigureApplicationParts(parts =&gt;
+                {
+                    parts.AddApplicationPart(typeof(CalculatorGrain).Assembly).WithReferences();
+
+                    // Alternative: add all loadable assemblies in the current base path
+                    // (see AppDomain.BaseDirectory).
+                    parts.AddFromApplicationBaseDirectory();
+                });
+            });
+
+        return new[] { listener };
+    }
+
+    protected override async Task RunAsync(CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken);
+        }
+    }
+}
+</code></pre><h2 id="clustering-beta">Clustering (beta)</h2>
+<p><em>Note: it is currently recommended to use a storage-backed clustering provider such as SQL, ZooKeeper, Consul, or Azure Tables in production while this feature is in beta.</em></p>
+<p>Support to use Service Fabric&#39;s Service Discovery (Naming Service) mechanism for cluster membership is available in the <code>Microsoft.Orleans.Clustering.ServiceFabric</code> package. The implementation requires that the Service Fabric <strong>Hosting</strong> support is also used and that the Silo endpoint is named &quot;Orleans&quot; in the value returned from <code>StatelessService.CreateServiceInstanceListeners()</code>. The simplest way to ensure this is to use the <code>OrleansServiceListener.CreateStateless(...)</code> method as described in the previous section.</p>
+<p>Service Fabric Clustering is enabled with the <code>ISiloHostBuilder.UseServiceFabricClustering(ServiceContext)</code> extension method on the silo and the <code>IClientBuilder.UseServiceFabricClustering(Uri)</code> extension method on the client.</p>
+<p>The current recommendation is to use a storage-backed clustering provider for production services, such as SQL, ZooKeeper, Consul, or Azure Storage. These providers (particularly SQL and Azure Storage) are sufficiently well tested for production use.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/1.5/Documentation/Deployment-and-Operations/Service-Fabric.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

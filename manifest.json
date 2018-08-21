@@ -1,0 +1,3721 @@
+{
+  "homepages": [],
+  "source_base_path": "c:/GitHub/sergeybykov/orleans/src",
+  "xrefmap": "xrefmap.yml",
+  "files": [
+    {
+      "type": "Resource",
+      "output": {
+        "resource": {
+          "relative_path": "index.json"
+        }
+      },
+      "is_incremental": false
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Advanced-Concepts/Activation-Garbage-Collection.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Advanced-Concepts/Activation-Garbage-Collection.html",
+          "hash": "F7qS3ONAy/nLT68TDMWjfQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Advanced-Concepts/Application-Bootstrap-within-a-Silo.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Advanced-Concepts/Application-Bootstrap-within-a-Silo.html",
+          "hash": "Q7bmJqulqCeOKwvatQArKA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Advanced-Concepts/Cancellation-Tokens.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Advanced-Concepts/Cancellation-Tokens.html",
+          "hash": "WOa45ECd84oeKip5ZX5qWA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Advanced-Concepts/Codegen.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Advanced-Concepts/Codegen.html",
+          "hash": "uvvz7k4+A9aVkgdmvNVLrQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Advanced-Concepts/External-Tasks-and-Grains.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Advanced-Concepts/External-Tasks-and-Grains.html",
+          "hash": "eP01eoMabybU8Q/zaQWFdw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Advanced-Concepts/Interceptors.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Advanced-Concepts/Interceptors.html",
+          "hash": "Ze2G6Hc9fNyjO6Rgdjn1dA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Advanced-Concepts/Powershell-Client.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Advanced-Concepts/Powershell-Client.html",
+          "hash": "e+vbc6Agci6ek+QiO7C07A=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Advanced-Concepts/Reentrant-Grains.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Advanced-Concepts/Reentrant-Grains.html",
+          "hash": "wcW2gNMjJ8bX0vZbPBj2HQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Advanced-Concepts/Request-Context.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Advanced-Concepts/Request-Context.html",
+          "hash": "mOwWnQWR9irvwfPq/vISvA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Advanced-Concepts/Serialization.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Advanced-Concepts/Serialization.html",
+          "hash": "HZmfvRfLxaAds02VnQ44sw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Benefits.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Benefits.html",
+          "hash": "R1K9Fv2HpmznZXo+jLfH/g=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.html",
+          "hash": "6znwEKNHH74jUKgH4lYrIg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Core-Features/Dependency-Injection.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Core-Features/Dependency-Injection.html",
+          "hash": "x/cEKSHASl9FOeh7hnVP/w=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Core-Features/Grain-Persistence.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Core-Features/Grain-Persistence.html",
+          "hash": "4dvnZ4obKT6h5bRvwqcfMQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Core-Features/Observers.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Core-Features/Observers.html",
+          "hash": "4heEMSgzB28JDBx4pRGzPA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Core-Features/StatelessWorker.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Core-Features/StatelessWorker.html",
+          "hash": "d9eyV9I87iCaMhwaAi0tEA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Core-Features/Timers-and-Reminders.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Core-Features/Timers-and-Reminders.html",
+          "hash": "Rk1VDvfhr1VK60iXdep1Vg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Deployment-and-Operations/Configuration-Guide/Client-Configuration.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Deployment-and-Operations/Configuration-Guide/Client-Configuration.html",
+          "hash": "wHm1s+emL5Vz5Ixcxe1aZQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Deployment-and-Operations/Configuration-Guide/Configuring-.NET-Garbage-Collection.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Deployment-and-Operations/Configuration-Guide/Configuring-.NET-Garbage-Collection.html",
+          "hash": "GdwL7Yg41+nWcUYWr6SOCw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Deployment-and-Operations/Configuration-Guide/Configuring-SQL-Tables.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Deployment-and-Operations/Configuration-Guide/Configuring-SQL-Tables.html",
+          "hash": "s8aQNGHQn55lybwRykA7fA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Deployment-and-Operations/Configuration-Guide/Server-Configuration.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Deployment-and-Operations/Configuration-Guide/Server-Configuration.html",
+          "hash": "Pl8XjmI0mFIt3gP64VXpng=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Deployment-and-Operations/Configuration-Guide/Typical-Configurations.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Deployment-and-Operations/Configuration-Guide/Typical-Configurations.html",
+          "hash": "V/co+qPWs45Myzf+xUeaaA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Deployment-and-Operations/Configuration-Guide/index.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Deployment-and-Operations/Configuration-Guide/index.html",
+          "hash": "guTeQsPxdI9ArEQcuzklQg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Deployment-and-Operations/Docker-Deployment.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Deployment-and-Operations/Docker-Deployment.html",
+          "hash": "Mbo1sKWyZ73hwmdLa4GQnA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Deployment-and-Operations/Heterogeneous-Silos.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Deployment-and-Operations/Heterogeneous-Silos.html",
+          "hash": "0tTkMX8XHu6jPvZNbLHYgg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Documentation/Deployment-and-Operations/Heterogeneous.png",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Documentation/Deployment-and-Operations/Heterogeneous.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Deployment-and-Operations/Monitoring/Client-Error-Code-Monitoring.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Deployment-and-Operations/Monitoring/Client-Error-Code-Monitoring.html",
+          "hash": "qLgwisgVUEiMBX4RFehG+Q=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Deployment-and-Operations/Monitoring/Runtime-Monitoring.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Deployment-and-Operations/Monitoring/Runtime-Monitoring.html",
+          "hash": "ICJCQBX9XLxocwaVyUus+g=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Deployment-and-Operations/Monitoring/Silo-Error-Code-Monitoring.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Deployment-and-Operations/Monitoring/Silo-Error-Code-Monitoring.html",
+          "hash": "xwo1eT4gl1aCNINIjjou/A=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Deployment-and-Operations/Service-Fabric.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Deployment-and-Operations/Service-Fabric.html",
+          "hash": "fXzSn+igFplxRrPZVM6FTQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Deployment-and-Operations/Troubleshooting-Deployments.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Deployment-and-Operations/Troubleshooting-Deployments.html",
+          "hash": "wfVVi1PJA2Uk5fZzufLwpA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Deployment-and-Operations/Using-Azure-Web-Apps.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Deployment-and-Operations/Using-Azure-Web-Apps.html",
+          "hash": "pBsbw6gCNAaGgdokrRzhog=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Documentation/Deployment-and-Operations/docker-orleans-solution.png",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Documentation/Deployment-and-Operations/docker-orleans-solution.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Event-Sourcing/Configuration.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Event-Sourcing/Configuration.html",
+          "hash": "380XG9y32w+0tmQjUFVwqQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Event-Sourcing/Diagnostics.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Event-Sourcing/Diagnostics.html",
+          "hash": "EZyRwZQSYpb/f2hoVVncSA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Event-Sourcing/GrainStateAPI.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Event-Sourcing/GrainStateAPI.html",
+          "hash": "nqOzdn0EHz9KurJu1QNQnA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Event-Sourcing/LogConsistencyProviders.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Event-Sourcing/LogConsistencyProviders.html",
+          "hash": "Xb8sRmIeddum4p6IxiR4yQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Event-Sourcing/MultiInstance.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Event-Sourcing/MultiInstance.html",
+          "hash": "8cIpZlGartPLU6Gcz4HNZw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Event-Sourcing/MultiVersion.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Event-Sourcing/MultiVersion.html",
+          "hash": "5ctSKbNhPsLXKurupfnrAw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Event-Sourcing/Overview.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Event-Sourcing/Overview.html",
+          "hash": "HqBK+/drtc/wVa1ZkaVDrw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Event-Sourcing/Subscribe.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Event-Sourcing/Subscribe.html",
+          "hash": "6qcpnmHoJlg8V5++6GWiGw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Getting-Started-With-Orleans/Debugging.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Getting-Started-With-Orleans/Debugging.html",
+          "hash": "Fz4m00kHmQukyXkvweWPAw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Getting-Started-With-Orleans/Developing-a-Client.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Getting-Started-With-Orleans/Developing-a-Client.html",
+          "hash": "CWdtMa7K7nH5zHiUKiafuQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Getting-Started-With-Orleans/Developing-a-Grain.html",
+          "hash": "R7Y5NcjRndkLsLy6FXF1bw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Documentation/Getting-Started-With-Orleans/Frontend-Cluster.png",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Documentation/Getting-Started-With-Orleans/Frontend-Cluster.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Getting-Started-With-Orleans/Grains.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Getting-Started-With-Orleans/Grains.html",
+          "hash": "y/HfqHbu8+N+p94w5zqa2w=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Getting-Started-With-Orleans/Running-the-Application.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Getting-Started-With-Orleans/Running-the-Application.html",
+          "hash": "tuSXcxtmXorKKU7QhpwajA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Grain-Versioning/Backward-compatibility-guidelines.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Grain-Versioning/Backward-compatibility-guidelines.html",
+          "hash": "ofHOIq+hwhbs3870KTG48Q=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Grain-Versioning/Compatible-grains.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Grain-Versioning/Compatible-grains.html",
+          "hash": "w0yZM/KXNlRBu6Lb93FFCA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Grain-Versioning/Deployment.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Grain-Versioning/Deployment.html",
+          "hash": "0jNODKmAeLb9PjrIucQrjQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Grain-Versioning/Grain-versioning.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Grain-Versioning/Grain-versioning.html",
+          "hash": "GJ25Suf2CoNuZtf5LLmowg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Grain-Versioning/Version-selector-strategy.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Grain-Versioning/Version-selector-strategy.html",
+          "hash": "+7veQNZTSxEuXdrmMLnkIA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Documentation/Grain-Versioning/rolling.gif",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Documentation/Grain-Versioning/rolling.gif"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Documentation/Grain-Versioning/version.png",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Documentation/Grain-Versioning/version.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Installation/NuGets.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Installation/NuGets.html",
+          "hash": "BEZjg3ITjgueEC8NzLiqNA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Installation/Prerequisites.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Installation/Prerequisites.html",
+          "hash": "SK++2VQg2gF6Vw8hORqJmg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Introduction.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Introduction.html",
+          "hash": "ijx4uFarLFilT/lNguWyJA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Multi-Cluster/GlobalSingleInstance.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Multi-Cluster/GlobalSingleInstance.html",
+          "hash": "fQ4e8z53eDPO//W63dbioQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Multi-Cluster/GossipChannels.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Multi-Cluster/GossipChannels.html",
+          "hash": "4d7YqxDNFKTBexyNTLZYfQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Multi-Cluster/MultiClusterConfiguration.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Multi-Cluster/MultiClusterConfiguration.html",
+          "hash": "a4fHpn/ckvz8mIGbxKSwvw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Multi-Cluster/Overview.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Multi-Cluster/Overview.html",
+          "hash": "jIwFWBbUQi5g4pBvNuZVvw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Multi-Cluster/SiloConfiguration.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Multi-Cluster/SiloConfiguration.html",
+          "hash": "BPdTxDF7UJR8OoBi+rgnmg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Orleans-Streams/Stream-Providers.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Orleans-Streams/Stream-Providers.html",
+          "hash": "CdPk2cBmmrsQPB0vsFIhEQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Orleans-Streams/Streams-Extensibility.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Orleans-Streams/Streams-Extensibility.html",
+          "hash": "+aE0U/Zz9Zu2Hhpcvp3yMg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Orleans-Streams/Streams-Implementation.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Orleans-Streams/Streams-Implementation.html",
+          "hash": "ffTfMXLN9I1rK43cR95Nkg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Orleans-Streams/Streams-Programming-APIs.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Orleans-Streams/Streams-Programming-APIs.html",
+          "hash": "bCCaIq/J43VY50Ty6x4tsw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Orleans-Streams/Streams-Quick-Start.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Orleans-Streams/Streams-Quick-Start.html",
+          "hash": "5itjIqFWen9R5Q5RvdnS8A=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Orleans-Streams/Streams-Why.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Orleans-Streams/Streams-Why.html",
+          "hash": "3RuOpmdNyZwrXjfug5R6yA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Orleans-Streams/index.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Orleans-Streams/index.html",
+          "hash": "32fpLIn61ATrrRw/3w14pQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Presentations/index.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Presentations/index.html",
+          "hash": "Q0EUaopiCM6GBO6eny7YjA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Runtime-Implementation-Details/Cluster-Management.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Runtime-Implementation-Details/Cluster-Management.html",
+          "hash": "DR5RP0DlvtkeKp3f6SBGBQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Runtime-Implementation-Details/Consul-Deployment.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Runtime-Implementation-Details/Consul-Deployment.html",
+          "hash": "Ik/GXfcRCt69fkQXL6V9sg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Runtime-Implementation-Details/Load-Balancing.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Runtime-Implementation-Details/Load-Balancing.html",
+          "hash": "zdtLbPdFtXvun2G++qYEZg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Runtime-Implementation-Details/Messaging-Delivery-Guarantees.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Runtime-Implementation-Details/Messaging-Delivery-Guarantees.html",
+          "hash": "pJrKwKLVrZ57ythOLajSqA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Runtime-Implementation-Details/Relational-Storage.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Runtime-Implementation-Details/Relational-Storage.html",
+          "hash": "Lcyg9M1SSrXAUEWltUw5UQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Runtime-Implementation-Details/Runtime-Tables.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Runtime-Implementation-Details/Runtime-Tables.html",
+          "hash": "O5S5g85ShvxC+7Q0cgzo6A=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Runtime-Implementation-Details/Scheduler.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Runtime-Implementation-Details/Scheduler.html",
+          "hash": "kT/mCvtY7vuiHcN9vnRDXQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Samples-Overview/Adventure.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Samples-Overview/Adventure.html",
+          "hash": "L5uGm0ZXF8aaDaMMUT5t1w=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Samples-Overview/Azure-Web-Sample.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Samples-Overview/Azure-Web-Sample.html",
+          "hash": "PvLCWtYh6gHQoOHg2Z7ZDw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Documentation/Samples-Overview/AzureSample 1.png",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Documentation/Samples-Overview/AzureSample 1.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Documentation/Samples-Overview/AzureSample 2.png",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Documentation/Samples-Overview/AzureSample 2.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Documentation/Samples-Overview/AzureSample 3.png",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Documentation/Samples-Overview/AzureSample 3.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Documentation/Samples-Overview/Chirper-1-Loader-Screenshot.png",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Documentation/Samples-Overview/Chirper-1-Loader-Screenshot.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Documentation/Samples-Overview/Chirper-2-Client-Screenshot.png",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Documentation/Samples-Overview/Chirper-2-Client-Screenshot.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Documentation/Samples-Overview/Chirper-3-Publisher-Screenshot.png",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Documentation/Samples-Overview/Chirper-3-Publisher-Screenshot.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Samples-Overview/Chirper.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Samples-Overview/Chirper.html",
+          "hash": "Zol8flkJ22vYOhQsde64+g=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Samples-Overview/GPS-Tracker.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Samples-Overview/GPS-Tracker.html",
+          "hash": "JDrHQR37vw32dSeAw5c+Zw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Documentation/Samples-Overview/GPS.png",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Documentation/Samples-Overview/GPS.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Samples-Overview/Hello-World.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Samples-Overview/Hello-World.html",
+          "hash": "zBB+O9lt3nMgsiQkN10sHQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Samples-Overview/Presence-Service.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Samples-Overview/Presence-Service.html",
+          "hash": "MeAtFsVnj0KCPupSaBlI/A=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Documentation/Samples-Overview/ProvidersSample.png",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Documentation/Samples-Overview/ProvidersSample.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Samples-Overview/Storage-Providers.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Samples-Overview/Storage-Providers.html",
+          "hash": "mG1kvLitNkRrA94yWCU3YA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Samples-Overview/Tic-Tac-Toe.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Samples-Overview/Tic-Tac-Toe.html",
+          "hash": "KDGHxKxrzoEYqiLubv1gsQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Samples-Overview/Twitter-Sentiment.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Samples-Overview/Twitter-Sentiment.html",
+          "hash": "COvw8RjXXXMxBMU894ckIw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Documentation/Samples-Overview/Twitter-Sentiment.png",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Documentation/Samples-Overview/Twitter-Sentiment.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Documentation/Samples-Overview/index.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/Samples-Overview/index.html",
+          "hash": "2GijwpTzbXdzpQ2+b/fP4w=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Documentation/Samples-Overview/screenshot.png",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Documentation/Samples-Overview/screenshot.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Documentation/actor-middle-tier.png",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Documentation/actor-middle-tier.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Documentation/grain-lifecycle.png",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Documentation/grain-lifecycle.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Documentation/n-tier.png",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Documentation/n-tier.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Documentation/server-failure.png",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Documentation/server-failure.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Toc",
+      "source_relative_path": "1.5/Documentation/toc.yml",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Documentation/toc.html",
+          "hash": "oKEiLCwD+5jJU/zsO14GnQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/AzureSample 1.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/AzureSample 1.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/AzureSample 3.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/AzureSample 3.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/AzureTutorial1.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/AzureTutorial1.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/AzureTutorial2.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/AzureTutorial2.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/AzureTutorial3.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/AzureTutorial3.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/AzureTutorial4.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/AzureTutorial4.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/AzureTutorial5.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/AzureTutorial5.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/Concurrency 1.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/Concurrency 1.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/Concurrency 2.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/Concurrency 2.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/GPS 1.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/GPS 1.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/MicrosoftOrleansToolsForVisualStudio.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/MicrosoftOrleansToolsForVisualStudio.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/MinimalOrleansApplication1.png",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/MinimalOrleansApplication1.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/MinimalOrleansApplication2.png",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/MinimalOrleansApplication2.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/Multiple Actors1.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/Multiple Actors1.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/New DevTest 1.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/New DevTest 1.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/New DevTest 2.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/New DevTest 2.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/New DevTest 3.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/New DevTest 3.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/New DevTest 4.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/New DevTest 4.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/New DevTest 5.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/New DevTest 5.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/New DevTest 6.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/New DevTest 6.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/New DevTest 7.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/New DevTest 7.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/NewDevTest1.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/NewDevTest1.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/Persistence 1.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/Persistence 1.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/Persistence 2.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/Persistence 2.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/Persistence 3.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/Persistence 3.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/Persistence 4.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/Persistence 4.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/ProvidersSample 1.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/ProvidersSample 1.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/ProvidersSample 2.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/ProvidersSample 2.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/Standalone 1.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/Standalone 1.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/Standalone 2.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/Standalone 2.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/Standalone 3.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/Standalone 3.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/Storage Provider 1.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/Storage Provider 1.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/background.jpg",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/background.jpg"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/logo-light.svg",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/logo-light.svg"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/logo.svg",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/logo.svg"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "1.5/Images/onpremise 1.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "1.5/Images/onpremise 1.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Tutorials/A-Service-is-a-Collection-of-Communicating-Actors.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Tutorials/A-Service-is-a-Collection-of-Communicating-Actors.html",
+          "hash": "RFCn8Z0EzDqyKsIl8AB5oA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Tutorials/Actor-Identity.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Tutorials/Actor-Identity.html",
+          "hash": "C56bp5ejM/iUso8LiW+FBQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Tutorials/Cloud-Deployment.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Tutorials/Cloud-Deployment.html",
+          "hash": "0Qs0s6AgdCgVPlD5DPxSAg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Tutorials/Concurrency.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Tutorials/Concurrency.html",
+          "hash": "mZTr42fUu3OpzwPuLFKaRA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Tutorials/Custom-Storage-Providers.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Tutorials/Custom-Storage-Providers.html",
+          "hash": "+JLUZflUgjrYWdEJfiR3EQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Tutorials/Declarative-Persistence.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Tutorials/Declarative-Persistence.html",
+          "hash": "cmAA6e9xBMuY37QVOcE8Yg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Tutorials/Failure-Handling.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Tutorials/Failure-Handling.html",
+          "hash": "iMF6LNXdv+eQKhv/bU9Few=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Tutorials/Front-Ends-for-Orleans-Services.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Tutorials/Front-Ends-for-Orleans-Services.html",
+          "hash": "w9yzWaeCfjzAexSqwVAEGg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Tutorials/Interaction-with-Libraries-and-Services.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Tutorials/Interaction-with-Libraries-and-Services.html",
+          "hash": "X+XaOEfjCs8hGWcqaPxo2Q=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Tutorials/Minimal-Orleans-Application.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Tutorials/Minimal-Orleans-Application.html",
+          "hash": "Ui0JmVnxtqb0jVIfe7wamw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Tutorials/My-First-Orleans-Application.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Tutorials/My-First-Orleans-Application.html",
+          "hash": "UlZqdHMxsUWMHJbv28lewA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Tutorials/On-Premise-Deployment.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Tutorials/On-Premise-Deployment.html",
+          "hash": "VYLRq5A3kXSStfuO/ero0Q=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Tutorials/Running-in-a-Stand-alone-Silo.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Tutorials/Running-in-a-Stand-alone-Silo.html",
+          "hash": "wN8qgs3bqBy2R/FkIg4Wxw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Tutorials/Unit-Testing-Grains.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Tutorials/Unit-Testing-Grains.html",
+          "hash": "fROr+4jKuGwQBnCocxezvQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/Tutorials/index.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Tutorials/index.html",
+          "hash": "CjVUibwJ/y2b8gMTyhn6/A=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Toc",
+      "source_relative_path": "1.5/Tutorials/toc.yml",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/Tutorials/toc.html",
+          "hash": "y456d2TuRFG5timd5R3gjA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "1.5/warning-banner.md",
+      "output": {
+        ".html": {
+          "relative_path": "1.5/warning-banner.html",
+          "hash": "UBmSHsaJGe0koU+oDrYwSw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Community/Contributing.md",
+      "output": {
+        ".html": {
+          "relative_path": "Community/Contributing.html",
+          "hash": "CYm6BpeoVwUT1P7U/+/o/A=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Community/Documentation-Guidelines.md",
+      "output": {
+        ".html": {
+          "relative_path": "Community/Documentation-Guidelines.html",
+          "hash": "gDP1lzPgSS29JVzNfobWWg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Community/Ideas-for-Contributions.md",
+      "output": {
+        ".html": {
+          "relative_path": "Community/Ideas-for-Contributions.html",
+          "hash": "021jN4GDL6NfJq017pePNg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Community/Links.md",
+      "output": {
+        ".html": {
+          "relative_path": "Community/Links.html",
+          "hash": "3YdX176MS/tdibJl/PaLgw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Community/Orleans-Architecture-Principles-and-Approach-I.md",
+      "output": {
+        ".html": {
+          "relative_path": "Community/Orleans-Architecture-Principles-and-Approach-I.html",
+          "hash": "EwJpWQyc4s3pBgAqgkBrKg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Community/Orleans-Thinking-Big-and-Small.md",
+      "output": {
+        ".html": {
+          "relative_path": "Community/Orleans-Thinking-Big-and-Small.html",
+          "hash": "ra8AZ7VIeLUwHrQkIMUxUQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Community/Student-Projects.md",
+      "output": {
+        ".html": {
+          "relative_path": "Community/Student-Projects.html",
+          "hash": "wWsWSYtvJiQ9KEWYdhQxJw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Community/Who-Is-Using-Orleans.md",
+      "output": {
+        ".html": {
+          "relative_path": "Community/Who-Is-Using-Orleans.html",
+          "hash": "dGq9LhTc5xCwyRgaf1JlLg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Toc",
+      "source_relative_path": "Community/toc.yml",
+      "output": {
+        ".html": {
+          "relative_path": "Community/toc.html",
+          "hash": "ks2APo4uodUdaLFspXTkNQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/Benefits.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/Benefits.html",
+          "hash": "qtBiuibgjjACN6cBz/P6MA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/clusters_and_clients/configuration_guide/activation_garbage_collection.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/clusters_and_clients/configuration_guide/activation_garbage_collection.html",
+          "hash": "EJAD8xDX1zmkGIspArYNqw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/clusters_and_clients/configuration_guide/client_configuration.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/clusters_and_clients/configuration_guide/client_configuration.html",
+          "hash": "ycNDdVx4HCO0DLMInveGdw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/clusters_and_clients/configuration_guide/configuring_.NET_garbage_collection.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/clusters_and_clients/configuration_guide/configuring_.NET_garbage_collection.html",
+          "hash": "ms2baKMEMKHU4krb982HGA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/clusters_and_clients/configuration_guide/configuring_ADO.NET_providers.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/clusters_and_clients/configuration_guide/configuring_ADO.NET_providers.html",
+          "hash": "CcjTvl9v6zAObyAcsM9HBg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/clusters_and_clients/configuration_guide/index.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/clusters_and_clients/configuration_guide/index.html",
+          "hash": "xcvl1hcFxAawd4t4l4Dv7A=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/clusters_and_clients/configuration_guide/list_of_options_classes.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/clusters_and_clients/configuration_guide/list_of_options_classes.html",
+          "hash": "Wh+BDcGQwumYhNRu4nR0ZQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/clusters_and_clients/configuration_guide/load_balancing.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/clusters_and_clients/configuration_guide/load_balancing.html",
+          "hash": "Ml3ZqntSdR7BZusoIpzpkQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/clusters_and_clients/configuration_guide/local_development_configuration.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/clusters_and_clients/configuration_guide/local_development_configuration.html",
+          "hash": "ryWbEPi9J7P6waMqQAPFwA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/clusters_and_clients/configuration_guide/messaging_delivery_guarantees.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/clusters_and_clients/configuration_guide/messaging_delivery_guarantees.html",
+          "hash": "19VhPdzLJPF6gCZzHbP4Mw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/clusters_and_clients/configuration_guide/serialization.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/clusters_and_clients/configuration_guide/serialization.html",
+          "hash": "DdcUH5J3o7WrLWr5Vw5T1A=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/clusters_and_clients/configuration_guide/server_configuration.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/clusters_and_clients/configuration_guide/server_configuration.html",
+          "hash": "Wx39evhLO0BtXbv9Nqv3Kw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/clusters_and_clients/configuration_guide/shutting_down_orleans.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/clusters_and_clients/configuration_guide/shutting_down_orleans.html",
+          "hash": "ePnFacdnCaaNp1gqvgkXTg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/clusters_and_clients/configuration_guide/startup_tasks.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/clusters_and_clients/configuration_guide/startup_tasks.html",
+          "hash": "n5+5D38f8OdY0ooHOn49YA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/clusters_and_clients/configuration_guide/typical_configurations.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/clusters_and_clients/configuration_guide/typical_configurations.html",
+          "hash": "Yj12bweWHwO6RIxaMvnMtw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/clusters_and_clients/developing_a_client.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/clusters_and_clients/developing_a_client.html",
+          "hash": "/s6gjyGrpQJ/jTGPIomg8Q=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Documentation/clusters_and_clients/heterogeneous.png",
+      "output": {
+        "resource": {
+          "relative_path": "Documentation/clusters_and_clients/heterogeneous.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/clusters_and_clients/heterogeneous_silos.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/clusters_and_clients/heterogeneous_silos.html",
+          "hash": "E1tDVQehqLLHRXlOtahrZA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Documentation/clusters_and_clients/images/frontend_cluster.png",
+      "output": {
+        "resource": {
+          "relative_path": "Documentation/clusters_and_clients/images/frontend_cluster.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/clusters_and_clients/index.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/clusters_and_clients/index.html",
+          "hash": "AjCeNjcoU6BZQtLQu/0E1w=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/clusters_and_clients/monitoring/client_error_code_monitoring.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/clusters_and_clients/monitoring/client_error_code_monitoring.html",
+          "hash": "i/+He0qIvGd5NX89IYAs0g=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/clusters_and_clients/monitoring/index.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/clusters_and_clients/monitoring/index.html",
+          "hash": "3XbhteE0ysC5Wvn+TN6LsQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/clusters_and_clients/monitoring/silo_error_code_monitoring.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/clusters_and_clients/monitoring/silo_error_code_monitoring.html",
+          "hash": "dE+LSuFWSEFDXyyDcSXjeA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/clusters_and_clients/powershell_client.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/clusters_and_clients/powershell_client.html",
+          "hash": "7BHaetcjM3a/02wKS0LXtw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/core_concepts/code_generation.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/core_concepts/code_generation.html",
+          "hash": "Olsp03hvRX5R7CUu79CsIw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Documentation/core_concepts/grain_lifecycle.png",
+      "output": {
+        "resource": {
+          "relative_path": "Documentation/core_concepts/grain_lifecycle.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/core_concepts/index.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/core_concepts/index.html",
+          "hash": "r1XqD+pxfhRpRMZYDlrOXQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/core_concepts/what_are_orleans_packages.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/core_concepts/what_are_orleans_packages.html",
+          "hash": "jRGhnyuqkNnqdrSKLBSGlQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/core_concepts/what_is_a_client.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/core_concepts/what_is_a_client.html",
+          "hash": "viggz1HyfWs14d0s70mO7w=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/core_concepts/what_is_a_cluster.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/core_concepts/what_is_a_cluster.html",
+          "hash": "i5z6OmvmWiLDVqFj9U5BZA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/core_concepts/what_is_a_grain.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/core_concepts/what_is_a_grain.html",
+          "hash": "cA8g8oL6k07Il+XiWwY3rw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/deployment/azure_web_apps_with_azure_cloud_services.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/deployment/azure_web_apps_with_azure_cloud_services.html",
+          "hash": "0CZMxBBCCR0xEdNhvVFhPw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/deployment/cluster_management.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/deployment/cluster_management.html",
+          "hash": "ukH4MUV6hkBv/2BxYLzizw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/deployment/consul_deployment.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/deployment/consul_deployment.html",
+          "hash": "N0DP4a1V4ag4av1Qu30hag=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Documentation/deployment/docker-orleans-solution.png",
+      "output": {
+        "resource": {
+          "relative_path": "Documentation/deployment/docker-orleans-solution.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/deployment/docker_deployment.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/deployment/docker_deployment.html",
+          "hash": "TNtc2zejEWShQ38FHBxTlA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/deployment/grain_versioning/backward_compatibility_guidelines.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/deployment/grain_versioning/backward_compatibility_guidelines.html",
+          "hash": "27XcsDTB/mHfCV87F4hg7w=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/deployment/grain_versioning/compatible_grains.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/deployment/grain_versioning/compatible_grains.html",
+          "hash": "3TL+RC5hfuxZ4AprGObrdw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/deployment/grain_versioning/deploying_new_versions_of_grains.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/deployment/grain_versioning/deploying_new_versions_of_grains.html",
+          "hash": "J/j/JC4oLmDSQTgEBdcA1g=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/deployment/grain_versioning/grain_versioning.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/deployment/grain_versioning/grain_versioning.html",
+          "hash": "x2ke9E8QU2UiF4FkSbTlYw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Documentation/deployment/grain_versioning/rolling.gif",
+      "output": {
+        "resource": {
+          "relative_path": "Documentation/deployment/grain_versioning/rolling.gif"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Documentation/deployment/grain_versioning/version.png",
+      "output": {
+        "resource": {
+          "relative_path": "Documentation/deployment/grain_versioning/version.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/deployment/grain_versioning/version_selector_strategy.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/deployment/grain_versioning/version_selector_strategy.html",
+          "hash": "jSkMUMKvPUcURmmFZduZRg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/deployment/index.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/deployment/index.html",
+          "hash": "l5KGbIpDfD3e6hY4CTnmgw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/deployment/multi-cluster_support/GlobalSingleInstance.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/deployment/multi-cluster_support/GlobalSingleInstance.html",
+          "hash": "aCrGlhtXAqPpRnL4gbCZqg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/deployment/multi-cluster_support/GossipChannels.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/deployment/multi-cluster_support/GossipChannels.html",
+          "hash": "hTtvNijyWXwP/YXVUYbwpQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/deployment/multi-cluster_support/MultiClusterConfiguration.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/deployment/multi-cluster_support/MultiClusterConfiguration.html",
+          "hash": "buvCGxnI3g7FItfj18g16g=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/deployment/multi-cluster_support/Overview.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/deployment/multi-cluster_support/Overview.html",
+          "hash": "OJLxWAUWt0DEESg/1BBFGQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/deployment/multi-cluster_support/SiloConfiguration.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/deployment/multi-cluster_support/SiloConfiguration.html",
+          "hash": "yYZS/pyFBYf7O2jCafEJ4A=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/deployment/service_fabric_hosting.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/deployment/service_fabric_hosting.html",
+          "hash": "n+6rAXGJx4sMBec1UxrzUQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/deployment/troubleshooting_azure_cloud_services_deployments.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/deployment/troubleshooting_azure_cloud_services_deployments.html",
+          "hash": "9BIopmOgRIPb1rC/WQnGRg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/frequently_asked_questions.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/frequently_asked_questions.html",
+          "hash": "lzbfXhZHrq19aAl3a/tPHQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/grains/cancellation_tokens.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/grains/cancellation_tokens.html",
+          "hash": "yGtfKApmtlXVT4yT1J8Bzg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/grains/developing_a_grain.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/grains/developing_a_grain.html",
+          "hash": "A9JGmyU5fNRgKJBlSHqpzg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/grains/event_sourcing/event_sourcing_configuration.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/grains/event_sourcing/event_sourcing_configuration.html",
+          "hash": "r02pA1LRfJAVN5K0/qNZDQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/grains/event_sourcing/immediate_vs_delayed_confirmation.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/grains/event_sourcing/immediate_vs_delayed_confirmation.html",
+          "hash": "+z9kxmMFK0gLSdr1H3F55A=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/grains/event_sourcing/index.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/grains/event_sourcing/index.html",
+          "hash": "w4zYjq+UnMTkwj/cdfw+Qw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/grains/event_sourcing/journaledgrain_basics.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/grains/event_sourcing/journaledgrain_basics.html",
+          "hash": "tSM1hMHqV+NriuOLXaKGrQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/grains/event_sourcing/journaledgrain_diagnostics.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/grains/event_sourcing/journaledgrain_diagnostics.html",
+          "hash": "ghr9BASpVJLzAzKGg410dg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/grains/event_sourcing/log_consistency_providers.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/grains/event_sourcing/log_consistency_providers.html",
+          "hash": "QqyNc7O4x9D9CwlPklctRw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/grains/event_sourcing/notifications.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/grains/event_sourcing/notifications.html",
+          "hash": "GJK3YrXUanaqCR6GjTKzvw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/grains/event_sourcing/replicated_instances.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/grains/event_sourcing/replicated_instances.html",
+          "hash": "CcS1FtWVtMuRsYBTnXc2hg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/grains/external_tasks_and_grains.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/grains/external_tasks_and_grains.html",
+          "hash": "Dzuyc9qsmeVcWLy/b8Ne7Q=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/grains/grain_persistence/index.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/grains/grain_persistence/index.html",
+          "hash": "Lu3wf33szI3xWBGYSUZjnA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/grains/grain_persistence/relational_storage.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/grains/grain_persistence/relational_storage.html",
+          "hash": "NdLwI1HGYbXvZ8h+7Lf6Dw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/grains/index.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/grains/index.html",
+          "hash": "8/Ir6gDlqJ4sjqfUnglIJw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/grains/interceptors.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/grains/interceptors.html",
+          "hash": "fCUK8jMWYr3/KgxOGbzT6A=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/grains/observers.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/grains/observers.html",
+          "hash": "VH0aMufKnWRbKVbN5tJSlg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/grains/reentrancy.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/grains/reentrancy.html",
+          "hash": "G7x1xcE6MQ3xrDs2eDFEAA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/grains/request_context.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/grains/request_context.html",
+          "hash": "Q0ivFwbSSfM2ikC23wxuxw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/grains/scheduler.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/grains/scheduler.html",
+          "hash": "NTkSSbyO7qPCzqzl34JY8A=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/grains/stateless_worker_grains.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/grains/stateless_worker_grains.html",
+          "hash": "HID1qd1IJiwayFH/VV1Vyw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/grains/timers_and_reminders.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/grains/timers_and_reminders.html",
+          "hash": "Tea1YAzHr4F9+mt+duZO9Q=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/grains/transactions.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/grains/transactions.html",
+          "hash": "IgngFNV5tdKCTO8d9V1CwA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/grains/types_of_grains.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/grains/types_of_grains.html",
+          "hash": "2xRwWXp+NpaajbegtBcGlg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Documentation/images/actor_middle_tier.png",
+      "output": {
+        "resource": {
+          "relative_path": "Documentation/images/actor_middle_tier.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Documentation/images/frontend_cluster.png",
+      "output": {
+        "resource": {
+          "relative_path": "Documentation/images/frontend_cluster.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Documentation/images/grain_lifecycle.png",
+      "output": {
+        "resource": {
+          "relative_path": "Documentation/images/grain_lifecycle.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Documentation/images/n-tier.png",
+      "output": {
+        "resource": {
+          "relative_path": "Documentation/images/n-tier.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Documentation/images/server-failure.png",
+      "output": {
+        "resource": {
+          "relative_path": "Documentation/images/server-failure.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/index.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/index.html",
+          "hash": "BQKi/SjQQU/WSIeUz5VTsA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/resources/Contributing.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/resources/Contributing.html",
+          "hash": "/JAABumsFVjCw8gEd2XrnA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/resources/Documentation-Guidelines.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/resources/Documentation-Guidelines.html",
+          "hash": "dGoP20Aci1s13BUn9+OFXQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/resources/Ideas-for-Contributions.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/resources/Ideas-for-Contributions.html",
+          "hash": "Xs2YDz7WKSGrEIIzeYqXIQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/resources/Migration/Codegen.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/resources/Migration/Codegen.html",
+          "hash": "gLlqv165SPkxy3ynzC+MUg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/resources/Migration/Migration1.5.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/resources/Migration/Migration1.5.html",
+          "hash": "BXLuHkaDuB8BjxameRFEXg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/resources/Migration/MigrationAzure2.0.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/resources/Migration/MigrationAzure2.0.html",
+          "hash": "2pEa1mykQJXRv0/dpQaoDQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/resources/Migration/index.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/resources/Migration/index.html",
+          "hash": "K/TzL/X3o2hopzQq+DCY0g=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/resources/Presentations/index.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/resources/Presentations/index.html",
+          "hash": "DU22o9YQTE7CHovuZn+5rg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/resources/Student-Projects.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/resources/Student-Projects.html",
+          "hash": "W3RO4o62SDyMpK2nVNTrNg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/resources/index.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/resources/index.html",
+          "hash": "aopvW+pV/iwnYJF07EQR7A=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/resources/links.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/resources/links.html",
+          "hash": "TY1uYRbMbOpbIZpv0K7htQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/resources/orleans_architecture_principles_and_approach_I.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/resources/orleans_architecture_principles_and_approach_I.html",
+          "hash": "pmoMXgf582qtU1ssZ1MysA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/resources/orleans_thinking_big_and_small.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/resources/orleans_thinking_big_and_small.html",
+          "hash": "Vz1PDIAStV5G6PmRwsBLhg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/streaming/index.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/streaming/index.html",
+          "hash": "q4mLQvVNRSn484wuPn8CSg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/streaming/stream_providers.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/streaming/stream_providers.html",
+          "hash": "7SqSbj7cHcujF1zZII9Jyw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/streaming/streams_implementation.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/streaming/streams_implementation.html",
+          "hash": "GqcGosLNvXzOGQKLkQjfsA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/streaming/streams_programming_APIs.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/streaming/streams_programming_APIs.html",
+          "hash": "aNnmjv/9V3ILQeaNu5j2MQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/streaming/streams_quick_start.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/streaming/streams_quick_start.html",
+          "hash": "1XtzScpCyAPkCl5uXqBwGw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/streaming/streams_why.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/streaming/streams_why.html",
+          "hash": "iUOTdk4JP2iixe6iOuX1og=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Toc",
+      "source_relative_path": "Documentation/streaming/toc.yml",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/streaming/toc.html",
+          "hash": "lsdTuFLAsB3EgN5XrQ4iXw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Toc",
+      "source_relative_path": "Documentation/toc.yml",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/toc.html",
+          "hash": "QNWB+DR9eKN/KUclae7d5g=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/tutorials_and_samples/Adventure.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/tutorials_and_samples/Adventure.html",
+          "hash": "pzvlXlyvZZWSw8y5Nmh+MA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/tutorials_and_samples/Hello-World.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/tutorials_and_samples/Hello-World.html",
+          "hash": "LwiMELVIx3EmLgIYU4LX1w=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/tutorials_and_samples/MathGrains.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/tutorials_and_samples/MathGrains.html",
+          "hash": "cE+m3gxMddOrjVQalt51eQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/tutorials_and_samples/index.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/tutorials_and_samples/index.html",
+          "hash": "exFLp3AMdh22BnGMFlKcaA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/whats_new_in_orleans.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/whats_new_in_orleans.html",
+          "hash": "bH1OTkKoxjiQOPiReRy58Q=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/who_is_using_orleans.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/who_is_using_orleans.html",
+          "hash": "YLP6cPKYGy8EOoiWVNVdcQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/AzureSample 1.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/AzureSample 1.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/AzureSample 3.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/AzureSample 3.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/AzureTutorial1.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/AzureTutorial1.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/AzureTutorial2.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/AzureTutorial2.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/AzureTutorial3.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/AzureTutorial3.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/AzureTutorial4.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/AzureTutorial4.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/AzureTutorial5.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/AzureTutorial5.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/Concurrency 1.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/Concurrency 1.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/Concurrency 2.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/Concurrency 2.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/GPS 1.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/GPS 1.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/MicrosoftOrleansToolsForVisualStudio.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/MicrosoftOrleansToolsForVisualStudio.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/MinimalOrleansApplication1.png",
+      "output": {
+        "resource": {
+          "relative_path": "Images/MinimalOrleansApplication1.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/MinimalOrleansApplication2.png",
+      "output": {
+        "resource": {
+          "relative_path": "Images/MinimalOrleansApplication2.png"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/Multiple Actors1.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/Multiple Actors1.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/New DevTest 1.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/New DevTest 1.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/New DevTest 2.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/New DevTest 2.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/New DevTest 3.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/New DevTest 3.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/New DevTest 4.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/New DevTest 4.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/New DevTest 5.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/New DevTest 5.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/New DevTest 6.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/New DevTest 6.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/New DevTest 7.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/New DevTest 7.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/NewDevTest1.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/NewDevTest1.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/Persistence 1.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/Persistence 1.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/Persistence 2.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/Persistence 2.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/Persistence 3.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/Persistence 3.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/Persistence 4.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/Persistence 4.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/ProvidersSample 1.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/ProvidersSample 1.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/ProvidersSample 2.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/ProvidersSample 2.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/Standalone 1.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/Standalone 1.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/Standalone 2.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/Standalone 2.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/Standalone 3.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/Standalone 3.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/Storage Provider 1.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/Storage Provider 1.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/background.jpg",
+      "output": {
+        "resource": {
+          "relative_path": "Images/background.jpg"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/logo-light.svg",
+      "output": {
+        "resource": {
+          "relative_path": "Images/logo-light.svg"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/logo.svg",
+      "output": {
+        "resource": {
+          "relative_path": "Images/logo.svg"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Resource",
+      "source_relative_path": "Images/onpremise 1.PNG",
+      "output": {
+        "resource": {
+          "relative_path": "Images/onpremise 1.PNG"
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Tutorials/Custom-Grain-Storage.md",
+      "output": {
+        ".html": {
+          "relative_path": "Tutorials/Custom-Grain-Storage.html",
+          "hash": "5eyQX9YFjjYWMenVDzPluA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Tutorials/Declarative-Persistence.md",
+      "output": {
+        ".html": {
+          "relative_path": "Tutorials/Declarative-Persistence.html",
+          "hash": "j2YjarO3g2aInXVE0HGO9Q=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Tutorials/index.md",
+      "output": {
+        ".html": {
+          "relative_path": "Tutorials/index.html",
+          "hash": "+giZk5/k0qzAX/Jgsa4yfQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Toc",
+      "source_relative_path": "Tutorials/toc.yml",
+      "output": {
+        ".html": {
+          "relative_path": "Tutorials/toc.html",
+          "hash": "r/Hxx2/35r5Iox6VNTNlGQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "index",
+      "source_relative_path": "index.md",
+      "output": {
+        ".html": {
+          "relative_path": "index.html",
+          "hash": "dyK8VlU2WAPS00jF+0v58w=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Toc",
+      "source_relative_path": "toc.yml",
+      "output": {
+        ".html": {
+          "relative_path": "toc.html",
+          "hash": "v9Xmo8R9W8E4m97Q5VfnEg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    }
+  ],
+  "incremental_info": [
+    {
+      "status": {
+        "can_incremental": false,
+        "details": "Cannot build incrementally because last build info is missing.",
+        "incrementalPhase": "build"
+      },
+      "processors": {
+        "ResourceDocumentProcessor": {
+          "can_incremental": false,
+          "details": "Processor ResourceDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
+          "incrementalPhase": "build"
+        },
+        "ConceptualDocumentProcessor": {
+          "can_incremental": false,
+          "incrementalPhase": "build"
+        },
+        "TocDocumentProcessor": {
+          "can_incremental": false,
+          "details": "Processor TocDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
+          "incrementalPhase": "build"
+        }
+      }
+    },
+    {
+      "status": {
+        "can_incremental": false,
+        "details": "Cannot support incremental post processing, the reason is: should not trace intermediate info.",
+        "incrementalPhase": "postProcessing"
+      },
+      "processors": {}
+    }
+  ],
+  "version_info": {},
+  "groups": [
+    {
+      "xrefmap": "xrefmap.yml"
+    }
+  ]
+}

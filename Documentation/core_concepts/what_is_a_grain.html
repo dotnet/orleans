@@ -1,0 +1,185 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>What is a grain | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="What is a grain | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../Images/logo-light.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list"></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h3 id="what-is-a-grain">What is a grain?</h3>
+
+<p>Grains are the key primitives of the Orleans programming model.
+Grains are the building blocks of an Orleans application, they are atomic units of isolation, distribution, and persistence.
+Grains are objects that represent application entities.
+Just like in the classic Object Oriented Programming, a grain encapsulates state of an entity and encodes its behavior in the code logic.
+Grains can hold references to each other and interact by invoking each other’s methods exposed via interfaces. </p>
+<p>Orleans aims to greatly simplify building a scalable application and eliminate most of the concurrency challenges </p>
+<ul>
+<li>By not sharing data between grains instances except via message passing.</li>
+<li>By providing the single-threaded execution guarantee to each individual grain.</li>
+</ul>
+<p>A typical grain encapsulates state and behavior of a single entity (e.g. a specific user or a device or a session).</p>
+<h3 id="grain-identity">Grain Identity</h3>
+<p>An individual grain is a uniquely addressable instance of a grain type (class).
+Each grain has a unique identity, also referred to as a grain key, within its type.
+Grain identity within its type can be a long integer, a GUID, a string, or a combination of a long+string or GUID+string.</p>
+<h3 id="accessing-a-grain">Accessing a Grain</h3>
+<p>A grain class implements one or more grain interfaces, formal code contracts for interacting with grains of that type.
+To invoke a grain, a caller needs to know the grain interface that the grain class implements that includes the method that the caller wants to call and the unique identity (key) of the target grain.
+For example, here&#39;s how a user profile grain can be called to update user&#39;s address if email is used as a user identity.</p>
+<pre><code class="lang-csharp">var user = grainFactory.GetGrain&lt;IUserProfile&gt;(userEmail);
+await user.UpdateAddress(newAddress);
+</code></pre><p>A call to GetGrain is an inexpensive local operation of constructing a grain reference with an embedded identity and type of the target grain.</p>
+<p>Note that there is no need to create or instantiate the target grain.
+We make a call to it to update user&#39;s address as if the user&#39;s grain is already instantiated for us.
+This is one of the biggest advantages of the Orleans programming model - we never need to create, instantiate or delete grains.
+We can write our code as if all possible grains, for example millions of user profiles, are always in memory waiting for us to call them.
+Behind the scenes, the Orleans runtime performs all the heavy lifting of managing resources to transparently bring grains to memory when needed.   </p>
+<h3 id="behind-the-scenes---grain-lifecycle">Behind the Scenes - Grain Lifecycle</h3>
+<p>Grains live in execution containers called silos.
+Silos form a cluster that combines resources of multiple physical or virtual machines.
+When there is work (request) for a grain, Orleans ensures there is an instance of the grain on one of the Silos in the cluster.
+If there is no instance of the grain on any silo, the Orleans runtime creates one. 
+This process is called Activation.
+In the case that a grain is using Grain Persistence, the runtime automatically reads the state from the backing store upon activation.</p>
+<p>Once activated on a silo, a grain processes incoming requests (method calls) from other grains or from outside of the cluster (usually from frontend web servers).
+In the course of processing a request a grain may call other grains or some external services.
+If a grain stops receiving requests and stays idle, after a configurable period of inactivity Orleans removes the grain from memory (deactivates it) to free up resources for other grains.
+If and when there&#39;s a new request for that grain, Orleans will activate it again, potentially on a different silo, so the caller gets the impression that the grain stayed in memory the whole time.
+A grain goes through the lifecycle from existing only as its persisted state (if it has any) in storage to being instantiated in memory to being removed from memory.</p>
+<p><img src="grain_lifecycle.png" alt=""></p>
+<p>Orleans controls the process of activating and deactivating grains transparently.
+When coding a grain, a developer assumes all grains are always activated.</p>
+<p>The sequence of key events in grain lifecycle looks like this.</p>
+<ul>
+<li>Another grain or a client makes a call to a method of the grain (via a grain reference)</li>
+<li>The grain gets activated (if it is not already activated somewhere in the cluster) and an instance of the grain class, called a grain activation, is created<ul>
+<li>Constructor of the grain is executed leveraging Dependency Injection, if applicable</li>
+<li>If Declarative Persistence is used, the grain state is read from storage</li>
+<li>If overridden, <code>OnActivateAsync</code> is called</li>
+</ul>
+</li>
+<li>The grain processes incoming requests</li>
+<li>The grain remains idle for some time</li>
+<li>Silo runtime decides to deactivate the grain</li>
+<li>Silo runtime calls <code>OnDeactivateAsync</code>, if overridden</li>
+<li>Silo runtime removes the grain from memory</li>
+</ul>
+<p>Upon a graceful shutdown of a silo, all grain activations it holds get deactivated.
+Any requests waiting to be processed in grains&#39; queues get forwarded to other silos in the cluster, where new activations of deactivated grains get created on an as-needed basis.
+If a silo shuts down or dies ungracefully, other silos in the cluster detect the failure, and start creating new activations of grains lost on the failed silo, as new requests for those grains arrive.
+Note that detection of a silo failure takes some time (configurable), and hence the process of reactivating lost grains isn&#39;t instantaneous. </p>
+<h3 id="grain-execution">Grain Execution</h3>
+<p>A grain activation performs work in chunks and finishes each chunk before it moves on to the next.
+Chunks of work include method invocations in response to requests from other grains or external clients, and closures scheduled on completion of a previous chunk.
+The basic unit of execution corresponding to a chunk of work is known as a turn.</p>
+<p>While Orleans may execute many turns belonging to different activations in parallel, each activation will always execute its turns one at a time.
+This means that there is no need to use locks or other synchronization methods to guard against data races and other multi-threading hazards. </p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/core_concepts/what_is_a_grain.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

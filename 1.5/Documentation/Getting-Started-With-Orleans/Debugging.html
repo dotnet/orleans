@@ -1,0 +1,140 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Debugging and Symbols | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Debugging and Symbols | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../../favicon.ico">
+    <link rel="stylesheet" href="../../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../../styles/docfx.css">
+    <link rel="stylesheet" href="../../../styles/main.css">
+    <meta property="docfx:navrel" content="../../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../Images/logo-light.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list"></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+
+<div class="IMPORTANT"><h5>Important</h5><p><strong>You are looking at the 1.5 documentation</strong></p>
+<p>Orleans 2.0 is a significant overhaul from the 1.x versions.
+You can find 2.0 documentation <a href="/orleans/Documentation/index.html">here</a>.</p>
+</div>
+<h3 id="debugging">Debugging</h3>
+<p>An Orleans-based application can be easily debugged during development by attaching a debugger to the <a href="Running-the-Application.html#configuring-and-starting-a-silo">silo host process</a> or to the <a href="Running-the-Application.html#configuring-and-connecting-a-client">client process</a>.
+For fast development iterations, it is convenient to use a single process that combines a silos and a client, such as a console application project that gets created by the Orleans Dev/Test Host project template that is part of the <a href="https://marketplace.visualstudio.com/items?itemName=sbykov.MicrosoftOrleansToolsforVisualStudio">Microsoft Orleans Tools</a> extension for Visual Studio.
+Similarly, debugger can be attached to the Worker/Web Role instance process when running inside the Azure Compute Emulator.</p>
+<p>In production, it is rarely a good idea to stop a silo at a breakpoint because the frozen silo will soon get voted dead by the cluster membership protocol and will not be able to communicate with other silos in the cluster.
+Hence, in productions tracing is the primary &#39;debugging&#39; mechanism.</p>
+<h3 id="source-link">Source Link</h3>
+<p>Starting with the 2.0.0-beta1 release we added <a href="https://github.com/ctaggart/SourceLink">Source Link</a> support to our Symbols. It means that if a project consumes the Orleans NuGet packages, when debugging the application code, they can step into the Orleans source code. In Steve Gordon&#39;s <a href="https://www.stevejgordon.co.uk/debugging-asp-net-core-2-source">blog post</a>, you can see what steps are needed to configure it.</p>
+<h3 id="symbols">Symbols</h3>
+<p>Starting with 1.3.0 release, symbols for Orleans binaries are published to Microsoft symbol servers.
+Make sure you enable <code>Microsoft Symbol Servers</code> in Visual Studio in Tools/Options/Debugging/Symbols for debugging Orleans code.</p>
+<p>Prior to 1.3.0, symbols were published to <a href="https://nuget.smbsrc.net">https://nuget.smbsrc.net/</a> symbol server.
+Add it to the list of symbol servers in Visual Studio in Tools/Options/Debugging/Symbols.
+Make sure there is a trailing slash in the URL.
+Visual Studio 2015 has a bug with parsing it.</p>
+<h3 id="sources">Sources</h3>
+<p>You can download zipped sources for specific releases of Orleans from the <a href="https://github.com/dotnet/orleans/releases">Releases page</a>.
+However, due to the LF/CR differences between Windows and Unix (default for GitHub), debugger may complain about a mismatch of the sources and symbols.
+The workaround is to check out the corresponding version tag on a Windows machine to get sources with the matching LF/CR ending.</p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/1.5/Documentation/Getting-Started-With-Orleans/Debugging.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+  </body>
+</html>

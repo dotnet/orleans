@@ -1,0 +1,188 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Front Ends for Orleans Services | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Front Ends for Orleans Services | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../Images/logo-light.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list"></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="front-ends-for-orleans-services">Front Ends for Orleans Services</h1>
+
+<p>Exposing silo gateway ports as public endpoints of an Orleans cluster is not recommended.
+Instead, Orleans is intended to be fronted by your own API.</p>
+<p>Creating an HTTP API, or web application is a common scenario.
+Let&#39;s extend the Employee/Manager scenario from the  <a href="Declarative-Persistence.html">Declarative-Persistence</a> walk-through to see what steps are required to publish grain data over HTTP.</p>
+<h2 id="creating-the-aspnet-application">Creating the ASP.NET application</h2>
+<p>First, you should add a new ASP.NET Web Application to your solution. Then, select the Web API template, although you could use MVC or Web Forms.</p>
+<h2 id="initializing-orleans">Initializing Orleans</h2>
+<p>Next, add a reference to the <em>Orleans.dll</em> file in the project references.</p>
+<p>As with the Orleans host we created earlier, we need to initialize Orleans.
+This is best done in the <em>Global.asax.cs</em> file like this:</p>
+<pre><code class="lang-csharp">namespace WebApplication1
+{
+    public class WebApiApplication : System.Web.HttpApplication
+    {
+        protected void Application_Start()
+        {
+            ...
+            var config = ClientConfiguration.LocalhostSilo();
+
+           // Attempt to connect a few times to overcome transient failures and to give the silo enough 
+            // time to start up when starting at the same time as the client (useful when deploying or during development).
+            const int initializeAttemptsBeforeFailing = 5;
+
+            int attempt = 0;
+            while (true)
+            {
+                try
+                {
+                    GrainClient.Initialize(config);
+                    break;
+                }
+                catch (SiloUnavailableException e)
+                {
+                    attempt++;
+                    if (attempt &gt;= initializeAttemptsBeforeFailing)
+                    {
+                         throw;
+                    }
+                    Thread.Sleep(TimeSpan.FromSeconds(2));
+                }
+            }
+
+           ...
+</code></pre><p>Now when the ASP.NET application starts, it will initialize the Orleans Client.</p>
+<h2 id="creating-the-controller">Creating the Controller</h2>
+<p>Now lets add a controller to the project, to receive HTTP requests, and call the grain code.</p>
+<p>Right click on the &quot;Controllers&quot; folder, and add a new &quot;Web API 2 Controller - Empty&quot;.</p>
+<p>Next, call the controller <code>EmployeeController</code>.</p>
+<p>This will create a new empty controller called <code>EmployeeController</code>.</p>
+<p>We can add a <code>Get</code> method to the controller, which we&#39;ll use to return the level of an Employee.</p>
+<pre><code class="lang-csharp">public class EmployeeController : ApiController
+{
+    public Task&lt;int&gt; Get(Guid id)
+    {
+        var employee = GrainClient.GrainFactory.GetGrain&lt;IEmployee&gt;(id);
+        return employee.GetLevel();
+    }
+}
+</code></pre><p>Note that the controller is asynchronous, and we can just pass back the <code>Task</code> which the grain returns.</p>
+<h2 id="running-the-application">Running the Application</h2>
+<p>Now let&#39;s test the application.</p>
+<p>Build the project. Set the ASP.NET application and the silo host project as the startup projects, and run them.</p>
+<p>If you navigate to the API URL (the number may be different on your project)...</p>
+<pre><code>http://localhost:6858/api/employee/42783519-d64e-44c9-9c29-399e3afaa625
+</code></pre><p> ...you should see the result returned from the grain:</p>
+<pre><code class="lang-xml">    42
+</code></pre><p>That&#39;s the basics in place, the rest of the API can be completed by adding the rest of the HTTP verbs.</p>
+<h2 id="next">Next</h2>
+<p>We&#39;ll look at how you can deploy Orleans in the Azure Cloud</p>
+<p><a href="Cloud-Deployment.html">Cloud Deployment</a></p>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/1.5/Tutorials/Front-Ends-for-Orleans-Services.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+  </body>
+</html>

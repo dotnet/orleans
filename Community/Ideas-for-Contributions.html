@@ -1,0 +1,157 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Ideas for Contributions | Microsoft Orleans Documentation </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Ideas for Contributions | Microsoft Orleans Documentation ">
+    <meta name="generator" content="docfx 2">
+    
+    <link rel="shortcut icon" href="../favicon.ico">
+    <link rel="stylesheet" href="../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../styles/docfx.css">
+    <link rel="stylesheet" href="../styles/main.css">
+    <meta property="docfx:navrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../Images/logo-light.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list"></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="ideas-for-contributions">Ideas for Contributions</h1>
+
+<p>These are some of the ideas for contributing to Orleans. Just an initial list for consideration, meant to be a live document. If you are interested in any of these or one that is not listed, create an issue to discuss it.</p>
+<p>We roughly put them into 3 size categories based on our gut feel, which may be wrong:</p>
+<ul>
+<li>Small - hours of work</li>
+<li>Medium - couple of days of work</li>
+<li>Large - big projects, multiple days up to weeks of work</li>
+</ul>
+<ol>
+<li><p><strong>Project template/wizard for Azure deployment</strong> [Medium/Large]</p>
+<ul>
+<li>Worker role for silos (in our experience it is better to star a silo as a standalone process and wait on the process handle in the worker roles code)</li>
+<li>Worker/web role for frontend clients</li>
+<li>Configuration of diagnostics, ETW tracing, etc.</li>
+<li>Try Azure SDK plug-in as suggested <a href="http://richorama.github.io/2015/01/13/thoughts-on-deploying-orleans/">here</a> by @richorama.</li>
+</ul>
+</li>
+<li><p><strong>Cluster monitoring dashboard</strong> [Medium]</p>
+<ul>
+<li><a href="https://github.com/OrleansContrib/OrleansMonitor">https://github.com/OrleansContrib/OrleansMonitor</a> may be a good start</li>
+</ul>
+</li>
+<li><p><strong>Proper support for F#</strong> [Medium/Large]
+See <a href="https://github.com/dotnet/orleans/issues/38">Issue #38</a></p>
+</li>
+<li><p><strong>Orleans backplane for SignalR</strong> [Medium]
+See <a href="https://github.com/dotnet/orleans/issues/73">Issue #73</a></p>
+</li>
+<li><p><strong>Port Orleans to <a href="https://github.com/dotnet/coreclr">coreclr</a></strong> [Medium]
+See <a href="https://github.com/dotnet/orleans/issues/368">Issue #368</a></p>
+<ul>
+<li>Some APIs from the full .NET got deprecated in coreclr, mainly around files and reflection, but at large the porting effort shouldn&#39;t be too big. This will allow to run Orleans efficiently cross platform.</li>
+</ul>
+</li>
+<li><p><strong>Secure communication between silos and clients</strong></p>
+<ul>
+<li>Add support for secure communication mode with certificates used for encryption of messages.</li>
+</ul>
+</li>
+</ol>
+</article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Community/Ideas-for-Contributions.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+  </body>
+</html>
