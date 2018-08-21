@@ -1,3 +1,7 @@
 - name: Documentation
   href: Documentation/index.md
+- name: 1.5 Documentation
+  href: 1.5/Documentation/Introduction.md
+- name: 1.5 Tutorials
+  href: 1.5/Tutorials/index.md
 
