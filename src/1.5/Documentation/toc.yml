@@ -5,9 +5,9 @@
   - name: Benefits
     href: Benefits.md
   - name: What's new in Orleans
-    href: ../../Documentation/What's-new-in-Orleans.md
+    href: ../../Documentation/whats_new_in_orleans.md
   - name: Frequently Asked Questions
-    href: ../../Documentation/Frequently-Asked-Questions.md
+    href: ../../Documentation/frequently_asked_questions.md
 - name: Installation
   href: Installation/toc.yml
 - name: Getting Started
