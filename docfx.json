@@ -1,0 +1,62 @@
+{
+  "build": {
+    "content": [
+      {
+        "files": [
+          "Documentation/**/**.yml",
+          "Documentation/**/**.md"
+        ]
+      },
+      {
+        "files": [
+          "toc.yml",
+          "*.md"
+        ],
+        "exclude": [
+          "obj/**",
+          "_site/**"
+        ]
+      }
+    ],
+    "resource": [
+      {
+        "files": [
+          "images/**",
+          "logo.svg",
+          "logo-light.svg",
+          "Documentation/**/**.png",
+          "Documentation/**/**.gif"
+        ],
+        "exclude": [
+          "obj/**",
+          "_site/**"
+        ]
+      }
+    ],
+    "overwrite": [
+      {
+        "files": [
+        ],
+        "exclude": [
+          "obj/**",
+          "_site/**"
+        ]
+      }
+    ],
+    "dest": "./_site",
+    "template": [
+      "default", "template"
+    ],
+    "noLangKeyword": false,
+    "globalMetadata": {
+      "_appTitle": "Microsoft Orleans Documentation",
+      "_enableSearch": true,
+      "_gitContribute": {
+        "repo": "https://github.com/dotnet/orleans",
+        "branch": "master",
+      },
+	  "_gitUrlPattern": "github",
+    "_docfxVersion": "2"
+    }
+  }
+}

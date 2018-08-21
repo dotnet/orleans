@@ -1,0 +1,16 @@
+- name: Event Sourcing Overview
+  href: index.md
+- name: JournaledGrain Basics
+  href: journaledgrain_basics.md
+- name: JournaledGrain Diagnostics
+  href: journaledgrain_diagnostics.md
+- name: Immediate/Delayed Confirmation
+  href: immediate_vs_delayed_confirmation.md
+- name: Notifications
+  href: notifications.md
+- name: Event Sourcing Configuration
+  href: event_sourcing_configuration.md
+- name: Built-In Log-Consistency Providers
+  href: log_consistency_providers.md
+- name: Replicated Instances
+  href: replicated_instances.md
