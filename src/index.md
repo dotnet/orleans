@@ -21,7 +21,7 @@ tagline: A straightforward approach to building distributed, high-scale applicat
       <img src="images/logo.svg" class="main_logo" />
       <h1 class="title"><small class="subtitle">A straightforward approach to building distributed, high-scale applications in .NET</small></h1>
       <div class="options">
-        <a class="btn btn-lg btn-primary" href="https://github.com/dotnet/orleans">Go to the Orleans Repo</a> 
+        <a class="btn btn-lg btn-primary" href="https://github.com/dotnet/orleans">Go to the Orleans Repository</a> 
       </div>
     </div>
 </div>
@@ -52,14 +52,6 @@ You can use this and other samples as starting points for your own application.
 
 ### [Resources](/Documentation/resources/index.html)
  Information about contributing, links to articles about Orleans, and the sections about Migration, and Presentations.
-
-
----
-##Archive
-Links to 1.5 documentation and tutorials could go here...
----
-
-### Links
 
 Discuss your Orleans questions in the [gitter chat room](https://gitter.im/dotnet/orleans).
 
