@@ -5,9 +5,9 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>Running in a Stand-Alone Silo | Microsoft Orleans Website </title>
+    <title>Running in a Stand-Alone Silo | Microsoft Orleans Documentation </title>
     <meta name="viewport" content="width=device-width">
-    <meta name="title" content="Running in a Stand-Alone Silo | Microsoft Orleans Website ">
+    <meta name="title" content="Running in a Stand-Alone Silo | Microsoft Orleans Documentation ">
     <meta name="generator" content="docfx 2">
     
     <link rel="shortcut icon" href="../../favicon.ico">
@@ -103,7 +103,7 @@ Rather than adding some clever backoff-retry code, here we simply expect you to 
 <pre><code class="lang-xml">&lt;ProxyingGateway Address=&quot;localhost&quot; Port=&quot;30000&quot; /&gt;
 </code></pre><p>Don&#39;t forget to set the file&#39;s &quot;Copy to Output Directory&quot; property to &quot;Copy if newer&quot;.</p>
 <p>OrleansHost.exe is a ready-made host executable intended for running Orleans silo code. It is also useful for development purposes. If you set both the grain collection project and the the host project as startup projects, you will see two windows come up:</p>
-<p>![](../Images/Standalone 1.PNG)</p>
+<p><img src="../Images/Standalone%201.PNG" alt=""></p>
 <p>This allows us to debug the grains in their own process, while keeping the client code in its own process.
 If you let the client make its request, then terminate it using &#39;Enter&#39; when asked, you should see only the client process windows disappear.
 The debugging session won&#39;t end, because the grains are still being debugged in the <em>OrleansHost.exe</em> process.
@@ -134,11 +134,11 @@ Console.WriteLine(hello.SayHello(&quot;Third&quot;).Result);
 Console.WriteLine(hello.SayHello(&quot;Fourth&quot;).Result);
 </code></pre><p>What we would expect to see here is four greetings, the first of which is &quot;Hello World!&quot;.
 Let&#39;s check it out:</p>
-<p>![](../Images/Standalone 2.PNG)</p>
+<p><img src="../Images/Standalone%202.PNG" alt=""></p>
 <p>Terminate the client (make sure it&#39;s just the client, we need the grain host to stay up) and restart it using the context menu.
 There&#39;s no reason to wait for the silo now, since it&#39;s already running.
 Here&#39;s what we get:</p>
-<p>![](../Images/Standalone 3.PNG)</p>
+<p><img src="../Images/Standalone%203.PNG" alt=""></p>
 <p>Still four greetings, but instead of &quot;Hello World!&quot; the first greeting is the last one from our previous client session.
 In other words, the grain in the silo kept some state around for us.</p>
 <h2 id="next">Next</h2>

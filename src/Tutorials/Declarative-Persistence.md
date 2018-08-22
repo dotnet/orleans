@@ -50,7 +50,7 @@ private static async Task DoClientWork(IClusterClient client)
 }
 ```
 > Note: If you are transitioning from Orleans 1.5, you will notice that the Client is no longer static.
-Please refer to [Migration from Orleans 1.5 to 2.0](../Documentation/Migration/Migration1.5.md) page.
+Please refer to [Migration from Orleans 1.5 to 2.0](../Documentation/resources/Migration/Migration1.5.md) page.
 
 Next, we'll do some silo configuration, in order to configure the storage provider that will give us access to persistent storage.
 The SiloHost project includes a file _Program.cs_ which is where we find the following section:

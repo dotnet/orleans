@@ -5,9 +5,9 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>Serialization and Writing Custom Serializers | Microsoft Orleans Website </title>
+    <title>Serialization and Writing Custom Serializers | Microsoft Orleans Documentation </title>
     <meta name="viewport" content="width=device-width">
-    <meta name="title" content="Serialization and Writing Custom Serializers | Microsoft Orleans Website ">
+    <meta name="title" content="Serialization and Writing Custom Serializers | Microsoft Orleans Documentation ">
     <meta name="generator" content="docfx 2">
     
     <link rel="shortcut icon" href="../../../favicon.ico">
@@ -78,7 +78,7 @@
 
 <div class="IMPORTANT"><h5>Important</h5><p><strong>You are looking at the 1.5 documentation</strong></p>
 <p>Orleans 2.0 is a significant overhaul from the 1.x versions.
-For 2.0 <a href="/orleans/Documentation/Introduction.html">Documentation</a> and <a href="/orleans/Tutorials/index.html">Tutorials</a>, refer to the respective sections.</p>
+You can find 2.0 documentation <a href="/orleans/Documentation/index.html">here</a>.</p>
 </div>
 <h1 id="serialization-and-writing-custom-serializers">Serialization and Writing Custom Serializers</h1>
 <p>Orleans has an advanced and extensible serialization framework. Orleans serializes data types passed in grain request and response messages as well as grain persistent state objects. As part of this framework, Orleans automatically generates serialization code for those data types. In addition to generating a more efficient serialization/deserialization for types that are already .NET-serializable, Orleans also tries to generate serializers for types used in grain interfaces that are not .NET-serializable. The framework also includes a set of efficient built-in serializers for frequently used types: lists, dictionaries, strings, primitives, arrays, etc.</p>

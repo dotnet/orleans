@@ -5,9 +5,9 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>Load Balancing | Microsoft Orleans Website </title>
+    <title>Load Balancing | Microsoft Orleans Documentation </title>
     <meta name="viewport" content="width=device-width">
-    <meta name="title" content="Load Balancing | Microsoft Orleans Website ">
+    <meta name="title" content="Load Balancing | Microsoft Orleans Documentation ">
     <meta name="generator" content="docfx 2">
     
     <link rel="shortcut icon" href="../../../favicon.ico">
@@ -78,7 +78,7 @@
 
 <div class="IMPORTANT"><h5>Important</h5><p><strong>You are looking at the 1.5 documentation</strong></p>
 <p>Orleans 2.0 is a significant overhaul from the 1.x versions.
-For 2.0 <a href="/orleans/Documentation/Introduction.html">Documentation</a> and <a href="/orleans/Tutorials/index.html">Tutorials</a>, refer to the respective sections.</p>
+You can find 2.0 documentation <a href="/orleans/Documentation/index.html">here</a>.</p>
 </div>
 <h1 id="load-balancing">Load Balancing</h1>
 <p><strong>Load balancing, in a broad sense, is one of the pillars of the Orleans runtime</strong>. Orleans runtime tries to make everything balanced, since balancing allows to maximize resource usage and avoid hotspots, which leads to better performance, as well as helps with elasticity. Load balancing in Orleans applies in multiple places. Below is a non-exhaustive list of places where the runtime performs balancing:</p>
@@ -99,7 +99,7 @@ For 2.0 <a href="/orleans/Documentation/Introduction.html">Documentation</a> and
 </li>
 </ol>
 <p>Also notice that <strong>balancing, in a broad sense, does not necessarily mean loss of locality</strong>. One can be balanced and still maintain a good locality. For example, when balancing means sharding/partitioning, you can partition responsibility for a certain logical task, while still maintaining  locality within each partition. That applies both for local and distributed balancing.</p>
-<p>Refer to this presentation on [Balancing Techniques in Orleans](<a href="http://dotnet.github.io/orleans/Presentations/Balancing">http://dotnet.github.io/orleans/Presentations/Balancing</a> Techniques in Orleans.pptx) for more details.</p>
+<p>Refer to this presentation on <a href="http://dotnet.github.io/orleans/Presentations/Balancing Techniques in Orleans.pptx">Balancing Techniques in Orleans</a> for more details.</p>
 </article>
           </div>
           

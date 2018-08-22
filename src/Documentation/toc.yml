@@ -1,26 +1,37 @@
-- name: Introduction
-  href: Introduction.md
-  homepage: Introduction.md
+- name: Orleans Overview
+  href: index.md
+  homepage: index.md
   items:
   - name: Benefits
-    href: Benefits.md
-  - name: Orleans 2.0
-    href: Orleans-2.0.md
+    href: benefits.md
   - name: Frequently Asked Questions
-    href: Frequently-Asked-Questions.md
+    href: frequently_asked_questions.md
   - name: What's new in Orleans
-    href: What's-new-in-Orleans.md
-- name: Getting Started
-  href: Getting-Started-With-Orleans/toc.yml
-- name: Core Features
-  href: Core-Features/toc.yml
+    href: whats_new_in_orleans.md
+  - name: Who's using Orleans
+    href: who_is_using_orleans.md
+- name: Core Concepts
+  href: core_concepts/toc.yml
+- name: Grains
+  href: grains/toc.yml
+  items:
+- name: Clusters and Clients
+  href: clusters_and_clients/toc.yml
+  items:
+  - name: Configuration Guide
+    href: index.md
+  - name: Monitoring
+    href: index.md
 - name: Deployment
-  href: Deployment-and-Operations/toc.yml
-- name: Advanced Features
-  href: Advanced-Concepts/toc.yml
-- name: Migration from Orleans 1.5
-  href: Migration/toc.yml
-- name: Implementation Details
-  href: Runtime-Implementation-Details/toc.yml
-- name: Samples
-  href: Samples-Overview/toc.yml
+  href: deployment/toc.yml
+  items:
+  - name: Grain Versioning
+    href: index.md
+  - name: Multi-Cluster Support
+    href: index.md
+- name: Tutorials and Samples
+  href: tutorials_and_samples/toc.yml
+- name: Resources
+  href: resources/toc.yml
+
+  

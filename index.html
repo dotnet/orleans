@@ -5,9 +5,9 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>Microsoft Orleans | Microsoft Orleans Website </title>
+    <title>Microsoft Orleans | Microsoft Orleans Documentation </title>
     <meta name="viewport" content="width=device-width">
-    <meta name="title" content="Microsoft Orleans | Microsoft Orleans Website ">
+    <meta name="title" content="Microsoft Orleans | Microsoft Orleans Documentation ">
     <meta name="generator" content="docfx 2">
     
     <link rel="shortcut icon" href="favicon.ico">
@@ -52,7 +52,7 @@
     font-size:20px;
 }
 .main_logo {
-    width:100%
+    width:60%
 }
 .jumbotron{
     text-align: center;
@@ -65,63 +65,31 @@
       <img src="Images/logo.svg" class="main_logo">
       <h1 class="title"><small class="subtitle">A straightforward approach to building distributed, high-scale applications in .NET</small></h1>
       <div class="options">
-        <a class="btn btn-lg btn-primary" href="https://github.com/dotnet/orleans">Get the code</a> <a class="btn btn-lg btn-primary" href="Documentation/Introduction.html">Read the documentation</a>
+        <a class="btn btn-lg btn-primary" href="https://github.com/dotnet/orleans">Go to the Orleans Repository</a> 
       </div>
     </div>
 </div>
 
-<p class="lead">
-    Orleans is a framework that provides a straightforward approach to building distributed high-scale computing applications, without the need to learn and apply complex concurrency or other scaling patterns.
-    It was created by Microsoft Research and designed for use in the cloud.
-</p>
-
-<p class="lead">
-    Orleans has been used extensively in Microsoft Azure by several Microsoft product groups, most notably by 343 Industries as a platform for all of Halo 4 and Halo 5 cloud services, as well as by a growing number of other companies.
-</p>
-
-<hr>
-<div class="row">
-    <div class="col-md-4">
-        <h3>Scalable by Default</h3>
-
-        Orleans handles the complexity of building distributed systems, enabling your application
-        to scale to hundreds of servers.
-    </div>
-    <div class="col-md-4">
-        <h3>Low Latency</h3>
-
-        Orleans allows you to keep the state you need in memory, so your application can rapidly respond
-        to incoming requests.
-    </div>
-    <div class="col-md-4">
-        <h3>Simplified Concurrency</h3>
-
-        Orleans allows you to write simple, single threaded C# code, handling concurrency with asynchronous
-        message passing between objects (grains).
-    </div>
-</div>
-
-<hr>
-<p>In Orleans, grains are the building blocks of application code. Grains are instances of .NET classes that implement a conforming interface. Asynchronous methods of the interface are used to indicate which operations the grain can perform:</p>
-<pre><code class="lang-csharp">public interface IMyGrain : IGrainWithStringKey
-{
-    Task&lt;string&gt; SayHello(string name);
-}
-</code></pre><p>The implementation is executed inside the Orleans framework:</p>
-<pre><code class="lang-csharp">public class MyGrain : IMyGrain
-{
-    public Task&lt;string&gt; SayHello(string name)
-    {
-        return Task.FromResult($&quot;Hello {name}&quot;);
-    }
-}
-</code></pre><p>You can then invoke the grain by obtaining a proxy object (a grain reference), and calling the methods:</p>
-<pre><code class="lang-csharp">var grain = GrainClient.GrainFactory.GetGrain&lt;IMyGrain&gt;(&quot;grain1&quot;);
-await grain.SayHello(&quot;World&quot;);
-</code></pre><h2 id="where-next">Where Next?</h2>
-<p>To learn more about the concepts in Orleans, read the <a href="Documentation/Introduction.html">introduction</a>.</p>
-<p>There are a number of <a href="Tutorials/index.html">step-by-step tutorials</a>.</p>
-<p>Discuss your Orleans questions on the <a href="https://gitter.im/dotnet/orleans">gitter chat room</a>.</p>
+<h3 id="orleans-overviewdocumentationindexhtml"><a href="/Documentation/index.html">Orleans Overview</a></h3>
+<p>Orleans is a framework that provides a straightforward approach to building distributed high-scale computing applications, without the need to learn and apply complex concurrency or other scaling patterns. 
+Go here to learn more about what Orleans is.</p>
+<h3 id="core-conceptsdocumentationcoreconceptsindexhtml"><a href="/Documentation/core_concepts/index.html">Core Concepts</a></h3>
+<p>Orleans is a framework that provides a straightforward approach to building distributed high-scale computing applications, without the need to learn and apply complex concurrency or other scaling patterns. 
+This section contains information about the fundamental components of Orleans.</p>
+<h3 id="grainsdocumentationgrainsindexhtml"><a href="/Documentation/grains/index.html">Grains</a></h3>
+<p>Grains are the key primitives of the Orleans programming model. They are the building blocks of an Orleans application, and they are atomic units of isolation, distribution, and persistence. Grains are objects that represent application entities. Just like in the classic Object Oriented Programming, a grain encapsulates state of an entity and encodes its behavior in the code logic. 
+This section contains in-depth information about grains.</p>
+<h3 id="clusters-and-clientsdocumentationclustersandclientsindexhtml"><a href="/Documentation/clusters_and_clients/index.html">Clusters and Clients</a></h3>
+<p>The term &quot;Client&quot; or sometimes &quot;Grain Client&quot; is used for application code that interacts with grains but itself is not part of a grain logic. Client code runs outside of the cluster of Orleans servers called silos where grains are hosted. Hence, a client acts as a connector or conduit to the cluster and to all grains of the application.
+Go here to learn more about clusters and clients, specifically. </p>
+<h3 id="deploymentdocumentationdeploymentindexhtml"><a href="/Documentation/deployment/index.html">Deployment</a></h3>
+<p>A typical Orleans application consists of a cluster of server processes (silos) where grains live, and a set of client processes, usually web servers, that receive external requests, turn them into grain method calls, and return results back. Hence, the first thing one needs to do to run an Orleans application is to start a cluster of silos.</p>
+<h3 id="tutorials-and-samplesdocumentationtutorialsandsamplesindexhtml"><a href="/Documentation/tutorials_and_samples/index.html">Tutorials and Samples</a></h3>
+<p>Start with the MathGrains tutorial to learn how to create and deploy an Orleans app on your local machine. 
+You can use this and other samples as starting points for your own application. </p>
+<h3 id="resourcesdocumentationresourcesindexhtml"><a href="/Documentation/resources/index.html">Resources</a></h3>
+<p> Information about contributing, links to articles about Orleans, and the sections about Migration, and Presentations.</p>
+<p>Discuss your Orleans questions in the <a href="https://gitter.im/dotnet/orleans">gitter chat room</a>.</p>
 <p>Fork the code on the <a href="https://github.com/dotnet/orleans">GitHub Respository</a>.</p>
 
       </div>
