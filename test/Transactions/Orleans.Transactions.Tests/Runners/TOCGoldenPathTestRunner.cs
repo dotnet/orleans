@@ -39,6 +39,8 @@ namespace Orleans.Transactions.Tests
                     Assert.Equal(expected, actual);
                 }
             }
+
+            // TODO : Add verification that commit service recieve call with proper args.
         }
     }
 }

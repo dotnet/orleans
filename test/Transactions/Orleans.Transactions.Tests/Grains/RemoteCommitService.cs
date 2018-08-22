@@ -10,6 +10,9 @@ namespace Orleans.Transactions.Tests
         Task<bool> Callme(Guid transactionId, string data);
     }
 
+    // TODO : Replace with more complete service implementation which:
+    // - can be called to verify that commit service recieve Callme with proper args.
+    // - can produce errors for fault senarios.
     public class RemoteCommitService : IRemoteCommitService
     {
         ILogger logger;
