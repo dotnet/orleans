@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.Remoting;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 
@@ -77,7 +78,7 @@ namespace Orleans.TestingHost
         }
 
         /// <inheritdoc />
-        public override void StopSilo(bool stopGracefully)
+        public override void StopSilo(bool stopGracefully, CancellationToken ct = default(CancellationToken))
         {
             if (!IsActive) return;
 
@@ -85,7 +86,7 @@ namespace Orleans.TestingHost
             {
                 try
                 {
-                    this.SiloHost.Shutdown();
+                    this.SiloHost.Shutdown(ct);
                 }
                 catch (RemotingException re)
                 {

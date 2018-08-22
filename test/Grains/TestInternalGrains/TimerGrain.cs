@@ -270,5 +270,10 @@ namespace UnitTestGrains
             this.completionSource.SetResult(1);
             return Task.CompletedTask;
         }
+
+        public override Task OnDeactivateAsync()
+        {
+            return base.OnDeactivateAsync();
+        }
     }
 }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Hosting;
@@ -37,9 +38,9 @@ namespace Orleans.TestingHost
         }
 
         /// <summary>Gracefully shuts down the silo</summary>
-        public void Shutdown()
+        public void Shutdown(CancellationToken ct)
         {
-            this.host.StopAsync().GetAwaiter().GetResult();
+            this.host.StopAsync(ct).GetAwaiter().GetResult();
         }
     }
 }

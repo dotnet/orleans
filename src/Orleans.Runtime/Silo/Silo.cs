@@ -106,6 +106,8 @@ namespace Orleans.Runtime
 
         public Task SiloTerminated { get { return this.siloTerminatedTask.Task; } } // one event for all types of termination (shutdown, stop and fast kill).
 
+        private bool isFastKilledNeeded = false; // Set to true if something goes wrong in the shutdown/stop phase
+
         private SchedulingContext membershipOracleContext;
         private SchedulingContext multiClusterOracleContext;
         private SchedulingContext reminderServiceContext;
@@ -371,7 +373,7 @@ namespace Orleans.Runtime
             var processExitHandlingOptions = this.Services.GetService<IOptions<ProcessExitHandlingOptions>>().Value;
             if(processExitHandlingOptions.FastKillOnProcessExit)
                 AppDomain.CurrentDomain.ProcessExit += HandleProcessExit;
-
+            
             //TODO: setup thead pool directly to lifecycle
             StartTaskWithPerfAnalysis("ConfigureThreadPoolAndServicePointSettings",
                 this.ConfigureThreadPoolAndServicePointSettings, Stopwatch.StartNew());
@@ -636,7 +638,8 @@ namespace Orleans.Runtime
         /// </summary>
         public void Shutdown()
         {
-            StopAsync(CancellationToken.None).GetAwaiter().GetResult();
+            var cancellationSource = new CancellationTokenSource(this.stopTimeout);
+            StopAsync(cancellationSource.Token).GetAwaiter().GetResult();
         }
 
         /// <summary>
@@ -687,15 +690,20 @@ namespace Orleans.Runtime
             try
             {
                 await this.scheduler.QueueTask(() => this.siloLifecycle.OnStop(cancellationToken), this.lifecycleSchedulingSystemTarget.SchedulingContext);
-            } finally
+                await this.SiloTerminated;
+            }
+            finally
             {
                 SafeExecute(scheduler.Stop);
                 SafeExecute(scheduler.PrintStatistics);
             }
         }
 
-        private Task OnRuntimeServicesStop(CancellationToken cancellationToken)
+        private Task OnRuntimeServicesStop(CancellationToken ct)
         {
+            if (this.isFastKilledNeeded || ct.IsCancellationRequested) // No time for this
+                return Task.CompletedTask;
+
             // Start rejecting all silo to silo application messages
             SafeExecute(messageCenter.BlockApplicationMessages);
 
@@ -704,8 +712,7 @@ namespace Orleans.Runtime
 
             // Directory: Speed up directory handoff
             // will be started automatically when directory receives SiloStatusChangeNotification(Stopping)
-
-            SafeExecute(() => LocalGrainDirectory.StopPreparationCompletion.WaitWithThrow(stopTimeout));
+            SafeExecute(() => LocalGrainDirectory.StopPreparationCompletion.WithCancellation(ct));
 
             return Task.CompletedTask;
         }
@@ -716,7 +723,7 @@ namespace Orleans.Runtime
             logger.Info(ErrorCode.SiloStopped, "Silo is Stopped()");
 
             SafeExecute(() => scheduler.QueueTask( this.membershipOracle.KillMyself, this.membershipOracleContext)
-                .WaitWithThrow(stopTimeout));
+                .WaitWithThrow(stopTimeout)); // TODO: we have to do this, even on "fast kill", but the timeout should be smaller
 
             // incoming messages
             SafeExecute(incomingSystemAgent.Stop);
@@ -727,7 +734,9 @@ namespace Orleans.Runtime
             if (platformWatchdog != null) 
                 SafeExecute(platformWatchdog.Stop); // Silo may be dying before platformWatchdog was set up
 
-            SafeExecute(activationDirectory.PrintActivationDirectory);
+            if (!ct.IsCancellationRequested)
+                SafeExecute(activationDirectory.PrintActivationDirectory);
+
             SafeExecute(messageCenter.Stop);
             SafeExecute(siloStatistics.Stop);
 
@@ -742,6 +751,9 @@ namespace Orleans.Runtime
 
         private async Task OnBecomeActiveStop(CancellationToken ct)
         {
+            if (this.isFastKilledNeeded)
+                return;
+
             bool gracefully = !ct.IsCancellationRequested;
             string operation = gracefully ? "Shutdown()" : "Stop()";
             try
@@ -751,13 +763,14 @@ namespace Orleans.Runtime
                     logger.Info(ErrorCode.SiloShuttingDown, "Silo starting to Shutdown()");
                     // Write "ShutDown" state in the table + broadcast gossip msgs to re-read the table to everyone
                     await scheduler.QueueTask(this.membershipOracle.ShutDown, this.membershipOracleContext)
-                        .WithTimeout(stopTimeout, $"MembershipOracle Shutting down failed due to timeout {stopTimeout}");
+                        .WithCancellation(ct, "MembershipOracle Shutting down failed because the task was cancelled");
                     // Deactivate all grains
-                    SafeExecute(() => catalog.DeactivateAllActivations().WaitWithThrow(stopTimeout));
+                    SafeExecute(() => catalog.DeactivateAllActivations().Wait(ct));
                 }
                 else
                 {
                     logger.Info(ErrorCode.SiloStopping, "Silo starting to Stop()");
+                    // TODO: we have to do this, even on non graceful shutdown, but the timeout should be smaller
                     // Write "Stopping" state in the table + broadcast gossip msgs to re-read the table to everyone
                     await scheduler.QueueTask(this.membershipOracle.Stop, this.membershipOracleContext)
                         .WithTimeout(stopTimeout, $"Stopping MembershipOracle faield due to timeout {stopTimeout}");
@@ -765,8 +778,9 @@ namespace Orleans.Runtime
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.SiloFailedToStopMembership, String.Format("Failed to {0} membership oracle. About to FastKill this silo.", operation), exc);
-                return; // will go to finally
+                logger.Error(ErrorCode.SiloFailedToStopMembership,
+                    $"Failed to {operation} membership oracle. About to FastKill this silo.", exc);
+                this.isFastKilledNeeded = true;
             }
             // Stop the gateway
             SafeExecute(messageCenter.StopAcceptingClientMessages);
@@ -774,18 +788,28 @@ namespace Orleans.Runtime
 
         private async Task OnActiveStop(CancellationToken ct)
         {
+            if (this.isFastKilledNeeded || ct.IsCancellationRequested)
+                return;
+
             if (reminderService != null)
             {
-                // 2: Stop reminder service
-                await scheduler.QueueTask(reminderService.Stop, this.reminderServiceContext)
-                    .WithTimeout(stopTimeout, $"Stopping ReminderService failed due to timeout {stopTimeout}");
+                await this.scheduler
+                    .QueueTask(reminderService.Stop, this.reminderServiceContext)
+                    .WithCancellation(ct, "Stopping ReminderService failed because the task was cancelled");
             }
+
             foreach (var grainService in grainServices)
             {
-                await this.scheduler.QueueTask(grainService.Stop, grainService.SchedulingContext).WithTimeout(this.stopTimeout, $"Stopping GrainService failed due to timeout {initTimeout}");
+                await this.scheduler
+                    .QueueTask(grainService.Stop, grainService.SchedulingContext)
+                    .WithCancellation(ct, $"Stopping GrainService failed because the task was cancelled");
+
                 if (this.logger.IsEnabled(LogLevel.Debug))
                 {
-                    logger.Debug(String.Format("{0} Grain Service with Id {1} stopped successfully.", grainService.GetType().FullName, grainService.GetPrimaryKeyLong(out string ignored)));
+                    logger.Debug(
+                        "{GrainServiceType} Grain Service with Id {GrainServiceId} stopped successfully.", 
+                        grainService.GetType().FullName, 
+                        grainService.GetPrimaryKeyLong(out string ignored));
                 }
             }
         }
@@ -799,6 +823,7 @@ namespace Orleans.Runtime
         {
             // NOTE: We need to minimize the amount of processing occurring on this code path -- we only have under approx 2-3 seconds before process exit will occur
             this.logger.Warn(ErrorCode.Runtime_Error_100220, "Process is exiting");
+            this.isFastKilledNeeded = true;
             this.Stop();
         }
 
