@@ -16,14 +16,14 @@ namespace Orleans.Hosting
         /// <param name="builder">Silo host builder</param>
         /// <param name="withStatisticsReporter">Configure a transaction statistics reporter.  Set to false if you want to configure your own transaction statistics reporting or don't want transaction statistics reported</param>
         /// <returns></returns>
-        public static ISiloHostBuilder UseDistributedTM(this ISiloHostBuilder builder, bool withStatisticsReporter = true)
+        public static ISiloHostBuilder UseTransactions(this ISiloHostBuilder builder, bool withStatisticsReporter = true)
         {
-            return builder.ConfigureServices(services => services.UseDistributedTM(withStatisticsReporter))
+            return builder.ConfigureServices(services => services.UseTransactions(withStatisticsReporter))
                           .AddGrainExtension<ITransactionManagerExtension, TransactionManagerExtension>()
                           .AddGrainExtension<ITransactionalResourceExtension, TransactionalResourceExtension>();
         }
 
-        internal static IServiceCollection UseDistributedTM(this IServiceCollection services, bool withReporter)
+        internal static IServiceCollection UseTransactions(this IServiceCollection services, bool withReporter)
         {
             services.TryAddSingleton<IClock,Clock>();
             services.TryAddSingleton<ITransactionAgentStatistics, TransactionAgentStatistics>();

@@ -32,7 +32,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     })
-                    .UseDistributedTM();
+                    .UseTransactions();
             }
         }
     }
@@ -61,7 +61,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     })
                     .UseDeactivationTransactionState()
-                    .UseDistributedTM();
+                    .UseTransactions();
             }
         }
     }

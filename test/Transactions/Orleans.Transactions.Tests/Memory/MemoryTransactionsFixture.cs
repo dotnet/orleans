@@ -18,7 +18,7 @@ namespace Orleans.Transactions.Tests
                 hostBuilder
                     .ConfigureTracingForTransactionTests()
                     .AddMemoryGrainStorage(TransactionTestConstants.TransactionStore)
-                    .UseDistributedTM();
+                    .UseTransactions();
             }
         }
     }
