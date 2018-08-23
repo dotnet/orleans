@@ -294,7 +294,7 @@ namespace Orleans
             }
             else if (cancellationToken.IsCancellationRequested)
             {
-                return TaskFromCanceled<object>();
+                return Task.FromCanceled<object>(cancellationToken);
             }
             else
             {
@@ -357,7 +357,7 @@ namespace Orleans
             }
             else if (cancellationToken.IsCancellationRequested)
             {
-                return TaskFromCanceled<T>();
+                return Task.FromCanceled<T>(cancellationToken);
             }
             else 
             {

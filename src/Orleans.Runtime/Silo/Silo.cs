@@ -802,7 +802,7 @@ namespace Orleans.Runtime
             {
                 await this.scheduler
                     .QueueTask(grainService.Stop, grainService.SchedulingContext)
-                    .WithCancellation(ct, $"Stopping GrainService failed because the task was cancelled");
+                    .WithCancellation(ct, "Stopping GrainService failed because the task was cancelled");
 
                 if (this.logger.IsEnabled(LogLevel.Debug))
                 {
