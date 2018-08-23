@@ -45,6 +45,8 @@ Go here to learn more about clusters and clients, specifically.
 ### [Deployment](Documentation/deployment/index.md)
 A typical Orleans application consists of a cluster of server processes (silos) where grains live, and a set of client processes, usually web servers, that receive external requests, turn them into grain method calls, and return results back. Hence, the first thing one needs to do to run an Orleans application is to start a cluster of silos.
 
+### [Streaming](Documentation/streaming/index.md)
+Streaming extensions provide a set of abstractions and APIs that make thinking about and working with streams simpler and more robust. Streaming extensions allow developers to write reactive applications that operate on a sequence of events in a structured way.
 
 ### [Tutorials and Samples](Documentation/tutorials_and_samples/index.md)
 Start with the MathGrains tutorial to learn how to create and deploy an Orleans app on your local machine. 
