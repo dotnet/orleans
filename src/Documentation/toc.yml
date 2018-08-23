@@ -29,6 +29,8 @@
     href: index.md
   - name: Multi-Cluster Support
     href: index.md
+- name: Streaming
+  href: streaming/toc.yml
 - name: Tutorials and Samples
   href: tutorials_and_samples/toc.yml
 - name: Resources
