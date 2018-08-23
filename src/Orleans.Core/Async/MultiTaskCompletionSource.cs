@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans
@@ -25,6 +26,10 @@ namespace Orleans
             get { return tcs.Task; }
         }
 
+        public bool TrySetCancelled(CancellationToken ct)
+        {
+            return tcs.TrySetCanceled(ct);
+        }
 
         public void SetOneResult()
         {
