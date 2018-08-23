@@ -16,11 +16,16 @@ namespace Orleans.Serialization
         public const string UseFullAssemblyNamesProperty = "UseFullAssemblyNames";
         public const string IndentJsonProperty = "IndentJSON";
         public const string TypeNameHandlingProperty = "TypeNameHandling";
-        private readonly JsonSerializerSettings settings;
+        private readonly Lazy<JsonSerializerSettings> settings;
 
-        public OrleansJsonSerializer(ITypeResolver typeResolver, IGrainFactory grainFactory)
+        public OrleansJsonSerializer(IServiceProvider services)
         {
-            this.settings = GetDefaultSerializerSettings(typeResolver, grainFactory);
+            this.settings = new Lazy<JsonSerializerSettings>(() =>
+            {
+                var typeResolver = services.GetRequiredService<ITypeResolver>();
+                var grainFactory = services.GetRequiredService<IGrainFactory>();
+                return GetDefaultSerializerSettings(typeResolver, grainFactory);
+            });
         }
 
         /// <summary>
@@ -128,7 +133,7 @@ namespace Orleans.Serialization
 
             var reader = context.StreamReader;
             var str = reader.ReadString();
-            return JsonConvert.DeserializeObject(str, expectedType, this.settings);
+            return JsonConvert.DeserializeObject(str, expectedType, this.settings.Value);
         }
 
         /// <summary>
@@ -151,7 +156,7 @@ namespace Orleans.Serialization
                 return;
             }
 
-            var str = JsonConvert.SerializeObject(item, expectedType, this.settings);
+            var str = JsonConvert.SerializeObject(item, expectedType, this.settings.Value);
             writer.Write(str);
         }
     }
