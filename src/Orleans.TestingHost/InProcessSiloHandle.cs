@@ -45,16 +45,20 @@ namespace Orleans.TestingHost
         }
 
         /// <inheritdoc />
-        public override void StopSilo(bool stopGracefully, CancellationToken ct = default(CancellationToken))
+        public override void StopSilo(bool stopGracefully)
         {
-            if (!IsActive) return;
+            var cancellation = new CancellationTokenSource();
+            var ct = cancellation.Token;
 
             if (!stopGracefully)
-            {
-                var cancellation = new CancellationTokenSource();
                 cancellation.Cancel();
-                ct = cancellation.Token;
-            }
+
+            StopSilo(ct);
+        }
+
+        public override void StopSilo(CancellationToken ct)
+        {
+            if (!IsActive) return;
 
             try
             {

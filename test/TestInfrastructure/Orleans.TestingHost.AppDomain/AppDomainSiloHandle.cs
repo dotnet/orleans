@@ -78,7 +78,7 @@ namespace Orleans.TestingHost
         }
 
         /// <inheritdoc />
-        public override void StopSilo(bool stopGracefully, CancellationToken ct = default(CancellationToken))
+        public override void StopSilo(bool stopGracefully)
         {
             if (!IsActive) return;
 
@@ -86,7 +86,7 @@ namespace Orleans.TestingHost
             {
                 try
                 {
-                    this.SiloHost.Shutdown(ct);
+                    this.SiloHost.Shutdown();
                 }
                 catch (RemotingException re)
                 {
@@ -111,6 +111,11 @@ namespace Orleans.TestingHost
             }
 
             this.SiloHost = null;
+        }
+
+        public override void StopSilo(CancellationToken ct)
+        {
+            throw new NotImplementedException();
         }
 
         private void UnloadAppDomain()

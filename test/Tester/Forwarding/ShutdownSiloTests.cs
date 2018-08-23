@@ -70,7 +70,7 @@ namespace Tester.Forwarding
             await Task.Delay(500);
             var stopwatch = Stopwatch.StartNew();
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            HostedCluster.SecondarySilos.First().StopSilo(true, cts.Token);
+            HostedCluster.SecondarySilos.First().StopSilo(cts.Token);
             stopwatch.Stop();
             Assert.True(stopwatch.Elapsed < TimeSpan.FromMinutes(1));
         }

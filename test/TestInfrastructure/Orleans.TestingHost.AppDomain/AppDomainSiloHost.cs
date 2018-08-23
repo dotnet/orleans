@@ -38,9 +38,9 @@ namespace Orleans.TestingHost
         }
 
         /// <summary>Gracefully shuts down the silo</summary>
-        public void Shutdown(CancellationToken ct)
+        public void Shutdown()
         {
-            this.host.StopAsync(ct).GetAwaiter().GetResult();
+            this.host.StopAsync().GetAwaiter().GetResult();
         }
     }
 }
