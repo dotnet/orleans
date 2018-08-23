@@ -1,4 +1,4 @@
-- name: Grains
+- name: Developing a Grain
   href: index.md
 - name: Types of Grains
   href: types_of_grains.md
@@ -6,10 +6,20 @@
   href: timers_and_reminders.md
 - name: Observers
   href: observers.md
+- name: Interceptors
+  href: interceptors.md
+- name: Scheduler
+  href: scheduler.md
 - name: Reentrancy
   href: reentrancy.md
 - name: Stateless Worker Grains
   href: stateless_worker_grains.md
+- name: Cancellation Tokens
+  href: cancellation_tokens.md
+- name: External Tasks and Grains
+  href: external_tasks_and_grains.md
+- name: Request Context
+  href: request_context.md
 - name: Transactions
   href: transactions.md
 - name: Grain Persistence
