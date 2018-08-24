@@ -282,7 +282,7 @@ namespace Orleans.Transactions.Tests
             }
 
             // then, analyze the history results
-            harness.CheckConsistency(tolerateGenericTimeouts: scale > 4, tolerateUnknownExceptions: StorageAdaptorHasLimitedCommitSpace);
+            harness.CheckConsistency(tolerateGenericTimeouts: (scale >= 3 && !avoidTimeouts), tolerateUnknownExceptions: StorageAdaptorHasLimitedCommitSpace);
         }
     }
 }
