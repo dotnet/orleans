@@ -26,11 +26,6 @@ namespace Orleans
             get { return tcs.Task; }
         }
 
-        public bool TrySetCancelled(CancellationToken ct)
-        {
-            return tcs.TrySetCanceled(ct);
-        }
-
         public void SetOneResult()
         {
             lock (lockable)
