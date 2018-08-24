@@ -19,7 +19,6 @@ namespace Tester.Forwarding
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            Assert.True(StorageEmulator.TryStart());
             builder.Options.InitialSilosCount = NumberOfSilos;
             builder.ConfigureLegacyConfiguration(legacy =>
             {
