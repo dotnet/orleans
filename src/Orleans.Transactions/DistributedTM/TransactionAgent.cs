@@ -139,24 +139,24 @@ namespace Orleans.Transactions
 
         private async Task<TransactionalStatus> CommitReadWriteTransaction(TransactionInfo transactionInfo, List<ParticipantId> writeResources)
         {
-            KeyValuePair<ParticipantId,AccessCounter> manager = SelectManager(transactionInfo);
+            ParticipantId manager = SelectManager(transactionInfo, writeResources);
             Dictionary<ParticipantId, AccessCounter> participants = transactionInfo.Participants;
 
             foreach (var p in participants
                 .SelectResources()
-                .Where(kvp => !kvp.Key.Equals(manager.Key)))
+                .Where(kvp => !kvp.Key.Equals(manager)))
             {
                 // one-way prepare message
                 p.Key.Reference.AsReference<ITransactionalResourceExtension>()
-                        .Prepare(p.Key.Name, transactionInfo.TransactionId, p.Value, transactionInfo.TimeStamp, manager.Key)
+                        .Prepare(p.Key.Name, transactionInfo.TransactionId, p.Value, transactionInfo.TimeStamp, manager)
                         .Ignore();
             }
 
             try
             {
                 // wait for the TM to commit the transaction
-                TransactionalStatus status = await manager.Key.Reference.AsReference<ITransactionManagerExtension>()
-                    .PrepareAndCommit(manager.Key.Name, transactionInfo.TransactionId, manager.Value, transactionInfo.TimeStamp, writeResources, participants.Count);
+                TransactionalStatus status = await manager.Reference.AsReference<ITransactionManagerExtension>()
+                    .PrepareAndCommit(manager.Name, transactionInfo.TransactionId, participants[manager], transactionInfo.TimeStamp, writeResources, participants.Count);
 
                 if (status != TransactionalStatus.Ok)
                 {
@@ -168,7 +168,7 @@ namespace Orleans.Transactions
                     {
                         foreach (var p in writeResources)
                         {
-                            if (!p.Equals(manager.Key))
+                            if (!p.Equals(manager))
                             {
                                 // one-way cancel message
                                 p.Reference.AsReference<ITransactionalResourceExtension>()
@@ -215,23 +215,21 @@ namespace Orleans.Transactions
         }
 
         // TODO: make overridable - jbragg
-        private KeyValuePair<ParticipantId,AccessCounter> SelectManager(TransactionInfo transactionInfo)
+        private ParticipantId SelectManager(TransactionInfo transactionInfo, List<ParticipantId> candidates)
         {
-            List<KeyValuePair<ParticipantId, AccessCounter>> priorityManagers = transactionInfo.Participants.SelectPriorityManagers().ToList();
-            if(priorityManagers.Count > 1)
+            ParticipantId? priorityManager = null;
+            foreach(var p in candidates)
             {
-                throw new ArgumentOutOfRangeException(nameof(transactionInfo), "Only one priority transaction manager allowed in transaction");
+                if (p.IsPriorityManager())
+                {
+                    if (priorityManager != null)
+                    {
+                        throw new ArgumentOutOfRangeException(nameof(transactionInfo), "Only one priority transaction manager allowed in transaction");
+                    }
+                    priorityManager = p;
+                }
             }
-            if(priorityManagers.Count == 1)
-            {
-                return priorityManagers[0];
-            }
-            KeyValuePair<ParticipantId, AccessCounter> manager = transactionInfo.Participants.FirstOrDefault(kvp => kvp.Key.IsManager());
-            if(manager.Key.Reference == null)
-            {
-                throw new ArgumentOutOfRangeException(nameof(transactionInfo), "At least one transaction manager is required in transaction");
-            }
-            return manager;
+            return priorityManager ?? candidates[0];
         }
     }
 }
