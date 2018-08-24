@@ -29,6 +29,8 @@ namespace UnitTests.GrainInterfaces
     {
         Task StartAndWaitTimerTick(TimeSpan dueTime);
 
+        Task StartStuckTimer(TimeSpan dueTime);
+
         Task<string> GetRuntimeInstanceId();
     }
 }

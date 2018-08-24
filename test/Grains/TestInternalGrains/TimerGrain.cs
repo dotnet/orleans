@@ -265,10 +265,22 @@ namespace UnitTestGrains
             await this.completionSource.Task;
         }
 
+        public Task StartStuckTimer(TimeSpan dueTime)
+        {
+            this.completionSource = new TaskCompletionSource<int>();
+            var timer = this.RegisterTimer(StuckTimerTick, null, dueTime, TimeSpan.FromSeconds(1));
+            return Task.CompletedTask;
+        }
+
         private Task TimerTick(object state)
         {
             this.completionSource.SetResult(1);
             return Task.CompletedTask;
+        }
+
+        private async Task StuckTimerTick(object state)
+        {
+            await completionSource.Task;
         }
     }
 }

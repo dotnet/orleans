@@ -950,6 +950,8 @@ namespace Orleans.Runtime
 
         private async void StartDestroyActivations(List<ActivationData> list, MultiTaskCompletionSource tcs = null)
         {
+            var cts = new CancellationTokenSource(this.collectionOptions.Value.DeactivationTimeout);
+
             int number = destroyActivationsNumber;
             destroyActivationsNumber++;
             try
@@ -965,7 +967,7 @@ namespace Orleans.Runtime
 
                 try
                 {
-                    await Task.WhenAll(tasks1);
+                    await Task.WhenAll(tasks1).WithCancellation(cts.Token);
                 }
                 catch (Exception exc)
                 {
@@ -977,7 +979,7 @@ namespace Orleans.Runtime
                 foreach (var activation in list)
                 {
                     var activationData = activation; // Capture loop variable
-                    var task = scheduler.RunOrQueueTask(() => CallGrainDeactivateAndCleanupStreams(activationData), activationData.SchedulingContext);
+                    var task = scheduler.RunOrQueueTask(() => CallGrainDeactivateAndCleanupStreams(activationData, cts.Token), activationData.SchedulingContext);
                     tasks2.Add(new Tuple<Task, ActivationData>(task, activationData));
                 }
                 var asyncQueue = new AsyncBatchedContinuationQueue<ActivationData>();
@@ -1168,7 +1170,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private async Task<ActivationData> CallGrainDeactivateAndCleanupStreams(ActivationData activation)
+        private async Task<ActivationData> CallGrainDeactivateAndCleanupStreams(ActivationData activation, CancellationToken ct)
         {
             try
             {
@@ -1186,7 +1188,7 @@ namespace Orleans.Runtime
                         activation.State == ActivationState.Deactivating)
                     {
                         RequestContext.Clear(); // Clear any previous RC, so it does not leak into this call by mistake. 
-                        await activation.Lifecycle.OnStop();
+                        await activation.Lifecycle.OnStop().WithCancellation(ct);
                     }
                     if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Catalog_AfterCallingDeactivate, "Returned from calling {1} grain's OnDeactivateAsync() method {0}", activation, grainTypeName);
                 }

@@ -17,9 +17,20 @@ namespace Tester.Forwarding
     {
         public const int NumberOfSilos = 2;
 
+        public static readonly TimeSpan DeactivationTimeout = TimeSpan.FromSeconds(10);
+
+        internal class SiloBuilderConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder.Configure<GrainCollectionOptions>(options => options.DeactivationTimeout = DeactivationTimeout);
+            }
+        }
+
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             builder.Options.InitialSilosCount = NumberOfSilos;
+            builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
             builder.ConfigureLegacyConfiguration(legacy =>
             {
                 legacy.ClusterConfiguration.Globals.DefaultPlacementStrategy = "ActivationCountBasedPlacement";
@@ -57,6 +68,21 @@ namespace Tester.Forwarding
             HostedCluster.StopSilo(HostedCluster.SecondarySilos.First());
 
             await promise;
+        }
+
+        [Fact, TestCategory("GracefulShutdown"), TestCategory("Functional")]
+        public async Task SiloGracefulShutdown_StuckTimers()
+        {
+            var grain = await GetTimerRequestGrainOnSecondary();
+
+            await grain.StartStuckTimer(TimeSpan.Zero);
+
+            await Task.Delay(TimeSpan.FromSeconds(1));
+            var stopwatch = Stopwatch.StartNew();
+            HostedCluster.StopSilo(HostedCluster.SecondarySilos.First());
+            stopwatch.Stop();
+
+            Assert.True(stopwatch.Elapsed > DeactivationTimeout);
         }
 
         [Fact, TestCategory("GracefulShutdown"), TestCategory("Functional")]
