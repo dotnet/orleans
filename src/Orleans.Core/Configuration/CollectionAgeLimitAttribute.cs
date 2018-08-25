@@ -8,13 +8,13 @@ namespace Orleans.Configuration
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
     public class CollectionAgeLimitAttribute : Attribute
     {
-        private double timeInMinutes = CollectionAgeLimitConstants.DefaultCollectionAgeLimitInMinutes;
+        private double minutes = CollectionAgeLimitConstants.DefaultCollectionAgeLimitInMinutes;
 
-        public double AgeInMinutes
+        public double Minutes
         {
             get
             {
-                return timeInMinutes;
+                return minutes;
             }
             set
             {
@@ -22,7 +22,7 @@ namespace Orleans.Configuration
                 {
                     throw new ArgumentOutOfRangeException("Collection Age Limit must be a positive number.");
                 }
-                this.timeInMinutes = value;
+                this.minutes = value;
             }
         }
     }

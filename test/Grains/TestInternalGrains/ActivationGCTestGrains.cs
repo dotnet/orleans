@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Concurrency;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 
@@ -77,6 +78,15 @@ namespace UnitTests.Grains
     }
 
     public class BusyActivationGcTestGrain2: Grain, IBusyActivationGcTestGrain2
+    {
+        public Task Nop()
+        {
+            return Task.CompletedTask;
+        }
+    }
+
+    [CollectionAgeLimit(Minutes = 0.2)]
+    public class CollectionSpecificAgeLimitActivationGcTestGrain : Grain, ICollectionSpecificAgeLimitActivationGcTestGrain
     {
         public Task Nop()
         {

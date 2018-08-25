@@ -473,7 +473,7 @@ namespace Orleans.Runtime
                 {
                     TimeSpan ageLimit = this.collectionOptions.Value.ClassSpecificCollectionAge.TryGetValue(grainType, out TimeSpan limit)
                         ? limit
-                        : GetDefaultOrCollectionAgeLimit(grainType);
+                        : TimeSpan.FromMinutes(CollectionAgeLimitConstants.DefaultCollectionAgeLimitInMinutes);
 
                     // create a dummy activation that will queue up messages until the real data arrives
                     // We want to do this (RegisterMessageTarget) under the same lock that we tested TryGetActivationData. They both access ActivationDirectory.
@@ -506,24 +506,6 @@ namespace Orleans.Runtime
             SetupActivationInstance(result, grainType, genericArguments);
             activatedPromise = InitActivation(result, grainType, genericArguments, requestContextData);
             return result;
-        }
-
-        private TimeSpan GetDefaultOrCollectionAgeLimit(string grainType)
-        {
-            GrainTypeData grainTypeData = GrainTypeManager[grainType];
-
-            CollectionAgeLimitAttribute attr = grainTypeData
-                .Type
-                .GetCustomAttributes<CollectionAgeLimitAttribute>(true)
-                .FirstOrDefault();
-            if (attr == null)
-            {
-                return TimeSpan.FromMinutes(CollectionAgeLimitConstants.DefaultCollectionAgeLimitInMinutes);
-            }
-
-            // Add to the ClassSpecificCollectionAge so that we don't need to use the reflection from next activation onwards
-            this.collectionOptions.Value.ClassSpecificCollectionAge.Add(grainType, TimeSpan.FromMinutes(attr.AgeInMinutes));
-            return TimeSpan.FromMinutes(attr.AgeInMinutes);
         }
 
         private void SetupActivationInstance(ActivationData result, string grainType, string genericArguments)

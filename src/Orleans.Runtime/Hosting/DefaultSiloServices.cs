@@ -38,6 +38,7 @@ using Microsoft.Extensions.Options;
 
 using Orleans.Configuration.Validators;
 using Orleans.Runtime.Configuration;
+using System.Reflection;
 
 namespace Orleans.Hosting
 {
@@ -56,8 +57,8 @@ namespace Orleans.Hosting
             // Register system services.
             services.TryAddSingleton<ILocalSiloDetails, LocalSiloDetails>();
             services.TryAddSingleton<ISiloHost, SiloWrapper>();
-            services.TryAddTransient<ILifecycleSubject,LifecycleSubject>();
-            services.TryAddSingleton<ISiloLifecycleSubject,SiloLifecycleSubject>();
+            services.TryAddTransient<ILifecycleSubject, LifecycleSubject>();
+            services.TryAddSingleton<ISiloLifecycleSubject, SiloLifecycleSubject>();
             services.TryAddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloOptionsLogger>();
             services.PostConfigure<SiloMessagingOptions>(options =>
             {
@@ -65,12 +66,12 @@ namespace Orleans.Hosting
                 // Assign environment specific defaults post configuration if user did not configured otherwise.
                 //
 
-                if (options.SiloSenderQueues==0)
+                if (options.SiloSenderQueues == 0)
                 {
                     options.SiloSenderQueues = Environment.ProcessorCount;
                 }
 
-                if (options.GatewaySenderQueues==0)
+                if (options.GatewaySenderQueues == 0)
                 {
                     options.GatewaySenderQueues = Environment.ProcessorCount;
                 }
@@ -123,7 +124,7 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<IRuntimeClient, InsideRuntimeClient>();
             services.TryAddFromExisting<ISiloRuntimeClient, InsideRuntimeClient>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, InsideRuntimeClient>();
-            
+
             services.TryAddSingleton<MultiClusterGossipChannelFactory>();
             services.TryAddSingleton<MultiClusterOracle>();
             services.TryAddSingleton<MultiClusterRegistrationStrategyManager>();
@@ -231,13 +232,13 @@ namespace Orleans.Hosting
             services.AddFromExisting<IKeyedSerializer, ILBasedSerializer>();
 
             // Transactions
-            services.TryAddSingleton<ITransactionAgent,DisabledTransactionAgent>();
+            services.TryAddSingleton<ITransactionAgent, DisabledTransactionAgent>();
 
             // Application Parts
             var applicationPartManager = context.GetApplicationPartManager();
             services.TryAddSingleton<IApplicationPartManager>(applicationPartManager);
-            applicationPartManager.AddApplicationPart(new AssemblyPart(typeof(RuntimeVersion).Assembly) {IsFrameworkAssembly = true});
-            applicationPartManager.AddApplicationPart(new AssemblyPart(typeof(Silo).Assembly) {IsFrameworkAssembly = true});
+            applicationPartManager.AddApplicationPart(new AssemblyPart(typeof(RuntimeVersion).Assembly) { IsFrameworkAssembly = true });
+            applicationPartManager.AddApplicationPart(new AssemblyPart(typeof(Silo).Assembly) { IsFrameworkAssembly = true });
             applicationPartManager.AddFeatureProvider(new BuiltInTypesSerializationFeaturePopulator());
             applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainInterfaceFeature>());
             applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainClassFeature>());
@@ -272,6 +273,24 @@ namespace Orleans.Hosting
 
             // Disable hosted client by default.
             services.TryAddSingleton<IHostedClient, DisabledHostedClient>();
+
+            // Enable collection specific Age limits
+            services.AddOptions<GrainCollectionOptions>()
+                .Configure<IApplicationPartManager>((options, parts) =>
+                {
+                    var grainClasses = new GrainClassFeature();
+                    parts.PopulateFeature(grainClasses);
+
+                    foreach (var grainClass in grainClasses.Classes)
+                    {
+                        var attr = grainClass.ClassType.GetCustomAttribute<CollectionAgeLimitAttribute>();
+                        if (attr != null)
+                        {
+                            var className = TypeUtils.GetFullName(grainClass.ClassType);
+                            options.ClassSpecificCollectionAge[className] = TimeSpan.FromMinutes(attr.Minutes);
+                        }
+                    }
+                });
         }
     }
 }
