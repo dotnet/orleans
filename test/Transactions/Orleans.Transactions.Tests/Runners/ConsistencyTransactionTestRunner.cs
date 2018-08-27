@@ -1,23 +1,25 @@
-﻿using Orleans.TestingHost;
-using Orleans.Transactions.Tests;
-using Orleans.Transactions.Tests.Consistency;
+﻿using Orleans.Transactions.Tests.Consistency;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Orleans.Transactions.AzureStorage.Tests
+namespace Orleans.Transactions.Tests
 {
-    [TestCategory("BVT"), TestCategory("Transactions")]
-    public class FaultInjectionConsistencyTests: TransactionTestRunnerBase, IClassFixture<FaultInjectedTestFixture>
+    public abstract class ConsistencyTransactionTestRunner : TransactionTestRunnerBase
     {
-        public FaultInjectionConsistencyTests(FaultInjectedTestFixture fixture, ITestOutputHelper output)
-            : base(fixture.GrainFactory, output)
-        { }
+        protected ConsistencyTransactionTestRunner(IGrainFactory grainFactory, ITestOutputHelper output)
+        : base(grainFactory, output) { }
+
+
+        // settings that are configuration dependent can be overridden by runner subclasses
+        // this allows tests to adapt their logic, or be skipped, for specific contexts
+        protected abstract bool StorageAdaptorHasLimitedCommitSpace { get; }
+        protected abstract bool StorageErrorInjectionActive { get; }
+
 
         [SkippableTheory]
         // high congestion
@@ -109,7 +111,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
         {
             var random = new Random(scale + numGrains * 1000 + (avoidDeadlocks ? 666 : 333) + ((int)readwrite) * 123976);
 
-            var harness = new ConsistencyTestHarness(grainFactory, numGrains, random.Next(), avoidDeadlocks, avoidTimeouts, readwrite, true);
+            var harness = new ConsistencyTestHarness(grainFactory, numGrains, random.Next(), avoidDeadlocks, avoidTimeouts, readwrite, StorageErrorInjectionActive);
 
             // first, run the random work load to generate history events
             output.WriteLine($"start at {DateTime.UtcNow}");
@@ -127,8 +129,18 @@ namespace Orleans.Transactions.AzureStorage.Tests
             await Task.WhenAll(tasks);
             output.WriteLine($"end at {DateTime.UtcNow}");
 
+            // golden path: all transactions are expected to pass when avoiding deadlocks and lock upgrades
+            if (!StorageErrorInjectionActive
+                && avoidDeadlocks
+                && (readwrite == ReadWriteDetermination.PerGrain || readwrite == ReadWriteDetermination.PerTransaction))
+            {
+                Assert.Equal(0, harness.NumAborted);
+            }
+
             // then, analyze the history results
-            harness.CheckConsistency(tolerateGenericTimeouts: true, tolerateUnknownExceptions: true);
-        }  
+            var tolerateGenericTimeouts = StorageErrorInjectionActive || (scale >= 3 && !avoidTimeouts);
+            var tolerateUnknownExceptions = StorageAdaptorHasLimitedCommitSpace || StorageErrorInjectionActive;
+            harness.CheckConsistency(tolerateGenericTimeouts, tolerateUnknownExceptions);
+        }
     }
 }

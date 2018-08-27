@@ -41,7 +41,7 @@ namespace Orleans.Transactions.Tests.Consistency
             bool avoidDeadlocks,
             bool avoidTimeouts,
             ReadWriteDetermination readWrite,
-            bool errorInjectionActive)
+            bool tolerateUnknownExceptions)
         {
             this.grainFactory = grainFactory;
 
@@ -63,7 +63,7 @@ namespace Orleans.Transactions.Tests.Consistency
             this.indoubt = new Dictionary<string, string>();
 
             // determine what to check for in the end
-            this.tolerateUnknownExceptions = errorInjectionActive;
+            this.tolerateUnknownExceptions = tolerateUnknownExceptions;
         }
 
         public const string InitialTx = "initial";
