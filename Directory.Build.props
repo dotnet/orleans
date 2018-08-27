@@ -106,7 +106,7 @@
   <!-- Versioning properties -->
   <PropertyGroup>
     <AssemblyVersion>2.0.0.0</AssemblyVersion>
-    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">2.0.4</VersionPrefix>
+    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">2.0.5</VersionPrefix>
   </PropertyGroup>
 
   <!-- For Debug builds generated a date/time dependent version suffix -->
@@ -147,7 +147,7 @@
     <OrleansToolsVersion>2.0.4</OrleansToolsVersion>
     <OrleansClientVersion>2.0.3</OrleansClientVersion>
     <OrleansServerVersion>2.0.4</OrleansServerVersion>
-    <OrleansCodegenVersion>2.0.4</OrleansCodegenVersion>
+    <OrleansCodegenVersion>2.0.5</OrleansCodegenVersion>
     <OrleansEventHubProviderVersion>2.0.3</OrleansEventHubProviderVersion>
     <OrleansTelemetryConsumersVersion>2.0.4</OrleansTelemetryConsumersVersion>
   </PropertyGroup>
