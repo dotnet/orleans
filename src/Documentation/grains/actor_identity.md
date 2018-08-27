@@ -85,9 +85,6 @@ public override Task OnActivateAsync()
     return base.OnActivateAsync();
 }
 ```
-
-The stock ticker example used in the [Interaction with Libraries and Services](Interaction-with-Libraries-and-Services.md) uses a string keys to activate grains representing different stock symbols.
-
 ## Using Compound Primary Key
 
 If you have a system that doesn't fit well with either GUIDs or longs, you can opt for a compound primary key which allows you to use a combination of a GUID or long and a string to reference a grain.
