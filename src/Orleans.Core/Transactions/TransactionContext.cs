@@ -20,6 +20,7 @@ namespace Orleans.Transactions
             return null;
         }
 
+        public static string CurrentTransactionId => GetRequiredTransactionInfo<ITransactionInfo>().Id;
 
         public static T GetRequiredTransactionInfo<T>() where T : class, ITransactionInfo
         {

@@ -145,8 +145,9 @@ namespace Orleans.Transactions
             Action deactivate = () => grainRuntime.DeactivateOnIdle(context.GrainInstance);
             var options = this.context.ActivationServices.GetRequiredService<IOptions<TransactionalStateOptions>>();
             var clock = this.context.ActivationServices.GetRequiredService<IClock>();
+            var errorInjector = this.context.ActivationServices.GetService<ITransactionalFaultInjector>();
             TService service = this.context.ActivationServices.GetRequiredServiceByName<TService>(this.config.ServiceName);
-            this.queue = new TocTransactionQueue<TService>(service, options, this.participantId, deactivate, storage, this.serializerSettings, clock, logger);
+            this.queue = new TocTransactionQueue<TService>(service, options, this.participantId, deactivate, storage, this.serializerSettings, clock, errorInjector, logger);
 
             // Add transaction manager factory to the grain context
             this.context.RegisterResourceFactory<ITransactionManager>(this.config.ServiceName, () => new TransactionManager<OperationState>(this.queue));
