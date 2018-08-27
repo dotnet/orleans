@@ -218,7 +218,17 @@ namespace Orleans.Transactions
         private ParticipantId SelectManager(TransactionInfo transactionInfo, List<ParticipantId> candidates)
         {
             ParticipantId? priorityManager = null;
-            foreach(var p in candidates)
+            List<ParticipantId> priorityManagers = transactionInfo.Participants.Keys.SelectPriorityManagers().ToList();
+            if (priorityManagers.Count > 1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(transactionInfo), "Only one priority transaction manager allowed in transaction");
+            }
+            if (priorityManagers.Count == 1)
+            {
+                return priorityManagers[0];
+            }
+
+            foreach (var p in candidates)
             {
                 if (p.IsPriorityManager())
                 {
