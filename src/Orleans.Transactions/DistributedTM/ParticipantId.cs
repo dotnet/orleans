@@ -88,9 +88,9 @@ namespace Orleans.Transactions
             return participants.Where(p => p.Key.IsManager());
         }
 
-        public static IEnumerable<KeyValuePair<ParticipantId, AccessCounter>> SelectPriorityManagers(this IEnumerable<KeyValuePair<ParticipantId, AccessCounter>> participants)
+        public static IEnumerable<ParticipantId> SelectPriorityManagers(this IEnumerable<ParticipantId> participants)
         {
-            return participants.Where(p => p.Key.IsPriorityManager());
+            return participants.Where(p => p.IsPriorityManager());
         }
     }
 }
