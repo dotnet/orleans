@@ -73,6 +73,8 @@ namespace Orleans.Transactions
         private int collect = 0;
         private int cancel = 0;
         private readonly JsonSerializerSettings serializerSettings;
+        private readonly ITransactionalFaultInjector errorInjector;
+
         public MetaData MetaData { get; private set; }
 
         public string ETag { get; set; }
@@ -83,9 +85,10 @@ namespace Orleans.Transactions
             return $"batchsize={total} [{read}r {prepare}p {commit}c {confirm}cf {collect}cl {cancel}cc]";
         }
 
-        public StorageBatch(TransactionalStorageLoadResponse<TState> loadresponse, JsonSerializerSettings serializerSettings)
+        public StorageBatch(TransactionalStorageLoadResponse<TState> loadresponse, JsonSerializerSettings serializerSettings, ITransactionalFaultInjector errorInjector)
         {
             this.serializerSettings = serializerSettings ?? throw new ArgumentNullException(nameof(serializerSettings));
+            this.errorInjector = errorInjector;
             MetaData = ReadMetaData(loadresponse, this.serializerSettings);
             ETag = loadresponse.ETag;
             confirmUpTo = loadresponse.CommittedSequenceId;
@@ -96,6 +99,7 @@ namespace Orleans.Transactions
         public StorageBatch(StorageBatch<TState> previous)
         {
             this.serializerSettings = previous.serializerSettings;
+            this.errorInjector = previous.errorInjector;
             MetaData = previous.MetaData;
             confirmUpTo = previous.confirmUpTo;
             cancelAbove = previous.cancelAbove;
@@ -119,7 +123,7 @@ namespace Orleans.Transactions
             }
         }
 
-        public Task<string> Store(ITransactionalStateStorage<TState> storage)
+        public async Task<string> Store(ITransactionalStateStorage<TState> storage)
         {
             var jsonMetaData = JsonConvert.SerializeObject(MetaData, this.serializerSettings);
             var list = new List<PendingTransactionState<TState>>();
@@ -132,9 +136,15 @@ namespace Orleans.Transactions
                 }
             }
 
-            return storage.Store(ETag, jsonMetaData, list,
+            errorInjector?.BeforeStore();
+
+            var result = await storage.Store(ETag, jsonMetaData, list,
                 (confirm > 0) ? confirmUpTo : (long?)null,
                 (cancelAbove < cancelAboveStart) ? cancelAbove : (long?)null);
+
+            errorInjector?.AfterStore();
+
+            return result;
         }
 
         public void RunFollowUpActions()

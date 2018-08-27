@@ -23,6 +23,7 @@ namespace Orleans.Transactions.State
         private readonly BatchWorker storageWorker;
         private readonly BatchWorker confirmationWorker;
         private readonly ILogger logger;
+        private readonly ITransactionalFaultInjector errorInjector;
         private readonly Dictionary<Guid, TransactionRecord<TState>> confirmationTasks;
         private CommitQueue<TState> commitQueue = new CommitQueue<TState>();
 
@@ -54,6 +55,7 @@ namespace Orleans.Transactions.State
             ITransactionalStateStorage<TState> storage,
             JsonSerializerSettings serializerSettings,
             IClock clock,
+            ITransactionalFaultInjector errorInjector,
             ILogger logger)
         {
             this.options = options.Value;
@@ -62,6 +64,7 @@ namespace Orleans.Transactions.State
             this.storage = storage;
             this.serializerSettings = serializerSettings;
             this.Clock = new CausalClock(clock);
+            this.errorInjector = errorInjector;
             this.logger = logger;
             this.confirmationTasks = new Dictionary<Guid, TransactionRecord<TState>>();
             this.storageWorker = new BatchWorkerFromDelegate(StorageWork);
@@ -350,7 +353,7 @@ namespace Orleans.Transactions.State
         {
             var loadresponse = await storage.Load();
 
-            this.storageBatch = new StorageBatch<TState>(loadresponse, this.serializerSettings);
+            this.storageBatch = new StorageBatch<TState>(loadresponse, this.serializerSettings, this.errorInjector);
 
             this.stableState = loadresponse.CommittedState;
             this.stableSequenceNumber = loadresponse.CommittedSequenceId;

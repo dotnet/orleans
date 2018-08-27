@@ -33,4 +33,13 @@ namespace Orleans.Transactions.Tests
             base.ConfigureTestCluster(builder);
         }
     }
+
+    public class FaultInjectedMemoryTransactionsFixture : MemoryTransactionsFixture
+    {
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        {
+            builder.AddSiloBuilderConfigurator<ErrorInjectorConfigurator>();
+            base.ConfigureTestCluster(builder);
+        }
+    }
 }

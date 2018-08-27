@@ -1,6 +1,8 @@
-﻿using System;
+﻿using Orleans.Transactions.Tests.Consistency;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 using Xunit.Abstractions;
@@ -11,6 +13,7 @@ namespace Orleans.Transactions.Tests
     {
         protected GoldenPathTransactionTestRunner(IGrainFactory grainFactory, ITestOutputHelper output)
         : base(grainFactory, output) { }
+
 
         [SkippableTheory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
@@ -161,5 +164,6 @@ namespace Orleans.Transactions.Tests
                 Assert.Equal(expected, actual);
             }
         }
+
     }
 }
