@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Orleans.Runtime;
 using Orleans.Utilities;
 
-namespace Orleans.Transactions.State
+namespace Orleans.Transactions
 {
     internal class ResourceFactoryRegistry<T> : Dictionary<string, Func<T>> { };
 
