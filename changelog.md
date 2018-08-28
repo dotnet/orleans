@@ -7,6 +7,68 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [2.1.0-beta1] (changes since 2.0.0)
+
+- Major changes
+  - New scheduler (#3792)
+  - Hosted Client (#3362)
+  - Distributed Transaction Manager (beta) (#3820, #4502, #4538, #4566, #4568, #4591, #4599, #4613, #4609, #4616, #4608, #4628, #4638, #4685, #4714, #4739, #4768, #4799, #4781, #4810, #4820, #4838, #4831, #4871, #4887)
+  
+- Breaking changes
+  - None
+
+- Non-breaking improvements
+  - Test clustering: minor fixups (#4342)
+  - TestCluster: wait for cluster stabilization before starting tests (#4343)
+  - Avoid continuation in synchronous case (#4422)
+  - Improve Dictionary allocation in RequestContext (#4435)
+  - Copy elements in-place in InvokeMethodAsync (#4463)
+  - Azure blob storage provider: respect UseJson setting (#4455)
+  - Fix orleans integration with third party DI solution which requires public constructor (#4453)
+  - Remove unused Stopwatch in Grain<T>.OnSetupState (#4403) (#4472)
+  - Add validator for ClusterOptions (#4450)
+  - Non-static statistics: Round 1 (#4515)
+  - Remove saving of minidumps because that functionality is platform specific. (#4558)
+  - Fix Dependency Injection without changing Abstractions project (#4573)
+  - Sanitize "." from azure queue name (#4582)
+  - Add Client/SiloHost builder delegate to legacy GrainClient and Silo/AzureSilo (#4552)
+  - Support of ValueTask as a grain method return type (#4562)
+  - Convert IMembershipTableGrain into a SystemTarget (#4479)
+  - Convert counter values before calling ITelemetryProducer.TrackMetric (#4623)
+  - Optimize removing consumed buffers from read buffer (#4629)
+  - Remove unused settings MaxPendingWorkItemsHardLimit in SchedulingOptions (#4672)
+  - Udpate reference links in sql files (#4684)
+  - Use netcoreapp2.0 for msbuild target dll if using dotnet core msbuild but targeting full .net (#4689)
+  - Make AzureBasedReminderTable public to allow reuse in extensions (#4699)
+  - Remove per-call timer (#4399)
+  - Make LifecycleSubject logging less verbose (#4660)
+  - Do not use ip address from interface not operational (#4713)
+  - Updated Ignore(this Task) method (#4729)
+  - Make azure queue name configurable (#4762)
+  - Auto-installing grain extensions (#4815)
+  - Allow implicit subscription attribute to be inheritable (#4824)
+  - Do not place stateless worker locally if the silo is stopping (#4853)
+  - When deactivating a grain, do not stop timers if there are running requests  (#4830)
+  - No default grains storage added to container if one is not configured. (#4861)
+  - Revisit silo stop/shutdown timeout (#4875)
+  - Add timeout mechanism for grain deactivation (#4883)
+
+- Non-breaking bug fixes
+  - Fix telemetry consumer construction (#4392)
+  - Fix client connection retry (#4429)
+  - Fix routing in Silo Gateway (#4483)
+  - Don't generate serializers for foreign types in Orleans.Streaming.EventHubs (#4487)
+  - Fix NRE on AWS DynamoDB storage provider. #4482 (#4513)
+  - Fix Exception thrown in MembershipOracle.TryToSuspectOrKill (#4508)
+  - Fix logging level check on Grain exception (#451
+  - Assign Issue property in RecordedConnectionIssue.Record(...) (#4598)
+  - Fix (or workaround?) for codegen using netcore/netstandard 2.1 (#4673)
+  - Don't enforce reentrancy for one way requests (#4382)
+  - Cleanup Reminders PartitionKey (#4749)
+  - Fix NullReferenceException in ExecutingWorkItemsTracker (#4850)
+  - Fix NullReferenceException in LocalGrainDirectory when trace logging is enabled (#4854)
+  - Fix dependency injection cycle when OrleansJsonSerializer is used as a serialization provider (#4876)
+
 ### [2.0.4]
 
 - Non-breaking bug fixes
