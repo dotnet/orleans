@@ -448,7 +448,26 @@ namespace Orleans
                         continue;
 
                     RequestContext.Import(message.RequestContextData);
-                    var request = (InvokeMethodRequest)message.GetDeserializedBody(this.SerializationManager);
+                    InvokeMethodRequest request = null;
+                    try
+                    {
+                        request = (InvokeMethodRequest)message.GetDeserializedBody(this.SerializationManager);
+                    }
+                    catch (Exception deserializationException)
+                    {
+                        if (this.logger.IsWarning)
+                        {
+                            this.logger.Warn(
+                                ErrorCode.Messaging_UnableToDeserializeBody,
+                                "Exception during message body deserialization in " + nameof(LocalObjectMessagePumpAsync) + " for message: {0}, Exception: {1}",
+                                message,
+                                deserializationException);
+                        }
+
+                        this.SendResponse(message, Response.ExceptionResponse(deserializationException));
+                        continue;
+                    }
+
                     var targetOb = (IAddressable)objectData.LocalObject.Target;
                     object resultObject = null;
                     Exception caught = null;
@@ -472,9 +491,17 @@ namespace Orleans
                     else if (message.Direction != Message.Directions.OneWay)
                         await this.SendResponseAsync(message, resultObject);
                 }
-                catch (Exception)
+                catch (Exception outerException)
                 {
                     // ignore, keep looping.
+                    if (this.logger.IsWarning)
+                    {
+                        this.logger.Warn(0, "Exception in " + nameof(LocalObjectMessagePumpAsync) + ": {0}", outerException);
+                    }
+                }
+                finally
+                {
+                    RequestContext.Clear();
                 }
             }
         }

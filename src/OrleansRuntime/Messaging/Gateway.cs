@@ -538,10 +538,47 @@ namespace Orleans.Runtime.Messaging
                 // we only get here if we failed to serialize the msg (or any other catastrophic failure).
                 // Request msg fails to serialize on the sending silo, so we just enqueue a rejection msg.
                 // Response msg fails to serialize on the responding silo, so we try to send an error response back.
-                Log.Warn(ErrorCode.Messaging_Gateway_SerializationError, String.Format("Unexpected error serializing message {0} on the gateway", msg.ToString()), exc);
+                if (this.Log.IsWarning)
+                {
+                    this.Log.Warn(
+                        ErrorCode.Messaging_Gateway_SerializationError,
+                        "Unexpected error serializing message {0}: {1}",
+                        msg,
+                        exc);
+                }
+
                 msg.ReleaseBodyAndHeaderBuffers();
                 MessagingStatisticsGroup.OnFailedSentMessage(msg);
-                MessagingStatisticsGroup.OnDroppedSentMessage(msg);
+
+                var retryCount = msg.RetryCount ?? 0;
+
+                if (msg.Direction == Message.Directions.Request)
+                {
+                    this.gateway.messageCenter.SendRejection(msg, Message.RejectionTypes.Unrecoverable, exc.ToString());
+                }
+                else if (msg.Direction == Message.Directions.Response && retryCount < 1)
+                {
+                    // if we failed sending an original response, turn the response body into an error and reply with it.
+                    // unless we have already tried sending the response multiple times.
+                    msg.Result = Message.ResponseTypes.Error;
+                    msg.BodyObject = Response.ExceptionResponse(exc);
+                    msg.RetryCount = retryCount + 1;
+                    this.gateway.messageCenter.SendMessage(msg);
+                }
+                else
+                {
+                    if (this.Log.IsWarning)
+                    {
+                        this.Log.Warn(
+                            ErrorCode.Messaging_OutgoingMS_DroppingMessage,
+                            "Gateway {0} is dropping message which failed during serialization: {2}. Exception = {3}",
+                            this.gateway.gatewayAddress,
+                            msg,
+                            exc);
+                    }
+
+                    MessagingStatisticsGroup.OnDroppedSentMessage(msg);
+                }
             }
         }
     }
