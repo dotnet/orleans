@@ -109,24 +109,39 @@ namespace Orleans.Runtime.Messaging
             // we only get here if we failed to serialize the msg (or any other catastrophic failure).
             // Request msg fails to serialize on the sending silo, so we just enqueue a rejection msg.
             // Response msg fails to serialize on the responding silo, so we try to send an error response back.
-            Log.Warn(ErrorCode.MessagingUnexpectedSendError, String.Format("Unexpected error sending message {0}", msg.ToString()), exc);
-            
+            this.Log.LogWarning(
+                (int)ErrorCode.MessagingUnexpectedSendError,
+                "Unexpected error serializing message {Message}: {Exception}",
+                msg,
+                exc);
+
             msg.ReleaseBodyAndHeaderBuffers();
             MessagingStatisticsGroup.OnFailedSentMessage(msg);
+
+            var retryCount = msg.RetryCount ?? 0;
+
             if (msg.Direction == Message.Directions.Request)
             {
                 messageCenter.SendRejection(msg, Message.RejectionTypes.Unrecoverable, exc.ToString());
             }
-            else if (msg.Direction == Message.Directions.Response && msg.Result != Message.ResponseTypes.Error)
+            else if (msg.Direction == Message.Directions.Response && retryCount < 1)
             {
                 // if we failed sending an original response, turn the response body into an error and reply with it.
-                // unless the response was already an error response (so we don't loop forever).
+                // unless we have already tried sending the response multiple times.
                 msg.Result = Message.ResponseTypes.Error;
                 msg.BodyObject = Response.ExceptionResponse(exc);
-                messageCenter.SendMessage(msg);
+                msg.RetryCount = retryCount + 1;
+                this.messageCenter.SendMessage(msg);
             }
             else
             {
+                this.Log.LogWarning(
+                    (int)ErrorCode.Messaging_OutgoingMS_DroppingMessage,
+                    "Silo {SiloAddress} is dropping message which failed during serialization: {Message}. Exception = {Exception}",
+                    this.messageCenter.MyAddress,
+                    msg,
+                    exc);
+
                 MessagingStatisticsGroup.OnDroppedSentMessage(msg);
             }
         }
@@ -159,7 +174,8 @@ namespace Orleans.Runtime.Messaging
                 if (Log.IsEnabled(LogLevel.Debug)) Log.Debug(ErrorCode.MessagingSendingRejection, "Silo {siloAddress} is rejecting message: {message}. Reason = {reason}", messageCenter.MyAddress, msg, reason);
                 // Done retrying, send back an error instead
                 messageCenter.SendRejection(msg, Message.RejectionTypes.Transient, String.Format("Silo {0} is rejecting message: {1}. Reason = {2}", messageCenter.MyAddress, msg, reason));
-            }else
+            }
+            else
             {
                 Log.Info(ErrorCode.Messaging_OutgoingMS_DroppingMessage, "Silo {siloAddress} is dropping message: {message}. Reason = {reason}", messageCenter.MyAddress, msg, reason);
                 MessagingStatisticsGroup.OnDroppedSentMessage(msg);
@@ -170,14 +186,10 @@ namespace Orleans.Runtime.Messaging
         {
             if (msg == null) return;
 
-            int maxRetries = DEFAULT_MAX_RETRIES;
-            if (msg.MaxRetries.HasValue)
-                maxRetries = msg.MaxRetries.Value;
-            
-            int retryCount = 0;
-            if (msg.RetryCount.HasValue)
-                retryCount = msg.RetryCount.Value;
-            
+            int maxRetries = msg.MaxRetries ?? DEFAULT_MAX_RETRIES;
+
+            int retryCount = msg.RetryCount ?? 0;
+
             if (retryCount < maxRetries)
             {
                 msg.RetryCount = retryCount + 1;

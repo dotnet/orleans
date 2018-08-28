@@ -145,12 +145,31 @@ namespace Orleans
                         continue;
 
                     RequestContextExtensions.Import(message.RequestContextData);
-                    var request = (InvokeMethodRequest)message.GetDeserializedBody(this.serializationManager);
+                    InvokeMethodRequest request = null;
+                    try
+                    {
+                        request = (InvokeMethodRequest) message.GetDeserializedBody(this.serializationManager);
+                    }
+                    catch (Exception deserializationException)
+                    {
+                        if (this.logger.IsEnabled(LogLevel.Warning))
+                        {
+                            this.logger.LogWarning(
+                                "Exception during message body deserialization in " + nameof(LocalObjectMessagePumpAsync) + " for message: {Message}, Exception: {Exception}",
+                                message,
+                                deserializationException);
+                        }
+
+                        this.runtimeClient.SendResponse(message, Response.ExceptionResponse(deserializationException));
+                        continue;
+                    }
+
                     var targetOb = (IAddressable)objectData.LocalObject.Target;
                     object resultObject = null;
                     Exception caught = null;
                     try
                     {
+
                         // exceptions thrown within this scope are not considered to be thrown from user code
                         // and not from runtime code.
                         var resultPromise = objectData.Invoker.Invoke(targetOb, request);
@@ -170,9 +189,14 @@ namespace Orleans
                     else if (message.Direction != Message.Directions.OneWay)
                         this.SendResponseAsync(message, resultObject);
                 }
-                catch (Exception)
+                catch (Exception outerException)
                 {
                     // ignore, keep looping.
+                    this.logger.LogWarning("Exception in " + nameof(LocalObjectMessagePumpAsync) + ": {Exception}", outerException);
+                }
+                finally
+                {
+                    RequestContext.Clear();
                 }
             }
         }
