@@ -35,7 +35,6 @@ set TESTS=^
 %CMDHOME%\test\RuntimeCodeGen.Tests,^
 %CMDHOME%\test\Transactions\Orleans.Transactions.Tests,^
 %CMDHOME%\test\Transactions\Orleans.Transactions.Azure.Test,^
-%CMDHOME%\test\Transactions\Orleans.Transactions.DynamoDB.Test,^
 %CMDHOME%\test\TestInfrastructure\Orleans.TestingHost.Tests,^
 %CMDHOME%\test\DependencyInjection.Tests
 
