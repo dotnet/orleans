@@ -11,9 +11,9 @@ using Xunit.Abstractions;
 namespace Orleans.Transactions.Azure.Tests
 {
     [TestCategory("Azure"), TestCategory("Transactions")]
-    public class TransactionFaultInjectionTests : FaultInjectionTransactionTestRunner, IClassFixture<FaultInjectionTestFixture>
+    public class TransactionFaultInjectionTests : ControlledFaultInjectionTransactionTestRunner, IClassFixture<ControlledFaultInjectionTestFixture>
     {
-        public TransactionFaultInjectionTests(FaultInjectionTestFixture fixture, ITestOutputHelper output)
+        public TransactionFaultInjectionTests(ControlledFaultInjectionTestFixture fixture, ITestOutputHelper output)
             : base(fixture.GrainFactory, output)
         {
             fixture.EnsurePreconditionsMet();

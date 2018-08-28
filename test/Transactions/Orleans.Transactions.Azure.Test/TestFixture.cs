@@ -41,7 +41,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
         }
     }
 
-    public class FaultInjectionTestFixture : BaseTestClusterFixture
+    public class ControlledFaultInjectionTestFixture : BaseTestClusterFixture
     {
         protected override void CheckPreconditionsOrThrow()
         {
@@ -64,11 +64,12 @@ namespace Orleans.Transactions.AzureStorage.Tests
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     })
-                    .UseFaultInjectionTransactionState()
+                    .UseControlledFaultInjectionTransactionState()
                     .UseTransactions()
                     .ConfigureServices(svc =>
                     {
-                        svc.AddScoped<IControlledTransactionFaultInjector, SimpleAzureStorageExceptionInjector>();
+                        svc.AddScoped<ITransactionFaultInjector, SimpleAzureStorageExceptionInjector>()
+                        .AddScoped<IControlledTransactionFaultInjector>(sp => sp.GetService<ITransactionFaultInjector>() as IControlledTransactionFaultInjector);
                     });
             }
         }
@@ -84,12 +85,28 @@ namespace Orleans.Transactions.AzureStorage.Tests
     }
 
 
-    public class FaultInjectedTestFixture : TestFixture
+    public class RandomFaultInjectedTestFixture : TestFixture
     {
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            builder.AddSiloBuilderConfigurator<ErrorInjectorConfigurator>();
+            builder.AddSiloBuilderConfigurator<TxSiloBuilderConfigurator>();
             base.ConfigureTestCluster(builder);
+        }
+
+        public class TxSiloBuilderConfigurator : ISiloBuilderConfigurator
+        {
+            private static readonly double probability = 0.05;
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder
+                    .ConfigureTracingForTransactionTests()
+                    .AddFaultInjectionAzureTableTransactionalStateStorage(TransactionTestConstants.TransactionStore, options =>
+                    {
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    })
+                    .UseTransactions()
+                    .ConfigureServices(services => services.AddSingleton<ITransactionFaultInjector>(sp => new RandomErrorInjector(probability)));
+            }
         }
     }
 

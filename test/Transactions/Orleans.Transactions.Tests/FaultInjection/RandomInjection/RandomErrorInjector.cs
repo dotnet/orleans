@@ -3,10 +3,11 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Text;
+using Orleans.Transactions.Tests.FaultInjection;
 
 namespace Orleans.Transactions.Tests
 {
-    internal class ErrorInjector : ITransactionalFaultInjector
+    public class RandomErrorInjector : ITransactionFaultInjector
     {
         private readonly double conflictProbability;
         private readonly double beforeProbability;
@@ -14,7 +15,7 @@ namespace Orleans.Transactions.Tests
 
         private readonly Random random;
 
-        public ErrorInjector(double injectionProbability)
+        public RandomErrorInjector(double injectionProbability)
         {
             conflictProbability = injectionProbability / 5;
             beforeProbability = 2 * injectionProbability / 5;

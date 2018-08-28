@@ -22,9 +22,8 @@ namespace Orleans.Transactions.TOC
             ITransactionalStateStorage<TransactionCommitter<TService>.OperationState> storage,
             JsonSerializerSettings serializerSettings,
             IClock clock,
-            ITransactionalFaultInjector errorInjector,
             ILogger logger)
-            : base(options, resource, deactivate, storage, serializerSettings, clock, errorInjector, logger)
+            : base(options, resource, deactivate, storage, serializerSettings, clock, logger)
         {
             this.service = service;
         }
