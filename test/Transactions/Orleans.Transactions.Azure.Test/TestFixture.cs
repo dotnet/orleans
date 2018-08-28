@@ -1,8 +1,12 @@
 using Orleans.Runtime;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.TestingHost;
+using Orleans.Transactions.Azure.Tests;
+using Orleans.Transactions.Azure.Tests.FaultInjection;
 using Orleans.Transactions.Tests;
 using Orleans.Transactions.Tests.DeactivationTransaction;
+using Orleans.Transactions.Tests.FaultInjection;
 using TestExtensions;
 using Tester;
 
@@ -37,7 +41,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
         }
     }
 
-    public class DeactivationTestFixture : BaseTestClusterFixture
+    public class FaultInjectionTestFixture : BaseTestClusterFixture
     {
         protected override void CheckPreconditionsOrThrow()
         {
@@ -56,12 +60,16 @@ namespace Orleans.Transactions.AzureStorage.Tests
             {
                 hostBuilder
                     .ConfigureTracingForTransactionTests()
-                    .AddAzureTableTransactionalStateStorage(TransactionTestConstants.TransactionStore, options =>
+                    .AddFaultInjectionAzureTableTransactionalStateStorage(TransactionTestConstants.TransactionStore, options =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     })
-                    .UseDeactivationTransactionState()
-                    .UseTransactions();
+                    .UseFaultInjectionTransactionState()
+                    .UseTransactions()
+                    .ConfigureServices(svc =>
+                    {
+                        svc.AddScoped<IControlledTransactionFaultInjector, SimpleAzureStorageExceptionInjector>();
+                    });
             }
         }
     }

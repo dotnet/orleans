@@ -44,7 +44,6 @@ namespace Orleans.Transactions.State
 
         private TState stableState;
         private long stableSequenceNumber;
-
         public ReadWriteLock<TState> RWLock { get; }
         public CausalClock Clock { get; }
 
