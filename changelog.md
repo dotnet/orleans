@@ -27,11 +27,11 @@ The idea is to track end-user facing changes as they occur.*
   - Fix orleans integration with third party DI solution which requires public constructor (#4453)
   - Remove unused Stopwatch in Grain<T>.OnSetupState (#4403) (#4472)
   - Add validator for ClusterOptions (#4450)
-  - Non static statistics: Round 1 (#4515)
+  - Non-static statistics: Round 1 (#4515)
   - Remove saving of minidumps because that functionality is platform specific. (#4558)
   - Fix Dependency Injection without changing Abstractions project (#4573)
-  - sanitize "." from azure queue name (#4582)
-  - Add Client/SiloHost builder delegate to legacy GrainClient and SIlo/AzureSilo (#4552)
+  - Sanitize "." from azure queue name (#4582)
+  - Add Client/SiloHost builder delegate to legacy GrainClient and Silo/AzureSilo (#4552)
   - Support of ValueTask as a grain method return type (#4562)
   - Convert IMembershipTableGrain into a SystemTarget (#4479)
   - Convert counter values before calling ITelemetryProducer.TrackMetric (#4623)
@@ -42,7 +42,7 @@ The idea is to track end-user facing changes as they occur.*
   - Make AzureBasedReminderTable public to allow reuse in extensions (#4699)
   - Remove per-call timer (#4399)
   - Make LifecycleSubject logging less verbose (#4660)
-  - Do not use ip address from interface not operational" (#4713)
+  - Do not use ip address from interface not operational (#4713)
   - Updated Ignore(this Task) method (#4729)
   - Make azure queue name configurable (#4762)
   - Auto-installing grain extensions (#4815)
@@ -68,7 +68,6 @@ The idea is to track end-user facing changes as they occur.*
   - Fix NullReferenceException in ExecutingWorkItemsTracker (#4850)
   - Fix NullReferenceException in LocalGrainDirectory when trace logging is enabled (#4854)
   - Fix dependency injection cycle when OrleansJsonSerializer is used as a serialization provider (#4876)
-
 
 ### [2.0.4]
 
