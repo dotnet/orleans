@@ -117,6 +117,59 @@ namespace UnitTests.ActivationsLifeCycleTests
             await Task.WhenAll(t1, t2);
         }
 
+        [Fact, TestCategory("Stress")]
+        public async Task DeactivateOnIdleTest_Stress_3_MayInterleave_With_TaskCompletionSource_UnderConstantLoad()
+        {
+            foreach (var i in Enumerable.Range(0, 100))
+            {
+                Initialize();
+                
+                output.WriteLine($"Running test #{i}");
+                await RunTest();
+
+                Dispose();
+            }
+
+            async Task RunTest()
+            {                
+                var a = this.testCluster.GrainFactory.GetGrain<ICollectionTestGrain>(1, "UnitTests.Grains.MayInterleaveCollectionTestGrainWithTcs");
+
+                var activated = await a.GetActivationTime();
+                Assert.Equal(activated, await a.GetActivationTime());
+
+                var pipeline = new AsyncPipeline(20);
+                var cts = new CancellationTokenSource();
+                var cancellation = cts.Token;
+
+                var requests = new List<Task<int>>();
+                var senders = Task.Run(() =>
+                {
+                    while (!cancellation.IsCancellationRequested)
+                    {
+                        var request = a.IncrCounter();
+                        requests.Add(request);
+                        pipeline.Add(request);
+                    }
+                });
+
+                // give it some time to fill the queue
+                await Task.Delay(TimeSpan.FromSeconds(1));
+
+                output.WriteLine($"Requests (before): {requests.Count}");
+                await a.DeactivateSelf();
+
+                cts.Cancel();
+                pipeline.Wait();
+                await senders;
+
+                output.WriteLine("After deactivation");
+                Assert.NotEqual(activated, await a.GetActivationTime());
+
+                output.WriteLine($"Requests (total): {requests.Count}");
+                Assert.All(requests, x => Assert.True(x.Status == TaskStatus.RanToCompletion));
+            }
+        }
+
         [Fact, TestCategory("Functional")]
         public async Task DeactivateOnIdleTest_Stress_4_Timer()
         {
