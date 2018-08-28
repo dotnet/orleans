@@ -109,24 +109,39 @@ namespace Orleans.Runtime.Messaging
             // we only get here if we failed to serialize the msg (or any other catastrophic failure).
             // Request msg fails to serialize on the sending silo, so we just enqueue a rejection msg.
             // Response msg fails to serialize on the responding silo, so we try to send an error response back.
-            Log.Warn(ErrorCode.MessagingUnexpectedSendError, String.Format("Unexpected error sending message {0}", msg.ToString()), exc);
-            
+            this.Log.Warn(
+                ErrorCode.MessagingUnexpectedSendError,
+                "Unexpected error serializing message {0}: {1}",
+                msg,
+                exc);
+
             msg.ReleaseBodyAndHeaderBuffers();
             MessagingStatisticsGroup.OnFailedSentMessage(msg);
+
+            var retryCount = msg.RetryCount ?? 0;
+
             if (msg.Direction == Message.Directions.Request)
             {
                 messageCenter.SendRejection(msg, Message.RejectionTypes.Unrecoverable, exc.ToString());
             }
-            else if (msg.Direction == Message.Directions.Response && msg.Result != Message.ResponseTypes.Error)
+            else if (msg.Direction == Message.Directions.Response && retryCount < 1)
             {
                 // if we failed sending an original response, turn the response body into an error and reply with it.
-                // unless the response was already an error response (so we don't loop forever).
+                // unless we have already tried sending the response multiple times.
                 msg.Result = Message.ResponseTypes.Error;
                 msg.BodyObject = Response.ExceptionResponse(exc);
-                messageCenter.SendMessage(msg);
+                msg.RetryCount = retryCount + 1;
+                this.messageCenter.SendMessage(msg);
             }
             else
             {
+                this.Log.Warn(
+                    ErrorCode.Messaging_OutgoingMS_DroppingMessage,
+                    "Silo {0} is dropping message which failed during serialization: {1}. Exception = {2}",
+                    this.messageCenter.MyAddress,
+                    msg,
+                    exc);
+
                 MessagingStatisticsGroup.OnDroppedSentMessage(msg);
             }
         }
