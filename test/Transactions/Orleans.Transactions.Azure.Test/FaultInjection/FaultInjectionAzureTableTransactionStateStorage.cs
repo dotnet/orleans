@@ -17,8 +17,8 @@ namespace Orleans.Transactions.Azure.Tests.FaultInjection
         where TState : class, new()
     {
         private readonly AzureTableTransactionalStateStorage<TState> stateStorage;
-        private readonly IControlledTransactionFaultInjector faultInjector;
-        public FaultInjectionAzureTableTransactionStateStorage(IControlledTransactionFaultInjector faultInjector,
+        private readonly ITransactionFaultInjector faultInjector;
+        public FaultInjectionAzureTableTransactionStateStorage(ITransactionFaultInjector faultInjector,
             AzureTableTransactionalStateStorage<TState> azureStateStorage)
         {
             this.faultInjector = faultInjector;

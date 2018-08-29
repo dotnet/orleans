@@ -10,9 +10,9 @@ using Xunit.Abstractions;
 
 namespace Orleans.Transactions.Tests
 {
-    public class FaultInjectionTransactionTestRunner : TransactionTestRunnerBase
+    public class ControlledFaultInjectionTransactionTestRunner : TransactionTestRunnerBase
     {
-        public FaultInjectionTransactionTestRunner(IGrainFactory grainFactory, ITestOutputHelper output)
+        public ControlledFaultInjectionTransactionTestRunner(IGrainFactory grainFactory, ITestOutputHelper output)
          : base(grainFactory, output)
         { }
 
