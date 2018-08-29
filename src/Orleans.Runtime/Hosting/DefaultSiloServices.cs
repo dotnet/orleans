@@ -38,6 +38,7 @@ using Microsoft.Extensions.Options;
 
 using Orleans.Configuration.Validators;
 using Orleans.Runtime.Configuration;
+using System.Linq;
 
 namespace Orleans.Hosting
 {
@@ -171,8 +172,11 @@ namespace Orleans.Hosting
             services.TryAddSingleton<VersionSelectorManager>();
             services.TryAddSingleton<CachedVersionSelectorManager>();
             // Version selector strategy
-            services.TryAddSingleton<GrainVersionStore>();
-            services.AddFromExisting<IVersionStore, GrainVersionStore>();
+            if (!services.Any(x => x.ServiceType == typeof(IVersionStore)))
+            {
+                services.TryAddSingleton<GrainVersionStore>();
+                services.AddFromExisting<IVersionStore, GrainVersionStore>();
+            }
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, GrainVersionStore>();
             services.AddSingletonNamedService<VersionSelectorStrategy, AllCompatibleVersions>(nameof(AllCompatibleVersions));
             services.AddSingletonNamedService<VersionSelectorStrategy, LatestVersion>(nameof(LatestVersion));
