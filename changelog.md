@@ -7,6 +7,10 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [2.0.5]
+- Non-breaking bug fixes
+  - Use netcoreapp2.0 for msbuild target dll if using dotnet core msbuild but targeting full .net (#4895) 
+
 ### [2.1.0-beta1] (changes since 2.0.0)
 
 - Major changes
