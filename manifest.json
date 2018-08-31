@@ -1,6 +1,6 @@
 {
   "homepages": [],
-  "source_base_path": "c:/GitHub/sergeybykov/orleans/src",
+  "source_base_path": "C:/GitHub/sergeybykov/orleans/src",
   "xrefmap": "xrefmap.yml",
   "files": [
     {
@@ -829,7 +829,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Orleans-Streams/index.html",
-          "hash": "32fpLIn61ATrrRw/3w14pQ=="
+          "hash": "1qi1Zj2hS2qt/udAe3SUUw=="
         }
       },
       "is_incremental": false,
@@ -841,7 +841,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Presentations/index.html",
-          "hash": "Q0EUaopiCM6GBO6eny7YjA=="
+          "hash": "XzjAkDtlMv5MNXq6ghI71Q=="
         }
       },
       "is_incremental": false,
@@ -877,7 +877,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Runtime-Implementation-Details/Load-Balancing.html",
-          "hash": "zdtLbPdFtXvun2G++qYEZg=="
+          "hash": "zQNIBdvpsKE9vfPDuIayTA=="
         }
       },
       "is_incremental": false,
@@ -949,7 +949,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/Samples-Overview/Azure-Web-Sample.html",
-          "hash": "PvLCWtYh6gHQoOHg2Z7ZDw=="
+          "hash": "9TzGvlykdwEfrQqPLlLJMQ=="
         }
       },
       "is_incremental": false,
@@ -1211,7 +1211,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Documentation/toc.html",
-          "hash": "oKEiLCwD+5jJU/zsO14GnQ=="
+          "hash": "NmfUu02qAluytopd6MGKyA=="
         }
       },
       "is_incremental": false,
@@ -1619,7 +1619,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/A-Service-is-a-Collection-of-Communicating-Actors.html",
-          "hash": "RFCn8Z0EzDqyKsIl8AB5oA=="
+          "hash": "Znpl7nI0dCnXgvCRkhpYWg=="
         }
       },
       "is_incremental": false,
@@ -1667,7 +1667,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/Custom-Storage-Providers.html",
-          "hash": "+JLUZflUgjrYWdEJfiR3EQ=="
+          "hash": "L2E4js+OnA1SNPKt7PclWA=="
         }
       },
       "is_incremental": false,
@@ -1679,7 +1679,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/Declarative-Persistence.html",
-          "hash": "cmAA6e9xBMuY37QVOcE8Yg=="
+          "hash": "no3YVXGMcBtYNZHEHl6lKQ=="
         }
       },
       "is_incremental": false,
@@ -1739,7 +1739,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/My-First-Orleans-Application.html",
-          "hash": "UlZqdHMxsUWMHJbv28lewA=="
+          "hash": "kzH7vBJATPWhtAYWxLxttg=="
         }
       },
       "is_incremental": false,
@@ -1751,7 +1751,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/On-Premise-Deployment.html",
-          "hash": "VYLRq5A3kXSStfuO/ero0Q=="
+          "hash": "hqPF0QWgu9VukKgzCp8ACQ=="
         }
       },
       "is_incremental": false,
@@ -1763,7 +1763,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/Running-in-a-Stand-alone-Silo.html",
-          "hash": "wN8qgs3bqBy2R/FkIg4Wxw=="
+          "hash": "ij0Prk+tfw0DuBV4ZxEKjA=="
         }
       },
       "is_incremental": false,
@@ -1799,7 +1799,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/toc.html",
-          "hash": "y456d2TuRFG5timd5R3gjA=="
+          "hash": "+vjQGagRJXwSgnJ+PEHWfw=="
         }
       },
       "is_incremental": false,
@@ -1919,7 +1919,7 @@
       "output": {
         ".html": {
           "relative_path": "Community/toc.html",
-          "hash": "ks2APo4uodUdaLFspXTkNQ=="
+          "hash": "2sl4DvfAGFG1L8PqBMtYKw=="
         }
       },
       "is_incremental": false,
@@ -2027,7 +2027,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/clusters_and_clients/configuration_guide/load_balancing.html",
-          "hash": "Ml3ZqntSdR7BZusoIpzpkQ=="
+          "hash": "nDCGiZxANnrPoFOqOHHiqA=="
         }
       },
       "is_incremental": false,
@@ -2118,18 +2118,6 @@
       "version": ""
     },
     {
-      "type": "Conceptual",
-      "source_relative_path": "Documentation/clusters_and_clients/developing_a_client.md",
-      "output": {
-        ".html": {
-          "relative_path": "Documentation/clusters_and_clients/developing_a_client.html",
-          "hash": "/s6gjyGrpQJ/jTGPIomg8Q=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
       "type": "Resource",
       "source_relative_path": "Documentation/clusters_and_clients/heterogeneous.png",
       "output": {
@@ -2169,7 +2157,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/clusters_and_clients/index.html",
-          "hash": "AjCeNjcoU6BZQtLQu/0E1w=="
+          "hash": "EQkBJbJPR7dSE3FB4ILUNA=="
         }
       },
       "is_incremental": false,
@@ -2252,7 +2240,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/core_concepts/index.html",
-          "hash": "r1XqD+pxfhRpRMZYDlrOXQ=="
+          "hash": "jaRf5kdXV/ooez7hh+GT3w=="
         }
       },
       "is_incremental": false,
@@ -2265,42 +2253,6 @@
         ".html": {
           "relative_path": "Documentation/core_concepts/what_are_orleans_packages.html",
           "hash": "jRGhnyuqkNnqdrSKLBSGlQ=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Documentation/core_concepts/what_is_a_client.md",
-      "output": {
-        ".html": {
-          "relative_path": "Documentation/core_concepts/what_is_a_client.html",
-          "hash": "viggz1HyfWs14d0s70mO7w=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Documentation/core_concepts/what_is_a_cluster.md",
-      "output": {
-        ".html": {
-          "relative_path": "Documentation/core_concepts/what_is_a_cluster.html",
-          "hash": "i5z6OmvmWiLDVqFj9U5BZA=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Documentation/core_concepts/what_is_a_grain.md",
-      "output": {
-        ".html": {
-          "relative_path": "Documentation/core_concepts/what_is_a_grain.html",
-          "hash": "cA8g8oL6k07Il+XiWwY3rw=="
         }
       },
       "is_incremental": false,
@@ -2880,7 +2832,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/index.html",
-          "hash": "BQKi/SjQQU/WSIeUz5VTsA=="
+          "hash": "qEQxBASRE8Ete6h3Ny3b5Q=="
         }
       },
       "is_incremental": false,
@@ -2976,7 +2928,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/resources/Presentations/index.html",
-          "hash": "DU22o9YQTE7CHovuZn+5rg=="
+          "hash": "/Ogz9zd5+R+VZ5KqU4/ASA=="
         }
       },
       "is_incremental": false,
@@ -3048,7 +3000,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/streaming/index.html",
-          "hash": "TAnHjLAf6jy7ryJrHZmAWA=="
+          "hash": "p0vpdVyf16KyawIHYXiyXg=="
         }
       },
       "is_incremental": false,
@@ -3120,7 +3072,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/toc.html",
-          "hash": "f77BuvbbmdkzR4CLvWo+0A=="
+          "hash": "L6mJ09P+uRz4Uc2WJI1eZw=="
         }
       },
       "is_incremental": false,
@@ -3612,7 +3564,7 @@
       "output": {
         ".html": {
           "relative_path": "Tutorials/Declarative-Persistence.html",
-          "hash": "j2YjarO3g2aInXVE0HGO9Q=="
+          "hash": "HVJCPjnQhiLhMriH6fikZQ=="
         }
       },
       "is_incremental": false,
@@ -3636,7 +3588,7 @@
       "output": {
         ".html": {
           "relative_path": "Tutorials/toc.html",
-          "hash": "r/Hxx2/35r5Iox6VNTNlGQ=="
+          "hash": "XX6gEKxaJPiAFN6Kr25fLg=="
         }
       },
       "is_incremental": false,
@@ -3648,7 +3600,7 @@
       "output": {
         ".html": {
           "relative_path": "index.html",
-          "hash": "YHmwtA7rOlSWtPGJai7Pyg=="
+          "hash": "mMRL6lSHlMnh2JptEAU8QA=="
         }
       },
       "is_incremental": false,
@@ -3660,7 +3612,7 @@
       "output": {
         ".html": {
           "relative_path": "toc.html",
-          "hash": "v9Xmo8R9W8E4m97Q5VfnEg=="
+          "hash": "nbnLzQBEnedjZsO2Sbr9Qw=="
         }
       },
       "is_incremental": false,
@@ -3670,22 +3622,23 @@
   "incremental_info": [
     {
       "status": {
-        "can_incremental": true,
+        "can_incremental": false,
+        "details": "Cannot build incrementally because last build info is missing.",
         "incrementalPhase": "build"
       },
       "processors": {
         "TocDocumentProcessor": {
           "can_incremental": false,
-          "details": "Processor TocDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
+          "details": "Processor TocDocumentProcessor cannot support incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
+          "incrementalPhase": "build"
+        },
+        "ConceptualDocumentProcessor": {
+          "can_incremental": false,
           "incrementalPhase": "build"
         },
         "ResourceDocumentProcessor": {
           "can_incremental": false,
-          "details": "Processor ResourceDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
-          "incrementalPhase": "build"
-        },
-        "ConceptualDocumentProcessor": {
-          "can_incremental": true,
+          "details": "Processor ResourceDocumentProcessor cannot support incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
           "incrementalPhase": "build"
         }
       }
