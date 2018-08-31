@@ -1,8 +1,6 @@
-- name: Clusters and Clients Overview
+- name: What is a Grain Client
   href: index.md
   homepage: index.md
-- name: Developing a Client
-  href: developing_a_client.md
 - name: PowerShell Client Module
   href: powershell_client.md
 - name: Heterogeneous Silos
