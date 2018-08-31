@@ -120,7 +120,7 @@ namespace Orleans.Transactions
             }
         }
 
-        public  Task<string> Store(ITransactionalStateStorage<TState> storage)
+        public Task<string> Store(ITransactionalStateStorage<TState> storage)
         {
             var jsonMetaData = JsonConvert.SerializeObject(MetaData, this.serializerSettings);
             var list = new List<PendingTransactionState<TState>>();
