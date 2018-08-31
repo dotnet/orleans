@@ -41,14 +41,11 @@ namespace Orleans.Transactions.Tests.DeactivationTransaction
 
         public Task Add(int numberToAdd, FaultInjectionControl faultInjectionControl = null)
         {
+            //reset in case control from last tx isn't cleared for some reason
+            this.data.FaultInjectionControl.Reset();
             //dont replace it with this.data.FaultInjectionControl = faultInjectionControl, 
             //this.data.FaultInjectionControl must remain the same reference
-            if (faultInjectionControl == null)
-            {
-                this.data.FaultInjectionControl.FaultInjectionPhase = TransactionFaultInjectPhase.None;
-                this.data.FaultInjectionControl.FaultInjectionType = FaultInjectionType.None;
-            }
-            else
+            if (faultInjectionControl != null)
             {
                 this.data.FaultInjectionControl.FaultInjectionPhase = faultInjectionControl.FaultInjectionPhase;
                 this.data.FaultInjectionControl.FaultInjectionType = faultInjectionControl.FaultInjectionType;

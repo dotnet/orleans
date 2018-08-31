@@ -17,6 +17,12 @@ namespace Orleans.Transactions.Tests.DeactivatingInjection
     {
         public TransactionFaultInjectPhase FaultInjectionPhase = TransactionFaultInjectPhase.None;
         public FaultInjectionType FaultInjectionType = FaultInjectionType.None;
+
+        public void Reset()
+        {
+            this.FaultInjectionType = FaultInjectionType.None;
+            this.FaultInjectionPhase = TransactionFaultInjectPhase.None;
+        }
     }
 
     public enum TransactionFaultInjectPhase

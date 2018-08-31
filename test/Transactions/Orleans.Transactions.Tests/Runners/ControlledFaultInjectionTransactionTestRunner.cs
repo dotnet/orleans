@@ -75,6 +75,7 @@ namespace Orleans.Transactions.Tests
             }
             catch (OrleansTransactionException)
             {
+                await Task.Delay(TimeSpan.FromSeconds(2));
                 //if failed due to timeout or other legitimate transaction exception, try again. This should succeed 
                 await coordinator.MultiGrainAddAndFaultInjection(grains, addval);
             }
