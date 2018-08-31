@@ -1,9 +1,9 @@
 ---
 layout: page
-title: Actor Identity
+title: Grain Identity
 ---
 
-# Actor Identity
+# Grain Identity
 
 In object-oriented environments, the identity of an object is hard to distinguish from a reference to it.
 Thus, when an object is created using new, the reference you get back represents all aspects of its identity except those that map the object to some external entity that it represents.
@@ -12,16 +12,16 @@ In distributed systems, object references cannot represent instance identity, si
 That is certainly the case for .NET references.
 Furthermore, a virtual actor must have an identity regardless of whether it is active, so that we can activate it on demand.
 Therefore grains have a primary key.
-The primary key can be either a GUID (A Globally Unique Identifier), a long integer, or a string.
+The primary key can be a Globally Unique Identifier (GUID), a long integer, or a string.
 
 The primary key is scoped to the grain type.
 Therefore, the complete identity of a grain is formed from the actor type and its key.
 
 The caller of the grain decides a long, a GUID, or a string scheme should be used.
 In fact the underlying data is the same, so the schemes can be used interchangeably.
-When a long is used, a GUID is actually created, and padded with zeros.
+When a long is used, a GUID is actually created and padded with zeros.
 
-Situations that require a singleton grain instance, such as a dictionary or registry, benefit from using `0` (a valid GUID) as its key.
+Situations that require a singleton grain instance, such as a dictionary or registry, benefit from using `Guid.Empty` as its key.
 This is merely a convention, but by adhering, it becomes clear at the call site that it is what is going on, as we saw in the first tutorial:
 
 ## Using GUIDs
@@ -33,7 +33,7 @@ There is a very low chance of GUIDs colliding, so they would probably be the def
 Referencing a grain by GUID in client code:
 
 ``` csharp
-var grain = GrainClient.GrainFactory.GetGrain<IExample>(Guid.NewGuid());
+var grain = grainFactory.GetGrain<IExample>(Guid.NewGuid());
 ```
 
 Retrieving the primary key from grain code:
@@ -53,7 +53,7 @@ A long integer is also available, which would make sense if the grain is persist
 Referencing a grain by long integer in client code:
 
 ``` csharp
-var grain = GrainClient.GrainFactory.GetGrain<IExample>(1);
+var grain = grainFactory.GetGrain<IExample>(1);
 ```
 
 Retrieving the primary key form grain code:
@@ -73,7 +73,7 @@ A string is also available.
 Referencing a grain by String in client code:
 
 ``` csharp
-var grain = GrainClient.GrainFactory.GetGrain<IExample>("myGrainKey");
+var grain = grainFactory.GetGrain<IExample>("myGrainKey");
 ```
 
 Retrieving the primary key form grain code:
@@ -101,7 +101,7 @@ public interface IExampleGrain : Orleans.IGrainWithIntegerCompoundKey
 In client code, this adds a second argument to the `GetGrain` method on the grain factory.
 
 ``` csharp
-var grain = GrainClient.GrainFactory.GetGrain<IExample>(0, "a string!", null);
+var grain = grainFactory.GetGrain<IExample>(0, "a string!", null);
 ```
 
 To access the compound key in the grain, we can call an overload on the `GetPrimaryKey` method:
