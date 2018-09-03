@@ -18,7 +18,7 @@ namespace Orleans.Transactions.Tests.DeactivatingInjection
         private TransactionManager<TState> tm;
         private readonly IGrainRuntime grainRuntime;
         private readonly IGrainActivationContext context;
-        private FaultInjectionControl faultInjectionControl;
+        private readonly FaultInjectionControl faultInjectionControl;
         private readonly ILogger logger;
         private readonly IControlledTransactionFaultInjector faultInjector;
         public FaultInjectionTransactionManager(IControlledTransactionFaultInjector faultInjector, FaultInjectionControl faultInjectionControl, TransactionManager<TState> tm, IGrainActivationContext activationContext, ILogger logger, IGrainRuntime grainRuntime)
@@ -34,7 +34,7 @@ namespace Orleans.Transactions.Tests.DeactivatingInjection
         public async Task<TransactionalStatus> PrepareAndCommit(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, List<ParticipantId> writeParticipants, int totalParticipants)
         {
             this.logger.Info($"Grain {this.context.GrainInstance} started PrepareAndCommit transaction {transactionId}");
-            if (this.faultInjectionControl?.FaultInjectionPhase == TransactionFaultInjectPhase.BeforePrepareAndCommit)
+            if (this.faultInjectionControl.FaultInjectionPhase == TransactionFaultInjectPhase.BeforePrepareAndCommit)
             {
                 if (this.faultInjectionControl.FaultInjectionType == FaultInjectionType.ExceptionBeforeStore)
                     this.faultInjector.InjectBeforeStore = true;
@@ -50,6 +50,7 @@ namespace Orleans.Transactions.Tests.DeactivatingInjection
                 this.faultInjectionControl.FaultInjectionPhase = TransactionFaultInjectPhase.None;
                 this.logger.Info($"Grain {this.context.GrainInstance} deactivating after transaction {transactionId} PrepareAndCommit");
             }
+            this.faultInjectionControl.Reset();
             return result;
         }
 
@@ -64,6 +65,7 @@ namespace Orleans.Transactions.Tests.DeactivatingInjection
                 this.faultInjectionControl.FaultInjectionPhase = TransactionFaultInjectPhase.None;
                 this.logger.Info($"Grain {this.context.GrainInstance} deactivating after transaction {transactionId} Prepared");
             }
+            this.faultInjectionControl.Reset();
         }
 
         public async Task Ping(Guid transactionId, DateTime timeStamp, ParticipantId participant)
@@ -77,6 +79,7 @@ namespace Orleans.Transactions.Tests.DeactivatingInjection
                 this.faultInjectionControl.FaultInjectionPhase = TransactionFaultInjectPhase.None;
                 this.logger.Info($"Grain {this.context.GrainInstance} deactivating after transaction {transactionId} Ping");
             }
+            this.faultInjectionControl.Reset();
         }
 
     }
@@ -87,11 +90,12 @@ namespace Orleans.Transactions.Tests.DeactivatingInjection
 
         private readonly IGrainRuntime grainRuntime;
         private readonly IGrainActivationContext context;
-        private FaultInjectionControl faultInjectionControl;
+        private readonly FaultInjectionControl faultInjectionControl;
         private readonly TransactionalResource<TState> tResource;
         private readonly IControlledTransactionFaultInjector faultInjector;
         private readonly ILogger logger;
-        public FaultInjectionTransactionalResource(IControlledTransactionFaultInjector faultInjector, FaultInjectionControl faultInjectionControl, TransactionalResource<TState> tResource, IGrainActivationContext activationContext, ILogger logger, IGrainRuntime grainRuntime)
+        public FaultInjectionTransactionalResource(IControlledTransactionFaultInjector faultInjector, FaultInjectionControl faultInjectionControl, 
+            TransactionalResource<TState> tResource, IGrainActivationContext activationContext, ILogger logger, IGrainRuntime grainRuntime)
         {
             this.grainRuntime = grainRuntime;
             this.tResource = tResource;
@@ -105,13 +109,15 @@ namespace Orleans.Transactions.Tests.DeactivatingInjection
         {
             this.logger.Info($"Grain {this.context.GrainInstance} started CommitReadOnly transaction {transactionId}");
             var result = await this.tResource.CommitReadOnly(transactionId, accessCount, timeStamp);
-            if (this.faultInjectionControl?.FaultInjectionPhase == TransactionFaultInjectPhase.AfterCommitReadOnly
+            if (this.faultInjectionControl.FaultInjectionPhase == TransactionFaultInjectPhase.AfterCommitReadOnly
                 && this.faultInjectionControl.FaultInjectionType == FaultInjectionType.Deactivation)
             {
                 this.grainRuntime.DeactivateOnIdle((context.GrainInstance));
                 this.faultInjectionControl.FaultInjectionPhase = TransactionFaultInjectPhase.None;
                 this.logger.Info($"Grain {this.context.GrainInstance} deactivating after transaction {transactionId} CommitReadOnly");
             }
+
+            this.faultInjectionControl.Reset();
             return result;
         }
 
@@ -119,26 +125,28 @@ namespace Orleans.Transactions.Tests.DeactivatingInjection
         {
             this.logger.Info($"Grain {this.context.GrainInstance} aborting transaction {transactionId}");
             await this.tResource.Abort(transactionId);
-            if (this.faultInjectionControl?.FaultInjectionPhase == TransactionFaultInjectPhase.AfterAbort
+            if (this.faultInjectionControl.FaultInjectionPhase == TransactionFaultInjectPhase.AfterAbort
                 && this.faultInjectionControl.FaultInjectionType == FaultInjectionType.Deactivation)
             {
                 this.grainRuntime.DeactivateOnIdle((context.GrainInstance));
                 this.faultInjectionControl.FaultInjectionPhase = TransactionFaultInjectPhase.None;
                 this.logger.Info($"Grain {this.context.GrainInstance} deactivating after transaction {transactionId} abort");
             }
+            this.faultInjectionControl.Reset();
         }
 
         public async Task Cancel(Guid transactionId, DateTime timeStamp, TransactionalStatus status)
         {
             this.logger.Info($"Grain {this.context.GrainInstance} canceling transaction {transactionId}");
             await this.tResource.Cancel(transactionId, timeStamp, status);
-            if (this.faultInjectionControl?.FaultInjectionPhase == TransactionFaultInjectPhase.AfterCancel
+            if (this.faultInjectionControl.FaultInjectionPhase == TransactionFaultInjectPhase.AfterCancel
                 && this.faultInjectionControl.FaultInjectionType == FaultInjectionType.Deactivation)
             {
                 this.grainRuntime.DeactivateOnIdle((context.GrainInstance));
                 this.faultInjectionControl.FaultInjectionPhase = TransactionFaultInjectPhase.None;
                 this.logger.Info($"Grain {this.context.GrainInstance} deactivating after transaction {transactionId} cancel");
             }
+            this.faultInjectionControl.Reset();
         }
 
         public async Task Confirm(Guid transactionId, DateTime timeStamp)
@@ -154,13 +162,14 @@ namespace Orleans.Transactions.Tests.DeactivatingInjection
                                  $"with fault type {this.faultInjectionControl.FaultInjectionType}");
             }
             await this.tResource.Confirm(transactionId, timeStamp);
-            if (this.faultInjectionControl?.FaultInjectionPhase == TransactionFaultInjectPhase.AfterConfirm
+            if (this.faultInjectionControl.FaultInjectionPhase == TransactionFaultInjectPhase.AfterConfirm
                 && this.faultInjectionControl.FaultInjectionType == FaultInjectionType.Deactivation)
             {
                 this.grainRuntime.DeactivateOnIdle((context.GrainInstance));
                 this.faultInjectionControl.FaultInjectionPhase = TransactionFaultInjectPhase.None;
                 this.logger.Info($"Grain {this.context.GrainInstance} deactivating after transaction {transactionId} Confirm");
             }
+            this.faultInjectionControl.Reset();
         }
 
         public async Task Prepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager)
@@ -178,13 +187,14 @@ namespace Orleans.Transactions.Tests.DeactivatingInjection
             }
 
             await this.tResource.Prepare(transactionId, accessCount, timeStamp, transactionManager);
-            if (this.faultInjectionControl?.FaultInjectionPhase == TransactionFaultInjectPhase.AfterPrepare
+            if (this.faultInjectionControl.FaultInjectionPhase == TransactionFaultInjectPhase.AfterPrepare
                 && this.faultInjectionControl.FaultInjectionType == FaultInjectionType.Deactivation)
             {
                 this.grainRuntime.DeactivateOnIdle((context.GrainInstance));
                 this.faultInjectionControl.FaultInjectionPhase = TransactionFaultInjectPhase.None;
                 this.logger.Info($"Grain {this.context.GrainInstance} deactivating after transaction {transactionId} Prepare");
             }
+            this.faultInjectionControl.Reset();
         }
     }
 }
