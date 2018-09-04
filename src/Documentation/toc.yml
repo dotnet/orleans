@@ -8,8 +8,6 @@
     href: frequently_asked_questions.md
   - name: What's new in Orleans
     href: whats_new_in_orleans.md
-  - name: Who's using Orleans
-    href: who_is_using_orleans.md
 - name: Core Concepts
   href: core_concepts/toc.yml
 - name: Grains
