@@ -94,7 +94,7 @@ Then either restart VS, or go to the task manager and kill the processes that st
 Documentation
 =============
 
-Documentation is located [here](https://dotnet.github.io/orleans/Documentation/Introduction.html)
+Documentation is located [here](https://dotnet.github.io/orleans/Documentation/)
 
 Code Examples
 =============
