@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
+using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.Tests.Correctness;
 
 namespace Orleans.Transactions.Tests
@@ -48,11 +49,11 @@ namespace Orleans.Transactions.Tests
             return Task.WhenAll(grains.Select(g => g.SetBit(bitIndex)));
         }
 
-        public Task MultiGrainAdd(ITransactionCommitterTestGrain committer, string commitArg, List<ITransactionTestGrain> grains, int numberToAdd)
+        public Task MultiGrainAdd(ITransactionCommitterTestGrain committer, ITransactionCommitOperation<IRemoteCommitService> operation, List<ITransactionTestGrain> grains, int numberToAdd)
         {
             List<Task> tasks = new List<Task>();
             tasks.AddRange(grains.Select(g => g.Add(numberToAdd)));
-            tasks.Add(committer.Commit(commitArg));
+            tasks.Add(committer.Commit(operation));
             return Task.WhenAll(tasks);
         }
 
