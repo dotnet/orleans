@@ -18,6 +18,7 @@ namespace Orleans.Runtime.Membership
         private ILogger logger;
         private readonly ConsulClusteringClientOptions options;
         private readonly TimeSpan maxStaleness;
+        private readonly string kvRootFolder;
 
         public ConsulGatewayListProvider(
             ILogger<ConsulGatewayListProvider> logger, 
@@ -29,6 +30,7 @@ namespace Orleans.Runtime.Membership
             this.clusterId = clusterOptions.Value.ClusterId;
             this.maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
             this.options = options.Value;
+            this.kvRootFolder = options.Value.KvRootFolder;
         }
 
         public TimeSpan MaxStaleness
@@ -43,14 +45,18 @@ namespace Orleans.Runtime.Membership
         public Task InitializeGatewayListProvider()
         {
             consulClient =
-                new ConsulClient(config => config.Address = options.Address);
+                new ConsulClient(config =>
+                {
+                    config.Address = options.Address;
+                    config.Token = options.AclClientToken;
+                });
 
             return Task.CompletedTask;
         }
 
         public async Task<IList<Uri>> GetGateways()
         {
-            var membershipTableData = await ConsulBasedMembershipTable.ReadAll(this.consulClient, this.clusterId, this.logger);
+            var membershipTableData = await ConsulBasedMembershipTable.ReadAll(this.consulClient, this.clusterId, this.kvRootFolder, this.logger);
             if (membershipTableData == null) return new List<Uri>();
 
             return membershipTableData.Members.Select(e => e.Item1).

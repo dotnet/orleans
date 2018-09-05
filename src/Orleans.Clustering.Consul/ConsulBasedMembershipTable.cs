@@ -22,17 +22,22 @@ namespace Orleans.Runtime.Membership
         private readonly ConsulClient _consulClient;
         private readonly ConsulClusteringSiloOptions clusteringSiloTableOptions;
         private readonly string clusterId;
-
+        private readonly string kvRootFolder;
         public ConsulBasedMembershipTable(
             ILogger<ConsulBasedMembershipTable> logger,
             IOptions<ConsulClusteringSiloOptions> membershipTableOptions, 
             IOptions<ClusterOptions> clusterOptions)
         {
             this.clusterId = clusterOptions.Value.ClusterId;
+            this.kvRootFolder = membershipTableOptions.Value.KvRootFolder;
             this._logger = logger;
             this.clusteringSiloTableOptions = membershipTableOptions.Value;
             _consulClient =
-                new ConsulClient(config => config.Address = this.clusteringSiloTableOptions.Address);
+                new ConsulClient(config =>
+                {
+                    config.Address = this.clusteringSiloTableOptions.Address;
+                    config.Token = this.clusteringSiloTableOptions.AclClientToken;
+                });
         }
 
         /// <summary>
@@ -59,12 +64,12 @@ namespace Orleans.Runtime.Membership
 
         public Task<MembershipTableData> ReadAll()
         {
-            return ReadAll(this._consulClient, this.clusterId, this._logger);
+            return ReadAll(this._consulClient, this.clusterId, this.kvRootFolder, this._logger);
         }
 
-        public static async Task<MembershipTableData> ReadAll(ConsulClient consulClient, string clusterId, ILogger logger)
+        public static async Task<MembershipTableData> ReadAll(ConsulClient consulClient, string clusterId, string kvRootFolder, ILogger logger)
         {
-            var deploymentKVAddresses = await consulClient.KV.List(ConsulSiloRegistrationAssembler.ParseDeploymentKVPrefix(clusterId));
+            var deploymentKVAddresses = await consulClient.KV.List(ConsulSiloRegistrationAssembler.ParseDeploymentKVPrefix(clusterId, kvRootFolder));
             if (deploymentKVAddresses.Response == null)
             {
                 logger.Debug("Could not find any silo registrations for deployment {0}.", clusterId);
@@ -89,7 +94,7 @@ namespace Orleans.Runtime.Membership
             {
                 //Use "0" as the eTag then Consul KV CAS will treat the operation as an insert and return false if the KV already exiats.
                 var consulSiloRegistration = ConsulSiloRegistrationAssembler.FromMembershipEntry(this.clusterId, entry, "0");
-                var insertKV = ConsulSiloRegistrationAssembler.ToKVPair(consulSiloRegistration);
+                var insertKV = ConsulSiloRegistrationAssembler.ToKVPair(consulSiloRegistration, this.kvRootFolder);
 
                 var tryUpdate = await _consulClient.KV.CAS(insertKV);
                 if (!tryUpdate.Response)
@@ -113,7 +118,7 @@ namespace Orleans.Runtime.Membership
             try
             {
                 var siloRegistration = ConsulSiloRegistrationAssembler.FromMembershipEntry(this.clusterId, entry, etag);
-                var updateKV = ConsulSiloRegistrationAssembler.ToKVPair(siloRegistration);
+                var updateKV = ConsulSiloRegistrationAssembler.ToKVPair(siloRegistration, this.kvRootFolder);
 
                 //If the KV.CAS() call returns false then the update failed
                 var tryUpdate = await _consulClient.KV.CAS(updateKV);
@@ -135,18 +140,18 @@ namespace Orleans.Runtime.Membership
 
         public async Task UpdateIAmAlive(MembershipEntry entry)
         {
-            var iAmAliveKV = ConsulSiloRegistrationAssembler.ToIAmAliveKVPair(this.clusterId, entry.SiloAddress, entry.IAmAliveTime);
+            var iAmAliveKV = ConsulSiloRegistrationAssembler.ToIAmAliveKVPair(this.clusterId, this.kvRootFolder, entry.SiloAddress, entry.IAmAliveTime);
             await _consulClient.KV.Put(iAmAliveKV);
         }
 
         public async Task DeleteMembershipTableEntries(String clusterId)
         {
-            await _consulClient.KV.DeleteTree(ConsulSiloRegistrationAssembler.ParseDeploymentKVPrefix(this.clusterId));
+            await _consulClient.KV.DeleteTree(ConsulSiloRegistrationAssembler.ParseDeploymentKVPrefix(this.clusterId, this.kvRootFolder));
         }
 
         private async Task<ConsulSiloRegistration> GetConsulSiloRegistration(SiloAddress siloAddress)
         {
-            var siloKey = ConsulSiloRegistrationAssembler.ParseDeploymentSiloKey(this.clusterId, siloAddress);
+            var siloKey = ConsulSiloRegistrationAssembler.ParseDeploymentSiloKey(this.clusterId, this.kvRootFolder, siloAddress);
             var siloKVEntry = await _consulClient.KV.List(siloKey);
             if (siloKVEntry.Response == null) return null;
 
