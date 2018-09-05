@@ -219,13 +219,13 @@ namespace Orleans.Runtime
             services.AddTransient(sp => initializationParams.NodeConfig);
             services.AddTransient(sp => initializationParams.GlobalConfig);
             services.AddTransient<Func<NodeConfiguration>>(sp => () => initializationParams.NodeConfig);
-            services.AddTransient(typeof(IStreamSubscriptionObserver<>),typeof(StreamSubscriptionObserverProxy<>));
             //queue balancer contructing related
             services.AddTransient<StaticClusterConfigDeploymentBalancer>();
             services.AddTransient<DynamicClusterConfigDeploymentBalancer>();
             services.AddTransient<DynamicAzureDeploymentBalancer>();
             services.AddTransient<StaticAzureDeploymentBalancer>();
             services.AddTransient<ConsistentRingQueueBalancer>();
+            services.AddSingleton<IStreamSubscriptionHandleFactory, StreamSubscriptionHandlerFactory>(); 
             services.AddFromExisting<IMessagingConfiguration, GlobalConfiguration>();
             services.AddFromExisting<ITraceConfiguration, NodeConfiguration>();
             services.AddSingleton<SerializationManager>();

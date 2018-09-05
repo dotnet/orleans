@@ -77,7 +77,6 @@
     <Compile Include="FilteredImplicitSubscriptionWithExtensionGrain.cs" />
     <Compile Include="GrainService\CustomGrainService.cs" />
     <Compile Include="GrainService\GrainServiceTestGrain.cs" />
-    <Compile Include="ProgrammaticSubscribe\IExternalStreamSubscriptionHandle.cs" />
     <Compile Include="ProgrammaticSubscribe\Passive_ConsumerGrain.cs" />
     <Compile Include="ProgrammaticSubscribe\SubscribeGrain.cs" />
     <Compile Include="ProgrammaticSubscribe\TypedProducerGrain.cs" />
