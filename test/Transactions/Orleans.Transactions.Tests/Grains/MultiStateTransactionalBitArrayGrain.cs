@@ -153,8 +153,8 @@ namespace Orleans.Transactions.Tests.Correctness
             // Continue with the non-overlapping portion.
             for (; i < result.value.Length; i++)
             {
-                var leftVal = left.value.Length < i ? left.value[i] : 0;
-                var rightVal = right.value.Length < i ? right.value[i] : 0;
+                var leftVal = left.value.Length > i ? left.value[i] : 0;
+                var rightVal = right.value.Length > i ? right.value[i] : 0;
                 result.value[i] = op(leftVal, rightVal);
             }
 
@@ -215,32 +215,30 @@ namespace Orleans.Transactions.Tests.Correctness
         public override Task OnActivateAsync()
         {
             this.logger = this.loggerFactory.CreateLogger(this.GetGrainIdentity().ToString());
-            
+            this.logger.LogInformation($"GrainId : {this.GetPrimaryKey()}.");
+
             return base.OnActivateAsync();
         }
 
-        public async Task SetBit(int index)
+        public Task SetBit(int index)
         {
-            foreach (var data in this.dataArray)
-            {
-                await data.PerformUpdate(state =>
+            return Task.WhenAll(this.dataArray
+                .Select(data => data.PerformUpdate(state =>
                 {
                     this.logger.LogInformation($"Setting bit {index} in state {state}.");
                     state.Set(index, true);
                     this.logger.LogInformation($"Set bit {index} in state {state}.");
-                });
-            }
+                })));
         }
 
         public async Task<List<BitArrayState>> Get()
         {
-            var result = new List<BitArrayState>(this.dataArray.Length);
-            foreach (var state in this.dataArray)
-            {
-                result.Add(await state.PerformRead(s => s));
-            }
-
-            return result;
+            return (await Task.WhenAll(this.dataArray
+                .Select(state => state.PerformRead(s =>
+                {
+                    this.logger.LogInformation($"Get state {s}.");
+                    return s;
+                })))).ToList();
         }
     }
 }

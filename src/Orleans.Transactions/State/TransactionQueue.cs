@@ -37,6 +37,10 @@ namespace Orleans.Transactions.State
         private Dictionary<DateTime, PMessages> unprocessedPreparedMessages;
         private class PMessages
         {
+            public PMessages(TransactionalStatus status)
+            {
+                this.Status = status;
+            }
             public int Count;
             public TransactionalStatus Status;
         }
@@ -66,6 +70,7 @@ namespace Orleans.Transactions.State
             this.storageWorker = new BatchWorkerFromDelegate(StorageWork);
             this.confirmationWorker = new BatchWorkerFromDelegate(ConfirmationWork);
             this.RWLock = new ReadWriteLock<TState>(options, this, this.storageWorker, logger);
+            this.unprocessedPreparedMessages = new Dictionary<DateTime, PMessages>();
         }
 
         public void EnqueueCommit(TransactionRecord<TState> record)
@@ -89,8 +94,7 @@ namespace Orleans.Transactions.State
                     case CommitRole.LocalCommit:
                         {
                             // process prepared messages received ahead of time
-                            if (unprocessedPreparedMessages != null
-                                && unprocessedPreparedMessages.TryGetValue(record.Timestamp, out var info))
+                            if (unprocessedPreparedMessages.TryGetValue(record.Timestamp, out PMessages info))
                             {
                                 if (info.Status == TransactionalStatus.Ok)
                                 {
@@ -190,14 +194,10 @@ namespace Orleans.Transactions.State
             else
             {
                 // this message has arrived ahead of the commit request - we need to remember it
-
-                if (this.unprocessedPreparedMessages == null)
-                    this.unprocessedPreparedMessages = new Dictionary<DateTime, PMessages>();
-
                 PMessages info;
                 if (!this.unprocessedPreparedMessages.TryGetValue(timeStamp, out info))
                 {
-                    this.unprocessedPreparedMessages[timeStamp] = info = new PMessages();
+                    this.unprocessedPreparedMessages[timeStamp] = info = new PMessages(status);
                 }
                 if (status == TransactionalStatus.Ok)
                 {
@@ -286,20 +286,22 @@ namespace Orleans.Transactions.State
                 if (this.confirmationTasks.TryGetValue(transactionId, out var record))
                 {
                     // re-send now
-                    record.LastSent = null;
                     this.confirmationWorker.Notify();
                 }
                 else
                 {
                     // we never heard of this transaction - so it must have aborted
                     resource.Reference.AsReference<ITransactionalResourceExtension>()
-                            .Cancel(resource.Name, transactionId, timeStamp, TransactionalStatus.PresumedAbort);
+                            .Cancel(resource.Name, transactionId, timeStamp, TransactionalStatus.PresumedAbort).Ignore();
                 }
             }
         }
 
         public async Task NotifyOfConfirm(Guid transactionId, DateTime timeStamp)
         {
+            if (logger.IsEnabled(LogLevel.Trace))
+                logger.Trace($"NotifyOfConfirm: {transactionId} {timeStamp}");
+
             // find in queue
             var pos = commitQueue.Find(transactionId, timeStamp);
 
@@ -316,7 +318,7 @@ namespace Orleans.Transactions.State
 
             // setting this field makes this entry ready for batching
 
-            remoteEntry.ConfirmationResponsePromise = new TaskCompletionSource<bool>();
+            remoteEntry.ConfirmationResponsePromise = remoteEntry.ConfirmationResponsePromise ?? new TaskCompletionSource<bool>();
 
             storageWorker.Notify();
 
@@ -347,7 +349,7 @@ namespace Orleans.Transactions.State
         /// </summary>
         public async Task NotifyOfRestore()
         {
-            var loadresponse = await storage.Load();
+            TransactionalStorageLoadResponse<TState> loadresponse = await storage.Load();
 
             this.storageBatch = new StorageBatch<TState>(loadresponse, this.serializerSettings);
 
@@ -363,13 +365,12 @@ namespace Orleans.Transactions.State
             // resume prepared transactions (not TM)
             foreach (var pr in loadresponse.PendingStates.OrderBy(ps => ps.TimeStamp))
             {
-                if (pr.SequenceId > this.stableSequenceNumber && pr.TransactionManager != null)
+                if (pr.SequenceId > loadresponse.CommittedSequenceId && pr.TransactionManager != null)
                 {
                     if (logger.IsEnabled(LogLevel.Debug))
                         logger.Debug($"recover two-phase-commit {pr.TransactionId}");
 
-                    ParticipantId tm = (pr.TransactionManager == null) ? new ParticipantId() :
-                        JsonConvert.DeserializeObject<ParticipantId>(pr.TransactionManager, this.serializerSettings);
+                    ParticipantId tm = JsonConvert.DeserializeObject<ParticipantId>(pr.TransactionManager, this.serializerSettings);
 
                     commitQueue.Add(new TransactionRecord<TState>()
                     {
@@ -377,12 +378,14 @@ namespace Orleans.Transactions.State
                         TransactionId = Guid.Parse(pr.TransactionId),
                         Timestamp = pr.TimeStamp,
                         State = pr.State,
+                        SequenceNumber = pr.SequenceId,
                         TransactionManager = tm,
                         PrepareIsPersisted = true,
                         LastSent = default(DateTime),
                         ConfirmationResponsePromise = null,
                         NumberWrites = 1 // was a writing transaction
                     });
+                    this.stableSequenceNumber = pr.SequenceId;
                 }
             }
 
@@ -511,6 +514,9 @@ namespace Orleans.Transactions.State
                         var lastCommittedEntry = commitQueue[committableEntries - 1];
                         this.stableState = lastCommittedEntry.State;
                         this.stableSequenceNumber = lastCommittedEntry.SequenceNumber;
+                        if (logger.IsEnabled(LogLevel.Trace))
+                            logger.Trace($"Stable state version: {this.stableSequenceNumber}");
+
 
                         // remove committed entries from commit queue
                         commitQueue.RemoveFromFront(committableEntries);
@@ -606,13 +612,10 @@ namespace Orleans.Transactions.State
                                 if (bottom.LastSent + this.options.RemoteTransactionPingFrequency <= now)
                                 {
                                     bottom.TransactionManager.Reference.AsReference<ITransactionManagerExtension>()
-                                          .Ping(bottom.TransactionManager.Name, bottom.TransactionId, bottom.Timestamp, resource);
+                                          .Ping(bottom.TransactionManager.Name, bottom.TransactionId, bottom.Timestamp, resource).Ignore();
                                     bottom.LastSent = now;
                                 }
-                                else
-                                {
-                                    storageWorker.Notify(bottom.LastSent.Value + this.options.RemoteTransactionPingFrequency);
-                                }
+                                storageWorker.Notify(bottom.LastSent.Value + this.options.RemoteTransactionPingFrequency);
                             }
 
                             if (logger.IsEnabled(LogLevel.Trace))
@@ -698,7 +701,7 @@ namespace Orleans.Transactions.State
             {
                 if (logger.IsEnabled(LogLevel.Trace))
                 {
-                    logger.Trace($"committed {entry.Timestamp:o}");
+                    logger.Trace($"committed {entry.TransactionId} {entry.Timestamp:o}");
                 }
                 entry.PromiseForTA.TrySetResult(TransactionalStatus.Ok);
             });
@@ -733,12 +736,17 @@ namespace Orleans.Transactions.State
 
         private Task ConfirmationWork()
         {
+            var now = DateTime.UtcNow;
             var sendlist = confirmationTasks.Where(r => !r.Value.LastConfirmationAttempt.HasValue
-              || r.Value.LastConfirmationAttempt + this.options.ConfirmationRetryDelay < DateTime.UtcNow).ToList();
+              || r.Value.LastConfirmationAttempt + this.options.ConfirmationRetryDelay < now).ToList();
 
             foreach (var kvp in sendlist)
             {
                 ConfirmationTask(kvp.Value).Ignore();
+            }
+            if(confirmationTasks.Count != 0)
+            {
+                confirmationWorker.Notify(now + this.options.ConfirmationRetryDelay);
             }
 
             return Task.CompletedTask;

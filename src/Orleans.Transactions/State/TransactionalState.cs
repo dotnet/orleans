@@ -179,7 +179,7 @@ namespace Orleans.Transactions
                     finally
                     {
                         if (logger.IsEnabled(LogLevel.Trace))
-                            logger.Trace($"EndWrite {info} {record.State}");
+                            logger.Trace($"EndWrite {info} {record.TransactionId} {record.Timestamp}");
 
                         detectReentrancy = false;
                     }
