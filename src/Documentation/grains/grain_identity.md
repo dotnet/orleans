@@ -10,19 +10,26 @@ Thus, when an object is created using new, the reference you get back represents
 
 In distributed systems, object references cannot represent instance identity, since references are typically limited to a single address space.
 That is certainly the case for .NET references.
-Furthermore, a virtual actor must have an identity regardless of whether it is active, so that we can activate it on demand.
+Furthermore, a grain must have an identity regardless of whether it is active, so that we can activate it on demand.
 Therefore grains have a primary key.
 The primary key can be a Globally Unique Identifier (GUID), a long integer, or a string.
 
 The primary key is scoped to the grain type.
-Therefore, the complete identity of a grain is formed from the actor type and its key.
+Therefore, the complete identity of a grain is formed from the grain's type and its key.
 
-The caller of the grain decides a long, a GUID, or a string scheme should be used.
-In fact the underlying data is the same, so the schemes can be used interchangeably.
+The caller of the grain decides which scheme should be used. 
+The options are:
+* long
+* GUID 
+* string 
+* GUID + string
+* long + string
+
+Because the underlying data is the same, the schemes can be used interchangeably.
 When a long integer is used, a GUID is actually created and padded with zeros.
 
 Situations that require a singleton grain instance, such as a dictionary or registry, benefit from using `Guid.Empty` as its key.
-This is merely a convention, but by adhering, it becomes clear at the call site that it is what is going on, as we saw in the first tutorial:
+This is merely a convention, but by adhering, it becomes clear at the call site that it is what is going on, as we saw in the first tutorial.
 
 ## Using GUIDs
 
@@ -111,10 +118,10 @@ public class ExampleGrain : Orleans.Grain, IExampleGrain
 {
     public Task Hello()
     {
-	string keyExtension;
-        long primaryKey = this.GetPrimaryKey(out keyExtension);
+		string keyExtension;
+        long primaryKey = this.GetPrimaryKeyLong(out keyExtension);
         Console.WriteLine("Hello from " + keyExtension);
-        return TaskDone.Done;
+        Task.CompletedTask;
     }
 }
 ```
