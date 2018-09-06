@@ -34,10 +34,10 @@ namespace Orleans.Transactions.State
         private int failCounter;
 
         // collection tasks
-        private Dictionary<DateTime, PMessages> unprocessedPreparedMessages;
-        private class PMessages
+        private Dictionary<DateTime, PreparedMessages> unprocessedPreparedMessages;
+        private class PreparedMessages
         {
-            public PMessages(TransactionalStatus status)
+            public PreparedMessages(TransactionalStatus status)
             {
                 this.Status = status;
             }
@@ -70,7 +70,7 @@ namespace Orleans.Transactions.State
             this.storageWorker = new BatchWorkerFromDelegate(StorageWork);
             this.confirmationWorker = new BatchWorkerFromDelegate(ConfirmationWork);
             this.RWLock = new ReadWriteLock<TState>(options, this, this.storageWorker, logger);
-            this.unprocessedPreparedMessages = new Dictionary<DateTime, PMessages>();
+            this.unprocessedPreparedMessages = new Dictionary<DateTime, PreparedMessages>();
         }
 
         public void EnqueueCommit(TransactionRecord<TState> record)
@@ -94,7 +94,7 @@ namespace Orleans.Transactions.State
                     case CommitRole.LocalCommit:
                         {
                             // process prepared messages received ahead of time
-                            if (unprocessedPreparedMessages.TryGetValue(record.Timestamp, out PMessages info))
+                            if (unprocessedPreparedMessages.TryGetValue(record.Timestamp, out PreparedMessages info))
                             {
                                 if (info.Status == TransactionalStatus.Ok)
                                 {
@@ -194,10 +194,9 @@ namespace Orleans.Transactions.State
             else
             {
                 // this message has arrived ahead of the commit request - we need to remember it
-                PMessages info;
-                if (!this.unprocessedPreparedMessages.TryGetValue(timeStamp, out info))
+                if (!this.unprocessedPreparedMessages.TryGetValue(timeStamp, out PreparedMessages info))
                 {
-                    this.unprocessedPreparedMessages[timeStamp] = info = new PMessages(status);
+                    this.unprocessedPreparedMessages[timeStamp] = info = new PreparedMessages(status);
                 }
                 if (status == TransactionalStatus.Ok)
                 {
