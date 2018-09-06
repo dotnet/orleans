@@ -120,13 +120,13 @@ On the clients:
 ``` csharp
 var gateways = new IPEndPoint[]
 {
-    new IPEndPoint(PRIMARY_SILO_IP_ADDRESS, 11111),
-    new IPEndPoint(OTHER_SILO__IP_ADDRESS_1, 11111),
+    new IPEndPoint(PRIMARY_SILO_IP_ADDRESS, 30000),
+    new IPEndPoint(OTHER_SILO__IP_ADDRESS_1, 30000),
     [...]
-    new IPEndPoint(OTHER_SILO__IP_ADDRESS_N, 11111),
+    new IPEndPoint(OTHER_SILO__IP_ADDRESS_N, 30000),
 };
 var client = new ClientBuilder()
-    .UseStaticClustering(gatewayPort: 30000)
+    .UseStaticClustering(gateways)
     .Configure<ClusterOptions>(options =>
     {
         options.ClusterId = "dev";
