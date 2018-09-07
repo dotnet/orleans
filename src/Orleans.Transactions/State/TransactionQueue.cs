@@ -24,7 +24,8 @@ namespace Orleans.Transactions.State
         private readonly BatchWorker confirmationWorker;
         protected readonly ILogger logger;
         private readonly Dictionary<Guid, TransactionRecord<TState>> confirmationTasks;
-        private CommitQueue<TState> commitQueue = new CommitQueue<TState>();
+        private CommitQueue<TState> commitQueue;
+        private Task restoreTask;
 
         private StorageBatch<TState> storageBatch;
 
@@ -71,6 +72,8 @@ namespace Orleans.Transactions.State
             this.confirmationWorker = new BatchWorkerFromDelegate(ConfirmationWork);
             this.RWLock = new ReadWriteLock<TState>(options, this, this.storageWorker, logger);
             this.unprocessedPreparedMessages = new Dictionary<DateTime, PreparedMessages>();
+            this.commitQueue = new CommitQueue<TState>();
+            this.restoreTask = Task.CompletedTask;
         }
 
         public void EnqueueCommit(TransactionRecord<TState> record)
@@ -225,6 +228,7 @@ namespace Orleans.Transactions.State
                         if (logger.IsEnabled(LogLevel.Trace))
                             logger.Trace($"aborting RemoteCommitEntry {entry.Timestamp:o} status={status}");
 
+                        entry.ConfirmationResponsePromise?.TrySetException(new OrleansException("Confirm failed: Status {status}"));
                         if (entry.LastSent.HasValue)
                             return; // cannot abort anymore if we already sent prepare-ok message
 
@@ -328,6 +332,9 @@ namespace Orleans.Transactions.State
 
         public void NotifyOfCancel(Guid transactionId, DateTime timeStamp, TransactionalStatus status)
         {
+            if (logger.IsEnabled(LogLevel.Trace))
+                logger.Trace("NotifyOfConfirm. TransactionId: {TransactionId}, TimeStamp: {TimeStamp} Status: {TransactionalStatus}", transactionId, timeStamp, status);
+
             // find in queue
             var pos = commitQueue.Find(transactionId, timeStamp);
 
@@ -347,6 +354,24 @@ namespace Orleans.Transactions.State
         /// called on activation, and when recovering from storage conflicts or other exceptions.
         /// </summary>
         public async Task NotifyOfRestore()
+        {
+            await Ready();
+            this.restoreTask = Restore();
+            await this.restoreTask;
+        }
+
+        /// <summary>
+        /// called on activation, and when recovering from storage conflicts or other exceptions.
+        /// </summary>
+        public async Task Ready()
+        {
+            if (!this.restoreTask.IsCompleted)
+            {
+                await this.restoreTask;
+            }
+        }
+
+        private async Task Restore()
         {
             TransactionalStorageLoadResponse<TState> loadresponse = await storage.Load();
 

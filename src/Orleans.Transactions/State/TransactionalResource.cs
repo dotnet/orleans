@@ -14,8 +14,9 @@ namespace Orleans.Transactions.State
             this.queue = queue;
         }
 
-        public Task<TransactionalStatus> CommitReadOnly(Guid transactionId, AccessCounter accessCount, DateTime timeStamp)
+        public async Task<TransactionalStatus> CommitReadOnly(Guid transactionId, AccessCounter accessCount, DateTime timeStamp)
         {
+            await this.queue.Ready();
             // validate the lock
             var valid = this.queue.RWLock.ValidateLock(transactionId, accessCount, out var status, out var record);
 
@@ -33,32 +34,33 @@ namespace Orleans.Transactions.State
             }
 
             this.queue.RWLock.Notify();
-            return record.PromiseForTA.Task;
+            return await record.PromiseForTA.Task;
         }
 
-        public Task Abort(Guid transactionId)
+        public async Task Abort(Guid transactionId)
         {
+            await this.queue.Ready();
             // release the lock
             this.queue.RWLock.Rollback(transactionId, false);
 
             this.queue.RWLock.Notify();
-
-            return Task.CompletedTask; // one-way, no response
         }
 
-        public Task Cancel(Guid transactionId, DateTime timeStamp, TransactionalStatus status)
+        public async Task Cancel(Guid transactionId, DateTime timeStamp, TransactionalStatus status)
         {
+            await this.queue.Ready();
             this.queue.NotifyOfCancel(transactionId, timeStamp, status);
-            return Task.CompletedTask;
         }
 
         public async Task Confirm(Guid transactionId, DateTime timeStamp)
         {
+            await this.queue.Ready();
             await this.queue.NotifyOfConfirm(transactionId, timeStamp);
         }
 
-        public Task Prepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager)
+        public async Task Prepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager)
         {
+            await this.queue.Ready();
             var valid = this.queue.RWLock.ValidateLock(transactionId, accessCount, out var status, out var record);
 
             record.Timestamp = timeStamp;
@@ -77,7 +79,6 @@ namespace Orleans.Transactions.State
             }
 
             this.queue.RWLock.Notify();
-            return Task.CompletedTask; // one-way, no response
         }
     }
 }

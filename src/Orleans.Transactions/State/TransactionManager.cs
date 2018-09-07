@@ -15,8 +15,9 @@ namespace Orleans.Transactions.State
             this.queue = queue ?? throw new ArgumentNullException(nameof(queue));
         }
 
-        public Task<TransactionalStatus> PrepareAndCommit(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, List<ParticipantId> writeResources, int totalResources)
+        public async Task<TransactionalStatus> PrepareAndCommit(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, List<ParticipantId> writeResources, int totalResources)
         {
+            await this.queue.Ready();
             // validate the lock
             var valid = this.queue.RWLock.ValidateLock(transactionId, accessCount, out var status, out var record);
 
@@ -37,19 +38,19 @@ namespace Orleans.Transactions.State
             }
 
             this.queue.RWLock.Notify();
-            return record.PromiseForTA.Task;
+            return await record.PromiseForTA.Task;
         }
 
-        public Task Prepared(Guid transactionId, DateTime timeStamp, ParticipantId resource, TransactionalStatus status)
+        public async Task Prepared(Guid transactionId, DateTime timeStamp, ParticipantId resource, TransactionalStatus status)
         {
+            await this.queue.Ready();
             this.queue.NotifyOfPrepared(transactionId, timeStamp, status);
-            return Task.CompletedTask;
         }
 
-        public Task Ping(Guid transactionId, DateTime timeStamp, ParticipantId resource)
+        public async Task Ping(Guid transactionId, DateTime timeStamp, ParticipantId resource)
         {
+            await this.queue.Ready();
             this.queue.NotifyOfPing(transactionId, timeStamp, resource);
-            return Task.CompletedTask;
         }
     }
 }

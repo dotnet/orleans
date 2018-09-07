@@ -1,15 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Orleans.Transactions.AzureStorage.Tests;
+﻿using Orleans.Transactions.AzureStorage.Tests;
 using Orleans.Transactions.Tests;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Orleans.Transactions.Azure.Tests
 {
+    // TODO: add to functional when slow abort is addressed - jbragg
     [TestCategory("Azure"), TestCategory("Transactions")]
     public class TransactionFaultInjectionTests : ControlledFaultInjectionTransactionTestRunner, IClassFixture<ControlledFaultInjectionTestFixture>
     {
