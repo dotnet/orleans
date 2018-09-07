@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Concurrent;
-using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Text;
@@ -21,84 +20,74 @@ namespace Orleans.Serialization
                    t == typeof(string) ||
                    t == typeof(DateTime) ||
                    t == typeof(Decimal) ||
+                   t == typeof(Guid) ||
                    (t.IsArray && t.GetElementType().IsOrleansPrimitive());
         }
 
-        static readonly ConcurrentDictionary<Type, bool> shallowCopyableTypes = new ConcurrentDictionary<Type, bool>();
         static readonly ConcurrentDictionary<Type, string> typeNameCache = new ConcurrentDictionary<Type, string>();
         static readonly ConcurrentDictionary<Type, string> typeKeyStringCache = new ConcurrentDictionary<Type, string>();
         static readonly ConcurrentDictionary<Type, byte[]> typeKeyCache = new ConcurrentDictionary<Type, byte[]>();
 
-        static TypeUtilities()
+        static readonly ConcurrentDictionary<Type, bool> shallowCopyableTypes = new ConcurrentDictionary<Type, bool>
         {
-            shallowCopyableTypes[typeof(Decimal)] = true;
-            shallowCopyableTypes[typeof(DateTime)] = true;
-            shallowCopyableTypes[typeof(TimeSpan)] = true;
-            shallowCopyableTypes[typeof(IPAddress)] = true;
-            shallowCopyableTypes[typeof(IPEndPoint)] = true;
-            shallowCopyableTypes[typeof(SiloAddress)] = true;
-            shallowCopyableTypes[typeof(GrainId)] = true;
-            shallowCopyableTypes[typeof(ActivationId)] = true;
-            shallowCopyableTypes[typeof(ActivationAddress)] = true;
-            shallowCopyableTypes[typeof(CorrelationId)] = true;
-            shallowCopyableTypes[typeof(string)] = true;
-            shallowCopyableTypes[typeof(Immutable<>)] = true;
-            shallowCopyableTypes[typeof(CancellationToken)] = true;
-        }
+            [typeof(Decimal)] = true,
+            [typeof(DateTime)] = true,
+            [typeof(TimeSpan)] = true,
+            [typeof(IPAddress)] = true,
+            [typeof(IPEndPoint)] = true,
+            [typeof(SiloAddress)] = true,
+            [typeof(GrainId)] = true,
+            [typeof(ActivationId)] = true,
+            [typeof(ActivationAddress)] = true,
+            [typeof(CorrelationId)] = true,
+            [typeof(string)] = true,
+            [typeof(CancellationToken)] = true,
+            [typeof(Guid)] = true,
+        };
 
         internal static bool IsOrleansShallowCopyable(this Type t)
         {
-            bool result;
-            if (shallowCopyableTypes.TryGetValue(t, out result))
+            if (shallowCopyableTypes.TryGetValue(t, out var result))
             {
                 return result;
             }
+            return shallowCopyableTypes.GetOrAdd(t, IsShallowCopyableInternal(t));
+        }
 
-            var typeInfo = t.GetTypeInfo();
-            if (typeInfo.IsPrimitive || typeInfo.IsEnum)
-            {
-                shallowCopyableTypes[t] = true;
+        private static bool IsShallowCopyableInternal(Type t)
+        {
+            if (t.IsPrimitive || t.IsEnum)
                 return true;
-            }
 
-            if (typeInfo.GetCustomAttributes(typeof(ImmutableAttribute), false).Any())
-            {
-                shallowCopyableTypes[t] = true;
+            if (t.GetCustomAttributes(typeof(ImmutableAttribute), false).Length != 0)
                 return true;
+
+            if (t.IsConstructedGenericType)
+            {
+                var def = t.GetGenericTypeDefinition();
+
+                if (def == typeof(Immutable<>))
+                    return true;
+
+                if (def == typeof(Nullable<>)
+                    || def == typeof(Tuple<>)
+                    || def == typeof(Tuple<,>)
+                    || def == typeof(Tuple<,,>)
+                    || def == typeof(Tuple<,,,>)
+                    || def == typeof(Tuple<,,,,>)
+                    || def == typeof(Tuple<,,,,,>)
+                    || def == typeof(Tuple<,,,,,,>)
+                    || def == typeof(Tuple<,,,,,,,>))
+                    return Array.TrueForAll(t.GenericTypeArguments, a => IsOrleansShallowCopyable(a));
             }
 
-            if (typeInfo.IsGenericType && typeInfo.GetGenericTypeDefinition() == typeof(Immutable<>))
-            {
-                shallowCopyableTypes[t] = true;
+            if (t.IsValueType && !t.IsGenericTypeDefinition)
+                return Array.TrueForAll(t.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic), f => IsOrleansShallowCopyable(f.FieldType));
+
+            if (typeof(Exception).IsAssignableFrom(t))
                 return true;
-            }
 
-            if (typeof(Exception).IsAssignableFrom(typeInfo))
-            {
-                shallowCopyableTypes[t] = true;
-                return true;
-            }
-
-            if (typeInfo.IsValueType && !typeInfo.IsGenericType && !typeInfo.IsGenericTypeDefinition)
-            {
-                result = IsValueTypeFieldsShallowCopyable(typeInfo);
-                shallowCopyableTypes[t] = result;
-                return result;
-            }
-
-            shallowCopyableTypes[t] = false;
             return false;
-        }
-
-        private static bool IsValueTypeFieldsShallowCopyable(TypeInfo typeInfo)
-        {
-            return typeInfo.GetFields().All(f => f.FieldType != typeInfo.AsType() && IsOrleansShallowCopyable(f.FieldType));
-        }
-
-        internal static bool IsSpecializationOf(this Type t, Type match)
-        {
-            var typeInfo = t.GetTypeInfo();
-            return typeInfo.IsGenericType && typeInfo.GetGenericTypeDefinition() == match;
         }
 
         internal static string OrleansTypeName(this Type t)
