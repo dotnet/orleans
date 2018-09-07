@@ -1,7 +1,7 @@
 - name: Developing a Grain
   href: index.md
-- name: Types of Grains
-  href: types_of_grains.md
+- name: Grain Identity
+  href: grain_identity.md
 - name: Timers and Reminders
   href: timers_and_reminders.md
 - name: Observers
