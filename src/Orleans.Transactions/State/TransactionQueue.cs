@@ -228,7 +228,8 @@ namespace Orleans.Transactions.State
                         if (logger.IsEnabled(LogLevel.Trace))
                             logger.Trace($"aborting RemoteCommitEntry {entry.Timestamp:o} status={status}");
 
-                        entry.ConfirmationResponsePromise?.TrySetException(new OrleansException("Confirm failed: Status {status}"));
+                        entry.ConfirmationResponsePromise?.TrySetException(new OrleansException($"Confirm failed: Status {status}"));
+
                         if (entry.LastSent.HasValue)
                             return; // cannot abort anymore if we already sent prepare-ok message
 
@@ -361,8 +362,9 @@ namespace Orleans.Transactions.State
         }
 
         /// <summary>
-        /// called on activation, and when recovering from storage conflicts or other exceptions.
+        /// Ensures queue is ready to process requests.
         /// </summary>
+        /// <returns></returns>
         public async Task Ready()
         {
             if (!this.restoreTask.IsCompleted)
