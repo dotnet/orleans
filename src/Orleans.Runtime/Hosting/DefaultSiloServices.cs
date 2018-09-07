@@ -17,7 +17,8 @@ using Orleans.Runtime.Providers;
 using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Versions;
-using Orleans.Runtime.Versions.Compatibility;using Orleans.Runtime.Versions.Selector;
+using Orleans.Runtime.Versions.Compatibility;
+using Orleans.Runtime.Versions.Selector;
 using Orleans.Serialization;
 using Orleans.Statistics;
 using Orleans.Streams;
@@ -36,8 +37,6 @@ using Orleans.Runtime.Utilities;
 using System;
 using System.Reflection;
 using System.Linq;
-
-using System.Collections.Generic;
 using Microsoft.Extensions.Options;
 
 namespace Orleans.Hosting
