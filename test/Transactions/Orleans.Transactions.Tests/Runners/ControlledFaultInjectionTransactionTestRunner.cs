@@ -81,14 +81,14 @@ namespace Orleans.Transactions.Tests
             catch (OrleansTransactionAbortedException)
             {
                 // add delay between transactions so errors don't bleed into neighboring transactions
-                // TODO : remove when slow slow abort is complete
+                // TODO : remove when slow slow abort is complete - jbragg
                 await Task.Delay(TimeSpan.FromSeconds(30));
                 await coordinator.MultiGrainAddAndFaultInjection(grains, addval);
             }
             catch (OrleansTransactionException)
             {
                 // add delay between transactions so errors don't bleed into neighboring transactions
-                // TODO : remove when slow slow abort is complete
+                // TODO : remove when slow slow abort is complete - jbragg
                 await Task.Delay(TimeSpan.FromSeconds(30));
                 expected = await grains.First().Get() + addval;
                 await coordinator.MultiGrainAddAndFaultInjection(grains, addval);
