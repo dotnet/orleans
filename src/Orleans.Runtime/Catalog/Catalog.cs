@@ -473,7 +473,7 @@ namespace Orleans.Runtime
                 {
                     TimeSpan ageLimit = this.collectionOptions.Value.ClassSpecificCollectionAge.TryGetValue(grainType, out TimeSpan limit)
                         ? limit
-                        : TimeSpan.FromMinutes(CollectionAgeLimitConstants.DefaultCollectionAgeLimitInMinutes);
+                        : collectionOptions.Value.CollectionAge;
 
                     // create a dummy activation that will queue up messages until the real data arrives
                     // We want to do this (RegisterMessageTarget) under the same lock that we tested TryGetActivationData. They both access ActivationDirectory.

@@ -86,13 +86,22 @@ namespace UnitTests.Grains
     }
 
     [CollectionAgeLimit(Minutes = 0.2)]
-    public class CollectionSpecificAgeLimitActivationGcTestGrain : Grain, ICollectionSpecificAgeLimitActivationGcTestGrain
+    public class CollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain : Grain, ICollectionSpecificAgeLimitActivationGcTestGrain
     {
         public Task Nop()
         {
             return Task.CompletedTask;
         }
     }
+
+    //[CollectionAgeLimit(Minutes = 0)]
+    //public class CollectionSpecificAgeLimitForZeroSecondsActivationGcTestGrain : Grain, ICollectionSpecificAgeLimitActivationGcTestGrain
+    //{
+    //    public Task Nop()
+    //    {
+    //        return Task.CompletedTask;
+    //    }
+    //}
 
     [StatelessWorker]
     public class StatelessWorkerActivationCollectorTestGrain1 : Grain, IStatelessWorkerActivationCollectorTestGrain1

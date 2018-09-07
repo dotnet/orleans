@@ -521,14 +521,14 @@ namespace UnitTests.ActivationsLifeCycleTests
         }
 
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
-        public async Task ActivationCollectorShouldCollectByCollectionSpecificAgeLimit()
+        public async Task ActivationCollectorShouldCollectByCollectionSpecificAgeLimitForTenSeconds()
         {
             Initialize();
 
             const int grainCount = 1000;
 
             // CollectionAgeLimit.Minutes = 0.2 minutes (10 seconds)
-            var fullGrainTypeName = typeof(CollectionSpecificAgeLimitActivationGcTestGrain).FullName;
+            var fullGrainTypeName = typeof(CollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain).FullName;
 
             List<Task> tasks = new List<Task>();
             logger.Info("ActivationCollectorShouldCollectByCollectionSpecificAgeLimit: activating {0} grains.", grainCount);
@@ -545,7 +545,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             logger.Info("ActivationCollectorShouldCollectByCollectionSpecificAgeLimit: grains activated; waiting {0} sec (activation GC idle timeout is {1} sec).", WAIT_TIME.TotalSeconds, DEFAULT_IDLE_TIMEOUT.TotalSeconds);
             
             // Some time is required for GC to collect all of the Grains)
-            await Task.Delay(TimeSpan.FromSeconds(20));
+            await Task.Delay(TimeSpan.FromSeconds(30));
 
             int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, fullGrainTypeName);
             Assert.Equal(0, activationsNotCollected);

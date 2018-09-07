@@ -291,6 +291,9 @@ namespace Orleans.Hosting
                         }
                     }
                 });
+
+            // Validate all CollectionAgeLimit values for the right configuration.
+            services.AddTransient<IConfigurationValidator, CollectionAgeLimitValidator>();
         }
     }
 }
