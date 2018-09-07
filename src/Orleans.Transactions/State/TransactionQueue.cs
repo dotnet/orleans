@@ -22,13 +22,13 @@ namespace Orleans.Transactions.State
         private readonly JsonSerializerSettings serializerSettings;
         private readonly BatchWorker storageWorker;
         private readonly BatchWorker confirmationWorker;
-        private readonly ILogger logger;
+        protected readonly ILogger logger;
         private readonly Dictionary<Guid, TransactionRecord<TState>> confirmationTasks;
         private CommitQueue<TState> commitQueue = new CommitQueue<TState>();
 
         private StorageBatch<TState> storageBatch;
 
-        private TransactionalStatus problemFlag;
+        protected TransactionalStatus problemFlag;
         // the queues handling the various stages
 
         private int failCounter;
@@ -482,6 +482,10 @@ namespace Orleans.Transactions.State
                     {
                         // process all committable entries, adding storage events to the storage batch
                         CollectEventsForBatch(committableEntries);
+                        if (problemFlag != TransactionalStatus.Ok)
+                        {
+                            return;
+                        }
 
                         if (logger.IsEnabled(LogLevel.Debug))
                         {
@@ -528,7 +532,6 @@ namespace Orleans.Transactions.State
                         storageWorker.Notify();  // we have to re-check for work
                     }
                 }
-                return;
             }
             catch (InconsistentStateException e)
             {
@@ -541,20 +544,28 @@ namespace Orleans.Transactions.State
                 logger.Warn(888, $"exception in storageWorker", e);
 
                 problemFlag = TransactionalStatus.UnknownException;
-            }
-
-            // after exceptions, we try again, but with limits
-            if (++failCounter < 10)
+            } finally
             {
-                await Task.Delay(100);
+                if (problemFlag == TransactionalStatus.Ok)
+                {
+                    this.failCounter = 0;
+                }
+                else
+                {
+                    // after exceptions, we try again, but with limits
+                    if (++failCounter < 10)
+                    {
+                        await Task.Delay(100);
 
-                // this restarts the worker, which sees the problem flag and recovers.
-                storageWorker.Notify();
-            }
-            else
-            {
-                // bail out
-                logger.Warn(999, $"storageWorker is bailing out");
+                        // this restarts the worker, which sees the problem flag and recovers.
+                        storageWorker.Notify();
+                    }
+                    else
+                    {
+                        // bail out
+                        logger.Warn(999, $"storageWorker is bailing out");
+                    }
+                }
             }
         }
 
@@ -635,7 +646,7 @@ namespace Orleans.Transactions.State
         private void CollectEventsForBatch(int batchsize)
         {
             // collect events for batch
-            for (int i = 0; i < batchsize; i++)
+            for (int i = 0; i < batchsize && this.problemFlag == TransactionalStatus.Ok; i++)
             {
                 TransactionRecord<TState> entry = commitQueue[i];
 

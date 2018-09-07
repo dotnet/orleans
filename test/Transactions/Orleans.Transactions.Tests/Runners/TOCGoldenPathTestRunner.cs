@@ -29,7 +29,7 @@ namespace Orleans.Transactions.Tests
 
             ITransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
-            await coordinator.MultiGrainAdd(committer, "arg", grains, expected);
+            await coordinator.MultiGrainAdd(committer, new PassOperation("pass"), grains, expected);
 
             foreach (var grain in grains)
             {

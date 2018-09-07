@@ -26,6 +26,7 @@ namespace Orleans.Transactions
 
         UnknownException,  // an unkown exception was caught
         AssertionFailed,   // an internal assertion was violated
+        CommitFailure,     // Unable to commit transaction
     }
 
 
@@ -40,6 +41,7 @@ namespace Orleans.Transactions
                 case TransactionalStatus.BrokenLock:
                 case TransactionalStatus.LockValidationFailed:
                 case TransactionalStatus.ParticipantResponseTimeout:
+                case TransactionalStatus.CommitFailure:
                     return true;
 
                 default:
@@ -69,6 +71,8 @@ namespace Orleans.Transactions
                 case TransactionalStatus.TMResponseTimeout:
                     return new OrleansTransactionInDoubtException(TransactionId, $"transaction agent timed out waiting for read-only transaction participant responses ({status})");
 
+                case TransactionalStatus.CommitFailure:
+                    return new OrleansTransactionAbortedException(TransactionId, $"Unable to commit transaction ({status})");
 
                 default:
                     return new OrleansTransactionInDoubtException(TransactionId, $"failure during transaction commit, status={status}");
