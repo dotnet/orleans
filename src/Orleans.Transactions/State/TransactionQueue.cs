@@ -334,7 +334,7 @@ namespace Orleans.Transactions.State
         public void NotifyOfCancel(Guid transactionId, DateTime timeStamp, TransactionalStatus status)
         {
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace("NotifyOfConfirm. TransactionId: {TransactionId}, TimeStamp: {TimeStamp} Status: {TransactionalStatus}", transactionId, timeStamp, status);
+                logger.Trace("{MethodName}. TransactionId: {TransactionId}, TimeStamp: {TimeStamp} Status: {TransactionalStatus}", nameof(NotifyOfCancel), transactionId, timeStamp, status);
 
             // find in queue
             var pos = commitQueue.Find(transactionId, timeStamp);

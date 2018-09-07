@@ -14,9 +14,8 @@ namespace Orleans.Transactions.State
             this.queue = queue;
         }
 
-        public async Task<TransactionalStatus> CommitReadOnly(Guid transactionId, AccessCounter accessCount, DateTime timeStamp)
+        public Task<TransactionalStatus> CommitReadOnly(Guid transactionId, AccessCounter accessCount, DateTime timeStamp)
         {
-            await this.queue.Ready();
             // validate the lock
             var valid = this.queue.RWLock.ValidateLock(transactionId, accessCount, out var status, out var record);
 
@@ -34,7 +33,7 @@ namespace Orleans.Transactions.State
             }
 
             this.queue.RWLock.Notify();
-            return await record.PromiseForTA.Task;
+            return record.PromiseForTA.Task;
         }
 
         public async Task Abort(Guid transactionId)
@@ -58,9 +57,8 @@ namespace Orleans.Transactions.State
             await this.queue.NotifyOfConfirm(transactionId, timeStamp);
         }
 
-        public async Task Prepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager)
+        public Task Prepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager)
         {
-            await this.queue.Ready();
             var valid = this.queue.RWLock.ValidateLock(transactionId, accessCount, out var status, out var record);
 
             record.Timestamp = timeStamp;
@@ -79,6 +77,7 @@ namespace Orleans.Transactions.State
             }
 
             this.queue.RWLock.Notify();
+            return Task.CompletedTask;
         }
     }
 }
