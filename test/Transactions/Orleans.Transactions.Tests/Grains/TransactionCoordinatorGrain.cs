@@ -48,6 +48,14 @@ namespace Orleans.Transactions.Tests
             return Task.WhenAll(grains.Select(g => g.SetBit(bitIndex)));
         }
 
+        public Task MultiGrainAdd(ITransactionCommitterTestGrain committer, string commitArg, List<ITransactionTestGrain> grains, int numberToAdd)
+        {
+            List<Task> tasks = new List<Task>();
+            tasks.AddRange(grains.Select(g => g.Add(numberToAdd)));
+            tasks.Add(committer.Commit(commitArg));
+            return Task.WhenAll(tasks);
+        }
+
         private async Task Double(ITransactionTestGrain grain)
         {
             int[] values = await grain.Get();

@@ -376,11 +376,10 @@ namespace Orleans.Messaging
             PendingInboundMessages.Add(msg);
         }
 
-        private void RejectMessage(Message msg, string reasonFormat, params object[] reasonParams)
+        public void RejectMessage(Message msg, string reason, Exception exc = null)
         {
             if (!Running) return;
-
-            var reason = String.Format(reasonFormat, reasonParams);
+            
             if (msg.Direction != Message.Directions.Request)
             {
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.ProxyClient_DroppingMsg, "Dropping message: {0}. Reason = {1}", msg, reason);
@@ -389,7 +388,7 @@ namespace Orleans.Messaging
             {
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.ProxyClient_RejectingMsg, "Rejecting message: {0}. Reason = {1}", msg, reason);
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
-                Message error = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason);
+                Message error = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason, exc);
                 QueueIncomingMessage(error);
             }
         }

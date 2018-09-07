@@ -8,7 +8,7 @@ using Xunit.Abstractions;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {
-    [TestCategory("Azure"), TestCategory("Transactions"), TestCategory("Functional")]
+    [TestCategory("Azure"), TestCategory("Transactions")]
     public class TransactionRecoveryTests : TestClusterPerTest
     {
         private readonly TransactionRecoveryTestsRunner testRunner;
@@ -27,28 +27,26 @@ namespace Orleans.Transactions.AzureStorage.Tests
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            builder.Options.InitialSilosCount = 5;
+            builder.Options.InitialSilosCount = 4;
             builder.AddSiloBuilderConfigurator<TestFixture.SiloBuilderConfigurator>();
             builder.AddSiloBuilderConfigurator<TransactionRecoveryTestsRunner.SiloBuilderConfiguratorUsingAzureClustering>();
             builder.AddClientBuilderConfigurator<TransactionRecoveryTestsRunner.ClientBuilderConfiguratorUsingAzureClustering>();
         }
 
-        [SkippableTheory(Skip = "See https://github.com/dotnet/orleans/issues/4617")]
-        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
-        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
-        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
-        public Task TransactionWillRecoverAfterRandomSiloGracefulShutdown(string transactionTestGrainClassName)
+        [SkippableTheory]
+        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, 30)]
+        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, 20)]
+        public Task TransactionWillRecoverAfterRandomSiloGracefulShutdown(string transactionTestGrainClassName, int concurrent)
         {
-            return this.testRunner.TransactionWillRecoverAfterRandomSiloGracefulShutdown(transactionTestGrainClassName);
+            return this.testRunner.TransactionWillRecoverAfterRandomSiloGracefulShutdown(transactionTestGrainClassName, concurrent);
         }
 
-        [SkippableTheory(Skip = "See https://github.com/dotnet/orleans/issues/4617")]
-        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
-        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
-        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
-        public Task TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(string transactionTestGrainClassName)
+        [SkippableTheory]
+        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, 30)]
+        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, 20)]
+        public Task TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(string transactionTestGrainClassName, int concurrent)
         {
-            return this.testRunner.TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(transactionTestGrainClassName);
+            return this.testRunner.TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(transactionTestGrainClassName, concurrent);
         }
     }
 }

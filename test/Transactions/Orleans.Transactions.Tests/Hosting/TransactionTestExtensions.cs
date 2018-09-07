@@ -12,6 +12,7 @@ namespace Orleans.Transactions.Tests
                  .ConfigureLogging(builder => builder.AddFilter("SingleStateTransactionalGrain.data", LogLevel.Trace))
                  .ConfigureLogging(builder => builder.AddFilter("DoubleStateTransactionalGrain.data", LogLevel.Trace))
                  .ConfigureLogging(builder => builder.AddFilter("MaxStateTransactionalGrain.data", LogLevel.Trace))
+                 .ConfigureLogging(builder => builder.AddFilter("SingleStateFaultInjectionTransactionalGrain.data", LogLevel.Trace))
                  .ConfigureLogging(builder => builder.AddFilter("TransactionAgent", LogLevel.Trace))
                  .ConfigureLogging(builder => builder.AddFilter("Orleans.Transactions.AzureStorage.AzureTableTransactionalStateStorage", LogLevel.Trace));
         }

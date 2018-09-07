@@ -12,5 +12,6 @@ namespace Orleans.Transactions.AzureStorage.Tests
         {
             fixture.EnsurePreconditionsMet();
         }
+
     }
 }

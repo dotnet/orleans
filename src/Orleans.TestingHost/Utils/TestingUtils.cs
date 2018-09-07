@@ -74,9 +74,11 @@ namespace Orleans.TestingHost.Utils
         /// <summary> Run the predicate until it succeed or times out </summary>
         /// <param name="predicate">The predicate to run</param>
         /// <param name="timeout">The timeout value</param>
+        /// <param name="delayOnFail">The time to delay next call upon failure</param>
         /// <returns>True if the predicate succeed, false otherwise</returns>
-        public static async Task WaitUntilAsync(Func<bool,Task<bool>> predicate, TimeSpan timeout)
+        public static async Task WaitUntilAsync(Func<bool,Task<bool>> predicate, TimeSpan timeout, TimeSpan? delayOnFail = null)
         {
+            delayOnFail = delayOnFail ?? TimeSpan.FromSeconds(1);
             var keepGoing = new[] { true };
             Func<Task> loop =
                 async () =>
@@ -84,9 +86,9 @@ namespace Orleans.TestingHost.Utils
                     bool passed;
                     do
                     {
-                        // need to wait a bit to before re-checking the condition.
-                        await Task.Delay(TimeSpan.FromSeconds(1));
                         passed = await predicate(false);
+                        // need to wait a bit to before re-checking the condition.
+                        if (!passed) await Task.Delay(delayOnFail.Value);
                     }
                     while (!passed && keepGoing[0]);
                     if(!passed)

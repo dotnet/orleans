@@ -1,12 +1,15 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Configuration;
+using Orleans.Configuration.Validators;
 using Orleans.GrainDirectory;
+using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Counters;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.LogConsistency;
 using Orleans.Runtime.MembershipService;
+using Orleans.Metadata;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.MultiClusterNetwork;
 using Orleans.Runtime.Placement;
@@ -14,9 +17,9 @@ using Orleans.Runtime.Providers;
 using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Versions;
-using Orleans.Runtime.Versions.Compatibility;
-using Orleans.Runtime.Versions.Selector;
+using Orleans.Runtime.Versions.Compatibility;using Orleans.Runtime.Versions.Selector;
 using Orleans.Serialization;
+using Orleans.Statistics;
 using Orleans.Streams;
 using Orleans.Streams.Core;
 using Orleans.Timers;
@@ -31,14 +34,11 @@ using Microsoft.Extensions.Logging;
 using Orleans.ApplicationParts;
 using Orleans.Runtime.Utilities;
 using System;
-using System.Collections.Generic;
-using Orleans.Metadata;
-using Orleans.Statistics;
-using Microsoft.Extensions.Options;
-
-using Orleans.Configuration.Validators;
-using Orleans.Runtime.Configuration;
 using System.Reflection;
+using System.Linq;
+
+using System.Collections.Generic;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Hosting
 {
@@ -172,8 +172,11 @@ namespace Orleans.Hosting
             services.TryAddSingleton<VersionSelectorManager>();
             services.TryAddSingleton<CachedVersionSelectorManager>();
             // Version selector strategy
-            services.TryAddSingleton<GrainVersionStore>();
-            services.AddFromExisting<IVersionStore, GrainVersionStore>();
+            if (!services.Any(x => x.ServiceType == typeof(IVersionStore)))
+            {
+                services.TryAddSingleton<GrainVersionStore>();
+                services.AddFromExisting<IVersionStore, GrainVersionStore>();
+            }
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, GrainVersionStore>();
             services.AddSingletonNamedService<VersionSelectorStrategy, AllCompatibleVersions>(nameof(AllCompatibleVersions));
             services.AddSingletonNamedService<VersionSelectorStrategy, LatestVersion>(nameof(LatestVersion));

@@ -375,6 +375,7 @@ namespace Orleans.Runtime
                             OrleansTransactionAbortedException abortException = transactionInfo.MustAbort(serializationManager);
                             this.transactionAgent.Abort(transactionInfo, abortException);
                             exc1 = abortException;
+                            TransactionContext.Clear();
                         }
                     }
 

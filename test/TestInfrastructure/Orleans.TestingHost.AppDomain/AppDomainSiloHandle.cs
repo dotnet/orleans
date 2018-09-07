@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.Remoting;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 
@@ -110,6 +111,11 @@ namespace Orleans.TestingHost
             }
 
             this.SiloHost = null;
+        }
+
+        public override void StopSilo(CancellationToken ct)
+        {
+            throw new NotImplementedException();
         }
 
         private void UnloadAppDomain()

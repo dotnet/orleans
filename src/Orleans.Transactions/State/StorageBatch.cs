@@ -73,6 +73,7 @@ namespace Orleans.Transactions
         private int collect = 0;
         private int cancel = 0;
         private readonly JsonSerializerSettings serializerSettings;
+
         public MetaData MetaData { get; private set; }
 
         public string ETag { get; set; }
@@ -119,7 +120,7 @@ namespace Orleans.Transactions
             }
         }
 
-        public Task<string> Store(ITransactionalStateStorage<TState> storage)
+        public  Task<string> Store(ITransactionalStateStorage<TState> storage)
         {
             var jsonMetaData = JsonConvert.SerializeObject(MetaData, this.serializerSettings);
             var list = new List<PendingTransactionState<TState>>();

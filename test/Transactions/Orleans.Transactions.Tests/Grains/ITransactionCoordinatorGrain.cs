@@ -26,5 +26,8 @@ namespace Orleans.Transactions.Tests
 
         [Transaction(TransactionOption.Create)]
         Task MultiGrainSetBit(List<ITransactionalBitArrayGrain> grains, int bitIndex);
+
+        [Transaction(TransactionOption.Create)]
+        Task MultiGrainAdd(ITransactionCommitterTestGrain committer, string commitArg, List<ITransactionTestGrain> grains, int numberToAdd);
     }
 }

@@ -174,12 +174,8 @@ namespace Orleans.Providers.Streams.Common
                 return;
             }
 
-            // if no token is provided, set cursor to idle at end of cache
-            if (sequenceToken == null)
-            {
-                UnsetCursor(cursor, cachedMessages.First?.Value?.SequenceToken);
-                return;
-            }
+            // if no token is provided, set token to item at end of cache
+            sequenceToken = sequenceToken ?? cachedMessages.First?.Value?.SequenceToken;
 
             // If sequenceToken is too new to be in cache, unset token, and wait for more data.
             if (sequenceToken.Newer(cachedMessages.First.Value.SequenceToken))

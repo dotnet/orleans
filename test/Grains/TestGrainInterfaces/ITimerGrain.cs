@@ -24,4 +24,13 @@ namespace UnitTests.GrainInterfaces
         Task StartTimer(string name, TimeSpan delay);
         Task StopTimer(string name);
     }
+
+    public interface ITimerRequestGrain : IGrainWithIntegerKey
+    {
+        Task StartAndWaitTimerTick(TimeSpan dueTime);
+
+        Task StartStuckTimer(TimeSpan dueTime);
+
+        Task<string> GetRuntimeInstanceId();
+    }
 }

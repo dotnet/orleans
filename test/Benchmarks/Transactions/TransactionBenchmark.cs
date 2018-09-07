@@ -152,7 +152,7 @@ namespace Benchmarks.Transactions
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
-                    .UseDistributedTM()
+                    .UseTransactions()
                     .ConfigureServices(services => services.AddSingleton<TelemetryConsumer>())
                     .Configure<TelemetryOptions>(options => options.AddConsumer<TelemetryConsumer>())
                     .Configure<StatisticsOptions>(options =>

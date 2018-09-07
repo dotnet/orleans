@@ -12,7 +12,7 @@ namespace Orleans.Transactions.AzureStorage
             return $"{RK_PREFIX}{sequenceId.ToString("x16")}";
         }
 
-        public long SequenceId => long.Parse(RowKey.Substring(RK_PREFIX.Length));
+        public long SequenceId => long.Parse(RowKey.Substring(RK_PREFIX.Length), System.Globalization.NumberStyles.AllowHexSpecifier);
 
         // row keys range from s0000000000000001 to s7fffffffffffffff
         public const string RK_PREFIX = "s_";
