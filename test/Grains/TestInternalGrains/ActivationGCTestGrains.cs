@@ -86,7 +86,7 @@ namespace UnitTests.Grains
     }
 
     [CollectionAgeLimit(Minutes = 0.2)]
-    public class CollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain : Grain, ICollectionSpecificAgeLimitActivationGcTestGrain
+    public class CollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain : Grain, ICollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain
     {
         public Task Nop()
         {
@@ -95,7 +95,7 @@ namespace UnitTests.Grains
     }
 
     // Use this Test Class in Non.Silo test [SiloHostBuilder_GrainCollectionOptionsForZeroSecondsAgeLimitTest]
-    public class CollectionSpecificAgeLimitForZeroSecondsActivationGcTestGrain : Grain, ICollectionSpecificAgeLimitActivationGcTestGrain
+    public class CollectionSpecificAgeLimitForZeroSecondsActivationGcTestGrain : Grain, ICollectionSpecificAgeLimitForZeroSecondsActivationGcTestGrain
     {
         public Task Nop()
         {

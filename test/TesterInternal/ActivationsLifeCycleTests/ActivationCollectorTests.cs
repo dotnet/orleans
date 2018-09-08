@@ -534,7 +534,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             logger.Info("ActivationCollectorShouldCollectByCollectionSpecificAgeLimit: activating {0} grains.", grainCount);
             for (var i = 0; i < grainCount; ++i)
             {
-                ICollectionSpecificAgeLimitActivationGcTestGrain g = this.testCluster.GrainFactory.GetGrain<ICollectionSpecificAgeLimitActivationGcTestGrain>(Guid.NewGuid());
+                ICollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain g = this.testCluster.GrainFactory.GetGrain<ICollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain>(Guid.NewGuid());
                 tasks.Add(g.Nop());
             }
             await Task.WhenAll(tasks);
