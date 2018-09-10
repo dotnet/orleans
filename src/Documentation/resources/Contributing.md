@@ -5,7 +5,7 @@ title: Contributing to Orleans
 
 # Contributing to Orleans
 
-Some notes and guidelines for developers wanting to contribute to Orleans.
+Some notes and guidelines for developers who want to contribute to Orleans.
 
 ## Contributing To This Project
 
@@ -17,14 +17,15 @@ These are just a few ideas, so if you think of something else that would be usef
 
 Pull requests are always welcome!
 
-* **[Intern and Student Projects](Student-Projects.md)**
+* **[Intern and Student Projects](student_projects.md)**
 
 Some suggestions for possible intern / student projects.
 
-* **[Documentation Guidelines](Documentation-Guidelines.md)** A style guide for writing documentation for this site.
+* **[Documentation Guidelines](documentation_guidelines.md)** 
 
+A style guide for writing documentation for this site.
 
-## Code Contributions:
+## Code Contributions
 
 This project uses the same contribution process as the other **[DotNet projects](http://dotnet.github.io/)** on GitHub.
 
@@ -40,14 +41,13 @@ Contribution License Agreement for DotNet projects on GitHub.
 
 Some basic API design rules, coding standards, and style guide for .NET Framework APIs.
 
-
 ## Coding Standards and Conventions
 
 We try not to be too OCD about coding style wars, but in case of disputes we do fall back to the core principles in the two ".NET Coding Standards" books used by the other DotNet OSS projects on GitHub:
 
--[C# Coding Style Guide](https://github.com/dotnet/corefx/blob/master/Documentation/coding-guidelines/coding-style.md)
+* [C# Coding Style Guide](https://github.com/dotnet/corefx/blob/master/Documentation/coding-guidelines/coding-style.md)
 
--[.NET Framework Design Guidelines](https://github.com/dotnet/corefx/blob/master/Documentation/coding-guidelines/framework-design-guidelines-digest.md)
+* [.NET Framework Design Guidelines](https://github.com/dotnet/corefx/blob/master/Documentation/coding-guidelines/framework-design-guidelines-digest.md)
 
 There are lots of other useful documents on the [.NET CoreCLR](https://github.com/dotnet/coreclr/tree/master/Documentation) and [.NET Core Framework](https://github.com/dotnet/corefx/tree/master/Documentation) documentation sites which are worth reading, although most experienced C# developers will probably have picked up many of those best-practices by osmosis, particularly around performance and memory management.
 
