@@ -356,8 +356,14 @@ namespace Orleans.Transactions.State
         /// </summary>
         public async Task NotifyOfRestore()
         {
-            await Ready();
-            this.restoreTask = Restore();
+            try
+            {
+                await Ready();
+            }
+            finally
+            {
+                this.restoreTask = Restore();
+            }
             await this.restoreTask;
         }
 
@@ -365,12 +371,9 @@ namespace Orleans.Transactions.State
         /// Ensures queue is ready to process requests.
         /// </summary>
         /// <returns></returns>
-        public async Task Ready()
+        public Task Ready()
         {
-            if (!this.restoreTask.IsCompleted)
-            {
-                await this.restoreTask;
-            }
+            return this.restoreTask;
         }
 
         private async Task Restore()
