@@ -59,24 +59,7 @@ namespace Orleans.Transactions.State
 
         public Task Prepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager)
         {
-            var valid = this.queue.RWLock.ValidateLock(transactionId, accessCount, out var status, out var record);
-
-            record.Timestamp = timeStamp;
-            record.Role = CommitRole.RemoteCommit; // we are not the TM
-            record.TransactionManager = transactionManager;
-            record.LastSent = null;
-            record.PrepareIsPersisted = false;
-
-            if (!valid)
-            {
-                this.queue.NotifyOfAbort(record, status);
-            }
-            else
-            {
-                this.queue.Clock.Merge(record.Timestamp);
-            }
-
-            this.queue.RWLock.Notify();
+            this.queue.NotifyOfPrepare(transactionId, accessCount, timeStamp, transactionManager);
             return Task.CompletedTask; // one-way, no response
         }
     }

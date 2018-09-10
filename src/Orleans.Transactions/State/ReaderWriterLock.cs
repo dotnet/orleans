@@ -99,6 +99,9 @@ namespace Orleans.Transactions.State
                 if (group == currentGroup)
                 {
                     group.Deadline = DateTime.UtcNow + this.options.LockTimeout;
+
+                    if (logger.IsEnabled(LogLevel.Trace))
+                        logger.Trace("set lock expiration at {Deadline}", group.Deadline.Value.ToString("o"));
                 }
 
                 // create a new record for this transaction
@@ -251,8 +254,6 @@ namespace Orleans.Transactions.State
 
         private Task LockWork()
         {
-            if (this.logger.IsEnabled(LogLevel.Trace)) logger.Trace("/LockWork");
-
             if (currentGroup != null)
             {
                 // check if there are any group members that are ready to exit the lock
@@ -287,6 +288,9 @@ namespace Orleans.Transactions.State
 
                     else if (currentGroup.Deadline.HasValue)
                     {
+                        if (logger.IsEnabled(LogLevel.Trace))
+                            logger.Trace("recheck lock expiration at {Deadline}", currentGroup.Deadline.Value.ToString("o"));
+
                         // check again when the group expires
                         lockWorker.Notify(currentGroup.Deadline.Value);
                     }
@@ -349,8 +353,6 @@ namespace Orleans.Transactions.State
                     }
                 }
             }
-
-            if (this.logger.IsEnabled(LogLevel.Trace)) logger.Trace("\\LockWork");
 
             return Task.CompletedTask;
         }
