@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.Configuration;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
