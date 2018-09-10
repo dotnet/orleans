@@ -39,15 +39,12 @@ namespace Orleans.Transactions.Tests.DeactivatingInjection
                     this.faultInjector.InjectAfterStore = true;
                 this.logger.Info($"Grain {this.context.GrainInstance} injected fault before transaction {transactionId} PrepareAndCommit, " +
                                  $"with fault type {this.faultInjectionControl.FaultInjectionType}");
-                this.faultInjectionControl.FaultInjectionPhase = TransactionFaultInjectPhase.None;
             }
             var result = await this.tm.PrepareAndCommit(transactionId, accessCount, timeStamp, writeParticipants, totalParticipants);
             if (this.faultInjectionControl?.FaultInjectionPhase == TransactionFaultInjectPhase.AfterPrepareAndCommit && this.faultInjectionControl.FaultInjectionType == FaultInjectionType.Deactivation)
             {
-                this.grainRuntime.DeactivateOnIdle((context.GrainInstance));
-                this.faultInjectionControl.FaultInjectionPhase = TransactionFaultInjectPhase.None;
+                this.grainRuntime.DeactivateOnIdle(context.GrainInstance);
                 this.logger.Info($"Grain {this.context.GrainInstance} deactivating after transaction {transactionId} PrepareAndCommit");
-                this.faultInjectionControl.FaultInjectionPhase = TransactionFaultInjectPhase.None;
             }
             this.faultInjectionControl.Reset();
             return result;
@@ -61,9 +58,7 @@ namespace Orleans.Transactions.Tests.DeactivatingInjection
                 && this.faultInjectionControl?.FaultInjectionType == FaultInjectionType.Deactivation)
             {
                 this.grainRuntime.DeactivateOnIdle((context.GrainInstance));
-                this.faultInjectionControl.FaultInjectionPhase = TransactionFaultInjectPhase.None;
                 this.logger.Info($"Grain {this.context.GrainInstance} deactivating after transaction {transactionId} Prepared");
-                this.faultInjectionControl.FaultInjectionPhase = TransactionFaultInjectPhase.None;
             }
             this.faultInjectionControl.Reset();
         }
@@ -76,9 +71,7 @@ namespace Orleans.Transactions.Tests.DeactivatingInjection
                 && this.faultInjectionControl.FaultInjectionType == FaultInjectionType.Deactivation)
             {
                 this.grainRuntime.DeactivateOnIdle((context.GrainInstance));
-                this.faultInjectionControl.FaultInjectionPhase = TransactionFaultInjectPhase.None;
                 this.logger.Info($"Grain {this.context.GrainInstance} deactivating after transaction {transactionId} Ping");
-                this.faultInjectionControl.FaultInjectionPhase = TransactionFaultInjectPhase.None;
             }
             this.faultInjectionControl.Reset();
         }
@@ -114,9 +107,7 @@ namespace Orleans.Transactions.Tests.DeactivatingInjection
                 && this.faultInjectionControl.FaultInjectionType == FaultInjectionType.Deactivation)
             {
                 this.grainRuntime.DeactivateOnIdle((context.GrainInstance));
-                this.faultInjectionControl.FaultInjectionPhase = TransactionFaultInjectPhase.None;
                 this.logger.Info($"Grain {this.context.GrainInstance} deactivating after transaction {transactionId} CommitReadOnly");
-                this.faultInjectionControl.FaultInjectionPhase = TransactionFaultInjectPhase.None;
             }
 
             this.faultInjectionControl.Reset();
@@ -131,9 +122,7 @@ namespace Orleans.Transactions.Tests.DeactivatingInjection
                 && this.faultInjectionControl.FaultInjectionType == FaultInjectionType.Deactivation)
             {
                 this.grainRuntime.DeactivateOnIdle((context.GrainInstance));
-                this.faultInjectionControl.FaultInjectionPhase = TransactionFaultInjectPhase.None;
                 this.logger.Info($"Grain {this.context.GrainInstance} deactivating after transaction {transactionId} abort");
-                this.faultInjectionControl.FaultInjectionPhase = TransactionFaultInjectPhase.None;
             }
             this.faultInjectionControl.Reset();
         }
@@ -146,9 +135,7 @@ namespace Orleans.Transactions.Tests.DeactivatingInjection
                 && this.faultInjectionControl.FaultInjectionType == FaultInjectionType.Deactivation)
             {
                 this.grainRuntime.DeactivateOnIdle((context.GrainInstance));
-                this.faultInjectionControl.FaultInjectionPhase = TransactionFaultInjectPhase.None;
                 this.logger.Info($"Grain {this.context.GrainInstance} deactivating after transaction {transactionId} cancel");
-                this.faultInjectionControl.FaultInjectionPhase = TransactionFaultInjectPhase.None;
             }
             this.faultInjectionControl.Reset();
         }
@@ -164,16 +151,13 @@ namespace Orleans.Transactions.Tests.DeactivatingInjection
                     this.faultInjector.InjectAfterStore = true;
                 this.logger.Info($"Grain {this.context.GrainInstance} injected fault before transaction {transactionId} Confirm, " +
                                  $"with fault type {this.faultInjectionControl.FaultInjectionType}");
-                this.faultInjectionControl.FaultInjectionPhase = TransactionFaultInjectPhase.None;
             }
             await this.tResource.Confirm(transactionId, timeStamp);
             if (this.faultInjectionControl.FaultInjectionPhase == TransactionFaultInjectPhase.AfterConfirm
                 && this.faultInjectionControl.FaultInjectionType == FaultInjectionType.Deactivation)
             {
                 this.grainRuntime.DeactivateOnIdle((context.GrainInstance));
-                this.faultInjectionControl.FaultInjectionPhase = TransactionFaultInjectPhase.None;
                 this.logger.Info($"Grain {this.context.GrainInstance} deactivating after transaction {transactionId} Confirm");
-                this.faultInjectionControl.FaultInjectionPhase = TransactionFaultInjectPhase.None;
             }
             this.faultInjectionControl.Reset();
         }
@@ -190,7 +174,6 @@ namespace Orleans.Transactions.Tests.DeactivatingInjection
                     this.faultInjector.InjectAfterStore = true;
                 this.logger.Info($"Grain {this.context.GrainInstance} injected fault before transaction {transactionId} Prepare, " +
                                  $"with fault type {this.faultInjectionControl.FaultInjectionType}");
-                this.faultInjectionControl.FaultInjectionPhase = TransactionFaultInjectPhase.None;
             }
 
             await this.tResource.Prepare(transactionId, accessCount, timeStamp, transactionManager);
@@ -198,9 +181,7 @@ namespace Orleans.Transactions.Tests.DeactivatingInjection
                 && this.faultInjectionControl.FaultInjectionType == FaultInjectionType.Deactivation)
             {
                 this.grainRuntime.DeactivateOnIdle((context.GrainInstance));
-                this.faultInjectionControl.FaultInjectionPhase = TransactionFaultInjectPhase.None;
                 this.logger.Info($"Grain {this.context.GrainInstance} deactivating after transaction {transactionId} Prepare");
-                this.faultInjectionControl.FaultInjectionPhase = TransactionFaultInjectPhase.None;
             }
             this.faultInjectionControl.Reset();
         }
