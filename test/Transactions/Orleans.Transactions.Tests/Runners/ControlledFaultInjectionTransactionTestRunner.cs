@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Orleans.Transactions.Tests.DeactivatingInjection;
 using Orleans.Transactions.Tests.DeactivationTransaction;
@@ -58,9 +57,9 @@ namespace Orleans.Transactions.Tests
         {
             const int setval = 5;
             const int addval = 7;
-            const int expected = setval + addval;
+            int expected = setval + addval;
             const int grainCount = TransactionTestConstants.MaxCoordinatedTransactions;
-            var faultInjectionControl = new FaultInjectionControl(){FaultInjectionPhase = injectionPhase, FaultInjectionType = injectionType};
+            var faultInjectionControl = new FaultInjectionControl() { FaultInjectionPhase = injectionPhase, FaultInjectionType = injectionType };
             List<IFaultInjectionTransactionTestGrain> grains =
                 Enumerable.Range(0, grainCount)
                     .Select(i => this.grainFactory.GetGrain<IFaultInjectionTransactionTestGrain>(Guid.NewGuid()))
@@ -69,14 +68,29 @@ namespace Orleans.Transactions.Tests
             IFaultInjectionTransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<IFaultInjectionTransactionCoordinatorGrain>(Guid.NewGuid());
 
             await coordinator.MultiGrainSet(grains, setval);
+            // add delay between transactions so confirmation errors don't bleed into neighboring transactions
+            if (injectionPhase == TransactionFaultInjectPhase.BeforeConfirm || injectionPhase == TransactionFaultInjectPhase.BeforeConfirm)
+                await Task.Delay(TimeSpan.FromSeconds(30));
             try
             {
                 await coordinator.MultiGrainAddAndFaultInjection(grains, addval, faultInjectionControl);
+                // add delay between transactions so confirmation errors don't bleed into neighboring transactions
+                if (injectionPhase == TransactionFaultInjectPhase.BeforeConfirm || injectionPhase == TransactionFaultInjectPhase.BeforeConfirm)
+                    await Task.Delay(TimeSpan.FromSeconds(30));
+            }
+            catch (OrleansTransactionAbortedException)
+            {
+                // add delay between transactions so errors don't bleed into neighboring transactions
+                // TODO : remove when slow slow abort is complete - jbragg
+                await Task.Delay(TimeSpan.FromSeconds(30));
+                await coordinator.MultiGrainAddAndFaultInjection(grains, addval);
             }
             catch (OrleansTransactionException)
             {
-                await Task.Delay(TimeSpan.FromSeconds(2));
-                //if failed due to timeout or other legitimate transaction exception, try again. This should succeed 
+                // add delay between transactions so errors don't bleed into neighboring transactions
+                // TODO : remove when slow slow abort is complete - jbragg
+                await Task.Delay(TimeSpan.FromSeconds(30));
+                expected = await grains.First().Get() + addval;
                 await coordinator.MultiGrainAddAndFaultInjection(grains, addval);
             }
 
