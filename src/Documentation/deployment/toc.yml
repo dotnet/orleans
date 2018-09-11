@@ -8,7 +8,9 @@
   href: cluster_management.md
 - name: Consul Deployments
   href: consul_deployment.md
+- name: Troubleshooting Deployments
+  href: troubleshooting_deployments.md
 - name: Grain Versioning
-  href: grain_versioning/toc.yml  
+  href: grain_versioning/toc.yml
 - name: Multi-Cluster Support
   href: multi-cluster_support/toc.yml
