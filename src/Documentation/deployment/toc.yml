@@ -2,8 +2,6 @@
   href: index.md
 - name: Cluster Management
   href: cluster_management.md
-- name: Multi-Cluster Support
-  href: multi-cluster_support/toc.yml
 - name: Handling Failures
   href: handling_failures.md
 - name: Grain Versioning
@@ -14,3 +12,5 @@
   href: troubleshooting_azure_cloud_services_deployments.md
 - name: Consul Deployments
   href: consul_deployment.md
+- name: Multi-Cluster Support
+  href: multi-cluster_support/toc.yml
