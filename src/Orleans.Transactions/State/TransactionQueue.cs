@@ -22,13 +22,14 @@ namespace Orleans.Transactions.State
         private readonly JsonSerializerSettings serializerSettings;
         private readonly BatchWorker storageWorker;
         private readonly BatchWorker confirmationWorker;
-        private readonly ILogger logger;
+        protected readonly ILogger logger;
         private readonly Dictionary<Guid, TransactionRecord<TState>> confirmationTasks;
-        private CommitQueue<TState> commitQueue = new CommitQueue<TState>();
+        private CommitQueue<TState> commitQueue;
+        private Task restoreTask;
 
         private StorageBatch<TState> storageBatch;
 
-        private TransactionalStatus problemFlag;
+        protected TransactionalStatus problemFlag;
         // the queues handling the various stages
 
         private int failCounter;
@@ -71,6 +72,8 @@ namespace Orleans.Transactions.State
             this.confirmationWorker = new BatchWorkerFromDelegate(ConfirmationWork);
             this.RWLock = new ReadWriteLock<TState>(options, this, this.storageWorker, logger);
             this.unprocessedPreparedMessages = new Dictionary<DateTime, PreparedMessages>();
+            this.commitQueue = new CommitQueue<TState>();
+            this.restoreTask = Task.CompletedTask;
         }
 
         public void EnqueueCommit(TransactionRecord<TState> record)
@@ -250,6 +253,8 @@ namespace Orleans.Transactions.State
                         if (logger.IsEnabled(LogLevel.Trace))
                             logger.Trace("aborting status={Status} {Entry}", status, entry);
 
+                        entry.ConfirmationResponsePromise?.TrySetException(new OrleansException($"Confirm failed: Status {status}"));
+
                         if (entry.LastSent.HasValue)
                             return; // cannot abort anymore if we already sent prepare-ok message
 
@@ -362,6 +367,9 @@ namespace Orleans.Transactions.State
 
         public void NotifyOfCancel(Guid transactionId, DateTime timeStamp, TransactionalStatus status)
         {
+            if (logger.IsEnabled(LogLevel.Trace))
+                logger.Trace("{MethodName}. TransactionId: {TransactionId}, TimeStamp: {TimeStamp} Status: {TransactionalStatus}", nameof(NotifyOfCancel), transactionId, timeStamp, status);
+
             // find in queue
             var pos = commitQueue.Find(transactionId, timeStamp);
 
@@ -381,6 +389,28 @@ namespace Orleans.Transactions.State
         /// called on activation, and when recovering from storage conflicts or other exceptions.
         /// </summary>
         public async Task NotifyOfRestore()
+        {
+            try
+            {
+                await Ready();
+            }
+            finally
+            {
+                this.restoreTask = Restore();
+            }
+            await this.restoreTask;
+        }
+
+        /// <summary>
+        /// Ensures queue is ready to process requests.
+        /// </summary>
+        /// <returns></returns>
+        public Task Ready()
+        {
+            return this.restoreTask;
+        }
+
+        private async Task Restore()
         {
             TransactionalStorageLoadResponse<TState> loadresponse = await storage.Load();
 
@@ -516,6 +546,10 @@ namespace Orleans.Transactions.State
                     {
                         // process all committable entries, adding storage events to the storage batch
                         CollectEventsForBatch(committableEntries);
+                        if (problemFlag != TransactionalStatus.Ok)
+                        {
+                            return;
+                        }
 
                         if (logger.IsEnabled(LogLevel.Debug))
                         {
@@ -562,7 +596,6 @@ namespace Orleans.Transactions.State
                         storageWorker.Notify();  // we have to re-check for work
                     }
                 }
-                return;
             }
             catch (InconsistentStateException e)
             {
@@ -575,20 +608,28 @@ namespace Orleans.Transactions.State
                 logger.Warn(888, $"exception in storageWorker", e);
 
                 problemFlag = TransactionalStatus.UnknownException;
-            }
-
-            // after exceptions, we try again, but with limits
-            if (++failCounter < 10)
+            } finally
             {
-                await Task.Delay(100);
+                if (problemFlag == TransactionalStatus.Ok)
+                {
+                    this.failCounter = 0;
+                }
+                else
+                {
+                    // after exceptions, we try again, but with limits
+                    if (++failCounter < 10)
+                    {
+                        await Task.Delay(100);
 
-                // this restarts the worker, which sees the problem flag and recovers.
-                storageWorker.Notify();
-            }
-            else
-            {
-                // bail out
-                logger.Warn(999, $"storageWorker is bailing out");
+                        // this restarts the worker, which sees the problem flag and recovers.
+                        storageWorker.Notify();
+                    }
+                    else
+                    {
+                        // bail out
+                        logger.Warn(999, $"storageWorker is bailing out");
+                    }
+                }
             }
         }
 
@@ -670,7 +711,7 @@ namespace Orleans.Transactions.State
         private void CollectEventsForBatch(int batchsize)
         {
             // collect events for batch
-            for (int i = 0; i < batchsize; i++)
+            for (int i = 0; i < batchsize && this.problemFlag == TransactionalStatus.Ok; i++)
             {
                 TransactionRecord<TState> entry = commitQueue[i];
 

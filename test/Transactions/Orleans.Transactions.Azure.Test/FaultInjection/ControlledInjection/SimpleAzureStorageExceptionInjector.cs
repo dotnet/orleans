@@ -1,12 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage;
-using Orleans.Transactions.Abstractions;
-using Orleans.Transactions.Tests.DeactivatingInjection;
 using Orleans.Transactions.Tests.FaultInjection;
 
 namespace Orleans.Transactions.Azure.Tests
@@ -32,7 +25,6 @@ namespace Orleans.Transactions.Azure.Tests
                 this.logger.LogInformation($"Storage exception thrown after store, thrown total {injectionAfterStoreCounter}");
                 throw new SimpleAzureStorageException();
             }
-            
         }
 
         public void BeforeStore()

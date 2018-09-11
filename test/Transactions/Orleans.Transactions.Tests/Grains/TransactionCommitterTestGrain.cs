@@ -24,9 +24,9 @@ namespace Orleans.Transactions.Tests
             return base.OnActivateAsync();
         }
 
-        public Task Commit(string data)
+        public Task Commit(ITransactionCommitOperation<IRemoteCommitService> operation)
         {
-            return this.committer.OnCommit(new RemoteCommitServiceOperation(data));
+            return this.committer.OnCommit(operation);
         }
     }
 }

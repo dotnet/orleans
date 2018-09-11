@@ -46,10 +46,10 @@ namespace Orleans.Transactions.State
             return Task.CompletedTask;
         }
 
-        public Task Ping(Guid transactionId, DateTime timeStamp, ParticipantId resource)
+        public async Task Ping(Guid transactionId, DateTime timeStamp, ParticipantId resource)
         {
+            await this.queue.Ready();
             this.queue.NotifyOfPing(transactionId, timeStamp, resource);
-            return Task.CompletedTask;
         }
     }
 }

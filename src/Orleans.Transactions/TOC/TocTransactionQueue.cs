@@ -35,8 +35,22 @@ namespace Orleans.Transactions.TOC
 
         private async Task CallThenLocalCommit(TransactionRecord<TransactionCommitter<TService>.OperationState> entry)
         {
-            await entry.State.Operation.Commit(entry.TransactionId, this.service);
-            base.OnLocalCommit(entry);
+            try
+            {
+                if (await entry.State.Operation.Commit(entry.TransactionId, this.service))
+                {
+                    base.OnLocalCommit(entry);
+                }
+                else
+                {
+                    base.problemFlag = TransactionalStatus.CommitFailure;
+                }
+            }
+            catch (Exception ex)
+            {
+                base.logger.LogWarning(ex, $"Commit operation failed for transaction {entry.TransactionId}");
+                base.problemFlag = TransactionalStatus.UnknownException;
+            }
         }
     }
 }
