@@ -12,5 +12,8 @@
   href: troubleshooting_azure_cloud_services_deployments.md
 - name: Consul Deployments
   href: consul_deployment.md
+- name: Troubleshooting Deployments
+  href: troubleshooting_deployments.md
 - name: Multi-Cluster Support
   href: multi-cluster_support/toc.yml
+  
