@@ -1,14 +1,19 @@
 - name: Running the Application
   href: index.md
+- name: Cluster Management
+  href: cluster_management.md
+- name: Handling Failures
+  href: handling_failures.md
+- name: Grain Versioning
+  href: grain_versioning/toc.yml
 - name: Using Azure Web Apps with Azure Cloud Services
   href: azure_web_apps_with_azure_cloud_services.md
 - name: Troubleshooting Azure Cloud Services Deployments
   href: troubleshooting_azure_cloud_services_deployments.md
-- name: Cluster Management
-  href: cluster_management.md
 - name: Consul Deployments
   href: consul_deployment.md
-- name: Grain Versioning
-  href: grain_versioning/toc.yml  
+- name: Troubleshooting Deployments
+  href: troubleshooting_deployments.md
 - name: Multi-Cluster Support
   href: multi-cluster_support/toc.yml
+  
