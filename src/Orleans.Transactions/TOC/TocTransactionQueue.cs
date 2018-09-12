@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
@@ -30,27 +29,8 @@ namespace Orleans.Transactions.TOC
 
         protected override void OnLocalCommit(TransactionRecord<TransactionCommitter<TService>.OperationState> entry)
         {
-            CallThenLocalCommit(entry).Ignore();
-        }
-
-        private async Task CallThenLocalCommit(TransactionRecord<TransactionCommitter<TService>.OperationState> entry)
-        {
-            try
-            {
-                if (await entry.State.Operation.Commit(entry.TransactionId, this.service))
-                {
-                    base.OnLocalCommit(entry);
-                }
-                else
-                {
-                    base.problemFlag = TransactionalStatus.CommitFailure;
-                }
-            }
-            catch (Exception ex)
-            {
-                base.logger.LogWarning(ex, $"Commit operation failed for transaction {entry.TransactionId}");
-                base.problemFlag = TransactionalStatus.UnknownException;
-            }
+            base.storageBatch.AddStorePreCondition(() => entry.State.Operation.Commit(entry.TransactionId, this.service));
+            base.OnLocalCommit(entry);
         }
     }
 }

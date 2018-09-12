@@ -27,9 +27,9 @@ namespace Orleans.Transactions.State
         private CommitQueue<TState> commitQueue;
         private Task restoreTask;
 
-        private StorageBatch<TState> storageBatch;
+        protected StorageBatch<TState> storageBatch;
 
-        protected TransactionalStatus problemFlag;
+        private TransactionalStatus problemFlag;
         // the queues handling the various stages
 
         private int failCounter;
@@ -512,10 +512,6 @@ namespace Orleans.Transactions.State
                     {
                         // process all committable entries, adding storage events to the storage batch
                         CollectEventsForBatch(committableEntries);
-                        if (problemFlag != TransactionalStatus.Ok)
-                        {
-                            return;
-                        }
 
                         if (logger.IsEnabled(LogLevel.Debug))
                         {
@@ -537,8 +533,15 @@ namespace Orleans.Transactions.State
                         batchBeingSentToStorage = this.storageBatch;
                         this.storageBatch = new StorageBatch<TState>(batchBeingSentToStorage);
 
-                        // perform the actual store, and record the e-tag
-                        this.storageBatch.ETag = await batchBeingSentToStorage.Store(storage);
+                        if(await batchBeingSentToStorage.CheckStorePreConditions())
+                        {
+                            // perform the actual store, and record the e-tag
+                            this.storageBatch.ETag = await batchBeingSentToStorage.Store(storage);
+                        } else
+                        {
+                            problemFlag = TransactionalStatus.CommitFailure;
+                            return;
+                        }
                     }
 
                     if (committableEntries > 0)
@@ -676,7 +679,7 @@ namespace Orleans.Transactions.State
         private void CollectEventsForBatch(int batchsize)
         {
             // collect events for batch
-            for (int i = 0; i < batchsize && this.problemFlag == TransactionalStatus.Ok; i++)
+            for (int i = 0; i < batchsize; i++)
             {
                 TransactionRecord<TState> entry = commitQueue[i];
 

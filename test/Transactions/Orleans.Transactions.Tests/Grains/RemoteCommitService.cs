@@ -24,22 +24,25 @@ namespace Orleans.Transactions.Tests
             this.logger = logger;
         }
 
-        public Task<bool> Pass(Guid transactionId, string data)
+        public async Task<bool> Pass(Guid transactionId, string data)
         {
             this.logger.LogInformation($"Transaction {transactionId} Passed with data: {data}");
-            return Task.FromResult(true);
+            await Task.Delay(30);
+            return true;
         }
 
-        public Task<bool> Fail(Guid transactionId, string data)
+        public async Task<bool> Fail(Guid transactionId, string data)
         {
             this.logger.LogInformation($"Transaction {transactionId} Failed with data: {data}");
-            return Task.FromResult(false);
+            await Task.Delay(30);
+            return false;
         }
 
-        public Task<bool> Throw(Guid transactionId, string data)
+        public async Task<bool> Throw(Guid transactionId, string data)
         {
             var msg = $"Transaction {transactionId} Threw with data: {data}";
             this.logger.LogInformation(msg);
+            await Task.Delay(30);
             throw new ApplicationException(msg);
         }
     }
