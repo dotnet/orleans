@@ -1927,11 +1927,11 @@
     },
     {
       "type": "Conceptual",
-      "source_relative_path": "Documentation/Benefits.md",
+      "source_relative_path": "Documentation/Orleans-2.0.md",
       "output": {
         ".html": {
-          "relative_path": "Documentation/Benefits.html",
-          "hash": "qtBiuibgjjACN6cBz/P6MA=="
+          "relative_path": "Documentation/Orleans-2.0.html",
+          "hash": "dtZBKXa7g6HCKRNF8xHNIQ=="
         }
       },
       "is_incremental": false,
@@ -1939,11 +1939,11 @@
     },
     {
       "type": "Conceptual",
-      "source_relative_path": "Documentation/Orleans-2.0.md",
+      "source_relative_path": "Documentation/benefits.md",
       "output": {
         ".html": {
-          "relative_path": "Documentation/Orleans-2.0.html",
-          "hash": "XlO9ASeZXQaEqUikkJVEGQ=="
+          "relative_path": "Documentation/benefits.html",
+          "hash": "uqQEtHavbMnX0XaI+wUcsg=="
         }
       },
       "is_incremental": false,
@@ -2111,7 +2111,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/clusters_and_clients/configuration_guide/typical_configurations.html",
-          "hash": "Yj12bweWHwO6RIxaMvnMtw=="
+          "hash": "ffrfWzp+GPdlMllVm2zMTA=="
         }
       },
       "is_incremental": false,
@@ -2401,6 +2401,18 @@
     },
     {
       "type": "Conceptual",
+      "source_relative_path": "Documentation/deployment/handling_failures.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/deployment/handling_failures.html",
+          "hash": "lWQSvTBgo7YekbjixAw6VA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
       "source_relative_path": "Documentation/deployment/index.md",
       "output": {
         ".html": {
@@ -2629,6 +2641,18 @@
     },
     {
       "type": "Conceptual",
+      "source_relative_path": "Documentation/grains/grain_identity.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/grains/grain_identity.html",
+          "hash": "jJqi6Iu04sSosfCKCWJ5/A=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
       "source_relative_path": "Documentation/grains/grain_persistence/index.md",
       "output": {
         ".html": {
@@ -2754,18 +2778,6 @@
         ".html": {
           "relative_path": "Documentation/grains/transactions.html",
           "hash": "IgngFNV5tdKCTO8d9V1CwA=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Documentation/grains/types_of_grains.md",
-      "output": {
-        ".html": {
-          "relative_path": "Documentation/grains/types_of_grains.html",
-          "hash": "2xRwWXp+NpaajbegtBcGlg=="
         }
       },
       "is_incremental": false,
@@ -3072,7 +3084,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/toc.html",
-          "hash": "L6mJ09P+uRz4Uc2WJI1eZw=="
+          "hash": "vVGj8RZxlF1jQpWtllLrVA=="
         }
       },
       "is_incremental": false,
@@ -3133,18 +3145,6 @@
         ".html": {
           "relative_path": "Documentation/whats_new_in_orleans.html",
           "hash": "bH1OTkKoxjiQOPiReRy58Q=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Documentation/who_is_using_orleans.md",
-      "output": {
-        ".html": {
-          "relative_path": "Documentation/who_is_using_orleans.html",
-          "hash": "YLP6cPKYGy8EOoiWVNVdcQ=="
         }
       },
       "is_incremental": false,
@@ -3632,13 +3632,13 @@
           "details": "Processor TocDocumentProcessor cannot support incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
           "incrementalPhase": "build"
         },
-        "ConceptualDocumentProcessor": {
-          "can_incremental": false,
-          "incrementalPhase": "build"
-        },
         "ResourceDocumentProcessor": {
           "can_incremental": false,
           "details": "Processor ResourceDocumentProcessor cannot support incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
+          "incrementalPhase": "build"
+        },
+        "ConceptualDocumentProcessor": {
+          "can_incremental": false,
           "incrementalPhase": "build"
         }
       }
