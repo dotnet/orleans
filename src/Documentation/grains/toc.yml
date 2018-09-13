@@ -6,8 +6,6 @@
   href: timers_and_reminders.md
 - name: Observers
   href: observers.md
-- name: Scheduler
-  href: scheduler.md
 - name: Reentrancy
   href: reentrancy.md
 - name: Request Context
