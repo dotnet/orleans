@@ -15,9 +15,7 @@ namespace Orleans.AzureUtils
 {
     internal class OrleansSiloInstanceManager
     {
-        public string TableName { get { return INSTANCE_TABLE_NAME; } }
-
-        private const string INSTANCE_TABLE_NAME = "OrleansSiloInstances";
+        public string TableName { get; }
 
         private readonly string INSTANCE_STATUS_CREATED = SiloStatus.Created.ToString();  //"Created";
         private readonly string INSTANCE_STATUS_ACTIVE = SiloStatus.Active.ToString();    //"Active";
@@ -30,17 +28,18 @@ namespace Orleans.AzureUtils
 
         public string DeploymentId { get; private set; }
 
-        private OrleansSiloInstanceManager(string clusterId, string storageConnectionString, ILoggerFactory loggerFactory)
+        private OrleansSiloInstanceManager(string clusterId, string storageConnectionString, string tableName, ILoggerFactory loggerFactory)
         {
             DeploymentId = clusterId;
+            TableName = tableName;
             logger = loggerFactory.CreateLogger<OrleansSiloInstanceManager>();
             storage = new AzureTableDataManager<SiloInstanceTableEntry>(
-                INSTANCE_TABLE_NAME, storageConnectionString, loggerFactory);
+                tableName, storageConnectionString, loggerFactory);
         }
 
-        public static async Task<OrleansSiloInstanceManager> GetManager(string clusterId, string storageConnectionString, ILoggerFactory loggerFactory)
+        public static async Task<OrleansSiloInstanceManager> GetManager(string clusterId, string storageConnectionString, string tableName, ILoggerFactory loggerFactory)
         {
-            var instance = new OrleansSiloInstanceManager(clusterId, storageConnectionString, loggerFactory);
+            var instance = new OrleansSiloInstanceManager(clusterId, storageConnectionString, tableName, loggerFactory);
             try
             {
                 await instance.storage.InitTableAsync()

@@ -41,7 +41,7 @@ namespace Orleans.Runtime.MembershipService
             LogFormatter.SetExceptionDecoder(typeof(StorageException), AzureStorageUtils.PrintStorageException);
 
             tableManager = await OrleansSiloInstanceManager.GetManager(
-                this.clusterId, options.ConnectionString, this.loggerFactory);
+                this.clusterId, options.ConnectionString, options.TableName, this.loggerFactory);
 
             // even if I am not the one who created the table, 
             // try to insert an initial table version if it is not already there,
