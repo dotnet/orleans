@@ -26,7 +26,8 @@ namespace Orleans.AzureUtils
 
         public async Task InitializeGatewayListProvider()
         {
-            siloInstanceManager = await OrleansSiloInstanceManager.GetManager(this.clusterId, this.options.ConnectionString, this.loggerFactory);
+            siloInstanceManager = await OrleansSiloInstanceManager.GetManager(
+                this.clusterId, this.options.ConnectionString, this.options.TableName, this.loggerFactory);
         }
         // no caching
         public Task<IList<Uri>> GetGateways()

@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Logging;
 using Orleans.AzureUtils.Utilities;
+using Orleans.Configuration;
 using Orleans.Hosting.AzureCloudServices;
 using Orleans.Hosting;
 
@@ -110,7 +111,7 @@ namespace Orleans.Runtime.Host
 
                 try
                 {
-                    var manager = siloInstanceManager ?? await OrleansSiloInstanceManager.GetManager(clusterId, connectionString, loggerFactory);
+                    var manager = siloInstanceManager ?? await OrleansSiloInstanceManager.GetManager(clusterId, connectionString, AzureStorageClusteringOptions.DEFAULT_TABLE_NAME, loggerFactory);
                     var instances = await manager.DumpSiloInstanceTable();
                     logger.Debug(instances);
                 }
@@ -256,7 +257,7 @@ namespace Orleans.Runtime.Host
             try
             {
                 siloInstanceManager = OrleansSiloInstanceManager.GetManager(
-                    clusterId, connectionString, this.loggerFactory).WithTimeout(AzureTableDefaultPolicies.TableCreationTimeout).Result;
+                    clusterId, connectionString, AzureStorageClusteringOptions.DEFAULT_TABLE_NAME, this.loggerFactory).WithTimeout(AzureTableDefaultPolicies.TableCreationTimeout).Result;
             }
             catch (Exception exc)
             {
