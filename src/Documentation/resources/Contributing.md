@@ -14,11 +14,11 @@ Here are some pointers for anyone looking for mini-features and work items that 
 These are just a few ideas, so if you think of something else that would be useful, then spin up a [discussion thread](https://github.com/dotnet/orleans/issues) on GitHub to discuss the proposal, and go for it!
 
 * **[Orleans GitHub Repository](https://github.com/dotnet/orleans)**
+
 Pull requests are always welcome!
 
-* **[Ideas for Contributions](Ideas-for-Contributions.md)**
-
 * **[Intern and Student Projects](Student-Projects.md)**
+
 Some suggestions for possible intern / student projects.
 
 * **[Documentation Guidelines](Documentation-Guidelines.md)** A style guide for writing documentation for this site.
@@ -29,12 +29,15 @@ Some suggestions for possible intern / student projects.
 This project uses the same contribution process as the other **[DotNet projects](http://dotnet.github.io/)** on GitHub.
 
 * **[DotNet Project Contribution Guidelines](https://github.com/dotnet/corefx/wiki/Contributing)**
+
 Guidelines and workflow for contributing to DotNet projects on GitHub.
 
 * **[DotNet CLA](https://cla.dotnetfoundation.org/)**
+
 Contribution License Agreement for DotNet projects on GitHub.
 
 * **[.NET Framework Design Guidelines](https://github.com/dotnet/corefx/wiki/Framework-Design-Guidelines-Digest)**
+
 Some basic API design rules, coding standards, and style guide for .NET Framework APIs.
 
 
@@ -42,9 +45,9 @@ Some basic API design rules, coding standards, and style guide for .NET Framewor
 
 We try not to be too OCD about coding style wars, but in case of disputes we do fall back to the core principles in the two ".NET Coding Standards" books used by the other DotNet OSS projects on GitHub:
 
+-[C# Coding Style Guide](https://github.com/dotnet/corefx/blob/master/Documentation/coding-guidelines/coding-style.md)
 
-- [C# Coding Style Guide](https://github.com/dotnet/corefx/blob/master/Documentation/coding-guidelines/coding-style.md)
-- [.NET Framework Design Guidelines](https://github.com/dotnet/corefx/blob/master/Documentation/coding-guidelines/framework-design-guidelines-digest.md)
+-[.NET Framework Design Guidelines](https://github.com/dotnet/corefx/blob/master/Documentation/coding-guidelines/framework-design-guidelines-digest.md)
 
 There are lots of other useful documents on the [.NET CoreCLR](https://github.com/dotnet/coreclr/tree/master/Documentation) and [.NET Core Framework](https://github.com/dotnet/corefx/tree/master/Documentation) documentation sites which are worth reading, although most experienced C# developers will probably have picked up many of those best-practices by osmosis, particularly around performance and memory management.
 
@@ -56,7 +59,7 @@ See for example the various "log consumer" classes were originally placed in sin
 
 As a corollary, it is much easier to find the source code for a class if it is in a file with the same name as the class [similar to Java file naming rules], so there is a tension and value judgment here between code find-ability and minimizing / constraining the number of projects in a solution and files within a project [which both have direct impact on the Visual Studio "Opening" and "Building" times for large projects].
 
-Code search tools in VS and ReSharper definitely help here.    
+Code search tools in VS and ReSharper definitely help here.
 
 ## Dependencies and Inter-Project References
 
