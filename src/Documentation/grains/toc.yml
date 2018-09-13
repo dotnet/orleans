@@ -6,25 +6,15 @@
   href: timers_and_reminders.md
 - name: Observers
   href: observers.md
-- name: Interceptors
-  href: interceptors.md
 - name: Scheduler
   href: scheduler.md
 - name: Reentrancy
   href: reentrancy.md
-- name: GrainServices
-  href: grainservices.md
-- name: Stateless Worker Grains
-  href: stateless_worker_grains.md
-- name: Cancellation Tokens
-  href: cancellation_tokens.md
-- name: External Tasks and Grains
-  href: external_tasks_and_grains.md
 - name: Request Context
   href: request_context.md
-- name: Transactions
-  href: transactions.md
 - name: Grain Persistence
   href: grain_persistence/toc.yml
 - name: Event Sourcing
   href: event_sourcing/toc.yml
+- name: Advanced Features
+  href: advanced/toc.yml
