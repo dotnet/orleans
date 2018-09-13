@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>Orleans.Transactions.Azure.Tests</RootNamespace>
     <AssemblyName>Orleans.Transactions.Azure.Tests</AssemblyName>
@@ -15,5 +15,11 @@
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)test\Transactions\Orleans.Transactions.Tests\Orleans.Transactions.Tests.csproj" />
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Orleans.Transactions.Azure.Test.xunit.runner.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 </Project>
