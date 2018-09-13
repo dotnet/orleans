@@ -126,7 +126,7 @@ var gateways = new IPEndPoint[]
     new IPEndPoint(OTHER_SILO__IP_ADDRESS_N, 30000),
 };
 var client = new ClientBuilder()
-    .UseStaticClustering(gateways)
+    .UseStaticClustering(gatewayPort: 30000)
     .Configure<ClusterOptions>(options =>
     {
         options.ClusterId = "dev";
