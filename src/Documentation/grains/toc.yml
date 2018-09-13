@@ -12,6 +12,8 @@
   href: scheduler.md
 - name: Reentrancy
   href: reentrancy.md
+- name: GrainServices
+  href: grainservices.md
 - name: Stateless Worker Grains
   href: stateless_worker_grains.md
 - name: Cancellation Tokens
