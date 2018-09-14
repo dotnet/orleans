@@ -1,6 +1,6 @@
 {
   "homepages": [],
-  "source_base_path": "C:/github/sergeybykov/orleans/src",
+  "source_base_path": "C:/github/sergeybykov/orleans-2/src",
   "xrefmap": "xrefmap.yml",
   "files": [
     {
@@ -2023,35 +2023,11 @@
     },
     {
       "type": "Conceptual",
-      "source_relative_path": "Documentation/clusters_and_clients/configuration_guide/load_balancing.md",
-      "output": {
-        ".html": {
-          "relative_path": "Documentation/clusters_and_clients/configuration_guide/load_balancing.html",
-          "hash": "nDCGiZxANnrPoFOqOHHiqA=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
       "source_relative_path": "Documentation/clusters_and_clients/configuration_guide/local_development_configuration.md",
       "output": {
         ".html": {
           "relative_path": "Documentation/clusters_and_clients/configuration_guide/local_development_configuration.html",
           "hash": "ryWbEPi9J7P6waMqQAPFwA=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Documentation/clusters_and_clients/configuration_guide/messaging_delivery_guarantees.md",
-      "output": {
-        ".html": {
-          "relative_path": "Documentation/clusters_and_clients/configuration_guide/messaging_delivery_guarantees.html",
-          "hash": "19VhPdzLJPF6gCZzHbP4Mw=="
         }
       },
       "is_incremental": false,
@@ -2272,23 +2248,11 @@
     },
     {
       "type": "Conceptual",
-      "source_relative_path": "Documentation/deployment/cluster_management.md",
-      "output": {
-        ".html": {
-          "relative_path": "Documentation/deployment/cluster_management.html",
-          "hash": "ukH4MUV6hkBv/2BxYLzizw=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
       "source_relative_path": "Documentation/deployment/consul_deployment.md",
       "output": {
         ".html": {
           "relative_path": "Documentation/deployment/consul_deployment.html",
-          "hash": "N0DP4a1V4ag4av1Qu30hag=="
+          "hash": "z7LGdquHbdEf3IdmL0Qzdg=="
         }
       },
       "is_incremental": false,
@@ -2417,7 +2381,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/deployment/index.html",
-          "hash": "l5KGbIpDfD3e6hY4CTnmgw=="
+          "hash": "YaX2fzmPwExCqqKGYs7kjg=="
         }
       },
       "is_incremental": false,
@@ -2852,6 +2816,42 @@
     },
     {
       "type": "Conceptual",
+      "source_relative_path": "Documentation/implementation/cluster_management.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/implementation/cluster_management.html",
+          "hash": "k/lTHZh0Kn2OFvwJ5LpZNg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/implementation/load_balancing.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/implementation/load_balancing.html",
+          "hash": "LcnutwSX06cvVhFThB5X+A=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/implementation/messaging_delivery_guarantees.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/implementation/messaging_delivery_guarantees.html",
+          "hash": "+eAM1Av81iOutWRrPteWLg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
       "source_relative_path": "Documentation/implementation/scheduler.md",
       "output": {
         ".html": {
@@ -3096,7 +3096,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/toc.html",
-          "hash": "ppCyCx+igsS+Ine4TiT7Tg=="
+          "hash": "L6zRYkR5grbMLWkHq99U2w=="
         }
       },
       "is_incremental": false,
@@ -3634,22 +3634,23 @@
   "incremental_info": [
     {
       "status": {
-        "can_incremental": true,
+        "can_incremental": false,
+        "details": "Cannot build incrementally because last build info is missing.",
         "incrementalPhase": "build"
       },
       "processors": {
-        "ResourceDocumentProcessor": {
-          "can_incremental": false,
-          "details": "Processor ResourceDocumentProcessor cannot support incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
-          "incrementalPhase": "build"
-        },
         "TocDocumentProcessor": {
           "can_incremental": false,
           "details": "Processor TocDocumentProcessor cannot support incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
           "incrementalPhase": "build"
         },
+        "ResourceDocumentProcessor": {
+          "can_incremental": false,
+          "details": "Processor ResourceDocumentProcessor cannot support incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
+          "incrementalPhase": "build"
+        },
         "ConceptualDocumentProcessor": {
-          "can_incremental": true,
+          "can_incremental": false,
           "incrementalPhase": "build"
         }
       }
