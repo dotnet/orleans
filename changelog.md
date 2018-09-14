@@ -7,6 +7,29 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [2.1.0-rc1] (changes since 2.1.0-beta1)
+
+- Major changes
+  - Transactions (beta2) (#4851, #4923, #4951, #4950, #4953)
+  - Support for Tansfer of Coordination in transaction (#4860, #4894, #4949)
+
+- Breaking changes
+  - None
+
+- Non-breaking improvements
+  - Do not try to register GrainVersionStore if an implementation of IVersionStore is already registered (#4911)
+  - Consul clustering enhancements (#4942)
+  - IsOrleansShallowCopyable fixes (#4945)
+  - Feature per grain collection attribute (#4890)
+  - Add Microsoft.Orleans.Streaming.AzureStorage as a dependency to Microsoft.Orleans.OrleansAzureUtils. (#4954)
+  - Migrate Orleans.TelemetryConsumers.Counters to netstandard (#4914)
+  - Add TableName to AzureStorageClusteringOptions, AzureStorageGatewayOptions and AzureTableReminderStorageOptions (#4978)
+  - Added support for TableName on AWS legacy configurator (#4983)
+
+- Non-breaking bug fixes
+  - Propagate unserializable exceptions to callers (#4907)
+  - Fixing race condition with simple queue cache (#4936)
+
 ### [2.0.5]
 - Non-breaking bug fixes
   - Use netcoreapp2.0 for msbuild target dll if using dotnet core msbuild but targeting full .net (#4895) 
