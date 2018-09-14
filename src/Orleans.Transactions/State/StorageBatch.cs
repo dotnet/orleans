@@ -63,7 +63,8 @@ namespace Orleans.Transactions
 
         // follow-up actions, to be executed after storing this batch
         private List<Action> followUpActions;
-
+        private List<Func<Task<bool>>> storeConditions;
+        
         // counters for each type of event
         private int total = 0;
         private int prepare = 0;
@@ -120,7 +121,7 @@ namespace Orleans.Transactions
             }
         }
 
-        public  Task<string> Store(ITransactionalStateStorage<TState> storage)
+        public async Task<string> Store(ITransactionalStateStorage<TState> storage)
         {
             var jsonMetaData = JsonConvert.SerializeObject(MetaData, this.serializerSettings);
             var list = new List<PendingTransactionState<TState>>();
@@ -133,7 +134,7 @@ namespace Orleans.Transactions
                 }
             }
 
-            return storage.Store(ETag, jsonMetaData, list,
+            return await storage.Store(ETag, jsonMetaData, list,
                 (confirm > 0) ? confirmUpTo : (long?)null,
                 (cancelAbove < cancelAboveStart) ? cancelAbove : (long?)null);
         }
@@ -255,6 +256,25 @@ namespace Orleans.Transactions
                 followUpActions = new List<Action>();
             }
             followUpActions.Add(action);
+        }
+
+        public void AddStorePreCondition(Func<Task<bool>> action)
+        {
+            if (this.storeConditions == null)
+            {
+                this.storeConditions = new List<Func<Task<bool>>>();
+            }
+            this.storeConditions.Add(action);
+        }
+
+        public async Task<bool> CheckStorePreConditions()
+        {
+            if (this.storeConditions != null && this.storeConditions.Count != 0)
+            {
+                bool[] results = await Task.WhenAll(this.storeConditions.Select(a => a.Invoke()));
+                return results.All(b => b);
+            }
+            return true;
         }
     }
 }
