@@ -76,5 +76,4 @@ await client.Connect();
 
 The configuration examples we used here are for testing silos and clients running on the same machine as `localhost`.
 In production, silos and clients usually run on different servers and are configured with one of the reliable cluster configuration options.
-You can find more about that in the Configuration  Guide](../clusters_and_clients/configuration_guide/index.md) and in the description of [Cluster Management](cluster_management.md).
-
+You can find more about that in the Configuration  Guide](../clusters_and_clients/configuration_guide/index.md) and in the description of [Cluster Management](../implementation/cluster_management.md).

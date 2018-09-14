@@ -1,7 +1,5 @@
 - name: Running the Application
   href: index.md
-- name: Cluster Management
-  href: cluster_management.md
 - name: Handling Failures
   href: handling_failures.md
 - name: Grain Versioning
