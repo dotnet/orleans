@@ -6,14 +6,18 @@ title: Using Consul as a Membership Provider
 # Using Consul as a Membership Provider
 
 ## Introduction to Consul
-[Consul](https://www.consul.io) is a distributed, highly available and datacenter-aware service discovery platform which includes simple service registration, health checking, failure detection and key/value storage.  It is built on the premise that every node in the datacenter is running a Consul agent which is either acting as a server or client which communicate via a scalable gossip protocol.
+[Consul](https://www.consul.io) is a distributed, highly available and datacenter-aware service discovery platform which includes simple service registration, health checking, failure detection and key/value storage.
+It is built on the premise that every node in the datacenter is running a Consul agent which is either acting as a server or client which communicate via a scalable gossip protocol.
 
 There is a very detailed overview of Consul including comparisons with similar solutions [here](https://www.consul.io/intro/index.html).
 
 Consul is written in GO and is [open source](https://github.com/hashicorp/consul); compiled downloads are available for [Mac OS X, FreeBSD, Linux, Solaris and Windows](https://www.consul.io/downloads.html)
 
 ## Why Choose Consul?
-As an [Orleans Membership Provider](cluster_management.md), Consul is a good choice when you need to deliver an **on-premise solution** which does not require your potential customers to have existing infrastructure **and** a co-operative IT provider.  Consul is a very lightweight single executable, has no dependencies and as such can easily be built into your own middleware solution.  And when Consul is already your solution for discovering, checking and maintaining your microservices, it makes sense to fully integrate with Orleans membership for simplicity and ease of operation. We therefore implemented a membership table in Consul (also known as "Orleans Custom System Store"), which fully integrates with Orleans's [Cluster Management](cluster_management.md).
+As an [Orleans Membership Provider](../implementation/cluster_management.md), Consul is a good choice when you need to deliver an **on-premise solution** which does not require your potential customers to have existing infrastructure **and** a co-operative IT provider.
+Consul is a very lightweight single executable, has no dependencies and as such can easily be built into your own middleware solution.
+And when Consul is already your solution for discovering, checking and maintaining your microservices, it makes sense to fully integrate with Orleans membership for simplicity and ease of operation.
+We therefore implemented a membership table in Consul (also known as "Orleans Custom System Store"), which fully integrates with Orleans's [Cluster Management](../implementation/cluster_management.md).
 
 ## Setting up Consul
 There is very extensive documentation available on [Consul.io](https://www.consul.io) about setting up a stable Consul cluster and it doesn't make sense to repeat that here; however for your convenience we include this guide so you can very quickly get Orleans running with a standalone Consul agent.
@@ -28,7 +32,8 @@ There is very extensive documentation available on [Consul.io](https://www.consu
 
 5) Enter `Consul.exe agent -server -bootstrap -data-dir "C:\Consul\Data" -client=0.0.0.0`
 
-`agent` Instructs Consul to run the agent process that hosts the services.  Without this the Consul process will attempt to use RPC to configure a running agent.
+`agent` Instructs Consul to run the agent process that hosts the services.
+Without this the Consul process will attempt to use RPC to configure a running agent.
 
 `-server` Defines the agent as a server and not a client (A Consul *client* is an agent that hosts all the services and data, but does not have voting rights to decide, and cannot become, the cluster leader
 
@@ -38,14 +43,16 @@ There is very extensive documentation available on [Consul.io](https://www.consu
 
 `-client=0.0.0.0` Informs Consul which IP to open the service on.
 
-There are many other parameters, and the option to use a json configuration file.  Please consult the Consul documentation for a full listing of the options.
+There are many other parameters, and the option to use a json configuration file.
+Please consult the Consul documentation for a full listing of the options.
 
 6) Verify that Consul is running and ready to accept membership requests from Orleans by opening the [services](http://localhost:8500/v1/catalog/services) endpoint in your browser.
 
 ## Configuration of Orleans
 
 ### Server
-There is currently a known issue with the "Custom" membership provider OrleansConfiguration.xml configuration file that will fail to parse correctly.  For this reason you have to provide a placeholder SystemStore in the xml and then configure the provider in code before starting the Silo.
+There is currently a known issue with the "Custom" membership provider OrleansConfiguration.xml configuration file that will fail to parse correctly.
+For this reason you have to provide a placeholder SystemStore in the xml and then configure the provider in code before starting the Silo.
 
 **OrleansConfiguration.xml**
 
@@ -100,7 +107,10 @@ If you are interested in using Consul for your own service discovery there are [
 
 ## Implementation Detail
 
-The Membership Table Provider makes use of [Consul's Key/Value store](https://www.consul.io/intro/getting-started/kv.html) functionality with CAS.  When each Silo starts it registers two KV entries, one which contains the Silo details and one which holds the last time the Silo reported it was alive (the latter refers to diagnostics "I am alive" entries and not to failure detection hearbeats which are sent directly between the silos and are not written into the table). All writes to the table are performed with CAS to provide concurrency control, as necessitated by Orleans's [Cluster Management Protocol](cluster_management.md). Once the Silo is running you can view these entries in your web browser [here](http://localhost:8500/v1/kv/?keys), this will display something like:
+The Membership Table Provider makes use of [Consul's Key/Value store](https://www.consul.io/intro/getting-started/kv.html) functionality with CAS.
+When each Silo starts it registers two KV entries, one which contains the Silo details and one which holds the last time the Silo reported it was alive (the latter refers to diagnostics "I am alive" entries and not to failure detection hearbeats which are sent directly between the silos and are not written into the table).
+All writes to the table are performed with CAS to provide concurrency control, as necessitated by Orleans's [Cluster Management Protocol](../implementation/cluster_management.md).
+Once the Silo is running you can view these entries in your web browser [here](http://localhost:8500/v1/kv/?keys), this will display something like:
 
 ```js
 [
@@ -109,7 +119,9 @@ The Membership Table Provider makes use of [Consul's Key/Value store](https://ww
 ]
 ```
 
-You will notice that the keys are prefixed with *"orleans/"* this is hard coded in the provider and is intended to avoid key space collision with other users of Consul.  Each of these keys can be read by appending their key name *(sans quotes of course)* to the [Consul KV root](http://localhost:8500/v1/kv/).  Doing so will present you with the following:
+You will notice that the keys are prefixed with *"orleans/"* this is hard coded in the provider and is intended to avoid key space collision with other users of Consul.
+Each of these keys can be read by appending their key name *(sans quotes of course)* to the [Consul KV root](http://localhost:8500/v1/kv/).
+Doing so will present you with the following:
 
 ```js
 [
@@ -147,10 +159,13 @@ When the Clients connect, they read the KVs for all silos in the cluster in one 
 ## Limitations
 
 ### Orleans Extended Membership Protocol (Table Version & ETag)
-Consul KV currrently does not currently support atomic updates. Therefore, the Orleans Consul Membership Provider only implements the the Orleans Basic Membership Protocol, as described [here](cluster_management.md) and does not support the Extended Membership Protocol.  This Extended protocol was introduced as an additional, but not essential, silo connectivity validation and as a foundation to functionality that has not yet been implemented. Providing your infrastructure is correctly configured you will not experience any detrimental effect of the lack of support.
+Consul KV currrently does not currently support atomic updates.
+Therefore, the Orleans Consul Membership Provider only implements the the Orleans Basic Membership Protocol, as described [here](../implementation/cluster_management.md) and does not support the Extended Membership Protocol.  This Extended protocol was introduced as an additional, but not essential, silo connectivity validation and as a foundation to functionality that has not yet been implemented.
+Providing your infrastructure is correctly configured you will not experience any detrimental effect of the lack of support.
 
 ### Multiple Datacenters
-The Key Value Pairs in Consul are not currently replicated between Consul datacenters.  There is a [separate project](https://github.com/hashicorp/consul-replicate) to address this but it has not yet been proven to support Orleans.
+The Key Value Pairs in Consul are not currently replicated between Consul datacenters.
+There is a [separate project](https://github.com/hashicorp/consul-replicate) to address this but it has not yet been proven to support Orleans.
 
 ### When running on Windows
 
@@ -158,7 +173,8 @@ When Consul starts on Windows it logs the following message:
 
 	==> WARNING: Windows is not recommended as a Consul server. Do not use in production.
 
-This is displayed simply due to lack of focus on testing when running in a Windows environment and not because of any actual known issues.  Read the [discussion here](https://groups.google.com/forum/#!topic/consul-tool/DvXYgZtUZyU) before deciding if Consul is the right choice for you.
+This is displayed simply due to lack of focus on testing when running in a Windows environment and not because of any actual known issues.
+Read the [discussion here](https://groups.google.com/forum/#!topic/consul-tool/DvXYgZtUZyU) before deciding if Consul is the right choice for you.
 
 ## Potential Future Enhanecements
 
@@ -166,4 +182,5 @@ This is displayed simply due to lack of focus on testing when running in a Windo
 
 2) Implement the Reminder Table in Consul.
 
-3) Implement the Extended Membership Protocol. The team behind Consul does plan on implementing atomic operations, once this functionality is available it will be possible to remove the limitations in the provider.
+3) Implement the Extended Membership Protocol.
+The team behind Consul does plan on implementing atomic operations, once this functionality is available it will be possible to remove the limitations in the provider.

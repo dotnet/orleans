@@ -17,10 +17,6 @@
   href: configuring_.NET_garbage_collection.md
 - name: Configuring ADO.NET Providers
   href: configuring_ADO.NET_providers.md
-- name: Load Balancing
-  href: load_balancing.md
-- name: Messaging Delivery Guarantees
-  href: messaging_delivery_guarantees.md
 - name: Serialization
   href: serialization.md  
 - name: Startup Tasks
