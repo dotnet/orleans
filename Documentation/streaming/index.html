@@ -129,7 +129,7 @@ Individual event delivery guarantees depend on individual stream providers. Some
 <p><strong>Events Delivery Order</strong>:
 Event order also depends on a particular stream provider. In SMS streams, the producer explicitelly controls the order of events seen by the consumer by controlling the way it publishes them. Azure Queue streams do not guarantee FIFO order, since the underlaying Azure Queues do not guarantee order in failure cases. Applications can also control their own stream delivery ordering, by using <code>StreamSequenceToken</code>.</p>
 <h2 id="streams-implementation">Streams Implementation</h2>
-<p>The <a href="streams_implementation.html">Orleans Streams Implementation</a> provides a high level overview of the internal implementation.</p>
+<p>The <a href="../implementation/streams_implementation.html">Orleans Streams Implementation</a> provides a high level overview of the internal implementation.</p>
 <h2 id="code-samples">Code Samples</h2>
 <p>More examples of how to use streaming APIs within a grain can be found <a href="https://github.com/dotnet/orleans/blob/master/test/TestGrains/SampleStreamingGrain.cs">here</a>. We plan to create more samples in the future.</p>
 <h2 id="more-material">More Material</h2>
