@@ -47,6 +47,7 @@ Extending and/or customizing the set of existing persistent storage providers av
 
 The runtime automatically propagates unhandled errors up the call chain with the semantics of asynchronous and distributed try/catch.
 As a result, errors do not get lost within an application.
+
 This allows the programmer to put error handling logic at the appropriate places, without the tedious work of manually propagating errors at each level.
 
 ### Transparent Scalability by Default
