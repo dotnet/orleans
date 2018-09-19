@@ -31,13 +31,11 @@ namespace Orleans.Serialization
         public IList<SerializerKnownTypeMetadata> KnownTypes { get; } = new List<SerializerKnownTypeMetadata>();
 
         /// <summary>
-        /// Adds a serializer type 
+        /// Adds a serializer type.
         /// </summary>
-        /// <param name="targetType"></param>
-        /// <param name="serializerType"></param>
-        public void AddSerializerType(Type targetType, Type serializerType)
+        public void AddSerializerType(Type targetType, Type serializerType, bool overrideExisting = true)
         {
-            this.SerializerTypes.Add(new SerializerTypeMetadata(targetType, serializerType));
+            this.SerializerTypes.Add(new SerializerTypeMetadata(targetType, serializerType, overrideExisting));
         }
 
         /// <summary>
@@ -57,10 +55,11 @@ namespace Orleans.Serialization
     [DebuggerDisplay("Serializer: {" + nameof(Serializer) + "}, Target: {"+ nameof(Target) + "}")]
     public class SerializerTypeMetadata
     {
-        public SerializerTypeMetadata(Type target, Type serializer)
+        public SerializerTypeMetadata(Type target, Type serializer, bool overrideExisting = true)
         {
             this.Serializer = serializer;
             this.Target = target;
+            this.OverrideExisting = overrideExisting;
         }
 
         /// <summary>
@@ -72,6 +71,11 @@ namespace Orleans.Serialization
         /// Gets the target type.
         /// </summary>
         public Type Target { get; }
+
+        /// <summary>
+        /// Whether or not to override an existing registration for the provided <see cref="Target"/>.
+        /// </summary>
+        public bool OverrideExisting { get; }
     }
 
     /// <summary>
@@ -80,9 +84,10 @@ namespace Orleans.Serialization
     [DebuggerDisplay("Target: {" + nameof(Target) + "}")]
     public class SerializerDelegateMetadata
     {
-        public SerializerDelegateMetadata(Type target, DeepCopier deepCopier, Serializer serializer, Deserializer deserializer)
+        public SerializerDelegateMetadata(Type target, DeepCopier deepCopier, Serializer serializer, Deserializer deserializer, bool overrideExisting = true)
         {
             this.Target = target;
+            this.OverrideExisting = overrideExisting;
             this.Delegates = new SerializerMethods(deepCopier, serializer, deserializer);
         }
 
@@ -90,6 +95,11 @@ namespace Orleans.Serialization
         /// Gets the target type.
         /// </summary>
         public Type Target { get; }
+
+        /// <summary>
+        /// Whether or not to override entries which 
+        /// </summary>
+        public bool OverrideExisting { get; }
 
         /// <summary>
         /// Gets the serialization delegates.

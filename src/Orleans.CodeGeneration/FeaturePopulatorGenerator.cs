@@ -103,7 +103,7 @@ namespace Orleans.CodeGenerator
             var featureParameter = interfaceMethod.GetParameters()[0].Name.ToIdentifierName();
             var bodyStatements = new List<StatementSyntax>();
 
-            var addSerializerTypeMethod = TypeUtils.Method((SerializerFeature _) => _.AddSerializerType(default(Type), default(Type)));
+            var addSerializerTypeMethod = TypeUtils.Method((SerializerFeature _) => _.AddSerializerType(default(Type), default(Type), true));
             foreach (var serializerType in typeDescriptions.SerializerTypes)
             {
                 bodyStatements.Add(
