@@ -3,7 +3,7 @@
   homepage: index.md
   items:
   - name: Benefits
-    href: benefits.md
+    href: Benefits.md
   - name: Frequently Asked Questions
     href: frequently_asked_questions.md
   - name: What's new in Orleans
