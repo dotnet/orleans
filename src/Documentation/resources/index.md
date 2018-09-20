@@ -6,12 +6,12 @@ title: Resources
 
 ## [Contributing](contributing.md)
 
-Some notes and guidelines for developers wanting to contribute to Orleans.
+Some notes and guidelines for developers who want to contribute to Orleans.
 
 ## [Student Projects](student_projects.md)
 
-We suggest 2 types of projects for students:
-The first type includes exploratory, open-ended, research-oriented projects with the goal of enabling new capabilities in Orleans. 
+We suggest 2 types of projects for students.
+The first type includes exploratory, open-ended, research-oriented projects with the goal of enabling new capabilities in Orleans.
 The second type includes ideas for student education.
 
 ## [Documentation Guidelines](documentation_guidelines.md)
