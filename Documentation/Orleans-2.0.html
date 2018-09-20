@@ -91,9 +91,11 @@ See more details in the <a href="clusters_and_clients/configuration_guide/index.
 </li>
 <li><p>Explicit programmatic specification of application assemblies that replaces automatic scanning of folders by the Orleans runtime upon silo or client initialization. 
 Orleans will still automatically find relevant types, such as grain interfaces and classes, serializers, etc. in the specified assemblies, but it will no longer try to load every assembly it can find in the folder.
-An optional helper method for loading all assemblies in the folder is provided for backward compatibility: <code>IApplicationPartManager.AddFromApplicationBaseDirectory()</code> 
-See <a href="clusters_and_clients/configuration_guide/index.html">Configuration</a> and <a href="resources/Migration/Migration1.5.html">Migration</a> sections for more details.</p>
+An optional helper method for loading all assemblies in the folder is provided for backward compatibility: <code>IApplicationPartManager.AddFromApplicationBaseDirectory()</code>. </p>
 </li>
+</ul>
+<p>See <a href="clusters_and_clients/configuration_guide/index.html">Configuration</a> and <a href="resources/Migration/Migration1.5.html">Migration</a> sections for more details.</p>
+<ul>
 <li><p>Overhaul of code generation. 
 While mostly invisible for the developer, code generation became much more robust in handling serialization of various possible types. 
 Special handling is required for F# assemblies. 
