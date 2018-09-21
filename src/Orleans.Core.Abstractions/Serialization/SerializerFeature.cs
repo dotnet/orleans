@@ -33,7 +33,15 @@ namespace Orleans.Serialization
         /// <summary>
         /// Adds a serializer type.
         /// </summary>
-        public void AddSerializerType(Type targetType, Type serializerType, bool overrideExisting = true)
+        public void AddSerializerType(Type targetType, Type serializerType)
+        {
+            this.SerializerTypes.Add(new SerializerTypeMetadata(targetType, serializerType, overrideExisting: true));
+        }
+
+        /// <summary>
+        /// Adds a serializer type.
+        /// </summary>
+        public void AddSerializerType(Type targetType, Type serializerType, bool overrideExisting)
         {
             this.SerializerTypes.Add(new SerializerTypeMetadata(targetType, serializerType, overrideExisting));
         }
