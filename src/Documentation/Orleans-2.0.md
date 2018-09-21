@@ -11,12 +11,9 @@ As part of that effort, several modernizations of Orleans APIs were made to make
 Because it is compatible with .NET Standard 2.0, Orleans 2.0 can be used by applications targeting .NET Core or full .NET Framework.
 The emphasis of testing by the Core team for this release is on full .NET Framework to ensure that existing applications can easily migrate from 1.5 to 2.0, and with full backward compatibility.
 
-The open source community has been running the pre-release version of 2.0 with .NET Core successfully on both Windows and Linux, but test coverage on those platforms is currently much less comprehensive than on full .NET Framework.
-We plan to expand testing on .NET Core after the 2.0 release.
-
 The most significant changes in 2.0 are as follows:
 
-* Completely moved to programmatic config leveraging Dependency Injection with a fluid builder pattern API.
+* Completely moved to programmatic configuration leveraging Dependency Injection with a fluid builder pattern API.
 
 The old API based on configuration objects and XML files is preserved for backward compatibility, but will not move forward and will get deprecated in the future.
 See more details in the [Configuration](clusters_and_clients/configuration_guide/index.md) section.
