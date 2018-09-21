@@ -97,4 +97,4 @@ More examples of how to use streaming APIs within a grain can be found [here](ht
 ## More Material
 
 * [Orleans Virtual Meetup about Streams](https://plus.google.com/events/crdjm977pqubv81lgdhqruoqal4)
-* [Orleans Streaming Presentation from Virtual Meetup](http://dotnet.github.io/orleans/Presentations/Orleans Streaming%20-%20Virtual%20meetup%20-%205-22-2015.pptx)
+* [Orleans Streaming Presentation from Virtual Meetup](http://dotnet.github.io/orleans/Presentations/Orleans%20Streaming%20-%20Virtual%20meetup%20-%205-22-2015.pptx)
