@@ -1819,114 +1819,6 @@
     },
     {
       "type": "Conceptual",
-      "source_relative_path": "Community/Contributing.md",
-      "output": {
-        ".html": {
-          "relative_path": "Community/Contributing.html",
-          "hash": "CYm6BpeoVwUT1P7U/+/o/A=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Community/Documentation-Guidelines.md",
-      "output": {
-        ".html": {
-          "relative_path": "Community/Documentation-Guidelines.html",
-          "hash": "gDP1lzPgSS29JVzNfobWWg=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Community/Ideas-for-Contributions.md",
-      "output": {
-        ".html": {
-          "relative_path": "Community/Ideas-for-Contributions.html",
-          "hash": "021jN4GDL6NfJq017pePNg=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Community/Links.md",
-      "output": {
-        ".html": {
-          "relative_path": "Community/Links.html",
-          "hash": "3YdX176MS/tdibJl/PaLgw=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Community/Orleans-Architecture-Principles-and-Approach-I.md",
-      "output": {
-        ".html": {
-          "relative_path": "Community/Orleans-Architecture-Principles-and-Approach-I.html",
-          "hash": "EwJpWQyc4s3pBgAqgkBrKg=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Community/Orleans-Thinking-Big-and-Small.md",
-      "output": {
-        ".html": {
-          "relative_path": "Community/Orleans-Thinking-Big-and-Small.html",
-          "hash": "ra8AZ7VIeLUwHrQkIMUxUQ=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Community/Student-Projects.md",
-      "output": {
-        ".html": {
-          "relative_path": "Community/Student-Projects.html",
-          "hash": "wWsWSYtvJiQ9KEWYdhQxJw=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Community/Who-Is-Using-Orleans.md",
-      "output": {
-        ".html": {
-          "relative_path": "Community/Who-Is-Using-Orleans.html",
-          "hash": "dGq9LhTc5xCwyRgaf1JlLg=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Toc",
-      "source_relative_path": "Community/toc.yml",
-      "output": {
-        ".html": {
-          "relative_path": "Community/toc.html",
-          "hash": "2sl4DvfAGFG1L8PqBMtYKw=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
       "source_relative_path": "Documentation/Orleans-2.0.md",
       "output": {
         ".html": {
@@ -2892,19 +2784,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/resources/Contributing.html",
-          "hash": "2gjI+2LfSAkOYZSqg6r3EQ=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Documentation/resources/Documentation-Guidelines.md",
-      "output": {
-        ".html": {
-          "relative_path": "Documentation/resources/Documentation-Guidelines.html",
-          "hash": "dGoP20Aci1s13BUn9+OFXQ=="
+          "hash": "7Js0FvojrTybethBOTJONA=="
         }
       },
       "is_incremental": false,
@@ -2972,11 +2852,11 @@
     },
     {
       "type": "Conceptual",
-      "source_relative_path": "Documentation/resources/Student-Projects.md",
+      "source_relative_path": "Documentation/resources/documentation_guidelines.md",
       "output": {
         ".html": {
-          "relative_path": "Documentation/resources/Student-Projects.html",
-          "hash": "W3RO4o62SDyMpK2nVNTrNg=="
+          "relative_path": "Documentation/resources/documentation_guidelines.html",
+          "hash": "1ZY8xu0iROlZZiCwcBQcMw=="
         }
       },
       "is_incremental": false,
@@ -2988,7 +2868,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/resources/index.html",
-          "hash": "aopvW+pV/iwnYJF07EQR7A=="
+          "hash": "84sW9CcF2pKpk+wdz4mP3g=="
         }
       },
       "is_incremental": false,
@@ -3025,6 +2905,18 @@
         ".html": {
           "relative_path": "Documentation/resources/orleans_thinking_big_and_small.html",
           "hash": "Vz1PDIAStV5G6PmRwsBLhg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/resources/student_projects.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/resources/student_projects.html",
+          "hash": "CxLgLrkJy9kdD3oMy566BA=="
         }
       },
       "is_incremental": false,
@@ -3096,7 +2988,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/toc.html",
-          "hash": "c8JwKdcT9xWDgU/VlotjFQ=="
+          "hash": "vyrNdHjwswhPPKj9BPXYTg=="
         }
       },
       "is_incremental": false,
@@ -3634,8 +3526,7 @@
   "incremental_info": [
     {
       "status": {
-        "can_incremental": false,
-        "details": "Cannot build incrementally because last build info is missing.",
+        "can_incremental": true,
         "incrementalPhase": "build"
       },
       "processors": {
@@ -3650,7 +3541,7 @@
           "incrementalPhase": "build"
         },
         "ConceptualDocumentProcessor": {
-          "can_incremental": false,
+          "can_incremental": true,
           "incrementalPhase": "build"
         }
       }
