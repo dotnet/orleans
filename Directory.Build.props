@@ -44,16 +44,17 @@
   <PropertyGroup>
     <!-- System packages -->
     <SystemRuntimeVersion>4.3.0</SystemRuntimeVersion>
-    
+
     <SystemCollectionsImmutableVersion>1.4.0</SystemCollectionsImmutableVersion>
     <SystemNetHttpVersion>4.3.2</SystemNetHttpVersion>
     <SystemReflectionMetadataVersion>1.5.0</SystemReflectionMetadataVersion>
     <SystemReflectionTypeExtensionsVersion>4.4.0</SystemReflectionTypeExtensionsVersion>
     <SystemValueTupleVersion>4.4.0</SystemValueTupleVersion>
+    <SystemThreadingTasksExtensionsVersion>4.4.0</SystemThreadingTasksExtensionsVersion>
 
     <!-- Microsoft packages -->
-    <MicrosoftBuildVersion>15.3.409</MicrosoftBuildVersion>
-    <MicrosoftCodeAnalysisCSharpVersion>2.0.0</MicrosoftCodeAnalysisCSharpVersion>
+    <MicrosoftBuildVersion>15.7.179</MicrosoftBuildVersion>
+    <MicrosoftCodeAnalysisVersion>2.8.2</MicrosoftCodeAnalysisVersion>
 
     <MicrosoftExtensionsConfigurationBinderVersion>2.0.0</MicrosoftExtensionsConfigurationBinderVersion>
     <MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>2.0.0</MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>
@@ -72,7 +73,7 @@
     <MicrosoftServiceFabricServicesVersion>3.0.472</MicrosoftServiceFabricServicesVersion>
     <WindowsAzureStorageVersion>8.2.1</WindowsAzureStorageVersion>
 
-    <FSharpCoreVersion>4.2.3</FSharpCoreVersion>
+    <FSharpCoreVersion>4.5.2</FSharpCoreVersion>
 
     <SystemManagementAutomationdllVersion>10.0.10586</SystemManagementAutomationdllVersion>
 
@@ -151,7 +152,7 @@
     <OrleansEventHubProviderVersion>2.1.0</OrleansEventHubProviderVersion>
     <OrleansTelemetryConsumersVersion>2.1.0</OrleansTelemetryConsumersVersion>
   </PropertyGroup>
-  
+
   <PropertyGroup Condition="$(FullBuild) == 'true'">
     <OrleansCoreAbstractionsVersion>$(VersionPrefix)</OrleansCoreAbstractionsVersion>
     <OrleansRuntimeAbstractionsVersion>$(VersionPrefix)</OrleansRuntimeAbstractionsVersion>

@@ -7,6 +7,17 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [2.1.0-rc2] (changes since 2.1.0-rc1)
+
+- Major changes
+  - New Code Generator (#4934, #5010, #5011)
+
+- Breaking changes
+  - None
+
+- Non-breaking bug fixes
+  - More fixed to Transfer of Coordinatio (transactions) (#4968)
+
 ### [2.1.0-rc1] (changes since 2.1.0-beta1)
 
 - Major changes

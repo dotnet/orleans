@@ -8,7 +8,7 @@
   <PropertyGroup>
     <AssemblyName>Orleans.Core</AssemblyName>
     <RootNamespace>Orleans</RootNamespace>
-    <OrleansBuildTimeCodeGen Condition="'$(Bootstrap)' != 'true'">true</OrleansBuildTimeCodeGen>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
   <ItemGroup>

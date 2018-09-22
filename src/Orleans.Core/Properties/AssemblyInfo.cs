@@ -38,6 +38,7 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("TestExtensions")]
 [assembly: InternalsVisibleTo("TestInternalGrainInterfaces")]
 [assembly: InternalsVisibleTo("TestInternalGrains")]
+[assembly: InternalsVisibleTo("CodeGenerator.Tests")]
 
 // Legacy provider support
 [assembly: InternalsVisibleTo("Orleans.Core.Legacy")]
