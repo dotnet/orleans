@@ -1,3 +1,6 @@
 ### YamlMime:XRefMap
 sorted: true
-references: []
+references:
+- uid: serialization
+  name: Serialization and Writing Custom Serializers
+  href: Documentation/clusters_and_clients/configuration_guide/serialization.html
