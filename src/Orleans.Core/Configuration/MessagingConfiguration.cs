@@ -89,6 +89,11 @@ namespace Orleans.Runtime.Configuration
         /// Gets the fallback serializer, used as a last resort when no other serializer is able to serialize an object.
         /// </summary>
         TypeInfo FallbackSerializationProvider { get; set; }
+
+        /// <summary>
+        /// The LargeMessageWarningThreshold attribute specifies when to generate a warning trace message for large messages.
+        /// </summary>
+        int LargeMessageWarningThreshold { get; set; }
     }
 
     /// <summary>
@@ -120,6 +125,11 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public int MaxForwardCount { get; set; }
 
+        /// <summary>
+        /// The LargeMessageWarningThreshold attribute specifies when to generate a warning trace message for large messages.
+        /// </summary>
+        public int LargeMessageWarningThreshold { get; set; }
+
         public List<TypeInfo> SerializationProviders { get; private set; }
         public TypeInfo FallbackSerializationProvider { get; set; }
 
@@ -149,6 +159,7 @@ namespace Orleans.Runtime.Configuration
             BufferPoolBufferSize = MessagingOptions.DEFAULT_BUFFER_POOL_BUFFER_SIZE;
             BufferPoolMaxSize = MessagingOptions.DEFAULT_BUFFER_POOL_MAX_SIZE;
             BufferPoolPreallocationSize = MessagingOptions.DEFAULT_BUFFER_POOL_PREALLOCATION_SIZE;
+            LargeMessageWarningThreshold = MessagingOptions.DEFAULT_LARGE_MESSAGE_WARNING_THRESHOLD;
 
             if (isSiloConfig)
             {
@@ -202,6 +213,12 @@ namespace Orleans.Runtime.Configuration
                                       ? ConfigUtilities.ParseTimeSpan(child.GetAttribute("ResponseTimeout"),
                                                                  "Invalid ResponseTimeout")
                                       : MessagingOptions.DEFAULT_RESPONSE_TIMEOUT;
+
+            if (child.HasAttribute("LargeMessageWarningThreshold"))
+            {
+                LargeMessageWarningThreshold = ConfigUtilities.ParseInt(child.GetAttribute("LargeMessageWarningThreshold"),
+                    "Invalid boolean value for LargeMessageWarningThresholdattribute");
+            }
 
             if (child.HasAttribute("MaxResendCount"))
             {

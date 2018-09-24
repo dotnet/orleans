@@ -114,7 +114,6 @@ namespace Orleans.Runtime.Configuration
         ///  Whether Trace.CorrelationManager.ActivityId settings should be propagated into grain calls.
         /// </summary>
         public bool PropagateActivityId { get; set; }
-
         /// <summary>
         /// </summary>
         public AddressFamily PreferredFamily { get; set; }
