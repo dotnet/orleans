@@ -1,6 +1,7 @@
 ---
 layout: page
 title: Serialization and Writing Custom Serializers
+uid: serialization
 ---
 
 # Serialization and Writing Custom Serializers
@@ -29,6 +30,7 @@ The rules are:
 
 # Serialization Providers
 Orleans supports integration with third-party serializers using a provider model. This requires an implementation of the `IExternalSerializer` type described in the custom serialization section of this document. Integrations for some common serializers are maintained alongside Orleans, for example:
+
 * [Protocol Buffers](https://developers.google.com/protocol-buffers/): `Orleans.Serialization.ProtobufSerializer` from the [Microsoft.Orleans.OrleansGoogleUtils](https://www.nuget.org/packages/Microsoft.Orleans.OrleansGoogleUtils/) NuGet package.
 * [Bond](https://github.com/microsoft/bond/): `Orleans.Serialization.BondSerializer` from the [Microsoft.Orleans.Serialization.Bond](https://www.nuget.org/packages/Microsoft.Orleans.Serialization.Bond/) NuGet package.
 * [Newtonsoft.Json AKA Json.NET](http://www.newtonsoft.com/json): `Orleans.Serialization.OrleansJsonSerializer` from the core Orleans library.
@@ -40,16 +42,18 @@ It is important to ensure that serialization configuration is identical on all c
 
 Serialization providers, which implement `IExternalSerializer`, can be specified using the `SerializationProviders` property of `ClientConfiguration` and `GlobalConfiguration` in code:
 
-```C#
+``` csharp
 var cfg = new ClientConfiguration();
 cfg.SerializationProviders.Add(typeof(FantasticSerializer).GetTypeInfo());
 ```
-```C#
+
+``` csharp
 var cfg = new GlobalConfiguration();
 cfg.SerializationProviders.Add(typeof(FantasticSerializer).GetTypeInfo());
 ```
 
 Alternatively, they can be specified in XML configuration under the `<SerializationProviders />` property of `<Messaging>`:
+
 ``` xml
 <Messaging>
   <SerializationProviders>
@@ -77,9 +81,9 @@ Each of these methods are detailed in the sections below.
 ## Introduction
 Orleans serialization happens in three stages: objects are immediately deep copied to ensure isolation; before being put on the wire; objects are serialized to a message byte stream; and when delivered to the target activation, objects are recreated (deserialized) from the received byte stream. Data types that may be sent in messages -- that is, types that may be passed as method arguments or return values -- must have associated routines that perform these three steps. We refer to these routines collectively as the serializers for a data type.
 
- The copier for a type stands alone, while the serializer and deserializer are a pair that work together. You can provide just a custom copier, or just a custom serializer and a custom deserializer, or you can provide custom implementations of all three.
+The copier for a type stands alone, while the serializer and deserializer are a pair that work together. You can provide just a custom copier, or just a custom serializer and a custom deserializer, or you can provide custom implementations of all three.
 
- Serializers are registered for each supported data type at silo start-up and whenever an assembly is loaded. Registration is necessary for custom serializer routines for a type to be used. Serializer selection is based on the dynamic type of the object to be copied or serialized. For this reason, there is no need to create serializers for abstract classes or interfaces, because they will never be used.
+Serializers are registered for each supported data type at silo start-up and whenever an assembly is loaded. Registration is necessary for custom serializer routines for a type to be used. Serializer selection is based on the dynamic type of the object to be copied or serialized. For this reason, there is no need to create serializers for abstract classes or interfaces, because they will never be used.
 
 ## When to Consider Writing a Custom Serializer
 It is rare that a hand-crafted serializer routine will perform meaningfully better than the generated versions. If you are tempted to do so, you should first consider the following options:
@@ -118,7 +122,7 @@ var fooCopy = SerializationManager.DeepCopyInner(foo, context);
 
 It is important to use DeepCopyInner, instead of DeepCopy, in order to maintain the object identity context for the full copy operation.
 
-**Maintaining Object Identity**
+#### Maintaining Object Identity
 
 An important responsibility of a copy routine is to maintain object identity. The Orleans runtime provides a helper class for this. Before copying a sub-object "by hand" (i.e., not by calling DeepCopyInner), check to see if it has already been referenced as follows:
 
@@ -183,7 +187,7 @@ To deserialize sub-objects, use the `SerializationManager`'s `DeserializeInner` 
 var foo = SerializationManager.DeserializeInner(typeof(FooType), context);
 ```
 
-Or, alternatively,
+Or, alternatively:
 
 ``` csharp
 var foo = SerializationManager.DeserializeInner<FooType>(context);
@@ -197,6 +201,7 @@ The `BinaryTokenStreamReader` class provides a wide variety of methods for readi
 In this method, you implement `Orleans.Serialization.IExternalSerializer` and add it to the `SerializationProviders` property on both `ClientConfiguration` on the client and `GlobalConfiguration` on the silos. Configuration is detailed in the Serialization Providers section above.
 
 Implementation of `IExternalSerializer` follows the pattern described for serialization methods from `Method 1` above with the addition of an `Initialize` method and an `IsSupportedType` method which Orleans uses to determine if the serializer supports a given type. This is the interface definition:
+
 ``` csharp
 public interface IExternalSerializer
 {
@@ -321,27 +326,71 @@ If you write a custom serializer, and it winds up looking like a sequence of cal
 # Fallback Serialization
 
 Orleans supports transmission of arbitrary types at runtime and therefore the in-built code generator cannot determine the entire set of types which will be transmitted ahead of time. Additionally, certain types cannot have serializers generated for them because they are inaccessible (for example, `private`) or have fields which are inaccessible (for example, `readonly`). Therefore, there is a need for just-in-time serialization of types which were unexpected or could not have serializers generated ahead-of-time. The serializer responsible for these types is called the *fallback serializer*. Orleans ships with two fallback serializers:
+
 * `Orleans.Serialization.BinaryFormatterSerializer` which uses .NET's [BinaryFormatter](https://msdn.microsoft.com/en-us/library/system.runtime.serialization.formatters.binary.binaryformatter); and
 * `Orleans.Serialization.ILBasedSerializer` which emits [CIL](https://en.wikipedia.org/wiki/Common_Intermediate_Language) instructions at runtime to create serializers which leverage Orleans' serialization framework to serialize each field. This means that if an inaccessible type `MyPrivateType` contains a field `MyType` which has a custom serializer, that custom serializer will be used to serialize it.
 
 The fallback serializer can be configured using the `FallbackSerializationProvider` property on both `ClientConfiguration` on the client and `GlobalConfiguration` on the silos.
-```C#
+
+``` csharp
 var cfg = new ClientConfiguration();
 cfg.FallbackSerializationProvider = typeof(FantasticSerializer).GetTypeInfo();
 ```
-```C#
+
+``` csharp
 var cfg = new GlobalConfiguration();
 cfg.FallbackSerializationProvider = typeof(FantasticSerializer).GetTypeInfo();
 ```
 
 Alternatively, the fallback serialization provider can be specified in XML configuration:
+
 ``` xml
 <Messaging>
   <FallbackSerializationProvider type="GreatCompany.FantasticFallbackSerializer, GreatCompany.SerializerAssembly"/>
 </Messaging>
 ```
 
-.NET Core uses the `ILBasedSerializer` by default, whereas .NET 4.6 uses `BinaryFormatterSerializer` by default.
+`BinaryFormatterSerializer` is the default fallback serializer.
+
+# Exception Serialization
+
+Exceptions are serialized using the [fallback serializer](xref:serialization:fallback_serialization). Using the default configuration, `BinaryFormatterSerializer` is the fallback serializer and so the [ISerializable pattern](https://docs.microsoft.com/en-us/dotnet/standard/serialization/custom-serialization) must be followed in order to ensure correct serialization of all properties in an exception type.
+
+Here is an example of an exception type with correctly implemented serialization:
+
+``` csharp
+[Serializable]
+public class MyCustomException : Exception
+{
+    public string MyProperty { get; }
+
+    public MyCustomException(string myProperty, string message)
+        : base(message)
+    {
+        this.MyProperty = myProperty;
+    }
+
+    public MyCustomException(string transactionId, string message, Exception innerException)
+        : base(message, innerException)
+    {
+        this.MyProperty = transactionId;
+    }
+
+    // Note: This is the constructor called by BinaryFormatter during deserialization
+    public MyCustomException(SerializationInfo info, StreamingContext context)
+        : base(info, context)
+    {
+        this.MyProperty = info.GetString(nameof(this.MyProperty));
+    }
+
+    // Note: This method is called by BinaryFormatter during serialization
+    public override void GetObjectData(SerializationInfo info, StreamingContext context)
+    {
+        base.GetObjectData(info, context);
+        info.AddValue(nameof(this.MyProperty), this.MyProperty);
+    }
+}
+```
 
 # Optimize Copying Using Immutable Types
 
@@ -392,6 +441,7 @@ byte[] buffer = immutable.Value;
 ### Using `[Immutable]`
 For user-defined types, the `[Orleans.Concurrency.Immutable]` attribute can be added to the type. This instructs Orleans' serializer to avoid copying instances of this type.
 The following code snippet demonstrates using `[Immutable]` to denote an immutable type. This type will not be copied during transmission.
+
 ``` csharp
 [Immutable]
 public class MyImmutableType
@@ -413,6 +463,7 @@ In some cases it is safe to relax this to logical immutability, but care must be
 
 # Serialization Best Practices
 Serialization serves two primary purposes in Orleans:
+
 1. As a wire format for transmitting data between grains and clients at runtime.
 2. As a storage format for persisting long-lived data for later retrieval.
 
