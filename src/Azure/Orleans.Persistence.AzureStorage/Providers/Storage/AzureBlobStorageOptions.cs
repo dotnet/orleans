@@ -62,6 +62,7 @@ namespace Orleans.Configuration
             try
             {
                 AzureStorageUtils.ValidateContainerName(options.ContainerName);
+                AzureStorageUtils.ValidateBlobName(this.name);
             }
             catch(ArgumentException e)
             {
