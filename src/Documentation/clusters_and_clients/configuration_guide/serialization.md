@@ -354,7 +354,7 @@ Alternatively, the fallback serialization provider can be specified in XML confi
 
 # Exception Serialization
 
-Exceptions are serialized using the [fallback serializer](xref:serialization:fallback_serialization). Using the default configuration, `BinaryFormatterSerializer` is the fallback serializer and so the [ISerializable pattern](https://docs.microsoft.com/en-us/dotnet/standard/serialization/custom-serialization) must be followed in order to ensure correct serialization of all properties in an exception type.
+Exceptions are serialized using the [fallback serializer](serialization.md#fallback-serialization). Using the default configuration, `BinaryFormatterSerializer` is the fallback serializer and so the [ISerializable pattern](https://docs.microsoft.com/en-us/dotnet/standard/serialization/custom-serialization) must be followed in order to ensure correct serialization of all properties in an exception type.
 
 Here is an example of an exception type with correctly implemented serialization:
 
