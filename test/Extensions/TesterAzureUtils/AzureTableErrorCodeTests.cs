@@ -57,9 +57,22 @@ namespace Tester.AzureUtils
             Assert.Throws<ArgumentException>(() => AzureStorageUtils.ValidateContainerName("MyContainer"));
             Assert.Throws<ArgumentException>(() => AzureStorageUtils.ValidateContainerName("my_container123"));
             Assert.Throws<ArgumentException>(() => AzureStorageUtils.ValidateContainerName("_container"));
+            Assert.Throws<ArgumentException>(() => AzureStorageUtils.ValidateContainerName("__"));
+            Assert.Throws<ArgumentException>(() => AzureStorageUtils.ValidateContainerName("_."));
             AzureStorageUtils.ValidateContainerName("123");
             AzureStorageUtils.ValidateContainerName("container");
             AzureStorageUtils.ValidateContainerName("my-container123");
+        }
+
+        [Fact, TestCategory("Functional")]
+        public void AzureStorageUtils_BlobName()
+        {
+            Assert.Throws<ArgumentException>(() => AzureStorageUtils.ValidateBlobName(""));
+            Assert.Throws<ArgumentException>(() => AzureStorageUtils.ValidateBlobName(" "));
+            AzureStorageUtils.ValidateBlobName(".");
+            AzureStorageUtils.ValidateBlobName("/");
+            AzureStorageUtils.ValidateContainerName("123");
+            AzureStorageUtils.ValidateContainerName("orleans-blob");
         }
 
         [Fact, TestCategory("Functional")]
