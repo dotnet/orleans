@@ -84,8 +84,17 @@ namespace Orleans.CodeGenerator.MSBuild
                 ? ProjectId.CreateFromSerialized(projectIdGuid)
                 : ProjectId.CreateNewId();
 
+            this.Log.LogDebug($"AssemblyName: {this.AssemblyName}");
             this.Log.LogDebug($"ProjectGuid: {ProjectGuid}");
             this.Log.LogDebug($"ProjectID: {projectId}");
+            this.Log.LogDebug($"ProjectName: {projectName}");
+            this.Log.LogDebug($"CodeGenOutputFile: {this.CodeGenOutputFile}");
+            this.Log.LogDebug($"ProjectPath: {this.ProjectPath}");
+            this.Log.LogDebug($"OutputType: {this.OutputType}");
+            this.Log.LogDebug($"TargetPath: {this.TargetPath}");
+            this.Log.LogDebug($"DefineConstants ({this.DefineConstants.Count}): {string.Join(", ", this.DefineConstants)}");
+            this.Log.LogDebug($"Sources ({this.Compile.Count}): {string.Join(", ", this.Compile)}");
+            this.Log.LogDebug($"References ({this.Reference.Count}): {string.Join(", ", this.Reference)}");
 
             var languageName = GetLanguageName(ProjectPath);
 
