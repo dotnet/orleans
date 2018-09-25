@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Orleans.CodeGenerator.Compatibility;
 
 namespace Orleans.CodeGenerator.Model
 {
@@ -47,6 +48,17 @@ namespace Orleans.CodeGenerator.Model
 
     public class KnownTypeDescription
     {
+        public KnownTypeDescription(INamedTypeSymbol type)
+        {
+            this.Type = type.OriginalDefinition.ConstructedFrom;
+        }
+
+        public static IEqualityComparer<KnownTypeDescription> Comparer { get; } = new TypeTypeKeyEqualityComparer();
+
+        public INamedTypeSymbol Type { get; }
+
+        public string TypeKey => this.Type.OrleansTypeKeyString();
+
         private sealed class TypeTypeKeyEqualityComparer : IEqualityComparer<KnownTypeDescription>
         {
             public bool Equals(KnownTypeDescription x, KnownTypeDescription y)
@@ -55,28 +67,16 @@ namespace Orleans.CodeGenerator.Model
                 if (ReferenceEquals(x, null)) return false;
                 if (ReferenceEquals(y, null)) return false;
                 if (x.GetType() != y.GetType()) return false;
-                return Equals(x.type, y.type) && string.Equals(x.TypeKey, y.TypeKey);
+                return Equals(x.Type, y.Type);
             }
 
             public int GetHashCode(KnownTypeDescription obj)
             {
                 unchecked
                 {
-                    return ((obj.type != null ? obj.type.GetHashCode() : 0) * 397) ^ (obj.TypeKey != null ? obj.TypeKey.GetHashCode() : 0);
+                    return ((obj.Type != null ? obj.Type.GetHashCode() : 0) * 397);
                 }
             }
         }
-
-        public static IEqualityComparer<KnownTypeDescription> Comparer { get; } = new TypeTypeKeyEqualityComparer();
-
-        private INamedTypeSymbol type;
-
-        public INamedTypeSymbol Type
-        {
-            get => type;
-            set => type = value?.OriginalDefinition?.ConstructedFrom;
-        }
-
-        public string TypeKey { get; set; }
     }
 }
