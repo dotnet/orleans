@@ -85,9 +85,9 @@ namespace Orleans.Serialization
             ILoggerFactory loggerFactory,
             ITypeResolver typeResolver,
             SerializationStatisticsGroup serializationStatistics,
-            int LargetMessageWarningThreshold)
+            int largeMessageWarningThreshold)
         {
-            this.LargeObjectSizeThreshold = LargetMessageWarningThreshold;
+            this.LargeObjectSizeThreshold = largeMessageWarningThreshold;
             this.serializationContext = new ThreadLocal<SerializationContext>(() => new SerializationContext(this));
             this.deserializationContext = new ThreadLocal<DeserializationContext>(() => new DeserializationContext(this));
 
