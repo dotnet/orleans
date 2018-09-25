@@ -150,7 +150,8 @@ namespace Orleans.TestingHost
                 Options.Create(new SerializationProviderOptions()),
                 new NullLoggerFactory(),
                 new CachedTypeResolver(),
-                new SerializationStatisticsGroup(Options.Create(new StatisticsOptions {CollectionLevel = StatisticsLevel.Info})));
+                new SerializationStatisticsGroup(Options.Create(new StatisticsOptions {CollectionLevel = StatisticsLevel.Info})),
+                MessagingOptions.DEFAULT_LARGE_MESSAGE_WARNING_THRESHOLD);
             serializationManager.RegisterSerializers(applicationPartManager);
             return serializationManager;
         }
