@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGenerator.Analysis;
@@ -31,7 +32,7 @@ namespace Orleans.CodeGenerator
             this.compilation = compilation;
             this.log = log;
             this.wellKnownTypes = WellKnownTypes.FromCompilation(compilation);
-            this.compilationAnalyzer = new CompilationAnalyzer(log, this.wellKnownTypes);
+            this.compilationAnalyzer = new CompilationAnalyzer(log, this.wellKnownTypes, compilation);
 
             var firstSyntaxTree = compilation.SyntaxTrees.FirstOrDefault() ?? throw new InvalidOperationException("Compilation has no syntax trees.");
             this.semanticModelForAccessibility = compilation.GetSemanticModel(firstSyntaxTree);
@@ -54,7 +55,7 @@ namespace Orleans.CodeGenerator
         {
             // Inspect the target assembly to discover known assemblies and known types.
             if (log.IsEnabled(LogLevel.Debug)) log.LogDebug($"Main assembly {this.compilation.Assembly}");
-            this.compilationAnalyzer.InspectAssembly(this.compilation.Assembly);
+            this.compilationAnalyzer.Analyze();
 
             // Create a list of all distinct types from all known assemblies.
             var types = this.compilationAnalyzer
@@ -81,16 +82,40 @@ namespace Orleans.CodeGenerator
 
             foreach (var type in serializationTypes) this.ProcessSerializableType(model, type);
 
-            var otherAssemblies = this.compilation.References
-                .Select(a => this.compilation.GetAssemblyOrModuleSymbol(a))
-                .OfType<IAssemblySymbol>()
-                .Where(a => !this.compilationAnalyzer.KnownAssemblies.Contains(a));
-            foreach (var type in otherAssemblies.SelectMany(a => a.GetDeclaredTypes()))
-            {
-                if (this.ValidForKnownTypes(type)) AddKnownType(model, type);
-            }
+            this.AddAssemblyMetadata(model);
 
             return model;
+        }
+
+        private void AddAssemblyMetadata(AggregatedModel model)
+        {
+            var assembliesToScan = new List<IAssemblySymbol>();
+            foreach (var asm in this.compilationAnalyzer.ReferencedAssemblies)
+            {
+                // Known assemblies are already handled.
+                if (this.compilationAnalyzer.KnownAssemblies.Contains(asm)) continue;
+
+                if (this.compilationAnalyzer.AssembliesExcludedFromCodeGeneration.Contains(asm)
+                    || this.compilationAnalyzer.AssembliesExcludedFromMetadataGeneration.Contains(asm))
+                {
+                    this.log.LogDebug($"Skipping adding known types for assembly {asm.Identity.Name} since a referenced assembly already includes its types.");
+                    continue;
+                }
+
+                assembliesToScan.Add(asm);
+            }
+
+            foreach (var asm in assembliesToScan)
+            {
+                this.log.LogDebug($"Generating metadata for referenced assembly {asm.Identity.Name}.");
+                foreach (var type in asm.GetDeclaredTypes())
+                {
+                    if (this.ValidForKnownTypes(type))
+                    {
+                        AddKnownType(model, type);
+                    }
+                }
+            }
         }
 
         private void ValidateModel(AggregatedModel model)
@@ -111,7 +136,7 @@ namespace Orleans.CodeGenerator
         {
             var namespaceGroupings = new Dictionary<INamespaceSymbol, List<MemberDeclarationSyntax>>();
 
-            // Pass the relevent elements of the model to each of the code generators.
+            // Pass the relevant elements of the model to each of the code generators.
             foreach (var grainInterface in model.GrainInterfaces)
             {
                 var nsMembers = GetNamespace(namespaceGroupings, grainInterface.Type.ContainingNamespace);
@@ -151,6 +176,11 @@ namespace Orleans.CodeGenerator
             var (attributes, featurePopulators) = FeaturePopulatorGenerator.GenerateSyntax(this.wellKnownTypes, model);
             compilationMembers.AddRange(featurePopulators);
 
+            // Add some attributes detailing which assemblies this generated code targets.
+            attributes.Add(AttributeList(
+                AttributeTargetSpecifier(Token(SyntaxKind.AssemblyKeyword)),
+                SeparatedList(GetCodeGenerationTargetAttribute().ToArray())));
+
             return CompilationUnit()
                 .AddUsings(UsingDirective(ParseName("global::Orleans")))
                 .WithAttributeLists(List(attributes))
@@ -161,6 +191,31 @@ namespace Orleans.CodeGenerator
                 if (namespaces.TryGetValue(ns, out var result)) return result;
                 return namespaces[ns] = new List<MemberDeclarationSyntax>();
             }
+
+            IEnumerable<AttributeSyntax> GetCodeGenerationTargetAttribute()
+            {
+                yield return GenerateAttribute(this.compilation.Assembly);
+
+                foreach (var assembly in this.compilationAnalyzer.ReferencedAssemblies)
+                {
+                    if (this.compilationAnalyzer.AssembliesExcludedFromCodeGeneration.Contains(assembly) ||
+                        this.compilationAnalyzer.AssembliesExcludedFromMetadataGeneration.Contains(assembly))
+                    {
+                        continue;
+                    }
+
+                    yield return GenerateAttribute(assembly);
+                }
+
+                AttributeSyntax GenerateAttribute(IAssemblySymbol assembly)
+                {
+                    var assemblyName = assembly.Identity.GetDisplayName(fullKey: true);
+                    this.log.LogTrace($"Adding [assembly: OrleansCodeGenerationTarget(\"{assemblyName}\")]");
+                    var nameSyntax = this.wellKnownTypes.OrleansCodeGenerationTargetAttribute.ToNameSyntax();
+                    return Attribute(nameSyntax)
+                        .AddArgumentListArguments(AttributeArgument(assemblyName.ToLiteralExpression()));
+                }
+            }
         }
 
         private void ProcessGrainInterface(AggregatedModel model, INamedTypeSymbol type)
@@ -169,7 +224,7 @@ namespace Orleans.CodeGenerator
 
             if (this.log.IsEnabled(LogLevel.Debug))
             {
-                this.log.LogDebug($"Found grain interface: {type.ToDisplayString()} {(accessible ? "accessible" : "NOT accessible")}");
+                this.log.LogDebug($"Found grain interface {type.ToDisplayString()}{(accessible ? string.Empty : ", but it is inaccessible")}");
             }
 
             if (accessible)
@@ -222,7 +277,7 @@ namespace Orleans.CodeGenerator
 
             if (this.log.IsEnabled(LogLevel.Debug))
             {
-                this.log.LogDebug($"Found grain class: {type.ToDisplayString()} {(accessible ? "accessible" : "NOT accessible")}");
+                this.log.LogDebug($"Found grain class {type.ToDisplayString()}{(accessible ? string.Empty : ", but it is inaccessible")}");
             }
 
             if (accessible)
@@ -389,11 +444,8 @@ namespace Orleans.CodeGenerator
             // in a serialized payload. For example, when serializing List<SomeAbstractType>, SomeAbstractType must be known. The same applies to
             // interfaces (which are encoded as abstract).
             var serializerModel = model.Serializers;
-            serializerModel.KnownTypes.Add(new KnownTypeDescription
-            {
-                Type = type.WithoutTypeParameters(),
-                TypeKey = type.OrleansTypeKeyString()
-            });
+            var strippedType = type.WithoutTypeParameters();
+            serializerModel.KnownTypes.Add(new KnownTypeDescription(strippedType));
         }
 
         private bool ValidForKnownTypes(INamedTypeSymbol type)

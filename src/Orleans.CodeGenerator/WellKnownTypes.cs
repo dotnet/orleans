@@ -99,6 +99,7 @@ namespace Orleans.CodeGenerator
                 KnownAssemblyAttribute = Type("Orleans.CodeGeneration.KnownAssemblyAttribute"),
                 KnownBaseTypeAttribute = Type("Orleans.CodeGeneration.KnownBaseTypeAttribute"),
                 ConsiderForCodeGenerationAttribute = Type("Orleans.CodeGeneration.ConsiderForCodeGenerationAttribute"),
+                OrleansCodeGenerationTargetAttribute = Type("Orleans.CodeGeneration.OrleansCodeGenerationTargetAttribute"),
             };
 
             INamedTypeSymbol Type(string type)
@@ -204,6 +205,7 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol KnownAssemblyAttribute { get; private set; }
         public INamedTypeSymbol KnownBaseTypeAttribute { get; private set; }
         public INamedTypeSymbol ConsiderForCodeGenerationAttribute { get; private set; }
+        public INamedTypeSymbol OrleansCodeGenerationTargetAttribute { get; private set; }
         public class OptionalType { }
 
         public class None : OptionalType

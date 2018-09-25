@@ -84,14 +84,14 @@ namespace Orleans.CodeGenerator.MSBuild
                 ? ProjectId.CreateFromSerialized(projectIdGuid)
                 : ProjectId.CreateNewId();
 
-            this.Log.LogDebug($"ProjectGuid: {ProjectGuid}");
+            if (!string.IsNullOrWhiteSpace(this.ProjectGuid)) this.Log.LogDebug($"ProjectGuid: {this.ProjectGuid}");
             this.Log.LogDebug($"ProjectID: {projectId}");
 
             var languageName = GetLanguageName(ProjectPath);
 
             var projectInfo = ProjectInfo.Create(
                 projectId,
-                VersionStamp.Create(),
+                VersionStamp.Default,
                 projectName,
                 AssemblyName,
                 languageName,
@@ -102,18 +102,16 @@ namespace Orleans.CodeGenerator.MSBuild
                 metadataReferences: GetMetadataReferences(Reference),
                 parseOptions: new CSharpParseOptions(preprocessorSymbols: this.DefineConstants)
             );
-
-            this.Log.LogDebug($"Project: {projectInfo}");
-
+            
             var workspace = new AdhocWorkspace();
             workspace.AddProject(projectInfo);
 
             var project = workspace.CurrentSolution.Projects.Single();
-            this.Log.LogInformation($"Workspace creation completed in {stopwatch.ElapsedMilliseconds}ms.");
+            this.Log.LogDebug($"Workspace creation completed in {stopwatch.ElapsedMilliseconds}ms.");
             stopwatch.Restart();
 
             var compilation = await project.GetCompilationAsync(cancellationToken);
-            this.Log.LogInformation($"GetCompilation completed in {stopwatch.ElapsedMilliseconds}ms.");
+            this.Log.LogDebug($"GetCompilation completed in {stopwatch.ElapsedMilliseconds}ms.");
             stopwatch.Restart();
 
             if (compilation.ReferencedAssemblyNames.All(name => name.Name != AbstractionsAssemblyShortName))
@@ -124,11 +122,11 @@ namespace Orleans.CodeGenerator.MSBuild
 
             var generator = new CodeGenerator(compilation, this.Log);
             var syntax = generator.GenerateCode(cancellationToken);
-            this.Log.LogInformation($"GenerateCode completed in {stopwatch.ElapsedMilliseconds}ms.");
+            this.Log.LogDebug($"GenerateCode completed in {stopwatch.ElapsedMilliseconds}ms.");
             stopwatch.Restart();
 
             var normalized = syntax.NormalizeWhitespace();
-            this.Log.LogInformation($"NormalizeWhitespace completed in {stopwatch.ElapsedMilliseconds}ms.");
+            this.Log.LogDebug($"NormalizeWhitespace completed in {stopwatch.ElapsedMilliseconds}ms.");
             stopwatch.Restart();
             
             var sourceBuilder = new StringBuilder();
@@ -140,7 +138,7 @@ namespace Orleans.CodeGenerator.MSBuild
             sourceBuilder.AppendLine("#endif");
             var source = sourceBuilder.ToString();
 
-            this.Log.LogInformation($"Generate source from syntax completed in {stopwatch.ElapsedMilliseconds}ms.");
+            this.Log.LogDebug($"Generate source from syntax completed in {stopwatch.ElapsedMilliseconds}ms.");
             stopwatch.Restart();
 
             if (File.Exists(this.CodeGenOutputFile))
@@ -150,7 +148,7 @@ namespace Orleans.CodeGenerator.MSBuild
                     var existing = await reader.ReadToEndAsync();
                     if (string.Equals(source, existing, StringComparison.Ordinal))
                     {
-                        this.Log.LogInformation("Generated code matches existing code.");
+                        this.Log.LogDebug("Generated code matches existing code.");
                         return true;
                     }
                 }
@@ -161,7 +159,7 @@ namespace Orleans.CodeGenerator.MSBuild
                 await sourceWriter.WriteAsync(source);
             }
 
-            this.Log.LogInformation($"Write source to disk completed in {stopwatch.ElapsedMilliseconds}ms.");
+            this.Log.LogDebug($"Write source to disk completed in {stopwatch.ElapsedMilliseconds}ms.");
 
             return true;
         }
