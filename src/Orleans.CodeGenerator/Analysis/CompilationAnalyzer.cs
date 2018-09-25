@@ -17,6 +17,7 @@ namespace Orleans.CodeGenerator.Analysis
         private readonly INamedTypeSymbol knownBaseTypeAttribute;
         private readonly INamedTypeSymbol knownAssemblyAttribute;
         private readonly INamedTypeSymbol considerForCodeGenerationAttribute;
+        private readonly Compilation compilation;
 
         /// <summary>
         /// Assemblies whose declared types are all considered serializable.
@@ -38,7 +39,7 @@ namespace Orleans.CodeGenerator.Analysis
         private readonly HashSet<INamedTypeSymbol> serializationTypesToProcess = new HashSet<INamedTypeSymbol>();
         private readonly HashSet<INamedTypeSymbol> fieldOfSerializableType = new HashSet<INamedTypeSymbol>();
 
-        public CompilationAnalyzer(ILogger log, WellKnownTypes wellKnownTypes)
+        public CompilationAnalyzer(ILogger log, WellKnownTypes wellKnownTypes, Compilation compilation)
         {
             this.log = log;
             this.wellKnownTypes = wellKnownTypes;
@@ -46,9 +47,26 @@ namespace Orleans.CodeGenerator.Analysis
             this.knownBaseTypeAttribute = wellKnownTypes.KnownBaseTypeAttribute;
             this.knownAssemblyAttribute = wellKnownTypes.KnownAssemblyAttribute;
             this.considerForCodeGenerationAttribute = wellKnownTypes.ConsiderForCodeGenerationAttribute;
+            this.compilation = compilation;
         }
 
         public HashSet<INamedTypeSymbol> CodeGenerationRequiredTypes { get; } = new HashSet<INamedTypeSymbol>();
+
+        /// <summary>
+        /// All assemblies referenced by this compilation.
+        /// </summary>
+        public HashSet<IAssemblySymbol> ReferencedAssemblies = new HashSet<IAssemblySymbol>();
+
+        /// <summary>
+        /// Assemblies which should be excluded from code generation (eg, because they already contain generated code).
+        /// </summary>
+        public HashSet<IAssemblySymbol> AssembliesExcludedFromCodeGeneration = new HashSet<IAssemblySymbol>();
+
+        /// <summary>
+        /// Assemblies which should be excluded from metadata generation.
+        /// </summary>
+        public HashSet<IAssemblySymbol> AssembliesExcludedFromMetadataGeneration = new HashSet<IAssemblySymbol>();
+
         public HashSet<IAssemblySymbol> KnownAssemblies { get; } = new HashSet<IAssemblySymbol>();
         public HashSet<INamedTypeSymbol> KnownTypes { get; } = new HashSet<INamedTypeSymbol>();
 
@@ -79,25 +97,25 @@ namespace Orleans.CodeGenerator.Analysis
             var result = false;
             if (type.IsSerializable || type.HasAttribute(this.serializableAttribute))
             {
-                if (log.IsEnabled(LogLevel.Debug)) log.LogDebug($"Type {type} has [Serializable] attribute");
+                if (log.IsEnabled(LogLevel.Debug)) log.LogTrace($"Type {type} has [Serializable] attribute.");
                 result = true;
             }
 
             if (!result && this.assembliesWithForcedSerializability.Contains(type.ContainingAssembly))
             {
-                if (log.IsEnabled(LogLevel.Debug)) log.LogDebug($"Type {type} is declared in an assembly in which all types are considered serializable");
+                if (log.IsEnabled(LogLevel.Debug)) log.LogTrace($"Type {type} is declared in an assembly in which all types are considered serializable");
                 result = true;
             }
 
             if (!result && this.KnownTypes.Contains(type))
             {
-                if (log.IsEnabled(LogLevel.Debug)) log.LogDebug($"Type {type} is a known type");
+                if (log.IsEnabled(LogLevel.Debug)) log.LogTrace($"Type {type} is a known type");
                 result = true;
             }
 
             if (!result && this.dependencyTypes.Contains(type))
             {
-                if (log.IsEnabled(LogLevel.Debug)) log.LogDebug($"Type {type} was discovered on a grain method signature or in another serializable type");
+                if (log.IsEnabled(LogLevel.Debug)) log.LogTrace($"Type {type} was discovered on a grain method signature or in another serializable type");
                 result = true;
             }
 
@@ -107,7 +125,7 @@ namespace Orleans.CodeGenerator.Analysis
                 {
                     if (!knownBaseTypes.Contains(current)) continue;
 
-                    if (log.IsEnabled(LogLevel.Debug)) log.LogDebug($"Type {type} has a known base type");
+                    if (log.IsEnabled(LogLevel.Debug)) log.LogTrace($"Type {type} has a known base type");
                     result = true;
                 }
             }
@@ -118,14 +136,14 @@ namespace Orleans.CodeGenerator.Analysis
                 {
                     if (!knownBaseTypes.Contains(iface)) continue;
 
-                    if (log.IsEnabled(LogLevel.Debug)) log.LogDebug($"Type {type} has a known base interface");
+                    if (log.IsEnabled(LogLevel.Debug)) log.LogTrace($"Type {type} has a known base interface");
                     result = true;
                 }
             }
 
             if (!result && this.fieldOfSerializableType.Contains(type))
             {
-                if (log.IsEnabled(LogLevel.Debug)) log.LogDebug($"Type {type} is used in a field of another serializable type");
+                if (log.IsEnabled(LogLevel.Debug)) log.LogTrace($"Type {type} is used in a field of another serializable type");
                 result = true;
             }
 
@@ -216,13 +234,21 @@ namespace Orleans.CodeGenerator.Analysis
             this.serializationTypesToProcess.Add(type);
         }
 
-        public void InspectAssembly(IAssemblySymbol assembly)
+        public void Analyze()
         {
+            foreach (var reference in this.compilation.References)
+            {
+                if (!(this.compilation.GetAssemblyOrModuleSymbol(reference) is IAssemblySymbol asm)) continue;
+                this.ReferencedAssemblies.Add(asm);
+            }
+
             // Recursively all assemblies considered known from the inspected assembly.
-            ExpandKnownAssemblies(assembly);
+            ExpandKnownAssemblies(compilation.Assembly);
 
             // Add all types considered known from each known assembly.
             ExpandKnownTypes(this.KnownAssemblies);
+
+            this.ExpandAssembliesWithGeneratedCode();
 
             void ExpandKnownAssemblies(IAssemblySymbol asm)
             {
@@ -287,6 +313,64 @@ namespace Orleans.CodeGenerator.Analysis
                         }
 
                         if (log.IsEnabled(LogLevel.Debug)) log.LogDebug($"Known type {type}, Throw on failure: {throwOnFailure}");
+                    }
+                }
+            }
+        }
+
+        private void ExpandAssembliesWithGeneratedCode()
+        {
+            foreach (var asm in this.ReferencedAssemblies)
+            {
+                if (!asm.GetAttributes(this.wellKnownTypes.OrleansCodeGenerationTargetAttribute, out var attrs)) continue;
+
+                this.AssembliesExcludedFromMetadataGeneration.Add(asm);
+                this.AssembliesExcludedFromCodeGeneration.Add(asm);
+
+                foreach (var attr in attrs)
+                {
+                    var assemblyName = attr.ConstructorArguments[0].Value as string;
+                    bool metadataOnly;
+                    if (attr.ConstructorArguments.Length >= 2 && attr.ConstructorArguments[1].Value is bool val)
+                    {
+                        metadataOnly = val;
+                    }
+                    else
+                    {
+                        metadataOnly = false;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(assemblyName)) continue;
+                    foreach (var candidate in this.ReferencedAssemblies)
+                    {
+                        bool hasGeneratedCode;
+                        if (string.Equals(assemblyName, candidate.Identity.Name, StringComparison.OrdinalIgnoreCase))
+                        {
+                            hasGeneratedCode = true;
+                        }
+                        else if (string.Equals(assemblyName, candidate.Identity.GetDisplayName()))
+                        {
+                            hasGeneratedCode = true;
+                        }
+                        else if (string.Equals(assemblyName, candidate.Identity.GetDisplayName(fullKey: true)))
+                        {
+                            hasGeneratedCode = true;
+                        }
+                        else
+                        {
+                            hasGeneratedCode = false;
+                        }
+
+                        if (hasGeneratedCode)
+                        {
+                            this.AssembliesExcludedFromMetadataGeneration.Add(candidate);
+                            if (!metadataOnly)
+                            {
+                                this.AssembliesExcludedFromCodeGeneration.Add(candidate);
+                            }
+
+                            break;
+                        }
                     }
                 }
             }
