@@ -104,16 +104,36 @@ namespace Orleans.CodeGenerator
 
             INamedTypeSymbol Type(string type)
             {
-                var result = compilation.GetTypeByMetadataName(type);
-                if (result == null) throw new InvalidOperationException($"Unable to find type with metadata name \"{type}\".");
+                var result = ResolveType(type);
+                if (result == null)
+                {
+                    throw new InvalidOperationException($"Unable to find type with metadata name \"{type}\".");
+                }
                 return result;
             }
 
             OptionalType OptionalType(string type)
             {
-                var result = compilation.GetTypeByMetadataName(type);
+                var result = ResolveType(type);
                 if (result == null) return None.Instance;
                 return new Some(result);
+            }
+
+            INamedTypeSymbol ResolveType(string type)
+            {
+                var result = compilation.GetTypeByMetadataName(type);
+                if (result == null)
+                {
+                    foreach (var reference in compilation.References)
+                    {
+                        var asm = compilation.GetAssemblyOrModuleSymbol(reference) as IAssemblySymbol;
+                        if (asm == null) continue;
+                        result = asm.GetTypeByMetadataName(type);
+                        if (result != null) break;
+                    }
+                }
+
+                return result;
             }
         }
 
