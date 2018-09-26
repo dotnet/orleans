@@ -171,7 +171,7 @@ namespace Tester.StreamingTests
 
 
         [SkippableFact]
-        public async Task StreamingTests_Consumer_Producer_SubscribeToTwoStreamProcessDifferentType()
+        public async Task StreamingTests_Consumer_Producer_SubscribeToTwoStream_MessageWithPolymorphism()
         {
             var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);

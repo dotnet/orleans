@@ -125,8 +125,10 @@ namespace UnitTests.Grains
     }
 
     [ImplicitStreamSubscription(StreamNameSpace)]
-    public class ImplicitSubscribeGrain : Grain, IImplicitSubscribeGrain
+    [ImplicitStreamSubscription(StreamNameSpace2)]
+    public class ImplicitSubscribeGrain : Passive_ConsumerGrain, IImplicitSubscribeGrain
     {
-        public const string StreamNameSpace = "ImplicitSubscriptionSpace";
+        public const string StreamNameSpace = "ImplicitSubscriptionSpace11";
+        public const string StreamNameSpace2 = "ImplicitSubscriptionSpace22";
     }
 }

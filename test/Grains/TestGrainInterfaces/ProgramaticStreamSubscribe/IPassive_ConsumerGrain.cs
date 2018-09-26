@@ -26,7 +26,7 @@ namespace UnitTests.GrainInterfaces
     {
     }
 
-    public interface IImplicitSubscribeGrain: IGrainWithGuidKey
+    public interface IImplicitSubscribeGrain: IPassive_ConsumerGrain
     {
     }
 
