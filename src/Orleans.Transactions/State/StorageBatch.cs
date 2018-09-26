@@ -27,26 +27,6 @@ namespace Orleans.Transactions
     }
 
     /// <summary>
-    /// Metadata is stored in storage, as a JSON object
-    /// </summary>
-    [Serializable]
-    public class MetaData
-    {
-        public DateTime TimeStamp { get; set; }
-
-        public Dictionary<Guid, CommitRecord> CommitRecords { get; set; }
-    }
-
-    [Serializable]
-    [Immutable]
-    public class CommitRecord
-    {
-        public DateTime Timestamp { get; set; }
-
-        public List<ParticipantId> WriteParticipants { get; set; }
-    }
-
-    /// <summary>
     /// Accumulates storage events, for submitting them to storage as a batch.
     /// </summary>
     /// <typeparam name="TState"></typeparam>
@@ -73,9 +53,8 @@ namespace Orleans.Transactions
         private int confirm = 0;
         private int collect = 0;
         private int cancel = 0;
-        private readonly JsonSerializerSettings serializerSettings;
 
-        public MetaData MetaData { get; private set; }
+        public TransactionalStateMetaData MetaData { get; private set; }
 
         public string ETag { get; set; }
 
@@ -85,10 +64,9 @@ namespace Orleans.Transactions
             return $"batchsize={total} [{read}r {prepare}p {commit}c {confirm}cf {collect}cl {cancel}cc]";
         }
 
-        public StorageBatch(TransactionalStorageLoadResponse<TState> loadresponse, JsonSerializerSettings serializerSettings)
+        public StorageBatch(TransactionalStorageLoadResponse<TState> loadresponse)
         {
-            this.serializerSettings = serializerSettings ?? throw new ArgumentNullException(nameof(serializerSettings));
-            MetaData = ReadMetaData(loadresponse, this.serializerSettings);
+            MetaData = loadresponse.Metadata;
             ETag = loadresponse.ETag;
             confirmUpTo = loadresponse.CommittedSequenceId;
             cancelAbove = loadresponse.PendingStates.LastOrDefault()?.SequenceId ?? loadresponse.CommittedSequenceId;
@@ -97,33 +75,14 @@ namespace Orleans.Transactions
 
         public StorageBatch(StorageBatch<TState> previous)
         {
-            this.serializerSettings = previous.serializerSettings;
             MetaData = previous.MetaData;
             confirmUpTo = previous.confirmUpTo;
             cancelAbove = previous.cancelAbove;
             cancelAboveStart = cancelAbove;
         }
 
-        private static MetaData ReadMetaData(TransactionalStorageLoadResponse<TState> loadresponse, JsonSerializerSettings serializerSettings)
-        {
-            if (string.IsNullOrEmpty(loadresponse?.Metadata))
-            {
-                // this thing is fresh... did not exist in storage yet
-                return new MetaData()
-                {
-                    TimeStamp = default(DateTime),
-                    CommitRecords = new Dictionary<Guid, CommitRecord>(),
-                };
-            }
-            else
-            {
-                return JsonConvert.DeserializeObject<MetaData>(loadresponse.Metadata, serializerSettings);
-            }
-        }
-
         public async Task<string> Store(ITransactionalStateStorage<TState> storage)
         {
-            var jsonMetaData = JsonConvert.SerializeObject(MetaData, this.serializerSettings);
             var list = new List<PendingTransactionState<TState>>();
 
             if (prepares != null)
@@ -134,7 +93,7 @@ namespace Orleans.Transactions
                 }
             }
 
-            return await storage.Store(ETag, jsonMetaData, list,
+            return await storage.Store(ETag, MetaData, list,
                 (confirm > 0) ? confirmUpTo : (long?)null,
                 (cancelAbove < cancelAboveStart) ? cancelAbove : (long?)null);
         }
@@ -173,14 +132,12 @@ namespace Orleans.Transactions
             if (prepares == null)
                 prepares = new SortedDictionary<long, PendingTransactionState<TState>>();
 
-            var tmstring = JsonConvert.SerializeObject(transactionManager, this.serializerSettings);
-
             prepares[sequenceNumber] = new PendingTransactionState<TState>
             {
                 SequenceId = sequenceNumber,
                 TransactionId = transactionId.ToString(),
                 TimeStamp = timestamp,
-                TransactionManager = tmstring,
+                TransactionManager = transactionManager,
                 State = state
             };
 

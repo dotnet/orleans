@@ -5,6 +5,7 @@ using Newtonsoft.Json;
 using Xunit;
 using Orleans.Runtime;
 using Xunit.Abstractions;
+using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.Tests.Memory
 {
@@ -23,9 +24,8 @@ namespace Orleans.Transactions.Tests.Memory
         {
             ITransactionTestGrain testGrain = this.RandomTestGrain(TransactionTestConstants.SingleStateTransactionalGrain);
             GrainReference reference = (GrainReference)testGrain;
-            var metaData = new MetaData();
+            var metaData = new TransactionalStateMetaData();
             metaData.TimeStamp = DateTime.UtcNow;
-            metaData.CommitRecords = new Dictionary<Guid, CommitRecord>();
             metaData.CommitRecords.Add(Guid.NewGuid(), new CommitRecord()
             {
                 Timestamp = DateTime.UtcNow,
@@ -37,7 +37,7 @@ namespace Orleans.Transactions.Tests.Memory
             //should be able to serialize it
             string jsonMetaData = JsonConvert.SerializeObject(metaData, serializerSettings);
 
-            MetaData deseriliazedMetaData = JsonConvert.DeserializeObject<MetaData>(jsonMetaData, serializerSettings);
+            TransactionalStateMetaData deseriliazedMetaData = JsonConvert.DeserializeObject<TransactionalStateMetaData>(jsonMetaData, serializerSettings);
             Assert.Equal(metaData.TimeStamp, deseriliazedMetaData.TimeStamp);
         }
     }

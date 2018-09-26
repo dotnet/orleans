@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.Concurrency;
+using Orleans.Runtime;
 
 [assembly: GenerateSerializer(typeof(Orleans.Transactions.Abstractions.PendingTransactionState<>))]
 [assembly: GenerateSerializer(typeof(Orleans.Transactions.Abstractions.TransactionalStorageLoadResponse<>))]
@@ -21,7 +22,7 @@ namespace Orleans.Transactions.Abstractions
         Task<string> Store(
 
             string expectedETag,
-            string metadata,
+            TransactionalStateMetaData metadata,
 
             // a list of transactions to prepare.
             List<PendingTransactionState<TState>> statesToPrepare,
@@ -62,7 +63,7 @@ namespace Orleans.Transactions.Abstractions
         /// or null if this is the transaction manager.
         /// Used during recovery to inquire about the fate of the transaction.
         /// </summary>
-        public string TransactionManager { get; set; }
+        public ParticipantId TransactionManager { get; set; }
 
         /// <summary>
         /// A snapshot of the state after this transaction executed
@@ -75,9 +76,9 @@ namespace Orleans.Transactions.Abstractions
     public class TransactionalStorageLoadResponse<TState>
         where TState : class, new()
     {
-        public TransactionalStorageLoadResponse() : this(null, new TState(), 0, null, Array.Empty<PendingTransactionState<TState>>()) { }
+        public TransactionalStorageLoadResponse() : this(null, new TState(), 0, new TransactionalStateMetaData(), Array.Empty<PendingTransactionState<TState>>()) { }
 
-        public TransactionalStorageLoadResponse(string etag, TState committedState, long committedSequenceId, string metadata, IReadOnlyList<PendingTransactionState<TState>> pendingStates)
+        public TransactionalStorageLoadResponse(string etag, TState committedState, long committedSequenceId, TransactionalStateMetaData metadata, IReadOnlyList<PendingTransactionState<TState>> pendingStates)
         {
             this.ETag = etag;
             this.CommittedState = committedState;
@@ -98,11 +99,31 @@ namespace Orleans.Transactions.Abstractions
         /// <summary>
         /// Additional state maintained by the transaction algorithm, such as commit records
         /// </summary>
-        public string Metadata { get; set; }
+        public TransactionalStateMetaData Metadata { get; set; }
 
         /// <summary>
         /// List of pending states, ordered by sequence id
         /// </summary>
         public IReadOnlyList<PendingTransactionState<TState>> PendingStates { get; set; }
+    }
+
+    /// <summary>
+    /// Metadata is stored in storage, as a JSON object
+    /// </summary>
+    [Serializable]
+    public class TransactionalStateMetaData
+    {
+        public DateTime TimeStamp { get; set; } = default;
+
+        public Dictionary<Guid, CommitRecord> CommitRecords { get; set; } = new Dictionary<Guid, CommitRecord>();
+    }
+
+    [Serializable]
+    [Immutable]
+    public class CommitRecord
+    {
+        public DateTime Timestamp { get; set; }
+
+        public List<ParticipantId> WriteParticipants { get; set; }
     }
 }

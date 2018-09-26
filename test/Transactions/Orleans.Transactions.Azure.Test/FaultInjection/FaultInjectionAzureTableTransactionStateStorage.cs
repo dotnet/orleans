@@ -33,7 +33,7 @@ namespace Orleans.Transactions.Azure.Tests.FaultInjection
         public async Task<string> Store(
 
             string expectedETag,
-            string metadata,
+            TransactionalStateMetaData metadata,
 
             // a list of transactions to prepare.
             List<PendingTransactionState<TState>> statesToPrepare,

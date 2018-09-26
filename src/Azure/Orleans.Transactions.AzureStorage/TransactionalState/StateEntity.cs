@@ -37,7 +37,7 @@ namespace Orleans.Transactions.AzureStorage
                 RowKey = MakeRowKey(pendingState.SequenceId),
                 TransactionId = pendingState.TransactionId,
                 TransactionTimestamp = pendingState.TimeStamp,
-                TransactionManager = pendingState.TransactionManager,
+                TransactionManager = JsonConvert.SerializeObject(pendingState.TransactionManager, JsonSettings),
                 StateJson = JsonConvert.SerializeObject(pendingState.State, JsonSettings)
             };
         }
