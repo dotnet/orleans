@@ -78,13 +78,15 @@ namespace Orleans.Transactions.AzureStorage
                         if (kvp.Value.TransactionManager == null)
                             break;
 
+                        ParticipantId tm = JsonConvert.DeserializeObject<ParticipantId>(kvp.Value.TransactionManager, this.jsonSettings);
+
                         PrepareRecordsToRecover.Add(new PendingTransactionState<TState>()
                         {
                             SequenceId = kvp.Key,
                             State = kvp.Value.GetState<TState>(this.jsonSettings),
                             TimeStamp = kvp.Value.TransactionTimestamp,
                             TransactionId = kvp.Value.TransactionId,
-                            TransactionManager = kvp.Value.TransactionManager
+                            TransactionManager = tm
                         });
                     }
 
@@ -97,7 +99,8 @@ namespace Orleans.Transactions.AzureStorage
                     if (logger.IsEnabled(LogLevel.Debug))
                         logger.LogDebug($"{partition} Loaded v{this.key.CommittedSequenceId} rows={string.Join(",", states.Select(s => s.Key.ToString("x16")))}");
 
-                    return new TransactionalStorageLoadResponse<TState>(this.key.ETag, committedState, this.key.CommittedSequenceId, this.key.Metadata, PrepareRecordsToRecover);
+                    TransactionalStateMetaData metadata = JsonConvert.DeserializeObject<TransactionalStateMetaData>(this.key.Metadata, this.jsonSettings);
+                    return new TransactionalStorageLoadResponse<TState>(this.key.ETag, committedState, this.key.CommittedSequenceId, metadata, PrepareRecordsToRecover);
                 }
             }
             catch (Exception ex)
@@ -108,7 +111,7 @@ namespace Orleans.Transactions.AzureStorage
         }
 
 
-        public async Task<string> Store(string expectedETag, string metadata, List<PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter)
+        public async Task<string> Store(string expectedETag, TransactionalStateMetaData metadata, List<PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter)
         {
             if (this.key.ETag != expectedETag)
                 throw new ArgumentException(nameof(expectedETag), "Etag does not match");
@@ -144,7 +147,7 @@ namespace Orleans.Transactions.AzureStorage
                             var existing = states[pos].Value;
                             existing.TransactionId = s.TransactionId;
                             existing.TransactionTimestamp = s.TimeStamp;
-                            existing.TransactionManager = s.TransactionManager;
+                            existing.TransactionManager = JsonConvert.SerializeObject(s.TransactionManager, this.jsonSettings);
                             existing.SetState(s.State, this.jsonSettings);
                             await batchOperation.Add(TableOperation.Replace(existing)).ConfigureAwait(false);
 
@@ -163,7 +166,7 @@ namespace Orleans.Transactions.AzureStorage
                     }
 
             // third, persist metadata and commit position
-            key.Metadata = metadata;
+            key.Metadata = JsonConvert.SerializeObject(metadata, this.jsonSettings);
             if (commitUpTo.HasValue && commitUpTo.Value > key.CommittedSequenceId)
             {
                 key.CommittedSequenceId = commitUpTo.Value;

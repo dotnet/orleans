@@ -39,7 +39,7 @@ namespace Orleans.Transactions
             return new TransactionalStorageLoadResponse<TState>(stateStorage.Etag, stateStorage.State.CommittedState, stateStorage.State.CommittedSequenceId, stateStorage.State.Metadata, stateStorage.State.PendingStates);
         }
 
-        public async Task<string> Store(string expectedETag, string metadata, List<PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter)
+        public async Task<string> Store(string expectedETag, TransactionalStateMetaData metadata, List<PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter)
         {
             if (this.StateStorage.Etag != expectedETag)
                 throw new ArgumentException(nameof(expectedETag), "Etag does not match");
@@ -115,7 +115,7 @@ namespace Orleans.Transactions
 
         public long CommittedSequenceId { get; set; }
 
-        public string Metadata { get; set; }
+        public TransactionalStateMetaData Metadata { get; set; } = new TransactionalStateMetaData();
 
         public List<PendingTransactionState<TState>> PendingStates { get; set; } = new List<PendingTransactionState<TState>>();
     }

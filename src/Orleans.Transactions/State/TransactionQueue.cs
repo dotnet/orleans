@@ -19,7 +19,6 @@ namespace Orleans.Transactions.State
         private readonly ParticipantId resource;
         private readonly Action deactivate;
         private readonly ITransactionalStateStorage<TState> storage;
-        private readonly JsonSerializerSettings serializerSettings;
         private readonly BatchWorker storageWorker;
         private readonly BatchWorker confirmationWorker;
         protected readonly ILogger logger;
@@ -64,7 +63,6 @@ namespace Orleans.Transactions.State
             this.resource = resource;
             this.deactivate = deactivate;
             this.storage = storage;
-            this.serializerSettings = serializerSettings;
             this.Clock = new CausalClock(clock);
             this.logger = logger;
             this.confirmationTasks = new Dictionary<Guid, TransactionRecord<TState>>();
@@ -414,7 +412,7 @@ namespace Orleans.Transactions.State
         {
             TransactionalStorageLoadResponse<TState> loadresponse = await storage.Load();
 
-            this.storageBatch = new StorageBatch<TState>(loadresponse, this.serializerSettings);
+            this.storageBatch = new StorageBatch<TState>(loadresponse);
 
             this.stableState = loadresponse.CommittedState;
             this.stableSequenceNumber = loadresponse.CommittedSequenceId;
@@ -428,12 +426,12 @@ namespace Orleans.Transactions.State
             // resume prepared transactions (not TM)
             foreach (var pr in loadresponse.PendingStates.OrderBy(ps => ps.TimeStamp))
             {
-                if (pr.SequenceId > loadresponse.CommittedSequenceId && pr.TransactionManager != null)
+                if (pr.SequenceId > loadresponse.CommittedSequenceId && pr.TransactionManager.Reference != null)
                 {
                     if (logger.IsEnabled(LogLevel.Debug))
                         logger.Debug($"recover two-phase-commit {pr.TransactionId}");
 
-                    ParticipantId tm = JsonConvert.DeserializeObject<ParticipantId>(pr.TransactionManager, this.serializerSettings);
+                    ParticipantId tm = pr.TransactionManager;
 
                     commitQueue.Add(new TransactionRecord<TState>()
                     {
