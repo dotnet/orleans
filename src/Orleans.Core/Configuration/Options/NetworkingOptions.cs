@@ -19,5 +19,12 @@ namespace Orleans.Configuration
         /// </summary>
         public TimeSpan MaxSocketAge { get; set; } = DEFAULT_MAX_SOCKET_AGE;
         public static readonly TimeSpan DEFAULT_MAX_SOCKET_AGE = TimeSpan.MaxValue;
+
+        /// <summary>
+        /// The MaxSockets attribute defines the muximum number of TCP sockets a silo would keep open at any point in time.
+        /// When the limit is reached, least recently used sockets will be closed to keep the number of open sockets below the limit.
+        /// </summary>
+        public int MaxSockets { get; set; } = DEFAULT_MAX_SOCKETS;
+        public static readonly int DEFAULT_MAX_SOCKETS = 500;
     }
 }
