@@ -12,6 +12,7 @@ namespace Orleans.CodeGenerator
             return new WellKnownTypes
             {
                 AbstractionsAssembly = Type("Orleans.IGrain").ContainingAssembly,
+                Attribute = Type("System.Attribute"),
                 Action_2 = Type("System.Action`2"),
                 AlwaysInterleaveAttribute = Type("Orleans.Concurrency.AlwaysInterleaveAttribute"),
                 ArgumentNullException = Type("System.ArgumentNullException"),
@@ -138,6 +139,7 @@ namespace Orleans.CodeGenerator
         }
 
         public IAssemblySymbol AbstractionsAssembly { get; private set; }
+        public INamedTypeSymbol Attribute { get; private set; }
         public INamedTypeSymbol TimeSpan { get; private set; }
         public INamedTypeSymbol GrainClassMetadata { get; private set; }
         public INamedTypeSymbol GrainInterfaceMetadata { get; private set; }

@@ -151,7 +151,7 @@ namespace Orleans.CodeGenerator
             {
                 var nsMembers = GetNamespace(namespaceGroupings, serializerType.Target.ContainingNamespace);
                 TypeDeclarationSyntax generated;
-                (generated, serializerType.SerializerTypeSyntax) = SerializerGenerator.GenerateClass(this.wellKnownTypes, this.semanticModelForAccessibility, serializerType);
+                (generated, serializerType.SerializerTypeSyntax) = SerializerGenerator.GenerateClass(this.wellKnownTypes, this.semanticModelForAccessibility, serializerType, this.log);
                 nsMembers.Add(generated);
             }
 
