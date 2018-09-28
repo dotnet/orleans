@@ -12,12 +12,10 @@ namespace Orleans.Runtime
         private readonly LRU<IPEndPoint, Socket> cache;
         private TimeSpan connectionTimeout;
 
-        private const int MAX_SOCKETS = 200;
-
         internal SocketManager(IMessagingConfiguration config)
         {
             connectionTimeout = config.OpenConnectionTimeout;
-            cache = new LRU<IPEndPoint, Socket>(MAX_SOCKETS, config.MaxSocketAge, SendingSocketCreator);
+            cache = new LRU<IPEndPoint, Socket>(config.MaxSockets, config.MaxSocketAge, SendingSocketCreator);
             cache.RaiseFlushEvent += FlushHandler;
         }
 
