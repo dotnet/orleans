@@ -88,6 +88,12 @@ namespace Orleans.Runtime.Configuration
         /// Gets the fallback serializer, used as a last resort when no other serializer is able to serialize an object.
         /// </summary>
         TypeInfo FallbackSerializationProvider { get; set; }
+
+        /// <summary>
+        /// The MaxSockets attribute defines the muximum number of TCP sockets a silo would keep open at any point in time.
+        /// When the limit is reached, least recently used sockets will be closed to keep the number of open sockets below the limit.
+        /// </summary>
+        int MaxSockets { get; set; }
     }
 
     /// <summary>
@@ -102,6 +108,7 @@ namespace Orleans.Runtime.Configuration
         public bool ResendOnTimeout { get; set; }
         public TimeSpan MaxSocketAge { get; set; }
         public bool DropExpiredMessages { get; set; }
+        public int MaxSockets { get; set; }
 
         public int SiloSenderQueues { get; set; }
         public int GatewaySenderQueues { get; set; }
@@ -130,6 +137,7 @@ namespace Orleans.Runtime.Configuration
         private static readonly int DEFAULT_SILO_SENDER_QUEUES = Environment.ProcessorCount;
         private static readonly int DEFAULT_GATEWAY_SENDER_QUEUES = Environment.ProcessorCount;
         private static readonly int DEFAULT_CLIENT_SENDER_BUCKETS = (int)Math.Pow(2, 13);
+        private const int DEFAULT_MAX_SOCKETS = 500;
 
         private const int DEFAULT_BUFFER_POOL_BUFFER_SIZE = 4 * 1024;
         private const int DEFAULT_BUFFER_POOL_MAX_SIZE = 10000;
@@ -149,6 +157,7 @@ namespace Orleans.Runtime.Configuration
             ResendOnTimeout = DEFAULT_RESEND_ON_TIMEOUT;
             MaxSocketAge = DEFAULT_MAX_SOCKET_AGE;
             DropExpiredMessages = DEFAULT_DROP_EXPIRED_MESSAGES;
+            MaxSockets = DEFAULT_MAX_SOCKETS;
 
             SiloSenderQueues = DEFAULT_SILO_SENDER_QUEUES;
             GatewaySenderQueues = DEFAULT_GATEWAY_SENDER_QUEUES;
@@ -183,6 +192,7 @@ namespace Orleans.Runtime.Configuration
             sb.AppendFormat("       Resend On Timeout: {0}", ResendOnTimeout).AppendLine();
             sb.AppendFormat("       Maximum Socket Age: {0}", MaxSocketAge).AppendLine();
             sb.AppendFormat("       Drop Expired Messages: {0}", DropExpiredMessages).AppendLine();
+            sb.AppendFormat("       Maximum socket count: {0}", MaxSockets).AppendLine();
 
             if (isSiloConfig)
             {
@@ -235,6 +245,11 @@ namespace Orleans.Runtime.Configuration
             {
                 DropExpiredMessages = ConfigUtilities.ParseBool(child.GetAttribute("DropExpiredMessages"),
                                                           "Invalid integer value for the DropExpiredMessages attribute on the Messaging element");
+            }
+            if (child.HasAttribute("MaxSockets"))
+            {
+                MaxSockets = ConfigUtilities.ParseInt(child.GetAttribute("MaxSockets"),
+                                                          "Invalid integer value for the MaxSockets attribute on the Messaging element");
             }
             //--
             if (isSiloConfig)
