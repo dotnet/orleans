@@ -14,7 +14,7 @@
     <tags>Orleans Silo Deployment Cloud-Computing Actor-Model Actors Virtual-Actors Distributed-Systems C# .NET</tags>
     <authors>Microsoft</authors>
     <owners>Microsoft,Orleans</owners>
-    <copyright>Copyright (C) 2015 Microsoft Research</copyright>
+    <copyright>© Microsoft Corporation. All rights reserved.</copyright>
     <licenseUrl>https://github.com/dotnet/orleans/blob/master/LICENSE</licenseUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <!-- Important note about https://cdn.rawgit.com: Files are cached permanently after the first request. Use commit URLs when updating the icon. -->

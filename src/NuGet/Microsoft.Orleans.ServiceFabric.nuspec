@@ -15,7 +15,7 @@
     <description>
       Support for hosting Microsoft Orleans on Service Fabric.
     </description>
-    <copyright>Copyright Microsoft 2016</copyright>
+    <copyright>© Microsoft Corporation. All rights reserved.</copyright>
     <tags>Microsoft Orleans ServiceFabric</tags>
     <dependencies>
       <dependency id="Microsoft.Orleans.Core" version="$version$" />

@@ -15,7 +15,7 @@
     <description>
       NuGet package deprecated, please use Microsoft.Orleans.OrleansCodeGenerator.Build instead.
     </description>
-    <copyright>Copyright Microsoft 2015</copyright>
+    <copyright>© Microsoft Corporation. All rights reserved.</copyright>
     <tags></tags>
     <dependencies>
       <dependency id="Microsoft.Orleans.OrleansCodeGenerator.Build" version="$version$" />

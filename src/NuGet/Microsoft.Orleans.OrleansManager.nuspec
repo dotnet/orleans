@@ -15,7 +15,7 @@
     <description>
       Management tool of Microsoft Orleans for remote management of Orleans deployment.
     </description>
-    <copyright>Copyright Microsoft 2015</copyright>
+    <copyright>© Microsoft Corporation. All rights reserved.</copyright>
     <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
     <dependencies>
       <dependency id="Microsoft.Orleans.Core" version="$version$" />

@@ -15,7 +15,7 @@
     <description>
       Base types for creating Microsoft Orleans grains with event-sourced state.
     </description>
-    <copyright>Copyright Microsoft 2015</copyright>
+    <copyright>© Microsoft Corporation. All rights reserved.</copyright>
     <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET Event-Sourcing</tags>
     <dependencies>
       <dependency id="Microsoft.Orleans.Core" version="$version$" />
