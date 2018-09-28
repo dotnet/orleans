@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -488,11 +488,16 @@ namespace Orleans.CodeGenerator
                 case TypeKind.TypeParameter:
                 case TypeKind.Submission:
                 {
-                    if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace($"{nameof(ValidForKnownTypes)} skipping type {type} of kind {type.TypeKind}");
+                    // if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace($"{nameof(ValidForKnownTypes)} skipping type {type} of kind {type.TypeKind}");
                     return false;
                 }
             }
 
+            if (type.IsStatic)
+            {
+                return false;
+            }
+            
             if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace($"{nameof(ValidForKnownTypes)} adding type {type}");
 
             return true;
