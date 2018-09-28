@@ -15,10 +15,13 @@ namespace Orleans.Transactions.State
             this.queue = queue ?? throw new ArgumentNullException(nameof(queue));
         }
 
-        public Task<TransactionalStatus> PrepareAndCommit(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, List<ParticipantId> writeResources, int totalResources)
+        public async Task<TransactionalStatus> PrepareAndCommit(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, List<ParticipantId> writeResources, int totalResources)
         {
             // validate the lock
-            var valid = this.queue.RWLock.ValidateLock(transactionId, accessCount, out var status, out var record);
+            var locked = await this.queue.RWLock.ValidateLock(transactionId, accessCount);
+            var status = locked.Item1;
+            var record = locked.Item2;
+            var valid = status == TransactionalStatus.Ok;
 
             record.Timestamp = timeStamp;
             record.Role = CommitRole.LocalCommit; // we are the TM
@@ -29,7 +32,7 @@ namespace Orleans.Transactions.State
 
             if (!valid)
             {
-                this.queue.NotifyOfAbort(record, status);
+                await this.queue.NotifyOfAbort(record, status);
             }
             else
             {
@@ -37,19 +40,18 @@ namespace Orleans.Transactions.State
             }
 
             this.queue.RWLock.Notify();
-            return record.PromiseForTA.Task;
+            return await record.PromiseForTA.Task;
         }
 
         public Task Prepared(Guid transactionId, DateTime timeStamp, ParticipantId resource, TransactionalStatus status)
         {
-            this.queue.NotifyOfPrepared(transactionId, timeStamp, status);
-            return Task.CompletedTask;
+            return this.queue.NotifyOfPrepared(transactionId, timeStamp, status);
         }
 
         public async Task Ping(Guid transactionId, DateTime timeStamp, ParticipantId resource)
         {
             await this.queue.Ready();
-            this.queue.NotifyOfPing(transactionId, timeStamp, resource);
+            await this.queue.NotifyOfPing(transactionId, timeStamp, resource);
         }
     }
 }

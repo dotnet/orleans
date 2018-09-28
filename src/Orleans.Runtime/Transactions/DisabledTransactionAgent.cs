@@ -5,12 +5,12 @@ namespace Orleans.Transactions
 {
     internal class DisabledTransactionAgent : ITransactionAgent
     {
-        public void Abort(ITransactionInfo transactionInfo, OrleansTransactionAbortedException reason)
+        public Task Abort(ITransactionInfo transactionInfo)
         {
             throw new OrleansTransactionsDisabledException();
         }
 
-        public Task<TransactionalStatus> Commit(ITransactionInfo transactionInfo)
+        public Task<TransactionalStatus> Resolve(ITransactionInfo transactionInfo)
         {
             throw new OrleansTransactionsDisabledException();
         }

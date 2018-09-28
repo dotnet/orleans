@@ -50,10 +50,13 @@ namespace Orleans.Transactions.State
             this.lockWorker = new BatchWorkerFromDelegate(LockWork);
         }
 
-        public Task<TResult> EnterLock<TResult>(Guid transactionId, DateTime priority,
+        public async Task<TResult> EnterLock<TResult>(Guid transactionId, DateTime priority,
                                    AccessCounter counter, bool isRead, Task<TResult> task)
         {
             bool rollbacksOccurred = false;
+            List<Task> cleanup = new List<Task>();
+
+            await this.queue.Ready();
 
             // search active transactions
             if (Find(transactionId, isRead, out var group, out var record))
@@ -80,7 +83,7 @@ namespace Orleans.Transactions.State
                         {
                             foreach (var r in conflicts)
                             {
-                                Rollback(r, true);
+                                cleanup.Add(Rollback(r, true));
                                 rollbacksOccurred = true;
                             }
                         }
@@ -160,32 +163,25 @@ namespace Orleans.Transactions.State
                 lockWorker.Notify(group.Deadline.Value);
             }
 
-            return task;
+            await Task.WhenAll(cleanup);
+            return await task;
         }
 
-        public bool ValidateLock(Guid transactionId, AccessCounter accessCount, out TransactionalStatus status, out TransactionRecord<TState> record)
+        public async Task<Tuple<TransactionalStatus, TransactionRecord<TState>>> ValidateLock(Guid transactionId, AccessCounter accessCount)
         {
-            if (currentGroup == null || !currentGroup.TryGetValue(transactionId, out record))
+            if (currentGroup == null || !currentGroup.TryGetValue(transactionId, out TransactionRecord<TState> record))
             {
-                record = new TransactionRecord<TState>()
-                {
-                    TransactionId = transactionId
-                };
-                status = TransactionalStatus.BrokenLock;
-                return false;
+                return Tuple.Create(TransactionalStatus.BrokenLock, new TransactionRecord<TState>());
             }
             else if (record.NumberReads != accessCount.Reads
                    || record.NumberWrites != accessCount.Writes)
             {
-                Rollback(transactionId, true);
-
-                status = TransactionalStatus.LockValidationFailed;
-                return false;
+                await Rollback(transactionId, true);
+                return Tuple.Create(TransactionalStatus.LockValidationFailed, record);
             }
             else
             {
-                status = TransactionalStatus.Ok;
-                return true;
+                return Tuple.Create(TransactionalStatus.Ok, record);
             }
         }
 
@@ -199,20 +195,23 @@ namespace Orleans.Transactions.State
             return this.currentGroup.TryGetValue(transactionId, out record);
         }
 
-        public void AbortExecutingTransactions()
+        public Task AbortExecutingTransactions()
         {
             if (currentGroup != null)
             {
-                foreach (var kvp in currentGroup)
-                {
-                    if (logger.IsEnabled(LogLevel.Trace))
-                        logger.Trace($"break-lock for transaction {kvp.Key}");
-
-                    this.queue.NotifyOfAbort(kvp.Value, TransactionalStatus.BrokenLock);
-                }
-
+                Task[] pending = currentGroup.Select(g => BreakLock(g.Key, g.Value)).ToArray();
                 currentGroup.Clear();
+                return Task.WhenAll(pending);
             }
+            return Task.CompletedTask;
+        }
+
+        private Task BreakLock(Guid transactionId, TransactionRecord<TState> entry)
+        {
+            if (logger.IsEnabled(LogLevel.Trace))
+                logger.Trace("Break-lock for transaction {TransactionId}", transactionId);
+
+            return this.queue.NotifyOfAbort(entry, TransactionalStatus.BrokenLock);
         }
 
         public void AbortQueuedTransactions()
@@ -230,11 +229,14 @@ namespace Orleans.Transactions.State
                         var ignore = t.Exception;
                     }
                 }
+                pos.Clear();
                 pos = pos.Next;
             }
+            if (currentGroup != null)
+                currentGroup.Next = null;
         }
 
-        public void Rollback(Guid guid, bool notify)
+        public async Task Rollback(Guid guid, bool notify)
         {
             // no-op if the transaction never happened or already rolled back
             if (currentGroup == null || !currentGroup.TryGetValue(guid, out var record))
@@ -242,17 +244,17 @@ namespace Orleans.Transactions.State
                 return;
             }
 
+            // remove record for this transaction
+            currentGroup.Remove(guid);
+
             // notify remote listeners
             if (notify)
             {
-                this.queue.NotifyOfAbort(record, TransactionalStatus.BrokenLock);
+                await this.queue.NotifyOfAbort(record, TransactionalStatus.BrokenLock);
             }
-
-            // remove record for this transaction
-            currentGroup.Remove(guid);
         }
 
-        private Task LockWork()
+        private async Task LockWork()
         {
             if (currentGroup != null)
             {
@@ -263,13 +265,13 @@ namespace Orleans.Transactions.State
                     {
                         if (single != null)
                         {
-                            this.queue.EnqueueCommit(single);
+                            await this.queue.EnqueueCommit(single);
                         }
                         else if (multiple != null)
                         {
                             foreach (var r in multiple)
                             {
-                                this.queue.EnqueueCommit(r);
+                                await this.queue.EnqueueCommit(r);
                             }
                         }
 
@@ -282,7 +284,7 @@ namespace Orleans.Transactions.State
                         // the lock group has timed out.
                         var txlist = string.Join(",", currentGroup.Keys.Select(g => g.ToString()));
                         logger.Warn(555, $"break-lock timeout for {currentGroup.Count} transactions {txlist}");
-                        AbortExecutingTransactions();
+                        await AbortExecutingTransactions();
                         lockWorker.Notify();
                     }
 
@@ -353,8 +355,6 @@ namespace Orleans.Transactions.State
                     }
                 }
             }
-
-            return Task.CompletedTask;
         }
        
         private bool Find(Guid guid, bool isRead, out LockGroup group, out TransactionRecord<TState> record)

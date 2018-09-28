@@ -69,29 +69,46 @@ namespace Orleans.Transactions.Tests
 
             await coordinator.MultiGrainSet(grains, setval);
             // add delay between transactions so confirmation errors don't bleed into neighboring transactions
-            if (injectionPhase == TransactionFaultInjectPhase.BeforeConfirm || injectionPhase == TransactionFaultInjectPhase.BeforeConfirm)
+            if (injectionPhase == TransactionFaultInjectPhase.BeforeConfirm || injectionPhase == TransactionFaultInjectPhase.AfterConfirm)
                 await Task.Delay(TimeSpan.FromSeconds(30));
             try
             {
                 await coordinator.MultiGrainAddAndFaultInjection(grains, addval, faultInjectionControl);
                 // add delay between transactions so confirmation errors don't bleed into neighboring transactions
-                if (injectionPhase == TransactionFaultInjectPhase.BeforeConfirm || injectionPhase == TransactionFaultInjectPhase.BeforeConfirm)
+                if (injectionPhase == TransactionFaultInjectPhase.BeforeConfirm || injectionPhase == TransactionFaultInjectPhase.AfterConfirm)
                     await Task.Delay(TimeSpan.FromSeconds(30));
             }
             catch (OrleansTransactionAbortedException)
             {
                 // add delay between transactions so errors don't bleed into neighboring transactions
-                // TODO : remove when slow slow abort is complete - jbragg
-                await Task.Delay(TimeSpan.FromSeconds(30));
                 await coordinator.MultiGrainAddAndFaultInjection(grains, addval);
             }
-            catch (OrleansTransactionException)
+            catch (OrleansTransactionException e)
             {
-                // add delay between transactions so errors don't bleed into neighboring transactions
-                // TODO : remove when slow slow abort is complete - jbragg
-                await Task.Delay(TimeSpan.FromSeconds(30));
-                expected = await grains.First().Get() + addval;
-                await coordinator.MultiGrainAddAndFaultInjection(grains, addval);
+                this.output.WriteLine($"Call failed with exception: {e}, retrying without fault");
+                bool cascadingAbort = false;
+                bool firstAttempt = true;
+
+                do
+                {
+                    cascadingAbort = false;
+                    try
+                    {
+                        expected = await grains.First().Get() + addval;
+                        await coordinator.MultiGrainAddAndFaultInjection(grains, addval);
+                    }
+                    catch (OrleansCascadingAbortException)
+                    {
+                        this.output.WriteLine($"Retry failed with OrleansCascadingAbortException: {e}, retrying without fault");
+                        // should only encounter this when faulting after storage write
+                        Assert.Equal(FaultInjectionType.ExceptionAfterStore, injectionType);
+                        // only allow one retry
+                        Assert.True(firstAttempt);
+                        // add delay prevent castcading abort.
+                        cascadingAbort = true;
+                        firstAttempt = false;
+                    }
+                } while (cascadingAbort);
             }
 
             //if transactional state loaded correctly after reactivation, then following should pass

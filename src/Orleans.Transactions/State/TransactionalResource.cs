@@ -14,10 +14,13 @@ namespace Orleans.Transactions.State
             this.queue = queue;
         }
 
-        public Task<TransactionalStatus> CommitReadOnly(Guid transactionId, AccessCounter accessCount, DateTime timeStamp)
+        public async Task<TransactionalStatus> CommitReadOnly(Guid transactionId, AccessCounter accessCount, DateTime timeStamp)
         {
             // validate the lock
-            var valid = this.queue.RWLock.ValidateLock(transactionId, accessCount, out var status, out var record);
+            var locked = await this.queue.RWLock.ValidateLock(transactionId, accessCount);
+            var status = locked.Item1;
+            var record = locked.Item2;
+            var valid = status == TransactionalStatus.Ok;
 
             record.Timestamp = timeStamp;
             record.Role = CommitRole.ReadOnly;
@@ -25,7 +28,7 @@ namespace Orleans.Transactions.State
 
             if (!valid)
             {
-                this.queue.NotifyOfAbort(record, status);
+                await this.queue.NotifyOfAbort(record, status);
             }
             else
             {
@@ -33,14 +36,14 @@ namespace Orleans.Transactions.State
             }
 
             this.queue.RWLock.Notify();
-            return record.PromiseForTA.Task;
+            return await record.PromiseForTA.Task;
         }
 
         public async Task Abort(Guid transactionId)
         {
             await this.queue.Ready();
             // release the lock
-            this.queue.RWLock.Rollback(transactionId, false);
+            await this.queue.RWLock.Rollback(transactionId, false);
 
             this.queue.RWLock.Notify();
         }
@@ -48,7 +51,7 @@ namespace Orleans.Transactions.State
         public async Task Cancel(Guid transactionId, DateTime timeStamp, TransactionalStatus status)
         {
             await this.queue.Ready();
-            this.queue.NotifyOfCancel(transactionId, timeStamp, status);
+            await this.queue.NotifyOfCancel(transactionId, timeStamp, status);
         }
 
         public async Task Confirm(Guid transactionId, DateTime timeStamp)
@@ -57,10 +60,9 @@ namespace Orleans.Transactions.State
             await this.queue.NotifyOfConfirm(transactionId, timeStamp);
         }
 
-        public Task Prepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager)
+        public async Task Prepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager)
         {
-            this.queue.NotifyOfPrepare(transactionId, accessCount, timeStamp, transactionManager);
-            return Task.CompletedTask; // one-way, no response
+            await this.queue.NotifyOfPrepare(transactionId, accessCount, timeStamp, transactionManager);
         }
     }
 }

@@ -44,7 +44,7 @@ namespace Orleans.Transactions
             return Task.FromResult<ITransactionInfo>(new TransactionInfo(guid, ts, ts));
         }
 
-        public async Task<TransactionalStatus> Commit(ITransactionInfo info)
+        public async Task<TransactionalStatus> Resolve(ITransactionInfo info)
         {
             var transactionInfo = (TransactionInfo)info;
 
@@ -109,10 +109,8 @@ namespace Orleans.Transactions
                         if (logger.IsEnabled(LogLevel.Debug))
                             logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} fail {transactionInfo.TransactionId} prepare response status={status}");
 
-                        foreach (var p in resources)
-                            p.Key.Reference.AsReference<ITransactionalResourceExtension>()
-                                 .Abort(p.Key.Name, transactionInfo.TransactionId)
-                                 .Ignore();
+                        await Task.WhenAll(resources.Select(r => r.Key.Reference.AsReference<ITransactionalResourceExtension>()
+                                             .Abort(r.Key.Name, transactionInfo.TransactionId)));
 
                         return status;
                     }
@@ -123,10 +121,8 @@ namespace Orleans.Transactions
                 if (logger.IsEnabled(LogLevel.Debug))
                     logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} timeout {transactionInfo.TransactionId} prepare responses");
 
-                foreach(KeyValuePair<ParticipantId,AccessCounter> resource in resources)
-                    resource.Key.Reference.AsReference<ITransactionalResourceExtension>()
-                         .Abort(resource.Key.Name, transactionInfo.TransactionId)
-                         .Ignore();
+                await Task.WhenAll(resources.Select(r => r.Key.Reference.AsReference<ITransactionalResourceExtension>()
+                                     .Abort(r.Key.Name, transactionInfo.TransactionId)));
 
                 return TransactionalStatus.ParticipantResponseTimeout;
             }
@@ -166,16 +162,10 @@ namespace Orleans.Transactions
                     // notify participants 
                     if (status.DefinitelyAborted())
                     {
-                        foreach (var p in writeResources)
-                        {
-                            if (!p.Equals(manager))
-                            {
-                                // one-way cancel message
-                                p.Reference.AsReference<ITransactionalResourceExtension>()
-                                 .Cancel(p.Name, transactionInfo.TransactionId, transactionInfo.TimeStamp, status)
-                                 .Ignore();
-                            }
-                        }
+                        await Task.WhenAll(writeResources
+                            .Where(p => !p.Equals(manager))
+                            .Select(p => p.Reference.AsReference<ITransactionalResourceExtension>()
+                                 .Cancel(p.Name, transactionInfo.TransactionId, transactionInfo.TimeStamp, status)));
                     }
 
                     return status;
@@ -195,7 +185,7 @@ namespace Orleans.Transactions
             return TransactionalStatus.Ok;
         }
 
-        public void Abort(ITransactionInfo info, OrleansTransactionAbortedException reason)
+        public async Task Abort(ITransactionInfo info)
         {
             this.statistics.TrackTransactionFailed();
             var transactionInfo = (TransactionInfo)info;
@@ -203,15 +193,11 @@ namespace Orleans.Transactions
             List<ParticipantId> participants = transactionInfo.Participants.Keys.ToList();
 
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace($"abort {transactionInfo} {string.Join(",", participants.Select(p => p.ToString()))} {reason}");
+                logger.Trace($"abort {transactionInfo} {string.Join(",", participants.Select(p => p.ToString()))}");
 
             // send one-way abort messages to release the locks and roll back any updates
-            foreach (var p in participants)
-            {
-                p.Reference.AsReference<ITransactionalResourceExtension>()
-                 .Abort(p.Name, transactionInfo.TransactionId)
-                 .Ignore();
-            }
+            await Task.WhenAll(participants.Select(p => p.Reference.AsReference<ITransactionalResourceExtension>()
+                 .Abort(p.Name, transactionInfo.TransactionId)));
         }
 
         // TODO: make overridable - jbragg
