@@ -111,7 +111,7 @@ It ends up calling this bit: **orleans/src/Orleans.Runtime/Services/GrainService
 Basically, the silo fetches `IGrainService` types from the service provider when starting: **orleans/src/Orleans.Runtime/Silo/Silo.cs**
  `var grainServices = this.Services.GetServices<IGrainService>();`
 
-The `Orleans.Runtime` Nuget package should be imported into the Grainservice base class.
+The `Orleans.Runtime` Nuget package should be referenced by the Grainservice project.
  
 ###Note 2
  
