@@ -35,7 +35,7 @@ namespace Orleans.Streams
         private StreamId((Guid Guid, string ProviderName, string Namespace) key)
         {
             Key = key;
-            UniformHashCode = new Lazy<uint>(() => CalculateUniformHashCode(key));
+            UniformHashCode = new Lazy<uint>(() => CalculateUniformHashCode(Key));
         }
 
         internal static StreamId GetStreamId(Guid guid, string providerName, string streamNamespace)
@@ -50,6 +50,9 @@ namespace Orleans.Streams
 
         public bool Equals(StreamId other)
             => Key.Equals(other?.Key);
+
+        public override bool Equals(object other)
+            => Equals(other as StreamId);
 
         public uint GetUniformHashCode()
             => UniformHashCode.Value;
