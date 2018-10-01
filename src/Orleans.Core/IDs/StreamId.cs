@@ -35,18 +35,14 @@ namespace Orleans.Streams
         private StreamId((Guid Guid, string ProviderName, string Namespace) key)
         {
             Key = key;
-            UniformHashCode = new Lazy<uint>(() => CalculateUniformHashCode(Key));
+            UniformHashCode = new Lazy<uint>(CalculateUniformHashCode);
         }
 
         internal static StreamId GetStreamId(Guid guid, string providerName, string streamNamespace)
-        {
-            return FindOrCreateStreamId((guid, providerName, streamNamespace));
-        }
+            => FindOrCreateStreamId((guid, providerName, streamNamespace));
 
         private static StreamId FindOrCreateStreamId((Guid Guid, string ProviderName, string Namespace) key)
-        {
-            return streamIdInternCache.Value.FindOrCreate(key, k => new StreamId(k));
-        }
+            => streamIdInternCache.Value.FindOrCreate(key, k => new StreamId(k));
 
         public bool Equals(StreamId other)
             => Key.Equals(other?.Key);
@@ -81,13 +77,12 @@ namespace Orleans.Streams
             }
             return result;
         }
-
-
-        static uint CalculateUniformHashCode((Guid Guid, string ProviderName, string Namespace) key)
+        
+        uint CalculateUniformHashCode()
         {
-            var guidBytes = key.Guid.ToByteArray();
-            var providerBytes = GetBytes(key.ProviderName);
-            var namespaceBytes = GetBytes(key.Namespace);
+            var guidBytes = Guid.ToByteArray();
+            var providerBytes = GetBytes(ProviderName);
+            var namespaceBytes = GetBytes(Namespace);
             var allBytes = new byte[guidBytes.Length + providerBytes.Length + namespaceBytes.Length];
             Buffer.BlockCopy(guidBytes, 0, allBytes, 0, guidBytes.Length);
             Buffer.BlockCopy(providerBytes, 0, allBytes, guidBytes.Length, providerBytes.Length);
