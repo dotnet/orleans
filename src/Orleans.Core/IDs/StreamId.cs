@@ -49,7 +49,7 @@ namespace Orleans.Streams
         }
 
         public bool Equals(StreamId other)
-            => Key.Equals(other.Key);
+            => Key.Equals(other?.Key);
 
         public uint GetUniformHashCode()
             => UniformHashCode.Value;
