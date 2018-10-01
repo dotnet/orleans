@@ -148,8 +148,11 @@ namespace Orleans.Runtime.Messaging
             stopped = true;
             foreach (var sender in senders)
             {
-                sender.Value.Stop();
-                sender.Value.Dispose();
+                if (sender.IsValueCreated)
+                {
+                    sender.Value.Stop();
+                    sender.Value.Dispose();
+                }
             }
             systemSender.Stop();
             pingSender.Stop();
