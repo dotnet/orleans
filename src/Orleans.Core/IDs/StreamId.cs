@@ -20,7 +20,8 @@ namespace Orleans.Streams
         // TODO: Integrate with Orleans serializer to get interning working even better.
 
         [NonSerialized]
-        private static readonly Interner<(Guid Guid, string ProviderName, string Namespace), StreamId> streamIdInternCache = new Interner<(Guid Guid, string ProviderName, string Namespace), StreamId>();
+        private static readonly Lazy<Interner<(Guid Guid, string ProviderName, string Namespace), StreamId>> streamIdInternCache = new Lazy<Interner<(Guid Guid, string ProviderName, string Namespace), StreamId>>(
+            () => new Interner<(Guid Guid, string ProviderName, string Namespace), StreamId>());
 
         private readonly (Guid Guid, string ProviderName, string Namespace) Key;
 
@@ -44,7 +45,7 @@ namespace Orleans.Streams
 
         private static StreamId FindOrCreateStreamId((Guid Guid, string ProviderName, string Namespace) key)
         {
-            return streamIdInternCache.FindOrCreate(key, k => new StreamId(k));
+            return streamIdInternCache.Value.FindOrCreate(key, k => new StreamId(k));
         }
 
         public bool Equals(StreamId other)
