@@ -4,171 +4,87 @@ using System.Text;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 
-namespace Orleans.Streams
-{
+namespace Orleans.Streams {
+
+    // TODO: Use this record type instead of the value tuple when c# language releases the feature.
+    //struct StreamIdKey(Guid Guid, string ProviderName, string Namespace);
+
     /// <summary>
     /// Identifier of an Orleans virtual stream.
     /// </summary>
-    [Serializable]
-    [Immutable]
-    internal class StreamId : IStreamIdentity, IRingIdentifier<StreamId>, IEquatable<StreamId>, IComparable<StreamId>, ISerializable
-    {
-        [NonSerialized]
-        private static readonly Lazy<Interner<StreamIdInternerKey, StreamId>> streamIdInternCache = new Lazy<Interner<StreamIdInternerKey, StreamId>>(
-            () => new Interner<StreamIdInternerKey, StreamId>(InternerConstants.SIZE_LARGE, InternerConstants.DefaultCacheCleanupFreq));
+    [Serializable, Immutable]
+    internal class StreamId : IStreamIdentity, IRingIdentifier<StreamId>, IEquatable<StreamId>, IComparable<StreamId> {
+
+        // TODO: Integrate with Orleans serializer to get interning working even better.
 
         [NonSerialized]
-        private uint uniformHashCache;
-        private readonly StreamIdInternerKey key;
+        private static readonly Interner<(Guid Guid, string ProviderName, string Namespace), StreamId> streamIdInternCache = new Interner<(Guid Guid, string ProviderName, string Namespace), StreamId>();
 
-        // Keep public, similar to GrainId.GetPrimaryKey. Some app scenarios might need that.
-        public Guid Guid { get { return key.Guid; } }
+        private readonly (Guid Guid, string ProviderName, string Namespace) Key;
 
-        // I think it might be more clear if we called this the ActivationNamespace.
-        public string Namespace { get { return key.Namespace; } }
+        [NonSerialized]
+        private readonly Lazy<uint> UniformHashCode;
 
-        public string ProviderName { get { return key.ProviderName; } }
+        public Guid Guid => Key.Guid;
+        public string Namespace => Key.Namespace;
+        public string ProviderName => Key.ProviderName;
 
-        // TODO: need to integrate with Orleans serializer to really use Interner.
-        private StreamId(StreamIdInternerKey key)
-        {
-            this.key = key;
+        private StreamId((Guid Guid, string ProviderName, string Namespace) key) {
+            Key = key;
+            UniformHashCode = new Lazy<uint>(() => CalculateUniformHashCode(key));
         }
 
-        internal static StreamId GetStreamId(Guid guid, string providerName, string streamNamespace)
-        {
-            return FindOrCreateStreamId(new StreamIdInternerKey(guid, providerName, streamNamespace));
+        internal static StreamId GetStreamId(Guid guid, string providerName, string streamNamespace) {
+            return FindOrCreateStreamId((guid, providerName, streamNamespace));
         }
 
-        private static StreamId FindOrCreateStreamId(StreamIdInternerKey key)
-        {
-            return streamIdInternCache.Value.FindOrCreate(key, k => new StreamId(k));
-        }
-
-        public int CompareTo(StreamId other)
-        {
-            return key.CompareTo(other.key);
+        private static StreamId FindOrCreateStreamId((Guid Guid, string ProviderName, string Namespace) key) {
+            return streamIdInternCache.FindOrCreate(key, k => new StreamId(k));
         }
 
         public bool Equals(StreamId other)
-        {
-            return other != null && key.Equals(other.key);
-        }
-
-        public override bool Equals(object obj)
-        {
-            return Equals(obj as StreamId);
-        }
-
-        public override int GetHashCode()
-        {
-            return key.GetHashCode();
-        }
+            => Key.Equals(other.Key);
 
         public uint GetUniformHashCode()
-        {
-            if (uniformHashCache == 0)
-            {
-                byte[] guidBytes = Guid.ToByteArray();
-                byte[] providerBytes = Encoding.UTF8.GetBytes(ProviderName);
-                byte[] allBytes;
-                if (Namespace == null)
-                {
-                    allBytes = new byte[guidBytes.Length + providerBytes.Length];
-                    Array.Copy(guidBytes, allBytes, guidBytes.Length);
-                    Array.Copy(providerBytes, 0, allBytes, guidBytes.Length, providerBytes.Length);
-                }
-                else
-                {
-                    byte[] namespaceBytes = Encoding.UTF8.GetBytes(Namespace);
-                    allBytes = new byte[guidBytes.Length + providerBytes.Length + namespaceBytes.Length];
-                    Array.Copy(guidBytes, allBytes, guidBytes.Length);
-                    Array.Copy(providerBytes, 0, allBytes, guidBytes.Length, providerBytes.Length);
-                    Array.Copy(namespaceBytes, 0, allBytes, guidBytes.Length + providerBytes.Length, namespaceBytes.Length);
-                }
-                uniformHashCache = JenkinsHash.ComputeHash(allBytes);
-            }
-            return uniformHashCache;
-        }
+            => UniformHashCode.Value;
 
-        public override string ToString()
-        {
-            return Namespace == null ? 
-                Guid.ToString() : 
-                String.Format("{0}{1}-{2}", Namespace != null ? (String.Format("{0}-", Namespace)) : "", Guid, ProviderName);
-        }
-
-        public void GetObjectData(SerializationInfo info, StreamingContext context)
-        {
-            // Use the AddValue method to specify serialized values.
-            info.AddValue("Guid", Guid, typeof(Guid));
-            info.AddValue("ProviderName", ProviderName, typeof(string));
-            info.AddValue("Namespace", Namespace, typeof(string));
-        }
-
-        // The special constructor is used to deserialize values. 
-        protected StreamId(SerializationInfo info, StreamingContext context)
-        {
-            // Reset the property value using the GetValue method.
-            var guid = (Guid) info.GetValue("Guid", typeof(Guid));
-            var providerName = (string) info.GetValue("ProviderName", typeof(string));
-            var nameSpace = (string) info.GetValue("Namespace", typeof(string));
-            key = new StreamIdInternerKey(guid, providerName, nameSpace);
-        }
-    }
-
-    [Serializable]
-    [Immutable]
-    internal struct StreamIdInternerKey : IComparable<StreamIdInternerKey>, IEquatable<StreamIdInternerKey>
-    {
-        internal readonly Guid Guid;
-        internal readonly string ProviderName;
-        internal readonly string Namespace;
-
-        public StreamIdInternerKey(Guid guid, string providerName, string streamNamespace)
-        {
-            if (string.IsNullOrWhiteSpace(providerName))
-            {
-                throw new ArgumentException("Provider name is null or whitespace", "providerName");
-            }
-
-            Guid = guid;
-            ProviderName = providerName;
-            if (streamNamespace == null)
-            {
-                Namespace = null;
-            }
-            else
-            {
-                if (String.IsNullOrWhiteSpace(streamNamespace))
-                {
-                    throw new ArgumentException("namespace must be null or substantive (not empty or whitespace).");
-                }
-
-                Namespace = streamNamespace.Trim();
-            }
-        }
-
-        public int CompareTo(StreamIdInternerKey other)
-        {
-            int cmp1 = Guid.CompareTo(other.Guid);
-            if (cmp1 == 0)
-            {
-                int cmp2 = string.Compare(ProviderName, other.ProviderName, StringComparison.Ordinal);
-                return cmp2 == 0 ? string.Compare(Namespace, other.Namespace, StringComparison.Ordinal) : cmp2;
-            }
-            
-            return cmp1;
-        }
-
-        public bool Equals(StreamIdInternerKey other)
-        {
-            return Guid.Equals(other.Guid) && Object.Equals(ProviderName, other.ProviderName) && Object.Equals(Namespace, other.Namespace);
+        public int CompareTo(StreamId other) {
+            if (null == other) return 1;
+            var result = Guid.CompareTo(other.Guid);
+            if (result != 0) return result;
+            result = string.Compare(ProviderName, other.ProviderName, StringComparison.Ordinal);
+            if (result != 0) return result;
+            return string.Compare(Namespace, other.Namespace, StringComparison.Ordinal);
         }
 
         public override int GetHashCode()
-        {
-            return Guid.GetHashCode() ^ (ProviderName != null ? ProviderName.GetHashCode() : 0) ^ (Namespace != null ? Namespace.GetHashCode() : 0);
+            => Guid.GetHashCode()
+                ^ (ProviderName?.GetHashCode() ?? 0)
+                ^ (Namespace?.GetHashCode() ?? 0);
+
+        public override string ToString() {
+            var result = $"{Guid}-{ProviderName}";
+            if (null != Namespace) {
+                result = $"{Namespace}-" + result;
+            }
+            return result;
+        }
+
+
+        static uint CalculateUniformHashCode((Guid Guid, string ProviderName, string Namespace) key) {
+            var guidBytes = key.Guid.ToByteArray();
+            var providerBytes = GetBytes(key.ProviderName);
+            var namespaceBytes = GetBytes(key.Namespace);
+            var allBytes = new byte[guidBytes.Length + providerBytes.Length + namespaceBytes.Length];
+            Buffer.BlockCopy(guidBytes, 0, allBytes, 0, guidBytes.Length);
+            Buffer.BlockCopy(providerBytes, 0, allBytes, guidBytes.Length, providerBytes.Length);
+            Buffer.BlockCopy(namespaceBytes, 0, allBytes, guidBytes.Length + providerBytes.Length, namespaceBytes.Length);
+            return JenkinsHash.ComputeHash(allBytes);
+
+            byte[] GetBytes(string value) {
+                if (null == value) return new byte[0];
+                return Encoding.UTF8.GetBytes(value);
+            }
         }
     }
 }
