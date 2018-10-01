@@ -63,6 +63,13 @@ namespace Orleans.Streams
             return string.Compare(Namespace, other.Namespace, StringComparison.Ordinal);
         }
 
+        /// <remarks>
+        /// We could consider replacing the body of this method with <code>=> Key.GetHashCode()</code>.
+        /// Doing so would result in returning a different value of the hash code than was returned by the original 
+        /// implementation, so for now, pending feedback, I decided to use an implementation that returned
+        /// exactly the same value as previous implementations, instead of opting for a simpler (and better) implementation,
+        /// keeping in mind that someone somewhere might be depending on an unchanged hash code implementation.
+        /// </remarks>
         public override int GetHashCode()
             => Guid.GetHashCode()
                 ^ (ProviderName?.GetHashCode() ?? 0)
