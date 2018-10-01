@@ -21,7 +21,7 @@ namespace Orleans.Streams
 
         [NonSerialized]
         private static readonly Lazy<Interner<(Guid Guid, string ProviderName, string Namespace), StreamId>> streamIdInternCache = new Lazy<Interner<(Guid Guid, string ProviderName, string Namespace), StreamId>>(
-            () => new Interner<(Guid Guid, string ProviderName, string Namespace), StreamId>());
+            () => new Interner<(Guid Guid, string ProviderName, string Namespace), StreamId>(InternerConstants.SIZE_LARGE, InternerConstants.DefaultCacheCleanupFreq));
 
         private readonly (Guid Guid, string ProviderName, string Namespace) Key;
 
