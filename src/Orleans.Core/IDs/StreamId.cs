@@ -4,7 +4,8 @@ using System.Text;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 
-namespace Orleans.Streams {
+namespace Orleans.Streams
+{
 
     // TODO: Use this record type instead of the value tuple when c# language releases the feature.
     //struct StreamIdKey(Guid Guid, string ProviderName, string Namespace);
@@ -13,7 +14,8 @@ namespace Orleans.Streams {
     /// Identifier of an Orleans virtual stream.
     /// </summary>
     [Serializable, Immutable]
-    internal class StreamId : IStreamIdentity, IRingIdentifier<StreamId>, IEquatable<StreamId>, IComparable<StreamId> {
+    internal class StreamId : IStreamIdentity, IRingIdentifier<StreamId>, IEquatable<StreamId>, IComparable<StreamId>
+    {
 
         // TODO: Integrate with Orleans serializer to get interning working even better.
 
@@ -29,16 +31,19 @@ namespace Orleans.Streams {
         public string Namespace => Key.Namespace;
         public string ProviderName => Key.ProviderName;
 
-        private StreamId((Guid Guid, string ProviderName, string Namespace) key) {
+        private StreamId((Guid Guid, string ProviderName, string Namespace) key)
+        {
             Key = key;
             UniformHashCode = new Lazy<uint>(() => CalculateUniformHashCode(key));
         }
 
-        internal static StreamId GetStreamId(Guid guid, string providerName, string streamNamespace) {
+        internal static StreamId GetStreamId(Guid guid, string providerName, string streamNamespace)
+        {
             return FindOrCreateStreamId((guid, providerName, streamNamespace));
         }
 
-        private static StreamId FindOrCreateStreamId((Guid Guid, string ProviderName, string Namespace) key) {
+        private static StreamId FindOrCreateStreamId((Guid Guid, string ProviderName, string Namespace) key)
+        {
             return streamIdInternCache.FindOrCreate(key, k => new StreamId(k));
         }
 
@@ -48,7 +53,8 @@ namespace Orleans.Streams {
         public uint GetUniformHashCode()
             => UniformHashCode.Value;
 
-        public int CompareTo(StreamId other) {
+        public int CompareTo(StreamId other)
+        {
             if (null == other) return 1;
             var result = Guid.CompareTo(other.Guid);
             if (result != 0) return result;
@@ -62,16 +68,19 @@ namespace Orleans.Streams {
                 ^ (ProviderName?.GetHashCode() ?? 0)
                 ^ (Namespace?.GetHashCode() ?? 0);
 
-        public override string ToString() {
+        public override string ToString()
+        {
             var result = $"{Guid}-{ProviderName}";
-            if (null != Namespace) {
+            if (null != Namespace)
+            {
                 result = $"{Namespace}-" + result;
             }
             return result;
         }
 
 
-        static uint CalculateUniformHashCode((Guid Guid, string ProviderName, string Namespace) key) {
+        static uint CalculateUniformHashCode((Guid Guid, string ProviderName, string Namespace) key)
+        {
             var guidBytes = key.Guid.ToByteArray();
             var providerBytes = GetBytes(key.ProviderName);
             var namespaceBytes = GetBytes(key.Namespace);
@@ -81,7 +90,8 @@ namespace Orleans.Streams {
             Buffer.BlockCopy(namespaceBytes, 0, allBytes, guidBytes.Length + providerBytes.Length, namespaceBytes.Length);
             return JenkinsHash.ComputeHash(allBytes);
 
-            byte[] GetBytes(string value) {
+            byte[] GetBytes(string value)
+            {
                 if (null == value) return new byte[0];
                 return Encoding.UTF8.GetBytes(value);
             }
