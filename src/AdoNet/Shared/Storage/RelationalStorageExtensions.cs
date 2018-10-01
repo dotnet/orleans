@@ -21,7 +21,7 @@ namespace Orleans.Tests.SqlUtils
 #endif
 {
     /// <summary>
-    /// Convenienience functions to work with objects of type <see cref="IRelationalStorage"/>.
+    /// Convenience functions to work with objects of type <see cref="IRelationalStorage"/>.
     /// </summary>
     internal static class RelationalStorageExtensions
     {
@@ -253,7 +253,7 @@ namespace Orleans.Tests.SqlUtils
 
         /// <summary>
         /// Returns a native implementation of <see cref="DbDataReader.GetStream(int)"/> for those providers
-        /// which support it. Otherwise returns a chuncked read using <see cref="DbDataReader.GetBytes(int, long, byte[], int, int)"/>.
+        /// which support it. Otherwise returns a chunked read using <see cref="DbDataReader.GetBytes(int, long, byte[], int, int)"/>.
         /// </summary>
         /// <param name="reader">The reader from which to return the stream.</param>
         /// <param name="ordinal">The ordinal column for which to return the stream.</param>

@@ -136,7 +136,7 @@ namespace Orleans
         /// Returns the long representation of a grain primary key.
         /// </summary>
         /// <param name="grain">The grain to find the primary key for.</param>
-        /// <param name="keyExt">The output paramater to return the extended key part of the grain primary key, if extened primary key was provided for that grain.</param>
+        /// <param name="keyExt">The output parameter to return the extended key part of the grain primary key, if extended primary key was provided for that grain.</param>
         /// <returns>A long representing the primary key for this grain.</returns>
         public static long GetPrimaryKeyLong(this IAddressable grain, out string keyExt)
         {
@@ -157,7 +157,7 @@ namespace Orleans
         /// Returns the Guid representation of a grain primary key.
         /// </summary>
         /// <param name="grain">The grain to find the primary key for.</param>
-        /// <param name="keyExt">The output paramater to return the extended key part of the grain primary key, if extened primary key was provided for that grain.</param>
+        /// <param name="keyExt">The output parameter to return the extended key part of the grain primary key, if extended primary key was provided for that grain.</param>
         /// <returns>A Guid representing the primary key for this grain.</returns>
         public static Guid GetPrimaryKey(this IAddressable grain, out string keyExt)
         {

@@ -21,11 +21,11 @@ namespace Orleans.Streams
     }
 
     /// <summary>
-    /// The extesion multiplexes all stream related messages to this grain between different streams and their stream observers.
+    /// The extension multiplexes all stream related messages to this grain between different streams and their stream observers.
     /// 
-    /// On the silo, we have one extension object per activation and this extesion multiplexes all streams on this activation 
+    /// On the silo, we have one extension object per activation and this extension multiplexes all streams on this activation 
     ///     (streams of all types and ids: different stream ids and different stream providers).
-    /// On the client, we have one extension per stream (we bind an extesion for every StreamConsumer, therefore every stream has its own extension).
+    /// On the client, we have one extension per stream (we bind an extension for every StreamConsumer, therefore every stream has its own extension).
     /// </summary>
     [Serializable]
     internal class StreamConsumerExtension : IStreamConsumerExtension

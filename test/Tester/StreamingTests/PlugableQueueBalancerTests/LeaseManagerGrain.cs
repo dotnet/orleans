@@ -56,7 +56,7 @@ namespace Tester.StreamingTests
                     return Task.FromResult(lease.Key);
                 }
             }
-            throw new KeyNotFoundException("No more lease to aquire");
+            throw new KeyNotFoundException("No more lease to acquire");
         }
 
         public Task<bool> Renew(QueueId leaseNumber)

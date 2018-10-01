@@ -89,7 +89,7 @@ namespace Orleans.Providers.Streams.Common
     }
 
     /// <summary>
-    /// Cache data comparer exstension functions that switch argument order
+    /// Cache data comparer extension functions that switch argument order
     /// </summary>
     public static class CacheDataComparerExtensions
     {

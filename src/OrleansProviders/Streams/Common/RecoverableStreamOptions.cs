@@ -13,7 +13,7 @@ namespace Orleans.Configuration
         /// </summary>
         public TimeSpan DataMinTimeInCache { get; set; } = DefaultDataMinTimeInCache;
         /// <summary>
-        /// Drfault DataMinTimeInCache
+        /// Default DataMinTimeInCache
         /// </summary>
         public static readonly TimeSpan DefaultDataMinTimeInCache = TimeSpan.FromMinutes(5);
 

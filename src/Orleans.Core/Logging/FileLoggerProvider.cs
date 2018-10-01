@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 namespace Orleans.Logging
 {
     /// <summary>
-    /// FileLoggerProvider implemets ILoggerProvider, creates <see cref="FileLogger"/>
+    /// FileLoggerProvider implements ILoggerProvider, creates <see cref="FileLogger"/>
     /// </summary>
     public class FileLoggerProvider : ILoggerProvider
     {
@@ -28,7 +28,7 @@ namespace Orleans.Logging
     }
 
     /// <summary>
-    /// Exentions methods to configure ILoggingBuilder with FileLoggerProvider
+    /// Extension methods to configure ILoggingBuilder with FileLoggerProvider
     /// </summary>
     public static class FileLoggerProviderExtensions
     {

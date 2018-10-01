@@ -10,7 +10,7 @@ namespace Orleans.ServiceBus
     internal enum OrleansServiceBusErrorCode
     {
         /// <summary>
-        /// Start of orlean servicebus errocodes
+        /// Start of orlean servicebus error codes
         /// </summary>
         ServiceBus = 1<<16,
 

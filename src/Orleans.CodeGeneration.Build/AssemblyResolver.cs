@@ -19,7 +19,7 @@ namespace Orleans.CodeGeneration
     internal class AssemblyResolver
     {
         /// <summary>
-        /// Needs to be public so can be serialized accross the the app domain.
+        /// Needs to be public so can be serialized across the app domain.
         /// </summary>
         public Dictionary<string, string> ReferenceAssemblyPaths { get; } = new Dictionary<string, string>();
 

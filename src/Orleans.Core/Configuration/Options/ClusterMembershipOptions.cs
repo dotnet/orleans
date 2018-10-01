@@ -20,7 +20,7 @@ namespace Orleans.Configuration
         /// If a silo is suspected to be dead, but this attribute is set to "false", the suspicions will not propagated to the system and enforced,
         /// This parameter is intended for use only for testing and troubleshooting.
         /// In production, liveness should always be enabled.
-        /// Default is true (eanabled)
+        /// Default is true (enabled)
         /// </summary>
         public bool LivenessEnabled { get; set; } = DEFAULT_LIVENESS_ENABLED;
         public const bool DEFAULT_LIVENESS_ENABLED = true;

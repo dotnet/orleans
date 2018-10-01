@@ -25,7 +25,7 @@ namespace Orleans.Providers.Streams.AzureQueue
     }
 
     /// <summary>
-    /// Original data adapter.  Here to maintain backwards compatablity, but does not support json and other custom serializers
+    /// Original data adapter.  Here to maintain backwards compatibility, but does not support json and other custom serializers
     /// </summary>
     public class AzureQueueDataAdapterV1 : IAzureQueueDataAdapter, IOnDeserialized
     {

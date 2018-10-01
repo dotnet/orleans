@@ -52,7 +52,7 @@ namespace Orleans.Transactions.AzureStorage
     /// General utility functions related to Azure storage.
     /// </summary>
     /// <remarks>
-    /// These functions are mostly intended for internal usage by Orleans runtime, but due to certain assembly packaging constrants this class needs to have public visibility.
+    /// These functions are mostly intended for internal usage by Orleans runtime, but due to certain assembly packaging constraints this class needs to have public visibility.
     /// </remarks>
     public static class AzureStorageUtils
     {
@@ -105,7 +105,7 @@ namespace Orleans.Transactions.AzureStorage
         /// <summary>
         /// Examine a storage exception, and if applicable extracts the HTTP status code, and REST error code if <c>getRESTErrors=true</c>.
         /// </summary>
-        /// <param name="e">Exeption to be examined.</param>
+        /// <param name="e">Exception to be examined.</param>
         /// <param name="httpStatusCode">Output HTTP status code if applicable, otherwise HttpStatusCode.Unused (306)</param>
         /// <param name="restStatus">When <c>getRESTErrors=true</c>, will output REST error code if applicable, otherwise <c>null</c></param>
         /// <param name="getRESTErrors">Whether REST error code should also be examined / extracted.</param>

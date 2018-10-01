@@ -348,7 +348,7 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
         /// <summary>
-        /// Adjust local directory following the removal of a silo by droping all activations located on the removed silo
+        /// Adjust local directory following the removal of a silo by dropping all activations located on the removed silo
         /// </summary>
         /// <param name="removedSilo"></param>
         protected void AdjustLocalDirectory(SiloAddress removedSilo)
@@ -363,7 +363,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        /// Adjust local cache following the removal of a silo by droping:
+        /// Adjust local cache following the removal of a silo by dropping:
         /// 1) entries that point to activations located on the removed silo 
         /// 2) entries for grains that are now owned by this silo (me)
         /// 3) entries for grains that were owned by this removed silo - we currently do NOT do that.

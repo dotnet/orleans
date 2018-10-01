@@ -364,7 +364,7 @@ namespace Orleans.Runtime.GrainDirectory
 
    
         /// <summary>
-        /// Removes the grain (and, effectively, all its activations) from the diretcory
+        /// Removes the grain (and, effectively, all its activations) from the directory
         /// </summary>
         /// <param name="grain"></param>
         internal void RemoveGrain(GrainId grain)

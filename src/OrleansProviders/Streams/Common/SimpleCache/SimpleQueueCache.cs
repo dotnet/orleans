@@ -225,7 +225,7 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <summary>
-        /// Aquires the next message in the cache at the provided cursor
+        /// Acquires the next message in the cache at the provided cursor
         /// </summary>
         /// <param name="cursor"></param>
         /// <param name="batch"></param>

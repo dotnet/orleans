@@ -34,7 +34,7 @@ namespace Orleans.Configuration
         public int MaxResendCount { get; set; }
 
         /// <summary>
-        /// The ResendOnTimeout attribute specifies whether the message should be automaticaly resend by the runtime when it times out on the sender.
+        /// The ResendOnTimeout attribute specifies whether the message should be automatically resend by the runtime when it times out on the sender.
         /// Default is false.
         /// </summary>
         public bool ResendOnTimeout { get; set; }

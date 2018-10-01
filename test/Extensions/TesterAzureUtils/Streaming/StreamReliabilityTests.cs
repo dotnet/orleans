@@ -910,7 +910,7 @@ namespace UnitTests.Streaming.Reliability
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
 
-            when = "After starting additonal silo " + newSilo;
+            when = "After starting additional silo " + newSilo;
             output.WriteLine(when);
             CheckSilosRunning(when, numExpectedSilos + 1);
 

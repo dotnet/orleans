@@ -89,7 +89,7 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Restarts this stopwatch, begining from zero time elapsed.
+        /// Restarts this stopwatch, beginning from zero time elapsed.
         /// </summary>
         public void Restart() => this.value = Stopwatch.GetTimestamp();
 

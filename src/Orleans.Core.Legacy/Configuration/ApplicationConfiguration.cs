@@ -59,7 +59,7 @@ namespace Orleans.Runtime.Configuration
         public IEnumerable<GrainTypeConfiguration> ClassSpecific { get { return this.classSpecific.Values; } }
 
         /// <summary>
-        /// Load this configuratin from xml element.
+        /// Load this configuration from xml element.
         /// </summary>
         /// <param name="xmlElement"></param>
         public void Load(XmlElement xmlElement)
@@ -248,7 +248,7 @@ namespace Orleans.Runtime.Configuration
         public string FullTypeName { get; private set; }
 
         /// <summary>
-        /// Whether this is a defualt configuration that applies to all grain types.
+        /// Whether this is a default configuration that applies to all grain types.
         /// </summary>
         public bool AreDefaults { get { return this.FullTypeName == null; } }
 

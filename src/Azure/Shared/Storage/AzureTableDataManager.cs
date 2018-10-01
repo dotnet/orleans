@@ -35,7 +35,7 @@ namespace Orleans.Transactions.AzureStorage
     /// Utility class to encapsulate row-based access to Azure table storage.
     /// </summary>
     /// <remarks>
-    /// These functions are mostly intended for internal usage by Orleans runtime, but due to certain assembly packaging constrants this class needs to have public visibility.
+    /// These functions are mostly intended for internal usage by Orleans runtime, but due to certain assembly packaging constraints this class needs to have public visibility.
     /// </remarks>
     /// <typeparam name="T">Table data entry used by this table / manager.</typeparam>
     public class AzureTableDataManager<T> where T : class, ITableEntity, new()

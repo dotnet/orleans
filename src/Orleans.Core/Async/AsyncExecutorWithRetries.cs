@@ -6,7 +6,7 @@ using Orleans.Runtime;
 namespace Orleans
 {
     /// <summary>
-    /// This class a convinent utiliity class to execute a certain asyncronous function with retires,
+    /// This class a convenient utility class to execute a certain asynchronous function with retires,
     /// allowing to specify custom retry filters and policies.
     /// </summary>
     internal static class AsyncExecutorWithRetries

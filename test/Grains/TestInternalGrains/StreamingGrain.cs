@@ -195,7 +195,7 @@ namespace UnitTests.Grains
             // only SimpleMessageStreamProducer implements IDisposable and a means to verify it was cleaned up.
             if (null == observerAsSMSProducer)
             {
-                _logger.Info("ProducerObserver.BecomeProducer: producer requires no disposal; test short-circuted.");
+                _logger.Info("ProducerObserver.BecomeProducer: producer requires no disposal; test short-circuited.");
                 _observerDisposedYet = true;
             }
             else
@@ -222,7 +222,7 @@ namespace UnitTests.Grains
             // only SimpleMessageStreamProducer implements IDisposable and a means to verify it was cleaned up.
             if (null == observerAsSMSProducer)
             {
-                //_logger.Info("ProducerObserver.BecomeProducer: producer requires no disposal; test short-circuted.");
+                //_logger.Info("ProducerObserver.BecomeProducer: producer requires no disposal; test short-circuited.");
                 _observerDisposedYet = true;
             }
             else

@@ -40,7 +40,7 @@ namespace Orleans.Streams
         /// Constructor.
         /// Initializes an ideal distribution to be used to aid in resource to bucket affinity.
         /// </summary>
-        /// <param name="buckets">Buckets among which to destribute resources.</param>
+        /// <param name="buckets">Buckets among which to distribute resources.</param>
         /// <param name="resources">Resources to be distributed.</param>
         public BestFitBalancer(IEnumerable<TBucket> buckets, IEnumerable<TResource> resources)
         {
@@ -123,9 +123,9 @@ namespace Orleans.Streams
 
         /// <summary>
         /// Distribute resources evenly among buckets in a deterministic way.
-        /// - Must distribute resources evenly regardles off order of inputs.
+        /// - Must distribute resources evenly regardless off order of inputs.
         /// </summary>
-        /// <param name="buckets">Buckets among which to destribute resources.</param>
+        /// <param name="buckets">Buckets among which to distribute resources.</param>
         /// <param name="resources">Resources to be distributed.</param>
         /// <returns>Dictionary of resources evenly distributed among the buckets</returns>
         private static Dictionary<TBucket, List<TResource>> BuildIdealDistribution(IEnumerable<TBucket> buckets, IEnumerable<TResource> resources)

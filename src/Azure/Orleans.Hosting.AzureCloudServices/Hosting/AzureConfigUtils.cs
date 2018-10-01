@@ -45,7 +45,7 @@ namespace Orleans.Runtime.Host
         /// </summary>
         /// <param name="cfgFileName">Name of the file to be found.</param>
         /// <param name="what">Short description of the file to be found.</param>
-        /// <returns>Location if the file, if found, otherwise FileNotFound exeception will be thrown.</returns>
+        /// <returns>Location if the file, if found, otherwise FileNotFound exception will be thrown.</returns>
         /// <exception cref="FileNotFoundException">If the specified config file cannot be located</exception>
         internal static FileInfo FindConfigFile(string cfgFileName, string what)
         {
@@ -71,7 +71,7 @@ namespace Orleans.Runtime.Host
         /// <summary>
         /// Return the expected possible base locations for the Azure app directory we are being run from
         /// </summary>
-        /// <returns>Enererable list of app directory locations</returns>
+        /// <returns>Enumerable list of app directory locations</returns>
         public static DirectoryInfo[] AppDirectoryLocations
         {
             get { return appDirectoryLocations ?? (appDirectoryLocations = FindAppDirectoryLocations().ToArray()); }
@@ -82,7 +82,7 @@ namespace Orleans.Runtime.Host
         /// <summary>
         /// Return the expected possible base locations for the Azure app directory we are being run from
         /// </summary>
-        /// <returns>Enererable list of app directory locations</returns>
+        /// <returns>Enumerable list of app directory locations</returns>
         private static IEnumerable<DirectoryInfo> FindAppDirectoryLocations()
         {
             // App directory locations:

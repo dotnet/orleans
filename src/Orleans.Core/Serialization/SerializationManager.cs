@@ -1495,7 +1495,7 @@ namespace Orleans.Serialization
         }
 
         /// <summary>
-        /// Deserialize data from the specified byte[] and rehydrate backi into objects.
+        /// Deserialize data from the specified byte[] and rehydrate back into objects.
         /// </summary>
         /// <typeparam name="T">Type of data to be returned.</typeparam>
         /// <param name="data">Input data.</param>

@@ -223,7 +223,7 @@ namespace Orleans
         }
 
         /// <summary>
-        /// This method is called at the begining of the process of deactivating a grain.
+        /// This method is called at the beginning of the process of deactivating a grain.
         /// </summary>
         public virtual Task OnDeactivateAsync()
         {
