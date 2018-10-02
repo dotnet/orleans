@@ -18,7 +18,7 @@
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <IncludeSource>true</IncludeSource>
-	<LangVersion>7.3</LangVersion>
+    <LangVersion>7.3</LangVersion>
   </PropertyGroup>
 
   <!-- Common compile parameters -->
@@ -78,7 +78,7 @@
 
     <SystemManagementAutomationdllVersion>10.0.10586</SystemManagementAutomationdllVersion>
 	
-	<SystemMemoryVersion>4.5.1</SystemMemoryVersion>
+    <SystemMemoryVersion>4.5.1</SystemMemoryVersion>
 
 
     <!-- 3rd party packages -->
