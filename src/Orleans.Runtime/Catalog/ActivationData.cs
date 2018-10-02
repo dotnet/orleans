@@ -514,10 +514,10 @@ namespace Orleans.Runtime
         /// <summary>Decrement the number of in-flight messages currently being processed.</summary>
         public void DecrementInFlightCount() { Interlocked.Decrement(ref inFlightCount); }
 
-        /// <summary>Increment the number of messages currently in the prcess of being received.</summary>
+        /// <summary>Increment the number of messages currently in the process of being received.</summary>
         public void IncrementEnqueuedOnDispatcherCount() { Interlocked.Increment(ref enqueuedOnDispatcherCount); }
 
-        /// <summary>Decrement the number of messages currently in the prcess of being received.</summary>
+        /// <summary>Decrement the number of messages currently in the process of being received.</summary>
         public void DecrementEnqueuedOnDispatcherCount() { Interlocked.Decrement(ref enqueuedOnDispatcherCount); }
        
         /// <summary>

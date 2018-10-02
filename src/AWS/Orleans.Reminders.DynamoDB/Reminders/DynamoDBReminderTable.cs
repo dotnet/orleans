@@ -270,7 +270,7 @@ namespace Orleans.Reminders.DynamoDB
         }
 
         /// <summary>
-        /// Async method to put an entry into the remider table
+        /// Async method to put an entry into the reminder table
         /// </summary>
         /// <param name="entry"> The entry to put </param>
         /// <returns> Return the entry ETag if entry was upsert successfully </returns>
