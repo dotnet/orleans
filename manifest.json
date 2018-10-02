@@ -2549,7 +2549,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/grains/grainservices.html",
-          "hash": "6u6yK4tmC/lUqcLz9zN59g=="
+          "hash": "QPtHHqeLRTEsT/KaHoh0vA=="
         }
       },
       "is_incremental": false,
@@ -3048,7 +3048,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/whats_new_in_orleans.html",
-          "hash": "bH1OTkKoxjiQOPiReRy58Q=="
+          "hash": "B3aFjmbE4FvZbSePueXH0Q=="
         }
       },
       "is_incremental": false,
@@ -3536,13 +3536,13 @@
           "details": "Processor ResourceDocumentProcessor cannot support incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
           "incrementalPhase": "build"
         },
+        "ConceptualDocumentProcessor": {
+          "can_incremental": false,
+          "incrementalPhase": "build"
+        },
         "TocDocumentProcessor": {
           "can_incremental": false,
           "details": "Processor TocDocumentProcessor cannot support incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
-          "incrementalPhase": "build"
-        },
-        "ConceptualDocumentProcessor": {
-          "can_incremental": false,
           "incrementalPhase": "build"
         }
       }

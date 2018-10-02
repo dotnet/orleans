@@ -77,6 +77,96 @@
             <article class="content wrap" id="_content" data-uid="">
 <h1 id="whats-new-in-orleans">What&#39;s new in Orleans?</h1>
 
+<h2 id="v210httpsgithubcomdotnetorleansreleasestagv210-september-28th-2018"><a href="https://github.com/dotnet/orleans/releases/tag/v2.1.0">v2.1.0</a> September 28th 2018</h2>
+<ul>
+<li>Major changes<ul>
+<li>New scheduler (<a href="https://github.com/dotnet/orleans/pull/3792">#3792</a>)</li>
+<li>Hosted Client (<a href="https://github.com/dotnet/orleans/pull/3362">#3362</a>)</li>
+<li>Distributed Transaction Manager (<a href="https://github.com/dotnet/orleans/pull/3820">#3820</a>, <a href="https://github.com/dotnet/orleans/pull/4502">#4502</a>, <a href="https://github.com/dotnet/orleans/pull/4538">#4538</a>, <a href="https://github.com/dotnet/orleans/pull/4566">#4566</a>, <a href="https://github.com/dotnet/orleans/pull/4568">#4568</a>, <a href="https://github.com/dotnet/orleans/pull/4591">#4591</a>, <a href="https://github.com/dotnet/orleans/pull/4599">#4599</a>, <a href="https://github.com/dotnet/orleans/pull/4613">#4613</a>, <a href="https://github.com/dotnet/orleans/pull/4609">#4609</a>, <a href="https://github.com/dotnet/orleans/pull/4616">#4616</a>, <a href="https://github.com/dotnet/orleans/pull/4608">#4608</a>, <a href="https://github.com/dotnet/orleans/pull/4628">#4628</a>, <a href="https://github.com/dotnet/orleans/pull/4638">#4638</a>, <a href="https://github.com/dotnet/orleans/pull/4685">#4685</a>, <a href="https://github.com/dotnet/orleans/pull/4714">#4714</a>, <a href="https://github.com/dotnet/orleans/pull/4739">#4739</a>, <a href="https://github.com/dotnet/orleans/pull/4768">#4768</a>, <a href="https://github.com/dotnet/orleans/pull/4799">#4799</a>, <a href="https://github.com/dotnet/orleans/pull/4781">#4781</a>, <a href="https://github.com/dotnet/orleans/pull/4810">#4810</a>, <a href="https://github.com/dotnet/orleans/pull/4820">#4820</a>, <a href="https://github.com/dotnet/orleans/pull/4838">#4838</a>, <a href="https://github.com/dotnet/orleans/pull/4831">#4831</a>, <a href="https://github.com/dotnet/orleans/pull/4871">#4871</a>, <a href="https://github.com/dotnet/orleans/pull/4887">#4887</a>)</li>
+</ul>
+</li>
+</ul>
+<h2 id="v156httpsgithubcomdotnetorleansreleasestagv156-september-27th-2018"><a href="https://github.com/dotnet/orleans/releases/tag/v1.5.6">v1.5.6</a> September 27th 2018</h2>
+<p>Improvements and bug fixes since 1.5.5.</p>
+<ul>
+<li>Non-breaking improvements<ul>
+<li>Make MaxSockets in SocketManager configurable <a href="https://github.com/dotnet/orleans/pull/5033">#5033</a>.</li>
+</ul>
+</li>
+</ul>
+<h2 id="v210-rc2httpsgithubcomdotnetorleansreleasestagv210-rc2-september-21st-2018"><a href="https://github.com/dotnet/orleans/releases/tag/v2.1.0-rc2">v2.1.0-rc2</a> September 21st 2018</h2>
+<ul>
+<li>Major changes<ul>
+<li>New Code Generator (<a href="https://github.com/dotnet/orleans/pull/4934">#4934</a>, <a href="https://github.com/dotnet/orleans/pull/5010">#5010</a>, <a href="https://github.com/dotnet/orleans/pull/5011">#5011</a>).</li>
+</ul>
+</li>
+</ul>
+<h2 id="v210-rc1httpsgithubcomdotnetorleansreleasestagv210-rc1-september-14th-2018"><a href="https://github.com/dotnet/orleans/releases/tag/v2.1.0-rc1">v2.1.0-rc1</a> September 14th 2018</h2>
+<ul>
+<li>Major changes<ul>
+<li>Transactions (beta2) (<a href="https://github.com/dotnet/orleans/pull/4851">#4851</a>, <a href="https://github.com/dotnet/orleans/pull/4923">#4923</a>, <a href="https://github.com/dotnet/orleans/pull/4951">#4951</a>, <a href="https://github.com/dotnet/orleans/pull/4950">#4950</a>, <a href="https://github.com/dotnet/orleans/pull/4953">#4953</a>)</li>
+<li>Support for Transfer of Coordination in transaction (<a href="https://github.com/dotnet/orleans/pull/4860">#4860</a>, <a href="https://github.com/dotnet/orleans/pull/4894">#4894</a>, <a href="https://github.com/dotnet/orleans/pull/4949">#4949</a>)</li>
+</ul>
+</li>
+</ul>
+<h2 id="v155httpsgithubcomdotnetorleansreleasestagv155-september-7th-2018"><a href="https://github.com/dotnet/orleans/releases/tag/v1.5.5">v1.5.5</a> September 7th 2018</h2>
+<p>Improvements and bug fixes since 1.5.4.</p>
+<ul>
+<li><p>Non-breaking bug fixes</p>
+<ul>
+<li>Fix programmatic subscribe bugs (<a href="https://github.com/dotnet/orleans/pull/4943">#4943</a> - <a href="https://github.com/dotnet/orleans/pull/3843">#3843</a>)</li>
+<li>Propagate message serialization errors to callers (<a href="https://github.com/dotnet/orleans/pull/4944">#4944</a> - <a href="https://github.com/dotnet/orleans/pull/4907">#4907</a>)</li>
+</ul>
+</li>
+<li><p>Breaking bug fixes</p>
+<ul>
+<li>Add StreamSubscriptionHandleFactory to subscribe on behalf feature (<a href="https://github.com/dotnet/orleans/pull/4943">#4943</a> - <a href="https://github.com/dotnet/orleans/pull/3843">#3843</a>). While technically a breaking change, it only impacts users of the programmatic subscriptions feature that tried to use it with SMS stream by fixing that scenario (along with <a href="https://github.com/dotnet/orleans/pull/3843">#3843</a>).</li>
+</ul>
+</li>
+</ul>
+<h2 id="v204httpsgithubcomdotnetorleansreleasestagv204-august-7th-2018"><a href="https://github.com/dotnet/orleans/releases/tag/v2.0.4">v2.0.4</a> August 7th 2018</h2>
+<ul>
+<li>Non-breaking bug fixes<ul>
+<li>Use netcoreapp2.0 for msbuild target dll if using dotnet core msbuild but targeting full .net (<a href="https://github.com/dotnet/orleans/pull/4895">#4895</a>)</li>
+</ul>
+</li>
+</ul>
+<h2 id="v210httpsgithubcomdotnetorleansreleasestagv210-august-28th-2018"><a href="https://github.com/dotnet/orleans/releases/tag/v2.1.0">v2.1.0</a> August 28th 2018</h2>
+<ul>
+<li>Major changes<ul>
+<li>New scheduler (<a href="https://github.com/dotnet/orleans/pull/3792">#3792</a>)</li>
+<li>Hosted Client (<a href="https://github.com/dotnet/orleans/pull/3362">#3362</a>)</li>
+<li>Distributed Transaction Manager (beta)(<a href="https://github.com/dotnet/orleans/pull/3820">#3820</a>, <a href="https://github.com/dotnet/orleans/pull/4502">#4502</a>, <a href="https://github.com/dotnet/orleans/pull/4538">#4538</a>, <a href="https://github.com/dotnet/orleans/pull/4566">#4566</a>, <a href="https://github.com/dotnet/orleans/pull/4568">#4568</a>, <a href="https://github.com/dotnet/orleans/pull/4591">#4591</a>, <a href="https://github.com/dotnet/orleans/pull/4599">#4599</a>, <a href="https://github.com/dotnet/orleans/pull/4613">#4613</a>, <a href="https://github.com/dotnet/orleans/pull/4609">#4609</a>, <a href="https://github.com/dotnet/orleans/pull/4616">#4616</a>, <a href="https://github.com/dotnet/orleans/pull/4608">#4608</a>, <a href="https://github.com/dotnet/orleans/pull/4628">#4628</a>, <a href="https://github.com/dotnet/orleans/pull/4638">#4638</a>, <a href="https://github.com/dotnet/orleans/pull/4685">#4685</a>, <a href="https://github.com/dotnet/orleans/pull/4714">#4714</a>, <a href="https://github.com/dotnet/orleans/pull/4739">#4739</a>, <a href="https://github.com/dotnet/orleans/pull/4768">#4768</a>, <a href="https://github.com/dotnet/orleans/pull/4799">#4799</a>, <a href="https://github.com/dotnet/orleans/pull/4781">#4781</a>, <a href="https://github.com/dotnet/orleans/pull/4810">#4810</a>, <a href="https://github.com/dotnet/orleans/pull/4820">#4820</a>, <a href="https://github.com/dotnet/orleans/pull/4838">#4838</a>, <a href="https://github.com/dotnet/orleans/pull/4831">#4831</a>, <a href="https://github.com/dotnet/orleans/pull/4871">#4871</a>, 
+<a href="https://github.com/dotnet/orleans/pull/4887">#4887</a>)</li>
+</ul>
+</li>
+</ul>
+<h2 id="v204httpsgithubcomdotnetorleansreleasestagv204-august-7th-2018-1"><a href="https://github.com/dotnet/orleans/releases/tag/v2.0.4">v2.0.4</a> August 7th 2018</h2>
+<p>Improvements and bug fixes since 2.0.3.</p>
+<ul>
+<li>Non-breaking bug fixes<ul>
+<li>Workaround for CoreFx/#30781 when running on .NET Core (<a href="https://github.com/dotnet/orleans/pull/4736">#4736</a>)</li>
+<li>Fix for .NET Core 2.1 build-time code generation (<a href="https://github.com/dotnet/orleans/pull/4673">#4673</a>)</li>
+</ul>
+</li>
+</ul>
+<h2 id="v154httpsgithubcomdotnetorleansreleasestagv154-june-13th-2018"><a href="https://github.com/dotnet/orleans/releases/tag/v1.5.4">v1.5.4</a> June 13th 2018</h2>
+<h2 id="v203httpsgithubcomdotnetorleansreleasestagv203-may-14th-2018"><a href="https://github.com/dotnet/orleans/releases/tag/v2.0.3">v2.0.3</a> May 14th 2018</h2>
+<ul>
+<li>This is a first patch release with a partial build -- only 9 NuGet packages got updated:<ul>
+<li>Microsoft.Orleans.OrleansRuntime</li>
+<li>Microsoft.Orleans.OrleansServiceBus</li>
+<li>Microsoft.Orleans.Runtime.Legacy</li>
+<li>Microsoft.Orleans.OrleansCodeGenerator.Build</li>
+<li>Microsoft.Orleans.Core.Legacy</li>
+<li>Microsoft.Orleans.Transactions</li>
+<li>Microsoft.Orleans.OrleansCodeGenerator</li>
+<li>Microsoft.Orleans.Core</li>
+<li>Microsoft.Orleans.TestingHost</li>
+</ul>
+</li>
+</ul>
+<p>The rest of the packages stayed unchanged at 2.0.0, except for the <code>Microsoft.Orleans.ServiceFabric</code> meta-package which is at 2.0.2.</p>
 <h2 id="v200httpsgithubcomdotnetorleansreleasestagv200-march-28th-2018"><a href="https://github.com/dotnet/orleans/releases/tag/v2.0.0">v2.0.0</a> March 28th 2018</h2>
 <ul>
 <li>Major changes (since 2.0.0-rc2)<ul>
@@ -110,7 +200,7 @@ December 13th 2017
 <h2 id="v200-beta1httpsgithubcomdotnetorleansreleasestagv200-beta1-october-26th-2017"><a href="https://github.com/dotnet/orleans/releases/tag/v2.0.0-beta1">v2.0.0-beta1</a> October 26th 2017</h2>
 <ul>
 <li>Major new features<ul>
-<li>Most packages are now targetting .NET Standard 2.0 (which mean they can be used from either .NET Framework or .NET Core 2.0) and on non-Windows platforms.</li>
+<li>Most packages are now targeting .NET Standard 2.0 (which mean they can be used from either .NET Framework or .NET Core 2.0) and on non-Windows platforms.</li>
 </ul>
 </li>
 </ul>

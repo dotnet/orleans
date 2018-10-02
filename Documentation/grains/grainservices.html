@@ -78,17 +78,17 @@
 <h1 id="grainservices">GrainServices</h1>
 
 <p>A GrainService is a special grain; one that has no identity, and runs in every silo from startup to shutdown.</p>
-<h3 id="creating-a-grainservice">Creating a GrainService</h3>
+<h2 id="creating-a-grainservice">Creating a GrainService</h2>
 <p><strong>Step 1.</strong> Create the interface.
 The interface of a GrainService is built using exactly the same principles you would use for building the interface of any other grain.</p>
 <pre><code class="lang-csharp">public interface IDataService : IGrainService {
-Task MyMethod();
+    Task MyMethod();
 }
 </code></pre><p><strong>Step 2.</strong> Create the DataService grain itself.
 If possible, make the GrainService reentrant for better performance.
 Note the necessary base constructor call.
 It’s good to know that you can also inject an <code>IGrainFactory</code> so you can make grain calls from your GrainService.</p>
-<p>A note about streams: a GrainService cannot write to Orleans streams because it doesn’t work within a grain task scheduler. 
+<p>A note about streams: a GrainService cannot write to Orleans streams because it doesn’t work within a grain task scheduler.
 If you need the GrainService to write to streams for you, then you will have to send the object to another kind of grain for writing to the stream.</p>
 <pre><code class="lang-csharp">[Reentrant]
 
@@ -112,14 +112,14 @@ public class LightstreamerDataService : GrainService, IDataService {
         return base.Stop();
     }
 
-    public Task MyMethod() { 
+    public Task MyMethod() {
  }
 }
 </code></pre><p><strong>Step 3.</strong> Create an interface for the GrainServiceClient to be used by other grains to connect to the GrainService.</p>
 <pre><code class="lang-csharp">public interface IDataServiceClient : IGrainServiceClient&lt;IDataService&gt;, IDataService {
 }
 </code></pre><p><strong>Step 4.</strong> Create the actual grain service client.
-It pretty much just acts as a proxy for the data service. 
+It pretty much just acts as a proxy for the data service.
 Unfortunately, you have to manually type in all the method mappings, which are just simple one-liners.</p>
 <pre><code class="lang-csharp">public class DataServiceClient : GrainServiceClient&lt;IDataService&gt;, IDataServiceClient {
 
@@ -129,7 +129,7 @@ Unfortunately, you have to manually type in all the method mappings, which are j
     public Task MyMethod()  =&gt; GrainService.MyMethod();
 }
 </code></pre><p><strong>Step 5.</strong> Inject the grain service client into the other grains that need it.
-Note that the GrainServiceClient does not guarantee accessing the GrainService on the local silo. 
+Note that the GrainServiceClient does not guarantee accessing the GrainService on the local silo.
 Your command could potentially be sent to the GrainService on any silo in the cluster.</p>
 <pre><code class="lang-csharp">public class MyNormalGrain: Grain&lt;NormalGrainState&gt;, INormalGrain {
 
@@ -146,12 +146,11 @@ You need to do this so that the silo will start the GrainService.</p>
 <h3 id="note-1">Note 1</h3>
 <p>There&#39;s an extension method on <code>ISiloHostBuilder: AddGrainService&lt;SomeGrainService&gt;()</code>.
 Type constraint is: <code>where T : GrainService</code>.
-It ends up calling this bit: 
-<strong>orleans/src/Orleans.Runtime/Services/GrainServicesSiloBuilderExtensions.cs</strong></p>
+It ends up calling this bit: <strong>orleans/src/Orleans.Runtime/Services/GrainServicesSiloBuilderExtensions.cs</strong></p>
 <p> <code>return services.AddSingleton&lt;IGrainService&gt;(sp =&gt; GrainServiceFactory(grainServiceType, sp));</code></p>
-<p>Basically, the silo fetches <code>IGrainService</code> types from the service provider when starting: 
-<strong>orleans/src/Orleans.Runtime/Silo/Silo.cs</strong></p>
-<p> <code>var grainServices = this.Services.GetServices&lt;IGrainService&gt;();</code></p>
+<p>Basically, the silo fetches <code>IGrainService</code> types from the service provider when starting: <strong>orleans/src/Orleans.Runtime/Silo/Silo.cs</strong>
+ <code>var grainServices = this.Services.GetServices&lt;IGrainService&gt;();</code></p>
+<p>The <code>Orleans.Runtime</code> Nuget package should be referenced by the Grainservice project.</p>
 <h3 id="note-2">Note 2</h3>
 <p>In order for this to work you have to register both the Service and its Client.
 The code looks something like this:</p>
