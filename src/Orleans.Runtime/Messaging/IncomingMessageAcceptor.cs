@@ -468,7 +468,7 @@ namespace Orleans.Runtime.Messaging
             // situation that shows when the remote host has finished sending data.
             if (e.BytesTransferred <= 0)
             {
-                if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Closing recieving socket: " + e.RemoteEndPoint);
+                if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Closing receiving socket: " + e.RemoteEndPoint);
                 rcc.IMA.SafeCloseSocket(rcc.Socket);
                 FreeSocketAsyncEventArgs(e);
                 return;

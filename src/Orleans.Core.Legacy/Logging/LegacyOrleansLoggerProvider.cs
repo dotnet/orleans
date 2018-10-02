@@ -73,7 +73,7 @@ namespace Orleans.Logging.Legacy
     public class OrleansLoggerSeverityOverrides
     {
         /// <summary>
-        /// LoggerSeverityOverrides, which key being logger category name, value being its overrided severity
+        /// LoggerSeverityOverrides, which key being logger category name, value being its overridden severity
         /// </summary>
         public Dictionary<string, Severity> LoggerSeverityOverrides { get; set; } = new Dictionary<string, Severity>();
     }

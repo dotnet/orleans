@@ -134,7 +134,7 @@ namespace Orleans.Runtime
             {
                 logger.Error( 
                     ErrorCode.Timer_GrainTimerCallbackError,
-                    string.Format( "Caught and ignored exception: {0} with mesagge: {1} thrown from timer callback {2}",
+                    string.Format( "Caught and ignored exception: {0} with message: {1} thrown from timer callback {2}",
                         exc.GetType(),
                         exc.Message,
                         GetFullName()),

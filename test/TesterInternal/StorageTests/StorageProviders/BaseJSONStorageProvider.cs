@@ -136,7 +136,7 @@ namespace Samples.StorageProviders
         /// Constructs a grain state instance by deserializing a JSON document.
         /// </summary>
         /// <param name="grainState">Grain state to be populated for storage.</param>
-        /// <param name="entityData">JSON storage format representaiton of the grain state.</param>
+        /// <param name="entityData">JSON storage format representation of the grain state.</param>
         protected static void ConvertFromStorageFormat(IGrainState grainState, string entityData)
         {
             JavaScriptSerializer deserializer = new JavaScriptSerializer();

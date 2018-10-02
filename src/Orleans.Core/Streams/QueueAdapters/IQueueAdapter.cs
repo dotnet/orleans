@@ -27,7 +27,7 @@ namespace Orleans.Streams
         Task QueueMessageBatchAsync<T>(Guid streamGuid, String streamNamespace, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext);
 
         /// <summary>
-        /// Creates a quere receiver for the specificed queueId
+        /// Creates a queue receiver for the specified queueId
         /// </summary>
         /// <param name="queueId"></param>
         /// <returns></returns>

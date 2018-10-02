@@ -135,7 +135,7 @@ namespace Orleans.Runtime
         public int GrainCount { get; set; }
 
         /// <summary>
-        /// Number of activation of a agrain of this type.
+        /// Number of activation of a grain of this type.
         /// </summary>
         public int ActivationCount { get; set; }
 
@@ -145,7 +145,7 @@ namespace Orleans.Runtime
         public int SiloCount { get; set; }
 
         /// <summary>
-        /// Returns the string representatio of this GrainStatistic.
+        /// Returns the string representation of this GrainStatistic.
         /// </summary>
         public override string ToString()
         {
@@ -175,7 +175,7 @@ namespace Orleans.Runtime
         public int ActivationCount { get; set; }
 
         /// <summary>
-        /// Returns the string representatio of this SimpleGrainStatistic.
+        /// Returns the string representation of this SimpleGrainStatistic.
         /// </summary>
         public override string ToString()
         {

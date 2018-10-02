@@ -72,7 +72,7 @@ namespace Orleans.ServiceBus.Providers
         protected Func<string, IStreamQueueCheckpointer<string>, ILoggerFactory, ITelemetryProducer, IEventHubQueueCache> CacheFactory { get; set; }
 
         /// <summary>
-        /// Creates a parition checkpointer.
+        /// Creates a partition checkpointer.
         /// </summary>
         private IStreamQueueCheckpointerFactory checkpointerFactory;
 
@@ -218,7 +218,7 @@ namespace Orleans.ServiceBus.Providers
         }
 
         /// <summary>
-        /// Creates a quere receiver for the specificed queueId
+        /// Creates a queue receiver for the specified queueId
         /// </summary>
         /// <param name="queueId"></param>
         /// <returns></returns>

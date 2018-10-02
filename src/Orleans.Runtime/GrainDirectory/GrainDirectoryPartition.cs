@@ -589,7 +589,7 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
         /// <summary>
-        /// Sets the internal parition dictionary to the one given as input parameter.
+        /// Sets the internal partition dictionary to the one given as input parameter.
         /// This method is supposed to be used by handoff manager to update the old partition with a new partition.
         /// </summary>
         /// <param name="newPartitionData">new internal partition dictionary</param>

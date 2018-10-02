@@ -63,7 +63,7 @@ namespace Orleans.Runtime
         /// Get the statuses of all silo. 
         /// This method returns an approximate view on the statuses of all silo.
         /// </summary>
-        /// <param name="onlyActive">Include only silo who are currently considered to be active. If false, inlude all.</param>
+        /// <param name="onlyActive">Include only silo who are currently considered to be active. If false, include all.</param>
         /// <returns>A list of silo statuses.</returns>
         Dictionary<SiloAddress, SiloStatus> GetApproximateSiloStatuses(bool onlyActive = false);
 

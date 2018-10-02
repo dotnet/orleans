@@ -111,7 +111,7 @@ namespace Orleans.Runtime
             {
                 if (extensionMap == null || !extensionMap.ContainsKey(request.InterfaceId))
                     throw new InvalidOperationException(
-                        String.Format("Extension invoker invoked with an unknown inteface ID:{0}.", request.InterfaceId));
+                        String.Format("Extension invoker invoked with an unknown interface ID:{0}.", request.InterfaceId));
 
                 var invoker = extensionMap[request.InterfaceId].Item2;
                 var extension = extensionMap[request.InterfaceId].Item1;
@@ -514,10 +514,10 @@ namespace Orleans.Runtime
         /// <summary>Decrement the number of in-flight messages currently being processed.</summary>
         public void DecrementInFlightCount() { Interlocked.Decrement(ref inFlightCount); }
 
-        /// <summary>Increment the number of messages currently in the prcess of being received.</summary>
+        /// <summary>Increment the number of messages currently in the process of being received.</summary>
         public void IncrementEnqueuedOnDispatcherCount() { Interlocked.Increment(ref enqueuedOnDispatcherCount); }
 
-        /// <summary>Decrement the number of messages currently in the prcess of being received.</summary>
+        /// <summary>Decrement the number of messages currently in the process of being received.</summary>
         public void DecrementEnqueuedOnDispatcherCount() { Interlocked.Decrement(ref enqueuedOnDispatcherCount); }
        
         /// <summary>

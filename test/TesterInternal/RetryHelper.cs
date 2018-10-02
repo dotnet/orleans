@@ -6,13 +6,13 @@ using System.Threading.Tasks;
 namespace UnitTests
 {
     /// <summary>
-    /// Predeterimed retry operation, used with <see cref="RetryHelper"/>.
+    /// Predetermined retry operation, used with <see cref="RetryHelper"/>.
     /// </summary>
     /// <remarks>A very crude system for current tests.</remarks>
     public static class RetryOperation
     {
         /// <summary>
-        /// Procudes sigmoid shaped delay curve.
+        /// Produces sigmoid shaped delay curve.
         /// </summary>
         /// <param name="retryAttempt">The current retry attempt.</param>
         /// <returns>Delay for the next attempt to retry.</returns>

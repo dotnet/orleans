@@ -5,7 +5,7 @@ using Orleans.Runtime;
 namespace Orleans.Streams
 {
     /// <summary>
-    /// This exception indicates that an error has occured on a stream subscription that has placed the subscription into
+    /// This exception indicates that an error has occurred on a stream subscription that has placed the subscription into
     ///  a faulted state.  Work on faulted subscriptions should be abandoned.
     /// </summary>
     [Serializable]

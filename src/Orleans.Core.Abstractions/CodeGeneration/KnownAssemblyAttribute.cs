@@ -11,7 +11,7 @@ namespace Orleans.CodeGeneration
     {
         /// <summary>Initializes a new instance of <see cref="KnownAssemblyAttribute"/>.</summary>
         /// <param name="type">A type contained by the target assembly. 
-        /// The type itself is not relevant, and it's just a way to inrectly identify the assembly.</param>
+        /// The type itself is not relevant, and it's just a way to indirectly identify the assembly.</param>
         public KnownAssemblyAttribute(Type type)
         {
             this.Assembly = type.GetTypeInfo().Assembly;

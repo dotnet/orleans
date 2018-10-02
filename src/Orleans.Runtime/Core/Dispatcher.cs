@@ -241,7 +241,7 @@ namespace Orleans.Runtime
                 {
                     logger.Warn(ErrorCode.Dispatcher_Receive_InvalidActivation,
                         "Response received for invalid activation {0}", message);
-                    MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "Ivalid");
+                    MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "Invalid");
                     return;
                 }
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedOk(message);
