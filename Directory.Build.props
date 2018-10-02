@@ -18,6 +18,7 @@
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <IncludeSource>true</IncludeSource>
+	<LangVersion>7.3</LangVersion>
   </PropertyGroup>
 
   <!-- Common compile parameters -->
@@ -76,6 +77,9 @@
     <FSharpCoreVersion>4.5.2</FSharpCoreVersion>
 
     <SystemManagementAutomationdllVersion>10.0.10586</SystemManagementAutomationdllVersion>
+	
+	<SystemMemoryVersion>4.5.1</SystemMemoryVersion>
+
 
     <!-- 3rd party packages -->
     <AWSSDKDynamoDBv2Version>3.3.4.17</AWSSDKDynamoDBv2Version>
