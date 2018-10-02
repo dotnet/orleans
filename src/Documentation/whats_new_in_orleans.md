@@ -5,6 +5,13 @@ title: What's new in Orleans
 
 # What's new in Orleans?
 
+## [v2.1.0](https://github.com/dotnet/orleans/releases/tag/v2.1.0) September 28th 2018
+
+- Major changes
+  - New scheduler ([#3792](https://github.com/dotnet/orleans/pull/3792))
+  - Hosted Client ([#3362](https://github.com/dotnet/orleans/pull/3362))
+  - Distributed Transaction Manager ([#3820](https://github.com/dotnet/orleans/pull/3820), [#4502](https://github.com/dotnet/orleans/pull/4502), [#4538](https://github.com/dotnet/orleans/pull/4538), [#4566](https://github.com/dotnet/orleans/pull/4566), [#4568](https://github.com/dotnet/orleans/pull/4568), [#4591](https://github.com/dotnet/orleans/pull/4591), [#4599](https://github.com/dotnet/orleans/pull/4599), [#4613](https://github.com/dotnet/orleans/pull/4613), [#4609](https://github.com/dotnet/orleans/pull/4609), [#4616](https://github.com/dotnet/orleans/pull/4616), [#4608](https://github.com/dotnet/orleans/pull/4608), [#4628](https://github.com/dotnet/orleans/pull/4628), [#4638](https://github.com/dotnet/orleans/pull/4638), [#4685](https://github.com/dotnet/orleans/pull/4685), [#4714](https://github.com/dotnet/orleans/pull/4714), [#4739](https://github.com/dotnet/orleans/pull/4739), [#4768](https://github.com/dotnet/orleans/pull/4768), [#4799](https://github.com/dotnet/orleans/pull/4799), [#4781](https://github.com/dotnet/orleans/pull/4781), [#4810](https://github.com/dotnet/orleans/pull/4810), [#4820](https://github.com/dotnet/orleans/pull/4820), [#4838](https://github.com/dotnet/orleans/pull/4838), [#4831](https://github.com/dotnet/orleans/pull/4831), [#4871](https://github.com/dotnet/orleans/pull/4871), [#4887](https://github.com/dotnet/orleans/pull/4887))
+
 ## [v1.5.6](https://github.com/dotnet/orleans/releases/tag/v1.5.6) September 27th 2018
 
 Improvements and bug fixes since 1.5.5.
