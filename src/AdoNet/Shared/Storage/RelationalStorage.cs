@@ -37,13 +37,13 @@ namespace Orleans.Tests.SqlUtils
 
         /// <summary>
         /// If the ADO.NET provider of this storage supports cancellation or not. This
-        /// capability is queried and the the result is cached here.
+        /// capability is queried and the result is cached here.
         /// </summary>
         private readonly bool supportsCommandCancellation;
 
         /// <summary>
         /// If the underlying ADO.NET implementation is natively asynchronous
-        /// (the ADO.NET Db*.XXXAsync classes are overriden) or not.
+        /// (the ADO.NET Db*.XXXAsync classes are overridden) or not.
         /// </summary>
         private readonly bool isSynchronousAdoNetImplementation;
 

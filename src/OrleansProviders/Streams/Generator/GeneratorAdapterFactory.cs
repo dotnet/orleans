@@ -181,7 +181,7 @@ namespace Orleans.Providers.Streams.Generator
         }
 
         /// <summary>
-        /// Creates a quere receiver for the specificed queueId
+        /// Creates a queue receiver for the specified queueId
         /// </summary>
         /// <param name="queueId"></param>
         /// <returns></returns>

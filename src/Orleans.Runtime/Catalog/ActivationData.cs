@@ -111,7 +111,7 @@ namespace Orleans.Runtime
             {
                 if (extensionMap == null || !extensionMap.ContainsKey(request.InterfaceId))
                     throw new InvalidOperationException(
-                        String.Format("Extension invoker invoked with an unknown inteface ID:{0}.", request.InterfaceId));
+                        String.Format("Extension invoker invoked with an unknown interface ID:{0}.", request.InterfaceId));
 
                 var invoker = extensionMap[request.InterfaceId].Item2;
                 var extension = extensionMap[request.InterfaceId].Item1;

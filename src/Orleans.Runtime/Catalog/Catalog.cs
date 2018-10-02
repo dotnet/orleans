@@ -1244,7 +1244,7 @@ namespace Orleans.Runtime
             }
             
             /// <summary>
-            /// Returns true if this instance represents a successful registration, false otheriwse.
+            /// Returns true if this instance represents a successful registration, false otherwise.
             /// </summary>
             public bool IsSuccess { get; private set; }
 

@@ -89,11 +89,11 @@ namespace Orleans.Reminders.DynamoDB
 
         /// <summary>
         /// Reads a reminder for a grain reference by reminder name.
-        /// Read a row from the remider table
+        /// Read a row from the reminder table
         /// </summary>
         /// <param name="grainRef"> grain ref to locate the row </param>
-        /// <param name="reminderName"> remider name to locate the row </param>
-        /// <returns> Return the RemiderTableData if the rows were read successfully </returns>
+        /// <param name="reminderName"> reminder name to locate the row </param>
+        /// <returns> Return the ReminderTableData if the rows were read successfully </returns>
         public async Task<ReminderEntry> ReadRow(GrainReference grainRef, string reminderName)
         {
             var reminderId = ConstructReminderId(this.serviceId, grainRef, reminderName);
@@ -117,10 +117,10 @@ namespace Orleans.Reminders.DynamoDB
         }
 
         /// <summary>
-        /// Read one row from the remider table
+        /// Read one row from the reminder table
         /// </summary>
         /// <param name="grainRef">grain ref to locate the row </param>
-        /// <returns> Return the RemiderTableData if the rows were read successfully </returns>
+        /// <returns> Return the ReminderTableData if the rows were read successfully </returns>
         public async Task<ReminderTableData> ReadRows(GrainReference grainRef)
         {
             var expressionValues = new Dictionary<string, AttributeValue>
@@ -199,7 +199,7 @@ namespace Orleans.Reminders.DynamoDB
         /// Remove one row from the reminder table 
         /// </summary>
         /// <param name="grainRef"> specific grain ref to locate the row </param>
-        /// <param name="reminderName"> remider name to locate the row </param>
+        /// <param name="reminderName"> reminder name to locate the row </param>
         /// <param name="eTag"> e tag </param>
         /// <returns> Return true if the row was removed </returns>
         public async Task<bool> RemoveRow(GrainReference grainRef, string reminderName, string eTag)

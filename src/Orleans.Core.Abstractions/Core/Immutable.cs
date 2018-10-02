@@ -5,7 +5,7 @@ namespace Orleans.Concurrency
     /// </summary>
     /// <remarks>
     /// Objects that are known to be immutable are given special fast-path handling by the Orleans serializer 
-    /// -- which in a nutshell allows the DeepCopy step to be skipped during message sends where the sender and reveiving grain are in the same silo.
+    /// -- which in a nutshell allows the DeepCopy step to be skipped during message sends where the sender and receiver grain are in the same silo.
     /// 
     /// One very common usage pattern for Immutable is when passing byte[] parameters to a grain. 
     /// If a program knows it will not alter the contents of the byte[] (for example, if it contains bytes from a static image file read from disk)

@@ -15,7 +15,7 @@ using Orleans.Runtime.Startup;
 namespace Orleans.Runtime.Host
 {
     /// <summary>
-    /// Allows programmatically hosting an Orleans silo in the curent app domain.
+    /// Allows programmatically hosting an Orleans silo in the current app domain.
     /// </summary>
     public class SiloHost :
         MarshalByRefObject,

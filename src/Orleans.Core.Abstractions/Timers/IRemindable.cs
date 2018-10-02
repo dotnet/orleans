@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 namespace Orleans
 {
     /// <summary>
-    /// Callback interface that grains must implement inorder to be able to register and receive Reminders.
+    /// Callback interface that grains must implement in order to be able to register and receive Reminders.
     /// </summary>
     public interface IRemindable : IGrain
     {

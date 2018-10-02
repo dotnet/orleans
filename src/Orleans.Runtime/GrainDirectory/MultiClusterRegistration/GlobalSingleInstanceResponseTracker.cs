@@ -136,7 +136,7 @@ namespace Orleans.Runtime.GrainDirectory
             if (ownerResponses.Count > 0)
             {
                 if (ownerResponses.Count > 1)
-                    logger.Warn((int)ErrorCode.GlobalSingleInstance_MultipleOwners, "GSIP:Req {0} Unexpected error occured. Multiple Owner Replies.", grainId);
+                    logger.Warn((int)ErrorCode.GlobalSingleInstance_MultipleOwners, "GSIP:Req {0} Unexpected error occurred. Multiple Owner Replies.", grainId);
 
                 return new GlobalSingleInstanceResponseOutcome(OutcomeState.RemoteOwner, ownerResponses[0].ExistingActivationAddress, ownerResponses[0].ClusterId);
             }

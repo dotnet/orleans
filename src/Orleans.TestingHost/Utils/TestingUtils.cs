@@ -108,7 +108,7 @@ namespace Orleans.TestingHost.Utils
             await task;
         }
 
-        /// <summary> Multipy a timeout by a value </summary>
+        /// <summary> Multiply a timeout by a value </summary>
         public static TimeSpan Multiply(TimeSpan time, double value)
         {
             double ticksD = checked(time.Ticks * value);

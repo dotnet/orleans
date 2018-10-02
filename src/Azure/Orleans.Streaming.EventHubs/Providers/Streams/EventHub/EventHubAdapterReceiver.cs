@@ -103,7 +103,7 @@ namespace Orleans.ServiceBus.Providers
                 : Initialize();
         }
         /// <summary>
-        /// Initialization of EventHub receiver is performed at adapter reciever initialization, but if it fails,
+        /// Initialization of EventHub receiver is performed at adapter receiver initialization, but if it fails,
         ///  it will be retried when messages are requested
         /// </summary>
         /// <returns></returns>

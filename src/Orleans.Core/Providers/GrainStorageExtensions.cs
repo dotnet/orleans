@@ -10,7 +10,7 @@ namespace Orleans.Storage
     public static class GrainStorageExtensions
     {
         /// <summary>
-        /// Aquire the storage provider associated with the grain type.
+        /// Acquire the storage provider associated with the grain type.
         /// </summary>
         /// <returns></returns>
         public static IGrainStorage GetGrainStorage(this Grain grain, IServiceProvider services)

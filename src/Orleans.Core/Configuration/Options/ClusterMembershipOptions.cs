@@ -44,7 +44,7 @@ namespace Orleans.Configuration
         public static readonly TimeSpan DEFAULT_LIVENESS_DEATH_VOTE_EXPIRATION_TIMEOUT = TimeSpan.FromSeconds(120);
 
         /// <summary>
-        /// The number of seconds to periodically write in the membership table that this silo is alive. Used ony for diagnostics.
+        /// The number of seconds to periodically write in the membership table that this silo is alive. Used only for diagnostics.
         /// </summary>
         public TimeSpan IAmAliveTablePublishTimeout { get; set; } = DEFAULT_LIVENESS_I_AM_ALIVE_TABLE_PUBLISH_TIMEOUT;
         public static readonly TimeSpan DEFAULT_LIVENESS_I_AM_ALIVE_TABLE_PUBLISH_TIMEOUT = TimeSpan.FromMinutes(5);

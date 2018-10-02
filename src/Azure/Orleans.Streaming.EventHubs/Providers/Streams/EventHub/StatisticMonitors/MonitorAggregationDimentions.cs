@@ -90,7 +90,7 @@ namespace Orleans.ServiceBus.Providers
         }
 
         /// <summary>
-        /// Zero parametrers constructor
+        /// Zero parameters constructor
         /// </summary>
         public EventHubCacheMonitorDimensions()
         {

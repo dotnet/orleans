@@ -22,7 +22,7 @@ namespace Orleans.Streams
         Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount);
 
         /// <summary>
-        /// Notifies the adapter receiver that the mesages were delivered to all consumers,
+        /// Notifies the adapter receiver that the messages were delivered to all consumers,
         /// so the receiver can take an appropriate action (e.g., delete the messages from a message queue).
         /// </summary>
         /// <returns></returns>
