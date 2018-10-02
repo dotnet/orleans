@@ -28,11 +28,11 @@ public IDisposable RegisterTimer(
        TimeSpan period)                  // the period of the timer
 ```
 
- Cancel the timer by disposing it.
+Cancel the timer by disposing it.
 
- A timer will cease to trigger if the activation is deactivated or when a fault occurs and its silo crashes.
+A timer will cease to trigger if the activation is deactivated or when a fault occurs and its silo crashes.
 
- Important Considerations
+Important Considerations
 
 * When activation collection is enabled, the execution of a timer callback does not change the activation's state from idle to in use. This means that a timer cannot be used to postpone deactivation of otherwise idle activations.
 * The period passed to **Grain.RegisterTimer** is the amount of time that passes from the moment the Task returned by **asyncCallback** is resolved to the moment that the next invocation of **asyncCallback** should occur. This not only makes it impossible for successive calls to **asyncCallback** to overlap but also makes it so that the length of time **asyncCallback** takes to complete affects the frequency at which **asyncCallback** is invoked. This is an important deviation from the semantics of **System.Threading.Timer**.
@@ -55,8 +55,7 @@ Reminders are similar to timers with a few important differences:
 
 Reminders, being persistent, rely upon storage to function.
 You must specify which storage backing to use before the reminder subsystem will function.
-The reminder functionality is controlled by the SystemStore element in the server-side configuration.
-It works with either Azure Table or SQL Server as the store.
+This is done by configuring one of the reminder providers via `UseXReminderService` extension methods.
 
 Azure Table configuration:
 
