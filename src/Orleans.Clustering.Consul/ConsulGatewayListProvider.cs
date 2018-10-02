@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using Consul;
 using Orleans.Messaging;
@@ -63,8 +64,9 @@ namespace Orleans.Runtime.Membership
                 Where(m => m.Status == SiloStatus.Active && m.ProxyPort != 0).
                 Select(m =>
                 {
-                    m.SiloAddress.Endpoint.Port = m.ProxyPort;
-                    return m.SiloAddress.ToGatewayUri();
+                    var endpoint = new IPEndPoint(m.SiloAddress.Endpoint.Address, m.ProxyPort);
+                    var gatewayAddress = SiloAddress.New(endpoint, m.SiloAddress.Generation);
+                    return gatewayAddress.ToGatewayUri();
                 }).ToList();
         }
     }
