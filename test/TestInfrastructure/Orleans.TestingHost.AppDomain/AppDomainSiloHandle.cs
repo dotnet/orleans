@@ -19,7 +19,7 @@ namespace Orleans.TestingHost
         /// <summary> Get or set the AppDomain used by the silo </summary>
         public AppDomain AppDomain { get; set; }
 
-        /// <summary>Gets or sets a reference to the silo host that is marshable by reference.</summary>
+        /// <summary>Gets or sets a reference to the silo host that is marshallable by reference.</summary>
         public AppDomainSiloHost SiloHost { get; set; }
 
         /// <inheritdoc />

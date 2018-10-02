@@ -301,7 +301,7 @@ namespace Orleans.Runtime.Management
         /// will get routed either locally or remotely to the appropriate silo instance auto-magically.
         /// </remarks>
         /// <param name="siloAddresses">List of silos to perform the action for</param>
-        /// <param name="perSiloAction">The action functiona to be performed for each silo</param>
+        /// <param name="perSiloAction">The action function to be performed for each silo</param>
         /// <returns>Array containing one Task for each silo the action was performed for</returns>
         private List<Task> PerformPerSiloAction(SiloAddress[] siloAddresses, Func<SiloAddress, Task> perSiloAction)
         {

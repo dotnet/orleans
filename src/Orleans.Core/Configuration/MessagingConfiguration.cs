@@ -119,7 +119,7 @@ namespace Orleans.Runtime.Configuration
         public int BufferPoolPreallocationSize { get; set; }
 
         /// <summary>
-        /// The MaxForwardCount attribute specifies the maximal number of times a message is being forwared from one silo to another.
+        /// The MaxForwardCount attribute specifies the maximal number of times a message is being forwarded from one silo to another.
         /// Forwarding is used internally by the tuntime as a recovery mechanism when silos fail and the membership is unstable.
         /// In such times the messages might not be routed correctly to destination, and runtime attempts to forward such messages a number of times before rejecting them.
         /// </summary>

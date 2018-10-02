@@ -10,7 +10,7 @@ namespace Orleans.Storage
 {
 
     /// <summary>
-    /// Implementaiton class for the Storage Grain used by In-memory storage provider
+    /// Implementation class for the Storage Grain used by In-memory storage provider
     /// <c>Orleans.Storage.MemoryStorage</c>
     /// </summary>
     internal class MemoryStorageGrain : Grain, IMemoryStorageGrain

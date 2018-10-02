@@ -47,7 +47,7 @@ namespace Orleans.Runtime.Membership
         /// <returns></returns>
         /// <remarks>
         /// Consul Membership Provider does not support the extended Membership Protocol,
-        /// therefore there is no MembershipTable to Initialise
+        /// therefore there is no MembershipTable to Initialize
         /// </remarks>
         public Task InitializeMembershipTable(bool tryInitTableVersion)
         {

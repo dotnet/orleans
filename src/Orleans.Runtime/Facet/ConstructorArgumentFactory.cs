@@ -11,7 +11,7 @@ namespace Orleans.Runtime
     {
         private static readonly Type FacetMarkerInterfaceType = typeof(IFacetMetadata);
         /// <summary>
-        /// Cached constructor Argument factorys by type
+        /// Cached constructor Argument factories by type
         /// TODO: consider storing in grain type data and constructing at startup to avoid runtime errors. - jbragg
         /// </summary>
         private readonly CachedReadConcurrentDictionary<Type, ArgumentFactory> argumentsFactorys;

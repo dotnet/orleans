@@ -77,7 +77,7 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Move to next message in the stream.
         /// If it returns false, there are no more messages.  The enumerator is still
-        ///  valid howerver and can be called again when more data has come in on this
+        ///  valid however and can be called again when more data has come in on this
         ///  stream.
         /// </summary>
         /// <returns></returns>

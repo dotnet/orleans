@@ -257,7 +257,7 @@ namespace Orleans
         }
 
         /// <summary>
-        /// Check that the runtime is intialized correctly, and throw InvalidOperationException if not
+        /// Check that the runtime is initialized correctly, and throw InvalidOperationException if not
         /// </summary>
         /// <exception cref="InvalidOperationException">Thrown if Orleans runtime is not correctly initialized before this call.</exception>
         private static void CheckInitialized()

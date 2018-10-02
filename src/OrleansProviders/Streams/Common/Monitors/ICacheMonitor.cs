@@ -23,7 +23,7 @@ namespace Orleans.Providers.Streams.Common
             double? flowControlThreshold);
 
         /// <summary>
-        /// Track message added to the cache, and newest and oldest messsges among them 
+        /// Track message added to the cache, and newest and oldest messages among them 
         /// </summary>
         /// <param name="messageAdded"></param>
         void TrackMessagesAdded(long messageAdded);

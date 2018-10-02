@@ -108,7 +108,7 @@ namespace UnitTests
                 Assert.NotNull(ex.GetBaseException().InnerException);
                 Assert.IsType<ApplicationException>(ex.GetBaseException().InnerException);
                 Assert.True(ex.GetBaseException().InnerException?.Message == "boom",
-                    "Should fail with Orleans runtime exception having all of neccessary details");
+                    "Should fail with Orleans runtime exception having all of necessary details");
             }
             this.fixture.Logger.Info("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateThrows Test finished OK.");
         }

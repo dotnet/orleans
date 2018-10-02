@@ -61,7 +61,7 @@ namespace Orleans.Runtime.Membership
         }
 
         /// <summary>
-        /// Specifies how often this IGatewayListProvider is refreshed, to have a bound on max staleness of its returned infomation.
+        /// Specifies how often this IGatewayListProvider is refreshed, to have a bound on max staleness of its returned information.
         /// </summary>
         public TimeSpan MaxStaleness
         {
@@ -69,7 +69,7 @@ namespace Orleans.Runtime.Membership
         }
 
         /// <summary>
-        /// Specifies whether this IGatewayListProvider ever refreshes its returned infomation, or always returns the same gw list.
+        /// Specifies whether this IGatewayListProvider ever refreshes its returned information, or always returns the same gw list.
         /// (currently only the static config based StaticGatewayListProvider is not updatable. All others are.)
         /// </summary>
         public bool IsUpdatable

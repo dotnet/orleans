@@ -38,7 +38,7 @@ namespace Orleans
 
         /// <summary>
         /// Service will be active after this step.
-        /// It should only be used by the memebrship oracle 
+        /// It should only be used by the membership oracle 
         /// and the gateway, no other component should run
         /// at this stage
         /// </summary>

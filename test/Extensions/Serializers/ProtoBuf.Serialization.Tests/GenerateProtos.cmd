@@ -1,6 +1,6 @@
 REM This is a script to generate C# from proto files.
 REM Execute it in the same folder with your .proto files
-REM Have to explicitely list all .proto files as arguments
+REM Have to explicitly list all .proto files as arguments
 
 @echo on
 

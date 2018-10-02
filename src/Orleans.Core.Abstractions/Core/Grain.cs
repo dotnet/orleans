@@ -128,7 +128,7 @@ namespace Orleans
         /// </summary>
         /// <param name="reminderName">Name of this reminder</param>
         /// <param name="dueTime">Due time for this reminder</param>
-        /// <param name="period">Frequence period for this reminder</param>
+        /// <param name="period">Frequency period for this reminder</param>
         /// <returns>Promise for Reminder handle.</returns>
         protected Task<IGrainReminder> RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
         {

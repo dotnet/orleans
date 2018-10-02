@@ -88,7 +88,7 @@ namespace Orleans.ServiceBus.Providers
 
         /// <summary>
         /// Create a receiver monitor to report performance metrics.
-        /// Factory funciton should return an IEventHubReceiverMonitor.
+        /// Factory function should return an IEventHubReceiverMonitor.
         /// </summary>
         protected Func<EventHubReceiverMonitorDimensions, ILoggerFactory, ITelemetryProducer, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory { get; set; }
 

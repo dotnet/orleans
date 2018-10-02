@@ -27,7 +27,7 @@
         /// </summary>
         Stopping = 5,
         /// <summary>
-        /// This silo is de-activated/considered to be dead.
+        /// This silo is deactivated/considered to be dead.
         /// </summary>
         Dead = 6
     }
