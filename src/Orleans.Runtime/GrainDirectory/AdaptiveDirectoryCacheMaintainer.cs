@@ -216,7 +216,7 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     // this may happen only if the LRU cache is full and decided to drop this grain
                     // while we try to refresh it
-                    Log.Warn(ErrorCode.Runtime_Error_100199, "Grain {0} disappeared from the cache during maintainance", grain);
+                    Log.Warn(ErrorCode.Runtime_Error_100199, "Grain {0} disappeared from the cache during maintenance", grain);
                 }
             }
 

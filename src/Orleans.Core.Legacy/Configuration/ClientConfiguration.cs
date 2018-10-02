@@ -52,7 +52,7 @@ namespace Orleans.Runtime.Configuration
         public string SourceFile { get; private set; }
 
         /// <summary>
-        /// The list fo the gateways to use.
+        /// The list of the gateways to use.
         /// Each GatewayNode element specifies an outside grain client gateway node.
         /// If outside (non-Orleans) clients are to connect to the Orleans system, then at least one gateway node must be specified.
         /// Additional gateway nodes may be specified if desired, and will add some failure resilience and scalability.

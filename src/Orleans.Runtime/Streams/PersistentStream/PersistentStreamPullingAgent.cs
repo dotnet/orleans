@@ -75,8 +75,8 @@ namespace Orleans.Streams
         /// Take responsibility for a new queues that was assigned to me via a new range.
         /// We first store the new queue in our internal data structure, try to initialize it and start a pumping timer.
         /// ERROR HANDLING:
-        ///     The resposibility to handle initializatoion and shutdown failures is inside the INewQueueAdapterReceiver code.
-        ///     The agent will call Initialize once and log an error. It will not call initiliaze again.
+        ///     The responsibility to handle initialization and shutdown failures is inside the INewQueueAdapterReceiver code.
+        ///     The agent will call Initialize once and log an error. It will not call initialize again.
         ///     The receiver itself may attempt later to recover from this error and do initialization again. 
         ///     The agent will assume initialization has succeeded and will subsequently start calling pumping receive.
         ///     Same applies to shutdown.

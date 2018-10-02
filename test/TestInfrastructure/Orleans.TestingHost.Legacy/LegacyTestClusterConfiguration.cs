@@ -47,7 +47,7 @@ namespace Orleans.TestingHost
         }
         
         /// <summary>Build a cluster configuration.</summary>
-        /// <returns>The builded cluster configuration</returns>
+        /// <returns>The built cluster configuration</returns>
         public ClusterConfiguration BuildClusterConfiguration()
         {
             var config = ClusterConfiguration.LocalhostPrimarySilo(builder.Options.BaseSiloPort, builder.Options.BaseGatewayPort);

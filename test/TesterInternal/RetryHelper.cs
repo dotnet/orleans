@@ -15,7 +15,7 @@ namespace UnitTests
         /// Procudes sigmoid shaped delay curve.
         /// </summary>
         /// <param name="retryAttempt">The current retry attempt.</param>
-        /// <returns>Delay for the next attemp to retry.</returns>
+        /// <returns>Delay for the next attempt to retry.</returns>
         /// <remarks>This function has not received deep scrutiny.</remarks>
         public static TimeSpan Sigmoid(int retryAttempt)
         {

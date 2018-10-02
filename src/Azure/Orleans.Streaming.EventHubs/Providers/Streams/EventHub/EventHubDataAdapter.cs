@@ -88,7 +88,7 @@ namespace Orleans.ServiceBus.Providers
         }
 
         /// <summary>
-        /// Stream identifer
+        /// Stream identifier
         /// </summary>
         public IStreamIdentity StreamIdentity { get; }
         /// <summary>

@@ -52,7 +52,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
         }
 
         /// <summary>
-        /// Indicates if the subscription should be put in a fauted state upon stream failures
+        /// Indicates if the subscription should be put in a faulted state upon stream failures
         /// </summary>
         public bool ShouldFaultSubsriptionOnError { get; private set; }
 

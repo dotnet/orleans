@@ -527,7 +527,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// This method is supposed to be used by handoff manager to update the partitions when the system view (set of live silos) changes.
         /// </summary>
         /// <param name="predicate">filter predicate (usually if the given grain is owned by particular silo)</param>
-        /// <param name="modifyOrigin">flag controling whether the source partition should be modified (i.e., the entries should be moved or just copied) </param>
+        /// <param name="modifyOrigin">flag controlling whether the source partition should be modified (i.e., the entries should be moved or just copied) </param>
         /// <returns>new grain directory partition containing entries satisfying the given predicate</returns>
         internal GrainDirectoryPartition Split(Predicate<GrainId> predicate, bool modifyOrigin)
         {
