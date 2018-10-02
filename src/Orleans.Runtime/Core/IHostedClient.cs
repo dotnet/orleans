@@ -40,6 +40,6 @@ namespace Orleans.Runtime
 
         private static T ThrowDisabledException<T>() =>
             throw new InvalidOperationException(
-                "Support for accessing the Orleans runtime from a non-Orleans context is not enabled. Enable support using the ISiloHostBuilder.EnableExternalContextCalls() method.");
+                $"Support for accessing the Orleans runtime from a non-Orleans context is not enabled. Enable support using the ISiloHostBuilder.{nameof(Hosting.CoreHostingExtensions.EnableDirectClient)}() method.");
     }
 }
