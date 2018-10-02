@@ -66,7 +66,7 @@ namespace Orleans.Tests.SqlUtils
 
 
         /// <summary>
-        /// The connection string used to connecto the database.
+        /// The connection string used to connect to the database.
         /// </summary>
         public string ConnectionString
         {

@@ -91,7 +91,7 @@ namespace Orleans.Transactions.Tests
         }
 
         /// <summary>
-        /// Single transaction containing two grains is dependant on two other transaction, one from each grain
+        /// Single transaction containing two grains is dependent on two other transaction, one from each grain
         /// </summary>
         /// <param name="grainStates"></param>
         /// <returns></returns>

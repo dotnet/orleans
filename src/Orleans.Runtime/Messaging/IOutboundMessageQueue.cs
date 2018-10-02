@@ -3,7 +3,7 @@ using System;
 namespace Orleans.Runtime.Messaging
 {
     /// <summary>
-    /// Used for controlling message delverye
+    /// Used for controlling message delivery
     /// </summary>
     internal interface IOutboundMessageQueue : IDisposable
     {

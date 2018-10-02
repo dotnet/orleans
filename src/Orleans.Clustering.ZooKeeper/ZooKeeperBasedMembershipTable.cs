@@ -226,7 +226,7 @@ namespace Orleans.Runtime.Membership
 
         /// <summary>
         /// Updates the IAmAlive part (column) of the MembershipEntry for this silo.
-        /// This operation should only update the IAmAlive collumn and not change other columns.
+        /// This operation should only update the IAmAlive column and not change other columns.
         /// This operation is a "dirty write" or "in place update" and is performed without etag validation. 
         /// With regards to eTags update:
         /// This operation may automatically update the eTag associated with the given silo row, but it does not have to. It can also leave the etag not changed ("dirty write").

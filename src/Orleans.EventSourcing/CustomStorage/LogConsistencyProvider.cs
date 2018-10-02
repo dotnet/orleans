@@ -22,7 +22,7 @@ namespace Orleans.EventSourcing.CustomStorage
 
         /// <summary>
         /// Specifies a clusterid of the primary cluster from which to access storage exclusively, null if
-        /// storage should be accessed direcly from all clusters.
+        /// storage should be accessed directly from all clusters.
         /// </summary>
         public string PrimaryCluster => options.PrimaryCluster;
 

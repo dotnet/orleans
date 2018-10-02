@@ -74,7 +74,7 @@ namespace Orleans.Runtime
 
         /// <summary>
         /// Get a grain reference for the specified cache-key.
-        /// The grain reference will either be taken from cahce, or a new one will be created by calling the <c>FetchValueDelegate</c>
+        /// The grain reference will either be taken from cache, or a new one will be created by calling the <c>FetchValueDelegate</c>
         /// </summary>
         /// <param name="key"></param>
         /// <returns></returns>

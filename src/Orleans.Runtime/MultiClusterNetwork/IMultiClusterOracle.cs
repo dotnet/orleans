@@ -23,7 +23,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
         /// <summary>
         /// Inject a multicluster configuration. For this to have any effect, the timestamp must be newer 
-        /// than the latest configuation stored in the multicluster network.
+        /// than the latest configuration stored in the multicluster network.
         /// </summary>
         /// <returns>A task that completes once information has propagated to the multicluster channels</returns>
         Task InjectMultiClusterConfiguration(MultiClusterConfiguration configuration);

@@ -46,7 +46,7 @@ namespace Orleans.ServiceBus.Providers
     public class EventHubMessage
     {
         /// <summary>
-        /// Contructor
+        /// Constructor
         /// </summary>
         /// <param name="streamIdentity">Stream Identity</param>
         /// <param name="partitionKey">EventHub partition key for message</param>
@@ -122,7 +122,7 @@ namespace Orleans.ServiceBus.Providers
     }
 
     /// <summary>
-    /// Default eventhub data comparer.  Implements comparisions against CachedEventHubMessage
+    /// Default eventhub data comparer.  Implements comparisons against CachedEventHubMessage
     /// </summary>
     public class EventHubDataComparer : ICacheDataComparer<CachedEventHubMessage>
     {

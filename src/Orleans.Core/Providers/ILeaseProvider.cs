@@ -18,11 +18,11 @@ namespace Orleans.LeaseProviders
         /// </summary>
         public string ResourceKey { get; }
         /// <summary>
-        /// Duration of the aquired lease
+        /// Duration of the acquired lease
         /// </summary>
         public TimeSpan Duration { get; }
         /// <summary>
-        /// Lease token, whcih will be null if acquiring or renewing the lease failed
+        /// Lease token, which will be null if acquiring or renewing the lease failed
         /// </summary>
         public string Token { get; }
         /// <summary>
@@ -31,7 +31,7 @@ namespace Orleans.LeaseProviders
         public DateTime StartTimeUtc { get; }
 
         /// <summary>
-        /// Consructor
+        /// Constructor
         /// </summary>
         /// <param name="resourceKey"></param>
         /// <param name="duration"></param>
@@ -46,7 +46,7 @@ namespace Orleans.LeaseProviders
         }
 
         /// <summary>
-        /// Consructor
+        /// Constructor
         /// </summary>
         /// <param name="resourceKey"></param>
         public AcquiredLease(string resourceKey)

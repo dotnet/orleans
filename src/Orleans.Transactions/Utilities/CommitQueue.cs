@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace Orleans.Transactions
 {
     /// <summary>
-    /// A deque data structure that stores transaction records in a circular buffer, sorted by timestamps.
+    /// A queue data structure that stores transaction records in a circular buffer, sorted by timestamps.
     /// </summary>
     /// <typeparam name="T"></typeparam>
     internal struct CommitQueue<T>
