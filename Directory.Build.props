@@ -86,7 +86,7 @@
     <GoogleProtobufVersion>3.4.0</GoogleProtobufVersion>
     <ProtobufNetVersion>2.3.7</ProtobufNetVersion>
     <MySqlDataVersion>6.9.9</MySqlDataVersion>
-    <NewRelicAgentApiVersion>5.10.59.0</NewRelicAgentApiVersion>
+    <NewRelicAgentApiVersion>8.0.0.0</NewRelicAgentApiVersion>
     <NewtonsoftJsonVersion>10.0.3</NewtonsoftJsonVersion>
     <NpgsqlVersion>3.1.9</NpgsqlVersion>
     <NSubstituteVersion>1.10.0</NSubstituteVersion>
