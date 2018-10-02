@@ -39,7 +39,21 @@ namespace Orleans.Streams
         }
 
         internal static StreamId GetStreamId(Guid guid, string providerName, string streamNamespace)
-            => FindOrCreateStreamId((guid, providerName, streamNamespace));
+        {
+            // NB: providerName is not trimmed in order to stay consistent with the previous implementation.
+            if (string.IsNullOrWhiteSpace(providerName))
+            {
+                throw new ArgumentException("Provider name is null or whitespace", nameof(providerName));
+            }
+
+            streamNamespace = streamNamespace?.Trim();
+            if (string.Empty == streamNamespace)
+            {
+                throw new ArgumentException("namespace must be null or substantive (not empty or whitespace).", nameof(streamNamespace));
+            }
+
+            return FindOrCreateStreamId((guid, providerName, streamNamespace));
+        }
 
         private static StreamId FindOrCreateStreamId((Guid Guid, string ProviderName, string Namespace) key)
             => streamIdInternCache.Value.FindOrCreate(key, k => new StreamId(k));
@@ -72,19 +86,19 @@ namespace Orleans.Streams
         /// </remarks>
         public override int GetHashCode()
             => Guid.GetHashCode()
-                ^ (ProviderName?.GetHashCode() ?? 0)
+                ^ ProviderName.GetHashCode() // ProviderName is never null or whitespace due to checks in `GetStreamId`
                 ^ (Namespace?.GetHashCode() ?? 0);
 
         public override string ToString()
         {
-            var result = $"{Guid}-{ProviderName}";
+            var result = $"{Guid}-{ProviderName}"; // ProviderName is never null or whitespace due to checks in `GetStreamId`
             if (null != Namespace)
             {
                 result = $"{Namespace}-" + result;
             }
             return result;
         }
-        
+
         uint CalculateUniformHashCode()
         {
             var guidBytes = Guid.ToByteArray();
