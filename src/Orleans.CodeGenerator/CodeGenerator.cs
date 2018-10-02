@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -453,26 +453,21 @@ namespace Orleans.CodeGenerator
             // Skip implicitly declared types like anonymous classes and closures.
             if (type.IsImplicitlyDeclared)
             {
-                //if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace($"{nameof(ValidForKnownTypes)} skipping implicitly declared type {type}");
                 return false;
             }
 
             if (!type.CanBeReferencedByName)
             {
-                //if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace($"{nameof(ValidForKnownTypes)} skipping type which cannot be referenced by name {type}");
                 return false;
             }
 
             if (type.HasUnsupportedMetadata)
             {
-                //if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace($"{nameof(ValidForKnownTypes)} skipping type with unsupported metadata {type}");
                 return false;
             }
 
             if (type.SpecialType != SpecialType.None)
             {
-                //if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace($"{nameof(ValidForKnownTypes)} skipping special type {type}");
-
                 return false;
             }
 
@@ -488,11 +483,15 @@ namespace Orleans.CodeGenerator
                 case TypeKind.TypeParameter:
                 case TypeKind.Submission:
                 {
-                    if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace($"{nameof(ValidForKnownTypes)} skipping type {type} of kind {type.TypeKind}");
                     return false;
                 }
             }
 
+            if (type.IsStatic)
+            {
+                return false;
+            }
+            
             if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace($"{nameof(ValidForKnownTypes)} adding type {type}");
 
             return true;
