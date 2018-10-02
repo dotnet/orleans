@@ -3048,7 +3048,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/whats_new_in_orleans.html",
-          "hash": "B3aFjmbE4FvZbSePueXH0Q=="
+          "hash": "O8XBqkTFoOFmL0rPGePoyA=="
         }
       },
       "is_incremental": false,
@@ -3531,6 +3531,11 @@
         "incrementalPhase": "build"
       },
       "processors": {
+        "TocDocumentProcessor": {
+          "can_incremental": false,
+          "details": "Processor TocDocumentProcessor cannot support incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
+          "incrementalPhase": "build"
+        },
         "ResourceDocumentProcessor": {
           "can_incremental": false,
           "details": "Processor ResourceDocumentProcessor cannot support incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
@@ -3538,11 +3543,6 @@
         },
         "ConceptualDocumentProcessor": {
           "can_incremental": false,
-          "incrementalPhase": "build"
-        },
-        "TocDocumentProcessor": {
-          "can_incremental": false,
-          "details": "Processor TocDocumentProcessor cannot support incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
           "incrementalPhase": "build"
         }
       }
