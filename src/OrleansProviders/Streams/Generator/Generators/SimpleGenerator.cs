@@ -30,7 +30,7 @@ namespace Orleans.Providers.Streams.Generator
         }
 
         /// <summary>
-        /// Untill we've generated the configured number of events, return a single generated event
+        /// Until we've generated the configured number of events, return a single generated event
         /// </summary>
         /// <param name="utcNow"></param>
         /// <param name="events"></param>

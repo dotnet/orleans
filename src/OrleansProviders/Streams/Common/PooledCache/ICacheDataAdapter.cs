@@ -54,7 +54,7 @@ namespace Orleans.Providers.Streams.Common
         /// Get cached message enqueueTime
         /// </summary>
         /// <param name="message"></param>
-        /// <returns>Return message's enqueue time Utc, return null if message didn't keep a enqueue time</returns>
+        /// <returns>Return message's enqueue time Utc, return null if message didn't keep an enqueue time</returns>
         DateTime? GetMessageEnqueueTimeUtc(ref TCachedMessage message);
 
         /// <summary>

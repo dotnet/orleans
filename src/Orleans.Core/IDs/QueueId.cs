@@ -6,7 +6,7 @@ namespace Orleans.Streams
 {
     /// <summary>
     /// Identifier of a durable queue.
-    /// Used by Orlens streaming extensions.
+    /// Used by Orleans streaming extensions.
     /// </summary>
     [Serializable]
     [Immutable]

@@ -61,7 +61,7 @@ namespace Orleans.Runtime
         Task<List<Tuple<GrainId, int, List<ActivationAddress>>>> LookUpMany(List<Tuple<GrainId, int>> grainAndETagList);
 
         /// <summary>
-        /// Handoffs the the directory partition from source silo to the destination silo.
+        /// Handoffs the directory partition from source silo to the destination silo.
         /// </summary>
         /// <param name="source">The address of the owner of the partition.</param>
         /// <param name="partition">The (full or partial) copy of the directory partition to be Haded off.</param>

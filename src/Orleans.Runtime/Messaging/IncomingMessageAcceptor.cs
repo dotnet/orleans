@@ -312,7 +312,7 @@ namespace Orleans.Runtime.Messaging
         /// </summary>
         /// <param name="e">SocketAsyncEventArg associated with the completed accept operation.</param>
         /// <param name="completedSynchronously">Shows whether AcceptAsync completed synchronously, 
-        /// if true - the next accept operation woun't be started. Used for avoiding potential stack overflows.</param>
+        /// if true - the next accept operation won't be started. Used for avoiding potential stack overflows.</param>
         private void ProcessAccept(SocketAsyncEventArgs e, bool completedSynchronously)
         {
             var ima = e.UserToken as IncomingMessageAcceptor;

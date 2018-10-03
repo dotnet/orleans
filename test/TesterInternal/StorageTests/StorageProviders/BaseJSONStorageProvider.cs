@@ -72,7 +72,7 @@ namespace Samples.StorageProviders
         }
 
         /// <summary>
-        /// Reads persisted state from the backing store and deserializes it into the the target
+        /// Reads persisted state from the backing store and deserializes it into the target
         /// grain state object.
         /// </summary>
         /// <param name="grainType">A string holding the name of the grain class.</param>

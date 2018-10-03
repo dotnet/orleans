@@ -14,7 +14,7 @@ namespace Orleans.ServiceBus.Providers
     public interface IEventHubReceiver
     {
         /// <summary>
-        /// Send a async message to the partition asking for more messages
+        /// Send an async message to the partition asking for more messages
         /// </summary>
         /// <param name="maxCount">Max amount of message which should be delivered in this request</param>
         /// <param name="waitTime">Wait time of this request</param>

@@ -102,7 +102,7 @@ namespace Orleans.Runtime.Configuration
 
         /// <summary>
         /// ActivationSchedulingQuantum is a soft time limit on the duration of activation macro-turn (a number of micro-turns). 
-        /// If a activation was running its micro-turns longer than this, we will give up the thread.
+        /// If an activation was running its micro-turns longer than this, we will give up the thread.
         /// If this is set to zero or a negative number, then the full work queue is drained (MaxWorkItemsPerTurn allowing).
         /// </summary>
         public TimeSpan ActivationSchedulingQuantum { get; set; }

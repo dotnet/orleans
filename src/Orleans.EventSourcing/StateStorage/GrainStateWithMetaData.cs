@@ -38,7 +38,7 @@ namespace Orleans.EventSourcing.StateStorage
         }
 
         /// <summary>
-        /// Initialize a new instance of GrainStateWithMetaDataAndETag class with a initialVew
+        /// Initialize a new instance of GrainStateWithMetaDataAndETag class with an initialView
         /// </summary>
         public GrainStateWithMetaDataAndETag(TView initialview)
         {

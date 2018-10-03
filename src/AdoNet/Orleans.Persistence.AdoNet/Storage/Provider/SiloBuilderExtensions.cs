@@ -21,7 +21,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure silo to use  AdoNet grain storagee for grain storage.
+        /// Configure silo to use  AdoNet grain storage for grain storage.
         /// </summary>
         public static ISiloHostBuilder AddAdoNetGrainStorage(this ISiloHostBuilder builder, string name, Action<AdoNetGrainStorageOptions> configureOptions)
         {
