@@ -104,7 +104,7 @@ namespace Orleans
         /// will be logged, but will not prevent the next timer tick from being queued.
         /// </para>
         /// </remarks>
-        /// <param name="asyncCallback">Callback function to be invoked when timr ticks.</param>
+        /// <param name="asyncCallback">Callback function to be invoked when timer ticks.</param>
         /// <param name="state">State object that will be passed as argument when calling the asyncCallback.</param>
         /// <param name="dueTime">Due time for first timer tick.</param>
         /// <param name="period">Period of subsequent timer ticks.</param>

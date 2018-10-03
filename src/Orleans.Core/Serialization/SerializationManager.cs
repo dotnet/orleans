@@ -1794,7 +1794,7 @@ namespace Orleans.Serialization
         }
 
         /// <summary>
-        /// Loads the external srializers and places them into a hash set
+        /// Loads the external serializers and places them into a hash set
         /// </summary>
         /// <param name="providerTypes">The list of types that implement <see cref="IExternalSerializer"/></param>
         private void RegisterSerializationProviders(List<TypeInfo> providerTypes)

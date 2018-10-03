@@ -223,7 +223,7 @@ namespace Orleans
         }
 
         /// <summary>
-        /// This is the lock free version of uninitilize so we can share
+        /// This is the lock free version of uninitialize so we can share
         /// it between the public method and error paths inside initialize.
         /// This should only be called inside a lock(initLock) block.
         /// </summary>

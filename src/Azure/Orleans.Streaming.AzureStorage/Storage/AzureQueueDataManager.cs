@@ -182,7 +182,7 @@ namespace Orleans.AzureUtils
         }
 
         /// <summary>
-        /// Peeks in the queue for latest message, without dequeueing it.
+        /// Peeks in the queue for latest message, without dequeuing it.
         /// </summary>
         public async Task<CloudQueueMessage> PeekQueueMessage()
         {

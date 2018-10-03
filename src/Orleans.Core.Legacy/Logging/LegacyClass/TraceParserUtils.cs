@@ -14,7 +14,7 @@ namespace Orleans.Logging.Legacy
         /// This method should be very fast, since it is called synchronously during Orleans logging.
         /// </summary>
         /// <remarks>
-        /// To customize functionality in a log writter derived from this base class, 
+        /// To customize functionality in a log writer derived from this base class, 
         /// you should override the <c>FormatLogMessage</c> and/or <c>WriteLogMessage</c> 
         /// methods rather than overriding this method directly.
         /// </remarks>

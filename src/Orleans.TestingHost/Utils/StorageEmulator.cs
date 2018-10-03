@@ -85,7 +85,7 @@ namespace Orleans.TestingHost.Utils
         /// <summary>
         /// Tries to start the storage emulator.
         /// </summary>
-        /// <returns><em>TRUE</em> if the process was started sucessfully. <em>FALSE</em> otherwise.</returns>
+        /// <returns><em>TRUE</em> if the process was started successfully. <em>FALSE</em> otherwise.</returns>
         public static bool TryStart()
         {
             if (!StorageEmulator.Exists)
@@ -97,7 +97,7 @@ namespace Orleans.TestingHost.Utils
         /// <summary>
         /// Starts the storage emulator if not already started.
         /// </summary>
-        /// <returns><em>TRUE</em> if the process was stopped succesfully or was already started. <em>FALSE</em> otherwise.</returns>
+        /// <returns><em>TRUE</em> if the process was stopped successfully or was already started. <em>FALSE</em> otherwise.</returns>
         public static bool Start()
         {
             if (IsStarted()) return true;
@@ -121,7 +121,7 @@ namespace Orleans.TestingHost.Utils
         /// <summary>
         /// Stops the storage emulator if started.
         /// </summary>
-        /// <returns><em>TRUE</em> if the process was stopped succesfully or was already stopped. <em>FALSE</em> otherwise.</returns>
+        /// <returns><em>TRUE</em> if the process was stopped successfully or was already stopped. <em>FALSE</em> otherwise.</returns>
         public static bool Stop()
         {
             if (!IsStarted()) return false;

@@ -26,7 +26,7 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         public long SequenceNumber;
         /// <summary>
-        /// Time event was writen to EventHub
+        /// Time event was written to EventHub
         /// </summary>
         public DateTime EnqueueTimeUtc;
         /// <summary>

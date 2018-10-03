@@ -19,7 +19,7 @@ namespace Orleans.Streams
 
 
         /// <summary>
-        /// Should be called when establishing a subsription failed.
+        /// Should be called when establishing a subscription failed.
         /// </summary>
         /// <param name="subscriptionId"></param>
         /// <param name="streamProviderName"></param>

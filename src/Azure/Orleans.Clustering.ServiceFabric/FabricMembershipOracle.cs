@@ -15,7 +15,7 @@ using Orleans.ServiceFabric;
 namespace Orleans.Clustering.ServiceFabric
 {
     /// <summary>
-    /// Cluster membership implementation which uses Serivce Fabric's service discovery system.
+    /// Cluster membership implementation which uses Service Fabric's service discovery system.
     /// </summary>
     internal class FabricMembershipOracle : IMembershipOracle, IFabricServiceStatusListener, IDisposable
     {
