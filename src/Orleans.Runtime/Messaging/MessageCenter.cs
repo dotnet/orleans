@@ -241,7 +241,7 @@ namespace Orleans.Runtime.Messaging
 
         public Message WaitMessage(Message.Categories type, CancellationToken ct)
         {
-            return InboundQueue.WaitMessage(type);
+            return InboundQueue.WaitMessage(type, ct);
         }
 
         public void RegisterLocalMessageHandler(Message.Categories category, Action<Message> handler)
