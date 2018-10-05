@@ -55,7 +55,7 @@ Let's breakdown the steps used in this sample:
 
 Here we set two things:
 - the `ClusterId` to `"my-first-cluster"`: this is a unique ID for the Orleans cluster. All clients and silo that uses this ID will be able to directly talk to each other. Some will choose to use a different `ClusterId` for each deployments for example.
-- the `ServiceId` to `"AspNetSampleApp"`: this is a unique ID for your application, that will be used by some provider (for example for persistence providers). **This ID should be stable (not change) accross deployments**.
+- the `ServiceId` to `"AspNetSampleApp"`: this is a unique ID for your application, that will be used by some provider (for example for persistence providers). **This ID should be stable (not change) across deployments**.
 
 ## Clustering provider
 
