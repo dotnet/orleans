@@ -298,6 +298,16 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="grainId">String containing the GrainId info to be parsed.</param>
         /// <returns>New GrainId object created from the input data.</returns>
+        internal static GrainId FromParsableString(ReadOnlySpan<char> grainId)
+        {
+            return FromParsableString(grainId.ToString());
+        }
+
+        /// <summary>
+        /// Create a new GrainId object by parsing string in a standard form returned from <c>ToParsableString</c> method.
+        /// </summary>
+        /// <param name="grainId">String containing the GrainId info to be parsed.</param>
+        /// <returns>New GrainId object created from the input data.</returns>
         internal static GrainId FromParsableString(string grainId)
         {
             // NOTE: This function must be the "inverse" of ToParsableString, and data must round-trip reliably.
