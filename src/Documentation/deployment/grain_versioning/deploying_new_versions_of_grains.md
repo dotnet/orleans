@@ -3,7 +3,7 @@
 ### Rolling upgrade
 
 In this method you deploy newer silos directly on your environment.
-This is the simplest method, but it can be difficult to interrupt an on-going deployment
+This is the simplest method, but it can be difficult to interrupt an ongoing deployment
 and to rollback.
 
 Recommended configuration:
