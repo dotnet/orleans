@@ -5,11 +5,13 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator.Model;
 using Orleans.CodeGenerator.Utilities;
+using Microsoft.Extensions.Logging;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using ITypeSymbol = Microsoft.CodeAnalysis.ITypeSymbol;
 
@@ -95,7 +97,7 @@ namespace Orleans.CodeGenerator.Generators
         /// <summary>
         /// Generates the non static serializer class for the provided grain types.
         /// </summary>
-        internal static (TypeDeclarationSyntax, TypeSyntax) GenerateClass(WellKnownTypes wellKnownTypes, SemanticModel model, SerializerTypeDescription description)
+        internal static (TypeDeclarationSyntax, TypeSyntax) GenerateClass(WellKnownTypes wellKnownTypes, SemanticModel model, SerializerTypeDescription description, ILogger logger)
         {
             var className = GetGeneratedClassName(description.Target);
             var type = description.Target;
@@ -110,8 +112,8 @@ namespace Orleans.CodeGenerator.Generators
                         AttributeArgument(TypeOfExpression(type.WithoutTypeParameters().ToTypeSyntax())))
             };
 
-            var fields = GetFields(wellKnownTypes, model, type);
-
+            var fields = GetFields(wellKnownTypes, model, type, logger);
+            
             var members = new List<MemberDeclarationSyntax>(GenerateFields(wellKnownTypes, fields))
             {
                 GenerateConstructor(wellKnownTypes, className, fields),
@@ -482,13 +484,59 @@ namespace Orleans.CodeGenerator.Generators
         /// <summary>
         /// Returns a sorted list of the fields of the provided type.
         /// </summary>
-        private static List<FieldInfoMember> GetFields(WellKnownTypes wellKnownTypes, SemanticModel model, INamedTypeSymbol type)
+        private static List<FieldInfoMember> GetFields(WellKnownTypes wellKnownTypes, SemanticModel model, INamedTypeSymbol type, ILogger logger)
         {
-            var result =
-                type.GetAllMembers<IFieldSymbol>()
-                    .Where(f => ShouldSerializeField(wellKnownTypes, f))
-                    .Select((info, i) => new FieldInfoMember(wellKnownTypes, model, type, info, i))
-                    .ToList();
+            var result = new List<FieldInfoMember>();
+            foreach (var field in type.GetDeclaredMembers<IFieldSymbol>())
+            {
+                if (ShouldSerializeField(wellKnownTypes, field))
+                {
+                    result.Add(new FieldInfoMember(wellKnownTypes, model, type, field, result.Count));
+                }
+            }
+
+            // Some reference assemblies are compiled without private fields.
+            // Warn the user if they are inheriting from a type in one of these assemblies using a heuristic:
+            // If the type inherits from a type in a reference assembly and there are no fields declared on those
+            // base types, emit a warning.
+            var hasReferenceAssemblyBase = false;
+            var referenceAssemblyHasFields = false;
+            var baseType = type.BaseType;
+            while (baseType != null &&
+                   !baseType.Equals(wellKnownTypes.Object) &&
+                   !baseType.Equals(wellKnownTypes.Attribute))
+            {
+                if (!hasReferenceAssemblyBase && baseType.ContainingAssembly.HasAttribute("ReferenceAssemblyAttribute")) hasReferenceAssemblyBase = true;
+                foreach (var field in baseType.GetDeclaredMembers<IFieldSymbol>())
+                {
+                    if (hasReferenceAssemblyBase) referenceAssemblyHasFields = true;
+                    if (ShouldSerializeField(wellKnownTypes, field))
+                    {
+                        result.Add(new FieldInfoMember(wellKnownTypes, model, type, field, result.Count));
+                    }
+                }
+
+                baseType = baseType.BaseType;
+            }
+
+            if (type.TypeKind == TypeKind.Class && hasReferenceAssemblyBase && !referenceAssemblyHasFields)
+            {
+                var fileLocation = string.Empty;
+                var declaration = type.DeclaringSyntaxReferences.FirstOrDefault();
+                if (declaration != null)
+                {
+                    var location = declaration.SyntaxTree.GetLocation(declaration.Span);
+                    if (location.IsInSource)
+                    {
+                        var pos = location.GetMappedLineSpan();
+                        fileLocation = $"{pos.Path}({pos.Span.Start.Line},{pos.Span.Start.Character}): ";
+                    }
+                }
+
+                logger.LogWarning(
+                    $"{fileLocation}Warning: Type {type} has a base type which belongs to a reference assembly. Serializer generation for this type may not include important base type fields.");
+            }
+
             result.Sort(FieldInfoMember.Comparer.Instance);
             return result;
         }
