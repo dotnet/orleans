@@ -117,7 +117,7 @@ Option classes in Orleans follow the <a href="https://docs.microsoft.com/en-us/a
 </code></pre><p>Here we set two things:</p>
 <ul>
 <li>the <code>ClusterId</code> to <code>&quot;my-first-cluster&quot;</code>: this is a unique ID for the Orleans cluster. All clients and silo that uses this ID will be able to directly talk to each other. Some will choose to use a different <code>ClusterId</code> for each deployments for example.</li>
-<li>the <code>ServiceId</code> to <code>&quot;AspNetSampleApp&quot;</code>: this is a unique ID for your application, that will be used by some provider (for example for persistence providers). <strong>This ID should be stable (not change) accross deployments</strong>.</li>
+<li>the <code>ServiceId</code> to <code>&quot;AspNetSampleApp&quot;</code>: this is a unique ID for your application, that will be used by some provider (for example for persistence providers). <strong>This ID should be stable (not change) across deployments</strong>.</li>
 </ul>
 <h2 id="clustering-provider">Clustering provider</h2>
 <pre><code class="lang-csharp">    [...]
