@@ -327,7 +327,7 @@ namespace Orleans.Runtime
                    incoming.IsAlwaysInterleave
                 || targetActivation.Running == null
                 || (targetActivation.Running.IsReadOnly && incoming.IsReadOnly)
-                || IsCallChainReentrancyAllowed(targetActivation, incoming)
+                || (schedulingOptions.AllowCallChainReentrancy && targetActivation.ActivationId.Equals(incoming.SendingActivation))
                 || catalog.CanInterleave(targetActivation.ActivationId, incoming);
 
             return canInterleave;
@@ -337,37 +337,21 @@ namespace Orleans.Runtime
         /// https://github.com/dotnet/orleans/issues/3184
         /// Checks whether reentrancy is allowed for calls to grains that are already part of the call chain.
         /// Covers following case: grain A calls grain B, and while executing the invoked method B calls back to A. 
-        /// Design: Each call chain have unique id. If target of outgoing request is already part of the chain - 
+        /// Design: Senders collection `RunningRequestsSenders` contains sending grains references
+        /// during duration of request processing. If target of outgoing request is found in that collection - 
         /// such request will be marked as interleaving in order to prevent deadlocks.
         /// </summary>
-        private bool IsCallChainReentrancyAllowed(ActivationData targetActivation, Message incoming)
+        private void MarkSameCallChainMessageAsInterleaving(ActivationData sendingActivation, Message outgoing)
         {
-            if (!schedulingOptions.AllowCallChainReentrancy
-                 || incoming.Direction == Message.Directions.OneWay)
-            {
-                return false;
-            }
-
-            if (incoming.CallChainId == null || targetActivation.Running == null)
-            {
-                return false;
-            }
-
-            // do not allow interleaving between requests which are concurrently sent from the same activation
-            var isCallFromOriginatorActivation = incoming.SendingActivation.Equals(targetActivation.Running.SendingActivation);
-            return !isCallFromOriginatorActivation && incoming.CallChainId != null
-                && targetActivation.Running.CallChainId == incoming.CallChainId;
-        }
-
-        private void EnsureCallChainIdIsSet(ActivationData sendingActivation, Message outgoing)
-        {
-            if (sendingActivation?.Running == null)
+            if (!schedulingOptions.AllowCallChainReentrancy)
             {
                 return;
             }
 
-            sendingActivation.Running.CallChainId = sendingActivation.Running.CallChainId ?? outgoing.Id;
-            outgoing.CallChainId = sendingActivation.Running.CallChainId;
+            if (sendingActivation?.RunningRequestsSenders.Contains(outgoing.TargetActivation) == true)
+            {
+                outgoing.IsAlwaysInterleave = true;
+            }
         }
 
         /// <summary>
@@ -816,7 +800,7 @@ namespace Orleans.Runtime
         /// <param name="sendingActivation"></param>
         public void TransportMessage(Message message, ActivationData sendingActivation = null)
         {
-            EnsureCallChainIdIsSet(sendingActivation, message);
+            MarkSameCallChainMessageAsInterleaving(sendingActivation, message);
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.Dispatcher_Send_AddressedMessage, "Addressed message {0}", message);
             Transport.SendMessage(message);
         }
