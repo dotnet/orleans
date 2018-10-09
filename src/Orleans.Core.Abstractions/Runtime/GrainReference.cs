@@ -391,7 +391,7 @@ namespace Orleans.Runtime
         
         internal static GrainReference FromKeyString(string key, IGrainReferenceRuntime runtime)
         {
-            if (string.IsNullOrWhiteSpace(key)) throw new ArgumentNullException("key", "GrainReference.FromKeyString cannot parse null key");
+            if (string.IsNullOrWhiteSpace(key)) throw new ArgumentNullException(nameof(key), "GrainReference.FromKeyString cannot parse null key");
 
             ReadOnlySpan<char> trimmed = key.AsSpan().Trim();
             ReadOnlySpan<char> grainIdStr;

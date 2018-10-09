@@ -36,7 +36,6 @@
     <PackageReference Include="System.Diagnostics.Process" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Diagnostics.TraceSource" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Linq.Expressions" Version="$(SystemRuntimeVersion)" />
-    <PackageReference Include="System.Memory" Version="$(SystemMemoryVersion)" />
     <PackageReference Include="System.Net.NameResolution" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Net.NetworkInformation" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Reflection.Emit" Version="$(SystemRuntimeVersion)" />

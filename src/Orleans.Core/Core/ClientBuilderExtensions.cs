@@ -173,8 +173,7 @@ namespace Orleans
             string serviceId = ClusterOptions.DevelopmentServiceId,
             string clusterId = ClusterOptions.DevelopmentClusterId)
         {
-            Span<int> gatewayPorts = stackalloc[] {gatewayPort};
-            return builder.UseLocalhostClustering(gatewayPorts, serviceId, clusterId);
+            return builder.UseLocalhostClustering(new [] {gatewayPort}, serviceId, clusterId);
         }
 
         /// <summary>
@@ -189,28 +188,7 @@ namespace Orleans
             string serviceId = ClusterOptions.DevelopmentServiceId,
             string clusterId = ClusterOptions.DevelopmentClusterId)
         {
-            return builder.UseLocalhostClustering(gatewayPorts.AsSpan(), serviceId, clusterId);
-        }
-
-        /// <summary>
-        /// Configures the client to connect to a silo on the localhost.
-        /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="gatewayPorts">The local silo gateway ports.</param>
-        /// <param name="serviceId">The service id.</param>
-        /// <param name="clusterId">The cluster id.</param>
-        public static IClientBuilder UseLocalhostClustering(this IClientBuilder builder,
-            Span<int> gatewayPorts,
-            string serviceId = ClusterOptions.DevelopmentServiceId,
-            string clusterId = ClusterOptions.DevelopmentClusterId)
-        {
-            var endpoints = new IPEndPoint[gatewayPorts.Length];
-            for (int i = 0; i < gatewayPorts.Length; i++)
-            {
-                endpoints[i] = new IPEndPoint(IPAddress.Loopback, gatewayPorts[i]);
-            }
-
-            return builder.UseStaticClustering(endpoints)
+            return builder.UseStaticClustering(gatewayPorts.Select(p => new IPEndPoint(IPAddress.Loopback, p)).ToArray())
                 .ConfigureServices(services =>
                 {
                     // If the caller did not override service id or cluster id, configure default values as a fallback.
