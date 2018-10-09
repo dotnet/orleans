@@ -477,7 +477,7 @@ namespace Orleans.Runtime.Configuration
         }
 
         /// <summary>
-        /// Prints the the DataConnectionString,
+        /// Prints the DataConnectionString,
         /// without disclosing any credential info
         /// such as the Azure Storage AccountKey, SqlServer password or AWS SecretKey.
         /// </summary>

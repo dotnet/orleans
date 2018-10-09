@@ -40,7 +40,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="cacheDataAdapter">Performs data transforms appropriate for the various types of queue data.</param>
         /// <param name="comparer">Compares cached data</param>
         /// <param name="logger"></param>
-        /// <param name="evictionStrategy">Eviction stretagy manage purge related events</param>
+        /// <param name="evictionStrategy">Eviction strategy manage purge related events</param>
         /// <param name="cacheMonitor"></param>
         /// <param name="cacheMonitorWriteInterval"></param>
         protected EventHubQueueCache(int defaultMaxAddCount, IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, TCachedMessage> cacheDataAdapter,

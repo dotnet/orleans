@@ -312,7 +312,7 @@ namespace Orleans.Runtime.Messaging
         /// </summary>
         /// <param name="e">SocketAsyncEventArg associated with the completed accept operation.</param>
         /// <param name="completedSynchronously">Shows whether AcceptAsync completed synchronously, 
-        /// if true - the next accept operation woun't be started. Used for avoiding potential stack overflows.</param>
+        /// if true - the next accept operation won't be started. Used for avoiding potential stack overflows.</param>
         private void ProcessAccept(SocketAsyncEventArgs e, bool completedSynchronously)
         {
             var ima = e.UserToken as IncomingMessageAcceptor;
@@ -468,7 +468,7 @@ namespace Orleans.Runtime.Messaging
             // situation that shows when the remote host has finished sending data.
             if (e.BytesTransferred <= 0)
             {
-                if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Closing recieving socket: " + e.RemoteEndPoint);
+                if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Closing receiving socket: " + e.RemoteEndPoint);
                 rcc.IMA.SafeCloseSocket(rcc.Socket);
                 FreeSocketAsyncEventArgs(e);
                 return;

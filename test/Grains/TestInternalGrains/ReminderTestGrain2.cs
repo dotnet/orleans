@@ -331,7 +331,7 @@ namespace UnitTests.Grains
 
         public async Task StopReminder(string reminderName)
         {
-            this.logger.Info("Stoping reminder {0}.", reminderName);
+            this.logger.Info("Stopping reminder {0}.", reminderName);
             // we dont reset counter as we want the test methods to be able to read it even after stopping the reminder
             //return UnregisterReminder(allReminders[reminderName]);
             IGrainReminder reminder = null;
@@ -362,7 +362,7 @@ namespace UnitTests.Grains
 
         public async Task StopReminder(IGrainReminder reminder)
         {
-            this.logger.Info("Stoping reminder (using ref) {0}.", reminder);
+            this.logger.Info("Stopping reminder (using ref) {0}.", reminder);
             // we dont reset counter as we want the test methods to be able to read it even after stopping the reminder
             await UnregisterReminder(reminder);
         }

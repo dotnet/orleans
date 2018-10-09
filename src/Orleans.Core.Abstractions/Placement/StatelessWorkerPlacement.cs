@@ -7,6 +7,11 @@ namespace Orleans.Runtime
     {
         private static readonly int DefaultMaxStatelessWorkers = Environment.ProcessorCount;
 
+        /// <summary>
+        /// Stateless workers are not registered in the grain directory.
+        /// </summary>
+        public override bool IsUsingGrainDirectory => false;
+
         public int MaxLocal { get; private set; }
 
         internal StatelessWorkerPlacement(int maxLocal = -1)

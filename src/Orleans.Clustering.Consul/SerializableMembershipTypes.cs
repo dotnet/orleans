@@ -82,7 +82,7 @@ namespace Orleans.Runtime.Host
 
     /// <summary>
     /// Contains methods for converting a Consul KVPair to and from a MembershipEntry.  
-    /// This uses ConsulSiloRegistration objects as the serialisable KV.Value and minimises conversion operations.
+    /// This uses ConsulSiloRegistration objects as the serializable KV.Value and minimises conversion operations.
     /// </summary>
     internal class ConsulSiloRegistrationAssembler
     {

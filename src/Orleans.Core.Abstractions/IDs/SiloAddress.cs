@@ -128,7 +128,7 @@ namespace Orleans.Runtime
         /// <remarks>
         /// Note: This string value is not comparable with the <c>FromParsableString</c> method -- use the <c>ToParsableString</c> method for that purpose.
         /// </remarks>
-        /// <returns>String representaiton of this SiloAddress.</returns>
+        /// <returns>String representation of this SiloAddress.</returns>
         public string ToLongString()
         {
             return ToString();
@@ -140,7 +140,7 @@ namespace Orleans.Runtime
         /// <remarks>
         /// Note: This string value is not comparable with the <c>FromParsableString</c> method -- use the <c>ToParsableString</c> method for that purpose.
         /// </remarks>
-        /// <returns>String representaiton of this SiloAddress.</returns>
+        /// <returns>String representation of this SiloAddress.</returns>
         public string ToStringWithHashCode()
         {
             return String.Format("{0}/x{1, 8:X8}", ToString(), GetConsistentHashCode());

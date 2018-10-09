@@ -253,6 +253,9 @@ namespace Orleans.Transactions.State
                         if (entry.LastSent.HasValue)
                             return; // cannot abort anymore if we already sent prepare-ok message
 
+                        if (logger.IsEnabled(LogLevel.Trace))
+                            logger.Trace("aborting via Prepared. Status={Status} Entry={Entry}", status, entry);
+
                         entry.TransactionManager.Reference.AsReference<ITransactionManagerExtension>()
                              .Prepared(entry.TransactionManager.Name, entry.TransactionId, entry.Timestamp, resource, status)
                              .Ignore();
@@ -263,11 +266,17 @@ namespace Orleans.Transactions.State
                         if (logger.IsEnabled(LogLevel.Trace))
                             logger.Trace("aborting status={Status} {Entry}", status, entry);
 
-                        // tell remote participants
-                        await Task.WhenAll(entry.WriteParticipants
-                            .Where(p => !p.Equals(resource))
-                            .Select(p => p.Reference.AsReference<ITransactionalResourceExtension>()
-                                 .Cancel(p.Name, entry.TransactionId, entry.Timestamp, status)));
+                        try
+                        {
+                            // tell remote participants
+                            await Task.WhenAll(entry.WriteParticipants
+                                .Where(p => !p.Equals(resource))
+                                .Select(p => p.Reference.AsReference<ITransactionalResourceExtension>()
+                                     .Cancel(p.Name, entry.TransactionId, entry.Timestamp, status)));
+                        } catch(Exception ex)
+                        {
+                            this.logger.LogWarning(ex, "Failed to notify all transaction participants of cancellation.  TransactionId: {TransactionId}, Timestamp: {Timestamp}, Status: {Status}", entry.TransactionId, entry.Timestamp, status);
+                        }
 
                         // reply to transaction agent
                         entry.PromiseForTA.TrySetResult(status);
@@ -673,6 +682,8 @@ namespace Orleans.Transactions.State
 
                                 if (bottom.LastSent + this.options.RemoteTransactionPingFrequency <= now)
                                 {
+                                    if (logger.IsEnabled(LogLevel.Trace))
+                                        logger.Trace("sent ping {BottomEntry}", bottom);
                                     bottom.TransactionManager.Reference.AsReference<ITransactionManagerExtension>()
                                           .Ping(bottom.TransactionManager.Name, bottom.TransactionId, bottom.Timestamp, resource).Ignore();
                                     bottom.LastSent = now;

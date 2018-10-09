@@ -229,7 +229,7 @@ namespace Orleans.Runtime.Scheduler
                 if (IsActive)
                 {
                     ReportWorkGroupProblem(
-                        String.Format("WorkItemGroup is being stoped while still active. workItemCount = {0}."
+                        String.Format("WorkItemGroup is being stopped while still active. workItemCount = {0}."
                         + "The likely reason is that the task is not being 'awaited' properly.", WorkItemCount),
                         ErrorCode.SchedulerWorkGroupStopping);
                 }

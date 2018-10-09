@@ -4,8 +4,8 @@ using System.Threading.Tasks;
 namespace Orleans.Streams
 {
     /// <summary>
-    /// Handle representing this subsription.
-    /// Consumer may serialize and store the handle in order to unsubsribe later, for example
+    /// Handle representing this subscription.
+    /// Consumer may serialize and store the handle in order to unsubscribe later, for example
     /// in another activation on this grain.
     /// </summary>
     [Serializable]

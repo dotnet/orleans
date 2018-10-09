@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 namespace Orleans.Streams
 {
     /// <summary>
-    /// This interface represents an object that serves as a distributed rendevous between producers and consumers.
+    /// This interface represents an object that serves as a distributed rendezvous between producers and consumers.
     /// It is similar to a Reactive Framework <code>Subject</code> and implements
     /// <code>IObserver</code> nor <code>IObservable</code> interfaces.
     /// </summary>

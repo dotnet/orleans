@@ -16,7 +16,7 @@ namespace Orleans.SystemTargetInterfaces
     }
 
     /// <summary>
-    /// Reponse message used by Global Single Instance Protocol
+    /// Response message used by Global Single Instance Protocol
     /// </summary>
     [Serializable]
     internal class RemoteClusterActivationResponse
@@ -83,7 +83,7 @@ namespace Orleans.SystemTargetInterfaces
             string sendingClusterId);
 
         /// <summary>
-        /// Called on remote clusters after deactivating a owned or doubtful grain activation,
+        /// Called on remote clusters after deactivating an owned or doubtful grain activation,
         /// to give them the opportunity to remove the cached registration
         /// </summary>
         /// <param name="addresses">the list of activations</param>

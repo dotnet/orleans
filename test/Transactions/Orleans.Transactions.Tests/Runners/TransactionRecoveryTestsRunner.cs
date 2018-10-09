@@ -45,7 +45,15 @@ namespace Orleans.Transactions.Tests
             public List<BitArrayState> Actual { get; set; }
             public async Task GetActual()
             {
-                this.Actual = await this.Grain.Get();
+                try
+                {
+                    this.Actual = await this.Grain.Get();
+                } catch(Exception)
+                {
+                    // allow a single retry
+                    await Task.Delay(TimeSpan.FromSeconds(30));
+                    this.Actual = await this.Grain.Get();
+                }
             }
         }
 

@@ -189,7 +189,7 @@ namespace Orleans.Transactions.AzureStorage
         }
 
         /// <summary>
-        /// Inserts a data entry in the Azure table: creates a new one if does not exists or overwrites (without eTag) an already existing version (the "update in place" semantincs).
+        /// Inserts a data entry in the Azure table: creates a new one if does not exists or overwrites (without eTag) an already existing version (the "update in place" semantics).
         /// </summary>
         /// <param name="data">Data to be inserted or replaced in the table.</param>
         /// <returns>Value promise with new Etag for this data entry after completing this storage operation.</returns>

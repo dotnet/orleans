@@ -26,7 +26,7 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         public long SequenceNumber;
         /// <summary>
-        /// Time event was writen to EventHub
+        /// Time event was written to EventHub
         /// </summary>
         public DateTime EnqueueTimeUtc;
         /// <summary>
@@ -50,12 +50,12 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         /// <param name="streamIdentity">Stream Identity</param>
         /// <param name="partitionKey">EventHub partition key for message</param>
-        /// <param name="offset">Offset into the EventHub parition where this message was from</param>
-        /// <param name="sequenceNumber">Offset into the EventHub parition where this message was from</param>
+        /// <param name="offset">Offset into the EventHub partition where this message was from</param>
+        /// <param name="sequenceNumber">Offset into the EventHub partition where this message was from</param>
         /// <param name="enqueueTimeUtc">Time in UTC when this message was injected by EventHub</param>
         /// <param name="dequeueTimeUtc">Time in UTC when this message was read from EventHub into the current service</param>
         /// <param name="properties">User properties from EventData object</param>
-        /// <param name="payload">Binary data from EventData objbect</param>
+        /// <param name="payload">Binary data from EventData object</param>
         public EventHubMessage(IStreamIdentity streamIdentity, string partitionKey, string offset, long sequenceNumber,
             DateTime enqueueTimeUtc, DateTime dequeueTimeUtc, IDictionary<string, object> properties, byte[] payload)
         {

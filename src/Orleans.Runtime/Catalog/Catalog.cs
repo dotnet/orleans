@@ -1244,7 +1244,7 @@ namespace Orleans.Runtime
             }
             
             /// <summary>
-            /// Returns true if this instance represents a successful registration, false otheriwse.
+            /// Returns true if this instance represents a successful registration, false otherwise.
             /// </summary>
             public bool IsSuccess { get; private set; }
 
@@ -1263,6 +1263,7 @@ namespace Orleans.Runtime
         private async Task<ActivationRegistrationResult> RegisterActivationInGrainDirectoryAndValidate(ActivationData activation)
         {
             ActivationAddress address = activation.Address;
+
             // Currently, the only grain type that is not registered in the Grain Directory is StatelessWorker. 
             // Among those that are registered in the directory, we currently do not have any multi activations.
             if (activation.IsUsingGrainDirectory)
@@ -1272,9 +1273,9 @@ namespace Orleans.Runtime
                
                 return new ActivationRegistrationResult(existingActivationAddress: result.Address);
             }
-            else
+            else if (activation.PlacedUsing is StatelessWorkerPlacement stPlacement)
             {
-                StatelessWorkerPlacement stPlacement = activation.PlacedUsing as StatelessWorkerPlacement;
+                // Stateless workers are not registered in the directory and can have multiple local activations.
                 int maxNumLocalActivations = stPlacement.MaxLocal;
                 lock (activations)
                 {
@@ -1286,6 +1287,21 @@ namespace Orleans.Runtime
                     return new ActivationRegistrationResult(existingActivationAddress: id);
                 }
             }
+            else
+            {
+                // Some other non-directory, single-activation placement.
+                lock (activations)
+                {
+                    var exists = LocalLookup(address.Grain, out var local);
+                    if (exists && local.Count == 1 && local[0].ActivationId.Equals(activation.ActivationId))
+                    {
+                        return ActivationRegistrationResult.Success;
+                    }
+
+                    return new ActivationRegistrationResult(existingActivationAddress: local[0].Address);
+                }
+            }
+
             // We currently don't have any other case for multiple activations except for StatelessWorker. 
         }
 

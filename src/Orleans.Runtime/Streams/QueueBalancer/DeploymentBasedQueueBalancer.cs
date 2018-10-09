@@ -177,7 +177,7 @@ namespace Orleans.Streams
         /// <summary>
         /// Checks to see if deployment configuration has changed, by adding or removing silos.
         /// If so, it updates the list of all silo names and creates a new resource balancer.
-        /// This should occure rarely.
+        /// This should occur rarely.
         /// </summary>
         private BestFitBalancer<string, QueueId> GetBalancer()
         {

@@ -181,7 +181,7 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public TimeSpan DeathVoteExpirationTimeout { get; set; }
         /// <summary>
-        /// The number of seconds to periodically write in the membership table that this silo is alive. Used ony for diagnostics.
+        /// The number of seconds to periodically write in the membership table that this silo is alive. Used only for diagnostics.
         /// </summary>
         public TimeSpan IAmAliveTablePublishTimeout { get; set; }
         /// <summary>

@@ -18,7 +18,7 @@ namespace Orleans.Providers.Streams.Common
         void TrackMemoryAllocated(long allocatedMemoryInByte);
 
         /// <summary>
-        /// Track memory relased from cache
+        /// Track memory released from cache
         /// </summary>
         /// <param name="releasedMemoryInByte"></param>
         void TrackMemoryReleased(long releasedMemoryInByte);

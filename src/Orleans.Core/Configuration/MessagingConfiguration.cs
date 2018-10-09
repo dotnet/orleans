@@ -32,7 +32,7 @@ namespace Orleans.Runtime.Configuration
         bool ResendOnTimeout { get; set; }
         /// <summary>
         /// The MaxSocketAge attribute specifies how long to keep an open socket before it is closed.
-        /// Default is TimeSpan.MaxValue (never close sockets automatically, unles they were broken).
+        /// Default is TimeSpan.MaxValue (never close sockets automatically, unless they were broken).
         /// </summary>
         TimeSpan MaxSocketAge { get; set; }
         /// <summary>

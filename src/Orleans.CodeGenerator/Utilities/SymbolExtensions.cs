@@ -131,6 +131,17 @@ namespace Orleans.CodeGenerator.Utilities
             return false;
         }
 
+        public static bool HasAttribute(this ISymbol symbol, string attributeTypeName)
+        {
+            var attributes = symbol.GetAttributes();
+            foreach (var attr in attributes)
+            {
+                if (attr.AttributeClass.Name.Equals(attributeTypeName)) return true;
+            }
+
+            return false;
+        }
+
         public static bool GetAttribute(this ISymbol symbol, INamedTypeSymbol attributeType, out AttributeData attribute)
         {
             if (!symbol.GetAttributes(attributeType, out var attributes))
@@ -178,6 +189,14 @@ namespace Orleans.CodeGenerator.Utilities
                     return $"{parameter.Name}";
                 default:
                     throw new NotSupportedException($"Unable to format type of kind {type.GetType()} with name \"{type.Name}\"");
+            }
+        }
+
+        public static IEnumerable<TSymbol> GetDeclaredMembers<TSymbol>(this ITypeSymbol type) where TSymbol : ISymbol
+        {
+            foreach (var candidate in type.GetMembers())
+            {
+                if (candidate is TSymbol symbol) yield return symbol;
             }
         }
 

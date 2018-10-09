@@ -152,13 +152,11 @@ namespace Orleans.Transactions
                     return $"LCE wc={WaitCount} rtb={ReadyToCommit}";
 
                 case CommitRole.RemoteCommit:
-                    return $"RCE pip={PrepareIsPersisted} ls={LastSent.HasValue} ro={IsReadOnly} rtb={ReadyToCommit}";
+                    return $"RCE pip={PrepareIsPersisted} ls={LastSent.HasValue} ro={IsReadOnly} rtb={ReadyToCommit} tm={TransactionManager}";
 
                 default:
                     throw new NotSupportedException($"{Role} is not a supported CommitRole.");
             }
         }
     }
-
-
 }

@@ -116,7 +116,7 @@ namespace Orleans.CodeGenerator.Utilities
                     $"Can't create parenthesized binary expression with {bindingFlags.Length} arguments");
             }
 
-            var flags = IdentifierName("System").Member("Reflection").Member("BindingFlags");
+            var flags = AliasQualifiedName("global", IdentifierName("System")).Member("Reflection").Member("BindingFlags");
             var bindingFlagsBinaryExpression = BinaryExpression(
                 operationKind,
                 flags.Member(bindingFlags[0].ToString()),

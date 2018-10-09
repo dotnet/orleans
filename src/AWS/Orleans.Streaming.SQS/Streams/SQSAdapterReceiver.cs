@@ -12,7 +12,7 @@ using SQSMessage = Amazon.SQS.Model.Message;
 namespace OrleansAWSUtils.Streams
 {
     /// <summary>
-    /// Recieves batches of messages from a single partition of a message queue.  
+    /// Receives batches of messages from a single partition of a message queue.  
     /// </summary>
     internal class SQSAdapterReceiver : IQueueAdapterReceiver
     {
