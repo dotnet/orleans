@@ -125,32 +125,21 @@ namespace Orleans.Runtime
         /// <returns></returns>
         public ByteArrayBuilder Append(byte[] array)
         {
-            int arrLen = array.Length;
-            // Big enough for its own buffer
-            //
-            // This is a somewhat debatable optimization:
-            // 1) If the passed array is bigger than bufferSize, don't copy it and append it as its own buffer. 
-            // 2) Make sure to ALWAYS copy arrays which size is EXACTLY bufferSize, otherwise if the data was passed as an Immutable arg, 
-            // we may return this buffer back to the BufferPool and later over-write it.
-            // 3) If we already have MINIMUM_BUFFER_SIZE in the current buffer and passed enough data, also skip the copy and append it as its own buffer. 
-            if (((arrLen != bufferSize) && (currentOffset > MINIMUM_BUFFER_SIZE) && (arrLen > MINIMUM_BUFFER_SIZE)) || (arrLen > bufferSize))
-            {
-                Grow();
-                completedBuffers.Add(new ArraySegment<byte>(array));
-                completedLength += array.Length;
-            }
-            else
-            {
-                EnsureRoomFor(1);
-                int n = Math.Min(array.Length, bufferSize - currentOffset);
-                Array.Copy(array, 0, currentBuffer, currentOffset, n);
-                currentOffset += n;
-                int r = array.Length - n;
-                if (r <= 0) return this;
+            // We shouldn't introduce external buffer Since we need return byte array to ArrayPool<byte>.Shared.
 
-                Grow(); // Resets currentOffset to zero
-                Array.Copy(array, n, currentBuffer, currentOffset, r);
-                currentOffset += r;
+            int arrLen = array.Length;
+            int r = arrLen;
+            EnsureRoomFor(1);
+            while (true)
+            {
+                int n = Math.Min(r, bufferSize - currentOffset);
+                Array.Copy(array, arrLen - r, currentBuffer, currentOffset, n);
+                currentOffset += n;
+                r -= n;
+
+                // Grow buffers and continue if there's remain bytes to copy, otherwise complete.
+                if (r > 0) Grow();
+                else break;
             }
             return this;
         }

@@ -23,6 +23,7 @@
 
   <!-- Common compile parameters -->
   <PropertyGroup>
+    <LangVersion>7.3</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <NoWarn>$(NoWarn);1591;2003</NoWarn>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>

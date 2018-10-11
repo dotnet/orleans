@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -150,7 +150,7 @@ namespace UnitTests.Serialization
             {
                 Headers = SerializationManager.DeserializeMessageHeaders(context)
             };
-            deserializedMessage.SetBodyBytes(bodyList);
+            deserializedMessage.DeserializeBodyObject(this.fixture.SerializationManager, bodyList);
             return deserializedMessage;
         }
     }
