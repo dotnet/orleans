@@ -45,6 +45,14 @@ namespace UnitTests
             hostedCluster = fixture.HostedCluster;
         }
 
+        // See https://github.com/dotnet/orleans/pull/5086
+        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        public async Task CorrelationId_Bug()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<IFirstGrain>(Guid.NewGuid());
+            await grain.Start(Guid.NewGuid(), Guid.NewGuid());
+        }
+
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void ReentrantGrain()
         {
