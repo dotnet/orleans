@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -20,9 +20,8 @@ namespace Orleans.Transactions.State
         private readonly Action deactivate;
         private readonly ITransactionalStateStorage<TState> storage;
         private readonly BatchWorker storageWorker;
-        private readonly BatchWorker confirmationWorker;
         protected readonly ILogger logger;
-        private readonly Dictionary<Guid, TransactionRecord<TState>> confirmationTasks;
+        private readonly ConfirmationWorker<TState> confirmationWorker;
         private CommitQueue<TState> commitQueue;
         private Task readyTask;
 
@@ -62,10 +61,9 @@ namespace Orleans.Transactions.State
             this.storage = storage;
             this.Clock = new CausalClock(clock);
             this.logger = logger;
-            this.confirmationTasks = new Dictionary<Guid, TransactionRecord<TState>>();
             this.storageWorker = new BatchWorkerFromDelegate(StorageWork);
-            this.confirmationWorker = new BatchWorkerFromDelegate(ConfirmationWork);
             this.RWLock = new ReadWriteLock<TState>(options, this, this.storageWorker, logger);
+            this.confirmationWorker = new ConfirmationWorker<TState>(options, this.resource, this.storageWorker, () => this.storageBatch, this.logger);
             this.unprocessedPreparedMessages = new Dictionary<DateTime, PreparedMessages>();
             this.commitQueue = new CommitQueue<TState>();
             this.readyTask = Task.CompletedTask;
@@ -316,15 +314,7 @@ namespace Orleans.Transactions.State
             }
             else
             {
-                if (this.confirmationTasks.TryGetValue(transactionId, out var record))
-                {
-                    if (logger.IsEnabled(LogLevel.Trace))
-                        logger.Trace("received ping for {TransactionId}, irrelevant (still notifying)", transactionId);
-
-                    // re-send now
-                    this.confirmationWorker.Notify();
-                }
-                else
+                if (!this.confirmationWorker.IsConfirmed(transactionId))
                 {
                     if (logger.IsEnabled(LogLevel.Trace))
                         logger.Trace("received ping for {TransactionId}, unknown - presumed abort", transactionId);
@@ -458,21 +448,10 @@ namespace Orleans.Transactions.State
             {
                 if (logger.IsEnabled(LogLevel.Debug))
                     logger.Debug($"recover commit confirmation {kvp.Key}");
-
-                if (!this.confirmationTasks.TryGetValue(kvp.Key, out TransactionRecord<TState> record))
-                {
-                    confirmationTasks.Add(kvp.Key, new TransactionRecord<TState>()
-                    {
-                        Role = CommitRole.LocalCommit,
-                        TransactionId = kvp.Key,
-                        Timestamp = kvp.Value.Timestamp,
-                        WriteParticipants = kvp.Value.WriteParticipants
-                    });
-                }
+                this.confirmationWorker.Add(kvp.Key, kvp.Value.Timestamp, kvp.Value.WriteParticipants);
             }
 
             // check for work
-            this.confirmationWorker.Notify();
             this.storageWorker.Notify();
             this.RWLock.Notify();
         }
@@ -503,7 +482,6 @@ namespace Orleans.Transactions.State
             }
             return count;
         }
-
 
         private async Task StorageWork()
         {
@@ -786,8 +764,7 @@ namespace Orleans.Transactions.State
                 // after committing, we need to run a task to confirm and collect
                 this.storageBatch.FollowUpAction(() =>
                 {
-                    confirmationTasks.Add(entry.TransactionId, entry);
-                    confirmationWorker.Notify();
+                    this.confirmationWorker.Add(entry.TransactionId, entry.Timestamp, entry.WriteParticipants);
                 });
             }
             else
@@ -809,59 +786,6 @@ namespace Orleans.Transactions.State
 
             pending.Add(this.RWLock.AbortExecutingTransactions());
             await Task.WhenAll(pending);
-        }
-
-        private Task ConfirmationWork()
-        {
-            var now = DateTime.UtcNow;
-            var sendlist = confirmationTasks.Where(r => !r.Value.LastConfirmationAttempt.HasValue
-              || r.Value.LastConfirmationAttempt + this.options.ConfirmationRetryDelay < now).ToList();
-
-            foreach (var kvp in sendlist)
-            {
-                ConfirmationTask(kvp.Value).Ignore();
-            }
-            if(confirmationTasks.Count != 0)
-            {
-                confirmationWorker.Notify(now + this.options.ConfirmationRetryDelay);
-            }
-
-            return Task.CompletedTask;
-        }
-
-        private async Task ConfirmationTask(TransactionRecord<TState> record)
-        {
-            try
-            {
-                var tasks = new List<Task>();
-
-                record.LastConfirmationAttempt = DateTime.UtcNow;
-
-                foreach (var p in record.WriteParticipants)
-                {
-                    if (!p.Equals(resource))
-                    {
-                        tasks.Add(p.Reference.AsReference<ITransactionalResourceExtension>()
-                                   .Confirm(p.Name, record.TransactionId, record.Timestamp));
-                    }
-                }
-
-                await Task.WhenAll(tasks);
-
-                confirmationTasks.Remove(record.TransactionId);
-
-                // all prepare records have been removed from all participants. 
-                // Now we can remove the commit record.
-                this.storageBatch.Collect(record.TransactionId);
-
-                storageWorker.Notify();
-            }
-            catch (Exception e)
-            {
-                // we are giving up for now.
-                // if pinged or reloaded from storage, we'll try again.
-                logger.Warn(333, $"Could not notify/collect:", e);
-            }
         }
     }
 }

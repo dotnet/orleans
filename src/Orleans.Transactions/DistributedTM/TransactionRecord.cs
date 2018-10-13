@@ -68,7 +68,6 @@ namespace Orleans.Transactions
         public List<ParticipantId> WriteParticipants;
         public int WaitCount;
         public DateTime WaitingSince;
-        public DateTime? LastConfirmationAttempt;
 
         // used for remote commit
         public DateTime? LastSent;
