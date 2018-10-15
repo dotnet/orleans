@@ -1,56 +1,36 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using Orleans.Configuration;
+
 namespace Orleans.Runtime
 {
-    internal class BufferPool
+    internal class BufferPool: MemoryPool<byte>
     {
-        private const int MaximumBufferSize = int.MaxValue;
-        private readonly int byteBufferSize;
-        private readonly CounterStatistic checkedOutBufferCounter;
-        private readonly CounterStatistic checkedInBufferCounter;
-
+        private readonly int minimumBufferSize;
         public static BufferPool GlobalPool;
-        public int Size
+        public int MinimumSize
         {
-            get { return byteBufferSize; }
+            get { return minimumBufferSize; }
         }
 
         internal static void InitGlobalBufferPool(MessagingOptions messagingOptions)
         {
-            GlobalPool = new BufferPool(messagingOptions.BufferPoolBufferSize, messagingOptions.BufferPoolPreallocationSize);
+            GlobalPool = new BufferPool(messagingOptions.BufferPoolMinimumBufferSize);
         }
 
         /// <summary>
         /// Creates a buffer pool.
         /// </summary>
-        /// <param name="bufferSize">The size, in bytes, of each buffer.</param>
-        /// <param name="preallocationSize">Initial number of buffers to allocate.</param>
-        private BufferPool(int bufferSize, int preallocationSize)
+        /// <param name="minimumBufferSize">The minimum size, in bytes, of each buffer.</param>
+        private BufferPool(int minimumBufferSize)
         {
-            byteBufferSize = bufferSize;
-
-            // Some of statistics can not be recorded,
-            // because we aren't able to find out whether ArrayPool<byte>.Shared drops returned byte array or not.
-            checkedOutBufferCounter = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BUFFERPOOL_CHECKED_OUT_BUFFERS);
-            checkedInBufferCounter = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BUFFERPOOL_CHECKED_IN_BUFFERS);
-
-            IntValueStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BUFFERPOOL_INUSE_CHECKED_OUT_NOT_CHECKED_IN_BUFFERS,
-                () => checkedOutBufferCounter.GetCurrentValue()
-                      - checkedInBufferCounter.GetCurrentValue());
-
-            if (preallocationSize <= 0) return;
-
-            var dummy = GetMultiBuffer(preallocationSize * Size);
-            Release(dummy);
+            this.minimumBufferSize = minimumBufferSize;
         }
 
         public byte[] GetBuffer()
         {
-            byte[] buffer = ArrayPool<byte>.Shared.Rent(byteBufferSize);
-            checkedOutBufferCounter.Increment();
+            byte[] buffer = ArrayPool<byte>.Shared.Rent(minimumBufferSize);
             return buffer;
         }
 
@@ -60,8 +40,8 @@ namespace Orleans.Runtime
             while (totalSize > 0)
             {
                 var buff = GetBuffer();
-                list.Add(new ArraySegment<byte>(buff, 0, Math.Min(byteBufferSize, totalSize)));
-                totalSize -= byteBufferSize;
+                list.Add(new ArraySegment<byte>(buff, 0, Math.Min(minimumBufferSize, totalSize)));
+                totalSize -= minimumBufferSize;
             }
             return list;
         }
@@ -69,7 +49,6 @@ namespace Orleans.Runtime
         public void Release(byte[] buffer)
         {
             ArrayPool<byte>.Shared.Return(buffer);
-            checkedInBufferCounter.Increment();
         }
 
         public void Release(List<ArraySegment<byte>> list)
@@ -81,6 +60,60 @@ namespace Orleans.Runtime
                 Release(segment.Array);
             }
         }
+
+        #region MemoryPool<byte>
+
+        private const int MaximumBufferSize = int.MaxValue;
+
+        public sealed override int MaxBufferSize => MaximumBufferSize;
+
+        public sealed override IMemoryOwner<byte> Rent(int minimumBufferSize = -1)
+        {
+            if (minimumBufferSize == -1)
+                minimumBufferSize = this.minimumBufferSize;
+            else if (((uint)minimumBufferSize) > MaximumBufferSize)
+                throw new ArgumentOutOfRangeException(nameof(minimumBufferSize));
+
+            return new ArrayMemoryPoolBuffer(minimumBufferSize);
+        }
+
+        protected sealed override void Dispose(bool disposing) { }
+
+        private sealed class ArrayMemoryPoolBuffer : IMemoryOwner<byte>
+        {
+            private byte[] _array;
+
+            public ArrayMemoryPoolBuffer(int size)
+            {
+                _array = ArrayPool<byte>.Shared.Rent(size);
+            }
+
+            public Memory<byte> Memory
+            {
+                get
+                {
+                    byte[] array = _array;
+                    if (array == null)
+                    {
+                        throw new ObjectDisposedException("ArrayMemoryPoolBuffer");
+                    }
+
+                    return new Memory<byte>(array);
+                }
+            }
+
+            public void Dispose()
+            {
+                byte[] array = _array;
+                if (array != null)
+                {
+                    _array = null;
+                    ArrayPool<byte>.Shared.Return(array);
+                }
+            }
+        }
+
+        #endregion
 
     }
 }

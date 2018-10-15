@@ -111,9 +111,7 @@ namespace Orleans.Configuration
             options.MaxResendCount = configuration.MaxResendCount;
             options.ResendOnTimeout = configuration.ResendOnTimeout;
             options.DropExpiredMessages = configuration.DropExpiredMessages;
-            options.BufferPoolBufferSize = configuration.BufferPoolBufferSize;
-            options.BufferPoolMaxSize = configuration.BufferPoolMaxSize;
-            options.BufferPoolPreallocationSize = configuration.BufferPoolPreallocationSize;
+            options.BufferPoolMinimumBufferSize = configuration.BufferPoolMinimumBufferSize;
             options.LargeMessageWarningThreshold = configuration.LargeMessageWarningThreshold;
         }
 

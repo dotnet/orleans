@@ -40,7 +40,7 @@ namespace Orleans.Runtime
         private ByteArrayBuilder(BufferPool bufferPool)
         {
             pool = bufferPool;
-            bufferSize = bufferPool.Size;
+            bufferSize = bufferPool.MinimumSize;
             completedBuffers = new List<ArraySegment<byte>>();
             currentOffset = 0;
             completedLength = 0;

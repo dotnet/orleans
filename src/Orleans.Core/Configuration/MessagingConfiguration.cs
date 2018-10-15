@@ -68,17 +68,9 @@ namespace Orleans.Runtime.Configuration
         TimeSpan ClientDropTimeout { get; set; }
 
         /// <summary>
-        /// The size of a buffer in the messaging buffer pool.
+        /// The minimum size of a buffer in the messaging buffer pool.
         /// </summary>
-        int BufferPoolBufferSize { get; set; }
-        /// <summary>
-        /// The maximum size of the messaging buffer pool.
-        /// </summary>
-        int BufferPoolMaxSize { get; set; }
-        /// <summary>
-        /// The initial size of the messaging buffer pool that is pre-allocated.
-        /// </summary>
-        int BufferPoolPreallocationSize { get; set; }
+        int BufferPoolMinimumBufferSize { get; set; }
 
         /// <summary>
         /// The list of serialization providers
@@ -114,7 +106,7 @@ namespace Orleans.Runtime.Configuration
         public int ClientSenderBuckets { get; set; }
         public TimeSpan ClientDropTimeout { get; set; }
 
-        public int BufferPoolBufferSize { get; set; }
+        public int BufferPoolMinimumBufferSize { get; set; }
         public int BufferPoolMaxSize { get; set; }
         public int BufferPoolPreallocationSize { get; set; }
 
@@ -156,9 +148,7 @@ namespace Orleans.Runtime.Configuration
             ClientSenderBuckets = ClientMessagingOptions.DEFAULT_CLIENT_SENDER_BUCKETS;
             ClientDropTimeout = Constants.DEFAULT_CLIENT_DROP_TIMEOUT;
 
-            BufferPoolBufferSize = MessagingOptions.DEFAULT_BUFFER_POOL_BUFFER_SIZE;
-            BufferPoolMaxSize = MessagingOptions.DEFAULT_BUFFER_POOL_MAX_SIZE;
-            BufferPoolPreallocationSize = MessagingOptions.DEFAULT_BUFFER_POOL_PREALLOCATION_SIZE;
+            BufferPoolMinimumBufferSize = MessagingOptions.DEFAULT_BUFFER_POOL_MINIMUM_BUFFER_SIZE;
             LargeMessageWarningThreshold = MessagingOptions.DEFAULT_LARGE_MESSAGE_WARNING_THRESHOLD;
 
             if (isSiloConfig)
@@ -192,7 +182,7 @@ namespace Orleans.Runtime.Configuration
             {
                 sb.AppendFormat("       Client Sender Buckets: {0}", ClientSenderBuckets).AppendLine();
             }
-            sb.AppendFormat("       Buffer Pool Buffer Size: {0}", BufferPoolBufferSize).AppendLine();
+            sb.AppendFormat("       Buffer Pool Buffer Size: {0}", BufferPoolMinimumBufferSize).AppendLine();
             sb.AppendFormat("       Buffer Pool Max Size: {0}", BufferPoolMaxSize).AppendLine();
             sb.AppendFormat("       Buffer Pool Preallocation Size: {0}", BufferPoolPreallocationSize).AppendLine();
 
@@ -270,7 +260,7 @@ namespace Orleans.Runtime.Configuration
             //--
             if (child.HasAttribute("BufferPoolBufferSize"))
             {
-                BufferPoolBufferSize = ConfigUtilities.ParseInt(child.GetAttribute("BufferPoolBufferSize"),
+                BufferPoolMinimumBufferSize = ConfigUtilities.ParseInt(child.GetAttribute("BufferPoolBufferSize"),
                                                           "Invalid integer value for the BufferPoolBufferSize attribute on the Messaging element");
             }
             if (child.HasAttribute("BufferPoolMaxSize"))

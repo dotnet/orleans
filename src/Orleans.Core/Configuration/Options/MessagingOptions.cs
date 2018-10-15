@@ -48,22 +48,10 @@ namespace Orleans.Configuration
         public const bool DEFAULT_DROP_EXPIRED_MESSAGES = true;
 
         /// <summary>
-        /// The size of a buffer in the messaging buffer pool.
+        /// The minimum size of a buffer in the messaging buffer pool.
         /// </summary>
-        public int BufferPoolBufferSize { get; set; } = DEFAULT_BUFFER_POOL_BUFFER_SIZE;
-        public const int DEFAULT_BUFFER_POOL_BUFFER_SIZE = 4 * 1024;
-
-        /// <summary>
-        /// The maximum size of the messaging buffer pool.
-        /// </summary>
-        public int BufferPoolMaxSize { get; set; } = DEFAULT_BUFFER_POOL_MAX_SIZE;
-        public const int DEFAULT_BUFFER_POOL_MAX_SIZE = 10000;
-
-        /// <summary>
-        /// The initial size of the messaging buffer pool that is pre-allocated.
-        /// </summary>
-        public int BufferPoolPreallocationSize { get; set; } = DEFAULT_BUFFER_POOL_PREALLOCATION_SIZE;
-        public const int DEFAULT_BUFFER_POOL_PREALLOCATION_SIZE = 250;
+        public int BufferPoolMinimumBufferSize { get; set; } = DEFAULT_BUFFER_POOL_MINIMUM_BUFFER_SIZE;
+        public const int DEFAULT_BUFFER_POOL_MINIMUM_BUFFER_SIZE = 1 + (4095 / sizeof(byte));
         
         /// <summary>
         ///  Whether Trace.CorrelationManager.ActivityId settings should be propagated into grain calls.
