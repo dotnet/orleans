@@ -6,9 +6,12 @@ namespace Orleans.Runtime
     internal class PlacementResult
     {
         public PlacementStrategy PlacementStrategy { get; private set; }
-        public bool IsNewPlacement { get { return PlacementStrategy != null; } }
+
+        public bool IsNewPlacement => PlacementStrategy != null;
+
         public ActivationId Activation { get; private set; }
         public SiloAddress Silo { get; private set; }
+
         /// <summary>
         /// Some storage providers need to know the grain type in order to read the state.
         /// The PlacementResult is generated based on the target grain type's policy, so the type
@@ -17,39 +20,40 @@ namespace Orleans.Runtime
         public string GrainType { get; private set; }
 
         private PlacementResult()
-        { }
+        {
+        }
 
         public static PlacementResult IdentifySelection(ActivationAddress address)
         {
-            return
-                new PlacementResult
-                    {
-                        Activation = address.Activation,
-                        Silo = address.Silo
-                    };
+            return new PlacementResult
+            {
+                Activation = address.Activation,
+                Silo = address.Silo
+            };
         }
 
-        public static PlacementResult
-            SpecifyCreation(
-                SiloAddress silo,
-                PlacementStrategy placement,
-                string grainType)
+        public static PlacementResult SpecifyCreation(
+            SiloAddress silo,
+            ActivationId activationId,
+            PlacementStrategy placement,
+            string grainType)
         {
             if (silo == null)
-                throw new ArgumentNullException("silo");
+                throw new ArgumentNullException(nameof(silo));
+            if (activationId == null)
+                throw new ArgumentNullException(nameof(activationId));
             if (placement == null)
-                throw new ArgumentNullException("placement");
+                throw new ArgumentNullException(nameof(placement));
             if (string.IsNullOrWhiteSpace(grainType))
-                throw new ArgumentException("'grainType' must contain a valid typename.");
+                throw new ArgumentException("'grainType' must contain a valid type name.", nameof(grainType));
 
-            return
-                new PlacementResult
-                    {
-                        Activation = ActivationId.NewId(),
-                        Silo = silo,
-                        PlacementStrategy = placement,
-                        GrainType = grainType
-                    };
+            return new PlacementResult
+            {
+                Activation = activationId,
+                Silo = silo,
+                PlacementStrategy = placement,
+                GrainType = grainType
+            };
         }
 
         public ActivationAddress ToAddress(GrainId grainId)
@@ -60,8 +64,7 @@ namespace Orleans.Runtime
         public override string ToString()
         {
             var placementStr = IsNewPlacement ? PlacementStrategy.ToString() : "*not-new*";
-            return String.Format("PlacementResult({0}, {1}, {2}, {3})",
-                Silo, Activation, placementStr, GrainType);
+            return $"PlacementResult({this.Silo}, {this.Activation}, {placementStr}, {this.GrainType})";
         }
     }
 }

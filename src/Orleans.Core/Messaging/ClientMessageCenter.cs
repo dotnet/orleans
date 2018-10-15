@@ -330,13 +330,7 @@ namespace Orleans.Messaging
         {
             try
             {
-                if (ct.IsCancellationRequested)
-                {
-                    return null;
-                }
-
-                // Don't pass CancellationToken to Take. It causes too much spinning.
-                return PendingInboundMessages.Take();
+                return PendingInboundMessages.Take(ct);
             }
             catch (ThreadAbortException exc)
             {

@@ -21,23 +21,6 @@ namespace UnitTests.GrainInterfaces
         Task<string> Two();
 
         Task SetSelf(INonReentrantGrain self);
-
-        Task<int> GetCounter();
-
-        Task IncrementCounter();
-
-        Task<int> GetCounterAndScheduleIncrement();
-
-        Task<int> Ping(int t);
-
-        Task<int> PingOther(INonReentrantGrain target, int t);
-
-        [AlwaysInterleave]
-        Task<int> PingSelfThroughOtherInterleaving(INonReentrantGrain target, int t);
-
-        Task ScheduleDelayedIncrement(INonReentrantGrain target, TimeSpan delay);
-
-        Task DoAsyncWork(TimeSpan waitTime, GrainCancellationToken gct);
     }
 
     public interface IMayInterleavePredicateGrain : IGrainWithIntegerKey
