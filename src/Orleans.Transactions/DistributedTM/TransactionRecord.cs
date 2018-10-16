@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -68,7 +68,6 @@ namespace Orleans.Transactions
         public List<ParticipantId> WriteParticipants;
         public int WaitCount;
         public DateTime WaitingSince;
-        public DateTime? LastConfirmationAttempt;
 
         // used for remote commit
         public DateTime? LastSent;
@@ -143,16 +142,16 @@ namespace Orleans.Transactions
             switch (Role)
             {
                 case CommitRole.NotYetDetermined:
-                    return $"ND";
+                    return $"ND tid={TransactionId} v{SequenceNumber}";
 
                 case CommitRole.ReadOnly:
-                    return $"RE";
+                    return $"RE tid={TransactionId} v{SequenceNumber}";
 
                 case CommitRole.LocalCommit:
-                    return $"LCE wc={WaitCount} rtb={ReadyToCommit}";
+                    return $"LCE tid={TransactionId} v{SequenceNumber} wc={WaitCount} rtb={ReadyToCommit}";
 
                 case CommitRole.RemoteCommit:
-                    return $"RCE pip={PrepareIsPersisted} ls={LastSent.HasValue} ro={IsReadOnly} rtb={ReadyToCommit} tm={TransactionManager}";
+                    return $"RCE tid={TransactionId} v{SequenceNumber} pip={PrepareIsPersisted} ls={LastSent.HasValue} ro={IsReadOnly} rtb={ReadyToCommit} tm={TransactionManager}";
 
                 default:
                     throw new NotSupportedException($"{Role} is not a supported CommitRole.");
