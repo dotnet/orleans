@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Orleans.TestingHost;
 using Orleans.Transactions.Tests;
 using Tester;
@@ -8,7 +8,7 @@ using Xunit.Abstractions;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {
-    [TestCategory("Azure"), TestCategory("Transactions"), /*TestCategory("Functional") - under investigation - jbragg*/]
+    [TestCategory("Azure"), TestCategory("Transactions"), TestCategory("Functional")]
     public class TransactionRecoveryTests : TestClusterPerTest
     {
         private readonly TransactionRecoveryTestsRunner testRunner;
