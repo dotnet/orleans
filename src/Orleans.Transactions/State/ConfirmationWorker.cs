@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -89,6 +89,10 @@ namespace Orleans.Transactions.State
                 storageBatch.Collect(transactionId);
                 storageBatch.FollowUpAction(() =>
                 {
+                    if (this.logger.IsEnabled(LogLevel.Trace))
+                    {
+                        this.logger.LogTrace("Collection completed. TransactionId:{TransactionId}", transactionId);
+                    }
                     this.pending.Remove(transactionId);
                     storeComplete.TrySetResult(true);
                 });

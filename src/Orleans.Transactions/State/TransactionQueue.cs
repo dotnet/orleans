@@ -109,12 +109,15 @@ namespace Orleans.Transactions.State
 
                     case CommitRole.RemoteCommit:
                         {
+
                             // optimization: can immediately proceed if dependency is implied
-                            bool behindRemoteEntryBySameTM =
+                            bool behindRemoteEntryBySameTM = false;
+                                /* disabled - jbragg - TODO - revisit
                                 commitQueue.Count >= 2
                                 && commitQueue[commitQueue.Count - 2] is TransactionRecord<TState> rce
                                 && rce.Role == CommitRole.RemoteCommit
                                 && rce.TransactionManager.Equals(record.TransactionManager);
+                                */
 
                             if (record.NumberWrites > 0)
                             {
@@ -136,6 +139,10 @@ namespace Orleans.Transactions.State
 
                                 if (behindRemoteEntryBySameTM)
                                 {
+                                    if (logger.IsEnabled(LogLevel.Trace))
+                                    {
+                                        logger.Trace("Sending immediate prepared {Record}", record);
+                                    }
                                     // can send prepared message immediately after persisting prepare record
                                     record.TransactionManager.Reference.AsReference<ITransactionManagerExtension>()
                                           .Prepared(record.TransactionManager.Name, record.TransactionId, record.Timestamp, this.resource, TransactionalStatus.Ok)
@@ -163,9 +170,12 @@ namespace Orleans.Transactions.State
         public async Task NotifyOfPrepared(Guid transactionId, DateTime timeStamp, TransactionalStatus status)
         {
             var pos = commitQueue.Find(transactionId, timeStamp);
+            if (logger.IsEnabled(LogLevel.Trace))
+                logger.Trace("NotifyOfPrepared - TransactionId:{TransactionId} Timestamp:{Timestamp}, TransactionalStatus{TransactionalStatus}", transactionId, timeStamp, status);
 
             if (pos != -1)
             {
+
                 var localEntry = commitQueue[pos];
 
                 if (localEntry.Role != CommitRole.LocalCommit)
@@ -716,6 +726,10 @@ namespace Orleans.Transactions.State
                                 this.storageBatch.FollowUpAction(() =>
                                 {
                                     entry.ConfirmationResponsePromise.TrySetResult(true);
+                                    if (this.logger.IsEnabled(LogLevel.Trace))
+                                    {
+                                        this.logger.Trace("Confirmed remote commit v{SequenceNumber}. TransactionId:{TransactionId} Timestamp:{Timestamp} TransactionManager:{TransactionManager}", entry.SequenceNumber, entry.TransactionId, entry.Timestamp, entry.TransactionManager);
+                                    }
                                 });
                             }
 
@@ -752,9 +766,9 @@ namespace Orleans.Transactions.State
             // after store, send response back to TA
             this.storageBatch.FollowUpAction(() =>
             {
-                if (logger.IsEnabled(LogLevel.Trace))
+                if (this.logger.IsEnabled(LogLevel.Trace))
                 {
-                    logger.Trace($"committed {entry.TransactionId} {entry.Timestamp:o}");
+                    this.logger.Trace($"locally committed {entry.TransactionId} {entry.Timestamp:o}");
                 }
                 entry.PromiseForTA.TrySetResult(TransactionalStatus.Ok);
             });
@@ -764,6 +778,10 @@ namespace Orleans.Transactions.State
                 // after committing, we need to run a task to confirm and collect
                 this.storageBatch.FollowUpAction(() =>
                 {
+                    if (this.logger.IsEnabled(LogLevel.Trace))
+                    {
+                        this.logger.Trace($"Adding confirmation to worker for {entry.TransactionId} {entry.Timestamp:o}");
+                    }
                     this.confirmationWorker.Add(entry.TransactionId, entry.Timestamp, entry.WriteParticipants);
                 });
             }
