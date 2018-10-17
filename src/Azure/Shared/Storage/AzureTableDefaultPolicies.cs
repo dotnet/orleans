@@ -17,8 +17,6 @@ namespace Orleans.Reminders.AzureStorage
 namespace Orleans.Streaming.AzureStorage
 #elif ORLEANS_EVENTHUBS
 namespace Orleans.Streaming.EventHubs
-#elif AZURETRANSACTION_TESTS
-namespace Orleans.Transactions.Azure.Tests
 #elif TESTER_AZUREUTILS
 namespace Orleans.Tests.AzureUtils
 #elif ORLEANS_HOSTING_CLOUDSERVICES // Temporary until azure silo/client is refactored

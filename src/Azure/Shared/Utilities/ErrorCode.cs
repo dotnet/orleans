@@ -14,8 +14,6 @@ namespace Orleans.Reminders.AzureStorage.Utilities
 namespace Orleans.Streaming.AzureStorage.Utilities
 #elif ORLEANS_EVENTHUBS
 namespace Orleans.Streaming.EventHubs.Utilities
-#elif AZURETRANSACTION_TESTS
-namespace Orleans.Transactions.Azure.Utilities
 #elif TESTER_AZUREUTILS
 namespace Orleans.Tests.AzureUtils.Utilities
 #elif ORLEANS_TRANSACTIONS
