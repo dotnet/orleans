@@ -7,7 +7,7 @@ using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.AzureStorage;
 using Orleans.Transactions.AzureStorage.Tests;
-using Orleans.Transactions.Testkit.xUnit;
+using Orleans.Transactions.TestKit.xUnit;
 using Xunit;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -15,6 +15,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
 using TestExtensions;
+using Xunit.Abstractions;
 
 namespace Orleans.Transactions.Azure.Tests
 {
@@ -26,8 +27,9 @@ namespace Orleans.Transactions.Azure.Tests
     public class AzureTransactionalStateStorageTests : TransactionalStateStorageTestRunnerxUnit<TestState>, IClassFixture<TestFixture>
     {
         private const string tableName = "StateStorageTests";
-        public AzureTransactionalStateStorageTests(TestFixture fixture)
-            :base(()=>StateStorageFactory(fixture), ()=>new TestState(), fixture.GrainFactory)
+        private const string partition = "testpartition";
+        public AzureTransactionalStateStorageTests(TestFixture fixture, ITestOutputHelper testOutput)
+            :base(()=>StateStorageFactory(fixture), ()=>new TestState(), fixture.GrainFactory, testOutput)
         {
         }
 
@@ -37,7 +39,7 @@ namespace Orleans.Transactions.Azure.Tests
             var jsonSettings = TransactionalStateFactory.GetJsonSerializerSettings(
                 fixture.HostedCluster.ServiceProvider.GetRequiredService<ITypeResolver>(),
                 fixture.GrainFactory);
-            var stateStorage = new AzureTableTransactionalStateStorage<TestState>(table, "testpartition", jsonSettings, 
+            var stateStorage = new AzureTableTransactionalStateStorage<TestState>(table, partition, jsonSettings, 
                 NullLoggerFactory.Instance.CreateLogger<AzureTableTransactionalStateStorage<TestState>>());
             return stateStorage;
         }

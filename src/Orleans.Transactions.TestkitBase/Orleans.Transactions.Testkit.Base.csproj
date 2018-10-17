@@ -1,15 +1,15 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <PackageId>Microsoft.Orleans.Transactions.Testkit.Base</PackageId>
-    <Title>Microsoft Orleans Transactions testkit base</Title>
+    <PackageId>Microsoft.Orleans.Transactions.TestKit.Base</PackageId>
+    <Title>Microsoft Orleans Transactions test kit base</Title>
     <Description>Testkit base library for transactions</Description>
-    <PackageTags>$(PackageTags) TransactionTestkit</PackageTags>
+    <PackageTags>$(PackageTags) TransactionTestkKit</PackageTags>
   </PropertyGroup>
 
   <PropertyGroup>
-    <AssemblyName>Orleans.Transactions.Testkit.Base</AssemblyName>
-    <RootNamespace>Orleans.Transactions.Testkit.Base</RootNamespace>
+    <AssemblyName>Orleans.Transactions.TestKit.Base</AssemblyName>
+    <RootNamespace>Orleans.Transactions.TestKit.Base</RootNamespace>
   </PropertyGroup>
   
   <PropertyGroup>

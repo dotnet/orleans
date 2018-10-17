@@ -4,15 +4,16 @@ using System.Threading.Tasks;
 using FluentAssertions;
 using Orleans.Transactions.Abstractions;
 
-namespace Orleans.Transactions.Testkit.Base
+namespace Orleans.Transactions.TestKit.Base
 {
     public abstract class TransactionalStateStorageTestRunner<TState> : TransactionTestRunnerBase
         where TState : class, new()
     {
         protected Func<Task<ITransactionalStateStorage<TState>>> stateStorageFactory;
         protected Func<TState> stateFactory;
-        protected TransactionalStateStorageTestRunner(Func<Task<ITransactionalStateStorage<TState>>> stateStorageFactory, Func<TState> stateFactory, IGrainFactory grainFactory)
-            :base(grainFactory)
+        protected TransactionalStateStorageTestRunner(Func<Task<ITransactionalStateStorage<TState>>> stateStorageFactory, Func<TState> stateFactory, 
+            IGrainFactory grainFactory, Action<string> testOutput)
+            :base(grainFactory, testOutput)
         {
             this.stateStorageFactory = stateStorageFactory;
             this.stateFactory = stateFactory;

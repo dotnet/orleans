@@ -1,14 +1,16 @@
 ﻿using System;
 
-namespace Orleans.Transactions.Testkit.Base
+namespace Orleans.Transactions.TestKit.Base
 {
     public class TransactionTestRunnerBase
     {
         protected readonly IGrainFactory grainFactory;
+        protected readonly Action<string> testOutput;
 
-        protected TransactionTestRunnerBase(IGrainFactory grainFactory)
+        protected TransactionTestRunnerBase(IGrainFactory grainFactory, Action<string> testOutput)
         {
             this.grainFactory = grainFactory;
+            this.testOutput = testOutput;
         }
 
         protected ITransactionTestGrain RandomTestGrain(string transactionTestGrainClassNames)

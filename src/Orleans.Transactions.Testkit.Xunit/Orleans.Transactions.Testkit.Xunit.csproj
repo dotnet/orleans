@@ -1,14 +1,14 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <PackageId>Microsoft.Orleans.Transactions.Testkit.xUnit</PackageId>
+    <PackageId>Microsoft.Orleans.Transactions.TestKit.xUnit</PackageId>
     <Title>Microsoft Orleans Transactions test kit for xUnit</Title>
     <Description>xUnit testkit library for transactions</Description>
-    <PackageTags>$(PackageTags) TransactionTestkit</PackageTags>
+    <PackageTags>$(PackageTags) TransactionTestKit</PackageTags>
   </PropertyGroup>
 
   <PropertyGroup>
-    <AssemblyName>Orleans.Transactions.Testkit.xUnit</AssemblyName>
-    <RootNamespace>Orleans.Transactions.Testkit.xUnit</RootNamespace>
+    <AssemblyName>Orleans.Transactions.TestKit.xUnit</AssemblyName>
+    <RootNamespace>Orleans.Transactions.TestKit.xUnit</RootNamespace>
   </PropertyGroup>
   
   <PropertyGroup>
@@ -22,7 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Orleans.Transactions.TestkitBase\Orleans.Transactions.Testkit.Base.csproj" />
+    <ProjectReference Include="..\Orleans.Transactions.TestkitBase\Orleans.Transactions.TestKit.Base.csproj" />
   </ItemGroup>
 
 </Project>
