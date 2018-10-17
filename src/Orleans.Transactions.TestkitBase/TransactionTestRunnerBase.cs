@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Orleans.Transactions.Testkit
+namespace Orleans.Transactions.Testkit.Base
 {
     public class TransactionTestRunnerBase
     {

@@ -2,12 +2,9 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using FluentAssertions;
-using Orleans.Runtime;
-using Orleans.Transactions;
 using Orleans.Transactions.Abstractions;
-using Orleans.Transactions.Testkit;
 
-namespace Orleans.Transaction.Testkit
+namespace Orleans.Transactions.Testkit.Base
 {
     public abstract class TransactionalStateStorageTestRunner<TState> : TransactionTestRunnerBase
         where TState : class, new()

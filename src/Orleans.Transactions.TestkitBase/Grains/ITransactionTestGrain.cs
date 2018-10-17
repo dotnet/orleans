@@ -1,6 +1,6 @@
 ﻿using System.Threading.Tasks;
 
-namespace Orleans.Transactions.Testkit
+namespace Orleans.Transactions.Testkit.Base
 {
     public interface ITransactionTestGrain : IGrainWithGuidKey
     {

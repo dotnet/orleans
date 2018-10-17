@@ -220,9 +220,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.CodeGenerator.MSBui
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Transactions", "Transactions", "{3189037B-208D-40A1-A561-169D77D9BB5A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Transactions.TestkitBase", "src\Orleans.Transactions.TestkitBase\Orleans.Transactions.TestkitBase.csproj", "{531A89F5-DD05-4D14-A330-6548359A231A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Transactions.Testkit.Base", "src\Orleans.Transactions.TestkitBase\Orleans.Transactions.Testkit.Base.csproj", "{531A89F5-DD05-4D14-A330-6548359A231A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Transactions.Testkit.Xunit", "src\Orleans.Transactions.Testkit.Xunit\Orleans.Transactions.Testkit.Xunit.csproj", "{B8ABE746-C76F-4E0E-86A5-744E85A55CE8}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Transactions.Testkit.xUnit", "src\Orleans.Transactions.Testkit.Xunit\Orleans.Transactions.Testkit.xUnit.csproj", "{B8ABE746-C76F-4E0E-86A5-744E85A55CE8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

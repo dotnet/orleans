@@ -2,7 +2,7 @@
 using Microsoft.Extensions.Logging;
 using Orleans.Hosting;
 
-namespace Orleans.Transactions.Testkit
+namespace Orleans.Transactions.Testkit.Base
 {
     public static class TransactionTestConstants
     {

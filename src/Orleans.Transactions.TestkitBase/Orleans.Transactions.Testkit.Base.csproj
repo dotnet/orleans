@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Transactions.Testkit.Base</PackageId>
+    <Title>Microsoft Orleans Transactions testkit base</Title>
+    <Description>Testkit base library for transactions</Description>
+    <PackageTags>$(PackageTags) TransactionTestkit</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Orleans.Transactions.Testkit.Base</AssemblyName>
+    <RootNamespace>Orleans.Transactions.Testkit.Base</RootNamespace>
+  </PropertyGroup>
+  
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentAssertions" Version="$(FluentAssertionsVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Transactions\Orleans.Transactions.csproj" />
+  </ItemGroup>
+
+</Project>
