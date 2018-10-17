@@ -39,15 +39,13 @@ namespace Orleans.Transactions.Azure.Tests
             var jsonSettings = TransactionalStateFactory.GetJsonSerializerSettings(
                 fixture.HostedCluster.ServiceProvider.GetRequiredService<ITypeResolver>(),
                 fixture.GrainFactory);
-            var stateStorage = new AzureTableTransactionalStateStorage<TestState>(table, partition, jsonSettings, 
+            var stateStorage = new AzureTableTransactionalStateStorage<TestState>(table, $"{partition}{DateTime.UtcNow.Ticks}", jsonSettings, 
                 NullLoggerFactory.Instance.CreateLogger<AzureTableTransactionalStateStorage<TestState>>());
             return stateStorage;
         }
 
         private static async Task<CloudTable> InitTableAsync(ILogger logger)
         {
-            var startTime = DateTime.UtcNow;
-
             try
             {
                 CloudTableClient tableCreationClient = GetCloudTableCreationClient(logger);
