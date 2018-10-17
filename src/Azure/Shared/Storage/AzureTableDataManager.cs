@@ -25,6 +25,8 @@ namespace Orleans.Streaming.AzureStorage
 namespace Orleans.Streaming.EventHubs
 #elif TESTER_AZUREUTILS
 namespace Orleans.Tests.AzureUtils
+#elif AZURETRANSACTION_TESTS
+namespace Orleans.Transactions.Azure.Tests
 #elif ORLEANS_TRANSACTIONS
 namespace Orleans.Transactions.AzureStorage
 #else
