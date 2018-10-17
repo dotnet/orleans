@@ -44,7 +44,7 @@ PM> Install-Package Microsoft.Orleans.Client
 
 The stable production-quality release is located [here](https://github.com/dotnet/orleans/releases/latest).
 
-The latest clean development branch build from CI is located: [here](https://ci.dot.net/job/dotnet_orleans/job/master/job/netfx-bvt/lastStableBuild/artifact/)
+The latest clean development branch build from CI is located: [here](https://ci.dot.net/job/dotnet_orleans/job/master/job/bvt/lastSuccessfulBuild/artifact/)
 
 Nightly builds are published to https://dotnet.myget.org/gallery/orleans-ci . These builds pass all functional tests, but are not thoroughly tested as the stable builds or pre-release builds we push to NuGet.org
 
