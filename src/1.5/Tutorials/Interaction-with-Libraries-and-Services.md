@@ -32,6 +32,8 @@ We'll implement the grain so it retrieves the price of the stock when it is acti
 ``` csharp
 public class StockGrain : Orleans.Grain, IStockGrain
 {
+    // or get api key here https://www.alphavantage.co/support/#
+    private const string apiKey = "demo";
     string price;
 
     public override async Task OnActivateAsync()
@@ -44,19 +46,19 @@ public class StockGrain : Orleans.Grain, IStockGrain
 
     async Task UpdatePrice(string stock)
     {
-        price = await GetPriceFromYahoo(stock);
+        price = await GetPriceQuote(stock);
     }
 
-    async Task<string> GetPriceFromYahoo(string stock)
+    async Task<string> GetPriceQuote(string stock)
     {
-        var uri = "http://download.finance.yahoo.com/d/quotes.csv?f=snl1c1p2&e=.csv&s=" + stock;
+        var uri = $"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={stock}&apikey={apiKey}&datatype=csv";
         using (var http = new HttpClient())
         using (var resp = await http.GetAsync(uri))
         {
             return await resp.Content.ReadAsStringAsync();
         }
     }
-
+    
     public Task<string> GetPrice()
     {
         return Task.FromResult(price);
@@ -84,9 +86,12 @@ Console.ReadLine();
 
 When we start the local silo, and run the application, we should see the stock value written out
 
-     "MSFT","Microsoft Corpora",37.70,-0.19,"-0.50%"
+```
+symbol,open,high,low,price,volume,latestDay,previousClose,change,changePercent
+MSFT,110.1000,110.5300,107.8300,108.6875,20725407,2018-10-18,110.7100,-2.0225,-1.8268%
+```
 
-Note that the extra text in the stock price is just the formatting that Yahoo! returned.
+Note that the extra text in the stock price is just the formatting that Alphavantage returned.
 
 ## Refreshing the value with a timer
 
@@ -106,7 +111,7 @@ public override async Task OnActivateAsync()
     this.GetPrimaryKey(out stock);
     await UpdatePrice(stock);
 
-    var timer = RegisterTimer(
+    RegisterTimer(
         UpdatePrice,
         stock,
         TimeSpan.FromMinutes(1),
@@ -122,7 +127,7 @@ We'll also add some logging so we can see what's happening:
 ``` csharp
 async Task UpdatePrice(object stock)
 {
-    price = await GetPriceFromYahoo(stock as string);
+    price = await GetPriceQuote(stock as string);
     Console.WriteLine(price);
 }
 ```
@@ -143,14 +148,16 @@ It's a good idea to hold on to a reference to this in case you need to stop the 
 
 Now when we run the sample, the grain is activated, the timer gets registered and every minute the price is updated for us:
 
-    "MSFT","Microsoft Corpora",37.70,-0.19,"-0.50%"
+```
+symbol,open,high,low,price,volume,latestDay,previousClose,change,changePercent
+MSFT,110.1000,110.5300,107.8300,108.3000,21747221,2018-10-18,110.7100,-2.4100,-2.1769%
 
-    "MSFT","Microsoft Corpora",37.70,-0.19,"-0.50%"
+symbol,open,high,low,price,volume,latestDay,previousClose,change,changePercent
+MSFT,110.1000,110.5300,107.8300,108.3100,21750728,2018-10-18,110.7100,-2.4000,-2.1678%
 
-    "MSFT","Microsoft Corpora",37.70,-0.19,"-0.50%"
-
-    "MSFT","Microsoft Corpora",37.70,-0.19,"-0.50%"
-
+symbol,open,high,low,price,volume,latestDay,previousClose,change,changePercent
+MSFT,110.1000,110.5300,107.8300,108.3300,21762108,2018-10-18,110.7100,-2.3800,-2.1498%
+```
 
 
 Orleans is acting as an automatically refreshing cache.
@@ -163,11 +170,9 @@ Running code in a single threaded execution model, does not prohibit you from aw
 Let's add a new function to retrieve the graph data for a stock:
 
 ``` csharp
-async Task<string> GetYahooGraphData(string stock)
+async Task<string> GetDailySeries(string stock)
 {
-    // retrieve the graph data from Yahoo finance
-    var uri = string.Format(
-        "http://chartapi.finance.yahoo.com/instrument/1.0/{0}/chartdata;type=quote;range=1d/csv/",stock);
+    var uri = $"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={stock}&apikey={apiKey}&datatype=csv";
     using (var http = new HttpClient())
     using (var resp = await http.GetAsync(uri))
     {
@@ -188,8 +193,8 @@ Now we can retrieve the graph data and current price like this:
 ``` csharp
 async Task UpdatePrice(object stock)
 {
-    price = await GetPriceFromYahoo(stock as string);
-    graphData = await GetYahooGraphData(stock as string);
+    price = await GetPriceQuote(stock as string);
+    graphData = await GetDailySeries(stock as string);
     Console.WriteLine(price);
 }
 ```
@@ -203,8 +208,8 @@ Fortunately, `Task` has a convenient `WhenAll` method which allows us to await m
 async Task UpdatePrice(object stock)
 {
     // collect the task variables without awaiting
-    var priceTask = GetPriceFromYahoo(stock as string);
-    var graphDataTask = GetYahooGraphData(stock as string);
+    var priceTask = GetPriceQuote(stock as string);
+    var graphDataTask = GetDailySeries(stock as string);
 
     // await both tasks
     await Task.WhenAll(priceTask, graphDataTask);
