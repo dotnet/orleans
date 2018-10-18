@@ -32,7 +32,7 @@ We'll implement the grain so it retrieves the price of the stock when it is acti
 ``` csharp
 public class StockGrain : Orleans.Grain, IStockGrain
 {
-    // or get api key here https://www.alphavantage.co/support/#
+    // demo key might not work, claim yours at https://www.alphavantage.co/support/#
     private const string apiKey = "demo";
     string price;
 
