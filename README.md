@@ -2,7 +2,7 @@
   <img src="https://github.com/dotnet/orleans/blob/gh-pages/assets/logo_full.png" alt="Orleans logo" width="600px"> 
 </p>
 
-[![Build status](https://ci.dot.net/job/dotnet_orleans/job/master/job/netfx-bvt/badge/icon)](http://ci.dot.net/job/dotnet_orleans/job/master/)
+[![Build status](https://ci.dot.net/job/dotnet_orleans/job/master/job/bvt/badge/icon)](http://ci.dot.net/job/dotnet_orleans/job/master/)
 [![NuGet](https://img.shields.io/nuget/v/Microsoft.Orleans.Core.svg?style=flat)](http://www.nuget.org/profiles/Orleans)
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/dotnet/orleans?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 [![Help Wanted Issues](https://badge.waffle.io/dotnet/orleans.svg?label=up-for-grabs&title=Help%20Wanted%20Issues)](http://waffle.io/dotnet/orleans)
@@ -44,7 +44,7 @@ PM> Install-Package Microsoft.Orleans.Client
 
 The stable production-quality release is located [here](https://github.com/dotnet/orleans/releases/latest).
 
-The latest clean development branch build from CI is located: [here](https://ci.dot.net/job/dotnet_orleans/job/master/job/netfx-bvt/lastStableBuild/artifact/)
+The latest clean development branch build from CI is located: [here](https://ci.dot.net/job/dotnet_orleans/job/master/job/bvt/lastStableBuild/artifact/)
 
 Nightly builds are published to https://dotnet.myget.org/gallery/orleans-ci . These builds pass all functional tests, but are not thoroughly tested as the stable builds or pre-release builds we push to NuGet.org
 
@@ -111,7 +111,7 @@ Provide an implementation of that interface:
 ```c#
 public class HelloGrain : Orleans.Grain, IHello
 {
-  Task<string> SayHello(string greeting)
+  public Task<string> SayHello(string greeting)
   {
     return Task.FromResult($"You said: '{greeting}', I say: Hello!");
   }
