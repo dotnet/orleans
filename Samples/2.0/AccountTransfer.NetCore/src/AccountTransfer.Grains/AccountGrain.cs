@@ -27,21 +27,17 @@ namespace AccountTransfer.Grains
 
         Task IAccountGrain.Deposit(uint amount)
         {
-            this.balance.State.Value += amount;
-            this.balance.Save();
-            return Task.CompletedTask;
+            return this.balance.PerformUpdate(x => x.Value += amount);
         }
 
         Task IAccountGrain.Withdraw(uint amount)
         {
-            this.balance.State.Value -= amount;
-            this.balance.Save();
-            return Task.CompletedTask;
+            return this.balance.PerformUpdate(x => x.Value -= amount);
         }
 
         Task<uint> IAccountGrain.GetBalance()
         {
-            return Task.FromResult(this.balance.State.Value);
+            return this.balance.PerformRead(x => x.Value);
         }
     }
 }

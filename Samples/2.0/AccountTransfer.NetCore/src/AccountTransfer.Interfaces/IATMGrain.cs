@@ -6,7 +6,7 @@ namespace AccountTransfer.Interfaces
 {
     public interface IATMGrain : IGrainWithIntegerKey
     {
-        [Transaction(TransactionOption.RequiresNew)]
+        [Transaction(TransactionOption.Create)]
         Task Transfer(Guid fromAccount, Guid toAccount, uint amountToTransfer);
     }
 }
