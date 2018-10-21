@@ -44,13 +44,14 @@ namespace UnitTests.General
         }
 
         // 2 silos, loop across all cases (to force all grains to be local and remote):
-        //      Non Reentrant A, B
+        //      Non Reentrant A, B, D
         //      Reentrant C
         // 1) No Deadlock A, A
         // 2) No Deadlock A, B, A
         // 3) No Deadlock C, A, C, A
         // 4) No Deadlock C, C
         // 5) No Deadlock C, A, C
+        // 6) No Deadlock A, B, D, A
 
         // 1) Allowed reentrancy A, A
         [Fact, TestCategory("Functional"), TestCategory("Deadlock")]
@@ -138,6 +139,26 @@ namespace UnitTests.General
                 callChain.Add(new Tuple<long, bool>(grainId, true));
                 callChain.Add(new Tuple<long, bool>(cBase + grainId, false));
 
+                await firstGrain.CallNext_1(callChain, 1);
+            }
+        }
+
+        // 6) Allowed reentrancy on non-reentrant grains A, B, D, A
+        [Fact, TestCategory("Functional"), TestCategory("Deadlock")]
+        public async Task DeadlockDetection_6()
+        {
+            long baseGrainId = random.Next();
+            long bBase = 100;
+            long dBase = 200;
+            for (int i = 0; i < numIterations; i++)
+            {
+                long grainId = baseGrainId + i;
+                IDeadlockNonReentrantGrain firstGrain = this.fixture.GrainFactory.GetGrain<IDeadlockNonReentrantGrain>(grainId);
+                List<Tuple<long, bool>> callChain = new List<Tuple<long, bool>>();
+                callChain.Add(new Tuple<long, bool>(grainId, true));
+                callChain.Add(new Tuple<long, bool>(bBase + grainId, true));
+                callChain.Add(new Tuple<long, bool>(dBase + grainId, true));
+                callChain.Add(new Tuple<long, bool>(grainId, true));
                 await firstGrain.CallNext_1(callChain, 1);
             }
         }
