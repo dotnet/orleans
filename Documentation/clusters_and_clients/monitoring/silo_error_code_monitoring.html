@@ -124,13 +124,6 @@
 <td>Socket disconnects are logged as Warning messages. Problems opening sockets or during message transmission are logged as Errors.</td>
 </tr>
 <tr>
-<td>Bulk log message compaction</td>
-<td>Any</td>
-<td>500000 or higher</td>
-<td>Message summary based on bulk message threshold settings</td>
-<td>If multiple logs of the same log code occur within a designated time interval (the default is &gt;5 within 1 minute) then additional log messages with that log code are suppressed and output as a &quot;bulk&quot; entry with log code equal to the original log code + 500000. So for example, multiple 100157 entries will show in the logs as 5 x 100157 + 1 x 600157 log entry per minute.</td>
-</tr>
-<tr>
 <td>Grain problems</td>
 <td>Warning or Error</td>
 <td>101534</td>

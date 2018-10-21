@@ -1,6 +1,6 @@
 {
   "homepages": [],
-  "source_base_path": "C:/github/sergeybykov/orleans/src",
+  "source_base_path": "C:/GitHub/sergeybykov/orleans/src",
   "xrefmap": "xrefmap.yml",
   "files": [
     {
@@ -1715,7 +1715,7 @@
       "output": {
         ".html": {
           "relative_path": "1.5/Tutorials/Interaction-with-Libraries-and-Services.html",
-          "hash": "X+XaOEfjCs8hGWcqaPxo2Q=="
+          "hash": "Ebmor+jGByKUCHjT0NvM3Q=="
         }
       },
       "is_incremental": false,
@@ -2061,7 +2061,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/clusters_and_clients/monitoring/silo_error_code_monitoring.html",
-          "hash": "dE+LSuFWSEFDXyyDcSXjeA=="
+          "hash": "GWyaRpsBQYlevWLaufCGiQ=="
         }
       },
       "is_incremental": false,
@@ -2761,6 +2761,18 @@
         ".html": {
           "relative_path": "Documentation/implementation/streams_implementation.html",
           "hash": "l6Fwn9AnmiLSvDNr0/POoQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/implementation/testing.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/implementation/testing.html",
+          "hash": "gewR5ZrWmqf9MkVqTecg2Q=="
         }
       },
       "is_incremental": false,

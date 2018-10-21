@@ -93,6 +93,8 @@ Add a reference to <code>System.Net.Http</code>.</p>
 <p>We&#39;ll implement the grain so it retrieves the price of the stock when it is activated:</p>
 <pre><code class="lang-csharp">public class StockGrain : Orleans.Grain, IStockGrain
 {
+    // demo key might not work, claim yours at https://www.alphavantage.co/support/#
+    private const string apiKey = &quot;demo&quot;;
     string price;
 
     public override async Task OnActivateAsync()
@@ -105,12 +107,12 @@ Add a reference to <code>System.Net.Http</code>.</p>
 
     async Task UpdatePrice(string stock)
     {
-        price = await GetPriceFromYahoo(stock);
+        price = await GetPriceQuote(stock);
     }
 
-    async Task&lt;string&gt; GetPriceFromYahoo(string stock)
+    async Task&lt;string&gt; GetPriceQuote(string stock)
     {
-        var uri = &quot;http://download.finance.yahoo.com/d/quotes.csv?f=snl1c1p2&amp;e=.csv&amp;s=&quot; + stock;
+        var uri = $&quot;https://www.alphavantage.co/query?function=GLOBAL_QUOTE&amp;symbol={stock}&amp;apikey={apiKey}&amp;datatype=csv&quot;;
         using (var http = new HttpClient())
         using (var resp = await http.GetAsync(uri))
         {
@@ -137,8 +139,9 @@ Console.WriteLine(price);
 
 Console.ReadLine();
 </code></pre><p>When we start the local silo, and run the application, we should see the stock value written out</p>
-<pre><code> &quot;MSFT&quot;,&quot;Microsoft Corpora&quot;,37.70,-0.19,&quot;-0.50%&quot;
-</code></pre><p>Note that the extra text in the stock price is just the formatting that Yahoo! returned.</p>
+<pre><code>symbol,open,high,low,price,volume,latestDay,previousClose,change,changePercent
+MSFT,110.1000,110.5300,107.8300,108.6875,20725407,2018-10-18,110.7100,-2.0225,-1.8268%
+</code></pre><p>Note that the extra text in the stock price is just the formatting that Alphavantage returned.</p>
 <h2 id="refreshing-the-value-with-a-timer">Refreshing the value with a timer</h2>
 <p>The problem with the grain as it stands is that the value of the stock will change, but the grain will maintain the same value for it&#39;s lifetime (an indefinite period of time).</p>
 <p>One way to fix this is to periodically refresh the price.</p>
@@ -151,7 +154,7 @@ Instead, Orleans provides it&#39;s own timer.</p>
     this.GetPrimaryKey(out stock);
     await UpdatePrice(stock);
 
-    var timer = RegisterTimer(
+    RegisterTimer(
         UpdatePrice,
         stock,
         TimeSpan.FromMinutes(1),
@@ -163,7 +166,7 @@ Instead, Orleans provides it&#39;s own timer.</p>
 We&#39;ll also add some logging so we can see what&#39;s happening:</p>
 <pre><code class="lang-csharp">async Task UpdatePrice(object stock)
 {
-    price = await GetPriceFromYahoo(stock as string);
+    price = await GetPriceQuote(stock as string);
     Console.WriteLine(price);
 }
 </code></pre><p>The <code>RegisterTimer</code> method takes four arguments:</p>
@@ -179,23 +182,22 @@ Alternative we could set state to be <code>null</code>, and read the stock name 
 The method returns an <code>IOrleansTimer</code> which is disposable and can be used to stop the timer.
 It&#39;s a good idea to hold on to a reference to this in case you need to stop the timer.</p>
 <p>Now when we run the sample, the grain is activated, the timer gets registered and every minute the price is updated for us:</p>
-<pre><code>&quot;MSFT&quot;,&quot;Microsoft Corpora&quot;,37.70,-0.19,&quot;-0.50%&quot;
+<pre><code>symbol,open,high,low,price,volume,latestDay,previousClose,change,changePercent
+MSFT,110.1000,110.5300,107.8300,108.3000,21747221,2018-10-18,110.7100,-2.4100,-2.1769%
 
-&quot;MSFT&quot;,&quot;Microsoft Corpora&quot;,37.70,-0.19,&quot;-0.50%&quot;
+symbol,open,high,low,price,volume,latestDay,previousClose,change,changePercent
+MSFT,110.1000,110.5300,107.8300,108.3100,21750728,2018-10-18,110.7100,-2.4000,-2.1678%
 
-&quot;MSFT&quot;,&quot;Microsoft Corpora&quot;,37.70,-0.19,&quot;-0.50%&quot;
-
-&quot;MSFT&quot;,&quot;Microsoft Corpora&quot;,37.70,-0.19,&quot;-0.50%&quot;
+symbol,open,high,low,price,volume,latestDay,previousClose,change,changePercent
+MSFT,110.1000,110.5300,107.8300,108.3300,21762108,2018-10-18,110.7100,-2.3800,-2.1498%
 </code></pre><p>Orleans is acting as an automatically refreshing cache.
 Whenever a stock grain is queried Orleans will provide the latest price it has, without having to make a call to the stock web service.</p>
 <h2 id="parallelization">Parallelization</h2>
 <p>Running code in a single threaded execution model, does not prohibit you from awaiting several tasks at once (or in parallel).</p>
 <p>Let&#39;s add a new function to retrieve the graph data for a stock:</p>
-<pre><code class="lang-csharp">async Task&lt;string&gt; GetYahooGraphData(string stock)
+<pre><code class="lang-csharp">async Task&lt;string&gt; GetDailySeries(string stock)
 {
-    // retrieve the graph data from Yahoo finance
-    var uri = string.Format(
-        &quot;http://chartapi.finance.yahoo.com/instrument/1.0/{0}/chartdata;type=quote;range=1d/csv/&quot;,stock);
+    var uri = $&quot;https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&amp;symbol={stock}&amp;apikey={apiKey}&amp;datatype=csv&quot;;
     using (var http = new HttpClient())
     using (var resp = await http.GetAsync(uri))
     {
@@ -207,8 +209,8 @@ Whenever a stock grain is queried Orleans will provide the latest price it has, 
 </code></pre><p>Now we can retrieve the graph data and current price like this:</p>
 <pre><code class="lang-csharp">async Task UpdatePrice(object stock)
 {
-    price = await GetPriceFromYahoo(stock as string);
-    graphData = await GetYahooGraphData(stock as string);
+    price = await GetPriceQuote(stock as string);
+    graphData = await GetDailySeries(stock as string);
     Console.WriteLine(price);
 }
 </code></pre><p>However, by doing this we&#39;re waiting for the price from Yahoo, and after that&#39;s complete we request the graph data.
@@ -217,8 +219,8 @@ Fortunately, <code>Task</code> has a convenient <code>WhenAll</code> method whic
 <pre><code class="lang-csharp">async Task UpdatePrice(object stock)
 {
     // collect the task variables without awaiting
-    var priceTask = GetPriceFromYahoo(stock as string);
-    var graphDataTask = GetYahooGraphData(stock as string);
+    var priceTask = GetPriceQuote(stock as string);
+    var graphDataTask = GetDailySeries(stock as string);
 
     // await both tasks
     await Task.WhenAll(priceTask, graphDataTask);
