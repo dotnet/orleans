@@ -185,11 +185,14 @@ namespace Orleans.Hosting
                 var nodeConfig = configuration.GetOrCreateNodeConfigurationForSilo(siloOptions.Value.SiloName);
                 options.ExcludedGrainTypes.AddRange(nodeConfig.ExcludedGrainTypes);
             });
-            
+
             services.AddOptions<SchedulingOptions>()
                 .Configure<GlobalConfiguration>((options, config) =>
                 {
-                    options.AllowCallChainReentrancy = config.AllowCallChainReentrancy;
+                    options.CallChainReentrancy = config.AllowCallChainReentrancy ?
+                        SchedulingOptions.CallChainReentrancyStrategy.SingleCall
+                        : SchedulingOptions.CallChainReentrancyStrategy.None;
+
                     options.PerformDeadlockDetection = config.PerformDeadlockDetection;
                 })
                 .Configure<NodeConfiguration>((options, nodeConfig) =>
@@ -273,7 +276,7 @@ namespace Orleans.Hosting
                 {
                     options.IsRunningAsUnitTest = config.IsRunningAsUnitTest;
                 });
-            
+
             services.AddOptions<GrainVersioningOptions>()
                 .Configure<GlobalConfiguration>((options, config) =>
                 {

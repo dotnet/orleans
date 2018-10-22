@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Security.Cryptography.X509Certificates;
 
 namespace Orleans
 {
@@ -87,7 +88,7 @@ namespace Orleans
         }
     }
 
-    internal class DefaultOptionsFormatterResolver<T> : IOptionFormatterResolver<T> 
+    internal class DefaultOptionsFormatterResolver<T> : IOptionFormatterResolver<T>
         where T: class, new()
     {
         private IOptionsSnapshot<T> optionsSnapshot;
