@@ -7,6 +7,32 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [2.2.0-beta1] (changes since 2.1.0)
+
+- Breaking changes
+  - None
+
+- Non-breaking improvements
+  - Avoid lazy initialization when disposing OutboundMessageQueue (#5049)
+  - CodeGen: Fix race in Orleans.sln build (#5035)
+  - Change Orleans.TelemetryConsumers.NewRelic to target .NET Standard (#5044) (#5047)
+  - Typo and spelling check XML doc and strings. A to E. #Hacktoberfest (#5051, #5055, #5060, #5065)
+  - Filter static types from list of types known to serializer (#5036)
+  - fixed HostedClient method name in exception text (#5057)
+  - Adding global alias for binding flags in generator (#5068)
+  - Allow placement strategies to skip directory registration (#5074)
+  - CodeGen: Warn users when a type inherits from a type defined in a reference assembly (#5031)
+  - IMessageCenter.WaitMessage support cancellation (#5072)
+  - Allow placement strategies to specify deterministic activation ids (#5082)
+  - Add Orleans.Transaction.Testkit project structure (#5103)
+
+- Non-breaking bug fixes
+  - Resolve transaction on abort. (#4996)
+  - Avoid modification of interned SiloAddresses in Consul and ZooKeeper gateway providers (#5054)
+  - Partial fix for transaction recovery tests (#5070)
+  - Revert #4382 (#5086, #5088)
+  - Fixed bug in transaction confirmation logic (#5098)
+
 ### [2.1.0-rc2] (changes since 2.1.0-rc1)
 
 - Major changes

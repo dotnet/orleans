@@ -5,13 +5,13 @@ namespace AccountTransfer.Interfaces
 {
     public interface IAccountGrain : IGrainWithGuidKey
     {
-        [Transaction(TransactionOption.Required)]
+        [Transaction(TransactionOption.Join)]
         Task Withdraw(uint amount);
 
-        [Transaction(TransactionOption.Required)]
+        [Transaction(TransactionOption.Join)]
         Task Deposit(uint amount);
 
-        [Transaction(TransactionOption.Required)]
+        [Transaction(TransactionOption.CreateOrJoin)]
         Task<uint> GetBalance();
     }
 }

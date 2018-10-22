@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -14,18 +14,16 @@ namespace Orleans.Transactions.AzureStorage
     {
         private readonly CloudTable table;
         private readonly string partition;
-        private readonly string stateName;
         private readonly JsonSerializerSettings jsonSettings;
         private readonly ILogger logger;
 
         private KeyEntity key;
         private List<KeyValuePair<long, StateEntity>> states;
 
-        public AzureTableTransactionalStateStorage(CloudTable table, string partition, string stateName, JsonSerializerSettings JsonSettings, ILogger<AzureTableTransactionalStateStorage<TState>> logger)
+        public AzureTableTransactionalStateStorage(CloudTable table, string partition, JsonSerializerSettings JsonSettings, ILogger<AzureTableTransactionalStateStorage<TState>> logger)
         {
             this.table = table;
             this.partition = partition;
-            this.stateName = stateName;
             this.jsonSettings = JsonSettings;
             this.logger = logger;
         }
@@ -144,7 +142,7 @@ namespace Orleans.Transactions.AzureStorage
                         if (FindState(s.SequenceId, out var pos))
                         {
                             // overwrite with new pending state
-                            var existing = states[pos].Value;
+                            StateEntity existing = states[pos].Value;
                             existing.TransactionId = s.TransactionId;
                             existing.TransactionTimestamp = s.TimeStamp;
                             existing.TransactionManager = JsonConvert.SerializeObject(s.TransactionManager, this.jsonSettings);
@@ -176,14 +174,14 @@ namespace Orleans.Transactions.AzureStorage
                 await batchOperation.Add(TableOperation.Insert(this.key)).ConfigureAwait(false);
 
                 if (logger.IsEnabled(LogLevel.Trace))
-                    logger.LogTrace($"{partition}.{KeyEntity.RK} Insert");
+                    logger.LogTrace($"{partition}.{KeyEntity.RK} Insert. v{this.key.CommittedSequenceId}, {metadata.CommitRecords.Count}c");
             }
             else
             {
                 await batchOperation.Add(TableOperation.Replace(this.key)).ConfigureAwait(false);
 
                 if (logger.IsEnabled(LogLevel.Trace))
-                    logger.LogTrace($"{partition}.{KeyEntity.RK} Update");
+                    logger.LogTrace($"{partition}.{KeyEntity.RK} Update. v{this.key.CommittedSequenceId}, {metadata.CommitRecords.Count}c");
             }
 
             // fourth, remove obsolete records

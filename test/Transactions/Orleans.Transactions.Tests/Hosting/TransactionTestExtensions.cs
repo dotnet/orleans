@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Orleans.Hosting;
 
 namespace Orleans.Transactions.Tests
@@ -16,9 +16,9 @@ namespace Orleans.Transactions.Tests
                  .ConfigureLogging(builder => builder.AddFilter("ConsistencyTestGrain.data", LogLevel.Trace))
                  .ConfigureLogging(builder => builder.AddFilter("ConsistencyTestGrain.graincall", LogLevel.Trace))
                  .ConfigureLogging(builder => builder.AddFilter("Orleans.Transactions.TransactionAgent", LogLevel.Trace))
-                 .ConfigureLogging(builder => builder.AddFilter("Orleans.Transactions.AzureStorage.AzureTableTransactionalStateStorage", LogLevel.Trace));                      
+                 .ConfigureLogging(builder => builder.AddFilter("Orleans.Transactions.AzureStorage.AzureTableTransactionalStateStorage", LogLevel.Trace))
+                 .ConfigureLogging(builder => builder.AddFilter("TransactionAgent", LogLevel.Trace));
         }
     }
 }
-
 

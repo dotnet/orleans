@@ -15,6 +15,7 @@
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)test\Transactions\Orleans.Transactions.Tests\Orleans.Transactions.Tests.csproj" />
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+    <ProjectReference Include="..\..\..\src\Orleans.Transactions.Testkit.Xunit\Orleans.Transactions.TestKit.xUnit.csproj" />
   </ItemGroup>
 
   <ItemGroup>

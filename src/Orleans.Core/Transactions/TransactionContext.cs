@@ -27,13 +27,13 @@ namespace Orleans.Transactions
             var result = GetTransactionInfo();
             if (result == null)
             {
-                throw new OrleansTransactionException($"A transaction context is required for access. Did you forget a [TransactionOption.Required] annotation?");
+                throw new OrleansTransactionException($"A transaction context is required for access. Did you forget a [Transaction] attribute?");
             }
             else if (result is T info)
             {
                 return info;
             }
-            else  
+            else
             {
                 throw new OrleansTransactionException($"Configuration error: transaction agent is using a different protocol ({result.GetType().FullName}) than the participant expects ({typeof(T).FullName}).");
             }

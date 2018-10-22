@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -225,7 +225,7 @@ namespace Orleans.Transactions.Tests.Correctness
             return Task.WhenAll(this.dataArray
                 .Select(data => data.PerformUpdate(state =>
                 {
-                    this.logger.LogInformation($"Setting bit {index} in state {state}.");
+                    this.logger.LogInformation($"Setting bit {index} in state {state}. Transaction {TransactionContext.CurrentTransactionId}");
                     state.Set(index, true);
                     this.logger.LogInformation($"Set bit {index} in state {state}.");
                 })));

@@ -41,7 +41,7 @@ namespace Orleans.Transactions.AzureStorage
         public ITransactionalStateStorage<TState> Create<TState>(string stateName, IGrainActivationContext context) where TState : class, new()
         {
             string partitionKey = MakePartitionKey(context, stateName);
-            return ActivatorUtilities.CreateInstance<AzureTableTransactionalStateStorage<TState>>(context.ActivationServices, this.table, partitionKey, stateName, this.jsonSettings);
+            return ActivatorUtilities.CreateInstance<AzureTableTransactionalStateStorage<TState>>(context.ActivationServices, this.table, partitionKey, this.jsonSettings);
         }
 
         public void Participate(ISiloLifecycle lifecycle)
