@@ -7,8 +7,8 @@ namespace Orleans.Streams
 {
     /// <summary>
     /// This class is a [Serializable] function pointer to a static predicate method, used for stream filtering.
-    /// The predicate function / lamda is not directly serialized, only the class / method info details required to reconstruct the function reference on the other side.
-    /// Predicate filter functions must be staic (non-abstract) methods, so full class name and method name are sufficient info to rehydrate.
+    /// The predicate function / lambda is not directly serialized, only the class / method info details required to reconstruct the function reference on the other side.
+    /// Predicate filter functions must be static (non-abstract) methods, so full class name and method name are sufficient info to rehydrate.
     /// </summary>
     [Serializable]
     internal class FilterPredicateWrapperData : IStreamFilterPredicateWrapper, ISerializable
@@ -37,7 +37,6 @@ namespace Orleans.Streams
             DehydrateStaticFunc(pred);
         }
 
-        #region ISerializable methods
         protected FilterPredicateWrapperData(SerializationInfo info, StreamingContext context)
         {
             FilterData = info.GetValue(SER_FIELD_DATA, typeof(object));
@@ -52,7 +51,6 @@ namespace Orleans.Streams
             info.AddValue(SER_FIELD_METHOD, methodName);
             info.AddValue(SER_FIELD_CLASS,  className);
         }
-        #endregion
 
         public bool ShouldReceive(IStreamIdentity stream, object filterData, object item)
         {

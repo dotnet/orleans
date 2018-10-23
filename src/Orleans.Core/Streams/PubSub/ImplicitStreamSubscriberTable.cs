@@ -240,7 +240,7 @@ namespace Orleans.Streams
                 throw new ArgumentException($"{grainClass.FullName} is not a grain class.", nameof(grainClass));
             }
 
-            var attribs = grainClass.GetTypeInfo().GetCustomAttributes<ImplicitStreamSubscriptionAttribute>(false);
+            var attribs = grainClass.GetTypeInfo().GetCustomAttributes<ImplicitStreamSubscriptionAttribute>(true);
 
             return attribs.Select(attrib => attrib.Predicate).ToList();
         }

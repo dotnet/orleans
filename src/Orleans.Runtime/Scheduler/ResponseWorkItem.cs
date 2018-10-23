@@ -13,8 +13,6 @@ namespace Orleans.Runtime.Scheduler
             response = m;
         }
 
-        #region IWorkItem Members
-
         public override WorkItemType ItemType { get { return WorkItemType.Response; } }
 
         public override string Name
@@ -26,8 +24,6 @@ namespace Orleans.Runtime.Scheduler
         {
             target.HandleResponse(response);
         }
-
-        #endregion
 
         public override string ToString()
         {

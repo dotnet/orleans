@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using Orleans.Runtime;
 
 namespace Orleans.TestingHost
@@ -29,6 +30,10 @@ namespace Orleans.TestingHost
         /// <summary>Stop the remote silo</summary>
         /// <param name="stopGracefully">Specifies whether the silo should be stopped gracefully or abruptly.</param>
         public abstract void StopSilo(bool stopGracefully);
+
+        /// <summary>Stop the remote silo. This method cannot be use with AppDomain</summary>
+        /// <param name="ct">Specifies the cancellation token to use for the shutdown sequence</param>
+        public abstract void StopSilo(CancellationToken ct);
 
         /// <summary>Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.</summary>
         public void Dispose()

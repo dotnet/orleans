@@ -10,11 +10,11 @@ using Microsoft.Extensions.Logging;
 namespace Orleans.Providers.Streams.SimpleMessageStream
 {
     /// <summary>
-    /// Multiplexes messages to mutiple different producers in the same grain over one grain-extension interface.
+    /// Multiplexes messages to multiple different producers in the same grain over one grain-extension interface.
     /// 
-    /// On the silo, we have one extension per activation and this extesion multiplexes all streams on this activation 
+    /// On the silo, we have one extension per activation and this extension multiplexes all streams on this activation 
     ///     (different stream ids and different stream providers).
-    /// On the client, we have one extension per stream (we bind an extesion for every StreamProducer, therefore every stream has its own extension).
+    /// On the client, we have one extension per stream (we bind an extension for every StreamProducer, therefore every stream has its own extension).
     /// </summary>
     [Serializable]
     internal class SimpleMessageStreamProducerExtension : IStreamProducerExtension

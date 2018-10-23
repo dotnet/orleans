@@ -45,8 +45,6 @@ namespace Orleans.Runtime.MultiClusterNetwork
         }
 
 
-        #region IGossipChannel
-
         public async Task Publish(IMultiClusterGossipData data)
         {
             logger.Debug("-Publish data:{0}", data);
@@ -126,8 +124,6 @@ namespace Orleans.Runtime.MultiClusterNetwork
                 throw e;
             }
         }
-
-        #endregion
 
 
         // compare config with configInStorage, and

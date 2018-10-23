@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Runtime;
+using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
@@ -20,13 +21,14 @@ namespace Tester
         [Fact]
         public async Task LocalhostSiloTest()
         {
+            var opts = TestSiloSpecificOptions.Create(new TestClusterOptions(), 1, true);
             var silo = new SiloHostBuilder()
                 .AddMemoryGrainStorage("MemoryStore")
-                .UseLocalhostClustering()
+                .UseLocalhostClustering(opts.SiloPort, opts.GatewayPort)
                 .Build();
 
             var client = new ClientBuilder()
-                .UseLocalhostClustering()
+                .UseLocalhostClustering(opts.GatewayPort)
                 .Build();
             try
             {

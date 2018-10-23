@@ -37,7 +37,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Keep track of thread statistics, mainly timing, can be created outside the thread to be tracked.
         /// </summary>
-        /// <param name="threadName">Name used for logging the collected stastistics</param>
+        /// <param name="threadName">Name used for logging the collected statistics</param>
         /// <param name="loggerFactory">LoggerFactory used to create loggers</param>
         /// <param name="statisticsOptions"></param>
         /// <param name="schedulerStageStatistics"></param>
@@ -202,7 +202,7 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Call once to just increment the stastistic of processed requests
+        /// Call once to just increment the statistic of processed requests
         /// </summary>
         /// <param name="num">Number of processed requests</param>
         public void IncrementNumberOfProcessed(int num = 1)

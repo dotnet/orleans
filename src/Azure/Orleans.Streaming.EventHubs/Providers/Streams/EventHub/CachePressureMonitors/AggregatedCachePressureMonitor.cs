@@ -53,7 +53,7 @@ namespace Orleans.ServiceBus.Providers
         }
 
         /// <summary>
-        /// If any mornitor in this aggregated cache monitor group is under pressure, then return true
+        /// If any monitor in this aggregated cache monitor group is under pressure, then return true
         /// </summary>
         /// <param name="utcNow"></param>
         /// <returns></returns>

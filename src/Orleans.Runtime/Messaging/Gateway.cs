@@ -343,8 +343,6 @@ namespace Orleans.Runtime.Messaging
                 this.clientDropTimeout = clientDropTimeout;
             }
 
-            #region Overrides of AsynchAgent
-
             protected override void Run()
             {
                 while (!Cts.IsCancellationRequested)
@@ -354,8 +352,6 @@ namespace Orleans.Runtime.Messaging
                     Thread.Sleep(clientDropTimeout);
                 }
             }
-
-            #endregion
         }
 
         // this cache is used to record the addresses of Gateways from which clients connected to.
@@ -592,10 +588,41 @@ namespace Orleans.Runtime.Messaging
                 // we only get here if we failed to serialize the msg (or any other catastrophic failure).
                 // Request msg fails to serialize on the sending silo, so we just enqueue a rejection msg.
                 // Response msg fails to serialize on the responding silo, so we try to send an error response back.
-                Log.Warn(ErrorCode.Messaging_Gateway_SerializationError, String.Format("Unexpected error serializing message {0} on the gateway", msg.ToString()), exc);
+                this.Log.LogWarning(
+                    (int)ErrorCode.Messaging_Gateway_SerializationError,
+                    "Unexpected error serializing message {Message}: {Exception}",
+                    msg,
+                    exc);
+
                 msg.ReleaseBodyAndHeaderBuffers();
                 MessagingStatisticsGroup.OnFailedSentMessage(msg);
-                MessagingStatisticsGroup.OnDroppedSentMessage(msg);
+
+                var retryCount = msg.RetryCount ?? 0;
+
+                if (msg.Direction == Message.Directions.Request)
+                {
+                    this.gateway.messageCenter.SendRejection(msg, Message.RejectionTypes.Unrecoverable, exc.ToString());
+                }
+                else if (msg.Direction == Message.Directions.Response && retryCount < 1)
+                {
+                    // if we failed sending an original response, turn the response body into an error and reply with it.
+                    // unless we have already tried sending the response multiple times.
+                    msg.Result = Message.ResponseTypes.Error;
+                    msg.BodyObject = Response.ExceptionResponse(exc);
+                    msg.RetryCount = retryCount + 1;
+                    this.gateway.messageCenter.SendMessage(msg);
+                }
+                else
+                {
+                    this.Log.LogWarning(
+                        (int)ErrorCode.Messaging_OutgoingMS_DroppingMessage,
+                        "Gateway {GatewayAddress} is dropping message which failed during serialization: {Message}. Exception = {Exception}",
+                        this.gateway.gatewayAddress,
+                        msg,
+                        exc);
+
+                    MessagingStatisticsGroup.OnDroppedSentMessage(msg);
+                }
             }
         }
     }

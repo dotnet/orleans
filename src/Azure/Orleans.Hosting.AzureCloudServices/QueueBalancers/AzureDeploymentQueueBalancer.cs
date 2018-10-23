@@ -33,7 +33,7 @@ namespace Orleans.Streams
         /// Requires silo running in Azure.
         /// This Balancer uses both the information about the full set of silos as reported by Azure role code but 
         /// does NOT use the information from Membership oracle about currently alive silos. 
-        /// That is, it does not rebalance queues based on dymanic changes in the cluster Membership.
+        /// That is, it does not rebalance queues based on dynamic changes in the cluster Membership.
         /// </summary>
         public static ISiloPersistentStreamConfigurator UseStaticAzureDeploymentBalancer(this ISiloPersistentStreamConfigurator configurator,
            TimeSpan? siloMaturityPeriod = null)

@@ -3,7 +3,7 @@ using System;
 namespace Orleans.Streams
 {
     /// <summary>
-    /// Mark a subscriptionId as either an implicit subscription Id, or a explicit subscription Id.
+    /// Mark a subscriptionId as either an implicit subscription Id, or an explicit subscription Id.
     /// high bit of last byte in guild is the subscription type flag.
     /// 1: implicit subscription
     /// 0: explicit subscription

@@ -129,22 +129,14 @@ namespace Orleans.CodeGeneration
                         && declaringTypeInfo.GetRuntimeInterfaceMap(i).TargetMethods.Contains(methodInfo)));
         }
 
-        public static bool IsNewTransactionRequired(MethodInfo methodInfo)
+        public static bool TryGetTransactionOption(MethodInfo methodInfo, out TransactionOption option)
         {
+            option = TransactionOption.Suppress;
             TransactionAttribute transactionAttribute = methodInfo.GetCustomAttribute<TransactionAttribute>(true);
             if (transactionAttribute != null)
             {
-                return transactionAttribute.Requirement == TransactionOption.RequiresNew;
-            }
-            return false;
-        }
-
-        public static bool IsTransactionRequired(MethodInfo methodInfo)
-        {
-            TransactionAttribute transactionAttribute = methodInfo.GetCustomAttribute<TransactionAttribute>(true);
-            if (transactionAttribute != null)
-            {
-                return transactionAttribute.Requirement == TransactionOption.Required;
+                option = transactionAttribute.Requirement;
+                return true;
             }
             return false;
         }
@@ -168,6 +160,12 @@ namespace Orleans.CodeGeneration
             var attr = methodInfo.GetCustomAttribute<MethodIdAttribute>(true);
             if (attr != null) return attr.MethodId;
 
+            var result = FormatMethodForIdComputation(methodInfo);
+            return Utils.CalculateIdHash(result);
+        }
+
+        internal static string FormatMethodForIdComputation(MethodInfo methodInfo)
+        {
             var strMethodId = new StringBuilder(methodInfo.Name);
 
             if (methodInfo.IsGenericMethodDefinition)
@@ -203,8 +201,10 @@ namespace Orleans.CodeGeneration
 
                 bFirstTime = false;
             }
+
             strMethodId.Append(')');
-            return Utils.CalculateIdHash(strMethodId.ToString());
+            var result = strMethodId.ToString();
+            return result;
         }
 
         public static int GetGrainInterfaceId(Type grainInterface)

@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Logging;
 using Orleans.AzureUtils.Utilities;
+using Orleans.Configuration;
 using Orleans.Hosting.AzureCloudServices;
 using Orleans.Hosting;
 
@@ -110,7 +111,7 @@ namespace Orleans.Runtime.Host
 
                 try
                 {
-                    var manager = siloInstanceManager ?? await OrleansSiloInstanceManager.GetManager(clusterId, connectionString, loggerFactory);
+                    var manager = siloInstanceManager ?? await OrleansSiloInstanceManager.GetManager(clusterId, connectionString, AzureStorageClusteringOptions.DEFAULT_TABLE_NAME, loggerFactory);
                     var instances = await manager.DumpSiloInstanceTable();
                     logger.Debug(instances);
                 }
@@ -159,8 +160,6 @@ namespace Orleans.Runtime.Host
             
             return config;
         }
-
-        #region Azure RoleEntryPoint methods
 
         /// <summary>
         /// Initialize this Orleans silo for execution. Config data will be read from silo config file as normal
@@ -258,7 +257,7 @@ namespace Orleans.Runtime.Host
             try
             {
                 siloInstanceManager = OrleansSiloInstanceManager.GetManager(
-                    clusterId, connectionString, this.loggerFactory).WithTimeout(AzureTableDefaultPolicies.TableCreationTimeout).Result;
+                    clusterId, connectionString, AzureStorageClusteringOptions.DEFAULT_TABLE_NAME, this.loggerFactory).WithTimeout(AzureTableDefaultPolicies.TableCreationTimeout).Result;
             }
             catch (Exception exc)
             {
@@ -320,8 +319,6 @@ namespace Orleans.Runtime.Host
             host.ShutdownOrleansSilo();
             logger.Info(ErrorCode.Runtime_Error_100291, "Orleans silo '{0}' shutdown.", host.Name);
         }
-
-        #endregion
 
         private bool StartSilo()
         {

@@ -20,7 +20,7 @@ namespace Orleans.Configuration
         /// If a silo is suspected to be dead, but this attribute is set to "false", the suspicions will not propagated to the system and enforced,
         /// This parameter is intended for use only for testing and troubleshooting.
         /// In production, liveness should always be enabled.
-        /// Default is true (eanabled)
+        /// Default is true (enabled)
         /// </summary>
         public bool LivenessEnabled { get; set; } = DEFAULT_LIVENESS_ENABLED;
         public const bool DEFAULT_LIVENESS_ENABLED = true;
@@ -44,7 +44,7 @@ namespace Orleans.Configuration
         public static readonly TimeSpan DEFAULT_LIVENESS_DEATH_VOTE_EXPIRATION_TIMEOUT = TimeSpan.FromSeconds(120);
 
         /// <summary>
-        /// The number of seconds to periodically write in the membership table that this silo is alive. Used ony for diagnostics.
+        /// The number of seconds to periodically write in the membership table that this silo is alive. Used only for diagnostics.
         /// </summary>
         public TimeSpan IAmAliveTablePublishTimeout { get; set; } = DEFAULT_LIVENESS_I_AM_ALIVE_TABLE_PUBLISH_TIMEOUT;
         public static readonly TimeSpan DEFAULT_LIVENESS_I_AM_ALIVE_TABLE_PUBLISH_TIMEOUT = TimeSpan.FromMinutes(5);

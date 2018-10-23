@@ -2,9 +2,7 @@
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
-using Orleans.Runtime.Configuration;
 using Orleans.Hosting;
-using Orleans.Hosting.Development;
 using Orleans.Configuration;
 using System.Net;
 using AccountTransfer.Grains;
@@ -50,9 +48,7 @@ namespace OrleansSiloHost
                 .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(AccountGrain).Assembly).WithReferences())
                 .ConfigureLogging(logging => logging.AddConsole())
                 .AddMemoryGrainStorageAsDefault()
-                .UseInClusterTransactionManager()
-                .UseInMemoryTransactionLog()
-                .UseTransactionalState();
+                .UseTransactions();
 
             var host = builder.Build();
             await host.StartAsync();

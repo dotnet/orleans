@@ -7,7 +7,7 @@ namespace Orleans.Runtime.Development
     public static class DevelopmentSiloBuilderExtensions
     {
         /// <summary>
-        /// Configure silo with test/developement features.
+        /// Configure silo with test/development features.
         /// NOT FOR PRODUCTION USE - dev/test only
         /// </summary>
         public static ISiloHostBuilder UseInMemoryLeaseProvider(this ISiloHostBuilder builder)

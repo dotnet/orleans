@@ -248,4 +248,39 @@ namespace UnitTestGrains
                         Thread.CurrentThread.Name);
         }
     }
+
+    public class TimerRequestGrain : Grain, ITimerRequestGrain
+    {
+        private TaskCompletionSource<int> completionSource;
+
+        public Task<string> GetRuntimeInstanceId()
+        {
+            return Task.FromResult(this.RuntimeIdentity);
+        }
+
+        public async Task StartAndWaitTimerTick(TimeSpan dueTime)
+        {
+            this.completionSource = new TaskCompletionSource<int>();
+            var timer = this.RegisterTimer(TimerTick, null, dueTime, TimeSpan.FromMilliseconds(-1));
+            await this.completionSource.Task;
+        }
+
+        public Task StartStuckTimer(TimeSpan dueTime)
+        {
+            this.completionSource = new TaskCompletionSource<int>();
+            var timer = this.RegisterTimer(StuckTimerTick, null, dueTime, TimeSpan.FromSeconds(1));
+            return Task.CompletedTask;
+        }
+
+        private Task TimerTick(object state)
+        {
+            this.completionSource.SetResult(1);
+            return Task.CompletedTask;
+        }
+
+        private async Task StuckTimerTick(object state)
+        {
+            await completionSource.Task;
+        }
+    }
 }

@@ -33,7 +33,7 @@ namespace Orleans.TestingHost
         private readonly FaultInjectionGrainStorageOptions options;
         
         /// <summary>
-        /// Default conststructor which creates the decorated storage provider
+        /// Default constructor which creates the decorated storage provider
         /// </summary>
         public FaultInjectionGrainStorage(IGrainStorage realStorageProvider, string name, ILoggerFactory loggerFactory, 
             IGrainFactory grainFactory, FaultInjectionGrainStorageOptions faultInjectionOptions)

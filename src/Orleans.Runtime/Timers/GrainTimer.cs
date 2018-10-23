@@ -134,7 +134,7 @@ namespace Orleans.Runtime
             {
                 logger.Error( 
                     ErrorCode.Timer_GrainTimerCallbackError,
-                    string.Format( "Caught and ignored exception: {0} with mesagge: {1} thrown from timer callback {2}",
+                    string.Format( "Caught and ignored exception: {0} with message: {1} thrown from timer callback {2}",
                         exc.GetType(),
                         exc.Message,
                         GetFullName()),
@@ -204,8 +204,6 @@ namespace Orleans.Runtime
                 dueTime, timerFrequency, logger, GetFullName, ErrorCode.Timer_TimerInsideGrainIsNotTicking, false);
         }
 
-        #region IDisposable Members
-
         public void Dispose()
         {
             Dispose(true);
@@ -232,7 +230,5 @@ namespace Orleans.Runtime
             asyncCallback = null;
             activationData?.OnTimerDisposed(this);
         }
-
-        #endregion
     }
 }

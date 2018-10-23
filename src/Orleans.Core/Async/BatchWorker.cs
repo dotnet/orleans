@@ -13,15 +13,24 @@ namespace Orleans
     /// </summary>
     public abstract class BatchWorker
     {
-        /// <summary>Implement this member in derived classes to define what constitutes a work cycle</summary>
-        protected abstract Task Work();
-
-        protected object lockable = new object();
+        private readonly object lockable = new object();
 
         private bool startingCurrentWorkCycle;
 
-        private DateTime? scheduledNotify = null;
+        private DateTime? scheduledNotify;
 
+        // Task for the current work cycle, or null if idle
+        private volatile Task currentWorkCycle;
+
+        // Flag is set to indicate that more work has arrived during execution of the task
+        private volatile bool moreWork;
+
+        // Used to communicate the task for the next work cycle to waiters.
+        // This value is non-null only if there are waiters.
+        private TaskCompletionSource<Task> nextWorkCyclePromise;
+        
+        /// <summary>Implement this member in derived classes to define what constitutes a work cycle</summary>
+        protected abstract Task Work();
 
         /// <summary>
         /// Notify the worker that there is more work.
@@ -80,32 +89,22 @@ namespace Orleans
             }
         }
 
-        // task for the current work cycle, or null if idle
-        private volatile Task currentWorkCycle;
-
-        // flag is set to indicate that more work has arrived during execution of the task
-        private volatile bool moreWork;
-
-        // used to communicate the task for the next work cycle to waiters
-        // is non-null only if there are waiters
-        private TaskCompletionSource<Task> nextWorkCyclePromise;
-
         private void Start()
         {
-            // indicate that we are starting the worker (to prevent double-starts)
+            // Indicate that we are starting the worker (to prevent double-starts)
             startingCurrentWorkCycle = true;
 
-            // clear any scheduled runs
+            // Clear any scheduled runs
             scheduledNotify = null;
 
             try
             {
-                // start the task that is doing the work
+                // Start the task that is doing the work
                 currentWorkCycle = Work();
             }
             finally
             {
-                // by now we have started, and stored the task in currentWorkCycle
+                // By now we have started, and stored the task in currentWorkCycle
                 startingCurrentWorkCycle = false;
 
                 // chain a continuation that checks for more work, on the same scheduler
@@ -113,8 +112,9 @@ namespace Orleans
             }
         }
 
-        // executes at the end of each work cycle
-        // on the same task scheduler
+        /// <summary>
+        /// Executes at the end of each work cycle on the same task scheduler.
+        /// </summary>
         private void CheckForMoreWork()
         {
             TaskCompletionSource<Task> signal = null;
@@ -148,9 +148,8 @@ namespace Orleans
         }
 
         /// <summary>
-        /// Check if this worker is busy.
+        /// Check if this worker is idle.
         /// </summary>
-        /// <returns></returns>
         public bool IsIdle()
         {
             // no lock needed for reading volatile field
@@ -166,29 +165,36 @@ namespace Orleans
             Task<Task> waitfortasktask = null;
             Task waitfortask = null;
 
-            // figure out exactly what we need to wait for
+            // Figure out exactly what we need to wait for
             lock (lockable)
             {
                 if (!moreWork)
-                    // just wait for current work cycle
+                {
+                    // Just wait for current work cycle
                     waitfortask = currentWorkCycle;
+                }
                 else
                 {
                     // we need to wait for the next work cycle
                     // but that task does not exist yet, so we use a promise that signals when the next work cycle is launched
                     if (nextWorkCyclePromise == null)
+                    {
                         nextWorkCyclePromise = new TaskCompletionSource<Task>();
+                    }
+
                     waitfortasktask = nextWorkCyclePromise.Task;
                 }
             }
 
-            // now do the actual waiting outside of the lock
-
+            // Do the actual waiting outside of the lock
             if (waitfortasktask != null)
+            {
                 await await waitfortasktask;
-
+            }
             else if (waitfortask != null)
+            {
                 await waitfortask;
+            }
         }
 
         /// <summary>
@@ -205,7 +211,10 @@ namespace Orleans
                 {
                     moreWork = true;
                     if (nextWorkCyclePromise == null)
+                    {
                         nextWorkCyclePromise = new TaskCompletionSource<Task>();
+                    }
+
                     waitForTaskTask = nextWorkCyclePromise.Task;
                 }
                 else
@@ -216,23 +225,24 @@ namespace Orleans
             }
 
             if (waitForTaskTask != null)
+            {
                 await await waitForTaskTask;
-
+            }
             else if (waitForTask != null)
+            {
                 await waitForTask;
+            }
         }
     }
 
-    /// A convenient variant of a batch worker 
-    /// that allows the work function to be passed as a constructor argument
     public class BatchWorkerFromDelegate : BatchWorker
     {
+        private readonly Func<Task> work;
+
         public BatchWorkerFromDelegate(Func<Task> work)
         {
             this.work = work;
         }
-
-        private Func<Task> work;
 
         protected override Task Work()
         {

@@ -11,7 +11,7 @@ namespace Orleans.ApplicationParts
     public class AssemblyPart : IApplicationPart
     {
         /// <summary>
-        /// Initalizes a new <see cref="AssemblyPart"/> instance.
+        /// Initializes a new <see cref="AssemblyPart"/> instance.
         /// </summary>
         /// <param name="assembly"></param>
         public AssemblyPart(Assembly assembly)

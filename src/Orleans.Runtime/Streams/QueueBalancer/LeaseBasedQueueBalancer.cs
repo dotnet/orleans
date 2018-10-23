@@ -14,7 +14,7 @@ using Orleans.Timers;
 namespace Orleans.Streams
 {
     /// <summary>
-    /// IResourceSelector selects a centain amount of resource from a resource list
+    /// IResourceSelector selects a certain amount of resource from a resource list
     /// </summary>
     /// <typeparam name="T"></typeparam>
     internal interface IResourceSelector<T>

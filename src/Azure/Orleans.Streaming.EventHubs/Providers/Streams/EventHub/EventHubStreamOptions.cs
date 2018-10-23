@@ -69,7 +69,7 @@ namespace Orleans.Configuration
         /// </summary>
         public int? PrefetchCount { get; set; }
         /// <summary>
-        /// In cases where no checkpoint is found, this indicates if service should read from the most recent data, or from the begining of a partition.
+        /// In cases where no checkpoint is found, this indicates if service should read from the most recent data, or from the beginning of a partition.
         /// </summary>
         public bool StartFromNow { get; set; } = DEFAULT_START_FROM_NOW;
         public const bool DEFAULT_START_FROM_NOW = true;

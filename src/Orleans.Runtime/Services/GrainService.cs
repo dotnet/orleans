@@ -108,7 +108,7 @@ namespace Orleans.Runtime
             scheduler.QueueTask(() => OnRangeChange(oldRange, newRange, increased), this.SchedulingContext).Ignore();
         }
 
-        /// <summary>Invoked when the ring range owned by the service instance changes because of a change in the clsuter state</summary>
+        /// <summary>Invoked when the ring range owned by the service instance changes because of a change in the cluster state</summary>
         public virtual Task OnRangeChange(IRingRange oldRange, IRingRange newRange, bool increased)
         {
             Logger.Info(ErrorCode.RS_RangeChanged, "My range changed from {0} to {1} increased = {2}", oldRange, newRange, increased);

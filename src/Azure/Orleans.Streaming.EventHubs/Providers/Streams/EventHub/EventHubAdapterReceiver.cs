@@ -103,7 +103,7 @@ namespace Orleans.ServiceBus.Providers
                 : Initialize();
         }
         /// <summary>
-        /// Initialization of EventHub receiver is performed at adapter reciever initialization, but if it fails,
+        /// Initialization of EventHub receiver is performed at adapter receiver initialization, but if it fails,
         ///  it will be retried when messages are requested
         /// </summary>
         /// <returns></returns>
@@ -306,7 +306,6 @@ namespace Orleans.ServiceBus.Providers
             return new EventHubReceiverProxy(receiver);
         }
 
-#region EventHubGeneratorStreamProvider related region
         /// <summary>
         /// For test purpose. ConfigureDataGeneratorForStream will configure a data generator for the stream
         /// </summary>
@@ -320,7 +319,6 @@ namespace Orleans.ServiceBus.Providers
         {
             (this.receiver as EventHubPartitionGeneratorReceiver)?.StopProducingOnStream(streamId);
         }
-#endregion
 
         private class StreamActivityNotificationBatch : IBatchContainer
         {

@@ -10,6 +10,7 @@ using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using TestGrainInterfaces;
+using UnitTests.Grains;
 using Xunit;
 
 namespace NonSilo.Tests
@@ -90,6 +91,22 @@ namespace NonSilo.Tests
             {
                 Assert.NotNull(silo);
             }
+        }
+
+        /// <summary>
+        /// Grain's CollectionAgeLimit must be > 0 minutes.
+        /// </summary>
+        [Fact]
+        public void SiloHostBuilder_GrainCollectionOptionsForZeroSecondsAgeLimitTest()
+        {
+            Assert.Throws<OrleansConfigurationException>(() => new SiloHostBuilder()
+                .Configure<ClusterOptions>(options => { options.ClusterId = "GrainCollectionClusterId"; options.ServiceId = "GrainCollectionServiceId"; })
+                .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
+                .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>())
+                .Configure<GrainCollectionOptions>(options => options
+                            .ClassSpecificCollectionAge
+                            .Add(typeof(CollectionSpecificAgeLimitForZeroSecondsActivationGcTestGrain).FullName, TimeSpan.Zero))
+               .Build());
         }
 
         /// <summary>

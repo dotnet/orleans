@@ -105,7 +105,7 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <summary>
-        /// Indicates whether the cach is empty
+        /// Indicates whether the cache is empty
         /// </summary>
         public bool IsEmpty => messageBlocks.Count == 0 || (messageBlocks.Count == 1 && messageBlocks.First.Value.IsEmpty);
 

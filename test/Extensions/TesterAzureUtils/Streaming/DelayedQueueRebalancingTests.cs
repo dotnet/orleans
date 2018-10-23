@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -29,7 +30,7 @@ namespace Tester.AzureUtils.Streaming
 #pragma warning restore 618
         private static readonly TimeSpan SILO_IMMATURE_PERIOD = TimeSpan.FromSeconds(40); // matches the config
         private static readonly TimeSpan LEEWAY = TimeSpan.FromSeconds(10);
-
+        private const int queueCount = 8;
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             TestUtils.CheckForAzureStorage();
@@ -50,11 +51,12 @@ namespace Tester.AzureUtils.Streaming
             {
                 hostBuilder
                     .AddAzureQueueStreams<AzureQueueDataAdapterV2>(adapterName, b => b
-                        .ConfigureAzureQueue(ob => ob.Configure(
-                            options =>
+                        .ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
+                            (options, dep) =>
                             {
                                 options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            }))
+                                options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
+                        }))
                         .UseDynamicClusterConfigDeploymentBalancer(SILO_IMMATURE_PERIOD))
                     .Configure<StaticClusterDeploymentOptions>(op =>
                     {
@@ -63,6 +65,14 @@ namespace Tester.AzureUtils.Streaming
 
                 hostBuilder.AddMemoryGrainStorage("PubSubStore");
             }
+        }
+
+        public override void Dispose()
+        {
+            base.Dispose();
+            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, 
+                AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount), 
+                TestDefaultConfiguration.DataConnectionString).Wait();
         }
 
         [SkippableFact, TestCategory("Functional")]

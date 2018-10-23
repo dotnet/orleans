@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -14,18 +14,16 @@ namespace Orleans.Transactions.AzureStorage
     {
         private readonly CloudTable table;
         private readonly string partition;
-        private readonly string stateName;
         private readonly JsonSerializerSettings jsonSettings;
         private readonly ILogger logger;
 
         private KeyEntity key;
         private List<KeyValuePair<long, StateEntity>> states;
 
-        public AzureTableTransactionalStateStorage(CloudTable table, string partition, string stateName, JsonSerializerSettings JsonSettings, ILogger<AzureTableTransactionalStateStorage<TState>> logger)
+        public AzureTableTransactionalStateStorage(CloudTable table, string partition, JsonSerializerSettings JsonSettings, ILogger<AzureTableTransactionalStateStorage<TState>> logger)
         {
             this.table = table;
             this.partition = partition;
-            this.stateName = stateName;
             this.jsonSettings = JsonSettings;
             this.logger = logger;
         }
@@ -49,13 +47,21 @@ namespace Orleans.Transactions.AzureStorage
                 }
                 else
                 {
-                    if (!FindState(this.key.CommittedSequenceId, out var pos))
+                    TState committedState;
+                    if (this.key.CommittedSequenceId == 0)
                     {
-                        var error = $"Storage state corrupted: no record for committed state";
-                        logger.LogCritical(error);
-                        throw new InvalidOperationException(error);
+                        committedState = new TState();
                     }
-                    var committedState = states[pos].Value.GetState<TState>(this.jsonSettings);
+                    else
+                    {
+                        if (!FindState(this.key.CommittedSequenceId, out var pos))
+                        {
+                            var error = $"Storage state corrupted: no record for committed state v{this.key.CommittedSequenceId}";
+                            logger.LogCritical($"{partition} {error}");
+                            throw new InvalidOperationException(error);
+                        }
+                        committedState = states[pos].Value.GetState<TState>(this.jsonSettings);
+                    }
 
                     var PrepareRecordsToRecover = new List<PendingTransactionState<TState>>();
                     for (int i = 0; i < states.Count; i++)
@@ -70,13 +76,15 @@ namespace Orleans.Transactions.AzureStorage
                         if (kvp.Value.TransactionManager == null)
                             break;
 
+                        ParticipantId tm = JsonConvert.DeserializeObject<ParticipantId>(kvp.Value.TransactionManager, this.jsonSettings);
+
                         PrepareRecordsToRecover.Add(new PendingTransactionState<TState>()
                         {
                             SequenceId = kvp.Key,
                             State = kvp.Value.GetState<TState>(this.jsonSettings),
                             TimeStamp = kvp.Value.TransactionTimestamp,
                             TransactionId = kvp.Value.TransactionId,
-                            TransactionManager = kvp.Value.TransactionManager
+                            TransactionManager = tm
                         });
                     }
 
@@ -89,7 +97,8 @@ namespace Orleans.Transactions.AzureStorage
                     if (logger.IsEnabled(LogLevel.Debug))
                         logger.LogDebug($"{partition} Loaded v{this.key.CommittedSequenceId} rows={string.Join(",", states.Select(s => s.Key.ToString("x16")))}");
 
-                    return new TransactionalStorageLoadResponse<TState>(this.key.ETag, committedState, this.key.CommittedSequenceId, this.key.Metadata, PrepareRecordsToRecover);
+                    TransactionalStateMetaData metadata = JsonConvert.DeserializeObject<TransactionalStateMetaData>(this.key.Metadata, this.jsonSettings);
+                    return new TransactionalStorageLoadResponse<TState>(this.key.ETag, committedState, this.key.CommittedSequenceId, metadata, PrepareRecordsToRecover);
                 }
             }
             catch (Exception ex)
@@ -100,7 +109,7 @@ namespace Orleans.Transactions.AzureStorage
         }
 
 
-        public async Task<string> Store(string expectedETag, string metadata, List<PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter)
+        public async Task<string> Store(string expectedETag, TransactionalStateMetaData metadata, List<PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter)
         {
             if (this.key.ETag != expectedETag)
                 throw new ArgumentException(nameof(expectedETag), "Etag does not match");
@@ -133,13 +142,12 @@ namespace Orleans.Transactions.AzureStorage
                         if (FindState(s.SequenceId, out var pos))
                         {
                             // overwrite with new pending state
-                            var existing = states[pos].Value;
+                            StateEntity existing = states[pos].Value;
                             existing.TransactionId = s.TransactionId;
                             existing.TransactionTimestamp = s.TimeStamp;
-                            existing.TransactionManager = s.TransactionManager;
+                            existing.TransactionManager = JsonConvert.SerializeObject(s.TransactionManager, this.jsonSettings);
                             existing.SetState(s.State, this.jsonSettings);
                             await batchOperation.Add(TableOperation.Replace(existing)).ConfigureAwait(false);
-                            states.RemoveAt(pos);
 
                             if (logger.IsEnabled(LogLevel.Trace))
                                 logger.LogTrace($"{partition}.{existing.RowKey} Update {existing.TransactionId}");
@@ -156,7 +164,7 @@ namespace Orleans.Transactions.AzureStorage
                     }
 
             // third, persist metadata and commit position
-            key.Metadata = metadata;
+            key.Metadata = JsonConvert.SerializeObject(metadata, this.jsonSettings);
             if (commitUpTo.HasValue && commitUpTo.Value > key.CommittedSequenceId)
             {
                 key.CommittedSequenceId = commitUpTo.Value;
@@ -166,14 +174,14 @@ namespace Orleans.Transactions.AzureStorage
                 await batchOperation.Add(TableOperation.Insert(this.key)).ConfigureAwait(false);
 
                 if (logger.IsEnabled(LogLevel.Trace))
-                    logger.LogTrace($"{partition}.{KeyEntity.RK} Insert");
+                    logger.LogTrace($"{partition}.{KeyEntity.RK} Insert. v{this.key.CommittedSequenceId}, {metadata.CommitRecords.Count}c");
             }
             else
             {
                 await batchOperation.Add(TableOperation.Replace(this.key)).ConfigureAwait(false);
 
                 if (logger.IsEnabled(LogLevel.Trace))
-                    logger.LogTrace($"{partition}.{KeyEntity.RK} Update");
+                    logger.LogTrace($"{partition}.{KeyEntity.RK} Update. v{this.key.CommittedSequenceId}, {metadata.CommitRecords.Count}c");
             }
 
             // fourth, remove obsolete records

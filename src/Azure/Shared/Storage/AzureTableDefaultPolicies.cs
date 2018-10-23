@@ -31,7 +31,7 @@ namespace Orleans.Transactions.AzureStorage
     /// Utility class for default retry / timeout settings for Azure storage.
     /// </summary>
     /// <remarks>
-    /// These functions are mostly intended for internal usage by Orleans runtime, but due to certain assembly packaging constrants this class needs to have public visibility.
+    /// These functions are mostly intended for internal usage by Orleans runtime, but due to certain assembly packaging constraints this class needs to have public visibility.
     /// </remarks>
     internal static class AzureTableDefaultPolicies
     {

@@ -82,7 +82,7 @@ namespace Orleans.Runtime.Host
 
     /// <summary>
     /// Contains methods for converting a Consul KVPair to and from a MembershipEntry.  
-    /// This uses ConsulSiloRegistration objects as the serialisable KV.Value and minimises conversion operations.
+    /// This uses ConsulSiloRegistration objects as the serializable KV.Value and minimises conversion operations.
     /// </summary>
     internal class ConsulSiloRegistrationAssembler
     {
@@ -90,14 +90,14 @@ namespace Orleans.Runtime.Host
         private const char KeySeparator = '/';
         internal const string SiloIAmAliveSuffix = "iamalive";
 
-        internal static String ParseDeploymentKVPrefix(String deploymentId)
+        internal static String ParseDeploymentKVPrefix(String deploymentId, String rootKvFolder)
         {
-            return String.Format("{0}{1}{2}", DeploymentKVPrefix, KeySeparator, deploymentId);
+            return String.Format("{0}{1}{2}{3}{4}", rootKvFolder, KeySeparator, DeploymentKVPrefix, KeySeparator, deploymentId);
         }
 
-        internal static String ParseDeploymentSiloKey(String deploymentId, SiloAddress siloAddress)
+        internal static String ParseDeploymentSiloKey(String deploymentId, String rootKvFolder, SiloAddress siloAddress)
         {
-            return String.Format("{0}{1}{2}", ParseDeploymentKVPrefix(deploymentId), KeySeparator, siloAddress.ToParsableString());
+            return String.Format("{0}{1}{2}", ParseDeploymentKVPrefix(deploymentId, rootKvFolder), KeySeparator, siloAddress.ToParsableString());
         }
 
         internal static String ParseSiloIAmAliveKey(String siloKey)
@@ -105,9 +105,9 @@ namespace Orleans.Runtime.Host
             return String.Format("{0}{1}{2}", siloKey, KeySeparator, SiloIAmAliveSuffix);
         }
 
-        internal static String ParseSiloIAmAliveKey(String deploymentId, SiloAddress siloAddress)
+        internal static String ParseSiloIAmAliveKey(String deploymentId, String rootKvFolder, SiloAddress siloAddress)
         {
-            return ParseSiloIAmAliveKey(ParseDeploymentSiloKey(deploymentId, siloAddress));
+            return ParseSiloIAmAliveKey(ParseDeploymentSiloKey(deploymentId, rootKvFolder, siloAddress));
         }
 
         internal static ConsulSiloRegistration FromKVPairs(String deploymentId, KVPair siloKV, KVPair iAmAliveKV)
@@ -146,17 +146,17 @@ namespace Orleans.Runtime.Host
             return ret;
         }
 
-        internal static KVPair ToKVPair(ConsulSiloRegistration siloRegistration)
+        internal static KVPair ToKVPair(ConsulSiloRegistration siloRegistration, String rootKvFolder)
         {
-            var ret = new KVPair(ConsulSiloRegistrationAssembler.ParseDeploymentSiloKey(siloRegistration.DeploymentId, siloRegistration.Address));
+            var ret = new KVPair(ConsulSiloRegistrationAssembler.ParseDeploymentSiloKey(siloRegistration.DeploymentId, rootKvFolder, siloRegistration.Address));
             ret.ModifyIndex = siloRegistration.LastIndex;
             ret.Value = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(siloRegistration));
             return ret;
         }
 
-        internal static KVPair ToIAmAliveKVPair(String deploymentId, SiloAddress siloAddress, DateTime iAmAliveTime)
+        internal static KVPair ToIAmAliveKVPair(String deploymentId, String rootKvFolder, SiloAddress siloAddress, DateTime iAmAliveTime)
         {
-            var ret = new KVPair(ConsulSiloRegistrationAssembler.ParseSiloIAmAliveKey(deploymentId, siloAddress));
+            var ret = new KVPair(ConsulSiloRegistrationAssembler.ParseSiloIAmAliveKey(deploymentId, rootKvFolder, siloAddress));
             ret.Value = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(iAmAliveTime));
             return ret;
         }

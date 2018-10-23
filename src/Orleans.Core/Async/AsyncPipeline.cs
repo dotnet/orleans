@@ -27,7 +27,7 @@ namespace Orleans.Runtime
     /// Maintains a pipeline of asynchronous operations up to a given maximal capacity and blocks the calling thread if the pipeline 
     /// gets too deep before enqueued operations are not finished.
     /// Effectively adds a back-pressure to the caller.
-    /// This is mainly usefull for stress-testing grains under controlled load and should never be used from within a grain code! 
+    /// This is mainly useful for stress-testing grains under controlled load and should never be used from within a grain code! 
     /// </summary>
     public class AsyncPipeline : IPipeline
     {

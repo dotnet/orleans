@@ -28,7 +28,7 @@ namespace Orleans.ServiceBus.Providers
     ///   The SequenceNumber is required for uniqueness and ordering of EventHub messages within a partition.
     /// event Index - Since each EventHub message may contain more than one application layer event, this value
     ///   indicates which application layer event this token is for, within an EventHub message.  It is required for uniqueness
-    ///   and ordering of aplication layer events within an EventHub message.
+    ///   and ordering of application layer events within an EventHub message.
     /// </summary>
     [Serializable]
     public class EventHubSequenceToken : EventSequenceToken, IEventHubPartitionLocation

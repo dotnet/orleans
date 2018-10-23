@@ -165,7 +165,7 @@ namespace Orleans.Runtime.Configuration
         /// If a silo is suspected to be dead, but this attribute is set to "false", the suspicions will not propagated to the system and enforced,
         /// This parameter is intended for use only for testing and troubleshooting.
         /// In production, liveness should always be enabled.
-        /// Default is true (eanabled)
+        /// Default is true (enabled)
         /// </summary>
         public bool LivenessEnabled { get; set; }
         /// <summary>
@@ -181,7 +181,7 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public TimeSpan DeathVoteExpirationTimeout { get; set; }
         /// <summary>
-        /// The number of seconds to periodically write in the membership table that this silo is alive. Used ony for diagnostics.
+        /// The number of seconds to periodically write in the membership table that this silo is alive. Used only for diagnostics.
         /// </summary>
         public TimeSpan IAmAliveTablePublishTimeout { get; set; }
         /// <summary>
@@ -244,8 +244,6 @@ namespace Orleans.Runtime.Configuration
             set => this.ClusterId = value;
         }
 
-        #region MultiClusterNetwork
-
         /// <summary>
         /// Whether this cluster is configured to be part of a multicluster network
         /// </summary>
@@ -287,8 +285,6 @@ namespace Orleans.Runtime.Configuration
         /// A list of connection strings for gossip channels.
         /// </summary>
         public IReadOnlyList<GossipChannelConfiguration> GossipChannels { get; set; }
-
-        #endregion
 
         /// <summary>
         /// Connection string for the underlying data provider for liveness and reminders. eg. Azure Storage, ZooKeeper, SQL Server, ect.

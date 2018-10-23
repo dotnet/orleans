@@ -3,7 +3,9 @@ using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Streams;
 using System;
+using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans;
 
 namespace Orleans.Streaming
@@ -24,6 +26,16 @@ namespace Orleans.Streaming
                         .AddTransient<IConfigurationValidator>(sp => new SimpleQueueCacheOptionsValidator(sp.GetOptionsByName<SimpleQueueCacheOptions>(name), name))
                         .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name);
                 });
+            //configure default queue names
+            this.ConfigureAzureQueue(ob => ob.PostConfigure<IOptions<ClusterOptions>>((op, clusterOp) =>
+            {
+                if (op.QueueNames == null || op.QueueNames?.Count == 0)
+                {
+                    op.QueueNames =
+                        AzureQueueStreamProviderUtils.GenerateDefaultAzureQueueNames(clusterOp.Value.ServiceId,
+                            this.name);
+                }
+            }));
         }
 
         public SiloAzureQueueStreamConfigurator<TDataAdapter> ConfigureAzureQueue(Action<OptionsBuilder<AzureQueueOptions>> configureOptions)
@@ -31,19 +43,14 @@ namespace Orleans.Streaming
             this.Configure<AzureQueueOptions>(configureOptions);
             return this;
         }
+
         public SiloAzureQueueStreamConfigurator<TDataAdapter> ConfigureCache(int cacheSize = SimpleQueueCacheOptions.DEFAULT_CACHE_SIZE)
         {
             this.Configure<SimpleQueueCacheOptions>(ob => ob.Configure(options => options.CacheSize = cacheSize));
             return this;
         }
-
-        public SiloAzureQueueStreamConfigurator<TDataAdapter> ConfigurePartitioning(int numOfPartition = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
-        {
-            this.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfPartition));
-            return this;
-        }
     }
-
+    
     public class ClusterClientAzureQueueStreamConfigurator<TDataAdapter> : ClusterClientPersistentStreamConfigurator
           where TDataAdapter : IAzureQueueDataAdapter
     {
@@ -55,18 +62,21 @@ namespace Orleans.Streaming
                     services.ConfigureNamedOptionForLogging<AzureQueueOptions>(name)
                     .AddTransient<IConfigurationValidator>(sp => new AzureQueueOptionsValidator(sp.GetOptionsByName<AzureQueueOptions>(name), name))
                     .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name));
-               
+
+            //configure default queue names
+            this.ConfigureAzureQueue(ob => ob.PostConfigure<IOptions<ClusterOptions>>((op, clusterOp) =>
+            {
+                if (op.QueueNames == null || op.QueueNames?.Count == 0)
+                {
+                    op.QueueNames =
+                        AzureQueueStreamProviderUtils.GenerateDefaultAzureQueueNames(clusterOp.Value.ServiceId, this.name);
+                }
+            }));
         }
 
         public ClusterClientAzureQueueStreamConfigurator<TDataAdapter> ConfigureAzureQueue(Action<OptionsBuilder<AzureQueueOptions>> configureOptions)
         {
             this.Configure<AzureQueueOptions>(configureOptions);
-            return this;
-        }
-
-        public ClusterClientAzureQueueStreamConfigurator<TDataAdapter> ConfigurePartitioning(int numOfPartition = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
-        {
-            this.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfPartition));
             return this;
         }
     }

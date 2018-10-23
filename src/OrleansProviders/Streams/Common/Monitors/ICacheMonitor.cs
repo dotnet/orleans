@@ -11,8 +11,6 @@ namespace Orleans.Providers.Streams.Common
     /// </summary>
     public interface ICacheMonitor
     {
-        #region Event driven metrics
-
         /// <summary>
         /// Track cache pressure metrics when cache pressure monitor encounter a status change
         /// </summary>
@@ -25,7 +23,7 @@ namespace Orleans.Providers.Streams.Common
             double? flowControlThreshold);
 
         /// <summary>
-        /// Track message added to the cache, and newest and oldest messsges among them 
+        /// Track message added to the cache, and newest and oldest messages among them 
         /// </summary>
         /// <param name="messageAdded"></param>
         void TrackMessagesAdded(long messageAdded);
@@ -48,10 +46,6 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="memoryInByte"></param>
         void TrackMemoryReleased(int memoryInByte);
 
-        #endregion
-
-        #region periodically report discrete metrics
-
         /// <summary>
         /// Periodically report cache status metrics
         /// </summary>
@@ -67,7 +61,5 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         /// <param name="totalCacheSizeInByte"></param>
         void ReportCacheSize(long totalCacheSizeInByte);
-
-        #endregion
     }
 }

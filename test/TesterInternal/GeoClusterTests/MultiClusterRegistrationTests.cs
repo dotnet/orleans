@@ -152,7 +152,6 @@ namespace UnitTests.GeoClusterTests
 
         Random random;
 
-        #region client wrappers
         public class ClientWrapper : ClientWrapperBase
         {
             public static readonly Func<string, int, string, Action<ClientConfiguration>, Action<IClientBuilder>, ClientWrapper> Factory =
@@ -262,10 +261,6 @@ namespace UnitTests.GeoClusterTests
 
             public int count;
         }
-
-
-        #endregion
-
 
 
         private int Next()

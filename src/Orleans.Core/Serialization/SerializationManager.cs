@@ -30,8 +30,6 @@ namespace Orleans.Serialization
     /// </summary>
     public sealed class SerializationManager : IDisposable
     {
-        #region Privates
-
         private readonly HashSet<Type> registeredTypes;
         private readonly List<IExternalSerializer> externalSerializers;
         private readonly Dictionary<KeyedSerializerId, IKeyedSerializer> keyedSerializers = new Dictionary<KeyedSerializerId, IKeyedSerializer>();
@@ -81,18 +79,15 @@ namespace Orleans.Serialization
 
         internal IServiceProvider ServiceProvider => this.serviceProvider;
 
-        #endregion
-
-        #region initialization
-
         public SerializationManager(
             IServiceProvider serviceProvider,
             IOptions<SerializationProviderOptions> serializationProviderOptions,
             ILoggerFactory loggerFactory,
             ITypeResolver typeResolver,
-            SerializationStatisticsGroup serializationStatistics)
+            SerializationStatisticsGroup serializationStatistics,
+            int largeMessageWarningThreshold)
         {
-            this.LargeObjectSizeThreshold = Constants.LARGE_OBJECT_HEAP_THRESHOLD;
+            this.LargeObjectSizeThreshold = largeMessageWarningThreshold;
             this.serializationContext = new ThreadLocal<SerializationContext>(() => new SerializationContext(this));
             this.deserializationContext = new ThreadLocal<DeserializationContext>(() => new DeserializationContext(this));
 
@@ -145,12 +140,17 @@ namespace Orleans.Serialization
 
             foreach (var serializer in serializerFeature.SerializerDelegates)
             {
-                this.Register(serializer.Target, serializer.Delegates.DeepCopy, serializer.Delegates.Serialize, serializer.Delegates.Deserialize);
+                this.Register(
+                    serializer.Target,
+                    serializer.Delegates.DeepCopy,
+                    serializer.Delegates.Serialize,
+                    serializer.Delegates.Deserialize,
+                    serializer.OverrideExisting);
             }
 
             foreach (var serializer in serializerFeature.SerializerTypes)
             {
-                this.Register(serializer.Target, serializer.Serializer);
+                this.Register(serializer.Target, serializer.Serializer, serializer.OverrideExisting);
             }
 
             foreach (var knownType in serializerFeature.KnownTypes)
@@ -158,10 +158,6 @@ namespace Orleans.Serialization
                 this.typeKeysToQualifiedNames[knownType.TypeKey] = knownType.Type;
             }
         }
-
-        #endregion
-
-#region Serialization info registration
 
         /// <summary>
         /// Register a Type with the serialization system to use the specified DeepCopier, Serializer and Deserializer functions.
@@ -342,7 +338,8 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="type">The type serialized by the provided serializer type.</param>
         /// <param name="serializerType">The type containing serialization methods for <paramref name="type"/>.</param>
-        private void Register(Type type, Type serializerType)
+        /// <param name="overrideExisting">Whether or not to override existing registrations for the provided <paramref name="type"/>.</param>
+        private void Register(Type type, Type serializerType, bool overrideExisting = true)
         {
             GetSerializationMethods(serializerType, out var copier, out var serializer, out var deserializer);
 
@@ -394,7 +391,7 @@ namespace Orleans.Serialization
                         copier != null ? DeepCopyGeneric : default(DeepCopier),
                         serializer != null ? SerializeGeneric : default(Serializer),
                         deserializer != null ? DeserializeGeneric : default(Deserializer),
-                        true);
+                        overrideExisting);
                 }
                 else
                 {
@@ -404,7 +401,7 @@ namespace Orleans.Serialization
                         CreateDelegate<DeepCopier>(copier, serializerInstance),
                         CreateDelegate<Serializer>(serializer, serializerInstance),
                         CreateDelegate<Deserializer>(deserializer, serializerInstance),
-                        true);
+                        overrideExisting);
                 }
             }
             catch (ArgumentException)
@@ -560,10 +557,6 @@ namespace Orleans.Serialization
                 ? methodInfo.CreateDelegate(typeof(T))
                 : methodInfo.CreateDelegate(typeof(T), target)) as T;
         }
-
-        #endregion
-
-        #region Deep copying
 
         internal DeepCopier GetCopier(Type t)
         {
@@ -780,10 +773,6 @@ namespace Orleans.Serialization
             throw new OrleansException("No copier found for object of type " + t.OrleansTypeName() + 
                 ". Perhaps you need to mark it [Serializable] or define a custom serializer for it?");
         }
-
-#endregion
-
-#region Serializing
 
         /// <summary>
         /// Returns true if <paramref name="t"/> is serializable, false otherwise.
@@ -1168,10 +1157,6 @@ namespace Orleans.Serialization
             return result;
         }
 
-#endregion
-
-#region Deserializing
-
         /// <summary>
         /// Deserialize the next object from the input binary stream.
         /// </summary>
@@ -1510,7 +1495,7 @@ namespace Orleans.Serialization
         }
 
         /// <summary>
-        /// Deserialize data from the specified byte[] and rehydrate backi into objects.
+        /// Deserialize data from the specified byte[] and rehydrate back into objects.
         /// </summary>
         /// <typeparam name="T">Type of data to be returned.</typeparam>
         /// <param name="data">Input data.</param>
@@ -1524,10 +1509,6 @@ namespace Orleans.Serialization
             context.Reset();
             return result;
         }
-
-#endregion
-
-#region Special case code for message headers
 
         internal static void SerializeMessageHeaders(Message.HeadersContainer headers, SerializationContext context)
         {
@@ -1624,10 +1605,6 @@ namespace Orleans.Serialization
             return false;
         }
 
-#endregion
-
-#region Fallback serializer and deserializer
-
         internal void FallbackSerializer(object raw, ISerializationContext context, Type t)
         {
             Stopwatch timer = null;
@@ -1700,10 +1677,6 @@ namespace Orleans.Serialization
             return retVal;
         }
 
-#endregion
-
-#region Utilities
-
         internal Type ResolveTypeName(string typeName)
         {
             if (types.TryGetValue(typeName, out var result))
@@ -1771,8 +1744,6 @@ namespace Orleans.Serialization
             throw new TypeAccessException("Type string \"" + typeName + "\" cannot be resolved.");
         }
 
-#endregion
-        
         /// <summary>
         /// Internal test method to do a round-trip Serialize+Deserialize loop
         /// </summary>
@@ -1823,7 +1794,7 @@ namespace Orleans.Serialization
         }
 
         /// <summary>
-        /// Loads the external srializers and places them into a hash set
+        /// Loads the external serializers and places them into a hash set
         /// </summary>
         /// <param name="providerTypes">The list of types that implement <see cref="IExternalSerializer"/></param>
         private void RegisterSerializationProviders(List<TypeInfo> providerTypes)

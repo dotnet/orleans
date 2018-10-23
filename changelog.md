@@ -7,6 +7,138 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [2.2.0-beta1] (changes since 2.1.0)
+
+- Breaking changes
+  - None
+
+- Non-breaking improvements
+  - Avoid lazy initialization when disposing OutboundMessageQueue (#5049)
+  - CodeGen: Fix race in Orleans.sln build (#5035)
+  - Change Orleans.TelemetryConsumers.NewRelic to target .NET Standard (#5044) (#5047)
+  - Typo and spelling check XML doc and strings. A to E. #Hacktoberfest (#5051, #5055, #5060, #5065)
+  - Filter static types from list of types known to serializer (#5036)
+  - fixed HostedClient method name in exception text (#5057)
+  - Adding global alias for binding flags in generator (#5068)
+  - Allow placement strategies to skip directory registration (#5074)
+  - CodeGen: Warn users when a type inherits from a type defined in a reference assembly (#5031)
+  - IMessageCenter.WaitMessage support cancellation (#5072)
+  - Allow placement strategies to specify deterministic activation ids (#5082)
+  - Add Orleans.Transaction.Testkit project structure (#5103)
+
+- Non-breaking bug fixes
+  - Resolve transaction on abort. (#4996)
+  - Avoid modification of interned SiloAddresses in Consul and ZooKeeper gateway providers (#5054)
+  - Partial fix for transaction recovery tests (#5070)
+  - Revert #4382 (#5086, #5088)
+  - Fixed bug in transaction confirmation logic (#5098)
+
+### [2.1.0-rc2] (changes since 2.1.0-rc1)
+
+- Major changes
+  - New Code Generator (#4934, #5010, #5011)
+
+- Breaking changes
+  - None
+
+- Non-breaking bug fixes
+  - More fixed to Transfer of Coordinatio (transactions) (#4968)
+
+### [2.1.0-rc1] (changes since 2.1.0-beta1)
+
+- Major changes
+  - Transactions (beta2) (#4851, #4923, #4951, #4950, #4953)
+  - Support for Tansfer of Coordination in transaction (#4860, #4894, #4949)
+
+- Breaking changes
+  - None
+
+- Non-breaking improvements
+  - Do not try to register GrainVersionStore if an implementation of IVersionStore is already registered (#4911)
+  - Consul clustering enhancements (#4942)
+  - IsOrleansShallowCopyable fixes (#4945)
+  - Feature per grain collection attribute (#4890)
+  - Add Microsoft.Orleans.Streaming.AzureStorage as a dependency to Microsoft.Orleans.OrleansAzureUtils. (#4954)
+  - Migrate Orleans.TelemetryConsumers.Counters to netstandard (#4914)
+  - Add TableName to AzureStorageClusteringOptions, AzureStorageGatewayOptions and AzureTableReminderStorageOptions (#4978)
+  - Added support for TableName on AWS legacy configurator (#4983)
+
+- Non-breaking bug fixes
+  - Propagate unserializable exceptions to callers (#4907)
+  - Fixing race condition with simple queue cache (#4936)
+
+### [2.0.5]
+- Non-breaking bug fixes
+  - Use netcoreapp2.0 for msbuild target dll if using dotnet core msbuild but targeting full .net (#4895) 
+
+### [2.1.0-beta1] (changes since 2.0.0)
+
+- Major changes
+  - New scheduler (#3792)
+  - Hosted Client (#3362)
+  - Distributed Transaction Manager (beta) (#3820, #4502, #4538, #4566, #4568, #4591, #4599, #4613, #4609, #4616, #4608, #4628, #4638, #4685, #4714, #4739, #4768, #4799, #4781, #4810, #4820, #4838, #4831, #4871, #4887)
+  
+- Breaking changes
+  - None
+
+- Non-breaking improvements
+  - Test clustering: minor fixups (#4342)
+  - TestCluster: wait for cluster stabilization before starting tests (#4343)
+  - Avoid continuation in synchronous case (#4422)
+  - Improve Dictionary allocation in RequestContext (#4435)
+  - Copy elements in-place in InvokeMethodAsync (#4463)
+  - Azure blob storage provider: respect UseJson setting (#4455)
+  - Fix orleans integration with third party DI solution which requires public constructor (#4453)
+  - Remove unused Stopwatch in Grain<T>.OnSetupState (#4403) (#4472)
+  - Add validator for ClusterOptions (#4450)
+  - Non-static statistics: Round 1 (#4515)
+  - Remove saving of minidumps because that functionality is platform specific. (#4558)
+  - Fix Dependency Injection without changing Abstractions project (#4573)
+  - Sanitize "." from azure queue name (#4582)
+  - Add Client/SiloHost builder delegate to legacy GrainClient and Silo/AzureSilo (#4552)
+  - Support of ValueTask as a grain method return type (#4562)
+  - Convert IMembershipTableGrain into a SystemTarget (#4479)
+  - Convert counter values before calling ITelemetryProducer.TrackMetric (#4623)
+  - Optimize removing consumed buffers from read buffer (#4629)
+  - Remove unused settings MaxPendingWorkItemsHardLimit in SchedulingOptions (#4672)
+  - Udpate reference links in sql files (#4684)
+  - Use netcoreapp2.0 for msbuild target dll if using dotnet core msbuild but targeting full .net (#4689)
+  - Make AzureBasedReminderTable public to allow reuse in extensions (#4699)
+  - Remove per-call timer (#4399)
+  - Make LifecycleSubject logging less verbose (#4660)
+  - Do not use ip address from interface not operational (#4713)
+  - Updated Ignore(this Task) method (#4729)
+  - Make azure queue name configurable (#4762)
+  - Auto-installing grain extensions (#4815)
+  - Allow implicit subscription attribute to be inheritable (#4824)
+  - Do not place stateless worker locally if the silo is stopping (#4853)
+  - When deactivating a grain, do not stop timers if there are running requests  (#4830)
+  - No default grains storage added to container if one is not configured. (#4861)
+  - Revisit silo stop/shutdown timeout (#4875)
+  - Add timeout mechanism for grain deactivation (#4883)
+
+- Non-breaking bug fixes
+  - Fix telemetry consumer construction (#4392)
+  - Fix client connection retry (#4429)
+  - Fix routing in Silo Gateway (#4483)
+  - Don't generate serializers for foreign types in Orleans.Streaming.EventHubs (#4487)
+  - Fix NRE on AWS DynamoDB storage provider. #4482 (#4513)
+  - Fix Exception thrown in MembershipOracle.TryToSuspectOrKill (#4508)
+  - Fix logging level check on Grain exception (#451
+  - Assign Issue property in RecordedConnectionIssue.Record(...) (#4598)
+  - Fix (or workaround?) for codegen using netcore/netstandard 2.1 (#4673)
+  - Don't enforce reentrancy for one way requests (#4382)
+  - Cleanup Reminders PartitionKey (#4749)
+  - Fix NullReferenceException in ExecutingWorkItemsTracker (#4850)
+  - Fix NullReferenceException in LocalGrainDirectory when trace logging is enabled (#4854)
+  - Fix dependency injection cycle when OrleansJsonSerializer is used as a serialization provider (#4876)
+
+### [2.0.4]
+
+- Non-breaking bug fixes
+  - Workaround for [CoreFx/#30781](https://github.com/dotnet/corefx/issues/30781) when running on .NET Core (#4736)
+  - Fix for .NET Core 2.1 build-time code generation (#4673)
+
 ### [2.0.3]
 
 - Non-breaking improvements

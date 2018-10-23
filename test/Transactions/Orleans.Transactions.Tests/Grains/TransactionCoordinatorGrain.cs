@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
+using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.Tests.Correctness;
 
 namespace Orleans.Transactions.Tests
@@ -37,15 +38,23 @@ namespace Orleans.Transactions.Tests
             throw new Exception("This should abort the transaction");
         }
 
-        public async Task MultiGrainAddAndThrow(ITransactionTestGrain throwGrain, List<ITransactionTestGrain> grains, int numberToAdd)
+        public async Task MultiGrainAddAndThrow(List<ITransactionTestGrain> throwGrains, List<ITransactionTestGrain> grains, int numberToAdd)
         {
             await Task.WhenAll(grains.Select(g => g.Add(numberToAdd)));
-            await throwGrain.AddAndThrow(numberToAdd);
+            await Task.WhenAll(throwGrains.Select(tg => tg.AddAndThrow(numberToAdd)));
         }
 
         public Task MultiGrainSetBit(List<ITransactionalBitArrayGrain> grains, int bitIndex)
         {
             return Task.WhenAll(grains.Select(g => g.SetBit(bitIndex)));
+        }
+
+        public Task MultiGrainAdd(ITransactionCommitterTestGrain committer, ITransactionCommitOperation<IRemoteCommitService> operation, List<ITransactionTestGrain> grains, int numberToAdd)
+        {
+            List<Task> tasks = new List<Task>();
+            tasks.AddRange(grains.Select(g => g.Add(numberToAdd)));
+            tasks.Add(committer.Commit(operation));
+            return Task.WhenAll(tasks);
         }
 
         private async Task Double(ITransactionTestGrain grain)

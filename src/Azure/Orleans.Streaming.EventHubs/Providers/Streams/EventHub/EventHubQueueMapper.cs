@@ -31,7 +31,7 @@ namespace Orleans.ServiceBus.Providers
             QueueId[] queues = GetAllQueues().ToArray();
             if (queues.Length != partitionIds.Length)
             {
-                throw new ArgumentOutOfRangeException(nameof(partitionIds), "partitons and Queues do not line up");
+                throw new ArgumentOutOfRangeException(nameof(partitionIds), "partitions and Queues do not line up");
             }
             for (int i = 0; i < queues.Length; i++)
             {

@@ -24,7 +24,7 @@ using Orleans.Configuration.Overrides;
 namespace Orleans.Storage
 {
     /// <summary>
-    /// Simple stroge storage for writing grain state data to Azure table storage.
+    /// Simple storage for writing grain state data to Azure table storage.
     /// </summary>
     public class AzureTableGrainStorage : IGrainStorage, IRestExceptionDecoder, ILifecycleParticipant<ISiloLifecycle>
     {

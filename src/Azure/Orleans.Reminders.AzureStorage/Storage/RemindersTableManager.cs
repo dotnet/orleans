@@ -44,8 +44,7 @@ namespace Orleans.Runtime.ReminderService
             // when comparisons will be done on strings, this will ensure that positive numbers are always greater than negative
             // string grainHash = number < 0 ? string.Format("0{0}", number.ToString("X")) : string.Format("1{0:d16}", number);
 
-            var grainHash = String.Format("{0:X8}", number);
-            return String.Format("{0}_{1}", serviceId, grainHash);
+            return AzureStorageUtils.SanitizeTableProperty($"{serviceId}_{number:X8}");
         }
 
 
@@ -71,16 +70,14 @@ namespace Orleans.Runtime.ReminderService
     
     internal class RemindersTableManager : AzureTableDataManager<ReminderTableEntry>
     {
-        private const string REMINDERS_TABLE_NAME = "OrleansReminders";
-
         public string ServiceId { get; private set; }
         public string ClusterId { get; private set; }
 
         private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
 
-        public static async Task<RemindersTableManager> GetManager(string serviceId, string clusterId, string storageConnectionString, ILoggerFactory loggerFactory)
+        public static async Task<RemindersTableManager> GetManager(string serviceId, string clusterId, string storageConnectionString, string tableName, ILoggerFactory loggerFactory)
         {
-            var singleton = new RemindersTableManager(serviceId, clusterId, storageConnectionString, loggerFactory);
+            var singleton = new RemindersTableManager(serviceId, clusterId, storageConnectionString, tableName, loggerFactory);
             try
             {
                 singleton.Logger.Info("Creating RemindersTableManager for service id {0} and clusterId {1}.", serviceId, clusterId);
@@ -102,8 +99,8 @@ namespace Orleans.Runtime.ReminderService
             return singleton;
         }
 
-        private RemindersTableManager(string serviceId, string clusterId, string storageConnectionString, ILoggerFactory loggerFactory)
-            : base(REMINDERS_TABLE_NAME, storageConnectionString, loggerFactory)
+        private RemindersTableManager(string serviceId, string clusterId, string storageConnectionString, string tableName, ILoggerFactory loggerFactory)
+            : base(tableName, storageConnectionString, loggerFactory)
         {
             ClusterId = clusterId;
             ServiceId = serviceId;
@@ -220,8 +217,6 @@ namespace Orleans.Runtime.ReminderService
             }
         }
 
-        #region Table operations
-
         internal async Task DeleteTableEntries()
         {
             if (ServiceId.Equals(Guid.Empty) && ClusterId == null)
@@ -250,7 +245,5 @@ namespace Orleans.Runtime.ReminderService
                 await Task.WhenAll(tasks);
             }
         }
-
-        #endregion
     }
 }

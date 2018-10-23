@@ -492,8 +492,6 @@ namespace Orleans.Threading
             }
         }
 
-        #region UnfairSemaphore implementation
-
         // This class has been copied from:
         // https://github.com/akkadotnet/akka.net/blob/45533db309d2c5aea0be59918ecd92f655535462/src/core/Akka/Helios.Concurrency.DedicatedThreadPool.cs#L575
         // which was translated from https://github.com/dotnet/coreclr/blob/97433b9d153843492008652ff6b7c3bf4d9ff31c/src/vm/win32threadpool.h#L124
@@ -719,8 +717,6 @@ namespace Orleans.Threading
                 return state;
             }
         }
-
-        #endregion
 
         [StructLayout(LayoutKind.Explicit, Size = CACHE_LINE_SIZE - sizeof(int))]
         private struct PaddingFor32

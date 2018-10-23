@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -89,11 +90,15 @@ namespace Orleans.Runtime.Messaging
         }
 
         /// <inheritdoc />
-        public Message WaitMessage(Message.Categories type)
+        public Message WaitMessage(Message.Categories type, CancellationToken cancellationToken)
         {
             try
             {
-                return this.messageQueues[(int)type].Take();
+                return this.messageQueues[(int)type].Take(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                return null;
             }
             catch (InvalidOperationException)
             {

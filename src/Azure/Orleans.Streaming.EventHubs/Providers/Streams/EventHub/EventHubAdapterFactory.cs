@@ -72,7 +72,7 @@ namespace Orleans.ServiceBus.Providers
         protected Func<string, IStreamQueueCheckpointer<string>, ILoggerFactory, ITelemetryProducer, IEventHubQueueCache> CacheFactory { get; set; }
 
         /// <summary>
-        /// Creates a parition checkpointer.
+        /// Creates a partition checkpointer.
         /// </summary>
         private IStreamQueueCheckpointerFactory checkpointerFactory;
 
@@ -88,7 +88,7 @@ namespace Orleans.ServiceBus.Providers
 
         /// <summary>
         /// Create a receiver monitor to report performance metrics.
-        /// Factory funciton should return an IEventHubReceiverMonitor.
+        /// Factory function should return an IEventHubReceiverMonitor.
         /// </summary>
         protected Func<EventHubReceiverMonitorDimensions, ILoggerFactory, ITelemetryProducer, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory { get; set; }
 
@@ -186,7 +186,7 @@ namespace Orleans.ServiceBus.Providers
         }
 
         /// <summary>
-        /// Aquire delivery failure handler for a queue
+        /// Acquire delivery failure handler for a queue
         /// </summary>
         /// <param name="queueId"></param>
         /// <returns></returns>
@@ -218,7 +218,7 @@ namespace Orleans.ServiceBus.Providers
         }
 
         /// <summary>
-        /// Creates a quere receiver for the specificed queueId
+        /// Creates a queue receiver for the specified queueId
         /// </summary>
         /// <param name="queueId"></param>
         /// <returns></returns>

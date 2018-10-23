@@ -142,22 +142,21 @@ namespace Orleans.Runtime.Messaging
             pingSender.Stop();
         }
 
-        #region IDisposable Members
-
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA1816:CallGCSuppressFinalizeCorrectly")]
         public void Dispose()
         {
             stopped = true;
             foreach (var sender in senders)
             {
-                sender.Value.Stop();
-                sender.Value.Dispose();
+                if (sender.IsValueCreated)
+                {
+                    sender.Value.Stop();
+                    sender.Value.Dispose();
+                }
             }
             systemSender.Stop();
             pingSender.Stop();
             GC.SuppressFinalize(this);
         }
-
-        #endregion
     }
 }

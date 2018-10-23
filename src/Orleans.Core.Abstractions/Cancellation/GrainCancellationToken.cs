@@ -97,8 +97,6 @@ namespace Orleans
             _cancellationTokenSource.Dispose();
         }
 
-        #region Serialization
-
         [SerializerMethod]
         internal static void SerializeGrainCancellationToken(object obj, ISerializationContext context, Type expected)
         {
@@ -126,7 +124,5 @@ namespace Orleans
             var gct = (GrainCancellationToken) obj;
             return new GrainCancellationToken(gct.Id, gct.IsCancellationRequested, runtime);
         }
-
-        #endregion
     }
 }

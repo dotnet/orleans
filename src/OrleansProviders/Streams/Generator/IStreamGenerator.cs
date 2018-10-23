@@ -12,7 +12,7 @@ namespace Orleans.Providers.Streams.Generator
     public interface IStreamGenerator
     {
         /// <summary>
-        /// Tries to get an evente, if the generator is configured to generate any at this time
+        /// Tries to get an event, if the generator is configured to generate any at this time
         /// </summary>
         /// <param name="utcNow"></param>
         /// <param name="events"></param>

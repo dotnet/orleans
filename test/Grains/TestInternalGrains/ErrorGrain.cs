@@ -75,9 +75,9 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<int> UnobservedErrorImmideate()
+        public Task<int> UnobservedErrorImmediate()
         {
-            logger.Info("UnobservedErrorImmideate()");
+            logger.Info("UnobservedErrorImmediate()");
 
             bool doThrow = true;
             // the grain method returns OK, but leaves some unobserved promise
@@ -86,7 +86,7 @@ namespace UnitTests.Grains
                 if (!doThrow)
                     return 0;
                 logger.Info("About to throw 1.");
-                throw new ArgumentException("ErrorGrain left Immideate Unobserved Error 1.");
+                throw new ArgumentException("ErrorGrain left Immediate Unobserved Error 1.");
             });
             promise = null;
             GC.Collect();

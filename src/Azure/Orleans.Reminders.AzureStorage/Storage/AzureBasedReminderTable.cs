@@ -8,7 +8,7 @@ using Orleans.Configuration;
 
 namespace Orleans.Runtime.ReminderService
 {
-    internal class AzureBasedReminderTable : IReminderTable
+    public class AzureBasedReminderTable : IReminderTable
     {
         private readonly IGrainReferenceConverter grainReferenceConverter;
         private readonly ILogger logger;
@@ -32,11 +32,10 @@ namespace Orleans.Runtime.ReminderService
 
         public async Task Init()
         {
-            this.remTableManager = await RemindersTableManager.GetManager(this.clusterOptions.ServiceId, this.clusterOptions.ClusterId, this.storageOptions.ConnectionString, this.loggerFactory);
+            this.remTableManager = await RemindersTableManager.GetManager(
+                this.clusterOptions.ServiceId, this.clusterOptions.ClusterId, this.storageOptions.ConnectionString, this.storageOptions.TableName, this.loggerFactory);
         }
 
-        #region Utility methods
-        
         private ReminderTableData ConvertFromTableEntryList(IEnumerable<Tuple<ReminderTableEntry, string>> entries)
         {
             var remEntries = new List<ReminderEntry>();
@@ -113,8 +112,6 @@ namespace Orleans.Runtime.ReminderService
             };
         }
 
-        #endregion 
-        
         public Task TestOnlyClearTable()
         {
             return this.remTableManager.DeleteTableEntries();

@@ -18,7 +18,6 @@ namespace UnitTests.StreamingTests
     public class PullingAgentManagementTests : OrleansTestingBase, IClassFixture<PullingAgentManagementTests.Fixture>
     {
         private readonly Fixture fixture;
-
         public class Fixture : BaseTestClusterFixture
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -32,9 +31,10 @@ namespace UnitTests.StreamingTests
                 {
                     hostBuilder
                     .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME, b=>
-                        b.ConfigureAzureQueue(ob => ob.Configure(options =>
+                        b.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>((options, dep) =>
                            {
                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                               options.QueueNames = Enumerable.Range(0, 8).Select(num => $"{dep.Value.ClusterId}-{num}").ToList();
                            })));
 
                     hostBuilder.AddMemoryGrainStorage("PubSubStore");

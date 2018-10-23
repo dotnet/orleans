@@ -14,6 +14,7 @@ using UnitTests.MembershipTests;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.Clustering.AzureStorage;
+using Orleans.Configuration;
 
 namespace Tester.AzureUtils
 {
@@ -52,7 +53,7 @@ namespace Tester.AzureUtils
             output.WriteLine("ClusterId={0} Generation={1}", this.clusterId, generation);
 
             output.WriteLine("Initializing SiloInstanceManager");
-            manager = OrleansSiloInstanceManager.GetManager(this.clusterId, TestDefaultConfiguration.DataConnectionString, fixture.LoggerFactory)
+            manager = OrleansSiloInstanceManager.GetManager(this.clusterId, TestDefaultConfiguration.DataConnectionString, AzureStorageClusteringOptions.DEFAULT_TABLE_NAME, fixture.LoggerFactory)
                 .WaitForResultWithThrow(SiloInstanceTableTestConstants.Timeout);
         }
 

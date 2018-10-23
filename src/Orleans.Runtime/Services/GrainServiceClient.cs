@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.ConsistentRing;
+using Orleans.Runtime.Scheduler;
 using Orleans.Services;
 
 namespace Orleans.Runtime.Services
@@ -48,17 +49,11 @@ namespace Orleans.Runtime.Services
                 return grainService;
             }
         }
-        
+
         /// <summary>
         /// Resolves the Grain Reference invoking this request.
         /// </summary>
-        protected GrainReference CallingGrainReference
-        {
-            get
-            {
-                return runtimeClient.CurrentActivationData.GrainReference;
-            }
-        }
+        protected GrainReference CallingGrainReference => (RuntimeContext.Current?.ActivationContext as SchedulingContext)?.Activation?.GrainReference;
 
         /// <summary>
         /// Moved from InsideRuntimeClient.cs

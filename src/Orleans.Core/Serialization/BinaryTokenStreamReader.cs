@@ -73,7 +73,7 @@ namespace Orleans.Serialization
         /// <summary>
         /// Peek at the next token in this input stream.
         /// </summary>
-        /// <returns>Next token thatr will be read from the stream.</returns>
+        /// <returns>Next token that will be read from the stream.</returns>
         internal static SerializationTokenType PeekToken(this IBinaryTokenStreamReader @this)
         {
             // TODO try to avoid that
@@ -974,7 +974,7 @@ namespace Orleans.Serialization
         /// <summary>
         /// Peek at the next token in this input stream.
         /// </summary>
-        /// <returns>Next token thatr will be read from the stream.</returns>
+        /// <returns>Next token that will be read from the stream.</returns>
         internal SerializationTokenType PeekToken()
         {
             if (currentOffset == currentSegment.Count + currentSegment.Offset)

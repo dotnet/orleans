@@ -1,4 +1,5 @@
 ﻿
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Orleans.Transactions.Tests.Correctness
@@ -10,14 +11,13 @@ namespace Orleans.Transactions.Tests.Correctness
         /// </summary>
         /// <param name="newValue"></param>
         /// <returns></returns>
-        [Transaction(TransactionOption.Required)]
+        [Transaction(TransactionOption.CreateOrJoin)]
         Task SetBit(int newValue);
 
         /// <summary>
-        /// apply get operation to every transaction state
+        /// Performs a read transaction on each state, returning the results in order.
         /// </summary>
-        /// <returns></returns>
-        [Transaction(TransactionOption.Required)]
-        Task<int[][]> Get();
+        [Transaction(TransactionOption.CreateOrJoin)]
+        Task<List<BitArrayState>> Get();
     }
 }

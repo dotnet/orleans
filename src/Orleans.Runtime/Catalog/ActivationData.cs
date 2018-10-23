@@ -111,7 +111,7 @@ namespace Orleans.Runtime
             {
                 if (extensionMap == null || !extensionMap.ContainsKey(request.InterfaceId))
                     throw new InvalidOperationException(
-                        String.Format("Extension invoker invoked with an unknown inteface ID:{0}.", request.InterfaceId));
+                        String.Format("Extension invoker invoked with an unknown interface ID:{0}.", request.InterfaceId));
 
                 var invoker = extensionMap[request.InterfaceId].Item2;
                 var extension = extensionMap[request.InterfaceId].Item1;
@@ -216,8 +216,6 @@ namespace Orleans.Runtime
 
         public IServiceProvider ActivationServices => this.serviceScope.ServiceProvider;
 
-        #region Method invocation
-
         private ExtensionInvoker extensionInvoker;
         public IGrainMethodInvoker GetInvoker(GrainTypeManager typeManager, int interfaceId, string genericGrainType = null)
         {
@@ -241,7 +239,8 @@ namespace Orleans.Runtime
 
         internal bool TryAddExtension(IGrainExtensionMethodInvoker invoker, IGrainExtension extension)
         {
-            if(extensionInvoker == null)
+            this.lastInvoker = null;
+            if (extensionInvoker == null)
                 extensionInvoker = new ExtensionInvoker();
 
             return extensionInvoker.TryAddExtension(invoker, extension);
@@ -249,6 +248,7 @@ namespace Orleans.Runtime
 
         internal void RemoveExtension(IGrainExtension extension)
         {
+            this.lastInvoker = null;
             if (extensionInvoker != null)
             {
                 if (extensionInvoker.Remove(extension))
@@ -263,8 +263,6 @@ namespace Orleans.Runtime
             result = null;
             return extensionInvoker != null && extensionInvoker.TryGetExtensionHandler(extensionType, out result);
         }
-
-        #endregion
 
         public HashSet<ActivationId> RunningRequestsSenders { get; } = new HashSet<ActivationId>();
 
@@ -341,7 +339,6 @@ namespace Orleans.Runtime
             await streamDirectory.Cleanup(true, false);
         }
 
-        #region IActivationData
         GrainReference IActivationData.GrainReference
         {
             get { return GrainReference; }
@@ -375,10 +372,6 @@ namespace Orleans.Runtime
             AddTimer(timer);
         }
 
-        #endregion
-
-        #region Catalog
-
         internal readonly GrainReference GrainReference;
 
         public SiloAddress Silo { get { return Address.Silo;  } }
@@ -397,7 +390,8 @@ namespace Orleans.Runtime
         {
             SetState(ActivationState.Deactivating);
             deactivationStartTime = DateTime.UtcNow;
-            StopAllTimers();
+            if (!IsCurrentlyExecuting)
+                StopAllTimers();
         }
 
         /// <summary>
@@ -449,19 +443,18 @@ namespace Orleans.Runtime
             CollectionTicket = ticket;
         }
 
-        #endregion
-
-        #region Dispatcher
-
         public PlacementStrategy PlacedUsing { get; private set; }
 
         public IMultiClusterRegistrationStrategy RegistrationStrategy { get; private set; }
 
         // Currently, the only supported multi-activation grain is one using the StatelessWorkerPlacement strategy.
-        internal bool IsStatelessWorker { get { return PlacedUsing is StatelessWorkerPlacement; } }
-
-        // Currently, the only grain type that is not registered in the Grain Directory is StatelessWorker. 
-        internal bool IsUsingGrainDirectory { get { return !IsStatelessWorker; } }
+        internal bool IsStatelessWorker => this.PlacedUsing is StatelessWorkerPlacement;
+        
+        /// <summary>
+        /// Returns a value indicating whether or not this placement strategy requires activations to be registered in
+        /// the grain directory.
+        /// </summary>
+        internal bool IsUsingGrainDirectory => this.PlacedUsing.IsUsingGrainDirectory;
 
         public Message Running { get; private set; }
 
@@ -534,10 +527,10 @@ namespace Orleans.Runtime
         /// <summary>Decrement the number of in-flight messages currently being processed.</summary>
         public void DecrementInFlightCount() { Interlocked.Decrement(ref inFlightCount); }
 
-        /// <summary>Increment the number of messages currently in the prcess of being received.</summary>
+        /// <summary>Increment the number of messages currently in the process of being received.</summary>
         public void IncrementEnqueuedOnDispatcherCount() { Interlocked.Increment(ref enqueuedOnDispatcherCount); }
 
-        /// <summary>Decrement the number of messages currently in the prcess of being received.</summary>
+        /// <summary>Decrement the number of messages currently in the process of being received.</summary>
         public void DecrementEnqueuedOnDispatcherCount() { Interlocked.Decrement(ref enqueuedOnDispatcherCount); }
        
         /// <summary>
@@ -683,10 +676,6 @@ namespace Orleans.Runtime
             }
         }
 
-        #endregion
-        
-        #region Activation collection
-
         public bool IsInactive
         {
             get
@@ -778,9 +767,6 @@ namespace Orleans.Runtime
             }
         }
 
-        #endregion
-
-        #region In-grain Timers
         internal void AddTimer(IGrainTimer timer)
         {
             lock(this)
@@ -833,9 +819,6 @@ namespace Orleans.Runtime
                 return Task.WhenAll(tasks);
             }
         }
-        #endregion
-
-        #region Printing functions
 
         public string DumpStatus()
         {
@@ -913,8 +896,6 @@ namespace Orleans.Runtime
             return GrainInstanceType == null ? placement :
                 String.Format(" #GrainType={0} Placement={1}", GrainInstanceType.FullName, placement);
         }
-
-        #endregion
 
         public void Dispose()
         {

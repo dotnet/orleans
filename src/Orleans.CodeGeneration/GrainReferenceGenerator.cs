@@ -281,14 +281,31 @@ namespace Orleans.CodeGenerator
                 options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.AlwaysInterleave.ToString()));
             }
 
-            if (GrainInterfaceUtils.IsNewTransactionRequired(method))
+            if (GrainInterfaceUtils.TryGetTransactionOption(method, out TransactionOption option))
             {
-                options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionRequiresNew.ToString()));
-            }
-
-            if (GrainInterfaceUtils.IsTransactionRequired(method))
-            {
-                options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionRequired.ToString()));
+                switch (option)
+                {
+                    case TransactionOption.Suppress:
+                        options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionSuppress.ToString()));
+                        break;
+                    case TransactionOption.CreateOrJoin:
+                        options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionCreateOrJoin.ToString()));
+                        break;
+                    case TransactionOption.Create:
+                        options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionCreate.ToString()));
+                        break;
+                    case TransactionOption.Join:
+                        options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionJoin.ToString()));
+                        break;
+                    case TransactionOption.Supported:
+                        options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionSupported.ToString()));
+                        break;
+                    case TransactionOption.NotAllowed:
+                        options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.TransactionNotAllowed.ToString()));
+                        break;
+                    default:
+                        throw new NotSupportedException($"Transaction option {options} is not supported.");
+                }
             }
 
             ExpressionSyntax allOptions;

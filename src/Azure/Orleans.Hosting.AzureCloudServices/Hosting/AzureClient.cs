@@ -99,8 +99,6 @@ namespace Orleans.Runtime.Host
             return config;
         }
 
-        #region Internal implementation of client initialization processing
-
         private static void InitializeImpl_FromFile(FileInfo configFile)
         {
             if (GrainClient.IsInitialized)
@@ -209,8 +207,6 @@ namespace Orleans.Runtime.Host
             Trace.TraceError("Error starting Orleans Azure client application -- {0} -- bailing. {1}", err.Message, LogFormatter.PrintException(err));
             throw err;
         }
-
-        #endregion
     }
 }
 #pragma warning restore CS0618 // Type or member is obsolete

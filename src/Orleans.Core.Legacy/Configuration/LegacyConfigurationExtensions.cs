@@ -114,6 +114,7 @@ namespace Orleans.Configuration
             options.BufferPoolBufferSize = configuration.BufferPoolBufferSize;
             options.BufferPoolMaxSize = configuration.BufferPoolMaxSize;
             options.BufferPoolPreallocationSize = configuration.BufferPoolPreallocationSize;
+            options.LargeMessageWarningThreshold = configuration.LargeMessageWarningThreshold;
         }
 
         internal static void CopyNetworkingOptions(IMessagingConfiguration configuration, NetworkingOptions options)

@@ -15,13 +15,13 @@ namespace Orleans.Streams
         /// </summary>
         /// <typeparam name="T">The type of object produced by the observable.</typeparam>
         /// <param name="handle">The subscription handle.</param>
-        /// <param name="onNextAsync">Delegte that is called for IAsyncObserver.OnNextAsync.</param>
-        /// <param name="onErrorAsync">Delegte that is called for IAsyncObserver.OnErrorAsync.</param>
-        /// <param name="onCompletedAsync">Delegte that is called for IAsyncObserver.OnCompletedAsync.</param>
+        /// <param name="onNextAsync">Delegate that is called for IAsyncObserver.OnNextAsync.</param>
+        /// <param name="onErrorAsync">Delegate that is called for IAsyncObserver.OnErrorAsync.</param>
+        /// <param name="onCompletedAsync">Delegate that is called for IAsyncObserver.OnCompletedAsync.</param>
         /// <param name="token">The stream sequence to be used as an offset to start the subscription from.</param>
         /// <returns>A promise for a StreamSubscriptionHandle that represents the subscription.
         /// The consumer may unsubscribe by using this handle.
-        /// The subscription remains active for as long as it is not explicitely unsubscribed.
+        /// The subscription remains active for as long as it is not explicitly unsubscribed.
         /// </returns>
         public static Task<StreamSubscriptionHandle<T>> ResumeAsync<T>(this StreamSubscriptionHandle<T> handle,
                                                                            Func<T, StreamSequenceToken, Task> onNextAsync,
@@ -40,12 +40,12 @@ namespace Orleans.Streams
         /// </summary>
         /// <typeparam name="T">The type of object produced by the observable.</typeparam>
         /// <param name="handle">The subscription handle.</param>
-        /// <param name="onNextAsync">Delegte that is called for IAsyncObserver.OnNextAsync.</param>
-        /// <param name="onErrorAsync">Delegte that is called for IAsyncObserver.OnErrorAsync.</param>
+        /// <param name="onNextAsync">Delegate that is called for IAsyncObserver.OnNextAsync.</param>
+        /// <param name="onErrorAsync">Delegate that is called for IAsyncObserver.OnErrorAsync.</param>
         /// <param name="token">The stream sequence to be used as an offset to start the subscription from.</param>
         /// <returns>A promise for a StreamSubscriptionHandle that represents the subscription.
         /// The consumer may unsubscribe by using this handle.
-        /// The subscription remains active for as long as it is not explicitely unsubscribed.
+        /// The subscription remains active for as long as it is not explicitly unsubscribed.
         /// </returns>
         public static Task<StreamSubscriptionHandle<T>> ResumeAsync<T>(this StreamSubscriptionHandle<T> handle,
                                                                            Func<T, StreamSequenceToken, Task> onNextAsync,
@@ -62,12 +62,12 @@ namespace Orleans.Streams
         /// </summary>
         /// <typeparam name="T">The type of object produced by the observable.</typeparam>
         /// <param name="handle">The subscription handle.</param>
-        /// <param name="onNextAsync">Delegte that is called for IAsyncObserver.OnNextAsync.</param>
-        /// <param name="onCompletedAsync">Delegte that is called for IAsyncObserver.OnCompletedAsync.</param>
+        /// <param name="onNextAsync">Delegate that is called for IAsyncObserver.OnNextAsync.</param>
+        /// <param name="onCompletedAsync">Delegate that is called for IAsyncObserver.OnCompletedAsync.</param>
         /// <param name="token">The stream sequence to be used as an offset to start the subscription from.</param>
         /// <returns>A promise for a StreamSubscriptionHandle that represents the subscription.
         /// The consumer may unsubscribe by using this handle.
-        /// The subscription remains active for as long as it is not explicitely unsubscribed.
+        /// The subscription remains active for as long as it is not explicitly unsubscribed.
         /// </returns>
         public static Task<StreamSubscriptionHandle<T>> ResumeAsync<T>(this StreamSubscriptionHandle<T> handle,
                                                                            Func<T, StreamSequenceToken, Task> onNextAsync,
@@ -83,11 +83,11 @@ namespace Orleans.Streams
         /// </summary>
         /// <typeparam name="T">The type of object produced by the observable.</typeparam>
         /// <param name="handle">The subscription handle.</param>
-        /// <param name="onNextAsync">Delegte that is called for IAsyncObserver.OnNextAsync.</param>
+        /// <param name="onNextAsync">Delegate that is called for IAsyncObserver.OnNextAsync.</param>
         /// <param name="token">The stream sequence to be used as an offset to start the subscription from.</param>
         /// <returns>A promise for a StreamSubscriptionHandle that represents the subscription.
         /// The consumer may unsubscribe by using this handle.
-        /// The subscription remains active for as long as it is not explicitely unsubscribed.
+        /// The subscription remains active for as long as it is not explicitly unsubscribed.
         /// </returns>
         public static Task<StreamSubscriptionHandle<T>> ResumeAsync<T>(this StreamSubscriptionHandle<T> handle,
                                                                            Func<T, StreamSequenceToken, Task> onNextAsync,

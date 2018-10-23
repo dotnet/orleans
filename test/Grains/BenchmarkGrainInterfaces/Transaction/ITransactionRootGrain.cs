@@ -6,7 +6,7 @@ namespace BenchmarkGrainInterfaces.Transaction
 {
     public interface ITransactionRootGrain : IGrainWithGuidKey
     {
-        [Transaction(TransactionOption.RequiresNew)]
+        [Transaction(TransactionOption.Create)]
         Task Run(List<int> grains);
     }
 }

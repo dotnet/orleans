@@ -55,9 +55,62 @@ namespace Orleans.Transactions.Tests
 
             await throwGrain.Set(expected);
             await coordinator.MultiGrainSet(grains, expected);
-            await Assert.ThrowsAsync<OrleansTransactionAbortedException>(() => coordinator.MultiGrainAddAndThrow(throwGrain, grains, expected));
+            await Assert.ThrowsAsync<OrleansTransactionAbortedException>(() => coordinator.MultiGrainAddAndThrow(new List<ITransactionTestGrain>(){throwGrain}, grains, expected));
 
             grains.Add(throwGrain);
+
+            await TestAfterDustSettles(async () =>
+            {
+                foreach (var grain in grains)
+                {
+                    int[] actualValues = await grain.Get();
+                    foreach (var actual in actualValues)
+                    {
+                        Assert.Equal(expected, actual);
+                    }
+                }
+            });
+        }
+
+
+        [SkippableTheory]
+        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
+        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
+        public async Task AbortTransactionExceptionInnerExceptionOnlyContainsOneRootCauseException(string grainStates)
+        {
+            const int throwGrainCount = 3;
+            const int grainCount = TransactionTestConstants.MaxCoordinatedTransactions - throwGrainCount;
+            const int expected = 5;
+
+            List<ITransactionTestGrain> throwGrains = Enumerable.Range(0, throwGrainCount)
+                .Select(i => RandomTestGrain(grainStates))
+                .ToList();
+            List<ITransactionTestGrain> grains =
+                Enumerable.Range(0, grainCount)
+                    .Select(i => RandomTestGrain(grainStates))
+                    .ToList();
+            ITransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+
+            await coordinator.MultiGrainSet(throwGrains, expected);
+            await coordinator.MultiGrainSet(grains, expected);
+
+            async Task InnerExceptionCheck()
+            {
+                try
+                {
+                    await coordinator.MultiGrainAddAndThrow(throwGrains, grains, expected);
+                }
+                catch (Exception e)
+                {
+                    Assert.True(e.InnerException is AddAndThrowException);
+                    throw e;
+                }
+            }
+
+            await Assert.ThrowsAsync<OrleansTransactionAbortedException>(() => InnerExceptionCheck());
+
+            grains.AddRange(throwGrains);
 
             await TestAfterDustSettles(async () =>
             {

@@ -26,13 +26,13 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         int MaxResendCount { get; set; }
         /// <summary>
-        /// The ResendOnTimeout attribute specifies whether the message should be automaticaly resend by the runtime when it times out on the sender.
+        /// The ResendOnTimeout attribute specifies whether the message should be automatically resend by the runtime when it times out on the sender.
         /// Default is false.
         /// </summary>
         bool ResendOnTimeout { get; set; }
         /// <summary>
         /// The MaxSocketAge attribute specifies how long to keep an open socket before it is closed.
-        /// Default is TimeSpan.MaxValue (never close sockets automatically, unles they were broken).
+        /// Default is TimeSpan.MaxValue (never close sockets automatically, unless they were broken).
         /// </summary>
         TimeSpan MaxSocketAge { get; set; }
         /// <summary>
@@ -89,6 +89,11 @@ namespace Orleans.Runtime.Configuration
         /// Gets the fallback serializer, used as a last resort when no other serializer is able to serialize an object.
         /// </summary>
         TypeInfo FallbackSerializationProvider { get; set; }
+
+        /// <summary>
+        /// The LargeMessageWarningThreshold attribute specifies when to generate a warning trace message for large messages.
+        /// </summary>
+        int LargeMessageWarningThreshold { get; set; }
     }
 
     /// <summary>
@@ -114,11 +119,16 @@ namespace Orleans.Runtime.Configuration
         public int BufferPoolPreallocationSize { get; set; }
 
         /// <summary>
-        /// The MaxForwardCount attribute specifies the maximal number of times a message is being forwared from one silo to another.
+        /// The MaxForwardCount attribute specifies the maximal number of times a message is being forwarded from one silo to another.
         /// Forwarding is used internally by the tuntime as a recovery mechanism when silos fail and the membership is unstable.
         /// In such times the messages might not be routed correctly to destination, and runtime attempts to forward such messages a number of times before rejecting them.
         /// </summary>
         public int MaxForwardCount { get; set; }
+
+        /// <summary>
+        /// The LargeMessageWarningThreshold attribute specifies when to generate a warning trace message for large messages.
+        /// </summary>
+        public int LargeMessageWarningThreshold { get; set; }
 
         public List<TypeInfo> SerializationProviders { get; private set; }
         public TypeInfo FallbackSerializationProvider { get; set; }
@@ -149,6 +159,7 @@ namespace Orleans.Runtime.Configuration
             BufferPoolBufferSize = MessagingOptions.DEFAULT_BUFFER_POOL_BUFFER_SIZE;
             BufferPoolMaxSize = MessagingOptions.DEFAULT_BUFFER_POOL_MAX_SIZE;
             BufferPoolPreallocationSize = MessagingOptions.DEFAULT_BUFFER_POOL_PREALLOCATION_SIZE;
+            LargeMessageWarningThreshold = MessagingOptions.DEFAULT_LARGE_MESSAGE_WARNING_THRESHOLD;
 
             if (isSiloConfig)
             {
@@ -202,6 +213,12 @@ namespace Orleans.Runtime.Configuration
                                       ? ConfigUtilities.ParseTimeSpan(child.GetAttribute("ResponseTimeout"),
                                                                  "Invalid ResponseTimeout")
                                       : MessagingOptions.DEFAULT_RESPONSE_TIMEOUT;
+
+            if (child.HasAttribute("LargeMessageWarningThreshold"))
+            {
+                LargeMessageWarningThreshold = ConfigUtilities.ParseInt(child.GetAttribute("LargeMessageWarningThreshold"),
+                    "Invalid boolean value for LargeMessageWarningThresholdattribute");
+            }
 
             if (child.HasAttribute("MaxResendCount"))
             {

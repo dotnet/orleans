@@ -8,7 +8,6 @@ using Microsoft.WindowsAzure.Storage.Table;
 using Newtonsoft.Json;
 using Orleans.Configuration;
 using Orleans.Runtime;
-using Orleans.Serialization;
 using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.AzureStorage
@@ -33,14 +32,16 @@ namespace Orleans.Transactions.AzureStorage
             this.name = name;
             this.options = options;
             this.clusterOptions = clusterOptions.Value;
-            this.jsonSettings = OrleansJsonSerializer.GetDefaultSerializerSettings(typeResolver, grainFactory);
+            this.jsonSettings = TransactionalStateFactory.GetJsonSerializerSettings(
+                typeResolver,
+                grainFactory);
             this.loggerFactory = loggerFactory;
         }
 
         public ITransactionalStateStorage<TState> Create<TState>(string stateName, IGrainActivationContext context) where TState : class, new()
         {
             string partitionKey = MakePartitionKey(context, stateName);
-            return ActivatorUtilities.CreateInstance<AzureTableTransactionalStateStorage<TState>>(context.ActivationServices, this.table, partitionKey, stateName, this.jsonSettings);
+            return ActivatorUtilities.CreateInstance<AzureTableTransactionalStateStorage<TState>>(context.ActivationServices, this.table, partitionKey, this.jsonSettings);
         }
 
         public void Participate(ISiloLifecycle lifecycle)

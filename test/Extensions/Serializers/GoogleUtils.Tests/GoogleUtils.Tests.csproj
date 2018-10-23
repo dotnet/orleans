@@ -12,14 +12,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\src\Orleans.Streaming.GCP\Orleans.Streaming.GCP.csproj" />
-    <ProjectReference Include="..\..\..\Tester\Tester.csproj" />
-    <ProjectReference Include="..\..\..\TesterInternal\TesterInternal.csproj" />
-    <ProjectReference Include="..\..\..\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
-    <ProjectReference Include="..\..\..\Grains\TestGrains\TestGrains.csproj" />
-    <ProjectReference Include="..\..\..\Misc\TestInterfaces\TestInterfaces.csproj" />
-    <ProjectReference Include="..\..\..\Misc\TestInternalDtosRefOrleans\TestInternalDtosRefOrleans.csproj" />
-    <ProjectReference Include="..\..\..\Grains\TestInternalGrains\TestInternalGrains.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Streaming.GCP\Orleans.Streaming.GCP.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Tester\Tester.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TesterInternal\TesterInternal.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Grains\TestGrains\TestGrains.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Misc\TestInterfaces\TestInterfaces.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Misc\TestInternalDtosRefOrleans\TestInternalDtosRefOrleans.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Grains\TestInternalGrains\TestInternalGrains.csproj" />
   </ItemGroup>
 
   <ItemGroup>

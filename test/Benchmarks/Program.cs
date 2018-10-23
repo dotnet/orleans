@@ -7,6 +7,7 @@ using Benchmarks.MapReduce;
 using Benchmarks.Serialization;
 using Benchmarks.Ping;
 using Benchmarks.Transactions;
+using Benchmarks.GrainStorage;
 
 namespace Benchmarks
 {
@@ -37,8 +38,21 @@ namespace Benchmarks
                 "Running Transactions benchmark",
                 () =>
                 {
-                    var benchmark = new TransactionBenchmark();
-                    benchmark.Setup();
+                    var benchmark = new TransactionBenchmark(2, 20000, 5000);
+                    benchmark.MemorySetup();
+                    return benchmark;
+                },
+                benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
+                benchmark => benchmark.Teardown());
+            },
+            ["Transactions.Memory.Throttled"] = () =>
+            {
+                RunBenchmark(
+                "Running Transactions benchmark",
+                () =>
+                {
+                    var benchmark = new TransactionBenchmark(2, 200000, 15000);
+                    benchmark.MemoryThrottledSetup();
                     return benchmark;
                 },
                 benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
@@ -50,7 +64,33 @@ namespace Benchmarks
                 "Running Transactions benchmark",
                 () =>
                 {
-                    var benchmark = new TransactionBenchmark();
+                    var benchmark = new TransactionBenchmark(2, 20000, 5000);
+                    benchmark.AzureSetup();
+                    return benchmark;
+                },
+                benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
+                benchmark => benchmark.Teardown());
+            },
+            ["Transactions.Azure.Throttled"] = () =>
+            {
+                RunBenchmark(
+                "Running Transactions benchmark",
+                () =>
+                {
+                    var benchmark = new TransactionBenchmark(2, 200000, 15000);
+                    benchmark.AzureThrottledSetup();
+                    return benchmark;
+                },
+                benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
+                benchmark => benchmark.Teardown());
+            },
+            ["Transactions.Azure.Overloaded"] = () =>
+            {
+                RunBenchmark(
+                "Running Transactions benchmark",
+                () =>
+                {
+                    var benchmark = new TransactionBenchmark(2, 200000, 15000);
                     benchmark.AzureSetup();
                     return benchmark;
                 },
@@ -86,6 +126,45 @@ namespace Benchmarks
             {
                 new SequentialPingBenchmark().PingPongForever().GetAwaiter().GetResult();
             },
+            ["GrainStorage.Memory"] = () =>
+            {
+                RunBenchmark(
+                "Running grain storage benchmark against memory",
+                () =>
+                {
+                    var benchmark = new GrainStorageBenchmark();
+                    benchmark.MemorySetup();
+                    return benchmark;
+                },
+                benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
+                benchmark => benchmark.Teardown());
+            },
+            ["GrainStorage.AzureTable"] = () =>
+            {
+                RunBenchmark(
+                "Running grain storage benchmark against Azure Table",
+                () =>
+                {
+                    var benchmark = new GrainStorageBenchmark();
+                    benchmark.AzureTableSetup();
+                    return benchmark;
+                },
+                benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
+                benchmark => benchmark.Teardown());
+            },
+            ["GrainStorage.AzureBlob"] = () =>
+            {
+                RunBenchmark(
+                "Running grain storage benchmark against Azure Blob",
+                () =>
+                {
+                    var benchmark = new GrainStorageBenchmark();
+                    benchmark.AzureBlobSetup();
+                    return benchmark;
+                },
+                benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
+                benchmark => benchmark.Teardown());
+            },
         };
 
         // requires benchmark name or 'All' word as first parameter
@@ -119,8 +198,8 @@ namespace Benchmarks
             var stopWatch = Stopwatch.StartNew();
             benchmarkAction(bench);
             Console.WriteLine($"Elapsed milliseconds: {stopWatch.ElapsedMilliseconds}");
-            tearDown(bench);
             Console.WriteLine("Press any key to continue ...");
+            tearDown(bench);
             Console.ReadLine();
         }
     }

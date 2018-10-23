@@ -152,8 +152,6 @@ namespace Orleans.Streams
             return IsValid && streamImpl.StreamId.Equals(streamId);
         }
 
-        #region IEquatable<StreamId> Members
-
         public override bool Equals(StreamSubscriptionHandle<T> other)
         {
             var o = other as StreamSubscriptionHandleImpl<T>;
@@ -165,8 +163,6 @@ namespace Orleans.Streams
             return Equals(obj as StreamSubscriptionHandle<T>);
         }
 
-        #endregion
-        
         public override int GetHashCode()
         {
             return SubscriptionId.GetHashCode();

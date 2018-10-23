@@ -13,8 +13,6 @@ namespace Orleans.Runtime.Scheduler
             request = m;
         }
 
-        #region IWorkItem Members
-
         public override WorkItemType ItemType { get { return WorkItemType.Request; } }
 
         public override string Name
@@ -26,8 +24,6 @@ namespace Orleans.Runtime.Scheduler
         {
             target.HandleNewRequest(request);
         }
-
-        #endregion
 
         public override string ToString()
         {

@@ -20,8 +20,6 @@ namespace PSUtils.Tests
         string oldExecutionPolicy;
         static string preTestFolder;
 
-        #region Test Initialization
-
         static DeployTest()
         {
             string localAppDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
@@ -63,10 +61,6 @@ namespace PSUtils.Tests
                 RunPowerShellCommand("Set-ExecutionPolicy", oldExecutionPolicy, "-Force", "-Scope LocalMachine");
             }
         }
-
-        #endregion Test Initialization
-
-        #region Tests: CleanOrleansSilos.ps1
 
         [TestCategory("Deployment Scripts"), Fact(Skip ="FIXME!!!"), TestCategory("Management")]
         public void CleanOrleans_RequestHelp_UseageDisplayed()
@@ -132,10 +126,6 @@ namespace PSUtils.Tests
             CheckResultsForErrors(results);
         }
 
-        #endregion Test: CleanOrleansSilos.ps1
-
-        #region Tests: IsProcessRunning.ps1
-
         [TestCategory("Deployment Scripts"), Fact(Skip ="FIXME!!!"), TestCategory("Management")]
         public void IsProcessRunning_RequestHelp_UseageDisplayed()
         {
@@ -196,9 +186,6 @@ namespace PSUtils.Tests
             }
         }
 
-        #endregion IsProcessRunning.ps1
-
-        #region Tests: StartOrleans.ps1
         [TestCategory("Deployment Scripts"), Fact(Skip ="FIXME!!!"), TestCategory("Management")]
         public void StartOrleans_RequestHelp_UseageDisplayed()
         {
@@ -225,9 +212,6 @@ namespace PSUtils.Tests
 
         }
 
-        #endregion
-
-        #region Tests: StopOrleans.ps1
         [TestCategory("Deployment Scripts"), Fact(Skip ="FIXME!!!"), TestCategory("Management")]
         public void StopOrleans_RequestHelp_UseageDisplayed()
         {
@@ -287,9 +271,6 @@ namespace PSUtils.Tests
             // Check the results for an error or exception.
             CheckResultsForErrors(results);
         }
-        #endregion StopOrleans.ps1
-
-        #region Tests: DeployOrleansSilos.ps1
 
         [TestCategory("Deployment Scripts"), Fact(Skip ="FIXME!!!"), TestCategory("Management")]
         public void DeployOrleans_RequestHelp_UseageDisplayed()
@@ -316,9 +297,6 @@ namespace PSUtils.Tests
             TestOrleansDeployment("RelativeDeploy", "'.\\Configuration\\TestAbsolutePaths\\Deploy-AbsolutePaths.xml'");
         }
 
-        #endregion Tests: DeployOrleansSilos.ps1
-
-        #region Support Methods
         /// <summary>
         /// Builds an empty folder tree for a test.  May be used to test scripts against empty deployment sources.
         /// </summary>
@@ -613,9 +591,5 @@ namespace PSUtils.Tests
             WindowsPrincipal userPrincipal = new WindowsPrincipal(userIdent);
             return userPrincipal.IsInRole(WindowsBuiltInRole.Administrator);
         }
-
-        
-
-        #endregion Support Methods
     }
 }

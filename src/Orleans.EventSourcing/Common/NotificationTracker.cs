@@ -92,7 +92,7 @@ namespace Orleans.EventSourcing.Common
         }
 
         /// <summary>
-        /// Asynchronous batch worker that sends notfications to a particular cluster.
+        /// Asynchronous batch worker that sends notifications to a particular cluster.
         /// </summary>
         public class NotificationWorker : BatchWorker
         {

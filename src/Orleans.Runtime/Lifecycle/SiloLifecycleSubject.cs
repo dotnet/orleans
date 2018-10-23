@@ -12,38 +12,42 @@ namespace Orleans.Runtime
     /// <summary>
     /// Decorator over lifecycle subject for silo.  Adds some logging and monitoring
     /// </summary>
-    public class SiloLifecycleSubject : ISiloLifecycleSubject
+    public class SiloLifecycleSubject : LifecycleSubject, ISiloLifecycleSubject
     {
-        private readonly ILifecycleSubject subject;
         private readonly ILogger<SiloLifecycleSubject> logger;
         private readonly List<MonitoredObserver> observers;
 
-        public SiloLifecycleSubject(ILifecycleSubject subject, ILogger<SiloLifecycleSubject> logger)
+        public SiloLifecycleSubject(ILogger<SiloLifecycleSubject> logger)
+            :base(logger)
         {
-            this.subject = subject;
             this.logger = logger;
             this.observers = new List<MonitoredObserver>();
         }
 
-        public Task OnStart(CancellationToken ct)
+        public override Task OnStart(CancellationToken ct)
         {
             foreach(IGrouping<int,MonitoredObserver> stage in this.observers.GroupBy(o => o.Stage).OrderBy(s => s.Key))
             {
                 this.logger?.Info(ErrorCode.LifecycleStagesReport, $"Stage {stage.Key}: {string.Join(", ", stage.Select(o => o.Name))}", stage.Key);
             }
-            return this.subject.OnStart(ct);
+            return base.OnStart(ct);
         }
 
-        public Task OnStop(CancellationToken ct)
+        protected override void PerfMeasureOnStop(int? stage, TimeSpan timelapsed)
         {
-            return this.subject.OnStop(ct);
+            this.logger?.Info(ErrorCode.SiloStartPerfMeasure, $"Stopping lifecycle stage {stage} took {timelapsed.TotalMilliseconds} Milliseconds");
         }
 
-        public IDisposable Subscribe(string observerName, int stage, ILifecycleObserver observer)
+        protected override void PerfMeasureOnStart(int? stage, TimeSpan timelapsed)
+        {
+            this.logger?.Info(ErrorCode.SiloStartPerfMeasure, $"Starting lifecycle stage {stage} took {timelapsed.TotalMilliseconds} Milliseconds");
+        }
+
+        public override IDisposable Subscribe(string observerName, int stage, ILifecycleObserver observer)
         {
             var monitoredObserver = new MonitoredObserver(observerName, stage, observer, this.logger);
             this.observers.Add(monitoredObserver);
-            return this.subject.Subscribe(observerName, stage, monitoredObserver);
+            return base.Subscribe(observerName, stage, monitoredObserver);
         }
 
         private class MonitoredObserver : ILifecycleObserver

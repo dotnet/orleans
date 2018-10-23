@@ -12,7 +12,10 @@ namespace Orleans.Runtime
     {
         private readonly ISiloRuntimeClient runtimeClient;
         private readonly ILoggerFactory loggerFactory;
-        private readonly ILogger logger;
+        private readonly IServiceProvider serviceProvider;
+        private readonly IReminderRegistry reminderRegistry;
+        private readonly ITimerRegistry timerRegistry;
+        private readonly IGrainFactory grainFactory;
 
         public GrainRuntime(
             IOptions<ClusterOptions> clusterOptions,
@@ -24,15 +27,14 @@ namespace Orleans.Runtime
             ISiloRuntimeClient runtimeClient,
             ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger<GrainRuntime>();
             this.runtimeClient = runtimeClient;
             ServiceId = clusterOptions.Value.ServiceId;
             SiloAddress = localSiloDetails.SiloAddress;
             SiloIdentity = SiloAddress.ToLongString();
-            GrainFactory = grainFactory;
-            TimerRegistry = timerRegistry;
-            ReminderRegistry = reminderRegistry;
-            ServiceProvider = serviceProvider;
+            this.grainFactory = grainFactory;
+            this.timerRegistry = timerRegistry;
+            this.reminderRegistry = reminderRegistry;
+            this.serviceProvider = serviceProvider;
             this.loggerFactory = loggerFactory;
         }
 
@@ -42,21 +44,51 @@ namespace Orleans.Runtime
 
         public SiloAddress SiloAddress { get; }
 
-        public IGrainFactory GrainFactory { get; }
-        
-        public ITimerRegistry TimerRegistry { get; }
-        
-        public IReminderRegistry ReminderRegistry { get; }
+        public IGrainFactory GrainFactory
+        {
+            get
+            {
+                CheckRuntimeContext();
+                return this.grainFactory;
+            }
+        }
 
-        public IServiceProvider ServiceProvider { get; }
+        public ITimerRegistry TimerRegistry
+        {
+            get
+            {
+                CheckRuntimeContext();
+                return this.timerRegistry;
+            }
+        }
+
+        public IReminderRegistry ReminderRegistry
+        {
+            get
+            {
+                CheckRuntimeContext();
+                return this.reminderRegistry;
+            }
+        }
+
+        public IServiceProvider ServiceProvider
+        {
+            get
+            {
+                CheckRuntimeContext();
+                return this.serviceProvider;
+            }
+        }
 
         public void DeactivateOnIdle(Grain grain)
         {
+            CheckRuntimeContext();
             this.runtimeClient.DeactivateOnIdle(grain.Data.ActivationId);
         }
 
         public void DelayDeactivation(Grain grain, TimeSpan timeSpan)
         {
+            CheckRuntimeContext();
             grain.Data.DelayDeactivation(timeSpan);
         }
 
@@ -65,6 +97,14 @@ namespace Orleans.Runtime
             IGrainStorage grainStorage = grain.GetGrainStorage(ServiceProvider);
             string grainTypeName = grain.GetType().FullName;
             return new StateStorageBridge<TGrainState>(grainTypeName, grain.GrainReference, grainStorage, this.loggerFactory);
+        }
+
+        private static void CheckRuntimeContext()
+        {
+            if (RuntimeContext.Current == null)
+            {
+                throw new InvalidOperationException("Activation access violation. A non-activation thread attempted to access activation services.");
+            }
         }
     }
 }

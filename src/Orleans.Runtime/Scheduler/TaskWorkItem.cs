@@ -31,8 +31,6 @@ namespace Orleans.Runtime.Scheduler
 #endif
         }
 
-        #region IWorkItem Members
-
         public override WorkItemType ItemType
         {
             get { return WorkItemType.Task; }
@@ -68,8 +66,6 @@ namespace Orleans.Runtime.Scheduler
                 || t.Status == TaskStatus.Canceled
             );
         }
-
-        #endregion
 
         public override bool Equals(object other)
         {

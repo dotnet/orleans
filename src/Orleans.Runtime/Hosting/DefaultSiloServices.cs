@@ -1,12 +1,15 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Configuration;
+using Orleans.Configuration.Validators;
 using Orleans.GrainDirectory;
+using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Counters;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.LogConsistency;
 using Orleans.Runtime.MembershipService;
+using Orleans.Metadata;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.MultiClusterNetwork;
 using Orleans.Runtime.Placement;
@@ -17,6 +20,7 @@ using Orleans.Runtime.Versions;
 using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Runtime.Versions.Selector;
 using Orleans.Serialization;
+using Orleans.Statistics;
 using Orleans.Streams;
 using Orleans.Streams.Core;
 using Orleans.Timers;
@@ -31,13 +35,9 @@ using Microsoft.Extensions.Logging;
 using Orleans.ApplicationParts;
 using Orleans.Runtime.Utilities;
 using System;
-using System.Collections.Generic;
-using Orleans.Metadata;
-using Orleans.Statistics;
+using System.Reflection;
+using System.Linq;
 using Microsoft.Extensions.Options;
-
-using Orleans.Configuration.Validators;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans.Hosting
 {
@@ -56,8 +56,8 @@ namespace Orleans.Hosting
             // Register system services.
             services.TryAddSingleton<ILocalSiloDetails, LocalSiloDetails>();
             services.TryAddSingleton<ISiloHost, SiloWrapper>();
-            services.TryAddTransient<ILifecycleSubject,LifecycleSubject>();
-            services.TryAddSingleton<ISiloLifecycleSubject,SiloLifecycleSubject>();
+            services.TryAddTransient<ILifecycleSubject, LifecycleSubject>();
+            services.TryAddSingleton<ISiloLifecycleSubject, SiloLifecycleSubject>();
             services.TryAddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloOptionsLogger>();
             services.PostConfigure<SiloMessagingOptions>(options =>
             {
@@ -65,12 +65,12 @@ namespace Orleans.Hosting
                 // Assign environment specific defaults post configuration if user did not configured otherwise.
                 //
 
-                if (options.SiloSenderQueues==0)
+                if (options.SiloSenderQueues == 0)
                 {
                     options.SiloSenderQueues = Environment.ProcessorCount;
                 }
 
-                if (options.GatewaySenderQueues==0)
+                if (options.GatewaySenderQueues == 0)
                 {
                     options.GatewaySenderQueues = Environment.ProcessorCount;
                 }
@@ -123,7 +123,7 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<IRuntimeClient, InsideRuntimeClient>();
             services.TryAddFromExisting<ISiloRuntimeClient, InsideRuntimeClient>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, InsideRuntimeClient>();
-            
+
             services.TryAddSingleton<MultiClusterGossipChannelFactory>();
             services.TryAddSingleton<MultiClusterOracle>();
             services.TryAddSingleton<MultiClusterRegistrationStrategyManager>();
@@ -171,8 +171,11 @@ namespace Orleans.Hosting
             services.TryAddSingleton<VersionSelectorManager>();
             services.TryAddSingleton<CachedVersionSelectorManager>();
             // Version selector strategy
-            services.TryAddSingleton<GrainVersionStore>();
-            services.AddFromExisting<IVersionStore, GrainVersionStore>();
+            if (!services.Any(x => x.ServiceType == typeof(IVersionStore)))
+            {
+                services.TryAddSingleton<GrainVersionStore>();
+                services.AddFromExisting<IVersionStore, GrainVersionStore>();
+            }
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, GrainVersionStore>();
             services.AddSingletonNamedService<VersionSelectorStrategy, AllCompatibleVersions>(nameof(AllCompatibleVersions));
             services.AddSingletonNamedService<VersionSelectorStrategy, LatestVersion>(nameof(LatestVersion));
@@ -221,7 +224,8 @@ namespace Orleans.Hosting
             services.TryAddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
 
             // Serialization
-            services.TryAddSingleton<SerializationManager>();
+            services.TryAddSingleton<SerializationManager>(sp=>ActivatorUtilities.CreateInstance<SerializationManager>(sp, 
+                sp.GetRequiredService<IOptions<SiloMessagingOptions>>().Value.LargeMessageWarningThreshold));
             services.TryAddSingleton<ITypeResolver, CachedTypeResolver>();
             services.TryAddSingleton<IFieldUtils, FieldUtils>();
             services.AddSingleton<BinaryFormatterSerializer>();
@@ -231,13 +235,13 @@ namespace Orleans.Hosting
             services.AddFromExisting<IKeyedSerializer, ILBasedSerializer>();
 
             // Transactions
-            services.TryAddSingleton<ITransactionAgent,DisabledTransactionAgent>();
+            services.TryAddSingleton<ITransactionAgent, DisabledTransactionAgent>();
 
             // Application Parts
             var applicationPartManager = context.GetApplicationPartManager();
             services.TryAddSingleton<IApplicationPartManager>(applicationPartManager);
-            applicationPartManager.AddApplicationPart(new AssemblyPart(typeof(RuntimeVersion).Assembly) {IsFrameworkAssembly = true});
-            applicationPartManager.AddApplicationPart(new AssemblyPart(typeof(Silo).Assembly) {IsFrameworkAssembly = true});
+            applicationPartManager.AddApplicationPart(new AssemblyPart(typeof(RuntimeVersion).Assembly) { IsFrameworkAssembly = true });
+            applicationPartManager.AddApplicationPart(new AssemblyPart(typeof(Silo).Assembly) { IsFrameworkAssembly = true });
             applicationPartManager.AddFeatureProvider(new BuiltInTypesSerializationFeaturePopulator());
             applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainInterfaceFeature>());
             applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainClassFeature>());
@@ -269,6 +273,30 @@ namespace Orleans.Hosting
             // so move it in the end so other validator are called first
             services.AddTransient<IConfigurationValidator, ClusterOptionsValidator>();
             services.AddTransient<IConfigurationValidator, SiloClusteringValidator>();
+
+            // Disable hosted client by default.
+            services.TryAddSingleton<IHostedClient, DisabledHostedClient>();
+
+            // Enable collection specific Age limits
+            services.AddOptions<GrainCollectionOptions>()
+                .Configure<IApplicationPartManager>((options, parts) =>
+                {
+                    var grainClasses = new GrainClassFeature();
+                    parts.PopulateFeature(grainClasses);
+
+                    foreach (var grainClass in grainClasses.Classes)
+                    {
+                        var attr = grainClass.ClassType.GetCustomAttribute<CollectionAgeLimitAttribute>();
+                        if (attr != null)
+                        {
+                            var className = TypeUtils.GetFullName(grainClass.ClassType);
+                            options.ClassSpecificCollectionAge[className] = TimeSpan.FromMinutes(attr.Minutes);
+                        }
+                    }
+                });
+
+            // Validate all CollectionAgeLimit values for the right configuration.
+            services.AddTransient<IConfigurationValidator, CollectionAgeLimitValidator>();
         }
     }
 }

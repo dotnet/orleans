@@ -105,7 +105,7 @@ namespace Orleans.Tests.SqlUtils
         string InvariantName { get; }
 
         /// <summary>
-        /// The connection string used to connecto the database.
+        /// The connection string used to connect to the database.
         /// </summary>
         string ConnectionString { get; }
     }

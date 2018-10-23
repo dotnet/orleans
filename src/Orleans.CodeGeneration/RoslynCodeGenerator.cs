@@ -171,7 +171,7 @@ namespace Orleans.CodeGenerator
         /// <summary>
         /// Generates a syntax tree for the provided assemblies.
         /// </summary>
-        /// <param name="targetAssembly">The assemblies used for accessiblity checks, or <see langword="null"/> during runtime code generation.</param>
+        /// <param name="targetAssembly">The assemblies used for accessibility checks, or <see langword="null"/> during runtime code generation.</param>
         /// <param name="assemblies">The assemblies to generate code for.</param>
         /// <returns>The generated syntax tree.</returns>
         private GeneratedSyntax GenerateCode(Assembly targetAssembly, List<Assembly> assemblies)

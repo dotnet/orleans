@@ -12,7 +12,7 @@ namespace Orleans.CodeGeneration
     public static class GrainFactoryBase
     {
         /// <summary>
-        /// Check that a grain observer parameter is of the correct underlying concrent type -- either extending from <c>GrainRefereence</c> or <c>Grain</c>
+        /// Check that a grain observer parameter is of the correct underlying concurrent type -- either extending from <c>GrainRefereence</c> or <c>Grain</c>
         /// </summary>
         /// <param name="grainObserver">Grain observer parameter to be checked.</param>
         /// <exception cref="ArgumentNullException">If grainObserver is <c>null</c></exception>
@@ -34,8 +34,6 @@ namespace Orleans.CodeGeneration
             }
         }
 
-        #region Utility functions
-
         internal static void DisallowNullOrWhiteSpaceKeyExtensions(string keyExt)
         {
             if (!string.IsNullOrWhiteSpace(keyExt)) return;
@@ -47,7 +45,5 @@ namespace Orleans.CodeGeneration
             
             throw new ArgumentException("Key extension is empty or white space.", "keyExt");
         }
-
-        #endregion
     }
 }

@@ -16,6 +16,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ILogger log;
         private Action<Message> rerouteHandler;
         internal Func<Message, bool> ShouldDrop;
+        private IHostedClient hostedClient;
 
         // ReSharper disable NotAccessedField.Local
         private IntValueStatistic sendQueueLengthCounter;
@@ -32,12 +33,16 @@ namespace Orleans.Runtime.Messaging
         private readonly Action<Message>[] localMessageHandlers;
 
         internal bool IsBlockingApplicationMessages { get; private set; }
-        
-        public bool IsProxying { get { return Gateway != null; } }
+
+        public void SetHostedClient(IHostedClient client) => this.hostedClient = client;
+
+        public bool IsProxying => this.Gateway != null || this.hostedClient?.ClientId != null;
 
         public bool TryDeliverToProxy(Message msg)
         {
-            return msg.TargetGrain.IsClient && Gateway != null && Gateway.TryDeliverToProxy(msg);
+            if (!msg.TargetGrain.IsClient) return false;
+            if (this.Gateway != null && this.Gateway.TryDeliverToProxy(msg)) return true;
+            return this.hostedClient?.TryDispatchToClient(msg) ?? false;
         }
         
         // This is determined by the IMA but needed by the OMS, and so is kept here in the message center itself.
@@ -236,7 +241,7 @@ namespace Orleans.Runtime.Messaging
 
         public Message WaitMessage(Message.Categories type, CancellationToken ct)
         {
-            return InboundQueue.WaitMessage(type);
+            return InboundQueue.WaitMessage(type, ct);
         }
 
         public void RegisterLocalMessageHandler(Message.Categories category, Action<Message> handler)

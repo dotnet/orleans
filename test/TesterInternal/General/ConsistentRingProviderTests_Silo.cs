@@ -44,8 +44,6 @@ namespace UnitTests.General
             }
         }
 
-        #region Tests
-
         [Fact, TestCategory("Functional"), TestCategory("Ring")]
         public async Task Ring_Basic()
         {
@@ -202,10 +200,6 @@ namespace UnitTests.General
                 VerificationScenario(PickKey(joins[0].SiloAddress));
             }, failureTimeout);
         }
-
-        #endregion
-
-        #region Utility methods
 
         private uint PickKey(SiloAddress responsibleSilo)
         {
@@ -392,7 +386,5 @@ namespace UnitTests.General
                 }
             }
         }
-
-        #endregion
     }
 }

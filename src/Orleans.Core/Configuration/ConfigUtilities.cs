@@ -349,6 +349,7 @@ namespace Orleans.Runtime.Configuration
             if (string.IsNullOrEmpty(addrOrHost))
             {
                 nodeIps = NetworkInterface.GetAllNetworkInterfaces()
+                            .Where(iface => iface.OperationalStatus == OperationalStatus.Up)
                             .SelectMany(iface => iface.GetIPProperties().UnicastAddresses)
                             .Select(addr => addr.Address)
                             .Where(addr => addr.AddressFamily == family && !IPAddress.IsLoopback(addr))
@@ -476,7 +477,7 @@ namespace Orleans.Runtime.Configuration
         }
 
         /// <summary>
-        /// Prints the the DataConnectionString,
+        /// Prints the DataConnectionString,
         /// without disclosing any credential info
         /// such as the Azure Storage AccountKey, SqlServer password or AWS SecretKey.
         /// </summary>

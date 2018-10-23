@@ -186,7 +186,6 @@ namespace Tester.AzureUtils.Persistence
             }
         }
 
-        #region Utility functions
         // ---------- Utility functions ----------
 
         protected void RunPerfTest(int n, string testName, TimeSpan target,
@@ -260,7 +259,6 @@ namespace Tester.AzureUtils.Persistence
             output.WriteLine("{0} completed. Did {1} iterations in {2} at {3} RPS",
                               testName, n, sw.Elapsed, n / sw.Elapsed.TotalSeconds);
         }
-        #endregion
     }
 }
 

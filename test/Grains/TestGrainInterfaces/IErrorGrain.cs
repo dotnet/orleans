@@ -15,7 +15,7 @@ namespace UnitTests.GrainInterfaces
         Task LongMethodWithError(int waitTime);
         Task DelayMethod(int milliseconds);
         Task Dispose();
-        Task<int> UnobservedErrorImmideate();
+        Task<int> UnobservedErrorImmediate();
         Task<int> UnobservedErrorDelayed();
         Task<int> UnobservedErrorContinuation2();
         Task<int> UnobservedErrorContinuation3();

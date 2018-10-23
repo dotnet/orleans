@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Concurrency;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 
@@ -77,6 +78,24 @@ namespace UnitTests.Grains
     }
 
     public class BusyActivationGcTestGrain2: Grain, IBusyActivationGcTestGrain2
+    {
+        public Task Nop()
+        {
+            return Task.CompletedTask;
+        }
+    }
+
+    [CollectionAgeLimit(Minutes = 0.2)]
+    public class CollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain : Grain, ICollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain
+    {
+        public Task Nop()
+        {
+            return Task.CompletedTask;
+        }
+    }
+
+    // Use this Test Class in Non.Silo test [SiloHostBuilder_GrainCollectionOptionsForZeroSecondsAgeLimitTest]
+    public class CollectionSpecificAgeLimitForZeroSecondsActivationGcTestGrain : Grain, ICollectionSpecificAgeLimitForZeroSecondsActivationGcTestGrain
     {
         public Task Nop()
         {

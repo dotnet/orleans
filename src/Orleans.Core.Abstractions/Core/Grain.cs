@@ -104,7 +104,7 @@ namespace Orleans
         /// will be logged, but will not prevent the next timer tick from being queued.
         /// </para>
         /// </remarks>
-        /// <param name="asyncCallback">Callback function to be invoked when timr ticks.</param>
+        /// <param name="asyncCallback">Callback function to be invoked when timer ticks.</param>
         /// <param name="state">State object that will be passed as argument when calling the asyncCallback.</param>
         /// <param name="dueTime">Due time for first timer tick.</param>
         /// <param name="period">Period of subsequent timer ticks.</param>
@@ -128,7 +128,7 @@ namespace Orleans
         /// </summary>
         /// <param name="reminderName">Name of this reminder</param>
         /// <param name="dueTime">Due time for this reminder</param>
-        /// <param name="period">Frequence period for this reminder</param>
+        /// <param name="period">Frequency period for this reminder</param>
         /// <returns>Promise for Reminder handle.</returns>
         protected Task<IGrainReminder> RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
         {
@@ -223,7 +223,7 @@ namespace Orleans
         }
 
         /// <summary>
-        /// This method is called at the begining of the process of deactivating a grain.
+        /// This method is called at the beginning of the process of deactivating a grain.
         /// </summary>
         public virtual Task OnDeactivateAsync()
         {

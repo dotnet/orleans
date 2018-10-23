@@ -11,23 +11,16 @@ namespace Orleans.CodeGeneration
     {
         /// <summary>Initializes a new instance of <see cref="KnownAssemblyAttribute"/>.</summary>
         /// <param name="type">A type contained by the target assembly. 
-        /// The type itself is not relevant, and it's just a way to inrectly identify the assembly.</param>
+        /// The type itself is not relevant, and it's just a way to indirectly identify the assembly.</param>
         public KnownAssemblyAttribute(Type type)
         {
             this.Assembly = type.GetTypeInfo().Assembly;
         }
 
-        /// <summary>Initializes a new instance of <see cref="KnownAssemblyAttribute"/>.</summary>
-        /// <param name="assemblyName">The target assembly name.</param>
-        public KnownAssemblyAttribute(string assemblyName)
-        {
-            this.Assembly = Assembly.Load(new AssemblyName(assemblyName));
-        }
-
         /// <summary>
         /// Gets or sets the assembly to include in code generation.
         /// </summary>
-        public Assembly Assembly { get; set; }
+        public Assembly Assembly { get; }
 
         /// <summary>
         /// Gets or sets a value indicating whether or not to assume that all types in the specified assembly are

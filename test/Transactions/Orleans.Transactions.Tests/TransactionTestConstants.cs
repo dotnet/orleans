@@ -14,6 +14,9 @@ namespace Orleans.Transactions.Tests
         // storage providers
         public const string TransactionStore = "TransactionStore";
 
+        // committer service
+        public const string RemoteCommitService = "RemoteCommitService";
+        
         // grain implementations
         public const string NoStateTransactionalGrain = "NoStateTransactionalGrain";
         public const string SingleStateTransactionalGrain = "SingleStateTransactionalGrain";

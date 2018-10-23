@@ -14,8 +14,6 @@ namespace UnitTests.GrainInterfaces
     /// </summary>
     public interface ILogTestGrain: IGrainWithIntegerKey
     {
-        #region Queries
-
         // read A
 
         Task<int> GetAGlobal();
@@ -39,10 +37,6 @@ namespace UnitTests.GrainInterfaces
         // exception
         Task<IEnumerable<ConnectionIssue>> GetUnresolvedConnectionIssues();
 
-        #endregion
-
-
-        #region Updates
 
         // set or increment A
 
@@ -68,8 +62,6 @@ namespace UnitTests.GrainInterfaces
 
         Task RemoveReservationLocal(int x);
 
-        #endregion
-
 
         Task<KeyValuePair<int, object>> Read();
         Task<bool> Update(IReadOnlyList<object> updates, int expectedversion);
@@ -77,14 +69,10 @@ namespace UnitTests.GrainInterfaces
         Task<IReadOnlyList<object>> GetEventLog();
 
 
-            #region Other
-
-            // other operations
+        // other operations
 
             Task SynchronizeGlobalState();
         Task Deactivate();
-
-        #endregion
     }
 
     /// <summary>

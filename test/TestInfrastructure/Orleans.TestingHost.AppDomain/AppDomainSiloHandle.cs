@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.Remoting;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 
@@ -18,7 +19,7 @@ namespace Orleans.TestingHost
         /// <summary> Get or set the AppDomain used by the silo </summary>
         public AppDomain AppDomain { get; set; }
 
-        /// <summary>Gets or sets a reference to the silo host that is marshable by reference.</summary>
+        /// <summary>Gets or sets a reference to the silo host that is marshallable by reference.</summary>
         public AppDomainSiloHost SiloHost { get; set; }
 
         /// <inheritdoc />
@@ -110,6 +111,11 @@ namespace Orleans.TestingHost
             }
 
             this.SiloHost = null;
+        }
+
+        public override void StopSilo(CancellationToken ct)
+        {
+            throw new NotImplementedException();
         }
 
         private void UnloadAppDomain()

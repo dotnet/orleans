@@ -64,12 +64,9 @@ namespace Orleans.Messaging
     {
         internal readonly SerializationManager SerializationManager;
 
-        #region Constants
-
         internal static readonly TimeSpan MINIMUM_INTERCONNECT_DELAY = TimeSpan.FromMilliseconds(100);   // wait one tenth of a second between connect attempts
         internal const int CONNECT_RETRY_COUNT = 2;                                                      // Retry twice before giving up on a gateway server
 
-        #endregion
         internal GrainId ClientId { get; private set; }
         public IRuntimeClient RuntimeClient { get; }
         internal bool Running { get; private set; }
@@ -333,13 +330,7 @@ namespace Orleans.Messaging
         {
             try
             {
-                if (ct.IsCancellationRequested)
-                {
-                    return null;
-                }
-
-                // Don't pass CancellationToken to Take. It causes too much spinning.
-                return PendingInboundMessages.Take();
+                return PendingInboundMessages.Take(ct);
             }
             catch (ThreadAbortException exc)
             {
@@ -379,11 +370,10 @@ namespace Orleans.Messaging
             PendingInboundMessages.Add(msg);
         }
 
-        private void RejectMessage(Message msg, string reasonFormat, params object[] reasonParams)
+        public void RejectMessage(Message msg, string reason, Exception exc = null)
         {
             if (!Running) return;
-
-            var reason = String.Format(reasonFormat, reasonParams);
+            
             if (msg.Direction != Message.Directions.Request)
             {
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.ProxyClient_DroppingMsg, "Dropping message: {0}. Reason = {1}", msg, reason);
@@ -392,7 +382,7 @@ namespace Orleans.Messaging
             {
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.ProxyClient_RejectingMsg, "Rejecting message: {0}. Reason = {1}", msg, reason);
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
-                Message error = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason);
+                Message error = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason, exc);
                 QueueIncomingMessage(error);
             }
         }
@@ -416,8 +406,6 @@ namespace Orleans.Messaging
             throw new NotImplementedException("Reconnect");
         }
 
-        #region Random IMessageCenter stuff
-
         public int SendQueueLength
         {
             get { return 0; }
@@ -427,8 +415,6 @@ namespace Orleans.Messaging
         {
             get { return 0; }
         }
-
-        #endregion
 
         private IClusterTypeManager GetTypeManager(SiloAddress destination, IInternalGrainFactory grainFactory)
         {

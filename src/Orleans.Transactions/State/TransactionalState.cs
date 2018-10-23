@@ -1,253 +1,227 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
-using Newtonsoft.Json;
-using Orleans.Transactions;
-using Orleans.Transactions.Abstractions.Extensions;
+using Orleans.Transactions.State;
+using Orleans.Configuration;
 
 namespace Orleans.Transactions
 {
     /// <summary>
     /// Stateful facet that respects Orleans transaction semantics
     /// </summary>
-    public partial class TransactionalState<TState> : ITransactionalState<TState>, ITransactionParticipant, ILifecycleParticipant<IGrainLifecycle>
+    public class TransactionalState<TState> : ITransactionalState<TState>, ILifecycleParticipant<IGrainLifecycle>
         where TState : class, new()
     {
         private readonly ITransactionalStateConfiguration config;
         private readonly IGrainActivationContext context;
         private readonly ITransactionDataCopier<TState> copier;
-        private readonly ITransactionAgent transactionAgent;
         private readonly IProviderRuntime runtime;
+        private readonly IGrainRuntime grainRuntime;
         private readonly ILoggerFactory loggerFactory;
+        private readonly JsonSerializerSettings serializerSettings;
 
-        private  ILogger logger;
+        private ILogger logger;
+        private ParticipantId participantId;
+        private TransactionQueue<TState> queue;
 
-        private ITransactionParticipant thisParticipant;
+        public string CurrentTransactionId => TransactionContext.GetRequiredTransactionInfo<TransactionInfo>().Id;
 
-        // storage
-        private ITransactionalStateStorage<TState> storage;
-
-        private string stateName;
-        private string StateName => stateName ?? (stateName = StoredName());
-
-        //private TimeSpan DebuggerAllowance = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromTicks(0);
-        private TimeSpan DebuggerAllowance = TimeSpan.FromTicks(0);
-
-        // max time the TM will wait for prepare phase to complete
-        private TimeSpan PrepareTimeout => TimeSpan.FromSeconds(20) + DebuggerAllowance;
-
-        // max time a group can occupy the lock
-        private TimeSpan LockTimeout => TimeSpan.FromSeconds(8) + DebuggerAllowance;
-
-        // max time a transaction will wait for the lock to become available
-        private TimeSpan LockAcquireTimeout => TimeSpan.FromSeconds(10) + DebuggerAllowance;
-
-
-        private TimeSpan RemoteTransactionPingFrequency => TimeSpan.FromSeconds(60);
-        private static TimeSpan ConfirmationRetryDelay => TimeSpan.FromSeconds(30);
-        private static int ConfirmationRetryLimit => 3;
-
-
-        private TState stableState;
-        private long stableSequenceNumber;
-
-        // the queues handling the various stages
-        private CommitQueue<TState> commitQueue;
-        private StorageBatch<TState> storageBatch;
-
-        private Dictionary<Guid, TransactionRecord<TState>> _confirmationTasks;
-        private Dictionary<Guid, TransactionRecord<TState>> confirmationTasks
-        {
-            get
-            {
-                if (_confirmationTasks == null)
-                {
-                    _confirmationTasks = new Dictionary<Guid, TransactionRecord<TState>>();
-                }
-                return _confirmationTasks;
-            }
-        }
-
-        private TransactionalStatus problemFlag;
-        private int failCounter;
-
-        // moves transactions into and out of the lock stage
-        private BatchWorker lockWorker;
-
-        // processes storage and post-storage queues, moves transactions out of the commit stage
-        private BatchWorker storageWorker;
-
-        // processes confirmation tasks
-        private BatchWorker confirmationWorker;
-
-        private CausalClock clock;
-
-        // collection tasks
-        private Dictionary<DateTime, PMessages> unprocessedPreparedMessages;
-        private class PMessages
-        {
-            public int Count;
-            public TransactionalStatus Status;
-        }
+        private bool detectReentrancy;
 
         public TransactionalState(
             ITransactionalStateConfiguration transactionalStateConfiguration, 
             IGrainActivationContext context, 
             ITransactionDataCopier<TState> copier, 
-            ITransactionAgent transactionAgent, 
-            IProviderRuntime runtime, 
+            IProviderRuntime runtime,
+            IGrainRuntime grainRuntime,
             ILoggerFactory loggerFactory, 
-            ITypeResolver typeResolver,
-            IGrainFactory grainFactory,
-            IClock clock
+            JsonSerializerSettings serializerSettings
             )
         {
             this.config = transactionalStateConfiguration;
             this.context = context;
             this.copier = copier;
-            this.transactionAgent = transactionAgent;
             this.runtime = runtime;
+            this.grainRuntime = grainRuntime;
             this.loggerFactory = loggerFactory;
-            this.clock = new CausalClock(clock);
-
-            lockWorker = new BatchWorkerFromDelegate(LockWork);
-            storageWorker = new BatchWorkerFromDelegate(StorageWork);
-            confirmationWorker = new BatchWorkerFromDelegate(ConfirmationWork);
-
-            if (MetaData.SerializerSettings == null)
-            {
-                MetaData.SerializerSettings = TransactionParticipantExtensionExtensions.GetJsonSerializerSettings(typeResolver, grainFactory);
-            }
-        }
-
-        #region lifecycle
-
-        public void Participate(IGrainLifecycle lifecycle)
-        {
-            lifecycle.Subscribe<TransactionalState<TState>>(GrainLifecycleStage.SetupState, OnSetupState);
-        }
-
-        private async Task OnSetupState(CancellationToken ct)
-        {
-            if (ct.IsCancellationRequested) return;
-
-            var boundExtension = await this.runtime.BindExtension<TransactionParticipantExtension, ITransactionParticipantExtension>(() => new TransactionParticipantExtension());
-            boundExtension.Item1.Register(this.config.StateName, this);
-            this.thisParticipant = boundExtension.Item2.AsTransactionParticipant(this.config.StateName);
-
-            this.logger = loggerFactory.CreateLogger($"{context.GrainType.Name}.{this.config.StateName}.{this.thisParticipant.ToShortString()}");
-
-            var storageFactory = this.context.ActivationServices.GetRequiredService<INamedTransactionalStateStorageFactory>();
-            this.storage = storageFactory.Create<TState>(this.config.StorageName, this.config.StateName);
-
-            // recover state
-            await Restore();
-
-            storageWorker.Notify();
-        }
-
-        #endregion lifecycle
-  
-        private string StoredName()
-        {
-            return $"{this.context.GrainInstance.GetType().FullName}-{this.config.StateName}";
-        }
-
-        public bool Equals(ITransactionParticipant other)
-        {
-            return thisParticipant.Equals(other);
-        }
-
-        public override string ToString()
-        {
-            return $"{this.context.GrainInstance}.{this.config.StateName}";
+            this.serializerSettings = serializerSettings;
         }
 
         /// <summary>
-        /// called on activation, and when recovering from storage conflicts or other exceptions.
+        /// Read the current state.
         /// </summary>
-        private async Task Restore()
+        public Task<TResult> PerformRead<TResult>(Func<TState, TResult> operation)
         {
-            // start the load
-            var loadtask = this.storage.Load();
-
-            // abort active transactions, without waking up waiters just yet
-            AbortExecutingTransactions("due to restore");
-
-            // abort all entries in the commit queue
-            foreach (var entry in commitQueue.Elements)
+            if (detectReentrancy)
             {
-                NotifyOfAbort(entry, problemFlag);
+                throw new LockRecursionException("cannot perform a read operation from within another operation");
             }
-            commitQueue.Clear();
 
-            var loadresponse = await loadtask;
+            var info = (TransactionInfo)TransactionContext.GetRequiredTransactionInfo<TransactionInfo>();
 
-            storageBatch = new StorageBatch<TState>(loadresponse);
+            if (logger.IsEnabled(LogLevel.Trace))
+                logger.Trace($"StartRead {info}");
 
-            stableState = loadresponse.CommittedState;
-            stableSequenceNumber = loadresponse.CommittedSequenceId;
+            info.Participants.TryGetValue(this.participantId, out var recordedaccesses);
 
-            if (logger.IsEnabled(LogLevel.Debug))
-                logger.Debug($"Load v{stableSequenceNumber} {loadresponse.PendingStates.Count}p {storageBatch.MetaData.CommitRecords.Count}c");
+            // schedule read access to happen under the lock
+            return this.queue.RWLock.EnterLock<TResult>(info.TransactionId, info.Priority, recordedaccesses, true,
+                 new Task<TResult>(() =>
+                 {
+                     // check if our record is gone because we expired while waiting
+                     if (!this.queue.RWLock.TryGetRecord(info.TransactionId, out TransactionRecord<TState> record))
+                     {
+                         throw new OrleansTransactionLockAcquireTimeoutException(info.TransactionId.ToString());
+                     }
 
-            // ensure clock is consistent with loaded state
-            this.clock.Merge(storageBatch.MetaData.TimeStamp);
+                     // merge the current clock into the transaction time stamp
+                     record.Timestamp = this.queue.Clock.MergeUtcNow(info.TimeStamp);
 
-            // resume prepared transactions (not TM)
-            foreach (var pr in loadresponse.PendingStates.OrderBy(ps => ps.TimeStamp))
+                     if (record.State == null)
+                     {
+                         this.queue.GetMostRecentState(out record.State, out record.SequenceNumber);
+                     }
+
+                     if (logger.IsEnabled(LogLevel.Debug))
+                         logger.Debug($"update-lock read v{record.SequenceNumber} {record.TransactionId} {record.Timestamp:o}");
+
+                     // record this read in the transaction info data structure
+                     info.RecordRead(this.participantId, record.Timestamp);
+
+                     // perform the read 
+                     TResult result = default(TResult);
+                     try
+                     {
+                         detectReentrancy = true;
+
+                         result = operation(record.State);
+                     }
+                     finally
+                     {
+                         if (logger.IsEnabled(LogLevel.Trace))
+                             logger.Trace($"EndRead {info} {result} {record.State}");
+
+                         detectReentrancy = false;
+                     }
+
+                     return result;
+                 }));
+        }
+
+        /// <inheritdoc/>
+        public Task<TResult> PerformUpdate<TResult>(Func<TState, TResult> updateAction)
+        {
+            if (updateAction == null) throw new ArgumentNullException(nameof(updateAction));
+            if (detectReentrancy)
             {
-                if (pr.SequenceId > stableSequenceNumber && pr.TransactionManager != null)
+                throw new LockRecursionException("cannot perform an update operation from within another operation");
+            }
+
+            var info = (TransactionInfo)TransactionContext.GetRequiredTransactionInfo<TransactionInfo>();
+
+            if (logger.IsEnabled(LogLevel.Trace))
+                logger.Trace($"StartWrite {info}");
+
+            if (info.IsReadOnly)
+            {
+                throw new OrleansReadOnlyViolatedException(info.Id);
+            }
+
+            info.Participants.TryGetValue(this.participantId, out var recordedaccesses);
+
+            return this.queue.RWLock.EnterLock<TResult>(info.TransactionId, info.Priority, recordedaccesses, false,
+                new Task<TResult>(() =>
                 {
-                    if (logger.IsEnabled(LogLevel.Debug))
-                        logger.Debug($"recover two-phase-commit {pr.TransactionId}");
-
-                    var tm = (pr.TransactionManager == null) ? null :
-                        (ITransactionParticipant) JsonConvert.DeserializeObject<ITransactionParticipant>(pr.TransactionManager, MetaData.SerializerSettings);
-
-                    commitQueue.Add(new TransactionRecord<TState>()
+                    // check if we expired while waiting
+                    if (!this.queue.RWLock.TryGetRecord(info.TransactionId, out TransactionRecord<TState> record))
                     {
-                        Role = CommitRole.RemoteCommit,
-                        TransactionId = Guid.Parse(pr.TransactionId),
-                        Timestamp = pr.TimeStamp,
-                        State = pr.State,
-                        TransactionManager = tm,
-                        PrepareIsPersisted = true,
-                        LastSent = default(DateTime),
-                        ConfirmationResponsePromise = null
-                    });
+                        throw new OrleansTransactionLockAcquireTimeoutException(info.TransactionId.ToString());
+                    }
+
+                    // merge the current clock into the transaction time stamp
+                    record.Timestamp = this.queue.Clock.MergeUtcNow(info.TimeStamp);
+
+                    // link to the latest state
+                    if (record.State == null)
+                    {
+                        this.queue.GetMostRecentState(out record.State, out record.SequenceNumber);
+                    }
+
+                    // if this is the first write, make a deep copy of the state
+                    if (!record.HasCopiedState)
+                    {
+                        record.State = this.copier.DeepCopy(record.State);
+                        record.SequenceNumber++;
+                        record.HasCopiedState = true;
+                    }
+
+                    if (logger.IsEnabled(LogLevel.Debug))
+                        logger.Debug($"update-lock write v{record.SequenceNumber} {record.TransactionId} {record.Timestamp:o}");
+
+                    // record this write in the transaction info data structure
+                    info.RecordWrite(this.participantId, record.Timestamp);
+
+                    // perform the write
+                    try
+                    {
+                        detectReentrancy = true;
+
+                        return updateAction(record.State);
+                    }
+                    finally
+                    {
+                        if (logger.IsEnabled(LogLevel.Trace))
+                            logger.Trace($"EndWrite {info} {record.TransactionId} {record.Timestamp}");
+
+                        detectReentrancy = false;
+                    }
                 }
-            }
+            ));
+        }
 
-            // resume committed transactions (on TM)
-            foreach (var kvp in storageBatch.MetaData.CommitRecords)
-            {
-                if (logger.IsEnabled(LogLevel.Debug))
-                    logger.Debug($"recover commit confirmation {kvp.Key}");
+        public void Participate(IGrainLifecycle lifecycle)
+        {
+            lifecycle.Subscribe<TransactionalState<TState>>(GrainLifecycleStage.SetupState, (ct) => OnSetupState(ct, SetupResourceFactory));
+        }
 
-                confirmationTasks.Add(kvp.Key, new TransactionRecord<TState>()
-                {
-                    Role = CommitRole.LocalCommit,
-                    TransactionId = kvp.Key,
-                    Timestamp = kvp.Value.Timestamp,
-                    WriteParticipants = kvp.Value.WriteParticipants
-                });
-            }
+        private static void SetupResourceFactory(IGrainActivationContext context, string stateName, TransactionQueue<TState> queue)
+        {
+            // Add resources factory to the grain context
+            context.RegisterResourceFactory<ITransactionalResource>(stateName, () => new TransactionalResource<TState>(queue));
 
-            // clear the problem flag
-            problemFlag = TransactionalStatus.Ok;
+            // Add tm factory to the grain context
+            context.RegisterResourceFactory<ITransactionManager>(stateName, () => new TransactionManager<TState>(queue));
+        }
 
-            // check for work
-            confirmationWorker.Notify();
-            storageWorker.Notify();
-            lockWorker.Notify();
+        internal async Task OnSetupState(CancellationToken ct, Action<IGrainActivationContext, string, TransactionQueue<TState>> setupResourceFactory)
+        {
+            if (ct.IsCancellationRequested) return;
+
+            this.participantId = new ParticipantId(this.config.StateName, this.context.GrainInstance.GrainReference, ParticipantId.Role.Resource | ParticipantId.Role.Manager);
+
+            this.logger = loggerFactory.CreateLogger($"{context.GrainType.Name}.{this.config.StateName}.{this.context.GrainIdentity.IdentityString}");
+
+            var storageFactory = this.context.ActivationServices.GetRequiredService<INamedTransactionalStateStorageFactory>();
+            ITransactionalStateStorage<TState> storage = storageFactory.Create<TState>(this.config.StorageName, this.config.StateName);
+
+            // setup transaction processing pipe
+            Action deactivate = () => grainRuntime.DeactivateOnIdle(context.GrainInstance);
+            var options = this.context.ActivationServices.GetRequiredService<IOptions<TransactionalStateOptions>>();
+            var clock = this.context.ActivationServices.GetRequiredService<IClock>();
+            this.queue = new TransactionQueue<TState>(options, this.participantId, deactivate, storage, this.serializerSettings, clock, logger);
+
+            setupResourceFactory(this.context, this.config.StateName, queue);
+
+            // recover state
+            await this.queue.NotifyOfRestore();
         }
     }
 }

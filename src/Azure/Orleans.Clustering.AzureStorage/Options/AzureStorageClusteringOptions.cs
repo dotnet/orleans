@@ -14,5 +14,11 @@
         /// </summary>
         [RedactConnectionString]
         public string ConnectionString { get; set; }
+
+        /// <summary>
+        /// Table name for Azure Storage
+        /// </summary>
+        public string TableName { get; set; } = DEFAULT_TABLE_NAME;
+        public const string DEFAULT_TABLE_NAME = "OrleansSiloInstances";
     }
 }

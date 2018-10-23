@@ -5,7 +5,7 @@ using Orleans.Streams;
 namespace Orleans.Providers.Streams.Common
 {
     /// <summary>
-    /// Stream sequcen token that tracks sequence nubmer and event index
+    /// Stream sequence token that tracks sequence number and event index
     /// </summary>
     [Serializable]
     public class EventSequenceToken : StreamSequenceToken
