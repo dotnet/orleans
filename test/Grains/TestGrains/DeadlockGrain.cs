@@ -38,16 +38,18 @@ namespace UnitTests.Grains
     {
         private string Id { get { return String.Format("DeadlockNonReentrantGrain {0}", base.IdentityString); } }
 
-        public Task CallNext_1(List<Tuple<long, bool>> callChain, int currCallIndex)
+        public async Task CallNext_1(List<Tuple<long, bool>> callChain, int currCallIndex)
         {
-            this.GetLogger(Id).Info("Inside grain {0} CallNext_1().", Id);
-            return DeadlockGrain.CallNext(GrainFactory, callChain, currCallIndex);
+            this.GetLogger(Id).Info("Inside grain {0}.{1} CallNext_1().", Id, currCallIndex);
+            await  DeadlockGrain.CallNext(GrainFactory, callChain, currCallIndex);
+            this.GetLogger(Id).Info("Inside grain {0}.{1} CallNext_1() Finished.", Id, currCallIndex);
         }
 
-        public Task CallNext_2(List<Tuple<long, bool>> callChain, int currCallIndex)
+        public async Task CallNext_2(List<Tuple<long, bool>> callChain, int currCallIndex)
         {
-            this.GetLogger(Id).Info("Inside grain {0} CallNext_2().", Id);
-            return DeadlockGrain.CallNext(GrainFactory, callChain, currCallIndex);
+            this.GetLogger(Id).Info("Inside grain {0}.{1} CallNext_2().", Id, currCallIndex);
+            await DeadlockGrain.CallNext(GrainFactory, callChain, currCallIndex);
+            this.GetLogger(Id).Info("Inside grain {0}.{1} CallNext_2() Finished.", Id, currCallIndex);
         }
     }
 

@@ -400,8 +400,7 @@ namespace Orleans.Runtime
         /// <param name="message">Message to analyze</param>
         private void CheckDeadlock(Message message)
         {
-            if (IsMessageACallChainLoop(message)
-                && schedulingOptions.CallChainReentrancy != SchedulingOptions.CallChainReentrancyStrategy.EntireChain)
+            if (IsMessageACallChainLoop(message))
             {
                 IEnumerable<Tuple<GrainId, string>> callChain = Enumerable.Empty<Tuple<GrainId, string>>();
                 string exceptionMessage = string.Empty;
