@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 
-namespace HelloWorld.Interfaces
+namespace Stocks.Interfaces
 {
     public interface IStockGrain : Orleans.IGrainWithStringKey
     {

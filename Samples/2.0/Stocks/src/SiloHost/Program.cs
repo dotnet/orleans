@@ -1,16 +1,14 @@
 ﻿using System;
-using System.Net;
 using System.Threading.Tasks;
-using HelloWorld.Grains;
-using HelloWorld.Interfaces;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Stocks.Grains;
+using Stocks.Interfaces;
 
-namespace OrleansSiloHost
+namespace SiloHost
 {
     public class Program
     {

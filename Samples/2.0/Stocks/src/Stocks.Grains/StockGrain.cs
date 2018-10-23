@@ -1,12 +1,12 @@
 using System;
 using System.Net.Http;
 using System.Threading.Tasks;
-using HelloWorld.Interfaces;
 using Orleans;
+using Stocks.Interfaces;
 
-namespace HelloWorld.Grains
+namespace Stocks.Grains
 {
-    public class StockGrain : Orleans.Grain, IStockGrain
+    public class StockGrain : Grain, IStockGrain
     {
         // request api key from here https://www.alphavantage.co/support/#api-key
         private const string apiKey = "demo";
