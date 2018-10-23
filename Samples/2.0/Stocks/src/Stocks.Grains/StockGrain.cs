@@ -8,21 +8,21 @@ namespace HelloWorld.Grains
 {
     public class StockGrain : Orleans.Grain, IStockGrain
     {
-        private const string apiKey = "GYA8KUZ1L1MRDV7T";
+        // request api key from here https://www.alphavantage.co/support/#api-key
+        private const string apiKey = "demo";
         string price;
         string graphData;
 
         public override async Task OnActivateAsync()
         {
-            string stock;
-            this.GetPrimaryKey(out stock);
+            this.GetPrimaryKey(out var stock);
             await UpdatePrice(stock);
 
             RegisterTimer(
                 UpdatePrice,
                 stock,
-                TimeSpan.FromSeconds(5),
-                TimeSpan.FromSeconds(5));
+                TimeSpan.FromMinutes(1),
+                TimeSpan.FromMinutes(1));
 
             await base.OnActivateAsync();
         }
