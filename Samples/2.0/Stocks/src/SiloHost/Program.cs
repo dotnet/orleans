@@ -21,13 +21,9 @@ namespace OrleansSiloHost
 
         private static async Task<int> RunMainAsync()
         {
-            var configurationBuilder = new ConfigurationBuilder();
-
-            var configuration = configurationBuilder.Build();
-
             try
             {
-                var host = await StartSilo(configuration);
+                var host = await StartSilo();
                 Console.WriteLine("Press Enter to terminate...");
                 var client = host.Services.GetRequiredService<IClusterClient>();
 
@@ -50,7 +46,7 @@ namespace OrleansSiloHost
             }
         }
 
-        private static async Task<ISiloHost> StartSilo(IConfiguration configuration)
+        private static async Task<ISiloHost> StartSilo()
         {
             // define the cluster configuration
             var builder = new SiloHostBuilder()
