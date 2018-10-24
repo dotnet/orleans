@@ -92,7 +92,15 @@ namespace Orleans.Runtime.Host
 
         internal static String ParseDeploymentKVPrefix(String deploymentId, String rootKvFolder)
         {
-            return String.Format("{0}{1}{2}{3}{4}", rootKvFolder, KeySeparator, DeploymentKVPrefix, KeySeparator, deploymentId);
+            //Backward compatible
+            if (string.IsNullOrEmpty(rootKvFolder))
+            {
+                return String.Format("{0}{1}{2}", DeploymentKVPrefix, KeySeparator, deploymentId);
+            }
+            else
+            {
+                return String.Format("{0}{1}{2}{3}{4}", rootKvFolder, KeySeparator, DeploymentKVPrefix, KeySeparator, deploymentId);
+            }
         }
 
         internal static String ParseDeploymentSiloKey(String deploymentId, String rootKvFolder, SiloAddress siloAddress)
