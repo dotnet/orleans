@@ -1,9 +1,10 @@
-﻿open FSharp.Control.Tasks
-open Microsoft.Extensions.Logging
+﻿open Microsoft.Extensions.Logging
 open Orleans
 open Orleans.Runtime.Configuration
 open Orleans.Hosting
 open System
+open FSharp.Control.Tasks
+
 open FSharp.NetCore.Grains
 open FSharp.NetCore.Interfaces
 

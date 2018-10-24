@@ -1,11 +1,11 @@
-﻿open FSharp.Control.Tasks
-
-open System
+﻿open System
 open System.Threading.Tasks
 open Microsoft.Extensions.Logging
 open Orleans
 open Orleans.Runtime.Configuration
 open Orleans.Hosting
+open FSharp.Control.Tasks
+
 open FSharp.NetCore.Interfaces
 
 let buildClient () =
