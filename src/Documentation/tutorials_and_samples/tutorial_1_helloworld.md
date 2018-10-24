@@ -5,19 +5,84 @@ title: Tutorial 1 Hello World
 
 # Tutorial 1: Hello World
 
-This process recreates the same Hello World sample application available [here](https://github.com/dotnet/orleans/tree/master/Samples/2.0/HelloWorld).
+This process ties into the Hello World sample application available [here](https://github.com/dotnet/orleans/tree/master/Samples/2.0/HelloWorld).
+The important concepts to get out of this tutorial are:
+Orleans is not a single, standalone application that you download and install.
+Orleans is a collection of separate, configurable projects that use NuGet packages to add Orleans functionality to another application.
 
-## Overview of the parts
+The main concepts of Orleans involve a silo, a client, and one or more grains.
+Creating an Orleans app involves configuring the silo, configuring the client, and writing the grains.
 
-This application consists of a solution that contains four projects: SiloHost, OrleansClient, HelloWorld.Interfaces, and HelloWorld.Grains.
+## Configuring the silo
+
+Silos are configured programmatically via `SiloHostBuilder` and a number of supplemental option classes.
+A list of all of the options can be found [here.](http://dotnet.github.io/orleans/Documentation/clusters_and_clients/configuration_guide/list_of_options_classes.html)
 
 ```csharp
 [...]
         private static async Task<ISiloHost> StartSilo()
-        { 
-            // define the cluster configuration 
+        {
+            // define the cluster configuration
             var builder = new SiloHostBuilder()
+                .UseLocalhostClustering()
+                .Configure<ClusterOptions>(options =>
+                {
+                    options.ClusterId = "dev";
+                    options.ServiceId = "HelloWorldApp";
+                })
+                .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
+                .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(HelloGrain).Assembly).WithReferences())
+                .ConfigureLogging(logging => logging.AddConsole());
+
+            var host = builder.Build();
+            await host.StartAsync();
+            return host;
+        }
 ```
+
+| Option | Used for |
+|-------------|----------|
+| `.UseLocalhostClustering()` | Declaring that we are using a single local silo |
+| `ClusterOptions` | ClusterId is the name for the Orleans cluster must be the same for silo and client so they can talk to each other. ServiceId is the ID used for the application and it must not change across deployments|
+| `EndpointOptions` | This tells the silo where to listen. For this example, we are using a `loopback`. |
+| `ConfigureApplicationParts` | Adds the assembly with grain classes to the application setup. |
+
+After loading the configurations, the SiloHost is built and then started asynchronously.
+
+## Configuring the client
+
+Similar to the silo, the client is configured via `ClientBuilder` and a similar collection of option classes.
+
+```csharp
+        private static async Task<IClusterClient> StartClientWithRetries()
+        {
+            attempt = 0;
+            IClusterClient client;
+            client = new ClientBuilder()
+                .UseLocalhostClustering()
+                .Configure<ClusterOptions>(options =>
+                {
+                    options.ClusterId = "dev";
+                    options.ServiceId = "HelloWorldApp";
+                })
+                .ConfigureLogging(logging => logging.AddConsole())
+                .Build();
+
+            await client.Connect(RetryFilter);
+            Console.WriteLine("Client successfully connect to silo host");
+            return client;
+        }
+
+```
+
+| Option | Used for |
+|-------------|----------|
+| `.UseLocalhostClustering()` | Same as for SiloHost |
+| `ClusterOptions` | Same as for SiloHost |
+
+A more in-depth guide to configuring your client can be found [in the Client Configuration section of the Configuration Guide.](http://dotnet.github.io/orleans/Documentation/clusters_and_clients/configuration_guide/client_configuration.html)
+
+## Writing a grain
 
 Grains are the building blocks of an Orleans application, and you can read more about them in the [Core Concepts section of the Orleans documentation.](http://dotnet.github.io/orleans/Documentation/core_concepts/index.html)
 
@@ -29,12 +94,6 @@ namespace HelloWorld.Grains
 {
     public class HelloGrain : Orleans.Grain, IHello
     {
-        private readonly ILogger logger;
-        public HelloGrain(ILogger<HelloGrain> logger)
-        {
-            this.logger = logger;
-        }  
-
         Task<string> IHello.SayHello(string greeting)
         {
             logger.LogInformation($"SayHello message received: greeting = '{greeting}'");
@@ -42,7 +101,6 @@ namespace HelloWorld.Grains
         }
     }
 }
-
 ```
 
 A grain class implements one or more grain interfaces, as you can read [here, in the Grains section.](http://dotnet.github.io/orleans/Documentation/grains/index.html))
@@ -59,8 +117,7 @@ namespace HelloWorld.Interfaces
 
 ```
 
-Create the SiloHost and OrleansClient projects as .NET Core App files and the HelloWorld.Interfaces and HelloWorld.Grains projects as .NET Standard Libraries.
-Orleans comes into the picture when the NuGet packages are added to each project.
+
 
 ## How the parts work together
 
