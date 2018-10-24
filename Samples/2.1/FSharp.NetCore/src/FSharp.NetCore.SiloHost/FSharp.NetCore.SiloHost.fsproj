@@ -22,5 +22,4 @@
     <PackageReference Include="Microsoft.Orleans.Server" Version="$(OrleansPackageVersion)" />
     <PackageReference Include="Microsoft.Orleans.OrleansCodeGenerator" Version="$(OrleansPackageVersion)" />
   </ItemGroup>
-
 </Project>

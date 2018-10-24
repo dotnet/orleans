@@ -1,6 +1,7 @@
 ﻿open FSharp.Control.Tasks
 
 open System
+open System.Threading.Tasks
 open Microsoft.Extensions.Logging
 open Orleans
 open Orleans.Runtime.Configuration
@@ -11,6 +12,7 @@ let buildClient () =
       let builder = new ClientBuilder()
       builder
         .UseLocalhostClustering()
+        .ConfigureApplicationParts(fun parts -> parts.AddApplicationPart((typeof<IHello>).Assembly).WithCodeGeneration() |> ignore )
         .ConfigureLogging(fun logging -> logging.AddConsole() |> ignore)
         .Build()
 
@@ -25,7 +27,10 @@ let worker (client : IClusterClient) =
 let main _ =
     let t = task {
         use client = buildClient()
-        do! client.Connect()
+        do! client.Connect( fun (ex: Exception) -> task {
+            do! Task.Delay(1000)
+            return true
+        })
         printfn "Client successfully connect to silo host"
         do! worker client
     }
