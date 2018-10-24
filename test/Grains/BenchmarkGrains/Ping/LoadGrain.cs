@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,25 +11,26 @@ namespace BenchmarkGrains.Ping
     public class LoadGrain : Grain, ILoadGrain
     {
         private Task<Report> runTask;
+        private bool end = false;
 
-        public Task Generate(int run, int conncurrent, TimeSpan duration)
+        public Task Generate(int run, int conncurrent)
         {
-            this.runTask = RunGeneration(run, conncurrent, duration);
+            this.runTask = RunGeneration(run, conncurrent);
             return Task.CompletedTask;
         }
 
         public async Task<Report> TryGetReport()
         {
-            if (!this.runTask.IsCompleted) return default(Report);
+            this.end = true;
             return await this.runTask;
         }
 
-        private async Task<Report> RunGeneration(int run, int conncurrent, TimeSpan duration)
+        private async Task<Report> RunGeneration(int run, int conncurrent)
         {
             List<Pending> pendingWork = Enumerable.Range(run * conncurrent, conncurrent).Select(i => new Pending() { Grain = GrainFactory.GetGrain<IPingGrain>(i) }).ToList();
             Report report = new Report();
             Stopwatch sw = Stopwatch.StartNew();
-            while (sw.Elapsed < duration)
+            while (!this.end)
             {
                 foreach(Pending pending in pendingWork.Where(t => t.PendingCall == null))
                 {
