@@ -6,9 +6,6 @@ title: Tutorial 1 Hello World
 # Tutorial 1: Hello World
 
 This process ties into the Hello World sample application available [here](https://github.com/dotnet/orleans/tree/master/Samples/2.0/HelloWorld).
-The important concepts to get out of this tutorial are:
-Orleans is not a single, standalone application that you download and install.
-Orleans is a collection of separate, configurable projects that use NuGet packages to add Orleans functionality to another application.
 
 The main concepts of Orleans involve a silo, a client, and one or more grains.
 Creating an Orleans app involves configuring the silo, configuring the client, and writing the grains.
