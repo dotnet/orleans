@@ -1,18 +1,18 @@
 ﻿open Microsoft.Extensions.Logging
-open Giraffe.Tasks
 open Orleans
 open Orleans.Runtime.Configuration
 open Orleans.Hosting
 open System
+open FSharp.Control.Tasks
+
 open FSharp.NetCore.Grains
 open FSharp.NetCore.Interfaces
 
 let buildSiloHost () =
-      let config = ClusterConfiguration.LocalhostPrimarySilo()
-      config.AddMemoryStorageProvider() |> ignore
-      SiloHostBuilder()
-        .UseConfiguration(config)
-        .ConfigureApplicationParts(fun parts -> 
+      let builder = new SiloHostBuilder()
+      builder
+        .UseLocalhostClustering()
+        .ConfigureApplicationParts(fun parts ->
             parts.AddApplicationPart(typeof<HelloGrain>.Assembly)
                   .AddApplicationPart(typeof<IHello>.Assembly)
                   .WithCodeGeneration() |> ignore)
