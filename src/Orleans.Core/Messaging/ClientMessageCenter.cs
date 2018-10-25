@@ -446,15 +446,19 @@ namespace Orleans.Messaging
 
         internal void OnGatewayConnectionOpen()
         {
-            Interlocked.Increment(ref numberOfConnectedGateways);
+            int newCount = Interlocked.Increment(ref numberOfConnectedGateways);
+            this.connectionStatusListener.NotifyGatewayCountChanged(newCount, newCount - 1);
         }
 
         internal void OnGatewayConnectionClosed()
         {
-            if (Interlocked.Decrement(ref numberOfConnectedGateways) == 0)
+            var gatewayCount = Interlocked.Decrement(ref numberOfConnectedGateways);
+            if (gatewayCount == 0)
             {
                 this.connectionStatusListener.NotifyClusterConnectionLost();
             }
+
+            this.connectionStatusListener.NotifyGatewayCountChanged(gatewayCount, gatewayCount + 1);
         }
 
         public void Dispose()

@@ -132,6 +132,18 @@ namespace Orleans
         /// <param name="builder">The builder.</param>
         /// <param name="handler">The handler.</param>
         /// <returns>The builder.</returns>
+        public static IClientBuilder AddGatewayCountChangedHandler(this IClientBuilder builder, GatewayCountChangedHandler handler)
+        {
+            builder.ConfigureServices(services => services.AddSingleton(handler));
+            return builder;
+        }
+
+        /// <summary>
+        /// Registers a <see cref="ConnectionToClusterLostHandler"/> event handler.
+        /// </summary>
+        /// <param name="builder">The builder.</param>
+        /// <param name="handler">The handler.</param>
+        /// <returns>The builder.</returns>
         public static IClientBuilder AddClusterConnectionLostHandler(this IClientBuilder builder, ConnectionToClusterLostHandler handler)
         {
             builder.ConfigureServices(services => services.AddSingleton(handler));
