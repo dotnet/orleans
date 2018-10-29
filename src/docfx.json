@@ -65,7 +65,7 @@
       "_enableSearch": true,
       "_gitContribute": {
         "repo": "https://github.com/dotnet/orleans",
-        "branch": "gh-pages",
+        "branch": "docs",
       },
 	  "_gitUrlPattern": "github",
     "_docfxVersion": "2"
