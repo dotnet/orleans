@@ -39,7 +39,7 @@ A list of all of the options can be found [here.](http://dotnet.github.io/orlean
 
 | Option | Used for |
 |-------------|----------|
-| `.UseLocalhostClustering()` | Declaring that we are using a single local silo |
+| `.UseLocalhostClustering()` | Configures the client to connect to a silo on the localhost. |
 | `ClusterOptions` | ClusterId is the name for the Orleans cluster must be the same for silo and client so they can talk to each other. ServiceId is the ID used for the application and it must not change across deployments|
 | `EndpointOptions` | This tells the silo where to listen. For this example, we are using a `loopback`. |
 | `ConfigureApplicationParts` | Adds the assembly with grain classes to the application setup. |
@@ -81,7 +81,13 @@ A more in-depth guide to configuring your client can be found [in the Client Con
 
 ## Writing a grain
 
-Grains are the building blocks of an Orleans application, and you can read more about them in the [Core Concepts section of the Orleans documentation.](http://dotnet.github.io/orleans/Documentation/core_concepts/index.html)
+Grains are the key primitives of the Orleans programming model.
+Grains are the building blocks of an Orleans application, they are atomic units of isolation, distribution, and persistence.
+Grains are objects that represent application entities.
+Just like in the classic Object Oriented Programming, a grain encapsulates state of an entity and encodes its behavior in the code logic.
+Grains can hold references to each other and interact by invoking each other’s methods exposed via interfaces.
+
+You can read more about them in the [Core Concepts section of the Orleans documentation.](http://dotnet.github.io/orleans/Documentation/core_concepts/index.html)
 
 This is the main body of code for the Hello World grain:
 
@@ -114,26 +120,32 @@ namespace HelloWorld.Interfaces
 
 ```
 
-
-
 ## How the parts work together
 
-SiloHost is started first.
-Then, OrleansClient is started.
-OrleansClient creates a reference to the IHello grain and calls its SayHello() method through its interface, IHello.
 This programming model is built as part of our core concept of distributed Object Oriented Programming.
-Next, the grain is activated in the silo.
+SiloHost is run first.
+Then, the OrleansClient program is run.
+The Main method of OrleansClient calls the method that starts the client, `StartClientWithRetries().`
+The client is passed to the `DoClientWork()` method.
+
+
+```csharp
+
+        private static async Task DoClientWork(IClusterClient client)
+        {
+            // example of calling grains from the initialized client
+            var friend = client.GetGrain<IHello>(0);
+            var response = await friend.SayHello("Good morning, my friend!");
+            Console.WriteLine("\n\n{0}\n\n", response);
+        }
+
+```
+
+At this point, OrleansClient creates a reference to the IHello grain and calls its SayHello() method through its interface, IHello.
+Because of this reference, the grain is activated in the silo.
 OrleansClient sends a greeting to the activated grain.
-The grain returns a response to OrleansClient, which OrleansClient displays on the console.
+The grain returns a Task string to OrleansClient, which OrleansClient displays on the console.
 
-## Create the project structure
+## Running the sample app
 
-1. In Visual Studio, create a new Visual C# Console App (.NET Core) project.
-2. Name the project **SiloHost** and name the solution **HelloWorld**.
-3. Add a second .NET Core Console App project to the HelloWorld solution and name it **OrleansClient**.
-4. Add another new project, but this time choose .NET Standard – Class Library. Name it **HelloWorld.Interfaces**.
-5. Add a new interface class file to the GrainInterfaces folder and name it **IHello**.
-  *Note: If  Visual Studio adds a default class named `Class1.cs`, feel free to delete this file to keep things tidy.
-6. For the fourth and final project, add another .NET Standard – Class Library project and name it **HelloWorld.Grains**.
-7. Inside the Grains project, add a class and name it **HelloGrain.cs**.
-8. Add the Orleans NuGet packages
+To run the sample app, refer to the [Readme.](https://github.com/dotnet/orleans/tree/master/Samples/2.0/HelloWorld)
