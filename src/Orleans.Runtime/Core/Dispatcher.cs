@@ -276,7 +276,7 @@ namespace Orleans.Runtime
                     {
                         try
                         {
-                            CheckDeadlock(message);
+                            CheckDeadlock(targetActivation, message);
                         }
                         catch (DeadlockException exc)
                         {
@@ -380,11 +380,12 @@ namespace Orleans.Runtime
 
             var prevChain = ((IList)obj);
             ActivationId nextActivationId = message.TargetActivation;
+
             // check if the target activation already appears in the call chain.
             foreach (object invocationObj in prevChain)
             {
                 var prevId = ((RequestInvocationHistorySummary)invocationObj).ActivationId;
-                if (prevId.Equals(nextActivationId) && !catalog.CanInterleave(nextActivationId, message))
+                if (prevId.Equals(nextActivationId))
                 {
                     return true;
                 }
@@ -397,10 +398,11 @@ namespace Orleans.Runtime
         /// Check if the current message will cause deadlock.
         /// Throw DeadlockException if yes.
         /// </summary>
+        /// <param name="targetActivation"></param>
         /// <param name="message">Message to analyze</param>
-        private void CheckDeadlock(Message message)
+        private void CheckDeadlock(ActivationData targetActivation, Message message)
         {
-            if (IsMessageACallChainLoop(message))
+            if (IsMessageACallChainLoop(message) && !catalog.CanInterleave(targetActivation.ActivationId, message))
             {
                 IEnumerable<Tuple<GrainId, string>> callChain = Enumerable.Empty<Tuple<GrainId, string>>();
                 string exceptionMessage = string.Empty;
