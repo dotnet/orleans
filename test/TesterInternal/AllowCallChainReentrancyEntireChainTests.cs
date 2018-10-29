@@ -30,7 +30,7 @@ namespace UnitTests.General
                 {
                     hostBuilder.Configure<SchedulingOptions>(options =>
                     {
-                        options.PerformDeadlockDetection = true;
+                        options.PerformDeadlockDetection = false;
                         options.CallChainReentrancy = SchedulingOptions.CallChainReentrancyStrategy.EntireChain;
                     }).ConfigureLogging(logging =>
                     {
@@ -41,7 +41,7 @@ namespace UnitTests.General
             }
         }
 
-        private const int numIterations = 1;
+        private const int numIterations = 30;
 
         private readonly CallChainReentrancyTestHelper testHelper;
 
