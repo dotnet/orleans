@@ -42,7 +42,7 @@ A list of all of the options can be found [here.](http://dotnet.github.io/orlean
 | `.UseLocalhostClustering()` | Configures the client to connect to a silo on the localhost. |
 | `ClusterOptions` | ClusterId is the name for the Orleans cluster must be the same for silo and client so they can talk to each other. ServiceId is the ID used for the application and it must not change across deployments|
 | `EndpointOptions` | This tells the silo where to listen. For this example, we are using a `loopback`. |
-| `ConfigureApplicationParts` | Adds the assembly with grain classes to the application setup. |
+| `ConfigureApplicationParts` | Adds the grain class and interface assembly as application parts to your orleans application. |
 
 After loading the configurations, the SiloHost is built and then started asynchronously.
 
@@ -123,8 +123,8 @@ namespace HelloWorld.Interfaces
 ## How the parts work together
 
 This programming model is built as part of our core concept of distributed Object Oriented Programming.
-SiloHost is run first.
-Then, the OrleansClient program is run.
+SiloHost is started first.
+Then, the OrleansClient program is started.
 The Main method of OrleansClient calls the method that starts the client, `StartClientWithRetries().`
 The client is passed to the `DoClientWork()` method.
 
@@ -142,9 +142,9 @@ The client is passed to the `DoClientWork()` method.
 ```
 
 At this point, OrleansClient creates a reference to the IHello grain and calls its SayHello() method through its interface, IHello.
-Because of this reference, the grain is activated in the silo.
+This call activates the grain in the silo.
 OrleansClient sends a greeting to the activated grain.
-The grain returns a Task string to OrleansClient, which OrleansClient displays on the console.
+The grain returns the greeting as a response to OrleansClient, which OrleansClient displays on the console.
 
 ## Running the sample app
 
