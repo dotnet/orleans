@@ -105,17 +105,7 @@ namespace Orleans.Transactions
                      {
                          detectReentrancy = true;
 
-                         result = operation(record.State);
-                         ITransactionDataCopier<TResult> resultCopier;
-                         if (!this.copiers.TryGetValue(typeof(TResult), out object cp))
-                         {
-                                 resultCopier = this.context.ActivationServices.GetRequiredService<ITransactionDataCopier<TResult>>();
-                                 this.copiers.Add(typeof(TResult), resultCopier);
-                         } else
-                         {
-                             resultCopier = (ITransactionDataCopier<TResult>)cp;
-                         }
-                         result = resultCopier.DeepCopy(result);
+                         result = CopyResult(operation(record.State));
                      }
                      finally
                      {
@@ -187,19 +177,7 @@ namespace Orleans.Transactions
                     {
                         detectReentrancy = true;
 
-                        TResult result = updateAction(record.State);
-                        ITransactionDataCopier<TResult> resultCopier;
-                        if (!this.copiers.TryGetValue(typeof(TResult), out object cp))
-                        {
-                            resultCopier = this.context.ActivationServices.GetRequiredService<ITransactionDataCopier<TResult>>();
-                            this.copiers.Add(typeof(TResult), resultCopier);
-                        }
-                        else
-                        {
-                            resultCopier = (ITransactionDataCopier<TResult>)cp;
-                        }
-                        return resultCopier.DeepCopy(result);
-
+                        return CopyResult(updateAction(record.State));
                     }
                     finally
                     {
@@ -247,6 +225,21 @@ namespace Orleans.Transactions
 
             // recover state
             await this.queue.NotifyOfRestore();
+        }
+
+        private TResult CopyResult<TResult>(TResult result)
+        {
+            ITransactionDataCopier<TResult> resultCopier;
+            if (!this.copiers.TryGetValue(typeof(TResult), out object cp))
+            {
+                resultCopier = this.context.ActivationServices.GetRequiredService<ITransactionDataCopier<TResult>>();
+                this.copiers.Add(typeof(TResult), resultCopier);
+            }
+            else
+            {
+                resultCopier = (ITransactionDataCopier<TResult>)cp;
+            }
+            return resultCopier.DeepCopy(result);
         }
     }
 }
