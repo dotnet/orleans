@@ -7,14 +7,13 @@ title: Samples Overview
 
 ## What do I need?
 
-The samples are self-contained, except where noted. You will need 
+The samples are self-contained, except where noted.
+You might need an Azure subscription for some of the samples.
+For the Azure-based samples, you will need to install the SDK.
 
-An Azure subscription will help with some of the samples, but is not required. For the Azure-based samples, you will need to install the SDK.
+The samples can be downloaded from [GitHub](https://github.com/dotnet/orleans/tree/master/Samples).
 
-The samples themselves can be downloaded from [GitHub](https://github.com/dotnet/orleans/tree/master/Samples).
-
-
-## [Hello World](Hello-World.md)
+## [Hello World](tutorial_1_helloworld.md)
 
 This is the Orleans version of an old classic. It demonstrates that while there is no such thing as "trivial" when you are dealing with distributed computing, Orleans makes it pretty straight-forward.
 
