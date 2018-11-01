@@ -26,6 +26,11 @@ namespace Orleans.Transactions.AzureStorage
             this.partition = partition;
             this.jsonSettings = JsonSettings;
             this.logger = logger;
+
+            // default values must be included
+            // otherwise, we get errors for explicitly specified default values
+            // (e.g.  Orleans.Transactions.Azure.Tests.TestState.state)
+            this.jsonSettings.DefaultValueHandling = DefaultValueHandling.Include;
         }
 
         public async Task<TransactionalStorageLoadResponse<TState>> Load()

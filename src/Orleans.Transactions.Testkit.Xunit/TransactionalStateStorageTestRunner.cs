@@ -8,7 +8,7 @@ using Xunit.Abstractions;
 namespace Orleans.Transactions.TestKit.xUnit
 {
     public abstract class TransactionalStateStorageTestRunnerxUnit<TState> : TransactionalStateStorageTestRunner<TState>
-        where TState: class, new()
+        where TState: class, ITestState, new()
     {
         /// <summary>
         /// Constructor
@@ -29,5 +29,12 @@ namespace Orleans.Transactions.TestKit.xUnit
         {
             return base.FirstTime_Load_ShouldReturnEmptyLoadResponse();
         }
+
+        [Fact]
+        public override Task RunAll()
+        {
+            return base.RunAll();
+        }
+
     }
 }
