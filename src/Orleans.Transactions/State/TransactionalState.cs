@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
@@ -23,6 +23,7 @@ namespace Orleans.Transactions
         private readonly ITransactionalStateConfiguration config;
         private readonly IGrainActivationContext context;
         private readonly ITransactionDataCopier<TState> copier;
+        private readonly Dictionary<Type,object> copiers;
         private readonly IProviderRuntime runtime;
         private readonly IGrainRuntime grainRuntime;
         private readonly ILoggerFactory loggerFactory;
@@ -53,6 +54,8 @@ namespace Orleans.Transactions
             this.grainRuntime = grainRuntime;
             this.loggerFactory = loggerFactory;
             this.serializerSettings = serializerSettings;
+            this.copiers = new Dictionary<Type, object>();
+            this.copiers.Add(typeof(TState), copier);
         }
 
         /// <summary>
@@ -102,7 +105,7 @@ namespace Orleans.Transactions
                      {
                          detectReentrancy = true;
 
-                         result = operation(record.State);
+                         result = CopyResult(operation(record.State));
                      }
                      finally
                      {
@@ -174,7 +177,7 @@ namespace Orleans.Transactions
                     {
                         detectReentrancy = true;
 
-                        return updateAction(record.State);
+                        return CopyResult(updateAction(record.State));
                     }
                     finally
                     {
@@ -222,6 +225,21 @@ namespace Orleans.Transactions
 
             // recover state
             await this.queue.NotifyOfRestore();
+        }
+
+        private TResult CopyResult<TResult>(TResult result)
+        {
+            ITransactionDataCopier<TResult> resultCopier;
+            if (!this.copiers.TryGetValue(typeof(TResult), out object cp))
+            {
+                resultCopier = this.context.ActivationServices.GetRequiredService<ITransactionDataCopier<TResult>>();
+                this.copiers.Add(typeof(TResult), resultCopier);
+            }
+            else
+            {
+                resultCopier = (ITransactionDataCopier<TResult>)cp;
+            }
+            return resultCopier.DeepCopy(result);
         }
     }
 }
