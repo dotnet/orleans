@@ -473,7 +473,7 @@ namespace Orleans.Runtime.MembershipService
                 else
                     logger.Warn(
                         ErrorCode.MembershipSendingPreJoinPing,
-                        $"${nameof(ClusterMembershipOptions.ValidateInitialConnectivity)} is set to false. This is NOT a supported value for production environment.");
+                        $"${nameof(ClusterMembershipOptions.ValidateInitialConnectivity)} is set to false. This is NOT recommended for a production environment.");
             }
             
             TableVersion next = table.Version.Next();
