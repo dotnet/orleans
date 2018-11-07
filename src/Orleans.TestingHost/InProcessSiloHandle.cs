@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
@@ -26,12 +27,12 @@ namespace Orleans.TestingHost
         /// <param name="configurationSources">
         /// The configuration sources, interpreted by <see cref="TestClusterHostFactory.CreateSiloHost"/>.
         /// </param>
-        public static SiloHandle Create(
+        public static async Task<SiloHandle> Create(
             string siloName,
             IList<IConfigurationSource> configurationSources)
         {
             var host = TestClusterHostFactory.CreateSiloHost(siloName, configurationSources);
-            host.StartAsync().GetAwaiter().GetResult();
+            await host.StartAsync();
 
             var retValue = new InProcessSiloHandle
             {

@@ -26,7 +26,7 @@ namespace Orleans.TestingHost
         public override bool IsActive => isActive;
 
         /// <summary>Creates a new silo in a remote app domain and returns a handle to it.</summary>
-        public static SiloHandle Create(
+        public static Task<SiloHandle> Create(
             string siloName,
             IList<IConfigurationSource> configurationSources)
         {
@@ -68,7 +68,7 @@ namespace Orleans.TestingHost
                     AppDomainTestHook = siloHost.AppDomainTestHook,
                 };
 
-                return retValue;
+                return Task.FromResult((SiloHandle)retValue);
             }
             catch (Exception)
             {

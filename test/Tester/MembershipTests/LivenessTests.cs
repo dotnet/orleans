@@ -83,7 +83,7 @@ namespace UnitTests.MembershipTests
             logger.Info("\n\n\n\nAbout to kill {0}\n\n\n", silo2KillHandle.SiloAddress.Endpoint);
 
             if (restart)
-                this.HostedCluster.RestartSilo(silo2KillHandle);
+                await this.HostedCluster.RestartSilo(silo2KillHandle);
             else
                 this.HostedCluster.KillSilo(silo2KillHandle);
 
@@ -119,7 +119,7 @@ namespace UnitTests.MembershipTests
 
             logger.Info("\n\n\n\nAbout to re-start a first silo.\n\n\n");
             
-            this.HostedCluster.RestartStoppedSecondarySilo(siloToStop.Name);
+            await this.HostedCluster.RestartStoppedSecondarySilo(siloToStop.Name);
 
             await TestTraffic();
 

@@ -230,7 +230,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                     new MemoryConfigurationSource {InitialData = new TestClusterOptions {ApplicationBaseDirectory = rootDir.FullName}.ToDictionary()}
                 };
 
-                silo = TestCluster.StartOrleansSilo(cluster, siloIdx, testClusterOptions, sources);
+                silo = await TestCluster.StartOrleansSilo(cluster, siloIdx, testClusterOptions, sources);
             }
 
             this.deployedSilos.Add(silo);

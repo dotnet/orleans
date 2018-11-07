@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime.TestHooks;
@@ -55,7 +56,7 @@ namespace Orleans.TestingHost
         /// <summary>
         /// Delegate used to create and start an individual silo.
         /// </summary>
-        public Func<string, IList<IConfigurationSource>, SiloHandle> CreateSilo { private get; set; }
+        public Func<string, IList<IConfigurationSource>, Task<SiloHandle>> CreateSilo { private get; set; }
 
         public TestClusterBuilder ConfigureBuilder(Action configureDelegate)
         {

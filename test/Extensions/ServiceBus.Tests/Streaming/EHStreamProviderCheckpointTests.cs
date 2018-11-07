@@ -124,7 +124,7 @@ namespace ServiceBus.Tests.StreamingTests
                 await GenerateEvents(streamNamespace, streamGuids, eventsInStream, 0);
                 await TestingUtils.WaitUntilAsync(assertIsTrue => CheckCounters(streamNamespace, streamCount, eventsInStream, assertIsTrue), TimeSpan.FromSeconds(60));
 
-                HostedCluster.RestartSilo(HostedCluster.SecondarySilos[0]);
+                await HostedCluster.RestartSilo(HostedCluster.SecondarySilos[0]);
                 await HostedCluster.WaitForLivenessToStabilizeAsync();
 
                 await GenerateEvents(streamNamespace, streamGuids, eventsInStream, 0);
