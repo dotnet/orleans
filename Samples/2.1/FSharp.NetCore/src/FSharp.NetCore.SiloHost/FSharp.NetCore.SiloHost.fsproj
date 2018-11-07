@@ -1,8 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp2.0</TargetFramework>
+    <TargetFramework>netcoreapp2.1</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,12 +15,11 @@
     <ProjectReference Include="..\FSharp.NetCore.Grains\FSharp.NetCore.Grains.fsproj" />
     <ProjectReference Include="..\FSharp.NetCore.Interfaces\FSharp.NetCore.Interfaces.fsproj" />
   </ItemGroup>
-  
-  <ItemGroup>
-    <PackageReference Include="Giraffe.Tasks" Version="0.1.0-beta-010" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="2.0.0" />
-    <PackageReference Include="Microsoft.Orleans.Server" Version="2.0.0-beta3" />
-    <PackageReference Include="Microsoft.Orleans.OrleansCodeGenerator" Version="2.0.0-beta3" />
-  </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="TaskBuilder.fs" Version="2.1.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="2.0.0" />
+    <PackageReference Include="Microsoft.Orleans.Server" Version="$(OrleansPackageVersion)" />
+    <PackageReference Include="Microsoft.Orleans.OrleansCodeGenerator" Version="$(OrleansPackageVersion)" />
+  </ItemGroup>
 </Project>
