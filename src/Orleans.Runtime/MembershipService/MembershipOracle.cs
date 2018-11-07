@@ -466,8 +466,15 @@ namespace Orleans.Runtime.MembershipService
             myEntry.Status = newStatus;
             myEntry.IAmAliveTime = now;
 
-            if (newStatus == SiloStatus.Active && this.clusterMembershipOptions.ValidateInitialConnectivity)
-                await GetJoiningPreconditionPromise(table);
+            if (newStatus == SiloStatus.Active)
+            {
+                if (this.clusterMembershipOptions.ValidateInitialConnectivity)
+                    await GetJoiningPreconditionPromise(table);
+                else
+                    logger.Warn(
+                        ErrorCode.MembershipSendingPreJoinPing,
+                        $"${nameof(ClusterMembershipOptions.ValidateInitialConnectivity)} is set to false. This is NOT recommended for a production environment.");
+            }
             
             TableVersion next = table.Version.Next();
             if (myEtag != null) // no previous etag for my entry -> its the first write to this entry, so insert instead of update.
