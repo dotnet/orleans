@@ -51,7 +51,7 @@ namespace Tester
                 // Starting a new cluster should succeed.
                 siloHost = CreateSiloHost(appDomain, config);
                 siloHost.InitializeSilo();
-                await siloHost.StartSiloAsync(catchExceptions: false);
+                siloHost.StartSilo(catchExceptions: false);
             }
             finally
             {
