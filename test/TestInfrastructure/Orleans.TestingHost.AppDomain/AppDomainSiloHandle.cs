@@ -26,7 +26,7 @@ namespace Orleans.TestingHost
         public override bool IsActive => isActive;
 
         /// <summary>Creates a new silo in a remote app domain and returns a handle to it.</summary>
-        public static async Task<SiloHandle> Create(
+        public static Task<SiloHandle> Create(
             string siloName,
             IList<IConfigurationSource> configurationSources)
         {
@@ -56,9 +56,9 @@ namespace Orleans.TestingHost
 
                 appDomain.UnhandledException += ReportUnobservedException;
 
-                await siloHost.StartAsync();
+                siloHost.Start();
 
-                var retValue = new AppDomainSiloHandle
+                SiloHandle retValue = new AppDomainSiloHandle
                 {
                     Name = siloName,
                     SiloHost = siloHost,
@@ -68,7 +68,7 @@ namespace Orleans.TestingHost
                     AppDomainTestHook = siloHost.AppDomainTestHook,
                 };
 
-                return retValue;
+                return Task.FromResult(retValue);
             }
             catch (Exception)
             {
@@ -78,15 +78,15 @@ namespace Orleans.TestingHost
         }
 
         /// <inheritdoc />
-        public override async Task StopSiloAsync(bool stopGracefully)
+        public override Task StopSiloAsync(bool stopGracefully)
         {
-            if (!IsActive) return;
+            if (!IsActive) return Task.CompletedTask;
 
             if (stopGracefully)
             {
                 try
                 {
-                    await this.SiloHost.ShutdownAsync();
+                    this.SiloHost.Shutdown();
                 }
                 catch (RemotingException re)
                 {
@@ -111,6 +111,7 @@ namespace Orleans.TestingHost
             }
 
             this.SiloHost = null;
+            return Task.CompletedTask;
         }
 
         public override Task StopSiloAsync(CancellationToken ct)

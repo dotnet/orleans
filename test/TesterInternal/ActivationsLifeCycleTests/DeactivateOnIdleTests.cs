@@ -15,6 +15,8 @@ using Orleans.Runtime.Configuration;
 
 namespace UnitTests.ActivationsLifeCycleTests
 {
+
+
     [TestCategory("ActivationCollector")]
     public class DeactivateOnIdleTests : OrleansTestingBase, IDisposable
     {

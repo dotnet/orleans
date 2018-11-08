@@ -1,9 +1,7 @@
 using System;
-using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Hosting;
-using System.Threading.Tasks;
 
 namespace Orleans.TestingHost
 {
@@ -31,17 +29,11 @@ namespace Orleans.TestingHost
         public SiloAddress GatewayAddress => this.host.Services.GetRequiredService<ILocalSiloDetails>().GatewayAddress;
 
         internal AppDomainTestHooks AppDomainTestHook { get; }
-        
+
         /// <summary>Starts the silo</summary>
-        public async Task StartAsync()
-        {
-            await this.host.StartAsync();
-        }
+        public void Start() => this.host.StartAsync().GetAwaiter().GetResult();
 
         /// <summary>Gracefully shuts down the silo</summary>
-        public async Task ShutdownAsync()
-        {
-            await this.host.StopAsync();
-        }
+        public void Shutdown() => this.host.StopAsync().GetAwaiter().GetResult();
     }
 }
