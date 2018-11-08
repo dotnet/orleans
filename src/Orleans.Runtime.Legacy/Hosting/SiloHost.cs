@@ -247,9 +247,9 @@ namespace Orleans.Runtime.Host
             return true;
         }
 
-        /// <summary>	
-        /// Stop this silo.	
-        /// </summary>	
+        /// <summary>
+        /// Stop this silo.
+        /// </summary>
         public void StopSilo()
         {
             this.IsStarted = false;

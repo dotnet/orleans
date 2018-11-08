@@ -106,7 +106,7 @@ namespace UnitTests.MembershipTests
                     break;
                 }
                 clientId = null;
-                this.hostedCluster.KillClient();
+                await this.hostedCluster.KillClientAsync();
             }
             Assert.NotNull(clientId);
 
