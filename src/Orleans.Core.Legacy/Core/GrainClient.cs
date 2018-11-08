@@ -243,7 +243,7 @@ namespace Orleans
                 }
                 else
                 {
-                    client?.Abort();
+                    client?.AbortAsync().GetAwaiter().GetResult();
                 }
             }
             catch (Exception)

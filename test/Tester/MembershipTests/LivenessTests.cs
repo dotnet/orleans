@@ -43,7 +43,7 @@ namespace UnitTests.MembershipTests
 
             IPEndPoint address = silo3.SiloAddress.Endpoint;
             output.WriteLine("About to stop {0}", address);
-            this.HostedCluster.StopSilo(silo3);
+            await this.HostedCluster.StopSiloAsync(silo3);
 
             // TODO: Should we be allowing time for changes to percolate?
 
@@ -85,7 +85,7 @@ namespace UnitTests.MembershipTests
             if (restart)
                 await this.HostedCluster.RestartSiloAsync(silo2KillHandle);
             else
-                this.HostedCluster.KillSilo(silo2KillHandle);
+                await this.HostedCluster.KillSiloAsync(silo2KillHandle);
 
             bool didKill = !restart;
             await this.HostedCluster.WaitForLivenessToStabilizeAsync(didKill);
@@ -113,7 +113,7 @@ namespace UnitTests.MembershipTests
 
             logger.Info("\n\n\n\nAbout to stop a first silo.\n\n\n");
             var siloToStop = this.HostedCluster.SecondarySilos[0];
-            this.HostedCluster.StopSilo(siloToStop);
+            await this.HostedCluster.StopSiloAsync(siloToStop);
 
             await TestTraffic();
 
@@ -124,7 +124,7 @@ namespace UnitTests.MembershipTests
             await TestTraffic();
 
             logger.Info("\n\n\n\nAbout to stop a second silo.\n\n\n");
-            this.HostedCluster.StopSilo(moreSilos[0]);
+            await this.HostedCluster.StopSiloAsync(moreSilos[0]);
 
             await TestTraffic();
 

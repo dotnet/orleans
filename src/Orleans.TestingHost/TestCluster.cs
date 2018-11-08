@@ -149,7 +149,7 @@ namespace Orleans.TestingHost
             }
             catch (Exception ex)
             {
-                StopAllSilos();
+                await StopAllSilosAsync();
 
                 Exception baseExc = ex.GetBaseException();
                 FlushLogToConsole();
@@ -328,29 +328,29 @@ namespace Orleans.TestingHost
         /// <summary>
         /// Stop any additional silos, not including the default Primary silo.
         /// </summary>
-        public void StopSecondarySilos()
+        public async Task StopSecondarySilosAsync()
         {
             foreach (var instance in this.additionalSilos.ToList())
             {
-                StopSilo(instance);
+                await StopSiloAsync(instance);
             }
         }
 
         /// <summary>
         /// Stops the default Primary silo.
         /// </summary>
-        public void StopPrimarySilo()
+        public async Task StopPrimarySiloAsync()
         {
             if (Primary == null) throw new InvalidOperationException("There is no primary silo");
-            StopClusterClient();
-            StopSilo(Primary);
+            await StopClusterClientAsync();
+            await StopSiloAsync(Primary);
         }
 
-        private void StopClusterClient()
+        private async Task StopClusterClientAsync()
         {
             try
             {
-                this.InternalClient?.Close().GetAwaiter().GetResult();
+                await this.InternalClient?.Close();
             }
             catch (Exception exc)
             {
@@ -368,11 +368,19 @@ namespace Orleans.TestingHost
         /// </summary>
         public void StopAllSilos()
         {
-            StopClusterClient();
-            StopSecondarySilos();
+            StopAllSilosAsync().GetAwaiter().GetResult();
+        }
+
+        /// <summary>
+        /// Stop all current silos.
+        /// </summary>
+        public async Task StopAllSilosAsync()
+        {
+            await StopClusterClientAsync();
+            await StopSecondarySilosAsync();
             if (Primary != null)
             {
-                StopPrimarySilo();
+                await StopPrimarySiloAsync();
             }
             AppDomain.CurrentDomain.UnhandledException -= ReportUnobservedException;
         }
@@ -381,11 +389,11 @@ namespace Orleans.TestingHost
         /// Do a semi-graceful Stop of the specified silo.
         /// </summary>
         /// <param name="instance">Silo to be stopped.</param>
-        public void StopSilo(SiloHandle instance)
+        public async Task StopSiloAsync(SiloHandle instance)
         {
             if (instance != null)
             {
-                StopSilo(instance, true);
+                await StopSiloAsync(instance, true);
                 if (Primary == instance)
                 {
                     Primary = null;
@@ -401,21 +409,21 @@ namespace Orleans.TestingHost
         /// Do an immediate Kill of the specified silo.
         /// </summary>
         /// <param name="instance">Silo to be killed.</param>
-        public void KillSilo(SiloHandle instance)
+        public async Task KillSiloAsync(SiloHandle instance)
         {
             if (instance != null)
             {
                 // do NOT stop, just kill directly, to simulate crash.
-                StopSilo(instance, false);
+                await StopSiloAsync(instance, false);
             }
         }
 
         /// <summary>
         /// Performs a hard kill on client.  Client will not cleanup resources.
         /// </summary>
-        public void KillClient()
+        public async Task KillClientAsync()
         {
-            this.InternalClient?.Abort();
+            await this.InternalClient?.AbortAsync();
             this.InternalClient = null;
         }
 
@@ -429,7 +437,7 @@ namespace Orleans.TestingHost
             {
                 var instanceNumber = instance.InstanceNumber;
                 var siloName = instance.Name;
-                StopSilo(instance);
+                await StopSiloAsync(instance);
                 var newInstance = await StartSiloAsync(instanceNumber, this.options);
 
                 if (siloName == Silo.PrimarySiloName)
@@ -538,11 +546,11 @@ namespace Orleans.TestingHost
             return handle;
         }
 
-        private void StopSilo(SiloHandle instance, bool stopGracefully)
+        private async Task StopSiloAsync(SiloHandle instance, bool stopGracefully)
         {
             try
             {
-                instance.StopSilo(stopGracefully);
+                await instance.StopSiloAsync(stopGracefully);
                 instance.Dispose();
             }
             finally

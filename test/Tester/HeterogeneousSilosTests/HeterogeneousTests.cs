@@ -125,7 +125,7 @@ namespace Tester.HeterogeneousSilosTests
             }
 
             // Stop the latest silos
-            cluster.StopSecondarySilos();
+            await cluster.StopSecondarySilosAsync();
             await Task.Delay(delayTimeout);
 
             if (restartClient)

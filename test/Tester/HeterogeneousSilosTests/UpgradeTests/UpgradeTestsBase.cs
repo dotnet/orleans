@@ -241,7 +241,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
         protected async Task StopSilo(SiloHandle handle)
         {
-            handle?.StopSilo(true);
+            await handle?.StopSiloAsync(true);
             this.deployedSilos.Remove(handle);
             await Task.Delay(waitDelay);
         }

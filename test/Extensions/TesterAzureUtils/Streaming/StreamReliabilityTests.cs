@@ -991,12 +991,12 @@ namespace UnitTests.Streaming.Reliability
             }
             else if (kill)
             {
-                this.HostedCluster.KillSilo(silo);
+               await this.HostedCluster.KillSiloAsync(silo);
                Assert.False(silo.IsActive);
             }
             else
             {
-                this.HostedCluster.StopSilo(silo);
+               await this.HostedCluster.StopSiloAsync(silo);
                Assert.False(silo.IsActive);
             }
 

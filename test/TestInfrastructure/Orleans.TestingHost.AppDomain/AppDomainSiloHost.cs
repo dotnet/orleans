@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Hosting;
+using System.Threading.Tasks;
 
 namespace Orleans.TestingHost
 {
@@ -32,15 +33,15 @@ namespace Orleans.TestingHost
         internal AppDomainTestHooks AppDomainTestHook { get; }
         
         /// <summary>Starts the silo</summary>
-        public void Start()
+        public async Task StartAsync()
         {
-            this.host.StartAsync().GetAwaiter().GetResult();
+            await this.host.StartAsync();
         }
 
         /// <summary>Gracefully shuts down the silo</summary>
-        public void Shutdown()
+        public async Task ShutdownAsync()
         {
-            this.host.StopAsync().GetAwaiter().GetResult();
+            await this.host.StopAsync();
         }
     }
 }

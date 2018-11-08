@@ -118,7 +118,7 @@ namespace UnitTests.General
             AssertIsInRange(activationCounts[runtimes[0]], perSilo, stopLeavy);
             AssertIsInRange(activationCounts[runtimes[1]], perSilo, stopLeavy);
 
-            this.HostedCluster.StopSilo(runtimes[0]);
+            await this.HostedCluster.StopSiloAsync(runtimes[0]);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
             await InvokeAllGrains();
 

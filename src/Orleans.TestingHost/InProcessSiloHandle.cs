@@ -46,7 +46,7 @@ namespace Orleans.TestingHost
         }
 
         /// <inheritdoc />
-        public override void StopSilo(bool stopGracefully)
+        public override async Task StopSiloAsync(bool stopGracefully)
         {
             var cancellation = new CancellationTokenSource();
             var ct = cancellation.Token;
@@ -54,16 +54,16 @@ namespace Orleans.TestingHost
             if (!stopGracefully)
                 cancellation.Cancel();
 
-            StopSilo(ct);
+            await StopSiloAsync(ct);
         }
 
-        public override void StopSilo(CancellationToken ct)
+        public override async Task StopSiloAsync(CancellationToken ct)
         {
             if (!IsActive) return;
 
             try
             {
-                this.SiloHost.StopAsync(ct).GetAwaiter().GetResult();
+                await this.SiloHost.StopAsync(ct);
             }
             catch (Exception exc)
             {
@@ -85,7 +85,7 @@ namespace Orleans.TestingHost
             {
                 try
                 {
-                    StopSilo(true);
+                    StopSiloAsync(true).GetAwaiter().GetResult();
                 }
                 catch
                 {

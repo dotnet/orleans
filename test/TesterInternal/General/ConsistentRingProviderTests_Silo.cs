@@ -104,7 +104,7 @@ namespace UnitTests.General
             foreach (SiloHandle fail in failures) // verify before failure
             {
                 keysToTest.Add(PickKey(fail.SiloAddress)); //fail.SiloAddress.GetConsistentHashCode());
-                this.HostedCluster.StopSilo(fail);
+                await this.HostedCluster.StopSiloAsync(fail);
             }
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
@@ -158,7 +158,7 @@ namespace UnitTests.General
             
             var tasks = new Task[2]
             {
-                Task.Factory.StartNew(() => this.HostedCluster.StopSilo(failures[0])),
+                Task.Factory.StartNew(() => this.HostedCluster.StopSiloAsync(failures[0])),
                 this.HostedCluster.StartAdditionalSilosAsync(1).ContinueWith(t => joins = t.GetAwaiter().GetResult())
             };
             Task.WaitAll(tasks, endWait);
@@ -187,7 +187,7 @@ namespace UnitTests.General
             logger.Info("Killing secondary silo {0} and joining a silo", fail.SiloAddress);
             var tasks = new Task[2]
             {
-                Task.Factory.StartNew(() => this.HostedCluster.StopSilo(fail)),
+                Task.Factory.StartNew(() => this.HostedCluster.StopSiloAsync(fail)),
                 this.HostedCluster.StartAdditionalSilosAsync(1).ContinueWith(t => joins = t.GetAwaiter().GetResult())
             };
             Task.WaitAll(tasks, endWait);

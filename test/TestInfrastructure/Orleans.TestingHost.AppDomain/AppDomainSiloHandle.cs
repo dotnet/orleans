@@ -26,7 +26,7 @@ namespace Orleans.TestingHost
         public override bool IsActive => isActive;
 
         /// <summary>Creates a new silo in a remote app domain and returns a handle to it.</summary>
-        public static Task<SiloHandle> Create(
+        public static async Task<SiloHandle> Create(
             string siloName,
             IList<IConfigurationSource> configurationSources)
         {
@@ -56,7 +56,7 @@ namespace Orleans.TestingHost
 
                 appDomain.UnhandledException += ReportUnobservedException;
 
-                siloHost.Start();
+                await siloHost.StartAsync();
 
                 var retValue = new AppDomainSiloHandle
                 {
@@ -68,7 +68,7 @@ namespace Orleans.TestingHost
                     AppDomainTestHook = siloHost.AppDomainTestHook,
                 };
 
-                return Task.FromResult((SiloHandle)retValue);
+                return retValue;
             }
             catch (Exception)
             {
@@ -78,7 +78,7 @@ namespace Orleans.TestingHost
         }
 
         /// <inheritdoc />
-        public override void StopSilo(bool stopGracefully)
+        public override async Task StopSiloAsync(bool stopGracefully)
         {
             if (!IsActive) return;
 
@@ -86,7 +86,7 @@ namespace Orleans.TestingHost
             {
                 try
                 {
-                    this.SiloHost.Shutdown();
+                    await this.SiloHost.ShutdownAsync();
                 }
                 catch (RemotingException re)
                 {
@@ -113,7 +113,7 @@ namespace Orleans.TestingHost
             this.SiloHost = null;
         }
 
-        public override void StopSilo(CancellationToken ct)
+        public override Task StopSiloAsync(CancellationToken ct)
         {
             throw new NotImplementedException();
         }
@@ -140,7 +140,7 @@ namespace Orleans.TestingHost
 
             if (disposing)
             {
-                StopSilo(true);
+                StopSiloAsync(true).GetAwaiter().GetResult();
             }
             else
             {
