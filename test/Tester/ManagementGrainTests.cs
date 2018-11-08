@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -37,7 +37,7 @@ namespace UnitTests.Management
             {
                 // The ActivationCount tests rely on CounterStatistic, which is a shared static value, so isolation
                 // between silos is obtained using AppDomains.
-                builder.CreateSilo = AppDomainSiloHandle.Create;
+                builder.CreateSiloAsync = AppDomainSiloHandle.Create;
             }
         }
 
@@ -46,7 +46,7 @@ namespace UnitTests.Management
         {
             if (HostedCluster.SecondarySilos.Count == 0)
             {
-                HostedCluster.StartAdditionalSilo();
+                await HostedCluster.StartAdditionalSiloAsync();
                 await HostedCluster.WaitForLivenessToStabilizeAsync();
             }
 
@@ -61,7 +61,7 @@ namespace UnitTests.Management
         {
             if (HostedCluster.SecondarySilos.Count == 0)
             {
-                HostedCluster.StartAdditionalSilo();
+                await HostedCluster.StartAdditionalSiloAsync();
                 await HostedCluster.WaitForLivenessToStabilizeAsync();
             }
 

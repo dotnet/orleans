@@ -38,7 +38,7 @@ namespace Tester.HeterogeneousSilosTests
             var typesName = blackListedTypes.Select(t => t.FullName).ToList();
             var builder = new TestClusterBuilder(1)
             {
-                CreateSilo = AppDomainSiloHandle.Create
+                CreateSiloAsync = AppDomainSiloHandle.Create
             };
 
             builder.ConfigureLegacyConfiguration(legacy =>
@@ -102,7 +102,7 @@ namespace Tester.HeterogeneousSilosTests
             Assert.Contains("Cannot find an implementation class for grain interface", exception.Message);
 
             // Start a new silo with TestGrain
-            cluster.StartAdditionalSilo();
+            await cluster.StartAdditionalSiloAsync();
             await Task.Delay(delayTimeout);
 
             if (restartClient)

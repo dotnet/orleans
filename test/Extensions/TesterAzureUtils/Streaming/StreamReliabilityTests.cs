@@ -49,7 +49,7 @@ namespace UnitTests.Streaming.Reliability
             TestUtils.CheckForAzureStorage();
 
             this.numExpectedSilos = 2;
-            builder.CreateSilo = AppDomainSiloHandle.Create;
+            builder.CreateSiloAsync = AppDomainSiloHandle.Create;
             builder.Options.InitialSilosCount = (short) this.numExpectedSilos;
             builder.Options.UseTestClusterMembership = false;
 
@@ -906,7 +906,7 @@ namespace UnitTests.Streaming.Reliability
             // Add new silo
             //SiloHandle newSilo = StartAdditionalOrleans();
             //WaitForLivenessToStabilize();
-            SiloHandle newSilo = this.HostedCluster.StartAdditionalSilo();
+            SiloHandle newSilo = await this.HostedCluster.StartAdditionalSiloAsync();
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
 
@@ -957,7 +957,7 @@ namespace UnitTests.Streaming.Reliability
 
             foreach (var silo in this.HostedCluster.GetActiveSilos().ToList())
             {
-                await this.HostedCluster.RestartSilo(silo);
+                await this.HostedCluster.RestartSiloAsync(silo);
             }
 
             // Note: Needed to reinitialize client in this test case to connect to new silos
@@ -983,7 +983,7 @@ namespace UnitTests.Streaming.Reliability
             if (restart)
             {
                 //RestartRuntime(silo, kill);
-                SiloHandle newSilo = await this.HostedCluster.RestartSilo(silo);
+                SiloHandle newSilo = await this.HostedCluster.RestartSiloAsync(silo);
 
                 logger.Info("Restarted new {0} silo {1}", siloType, newSilo.SiloAddress);
 

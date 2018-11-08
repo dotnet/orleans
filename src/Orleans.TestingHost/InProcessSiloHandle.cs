@@ -27,7 +27,7 @@ namespace Orleans.TestingHost
         /// <param name="configurationSources">
         /// The configuration sources, interpreted by <see cref="TestClusterHostFactory.CreateSiloHost"/>.
         /// </param>
-        public static async Task<SiloHandle> Create(
+        public static async Task<SiloHandle> CreateAsync(
             string siloName,
             IList<IConfigurationSource> configurationSources)
         {

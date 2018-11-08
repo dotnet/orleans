@@ -89,7 +89,7 @@ namespace UnitTests.Streaming
 
             foreach (var silo in this.HostedCluster.GetActiveSilos().ToList())
             {
-                await this.HostedCluster.RestartSilo(silo);
+                await this.HostedCluster.RestartSiloAsync(silo);
             }
 
             output.WriteLine("..... Silos restarted");

@@ -105,7 +105,7 @@ namespace Orleans.TestingHost
         /// <summary>
         /// Delegate used to create and start an individual silo.
         /// </summary>
-        public Func<string, IList<IConfigurationSource>, Task<SiloHandle>> CreateSilo { private get; set; } = InProcessSiloHandle.Create;
+        public Func<string, IList<IConfigurationSource>, Task<SiloHandle>> CreateSiloAsync { private get; set; } = InProcessSiloHandle.CreateAsync;
         
         /// <summary>
         /// Configures the test cluster plus client in-process.
@@ -282,7 +282,16 @@ namespace Orleans.TestingHost
         /// <returns>SiloHandle for the newly started silo.</returns>
         public SiloHandle StartAdditionalSilo(bool startAdditionalSiloOnNewPort = false)
         {
-            return this.StartAdditionalSilos(1, startAdditionalSiloOnNewPort).GetAwaiter().GetResult().Single();
+            return StartAdditionalSiloAsync(startAdditionalSiloOnNewPort).GetAwaiter().GetResult();
+        }
+
+        /// <summary>
+        /// Start an additional silo, so that it joins the existing cluster.
+        /// </summary>
+        /// <returns>SiloHandle for the newly started silo.</returns>
+        public async Task<SiloHandle> StartAdditionalSiloAsync(bool startAdditionalSiloOnNewPort = false)
+        {
+            return (await this.StartAdditionalSilosAsync(1, startAdditionalSiloOnNewPort)).Single();
         }
 
         /// <summary>
@@ -291,13 +300,13 @@ namespace Orleans.TestingHost
         /// <param name="silosToStart">Number of silos to start.</param>
         /// <param name="startAdditionalSiloOnNewPort"></param>
         /// <returns>List of SiloHandles for the newly started silos.</returns>
-        public async Task<List<SiloHandle>> StartAdditionalSilos(int silosToStart, bool startAdditionalSiloOnNewPort = false)
+        public async Task<List<SiloHandle>> StartAdditionalSilosAsync(int silosToStart, bool startAdditionalSiloOnNewPort = false)
         {
             var instances = new List<SiloHandle>();
             if (silosToStart > 0)
             {
                 var siloStartTasks = Enumerable.Range(this.startedInstances, silosToStart)
-                    .Select(instanceNumber => Task.Run(() => StartOrleansSilo((short)instanceNumber, this.options, startSiloOnNewPort: startAdditionalSiloOnNewPort))).ToArray();
+                    .Select(instanceNumber => Task.Run(() => StartSiloAsync((short)instanceNumber, this.options, startSiloOnNewPort: startAdditionalSiloOnNewPort))).ToArray();
 
                 try
                 {
@@ -376,7 +385,7 @@ namespace Orleans.TestingHost
         {
             if (instance != null)
             {
-                StopOrleansSilo(instance, true);
+                StopSilo(instance, true);
                 if (Primary == instance)
                 {
                     Primary = null;
@@ -397,7 +406,7 @@ namespace Orleans.TestingHost
             if (instance != null)
             {
                 // do NOT stop, just kill directly, to simulate crash.
-                StopOrleansSilo(instance, false);
+                StopSilo(instance, false);
             }
         }
 
@@ -414,14 +423,14 @@ namespace Orleans.TestingHost
         /// Do a Stop or Kill of the specified silo, followed by a restart.
         /// </summary>
         /// <param name="instance">Silo to be restarted.</param>
-        public async Task<SiloHandle> RestartSilo(SiloHandle instance)
+        public async Task<SiloHandle> RestartSiloAsync(SiloHandle instance)
         {
             if (instance != null)
             {
                 var instanceNumber = instance.InstanceNumber;
                 var siloName = instance.Name;
                 StopSilo(instance);
-                var newInstance = await StartOrleansSilo(instanceNumber, this.options);
+                var newInstance = await StartSiloAsync(instanceNumber, this.options);
 
                 if (siloName == Silo.PrimarySiloName)
                 {
@@ -442,11 +451,11 @@ namespace Orleans.TestingHost
         /// Restart a previously stopped.
         /// </summary>
         /// <param name="siloName">Silo to be restarted.</param>
-        public async Task<SiloHandle> RestartStoppedSecondarySilo(string siloName)
+        public async Task<SiloHandle> RestartStoppedSecondarySiloAsync(string siloName)
         {
             if (siloName == null) throw new ArgumentNullException(nameof(siloName));
             var siloHandle = this.Silos.Single(s => s.Name.Equals(siloName, StringComparison.Ordinal));
-            var newInstance = await this.StartOrleansSilo(this.Silos.IndexOf(siloHandle), this.options);
+            var newInstance = await this.StartSiloAsync(this.Silos.IndexOf(siloHandle), this.options);
             additionalSilos.Add(newInstance);
             return newInstance;
         }
@@ -471,13 +480,13 @@ namespace Orleans.TestingHost
 
             if (this.options.UseTestClusterMembership)
             {
-                this.Primary = await StartOrleansSilo(this.startedInstances, this.options);
+                this.Primary = await StartSiloAsync(this.startedInstances, this.options);
                 silosToStart--;
             }
 
             if (silosToStart > 0)
             {
-                await this.StartAdditionalSilos(silosToStart);
+                await this.StartAdditionalSilosAsync(silosToStart);
             }
 
             WriteLog("Done initializing cluster");
@@ -497,10 +506,10 @@ namespace Orleans.TestingHost
         /// <param name="configurationOverrides">Configuration overrides.</param>
         /// <param name="startSiloOnNewPort">Whether we start this silo on a new port, instead of the default one</param>
         /// <returns>A handle to the silo deployed</returns>
-        public static async Task<SiloHandle> StartOrleansSilo(TestCluster cluster, int instanceNumber, TestClusterOptions clusterOptions, IReadOnlyList<IConfigurationSource> configurationOverrides = null, bool startSiloOnNewPort = false)
+        public static async Task<SiloHandle> StartSiloAsync(TestCluster cluster, int instanceNumber, TestClusterOptions clusterOptions, IReadOnlyList<IConfigurationSource> configurationOverrides = null, bool startSiloOnNewPort = false)
         {
             if (cluster == null) throw new ArgumentNullException(nameof(cluster));
-            return await cluster.StartOrleansSilo(instanceNumber, clusterOptions, configurationOverrides, startSiloOnNewPort);
+            return await cluster.StartSiloAsync(instanceNumber, clusterOptions, configurationOverrides, startSiloOnNewPort);
         }
 
         /// <summary>
@@ -511,7 +520,7 @@ namespace Orleans.TestingHost
         /// <param name="configurationOverrides">Configuration overrides.</param>
         /// <param name="startSiloOnNewPort">Whether we start this silo on a new port, instead of the default one</param>
         /// <returns>A handle to the deployed silo.</returns>
-        public async Task<SiloHandle> StartOrleansSilo(int instanceNumber, TestClusterOptions clusterOptions, IReadOnlyList<IConfigurationSource> configurationOverrides = null, bool startSiloOnNewPort = false)
+        public async Task<SiloHandle> StartSiloAsync(int instanceNumber, TestClusterOptions clusterOptions, IReadOnlyList<IConfigurationSource> configurationOverrides = null, bool startSiloOnNewPort = false)
         {
             var configurationSources = this.ConfigurationSources.ToList();
 
@@ -523,13 +532,13 @@ namespace Orleans.TestingHost
                 InitialData = siloSpecificOptions.ToDictionary()
             });
 
-            var handle = await this.CreateSilo(siloSpecificOptions.SiloName,configurationSources);
+            var handle = await this.CreateSiloAsync(siloSpecificOptions.SiloName,configurationSources);
             handle.InstanceNumber = (short)instanceNumber;
             Interlocked.Increment(ref this.startedInstances);
             return handle;
         }
 
-        private void StopOrleansSilo(SiloHandle instance, bool stopGracefully)
+        private void StopSilo(SiloHandle instance, bool stopGracefully)
         {
             try
             {

@@ -29,7 +29,7 @@ namespace UnitTests.MembershipTests
         {
             output.WriteLine("ClusterId= {0}", this.HostedCluster.Options.ClusterId);
 
-            SiloHandle silo3 = this.HostedCluster.StartAdditionalSilo();
+            SiloHandle silo3 = await this.HostedCluster.StartAdditionalSiloAsync();
 
             IManagementGrain mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
 
@@ -70,7 +70,7 @@ namespace UnitTests.MembershipTests
 
         protected async Task Do_Liveness_OracleTest_2(int silo2Kill, bool restart = true, bool startTimers = false)
         {
-            await this.HostedCluster.StartAdditionalSilos(numAdditionalSilos);
+            await this.HostedCluster.StartAdditionalSilosAsync(numAdditionalSilos);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             for (int i = 0; i < numGrains; i++)
@@ -83,7 +83,7 @@ namespace UnitTests.MembershipTests
             logger.Info("\n\n\n\nAbout to kill {0}\n\n\n", silo2KillHandle.SiloAddress.Endpoint);
 
             if (restart)
-                await this.HostedCluster.RestartSilo(silo2KillHandle);
+                await this.HostedCluster.RestartSiloAsync(silo2KillHandle);
             else
                 this.HostedCluster.KillSilo(silo2KillHandle);
 
@@ -106,7 +106,7 @@ namespace UnitTests.MembershipTests
 
         protected async Task Do_Liveness_OracleTest_3()
         {
-            var moreSilos = await this.HostedCluster.StartAdditionalSilos(1);
+            var moreSilos = await this.HostedCluster.StartAdditionalSilosAsync(1);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             await TestTraffic();
@@ -119,7 +119,7 @@ namespace UnitTests.MembershipTests
 
             logger.Info("\n\n\n\nAbout to re-start a first silo.\n\n\n");
             
-            await this.HostedCluster.RestartStoppedSecondarySilo(siloToStop.Name);
+            await this.HostedCluster.RestartStoppedSecondarySiloAsync(siloToStop.Name);
 
             await TestTraffic();
 

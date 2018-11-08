@@ -100,7 +100,7 @@ namespace UnitTests.General
         [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4008"), TestCategory("Functional")]
         public async Task ElasticityTest_StoppingSilos()
         {
-            List<SiloHandle> runtimes = await this.HostedCluster.StartAdditionalSilos(2);
+            List<SiloHandle> runtimes = await this.HostedCluster.StartAdditionalSilosAsync(2);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
             int stopLeavy = leavy;
 

@@ -280,7 +280,7 @@ namespace AWSUtils.Tests.StorageTests
             output.WriteLine("About to reset Silos");
             foreach (var silo in this.HostedCluster.GetActiveSilos().ToList())
             {
-                await this.HostedCluster.RestartSilo(silo);
+                await this.HostedCluster.RestartSiloAsync(silo);
             }
             this.HostedCluster.InitializeClient();
 
