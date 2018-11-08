@@ -247,6 +247,15 @@ namespace Orleans.Runtime.Host
             return true;
         }
 
+        /// <summary>	
+        /// Stop this silo.	
+        /// </summary>	
+        public void StopOrleansSilo()
+        {
+            this.IsStarted = false;
+            if (this.orleans != null) this.orleans.Stop();
+        }
+
         /// <summary>
         /// Gracefully shutdown this silo.
         /// </summary>
