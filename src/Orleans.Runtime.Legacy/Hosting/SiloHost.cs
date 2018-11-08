@@ -250,7 +250,7 @@ namespace Orleans.Runtime.Host
         /// <summary>	
         /// Stop this silo.	
         /// </summary>	
-        public void StopOrleansSilo()
+        public void StopSilo()
         {
             this.IsStarted = false;
             if (this.orleans != null) this.orleans.Stop();
