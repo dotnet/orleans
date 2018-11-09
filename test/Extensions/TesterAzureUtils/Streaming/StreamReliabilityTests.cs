@@ -49,7 +49,7 @@ namespace UnitTests.Streaming.Reliability
             TestUtils.CheckForAzureStorage();
 
             this.numExpectedSilos = 2;
-            builder.CreateSilo = AppDomainSiloHandle.Create;
+            builder.CreateSiloAsync = AppDomainSiloHandle.Create;
             builder.Options.InitialSilosCount = (short) this.numExpectedSilos;
             builder.Options.UseTestClusterMembership = false;
 
@@ -150,7 +150,7 @@ namespace UnitTests.Streaming.Reliability
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public void Baseline_StreamRel_RestartSilos()
+        public async Task Baseline_StreamRel_RestartSilos()
         {
             // This test case is just a sanity-check that the silo test config is OK.
             const string testName = "Baseline_StreamRel_RestartSilos";
@@ -158,7 +158,7 @@ namespace UnitTests.Streaming.Reliability
 
             CheckSilosRunning("Before Restart", numExpectedSilos);
             var silos = this.HostedCluster.Silos;
-            RestartAllSilos();
+            await RestartAllSilos();
 
             CheckSilosRunning("After Restart", numExpectedSilos);
             
@@ -622,7 +622,7 @@ namespace UnitTests.Streaming.Reliability
             await consumerGrain.Subscribe(_streamId, _streamProviderName);
 
             // Restart silos
-            RestartAllSilos();
+            await RestartAllSilos();
 
             string when = "After restart all silos";
             CheckSilosRunning(when, numExpectedSilos);
@@ -661,7 +661,7 @@ namespace UnitTests.Streaming.Reliability
             await Do_BaselineTest(consumerGrainId, producerGrainId);
 
             // Restart silos
-            RestartAllSilos();
+            await RestartAllSilos();
 
             string when = "After restart all silos";
             CheckSilosRunning(when, numExpectedSilos);
@@ -696,7 +696,7 @@ namespace UnitTests.Streaming.Reliability
 
             // Restart silos
             //RestartDefaultSilosButKeepCurrentClient(testName);
-            RestartAllSilos();
+            await RestartAllSilos();
 
             when = "After restart all silos";
             CheckSilosRunning(when, numExpectedSilos);
@@ -741,7 +741,7 @@ namespace UnitTests.Streaming.Reliability
 
             // Kill the silo containing the consumer grain
             SiloHandle siloToKill = this.HostedCluster.Silos.First(s => s.SiloAddress.Equals(siloAddress));
-            StopSilo(siloToKill, true, false);
+            await StopSilo(siloToKill, true, false);
             // Note: Don't restart failed silo for this test case
             // Note: Don't reinitialize client
 
@@ -779,7 +779,7 @@ namespace UnitTests.Streaming.Reliability
 
             // Kill the silo containing the producer grain
             SiloHandle siloToKill = this.HostedCluster.Silos.First(s => s.SiloAddress.Equals(siloAddress));
-            StopSilo(siloToKill, true, false);
+            await StopSilo(siloToKill, true, false);
             // Note: Don't restart failed silo for this test case
             // Note: Don't reinitialize client
 
@@ -819,7 +819,7 @@ namespace UnitTests.Streaming.Reliability
 
             // Restart the silo containing the consumer grain
             SiloHandle siloToKill = this.HostedCluster.Silos.First(s => s.SiloAddress.Equals(siloAddress));
-            StopSilo(siloToKill, true, true);
+            await StopSilo(siloToKill, true, true);
             // Note: Don't reinitialize client
 
             when = "After restart one silo";
@@ -857,7 +857,7 @@ namespace UnitTests.Streaming.Reliability
 
             // Restart the silo containing the consumer grain
             SiloHandle siloToKill = this.HostedCluster.Silos.First(s => s.SiloAddress.Equals(siloAddress));
-            StopSilo(siloToKill, true, true);
+            await StopSilo(siloToKill, true, true);
             // Note: Don't reinitialize client
 
             when = "After restart one silo";
@@ -906,7 +906,7 @@ namespace UnitTests.Streaming.Reliability
             // Add new silo
             //SiloHandle newSilo = StartAdditionalOrleans();
             //WaitForLivenessToStabilize();
-            SiloHandle newSilo = this.HostedCluster.StartAdditionalSilo();
+            SiloHandle newSilo = await this.HostedCluster.StartAdditionalSiloAsync();
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
 
@@ -948,7 +948,7 @@ namespace UnitTests.Streaming.Reliability
 
         // ---------- Utility Functions ----------
 
-        private void RestartAllSilos()
+        private async Task RestartAllSilos()
         {
             output.WriteLine("\n\n\n\n-----------------------------------------------------\n" +
                             "Restarting all silos - Old Primary={0} Secondary={1}" +
@@ -957,7 +957,7 @@ namespace UnitTests.Streaming.Reliability
 
             foreach (var silo in this.HostedCluster.GetActiveSilos().ToList())
             {
-                this.HostedCluster.RestartSilo(silo);
+                await this.HostedCluster.RestartSiloAsync(silo);
             }
 
             // Note: Needed to reinitialize client in this test case to connect to new silos
@@ -969,7 +969,7 @@ namespace UnitTests.Streaming.Reliability
                             this.HostedCluster.Primary?.SiloAddress, this.HostedCluster.SecondarySilos.FirstOrDefault()?.SiloAddress);
         }
 
-        private void StopSilo(SiloHandle silo, bool kill, bool restart)
+        private async Task StopSilo(SiloHandle silo, bool kill, bool restart)
         {
             SiloAddress oldSilo = silo.SiloAddress;
             bool isPrimary = oldSilo.Equals(this.HostedCluster.Primary?.SiloAddress);
@@ -983,7 +983,7 @@ namespace UnitTests.Streaming.Reliability
             if (restart)
             {
                 //RestartRuntime(silo, kill);
-                SiloHandle newSilo = this.HostedCluster.RestartSilo(silo);
+                SiloHandle newSilo = await this.HostedCluster.RestartSiloAsync(silo);
 
                 logger.Info("Restarted new {0} silo {1}", siloType, newSilo.SiloAddress);
 
@@ -991,12 +991,12 @@ namespace UnitTests.Streaming.Reliability
             }
             else if (kill)
             {
-                this.HostedCluster.KillSilo(silo);
+               await this.HostedCluster.KillSiloAsync(silo);
                Assert.False(silo.IsActive);
             }
             else
             {
-                this.HostedCluster.StopSilo(silo);
+               await this.HostedCluster.StopSiloAsync(silo);
                Assert.False(silo.IsActive);
             }
 

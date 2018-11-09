@@ -29,7 +29,7 @@ namespace UnitTests.MembershipTests
         {
             output.WriteLine("ClusterId= {0}", this.HostedCluster.Options.ClusterId);
 
-            SiloHandle silo3 = this.HostedCluster.StartAdditionalSilo();
+            SiloHandle silo3 = await this.HostedCluster.StartAdditionalSiloAsync();
 
             IManagementGrain mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
 
@@ -43,7 +43,7 @@ namespace UnitTests.MembershipTests
 
             IPEndPoint address = silo3.SiloAddress.Endpoint;
             output.WriteLine("About to stop {0}", address);
-            this.HostedCluster.StopSilo(silo3);
+            await this.HostedCluster.StopSiloAsync(silo3);
 
             // TODO: Should we be allowing time for changes to percolate?
 
@@ -70,7 +70,7 @@ namespace UnitTests.MembershipTests
 
         protected async Task Do_Liveness_OracleTest_2(int silo2Kill, bool restart = true, bool startTimers = false)
         {
-            await this.HostedCluster.StartAdditionalSilos(numAdditionalSilos);
+            await this.HostedCluster.StartAdditionalSilosAsync(numAdditionalSilos);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             for (int i = 0; i < numGrains; i++)
@@ -83,9 +83,9 @@ namespace UnitTests.MembershipTests
             logger.Info("\n\n\n\nAbout to kill {0}\n\n\n", silo2KillHandle.SiloAddress.Endpoint);
 
             if (restart)
-                this.HostedCluster.RestartSilo(silo2KillHandle);
+                await this.HostedCluster.RestartSiloAsync(silo2KillHandle);
             else
-                this.HostedCluster.KillSilo(silo2KillHandle);
+                await this.HostedCluster.KillSiloAsync(silo2KillHandle);
 
             bool didKill = !restart;
             await this.HostedCluster.WaitForLivenessToStabilizeAsync(didKill);
@@ -106,25 +106,25 @@ namespace UnitTests.MembershipTests
 
         protected async Task Do_Liveness_OracleTest_3()
         {
-            var moreSilos = await this.HostedCluster.StartAdditionalSilos(1);
+            var moreSilos = await this.HostedCluster.StartAdditionalSilosAsync(1);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             await TestTraffic();
 
             logger.Info("\n\n\n\nAbout to stop a first silo.\n\n\n");
             var siloToStop = this.HostedCluster.SecondarySilos[0];
-            this.HostedCluster.StopSilo(siloToStop);
+            await this.HostedCluster.StopSiloAsync(siloToStop);
 
             await TestTraffic();
 
             logger.Info("\n\n\n\nAbout to re-start a first silo.\n\n\n");
             
-            this.HostedCluster.RestartStoppedSecondarySilo(siloToStop.Name);
+            await this.HostedCluster.RestartStoppedSecondarySiloAsync(siloToStop.Name);
 
             await TestTraffic();
 
             logger.Info("\n\n\n\nAbout to stop a second silo.\n\n\n");
-            this.HostedCluster.StopSilo(moreSilos[0]);
+            await this.HostedCluster.StopSiloAsync(moreSilos[0]);
 
             await TestTraffic();
 

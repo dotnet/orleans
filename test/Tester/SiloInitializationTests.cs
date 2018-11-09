@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.Reflection;
+using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Host;
@@ -16,7 +17,7 @@ namespace Tester
         /// Tests that a silo host can be successfully started after a prior initialization failure.
         /// </summary>
         [Fact, TestCategory("Functional")]
-        public void SiloInitializationIsRetryableTest()
+        public async Task SiloInitializationIsRetryableTest()
         {
             var appDomain = CreateAppDomain();
             appDomain.UnhandledException += (sender, args) =>
@@ -37,11 +38,11 @@ namespace Tester
                 config.Globals.MembershipTableAssembly = "NonExistentAssembly.jpg";
                 
                 var siloHost = CreateSiloHost(appDomain, config);
-                siloHost.InitializeOrleansSilo();
+                siloHost.InitializeSilo();
 
                 // Attempt to start the silo.
-                Assert.ThrowsAny<Exception>(() => siloHost.StartOrleansSilo(catchExceptions: false));
-                siloHost.UnInitializeOrleansSilo();
+                await Assert.ThrowsAnyAsync<Exception>(() => siloHost.StartSiloAsync(catchExceptions: false));
+                siloHost.UnInitializeSilo();
 
                 // Reset the configuration to a valid configuration.
                 config.Globals.LivenessType = originalLivenessType;
@@ -49,8 +50,8 @@ namespace Tester
 
                 // Starting a new cluster should succeed.
                 siloHost = CreateSiloHost(appDomain, config);
-                siloHost.InitializeOrleansSilo();
-                siloHost.StartOrleansSilo(catchExceptions: false);
+                siloHost.InitializeSilo();
+                siloHost.StartSilo(catchExceptions: false);
             }
             finally
             {

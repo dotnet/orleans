@@ -101,9 +101,9 @@ namespace Orleans.Transactions.Tests
             this.Log($"Warmup transaction succeeded. {(gracefulShutdown ? "Stopping" : "Killing")} silo {siloToTerminate.SiloAddress} ({siloToTerminate.Name}) and continuing");
 
             if (gracefulShutdown)
-                this.testCluster.StopSilo(siloToTerminate);
+                await this.testCluster.StopSiloAsync(siloToTerminate);
             else
-                this.testCluster.KillSilo(siloToTerminate);
+                await this.testCluster.KillSiloAsync(siloToTerminate);
 
             this.Log("Waiting for transactions to stop completing successfully");
             var complete = await Task.WhenAny(succeeding, Task.Delay(TimeSpan.FromSeconds(30)));

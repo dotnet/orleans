@@ -215,7 +215,7 @@ namespace Tests.GeoClusterTests
                         BaseSiloPort = GetPortBase(myCount),
                         BaseGatewayPort = GetProxyBase(myCount)
                     },
-                    CreateSilo = AppDomainSiloHandle.Create
+                    CreateSiloAsync = AppDomainSiloHandle.Create
                 };
                 builder.AddSiloBuilderConfigurator<TestSiloBuilderConfigurator>();
                 builder.AddSiloBuilderConfigurator<TSiloBuilderConfigurator>();

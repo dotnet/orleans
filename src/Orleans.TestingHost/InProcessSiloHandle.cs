@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
@@ -26,12 +27,12 @@ namespace Orleans.TestingHost
         /// <param name="configurationSources">
         /// The configuration sources, interpreted by <see cref="TestClusterHostFactory.CreateSiloHost"/>.
         /// </param>
-        public static SiloHandle Create(
+        public static async Task<SiloHandle> CreateAsync(
             string siloName,
             IList<IConfigurationSource> configurationSources)
         {
             var host = TestClusterHostFactory.CreateSiloHost(siloName, configurationSources);
-            host.StartAsync().GetAwaiter().GetResult();
+            await host.StartAsync();
 
             var retValue = new InProcessSiloHandle
             {
@@ -45,7 +46,7 @@ namespace Orleans.TestingHost
         }
 
         /// <inheritdoc />
-        public override void StopSilo(bool stopGracefully)
+        public override async Task StopSiloAsync(bool stopGracefully)
         {
             var cancellation = new CancellationTokenSource();
             var ct = cancellation.Token;
@@ -53,16 +54,16 @@ namespace Orleans.TestingHost
             if (!stopGracefully)
                 cancellation.Cancel();
 
-            StopSilo(ct);
+            await StopSiloAsync(ct);
         }
 
-        public override void StopSilo(CancellationToken ct)
+        public override async Task StopSiloAsync(CancellationToken ct)
         {
             if (!IsActive) return;
 
             try
             {
-                this.SiloHost.StopAsync(ct).GetAwaiter().GetResult();
+                await this.SiloHost.StopAsync(ct);
             }
             catch (Exception exc)
             {
@@ -84,7 +85,7 @@ namespace Orleans.TestingHost
             {
                 try
                 {
-                    StopSilo(true);
+                    StopSiloAsync(true).GetAwaiter().GetResult();
                 }
                 catch
                 {

@@ -126,10 +126,7 @@ namespace Orleans
         public Task Close() => this.Stop(gracefully: true);
 
         /// <inheritdoc />
-        public void Abort()
-        {
-            this.Stop(gracefully: false).GetAwaiter().GetResult();
-        }
+        public Task AbortAsync() => this.Stop(gracefully: false);
 
         private async Task Stop(bool gracefully)
         {
@@ -167,7 +164,7 @@ namespace Orleans
         }
 
         /// <inheritdoc />
-        void IDisposable.Dispose() => this.Abort();
+        void IDisposable.Dispose() => this.AbortAsync().GetAwaiter().GetResult();
 
         /// <inheritdoc />
         public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string grainClassNamePrefix = null)

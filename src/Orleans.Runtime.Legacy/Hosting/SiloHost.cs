@@ -100,11 +100,11 @@ namespace Orleans.Runtime.Host
         /// <summary>
         /// Initialize this silo.
         /// </summary>
-        public void InitializeOrleansSilo()
+        public void InitializeSilo()
         {
             try
             {
-                if (!this.ConfigLoaded) LoadOrleansConfig();
+                if (!this.ConfigLoaded) LoadConfig();
                 var builder = new SiloHostBuilder()
                     .Configure<SiloOptions>(options => options.SiloName = this.Name)
                     .UseConfiguration(this.Config);
@@ -134,7 +134,7 @@ namespace Orleans.Runtime.Host
         /// <summary>
         /// Uninitialize this silo.
         /// </summary>
-        public void UnInitializeOrleansSilo()
+        public void UnInitializeSilo()
         {
             //currently an empty method, keep this method for backward-compatibility
         }
@@ -143,7 +143,16 @@ namespace Orleans.Runtime.Host
         /// Start this silo.
         /// </summary>
         /// <returns></returns>
-        public bool StartOrleansSilo(bool catchExceptions = true)
+        public bool StartSilo(bool catchExceptions = true)
+        {
+            return StartSiloAsync(catchExceptions).GetAwaiter().GetResult();
+        }
+
+        /// <summary>
+        /// Start this silo.
+        /// </summary>
+        /// <returns></returns>
+        public async Task<bool> StartSiloAsync(bool catchExceptions = true)
         {
             try
             {
@@ -174,7 +183,7 @@ namespace Orleans.Runtime.Host
                     }
 
                     // Start silo
-                    this.orleans.Start();
+                    await this.orleans.StartAsync(CancellationToken.None);
 
                     // Wait for the shutdown event, and trigger a graceful shutdown if we receive it.
 
@@ -241,7 +250,7 @@ namespace Orleans.Runtime.Host
         /// <summary>
         /// Stop this silo.
         /// </summary>
-        public void StopOrleansSilo()
+        public void StopSilo()
         {
             this.IsStarted = false;
             if (this.orleans != null) this.orleans.Stop();
@@ -250,7 +259,7 @@ namespace Orleans.Runtime.Host
         /// <summary>
         /// Gracefully shutdown this silo.
         /// </summary>
-        public void ShutdownOrleansSilo()
+        public void ShutdownSilo()
         {
             this.IsStarted = false;
             if (this.orleans != null) this.orleans.Shutdown();
@@ -262,7 +271,7 @@ namespace Orleans.Runtime.Host
         /// <param name="millisecondsTimeout">Timeout, or -1 for infinite.</param>
         /// <param name="cancellationToken">Token that cancels waiting for shutdown.</param>
         /// <returns></returns>
-        public Task ShutdownOrleansSiloAsync(int millisecondsTimeout, CancellationToken cancellationToken)
+        public Task ShutdownSiloAsync(int millisecondsTimeout, CancellationToken cancellationToken)
         {
             if (this.orleans == null || !this.IsStarted)
                 return Task.CompletedTask;
@@ -275,11 +284,11 @@ namespace Orleans.Runtime.Host
             })
             {
                 IsBackground = true,
-                Name = nameof(ShutdownOrleansSiloAsync)
+                Name = nameof(ShutdownSiloAsync)
             };
             shutdownThread.Start();
 
-            return WaitForOrleansSiloShutdownAsync(millisecondsTimeout, cancellationToken);
+            return WaitForSiloShutdownAsync(millisecondsTimeout, cancellationToken);
         }
 
         /// <summary>
@@ -287,9 +296,9 @@ namespace Orleans.Runtime.Host
         /// </summary>
         /// <param name="cancellationToken">Token that cancels waiting for shutdown.</param>
         /// <returns></returns>
-        public Task ShutdownOrleansSiloAsync(CancellationToken cancellationToken)
+        public Task ShutdownSiloAsync(CancellationToken cancellationToken)
         {
-            return ShutdownOrleansSiloAsync(Timeout.Infinite, cancellationToken);
+            return ShutdownSiloAsync(Timeout.Infinite, cancellationToken);
         }
 
         /// <summary>
@@ -299,9 +308,9 @@ namespace Orleans.Runtime.Host
         /// Note: This method call will block execution of current thread, 
         /// and will not return control back to the caller until the silo is shutdown.
         /// </remarks>
-        public void WaitForOrleansSiloShutdown()
+        public void WaitForSiloShutdown()
         {
-            WaitForOrleansSiloShutdownImpl();
+            WaitForSiloShutdownImpl();
         }
 
         /// <summary>
@@ -313,9 +322,9 @@ namespace Orleans.Runtime.Host
         /// and will not return control back to the caller until the silo is shutdown or 
         /// an external request for cancellation has been issued.
         /// </remarks>
-        public void WaitForOrleansSiloShutdown(CancellationToken cancellationToken)
+        public void WaitForSiloShutdown(CancellationToken cancellationToken)
         {
-            WaitForOrleansSiloShutdownImpl(cancellationToken);
+            WaitForSiloShutdownImpl(cancellationToken);
         }
 
         /// <summary>
@@ -326,7 +335,7 @@ namespace Orleans.Runtime.Host
         /// <remarks>
         /// This is essentially an async version of WaitForOrleansSiloShutdown.
         /// </remarks>
-        public async Task<bool> WaitForOrleansSiloShutdownAsync(int millisecondsTimeout, CancellationToken cancellationToken)
+        public async Task<bool> WaitForSiloShutdownAsync(int millisecondsTimeout, CancellationToken cancellationToken)
         {
             RegisteredWaitHandle registeredHandle = null;
             CancellationTokenRegistration tokenRegistration = default(CancellationTokenRegistration);
@@ -507,7 +516,7 @@ namespace Orleans.Runtime.Host
         /// <summary>
         /// Search for and load the config file for this silo.
         /// </summary>
-        public void LoadOrleansConfig()
+        public void LoadConfig()
         {
             if (this.ConfigLoaded) return;
 
@@ -557,7 +566,7 @@ namespace Orleans.Runtime.Host
         /// and will not return control back to the caller until the silo is shutdown or 
         /// an external request for cancellation has been issued.
         /// </remarks>
-        private void WaitForOrleansSiloShutdownImpl(CancellationToken? cancellationToken = null)
+        private void WaitForSiloShutdownImpl(CancellationToken? cancellationToken = null)
         {
             if (!this.IsStarted)
                 throw new InvalidOperationException("Cannot wait for silo " + this.Name + " since it was not started successfully previously.");
@@ -584,7 +593,7 @@ namespace Orleans.Runtime.Host
         {
             // Try to perform gracefull shutdown of Silo when we a cancellation request has been made
             this.logger.Info(ErrorCode.SiloStopping, "External cancellation triggered, starting to shutdown silo.");
-            ShutdownOrleansSilo();
+            ShutdownSilo();
         }
 
         /// <summary>
