@@ -82,7 +82,7 @@ namespace Orleans.Transactions
                      // check if our record is gone because we expired while waiting
                      if (!this.queue.RWLock.TryGetRecord(info.TransactionId, out TransactionRecord<TState> record))
                      {
-                         throw new OrleansTransactionLockAcquireTimeoutException(info.TransactionId.ToString());
+                         throw new OrleansCascadingAbortException(info.TransactionId.ToString());
                      }
 
                      // merge the current clock into the transaction time stamp
@@ -146,7 +146,7 @@ namespace Orleans.Transactions
                     // check if we expired while waiting
                     if (!this.queue.RWLock.TryGetRecord(info.TransactionId, out TransactionRecord<TState> record))
                     {
-                        throw new OrleansTransactionLockAcquireTimeoutException(info.TransactionId.ToString());
+                        throw new OrleansCascadingAbortException(info.TransactionId.ToString());
                     }
 
                     // merge the current clock into the transaction time stamp

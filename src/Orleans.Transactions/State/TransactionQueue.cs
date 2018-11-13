@@ -536,7 +536,9 @@ namespace Orleans.Transactions.State
                         {
                             // perform the actual store, and record the e-tag
                             this.storageBatch.ETag = await batchBeingSentToStorage.Store(storage);
-                        } else
+                            failCounter = 0;
+                        }
+                        else
                         {
                             logger.LogWarning("Store pre conditions not met.");
                             await AbortAndRestore(TransactionalStatus.CommitFailure);
@@ -576,7 +578,6 @@ namespace Orleans.Transactions.State
                     batchBeingSentToStorage.RunFollowUpActions();
                     storageWorker.Notify();  // we have to re-check for work
                 }
-                failCounter = 0;
             }
             catch (Exception e)
             {
@@ -593,25 +594,24 @@ namespace Orleans.Transactions.State
 
         private async Task Bail(TransactionalStatus status, bool force = false)
         {
-            await RWLock.AbortExecutingTransactions();
+            List<Task> pending = new List<Task>();
+            pending.Add(RWLock.AbortExecutingTransactions());
+            this.RWLock.AbortQueuedTransactions();
 
             // abort all entries in the commit queue
             foreach (var entry in commitQueue.Elements)
             {
-                await NotifyOfAbort(entry, status);
+                pending.Add(NotifyOfAbort(entry, status));
             }
             commitQueue.Clear();
 
-            this.RWLock.AbortQueuedTransactions();
-
+            await Task.WhenAll(pending);
             if (++failCounter >= 10 || force)
             {
                 logger.Debug("StorageWorker triggering grain Deactivation");
                 this.deactivate();
-            } else
-            {
-                await this.Restore();
             }
+            await this.Restore();
         }
 
         private async Task CheckProgressOfCommitQueue()

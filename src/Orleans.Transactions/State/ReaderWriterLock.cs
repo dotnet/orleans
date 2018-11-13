@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -35,6 +35,13 @@ namespace Orleans.Transactions.State
             public List<Task> Tasks; // the tasks for executing the waiting operations
             public LockGroup Next; // queued-up transactions waiting to acquire lock
             public DateTime? Deadline;
+            public void Reset()
+            {
+                FillCount = 0;
+                Tasks = null;
+                Deadline = null;
+                Clear();
+            }
         }
 
         public ReadWriteLock(
@@ -200,7 +207,7 @@ namespace Orleans.Transactions.State
             if (currentGroup != null)
             {
                 Task[] pending = currentGroup.Select(g => BreakLock(g.Key, g.Value)).ToArray();
-                currentGroup.Clear();
+                currentGroup.Reset();
                 return Task.WhenAll(pending);
             }
             return Task.CompletedTask;
@@ -256,6 +263,8 @@ namespace Orleans.Transactions.State
 
         private async Task LockWork()
         {
+            var now = DateTime.UtcNow;
+
             if (currentGroup != null)
             {
                 // check if there are any group members that are ready to exit the lock
@@ -279,7 +288,7 @@ namespace Orleans.Transactions.State
                         storageWorker.Notify();
                     }
 
-                    else if (currentGroup.Deadline < DateTime.UtcNow)
+                    else if (currentGroup.Deadline < now)
                     {
                         // the lock group has timed out.
                         var txlist = string.Join(",", currentGroup.Keys.Select(g => g.ToString()));
@@ -305,12 +314,11 @@ namespace Orleans.Transactions.State
 
                     if (currentGroup != null)
                     {
-                        currentGroup.Deadline = DateTime.UtcNow + this.options.LockTimeout;
+                        currentGroup.Deadline = now + this.options.LockTimeout;
 
                         // discard expired waiters that have no chance to succeed
                         // because they have been waiting for the lock for a longer timespan than the 
                         // total transaction timeout
-                        var now = DateTime.UtcNow;
                         List<Guid> expiredWaiters = null;
                         foreach (var kvp in currentGroup)
                         {

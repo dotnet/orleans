@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -80,7 +80,7 @@ namespace Orleans.Transactions
                     // check if we expired while waiting
                     if (!this.queue.RWLock.TryGetRecord(info.TransactionId, out TransactionRecord<OperationState> record))
                     {
-                        throw new OrleansTransactionLockAcquireTimeoutException(info.TransactionId.ToString());
+                        throw new OrleansCascadingAbortException(info.TransactionId.ToString());
                     }
 
                     // merge the current clock into the transaction time stamp
