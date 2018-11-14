@@ -14,6 +14,7 @@ using Xunit.Abstractions;
 
 namespace Tester.StreamingTests.ProgrammaticSubscribeTests
 {
+    [TestCategory("Functional")]
     public class SubscriptionObserverWithImplicitSubscribingTestsUsingSMS : SubscriptionObserverWithImplicitSubscribingTestRunner, IClassFixture<SubscriptionObserverWithImplicitSubscribingTestsUsingSMS.Fixture>
     {
         public class Fixture : BaseTestClusterFixture
