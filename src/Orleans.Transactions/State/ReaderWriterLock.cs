@@ -294,8 +294,8 @@ namespace Orleans.Transactions.State
                         {
                             // the lock group has timed out.
                             string txlist = string.Join(",", currentGroup.Keys.Select(g => g.ToString()));
-                            TimeSpan timeInLock = now - currentGroup.Deadline.Value;
-                            logger.LogWarning("Break-lock timeout for transactions {TransactionIds}, after {TimeInLock}ms", txlist, timeInLock.TotalMilliseconds);
+                            TimeSpan late = now - currentGroup.Deadline.Value;
+                            logger.LogWarning("Break-lock timeout for transactions {TransactionIds}. {Late}ms late", txlist, Math.Floor(late.TotalMilliseconds));
                             await AbortExecutingTransactions();
                             lockWorker.Notify();
                         }
