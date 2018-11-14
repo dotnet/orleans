@@ -29,7 +29,7 @@ namespace UnitTests.General
                     hostBuilder.Configure<SchedulingOptions>(options =>
                     {
                         options.PerformDeadlockDetection = true;
-                        options.CallChainReentrancy = SchedulingOptions.CallChainReentrancyStrategy.SingleCall;
+                        options.AllowCallChainReentrancy = true;
                     });
                 }
             }
@@ -85,6 +85,13 @@ namespace UnitTests.General
         public async Task DeadlockDetection_5()
         {
             await testHelper.DeadlockDetection_5();
+        }
+
+        // 6) Allowed reentrancy on non-reentrant grains A, B, C, A
+        [Fact, TestCategory("Functional"), TestCategory("Deadlock")]
+        public async Task DeadlockDetection_6()
+        {
+            await testHelper.DeadlockDetection_6();
         }
     }
 }

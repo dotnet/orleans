@@ -10,7 +10,7 @@ using Xunit.Abstractions;
 
 namespace UnitTests.General
 {
-    public class AllowCallChainReentrancyEntireChainTests : OrleansTestingBase
+    public class AllowCallChainReentrancyTests : OrleansTestingBase
     {
         private readonly Fixture fixture;
 
@@ -31,7 +31,7 @@ namespace UnitTests.General
                     hostBuilder.Configure<SchedulingOptions>(options =>
                     {
                         options.PerformDeadlockDetection = false;
-                        options.CallChainReentrancy = SchedulingOptions.CallChainReentrancyStrategy.EntireChain;
+                        options.AllowCallChainReentrancy = true;
                     }).ConfigureLogging(logging =>
                     {
                         logging.AddProvider(new TestLoggingProvider(x => _output.WriteLine(x)));
@@ -45,7 +45,7 @@ namespace UnitTests.General
 
         private readonly CallChainReentrancyTestHelper testHelper;
 
-        public AllowCallChainReentrancyEntireChainTests(ITestOutputHelper output)
+        public AllowCallChainReentrancyTests(ITestOutputHelper output)
         {
             if(output == null) throw new ArgumentNullException(nameof(output));
 

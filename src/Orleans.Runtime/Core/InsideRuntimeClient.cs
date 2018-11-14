@@ -289,8 +289,7 @@ namespace Orleans.Runtime
                 }
 
                 RequestContextExtensions.Import(message.RequestContextData);
-                if ((schedulingOptions.PerformDeadlockDetection
-                     || schedulingOptions.CallChainReentrancy == SchedulingOptions.CallChainReentrancyStrategy.EntireChain)
+                if ((schedulingOptions.PerformDeadlockDetection || schedulingOptions.AllowCallChainReentrancy)
                     && !message.TargetGrain.IsSystemTarget)
                 {
                     RequestInvocationHistorySummary invocationHistory = !schedulingOptions.PerformDeadlockDetection ?

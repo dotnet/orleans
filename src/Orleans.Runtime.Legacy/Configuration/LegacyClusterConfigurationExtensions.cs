@@ -189,10 +189,7 @@ namespace Orleans.Hosting
             services.AddOptions<SchedulingOptions>()
                 .Configure<GlobalConfiguration>((options, config) =>
                 {
-                    options.CallChainReentrancy = config.AllowCallChainReentrancy ?
-                        SchedulingOptions.CallChainReentrancyStrategy.SingleCall
-                        : SchedulingOptions.CallChainReentrancyStrategy.None;
-
+                    options.AllowCallChainReentrancy = config.AllowCallChainReentrancy;
                     options.PerformDeadlockDetection = config.PerformDeadlockDetection;
                 })
                 .Configure<NodeConfiguration>((options, nodeConfig) =>

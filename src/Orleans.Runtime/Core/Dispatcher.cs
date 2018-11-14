@@ -327,9 +327,7 @@ namespace Orleans.Runtime
                    incoming.IsAlwaysInterleave
                 || targetActivation.Running == null
                 || targetActivation.Running.IsReadOnly && incoming.IsReadOnly
-                || schedulingOptions.CallChainReentrancy == SchedulingOptions.CallChainReentrancyStrategy.SingleCall
-                    && targetActivation.ActivationId.Equals(incoming.SendingActivation) // TODO, consider using the same method for both modes
-                || schedulingOptions.CallChainReentrancy == SchedulingOptions.CallChainReentrancyStrategy.EntireChain
+                || schedulingOptions.AllowCallChainReentrancy
                    && IsMessageACallChainLoop(incoming)
                 || catalog.CanInterleave(targetActivation.ActivationId, incoming);
 
@@ -346,20 +344,7 @@ namespace Orleans.Runtime
         /// </summary>
         private void MarkSameCallChainMessageAsInterleaving(ActivationData sendingActivation, Message outgoing)
         {
-            if (schedulingOptions.CallChainReentrancy == SchedulingOptions.CallChainReentrancyStrategy.None)
-            {
-                return;
-            }
-
-            // TODO consider using the same method for both strategies
-            if (schedulingOptions.CallChainReentrancy == SchedulingOptions.CallChainReentrancyStrategy.SingleCall
-                && sendingActivation?.RunningRequestsSenders.Contains(outgoing.TargetActivation) == true)
-            {
-                outgoing.IsAlwaysInterleave = true;
-            }
-
-            if (schedulingOptions.CallChainReentrancy == SchedulingOptions.CallChainReentrancyStrategy.EntireChain
-                && IsMessageACallChainLoop(outgoing))
+            if (!schedulingOptions.AllowCallChainReentrancy && IsMessageACallChainLoop(outgoing))
             {
                 outgoing.IsAlwaysInterleave = true;
             }
