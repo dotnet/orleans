@@ -288,22 +288,25 @@ namespace Orleans.Transactions.State
                         storageWorker.Notify();
                     }
 
-                    else if (currentGroup.Deadline < now)
-                    {
-                        // the lock group has timed out.
-                        var txlist = string.Join(",", currentGroup.Keys.Select(g => g.ToString()));
-                        logger.Warn(555, $"break-lock timeout for {currentGroup.Count} transactions {txlist}");
-                        await AbortExecutingTransactions();
-                        lockWorker.Notify();
-                    }
-
                     else if (currentGroup.Deadline.HasValue)
                     {
-                        if (logger.IsEnabled(LogLevel.Trace))
-                            logger.Trace("recheck lock expiration at {Deadline}", currentGroup.Deadline.Value.ToString("o"));
+                        if (currentGroup.Deadline.Value < now)
+                        {
+                            // the lock group has timed out.
+                            string txlist = string.Join(",", currentGroup.Keys.Select(g => g.ToString()));
+                            TimeSpan timeInLock = now - currentGroup.Deadline.Value;
+                            logger.LogWarning("Break-lock timeout for transactions {TransactionIds}, after {TimeInLock}ms", txlist, timeInLock.TotalMilliseconds);
+                            await AbortExecutingTransactions();
+                            lockWorker.Notify();
+                        }
+                        else
+                        {
+                            if (logger.IsEnabled(LogLevel.Trace))
+                                logger.Trace("recheck lock expiration at {Deadline}", currentGroup.Deadline.Value.ToString("o"));
 
-                        // check again when the group expires
-                        lockWorker.Notify(currentGroup.Deadline.Value);
+                            // check again when the group expires
+                            lockWorker.Notify(currentGroup.Deadline.Value);
+                        }
                     }
                 }
 
