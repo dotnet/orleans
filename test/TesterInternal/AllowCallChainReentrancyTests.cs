@@ -16,9 +16,6 @@ namespace UnitTests.General
 
         public class Fixture : BaseTestClusterFixture
         {
-            // TODO static is really not what we want here
-            public static ITestOutputHelper _output { get; set; }
-
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.AddSiloBuilderConfigurator<SiloConfigurator>();
@@ -32,9 +29,6 @@ namespace UnitTests.General
                     {
                         options.PerformDeadlockDetection = false;
                         options.AllowCallChainReentrancy = true;
-                    }).ConfigureLogging(logging =>
-                    {
-                        logging.AddProvider(new TestLoggingProvider(x => _output.WriteLine(x)));
                     });
 
                 }
@@ -49,7 +43,6 @@ namespace UnitTests.General
         {
             if(output == null) throw new ArgumentNullException(nameof(output));
 
-            Fixture._output = output;
             this.fixture = new Fixture();
             testHelper = new CallChainReentrancyTestHelper
             {
