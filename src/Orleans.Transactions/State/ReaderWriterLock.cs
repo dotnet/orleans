@@ -307,6 +307,10 @@ namespace Orleans.Transactions.State
                             // check again when the group expires
                             lockWorker.Notify(currentGroup.Deadline.Value);
                         }
+                    } else
+                    {
+                        string txlist = string.Join(",", currentGroup.Keys.Select(g => g.ToString()));
+                        logger.LogWarning("Deadline not set for transactions {TransactionIds}", txlist);
                     }
                 }
 
