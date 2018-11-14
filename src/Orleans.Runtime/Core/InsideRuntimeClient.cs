@@ -299,7 +299,8 @@ namespace Orleans.Runtime
                     }
                     else if (schedulingOptions.AllowCallChainReentrancy)
                     {
-                        UpdateInvocationHistoryInRequestContext(new RequestInvocationHistorySummary(message.TargetActivation))
+                        UpdateInvocationHistoryInRequestContext(
+                            new RequestInvocationHistorySummary(message.TargetActivation));
                     }
 
                     // RequestContext is automatically saved in the msg upon send and propagated to the next hop
