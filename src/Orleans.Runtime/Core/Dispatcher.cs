@@ -344,7 +344,7 @@ namespace Orleans.Runtime
         /// </summary>
         private void MarkSameCallChainMessageAsInterleaving(ActivationData sendingActivation, Message outgoing)
         {
-            if (!schedulingOptions.AllowCallChainReentrancy && IsMessageACallChainLoop(outgoing))
+            if (schedulingOptions.AllowCallChainReentrancy && IsMessageACallChainLoop(outgoing))
             {
                 outgoing.IsAlwaysInterleave = true;
             }

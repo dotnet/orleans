@@ -289,14 +289,19 @@ namespace Orleans.Runtime
                 }
 
                 RequestContextExtensions.Import(message.RequestContextData);
-                if ((schedulingOptions.PerformDeadlockDetection || schedulingOptions.AllowCallChainReentrancy)
-                    && !message.TargetGrain.IsSystemTarget)
-                {
-                    RequestInvocationHistorySummary invocationHistory = !schedulingOptions.PerformDeadlockDetection ?
-                        new RequestInvocationHistorySummary(message.TargetActivation) :
-                        new RequestInvocationHistory(message.TargetGrain, message.TargetActivation, message.DebugContext);
 
-                    UpdateInvocationHistoryInRequestContext(invocationHistory);
+                if (!message.TargetGrain.IsSystemTarget)
+                {
+                    if (schedulingOptions.PerformDeadlockDetection)
+                    {
+                        UpdateInvocationHistoryInRequestContext(
+                            new RequestInvocationHistory(message.TargetGrain, message.TargetActivation, message.DebugContext));
+                    }
+                    else if (schedulingOptions.AllowCallChainReentrancy)
+                    {
+                        UpdateInvocationHistoryInRequestContext(new RequestInvocationHistorySummary(message.TargetActivation))
+                    }
+
                     // RequestContext is automatically saved in the msg upon send and propagated to the next hop
                     // in RuntimeClient.CreateMessage -> RequestContextExtensions.ExportToMessage(message);
                 }

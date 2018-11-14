@@ -24,7 +24,7 @@ namespace Orleans.Runtime
     /// </summary>
     internal class ActivationData : IGrainActivationContext, IActivationData, IInvokable, IDisposable
     {
-        // This class is used for activations that have extension invokers. It keeps a dictionary of 
+        // This class is used for activations that have extension invokers. It keeps a dictionary of
         // invoker objects to use with the activation, and extend the default invoker
         // defined for the grain class.
         // Note that in all cases we never have more than one copy of an actual invoker;
@@ -34,7 +34,7 @@ namespace Orleans.Runtime
             // Because calls to ExtensionInvoker are allways made within the activation context,
             // we rely on the single-threading guarantee of the runtime and do not protect the map with a lock.
             private Dictionary<int, Tuple<IGrainExtension, IGrainExtensionMethodInvoker>> extensionMap; // key is the extension interface ID
-            
+
             /// <summary>
             /// Try to add an extension for the specific interface ID.
             /// Fail and return false if there is already an extension for that interface ID.
@@ -171,7 +171,7 @@ namespace Orleans.Runtime
         private IGrainMethodInvoker lastInvoker;
         private IServiceScope serviceScope;
         private HashSet<IGrainTimer> timers;
-        
+
         public ActivationData(
             ActivationAddress addr,
             string genericArguments,
@@ -264,8 +264,6 @@ namespace Orleans.Runtime
             return extensionInvoker != null && extensionInvoker.TryGetExtensionHandler(extensionType, out result);
         }
 
-        public HashSet<ActivationId> RunningRequestsSenders { get; } = new HashSet<ActivationId>();
-
         public ISchedulingContext SchedulingContext { get; }
 
         public string GrainTypeName
@@ -313,14 +311,14 @@ namespace Orleans.Runtime
             var contextFactory = sp.GetRequiredService<GrainActivationContextFactory>();
             contextFactory.Context = context;
         }
-        
+
         private Streams.StreamDirectory streamDirectory;
         internal Streams.StreamDirectory GetStreamDirectory()
         {
             return streamDirectory ?? (streamDirectory = new Streams.StreamDirectory());
         }
 
-        internal bool IsUsingStreams 
+        internal bool IsUsingStreams
         {
             get { return streamDirectory != null; }
         }
@@ -343,7 +341,7 @@ namespace Orleans.Runtime
         {
             get { return GrainReference; }
         }
-        
+
         public GrainId Identity
         {
             get { return Grain; }
@@ -435,7 +433,7 @@ namespace Orleans.Runtime
         public void SetCollectionTicket(DateTime ticket)
         {
             if (ticket == default(DateTime)) throw new ArgumentException("default(DateTime) is disallowed", "ticket");
-            if (CollectionTicket != default(DateTime)) 
+            if (CollectionTicket != default(DateTime))
             {
                 throw new InvalidOperationException("call ResetCollectionTicket before calling SetCollectionTicket.");
             }
@@ -449,7 +447,7 @@ namespace Orleans.Runtime
 
         // Currently, the only supported multi-activation grain is one using the StatelessWorkerPlacement strategy.
         internal bool IsStatelessWorker => this.PlacedUsing is StatelessWorkerPlacement;
-        
+
         /// <summary>
         /// Returns a value indicating whether or not this placement strategy requires activations to be registered in
         /// the grain directory.
@@ -471,12 +469,6 @@ namespace Orleans.Runtime
             // Note: This method is always called while holding lock on this activation, so no need for additional locks here
 
             numRunning++;
-            if (message.Direction != Message.Directions.OneWay 
-                && message.SendingActivation != null
-                && !message.SendingGrain?.IsClient == true)
-            {
-                RunningRequestsSenders.Add(message.SendingActivation);
-            }
 
             if (Running != null) return;
 
@@ -490,7 +482,7 @@ namespace Orleans.Runtime
         {
             // Note: This method is always called while holding lock on this activation, so no need for additional locks here
             numRunning--;
-            RunningRequestsSenders.Remove(message.SendingActivation);
+
             if (numRunning == 0)
             {
                 becameIdle = DateTime.UtcNow;
@@ -523,7 +515,7 @@ namespace Orleans.Runtime
 
         /// <summary>Increment the number of in-flight messages currently being processed.</summary>
         public void IncrementInFlightCount() { Interlocked.Increment(ref inFlightCount); }
-        
+
         /// <summary>Decrement the number of in-flight messages currently being processed.</summary>
         public void DecrementInFlightCount() { Interlocked.Decrement(ref inFlightCount); }
 
@@ -532,14 +524,14 @@ namespace Orleans.Runtime
 
         /// <summary>Decrement the number of messages currently in the process of being received.</summary>
         public void DecrementEnqueuedOnDispatcherCount() { Interlocked.Decrement(ref enqueuedOnDispatcherCount); }
-       
+
         /// <summary>
         /// grouped by sending activation: responses first, then sorted by id
         /// </summary>
         private List<Message> waiting;
 
-        public int WaitingCount 
-        { 
+        public int WaitingCount
+        {
             get
             {
                 return waiting == null ? 0 : waiting.Count;
@@ -602,7 +594,7 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Check whether this activation is overloaded. 
+        /// Check whether this activation is overloaded.
         /// Returns LimitExceededException if overloaded, otherwise <c>null</c>c>
         /// </summary>
         /// <param name="log">Logger to use for reporting any overflow condition</param>
@@ -625,7 +617,7 @@ namespace Orleans.Runtime
 
             if (maxRequestsHardLimit > 0 && count > maxRequestsHardLimit) // Hard limit
             {
-                log.Warn(ErrorCode.Catalog_Reject_ActivationTooManyRequests, 
+                log.Warn(ErrorCode.Catalog_Reject_ActivationTooManyRequests,
                     String.Format("Overload - {0} enqueued requests for activation {1}, exceeding hard limit rejection threshold of {2}",
                         count, this, maxRequestsHardLimit));
 
@@ -699,7 +691,7 @@ namespace Orleans.Runtime
         {
             if (now == default(DateTime))
                 throw new ArgumentException("default(DateTime) is not allowed; Use DateTime.UtcNow instead.", "now");
-            
+
             return now - becameIdle;
         }
 
@@ -803,7 +795,7 @@ namespace Orleans.Runtime
         internal Task WaitForAllTimersToFinish()
         {
             lock(this)
-            { 
+            {
                 if (timers == null)
                 {
                     return Task.CompletedTask;
