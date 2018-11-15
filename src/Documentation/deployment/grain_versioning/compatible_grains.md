@@ -47,5 +47,5 @@ with V1:
 
   - If the current activation is a V2 and the requested version is V1, the current activation will
     be able to process the request normally
-  - If the current activation is a V2 and the requested version is V1, the current activation will also
+  - If the current activation is a V1 and the requested version is V2, the current activation will also
     be able to process the request normally
