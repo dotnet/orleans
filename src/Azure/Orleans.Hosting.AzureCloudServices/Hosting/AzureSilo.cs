@@ -208,7 +208,7 @@ namespace Orleans.Runtime.Host
             if (config == null)
             {
                 host = new SiloHost(instanceName);
-                host.LoadOrleansConfig(); // Load config from file + Initializes logger configurations
+                host.LoadConfig(); // Load config from file + Initializes logger configurations
             }
             else
             {
@@ -285,7 +285,7 @@ namespace Orleans.Runtime.Host
 
             host.ConfigureSiloHostDelegate = ConfigureSiloHostDelegate;
 
-            host.InitializeOrleansSilo();
+            host.InitializeSilo();
             return StartSilo();
         }
 
@@ -316,7 +316,7 @@ namespace Orleans.Runtime.Host
         {
             logger.Info(ErrorCode.Runtime_Error_100290, "Stopping {0}", this.GetType().FullName);
             serviceRuntimeWrapper.UnsubscribeFromStoppingNotification(this, HandleAzureRoleStopping);
-            host.ShutdownOrleansSilo();
+            host.ShutdownSilo();
             logger.Info(ErrorCode.Runtime_Error_100291, "Orleans silo '{0}' shutdown.", host.Name);
         }
 
@@ -324,7 +324,7 @@ namespace Orleans.Runtime.Host
         {
             logger.Info(ErrorCode.Runtime_Error_100292, "Starting Orleans silo '{0}' as a {1} node.", host.Name, host.Type);
 
-            bool ok = host.StartOrleansSilo();
+            bool ok = host.StartSilo();
 
             if (ok)
                 logger.Info(ErrorCode.Runtime_Error_100293, "Successfully started Orleans silo '{0}' as a {1} node.", host.Name, host.Type);
@@ -338,7 +338,7 @@ namespace Orleans.Runtime.Host
         {
             // Try to perform gracefull shutdown of Silo when we detect Azure role instance is being stopped
             logger.Info(ErrorCode.SiloStopping, "HandleAzureRoleStopping - starting to shutdown silo");
-            host.ShutdownOrleansSilo();
+            host.ShutdownSilo();
         }
 
 		/// <summary>
@@ -360,9 +360,9 @@ namespace Orleans.Runtime.Host
 			if (host.IsStarted)
 			{
 				if (cancellationToken.HasValue)
-					host.WaitForOrleansSiloShutdown(cancellationToken.Value);
+					host.WaitForSiloShutdown(cancellationToken.Value);
 				else
-					host.WaitForOrleansSiloShutdown();
+					host.WaitForSiloShutdown();
 			}
 			else
 				throw new Exception("Silo failed to start correctly - aborting");

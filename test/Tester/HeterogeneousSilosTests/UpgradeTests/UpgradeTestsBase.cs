@@ -195,7 +195,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                 // Setup configuration
                 this.builder = new TestClusterBuilder(1)
                 {
-                    CreateSilo = AppDomainSiloHandle.Create
+                    CreateSiloAsync = AppDomainSiloHandle.Create
                 };
                 TestDefaultConfiguration.ConfigureTestCluster(this.builder);
                 builder.Options.ApplicationBaseDirectory = rootDir.FullName;
@@ -230,7 +230,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                     new MemoryConfigurationSource {InitialData = new TestClusterOptions {ApplicationBaseDirectory = rootDir.FullName}.ToDictionary()}
                 };
 
-                silo = TestCluster.StartOrleansSilo(cluster, siloIdx, testClusterOptions, sources);
+                silo = await TestCluster.StartSiloAsync(cluster, siloIdx, testClusterOptions, sources);
             }
 
             this.deployedSilos.Add(silo);
@@ -241,7 +241,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
         protected async Task StopSilo(SiloHandle handle)
         {
-            handle?.StopSilo(true);
+            await handle?.StopSiloAsync(true);
             this.deployedSilos.Remove(handle);
             await Task.Delay(waitDelay);
         }

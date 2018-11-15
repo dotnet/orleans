@@ -26,7 +26,7 @@ namespace Orleans.TestingHost
         public override bool IsActive => isActive;
 
         /// <summary>Creates a new silo in a remote app domain and returns a handle to it.</summary>
-        public static SiloHandle Create(
+        public static Task<SiloHandle> Create(
             string siloName,
             IList<IConfigurationSource> configurationSources)
         {
@@ -58,7 +58,7 @@ namespace Orleans.TestingHost
 
                 siloHost.Start();
 
-                var retValue = new AppDomainSiloHandle
+                SiloHandle retValue = new AppDomainSiloHandle
                 {
                     Name = siloName,
                     SiloHost = siloHost,
@@ -68,7 +68,7 @@ namespace Orleans.TestingHost
                     AppDomainTestHook = siloHost.AppDomainTestHook,
                 };
 
-                return retValue;
+                return Task.FromResult(retValue);
             }
             catch (Exception)
             {
@@ -78,9 +78,9 @@ namespace Orleans.TestingHost
         }
 
         /// <inheritdoc />
-        public override void StopSilo(bool stopGracefully)
+        public override Task StopSiloAsync(bool stopGracefully)
         {
-            if (!IsActive) return;
+            if (!IsActive) return Task.CompletedTask;
 
             if (stopGracefully)
             {
@@ -111,9 +111,10 @@ namespace Orleans.TestingHost
             }
 
             this.SiloHost = null;
+            return Task.CompletedTask;
         }
 
-        public override void StopSilo(CancellationToken ct)
+        public override Task StopSiloAsync(CancellationToken ct)
         {
             throw new NotImplementedException();
         }
@@ -140,7 +141,7 @@ namespace Orleans.TestingHost
 
             if (disposing)
             {
-                StopSilo(true);
+                StopSiloAsync(true).GetAwaiter().GetResult();
             }
             else
             {

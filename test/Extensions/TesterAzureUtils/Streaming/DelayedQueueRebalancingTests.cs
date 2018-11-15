@@ -36,7 +36,7 @@ namespace Tester.AzureUtils.Streaming
             TestUtils.CheckForAzureStorage();
 
             // Define a cluster of 4, but 2 will be stopped.
-            builder.CreateSilo = AppDomainSiloHandle.Create;
+            builder.CreateSiloAsync = AppDomainSiloHandle.Create;
             builder.Options.InitialSilosCount = 2;
             builder.ConfigureLegacyConfiguration(legacy =>
             {
@@ -90,7 +90,7 @@ namespace Tester.AzureUtils.Streaming
         {
             await ValidateAgentsState(2, 2, "1");
             
-            await this.HostedCluster.StartAdditionalSilos(2, true);
+            await this.HostedCluster.StartAdditionalSilosAsync(2, true);
             await ValidateAgentsState(4, 2, "2");
 
             await Task.Delay(SILO_IMMATURE_PERIOD + LEEWAY);

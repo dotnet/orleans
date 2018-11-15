@@ -39,7 +39,7 @@ namespace UnitTests.MembershipTests
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            builder.CreateSilo = AppDomainSiloHandle.Create;
+            builder.CreateSiloAsync = AppDomainSiloHandle.Create;
             builder.AddClientBuilderConfigurator<BuilderConfigurator>();
             builder.AddSiloBuilderConfigurator<BuilderConfigurator>();
         }
@@ -55,7 +55,7 @@ namespace UnitTests.MembershipTests
             var promise = grain.CallOtherLongRunningTask(target, true, TimeSpan.FromSeconds(7));
 
             await Task.Delay(500);
-            HostedCluster.KillSilo(HostedCluster.SecondarySilos[0]);
+            await HostedCluster.KillSiloAsync(HostedCluster.SecondarySilos[0]);
 
             await Assert.ThrowsAsync<SiloUnavailableException>(() => promise);
         }
@@ -67,8 +67,8 @@ namespace UnitTests.MembershipTests
             var task = grain.LongRunningTask(true, TimeSpan.FromSeconds(7));
             await Task.Delay(500);
 
-            HostedCluster.KillSilo(HostedCluster.SecondarySilos[0]);
-            HostedCluster.KillSilo(HostedCluster.Primary);
+            await HostedCluster.KillSiloAsync(HostedCluster.SecondarySilos[0]);
+            await HostedCluster.KillSiloAsync(HostedCluster.Primary);
 
             await Assert.ThrowsAsync<SiloUnavailableException>(() => task);
         }

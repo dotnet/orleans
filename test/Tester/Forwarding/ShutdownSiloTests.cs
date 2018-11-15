@@ -51,7 +51,7 @@ namespace Tester.Forwarding
 
             // Shutdown the silo where the grain is
             await Task.Delay(500);
-            HostedCluster.StopSilo(HostedCluster.SecondarySilos.First());
+            await HostedCluster.StopSiloAsync(HostedCluster.SecondarySilos.First());
 
             await promisesBeforeShutdown;
             await promisesAfterShutdown;
@@ -65,7 +65,7 @@ namespace Tester.Forwarding
             var promise = grain.StartAndWaitTimerTick(TimeSpan.FromSeconds(10));
 
             await Task.Delay(500);
-            HostedCluster.StopSilo(HostedCluster.SecondarySilos.First());
+            await HostedCluster.StopSiloAsync(HostedCluster.SecondarySilos.First());
 
             await promise;
         }
@@ -79,7 +79,7 @@ namespace Tester.Forwarding
 
             await Task.Delay(TimeSpan.FromSeconds(1));
             var stopwatch = Stopwatch.StartNew();
-            HostedCluster.StopSilo(HostedCluster.SecondarySilos.First());
+            await HostedCluster.StopSiloAsync(HostedCluster.SecondarySilos.First());
             stopwatch.Stop();
 
             Assert.True(stopwatch.Elapsed > DeactivationTimeout);
@@ -95,7 +95,7 @@ namespace Tester.Forwarding
             await Task.Delay(500);
             var stopwatch = Stopwatch.StartNew();
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            HostedCluster.SecondarySilos.First().StopSilo(cts.Token);
+            await HostedCluster.SecondarySilos.First().StopSiloAsync(cts.Token);
             stopwatch.Stop();
             Assert.True(stopwatch.Elapsed < TimeSpan.FromMinutes(1));
         }

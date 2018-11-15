@@ -31,7 +31,7 @@ namespace Tester.StreamingTests
             await ProduceEventsFromClient(streamProviderName, streamGuid, streamNamespace, eventsProduced);
 
             // Hard kill client
-            testHost.KillClient();
+            await testHost.KillClientAsync();
 
             // Use a default configuration to get the default client drop timeout.
             var clusterConfig = new ClusterConfiguration();
@@ -70,7 +70,7 @@ namespace Tester.StreamingTests
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(() => Task.FromResult(eventCount[0]), producer.GetNumberProduced, lastTry), _timeout);
 
             // Hard kill client
-            testHost.KillClient();
+            await testHost.KillClientAsync();
 
             // Use a default configuration to get the default client drop timeout.
             var clusterConfig = new ClusterConfiguration();

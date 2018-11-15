@@ -38,7 +38,7 @@ namespace UnitTests.StreamingTests
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             TestUtils.CheckForAzureStorage();
-            builder.CreateSilo = AppDomainSiloHandle.Create;
+            builder.CreateSiloAsync = AppDomainSiloHandle.Create;
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
         }

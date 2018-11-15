@@ -250,11 +250,6 @@ namespace Orleans.Runtime
             logger.Info(ErrorCode.SiloInitializingFinished, "-------------- Started silo {0}, ConsistentHashCode {1:X} --------------", SiloAddress.ToLongString(), SiloAddress.GetConsistentHashCode());
         }
 
-        public void Start()
-        {
-            StartAsync(CancellationToken.None).GetAwaiter().GetResult();
-        }
-
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             StartTaskWithPerfAnalysis("Start Scheduler", scheduler.Start, new Stopwatch());

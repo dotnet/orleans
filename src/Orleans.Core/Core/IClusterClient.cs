@@ -47,6 +47,6 @@ namespace Orleans
         /// <summary>
         /// Aborts the client ungracefully.
         /// </summary>
-        void Abort();
+        Task AbortAsync();
     }
 }
