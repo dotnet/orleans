@@ -335,8 +335,11 @@ namespace Orleans.Runtime
 
         private const string GRAIN_REFERENCE_STR = "GrainReference";
         private const string SYSTEM_TARGET_STR = "SystemTarget";
+        private const string SYSTEM_TARGET_STR_WITH_EQUAL_SIGN = SYSTEM_TARGET_STR + "=";
         private const string OBSERVER_ID_STR = "ObserverId";
+        private const string OBSERVER_ID_STR_WITH_EQUAL_SIGN = OBSERVER_ID_STR + "=";
         private const string GENERIC_ARGUMENTS_STR = "GenericArguments";
+        private const string GENERIC_ARGUMENTS_STR_WITH_EQUAL_SIGN = GENERIC_ARGUMENTS_STR + "=";
 
         /// <summary>Returns a string representation of this reference.</summary>
         public override string ToString()
@@ -388,43 +391,39 @@ namespace Orleans.Runtime
         
         internal static GrainReference FromKeyString(string key, IGrainReferenceRuntime runtime)
         {
-            if (string.IsNullOrWhiteSpace(key)) throw new ArgumentNullException("key", "GrainReference.FromKeyString cannot parse null key");
-            
-            string trimmed = key.Trim();
-            string grainIdStr;
+            if (string.IsNullOrWhiteSpace(key)) throw new ArgumentNullException(nameof(key), "GrainReference.FromKeyString cannot parse null key");
+
+            ReadOnlySpan<char> trimmed = key.AsSpan().Trim();
+            ReadOnlySpan<char> grainIdStr;
             int grainIdIndex = (GRAIN_REFERENCE_STR + "=").Length;
 
-            int genericIndex = trimmed.IndexOf(GENERIC_ARGUMENTS_STR + "=", StringComparison.Ordinal);
-            int observerIndex = trimmed.IndexOf(OBSERVER_ID_STR + "=", StringComparison.Ordinal);
-            int systemTargetIndex = trimmed.IndexOf(SYSTEM_TARGET_STR + "=", StringComparison.Ordinal);
+            int genericIndex = trimmed.IndexOf(GENERIC_ARGUMENTS_STR_WITH_EQUAL_SIGN.AsSpan(), StringComparison.Ordinal);
+            int observerIndex = trimmed.IndexOf(OBSERVER_ID_STR_WITH_EQUAL_SIGN.AsSpan(), StringComparison.Ordinal);
+            int systemTargetIndex = trimmed.IndexOf(SYSTEM_TARGET_STR_WITH_EQUAL_SIGN.AsSpan(), StringComparison.Ordinal);
 
             if (genericIndex >= 0)
             {
-                grainIdStr = trimmed.Substring(grainIdIndex, genericIndex - grainIdIndex).Trim();
-                string genericStr = trimmed.Substring(genericIndex + (GENERIC_ARGUMENTS_STR + "=").Length);
-                if (String.IsNullOrEmpty(genericStr))
-                {
-                    genericStr = null;
-                }
-                return FromGrainId(GrainId.FromParsableString(grainIdStr), runtime, genericStr);
+                grainIdStr = trimmed.Slice(grainIdIndex, genericIndex - grainIdIndex).Trim();
+                ReadOnlySpan<char> genericStr = trimmed.Slice(genericIndex + GENERIC_ARGUMENTS_STR_WITH_EQUAL_SIGN.Length);
+                return FromGrainId(GrainId.FromParsableString(grainIdStr), runtime, genericStr.ToString());
             }
             else if (observerIndex >= 0)
             {
-                grainIdStr = trimmed.Substring(grainIdIndex, observerIndex - grainIdIndex).Trim();
-                string observerIdStr = trimmed.Substring(observerIndex + (OBSERVER_ID_STR + "=").Length);
-                GuidId observerId = GuidId.FromParsableString(observerIdStr);
+                grainIdStr = trimmed.Slice(grainIdIndex, observerIndex - grainIdIndex).Trim();
+                ReadOnlySpan<char> observerIdStr = trimmed.Slice(observerIndex + OBSERVER_ID_STR_WITH_EQUAL_SIGN.Length);
+                GuidId observerId = GuidId.FromParsableString(observerIdStr.ToString());
                 return NewObserverGrainReference(GrainId.FromParsableString(grainIdStr), observerId, runtime);
             }
             else if (systemTargetIndex >= 0)
             {
-                grainIdStr = trimmed.Substring(grainIdIndex, systemTargetIndex - grainIdIndex).Trim();
-                string systemTargetStr = trimmed.Substring(systemTargetIndex + (SYSTEM_TARGET_STR + "=").Length);
-                SiloAddress siloAddress = SiloAddress.FromParsableString(systemTargetStr);
+                grainIdStr = trimmed.Slice(grainIdIndex, systemTargetIndex - grainIdIndex).Trim();
+                ReadOnlySpan<char> systemTargetStr = trimmed.Slice(systemTargetIndex + SYSTEM_TARGET_STR_WITH_EQUAL_SIGN.Length);
+                SiloAddress siloAddress = SiloAddress.FromParsableString(systemTargetStr.ToString());
                 return FromGrainId(GrainId.FromParsableString(grainIdStr), runtime, null, siloAddress);
             }
             else
             {
-                grainIdStr = trimmed.Substring(grainIdIndex);
+                grainIdStr = trimmed.Slice(grainIdIndex);
                 return FromGrainId(GrainId.FromParsableString(grainIdStr), runtime);
             }
         }

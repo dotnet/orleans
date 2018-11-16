@@ -248,7 +248,7 @@ namespace Orleans.Serialization
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
             JObject jo = JObject.Load(reader);
-            UniqueKey addr = UniqueKey.Parse(jo["UniqueKey"].ToObject<string>());
+            UniqueKey addr = UniqueKey.Parse(jo["UniqueKey"].ToObject<string>().AsSpan());
             return addr;
         }
     }

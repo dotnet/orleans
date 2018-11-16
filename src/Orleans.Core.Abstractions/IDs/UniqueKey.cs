@@ -71,9 +71,9 @@ namespace Orleans.Runtime
                 KeyExt = null
             };
 
-        internal static UniqueKey Parse(string input)
+        internal static UniqueKey Parse(ReadOnlySpan<char> input)
         {
-            var trimmed = input.Trim();
+            var trimmed = input.Trim().ToString();
 
             // first, for convenience we attempt to parse the string using GUID syntax. this is needed by unit
             // tests but i don't know if it's needed for production.
