@@ -496,7 +496,7 @@ namespace UnitTests.GeoClusterTests
             });
         }
 
-        [SkippableFact, TestCategory("Functional")
+        [SkippableFact, TestCategory("Functional")]
         public async Task CacheCleanup()
         {
             await RunWithTimeout("Start Clusters and Clients", 180 * 1000, () =>

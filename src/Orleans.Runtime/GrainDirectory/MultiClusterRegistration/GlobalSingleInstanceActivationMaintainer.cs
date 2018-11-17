@@ -25,6 +25,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly IMultiClusterOracle multiClusterOracle;
         private readonly ILocalSiloDetails siloDetails;
         private readonly MultiClusterOptions multiClusterOptions;
+        private readonly RegistrarManager registrarManager;
 
         // scanning the entire directory for doubtful activations is too slow.
         // therefore, we maintain a list of potentially doubtful activations on the side.
@@ -42,7 +43,8 @@ namespace Orleans.Runtime.GrainDirectory
             ExecutorService executorService,
             ILocalSiloDetails siloDetails,
             IOptions<MultiClusterOptions> multiClusterOptions,
-            ILoggerFactory loggerFactory)
+            ILoggerFactory loggerFactory,
+            RegistrarManager registrarManager)
             : base(executorService, loggerFactory)
         {
             this.router = router;
@@ -52,6 +54,7 @@ namespace Orleans.Runtime.GrainDirectory
             this.siloDetails = siloDetails;
             this.multiClusterOptions = multiClusterOptions.Value;
             this.period = multiClusterOptions.Value.GlobalSingleInstanceRetryInterval;
+            this.registrarManager = registrarManager;
             multiClusterOracle.SubscribeToMultiClusterConfigurationEvents(this);
             logger.Debug("GSIP:M GlobalSingleInstanceActivationMaintainer Started, Period = {0}", period);
         }
@@ -141,6 +144,12 @@ namespace Orleans.Runtime.GrainDirectory
                             .Select(id => new KeyValuePair<string, SiloAddress>(id, this.multiClusterOracle.GetRandomClusterGateway(id)))
                             .ToList();
 
+                        // validate entries that point to remote clusters
+                        router.Scheduler.QueueTask(
+                                  () => RunBatchedValidation(),
+                                  router.CacheValidator.SchedulingContext
+                              ).Wait();
+
                         if (!remoteClusters.Any(kvp => kvp.Value == null))
                         {
                             // all clusters have at least one gateway reporting.
@@ -179,6 +188,66 @@ namespace Orleans.Runtime.GrainDirectory
 
             return Task.CompletedTask;
         }
+
+        private Task RunBatchedValidation()
+        {
+            // organize remote references by silo
+            var allEntries = router.DirectoryPartition.GetItems();
+            var cachedEntries = FilterByMultiClusterStatus(allEntries, GrainDirectoryEntryStatus.Cached).ToList();
+            var entriesBySilo = new Dictionary<SiloAddress, List<KeyValuePair<GrainId, IGrainInfo>>>();
+
+            logger.Debug("GSIP:M validating {count} cache entries", cachedEntries.Count);
+
+            foreach (var entry in cachedEntries)
+            {
+                var silo = entry.Value.Instances.FirstOrDefault().Value.SiloAddress;
+                if (!entriesBySilo.TryGetValue(silo, out var list))
+                {
+                    list = entriesBySilo[silo] = new List<KeyValuePair<GrainId, IGrainInfo>>();
+                }
+                list.Add(entry);
+            }
+
+            // process by silo
+            var tasks = new List<Task>();
+            foreach (var kvp in entriesBySilo)
+            {
+                tasks.Add(RunBatchedValidation(kvp.Key, kvp.Value));
+            }
+            return Task.WhenAll(tasks);
+        }
+
+        private async Task RunBatchedValidation(SiloAddress silo, List<KeyValuePair<GrainId, IGrainInfo>> list)
+        {
+            var multiClusterConfig = this.multiClusterOracle.GetMultiClusterConfiguration();
+            string clusterId = null;
+
+            // if we are still in a multi-cluster try to find out which cluster the silo belongs to
+            if (multiClusterConfig != null)
+            {
+                try
+                {
+                    var validator = this.grainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, silo);
+                    clusterId = await validator.Ping();
+                }
+                catch { }
+            }
+
+            // if the silo could not be contacted or is not part of the multicluster, unregister
+            if (clusterId == null
+                || ! multiClusterConfig.Clusters.Contains(clusterId))
+            {
+                logger.Debug("GSIP:M removing {count} cache entries pointing to {silo}", list.Count, silo);
+
+                var registrar = registrarManager.GetRegistrar(GlobalSingleInstanceRegistration.Singleton);
+
+                foreach (var kvp in list)
+                {
+                    registrar.InvalidateCache(ActivationAddress.GetAddress(silo, kvp.Key, kvp.Value.Instances.FirstOrDefault().Key));
+                }
+            }
+        }
+
 
         private async Task RunBatchedActivationRequests(List<KeyValuePair<string, SiloAddress>> remoteClusters, List<GrainId> grains)
         {
