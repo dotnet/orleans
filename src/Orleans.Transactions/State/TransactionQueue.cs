@@ -52,7 +52,6 @@ namespace Orleans.Transactions.State
             ParticipantId resource,
             Action deactivate,
             ITransactionalStateStorage<TState> storage,
-            JsonSerializerSettings serializerSettings,
             IClock clock,
             ILogger logger,
             ITimerManager timerManager)
@@ -359,7 +358,7 @@ namespace Orleans.Transactions.State
 
             // setting this field makes this entry ready for batching
 
-            remoteEntry.ConfirmationResponsePromise = remoteEntry.ConfirmationResponsePromise ?? new TaskCompletionSource<bool>();
+            remoteEntry.ConfirmationResponsePromise = remoteEntry.ConfirmationResponsePromise ?? new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             storageWorker.Notify();
 
