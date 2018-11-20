@@ -52,7 +52,7 @@ namespace UnitTests.GeoClusterTests
                 await t;
         }
 
-        [SkippableFact(Skip= "https://github.com/dotnet/orleans/issues/4265"), TestCategory("Functional")]
+        [SkippableFact(), TestCategory("Functional")]
         public async Task ThreeClusterBattery()
         {
 
@@ -369,7 +369,6 @@ namespace UnitTests.GeoClusterTests
             Clients[0][0].GetRuntimeId(x);
             WriteLog("{0} created grain", gref);
 
-            var listeners = new List<ClusterTestListener>();
             var promises = new List<Task<int>>();
 
             // create an observer on each client
@@ -384,8 +383,8 @@ namespace UnitTests.GeoClusterTests
                         WriteLog("{3} observedcall {2} on Client[{0}][{1}]", i, j, num, gref);
                         promise.TrySetResult(num);
                     });
-                    promises.Add(promise.Task);
-                    listeners.Add(listener);
+                    lock(promises)
+                        promises.Add(promise.Task);
                     Clients[i][j].Subscribe(x, listener);
                     WriteLog("{2} subscribed to Client[{0}][{1}]", i, j, gref);
                 }
@@ -410,7 +409,6 @@ namespace UnitTests.GeoClusterTests
             Clients[0][0].EnableStreamNotifications(x);
             WriteLog("{0} created grain", gref);
 
-            var listeners = new List<ClusterTestListener>();
             var promises = new List<Task<int>>();
 
             // create an observer on each client
@@ -425,8 +423,8 @@ namespace UnitTests.GeoClusterTests
                         WriteLog("{3} observedcall {2} on Client[{0}][{1}]", i, j, num, gref);
                         promise.TrySetResult(num);
                     });
-                    promises.Add(promise.Task);
-                    listeners.Add(listener);
+                    lock (promises)
+                        promises.Add(promise.Task);
                     Clients[i][j].SubscribeStream(x, listener);
                     WriteLog("{2} subscribed to Client[{0}][{1}]", i, j, gref);
                 }
