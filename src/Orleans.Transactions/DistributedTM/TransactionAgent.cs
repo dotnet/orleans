@@ -105,14 +105,17 @@ namespace Orleans.Transactions
             }
 
             // examine the return status
-            if (status == TransactionalStatus.Ok) foreach (var s in tasks)
+            if (status == TransactionalStatus.Ok)
             {
-                status = s.Result;
-                if (status != TransactionalStatus.Ok)
+                foreach (var s in tasks)
                 {
-                    if (logger.IsEnabled(LogLevel.Debug))
-                        logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} fail {transactionInfo.TransactionId} prepare response status={status}");
-                    break;
+                    status = s.Result;
+                    if (status != TransactionalStatus.Ok)
+                    {
+                        if (logger.IsEnabled(LogLevel.Debug))
+                            logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} fail {transactionInfo.TransactionId} prepare response status={status}");
+                        break;
+                    }
                 }
             }
 
