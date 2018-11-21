@@ -1,4 +1,4 @@
-﻿using Orleans.Runtime;
+using Orleans.Runtime;
 using System;
 using System.Runtime.Serialization;
 
@@ -233,23 +233,6 @@ namespace Orleans.Transactions
         }
 
         public OrleansBrokenTransactionLockException(SerializationInfo info, StreamingContext context)
-            : base(info, context)
-        {
-        }
-    }
-
-    /// <summary>
-    /// Signifies that the executing transaction has aborted because it could not acquire some lock in time
-    /// </summary>
-    [Serializable]
-    public class OrleansTransactionLockAcquireTimeoutException : OrleansTransactionTransientFailureException
-    {
-        public OrleansTransactionLockAcquireTimeoutException(string transactionId)
-            : base(transactionId, $"Transaction {transactionId} Aborted because some lock could not be acquired within the transaction timeout limit")
-        {
-        }
-
-        public OrleansTransactionLockAcquireTimeoutException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
