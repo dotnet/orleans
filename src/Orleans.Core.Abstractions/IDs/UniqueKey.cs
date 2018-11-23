@@ -290,7 +290,7 @@ namespace Orleans.Runtime
 
         /// <summary>
         /// If KeyExt not exists, returns following structure
-        /// |8 bytes|8 bytes|8 bytes|4 bytes| - total 36 bytes.
+        /// |8 bytes|8 bytes|8 bytes|4 bytes| - total 28 bytes.
         /// If KeyExt exists, adds additional KeyExt bytes length
         /// </summary>
         /// <returns></returns>
