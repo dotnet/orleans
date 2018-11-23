@@ -288,46 +288,51 @@ namespace Orleans.Runtime
             // ReSharper restore NonReadonlyFieldInGetHashCode
         }
 
+        /// <summary>
+        /// If KeyExt not exists, returns following structure
+        /// |8 bytes|8 bytes|8 bytes|4 bytes| - total 36 bytes.
+        /// If KeyExt exists, adds additional KeyExt bytes length
+        /// </summary>
+        /// <returns></returns>
         internal byte[] ToByteArray()
         {
             var extBytes = this.KeyExt != null ? Encoding.UTF8.GetBytes(KeyExt) : null;
             var extBytesLength = extBytes?.Length ?? 0;
             var sizeWithoutExtBytes = sizeof(ulong) * 3 + sizeof(int);
 
-            Span<byte> bytes = extBytes == null
-                ? stackalloc byte[sizeWithoutExtBytes]
-                : new byte[sizeWithoutExtBytes + extBytesLength];
+            byte[] bytes = new byte[sizeWithoutExtBytes + extBytesLength];
+            var spanBytes = bytes.AsSpan();
 
             var offset = 0;
             // Copy N0
             var n0 = this.N0;
-            MemoryMarshal.Write(bytes.Slice(offset, sizeof(ulong)), ref n0);
+            MemoryMarshal.Write(spanBytes.Slice(offset, sizeof(ulong)), ref n0);
             offset += sizeof(ulong);
 
             // Copy N1
             var n1 = this.N1;
-            MemoryMarshal.Write(bytes.Slice(offset, sizeof(ulong)), ref n1);
+            MemoryMarshal.Write(spanBytes.Slice(offset, sizeof(ulong)), ref n1);
             offset += sizeof(ulong);
 
             // Copy TypeCodeData
             var typeCodeData = this.TypeCodeData;
-            MemoryMarshal.Write(bytes.Slice(offset, sizeof(ulong)), ref typeCodeData);
+            MemoryMarshal.Write(spanBytes.Slice(offset, sizeof(ulong)), ref typeCodeData);
             offset += sizeof(ulong);
 
             // Copy KeyExt
             if (extBytes != null)
             {
-                MemoryMarshal.Write(bytes.Slice(offset, sizeof(int)), ref extBytesLength);
+                MemoryMarshal.Write(spanBytes.Slice(offset, sizeof(int)), ref extBytesLength);
                 offset += sizeof(int);
-                extBytes.CopyTo(bytes.Slice(offset, extBytesLength));
+                extBytes.CopyTo(spanBytes.Slice(offset, extBytesLength));
             }
             else
             {
                 var length = -1;
-                MemoryMarshal.Write(bytes.Slice(offset, sizeof(int)), ref length);
+                MemoryMarshal.Write(spanBytes.Slice(offset, sizeof(int)), ref length);
             }
 
-            return bytes.ToArray();
+            return bytes;
         }
 
         private Guid ConvertToGuid()
