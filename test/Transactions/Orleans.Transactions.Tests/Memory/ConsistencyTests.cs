@@ -1,9 +1,9 @@
-﻿using Xunit.Abstractions;
+using Xunit.Abstractions;
 using Xunit;
 
 namespace Orleans.Transactions.Tests
 {
-    [TestCategory("Transactions")]
+    [TestCategory("Transactions-dev")]
     public class ConsistencyTests : ConsistencyTransactionTestRunner, IClassFixture<MemoryTransactionsFixture>
     {
         public ConsistencyTests(MemoryTransactionsFixture fixture, ITestOutputHelper output)

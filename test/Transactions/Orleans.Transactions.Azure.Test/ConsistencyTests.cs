@@ -1,10 +1,10 @@
-﻿using Xunit.Abstractions;
+using Xunit.Abstractions;
 using Xunit;
 using Orleans.Transactions.Tests;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {
-    [TestCategory("Azure"), TestCategory("Transactions")]
+    [TestCategory("Azure"), TestCategory("Transactions-dev")]
     public class ConsistencyTests : ConsistencyTransactionTestRunner, IClassFixture<TestFixture>
     {
         public ConsistencyTests(TestFixture fixture, ITestOutputHelper output)

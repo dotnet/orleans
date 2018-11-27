@@ -53,6 +53,12 @@ namespace Orleans.Transactions
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.Trace($"{stopwatch.Elapsed.TotalMilliseconds:f2} prepare {transactionInfo}");
 
+            if (transactionInfo.Participants.Count == 0)
+            {
+                this.statistics.TrackTransactionSucceeded();
+                return TransactionalStatus.Ok;
+            }
+
             List<ParticipantId> writeParticipants = null;
             List<KeyValuePair<ParticipantId, AccessCounter>> resources = null;
             KeyValuePair<ParticipantId, AccessCounter>? manager;
@@ -79,16 +85,28 @@ namespace Orleans.Transactions
         {
             TransactionalStatus status = TransactionalStatus.Ok;
             var tasks = new List<Task<TransactionalStatus>>();
-            foreach (KeyValuePair<ParticipantId,AccessCounter> resource in resources)
-            {
-                tasks.Add(resource.Key.Reference.AsReference<ITransactionalResourceExtension>()
-                               .CommitReadOnly(resource.Key.Name, transactionInfo.TransactionId, resource.Value, transactionInfo.TimeStamp));
-            }
-
             try
             {
+                foreach (KeyValuePair<ParticipantId, AccessCounter> resource in resources)
+                {
+                    tasks.Add(resource.Key.Reference.AsReference<ITransactionalResourceExtension>()
+                                   .CommitReadOnly(resource.Key.Name, transactionInfo.TransactionId, resource.Value, transactionInfo.TimeStamp));
+                }
+
                 // wait for all responses
-                await Task.WhenAll(tasks);
+                TransactionalStatus[] results = await Task.WhenAll(tasks);
+
+                // examine the return status
+                foreach (var s in results)
+                {
+                    if (s != TransactionalStatus.Ok)
+                    {
+                        status = s;
+                        if (logger.IsEnabled(LogLevel.Debug))
+                            logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} fail {transactionInfo.TransactionId} prepare response status={status}");
+                        break;
+                    }
+                }
             }
             catch (TimeoutException)
             {
@@ -104,34 +122,19 @@ namespace Orleans.Transactions
                 status = TransactionalStatus.PresumedAbort;
             }
 
-            // examine the return status
-            if (status == TransactionalStatus.Ok)
+            if (status != TransactionalStatus.Ok)
             {
-                foreach (var s in tasks)
-                {
-                    status = s.Result;
-                    if (status != TransactionalStatus.Ok)
-                    {
-                        if (logger.IsEnabled(LogLevel.Debug))
-                            logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} fail {transactionInfo.TransactionId} prepare response status={status}");
-                        break;
-                    }
-                }
-            }
-
-            try
-            {
-                if(status != TransactionalStatus.Ok)
+                try
                 {
                     await Task.WhenAll(resources.Select(r => r.Key.Reference.AsReference<ITransactionalResourceExtension>()
                                 .Abort(r.Key.Name, transactionInfo.TransactionId)));
                 }
-            }
-            catch (Exception ex)
-            {
-                if (logger.IsEnabled(LogLevel.Debug))
-                    logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} failure aborting {transactionInfo.TransactionId} CommitReadOnly");
-                this.logger.LogWarning(ex, "Failed to abort readonly transaction {TransactionId}", transactionInfo.TransactionId);
+                catch (Exception ex)
+                {
+                    if (logger.IsEnabled(LogLevel.Debug))
+                        logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} failure aborting {transactionInfo.TransactionId} CommitReadOnly");
+                    this.logger.LogWarning(ex, "Failed to abort readonly transaction {TransactionId}", transactionInfo.TransactionId);
+                }
             }
 
             if (logger.IsEnabled(LogLevel.Trace))
@@ -144,18 +147,18 @@ namespace Orleans.Transactions
         {
             TransactionalStatus status = TransactionalStatus.Ok;
 
-            foreach (var p in resources)
-            {
-                if (p.Key.Equals(manager.Key))
-                    continue;
-                // one-way prepare message
-                p.Key.Reference.AsReference<ITransactionalResourceExtension>()
-                        .Prepare(p.Key.Name, transactionInfo.TransactionId, p.Value, transactionInfo.TimeStamp, manager.Key)
-                        .Ignore();
-            }
-
             try
             {
+                foreach (var p in resources)
+                {
+                    if (p.Key.Equals(manager.Key))
+                        continue;
+                    // one-way prepare message
+                    p.Key.Reference.AsReference<ITransactionalResourceExtension>()
+                            .Prepare(p.Key.Name, transactionInfo.TransactionId, p.Value, transactionInfo.TimeStamp, manager.Key)
+                            .Ignore();
+                }
+
                 // wait for the TM to commit the transaction
                 status = await manager.Key.Reference.AsReference<ITransactionManagerExtension>()
                     .PrepareAndCommit(manager.Key.Name, transactionInfo.TransactionId, manager.Value, transactionInfo.TimeStamp, writeResources, resources.Count);
@@ -164,7 +167,6 @@ namespace Orleans.Transactions
             {
                 if (logger.IsEnabled(LogLevel.Debug))
                     logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} timeout {transactionInfo.TransactionId} on CommitReadWriteTransaction");
-
                 status = TransactionalStatus.TMResponseTimeout;
             }
             catch (Exception ex)
@@ -175,9 +177,9 @@ namespace Orleans.Transactions
                 status = TransactionalStatus.PresumedAbort;
             }
 
-            try
+            if (status != TransactionalStatus.Ok)
             {
-                if (status != TransactionalStatus.Ok)
+                try
                 {
                     if (logger.IsEnabled(LogLevel.Debug))
                         logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} failed {transactionInfo.TransactionId} with status={status}");
@@ -191,12 +193,12 @@ namespace Orleans.Transactions
                                     .Cancel(p.Name, transactionInfo.TransactionId, transactionInfo.TimeStamp, status)));
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                if (logger.IsEnabled(LogLevel.Debug))
-                    logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} failure aborting {transactionInfo.TransactionId} CommitReadWriteTransaction");
-                this.logger.LogWarning(ex, "Failed to abort transaction {TransactionId}", transactionInfo.TransactionId);
+                catch (Exception ex)
+                {
+                    if (logger.IsEnabled(LogLevel.Debug))
+                        logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} failure aborting {transactionInfo.TransactionId} CommitReadWriteTransaction");
+                    this.logger.LogWarning(ex, "Failed to abort transaction {TransactionId}", transactionInfo.TransactionId);
+                }
             }
 
 

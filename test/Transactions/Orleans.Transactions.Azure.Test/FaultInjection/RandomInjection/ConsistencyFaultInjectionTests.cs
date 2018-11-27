@@ -1,4 +1,4 @@
-﻿using Orleans.TestingHost;
+using Orleans.TestingHost;
 using Orleans.Transactions.Tests;
 using Orleans.Transactions.Tests.Consistency;
 using System;
@@ -12,7 +12,7 @@ using Xunit.Abstractions;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {
-    [TestCategory("Azure"), TestCategory("Transactions")]
+    [TestCategory("Azure"), TestCategory("Transactions-dev")]
     public class ConsistencyFaultInjectionTests: ConsistencyTransactionTestRunner, IClassFixture<RandomFaultInjectedTestFixture>
     {
         public ConsistencyFaultInjectionTests(RandomFaultInjectedTestFixture fixture, ITestOutputHelper output)
