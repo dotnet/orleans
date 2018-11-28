@@ -3,24 +3,27 @@ layout: page
 title: Samples Overview
 ---
 
-# Samples Overview
+# Tutorials and Samples
 
 ## What do I need?
 
-The samples are self-contained, except where noted.
-You might need an Azure subscription for some of the samples.
+The tutorials and samples are self-contained, except where noted.
+
+The tutorials are intended to give step-by-step instructions for achieving a task, with links to places you can find more information.
+The sample app overviews do not necessarily contain steps.
+They are intended to me more like study guides.
+
+Note: You might need an Azure subscription for some of these.
 For the Azure-based samples, you will need to install the SDK.
 
 The samples can be downloaded from [GitHub](https://github.com/dotnet/orleans/tree/master/Samples).
 
-## [Hello World](tutorial_1_helloworld.md)
+## [Tutorial One - Orleans Test](tutorial_1_orleanstest.md)
 
-This is the Orleans version of an old classic. It demonstrates that while there is no such thing as "trivial" when you are dealing with distributed computing, Orleans makes it pretty straight-forward.
+The steps of this tutorial include creating the structure and adding the NuGet packages to basic Orleans application.
 
-## [MathGrains](MathGrains.md)
+## [Sample App - Hello World](overview_helloworld.md)
 
-This is a simple calculator that uses Orleans core components to encapsulate the functionality.
+This is a thorough overview of the Hello World sample application.
+It is similar to the application resulting from following the steps of Tutorial One.
 
-## [Adventure](Adventure.md)
-
-Before there was graphical user interfaces, before the era of game consoles and massive-multiplayer games, there were VT100 terminals and there was [Colossal Cave Adventure](http://en.wikipedia.org/wiki/Colossal_Cave_Adventure). Possibly lame by today's standards, back then it was a magical world of monsters, chirping birds, and things you could pick up. It's the inspiration for this sample.
