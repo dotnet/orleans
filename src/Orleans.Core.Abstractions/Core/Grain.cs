@@ -120,6 +120,18 @@ namespace Orleans
         }
 
         /// <summary>
+        /// Simple way to delay invoke an async callback
+        /// the timer will be destroyed automatically when first timer tick
+        /// </summary>
+        /// <param name="asyncCallback">Callback function to be invoked</param>
+        /// <param name="dueTime">Due time for invoke</param>
+        /// <returns></returns>
+        protected void DelayInvoke(Func<Task> asyncCallback, TimeSpan dueTime)
+        {
+            this.RegisterTimer(async obj => await asyncCallback(), null, dueTime, TimeSpan.FromMilliseconds(-1));
+        }
+
+        /// <summary>
         /// Registers a persistent, reliable reminder to send regular notifications (reminders) to the grain.
         /// The grain must implement the <c>Orleans.IRemindable</c> interface, and reminders for this grain will be sent to the <c>ReceiveReminder</c> callback method.
         /// If the current grain is deactivated when the timer fires, a new activation of this grain will be created to receive this reminder.
