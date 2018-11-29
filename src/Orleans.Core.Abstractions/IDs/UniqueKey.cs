@@ -304,32 +304,24 @@ namespace Orleans.Runtime
             var spanBytes = bytes.AsSpan();
 
             var offset = 0;
-            // Copy N0
-            var n0 = this.N0;
-            MemoryMarshal.Write(spanBytes.Slice(offset, sizeof(ulong)), ref n0);
-            offset += sizeof(ulong);
+            var ulongBytes = MemoryMarshal.Cast<byte, ulong>(spanBytes.Slice(offset, sizeof(ulong) * 3));
 
-            // Copy N1
-            var n1 = this.N1;
-            MemoryMarshal.Write(spanBytes.Slice(offset, sizeof(ulong)), ref n1);
-            offset += sizeof(ulong);
+            ulongBytes[0] = this.N0;
+            ulongBytes[1] = this.N1;
+            ulongBytes[2] = this.TypeCodeData;
 
-            // Copy TypeCodeData
-            var typeCodeData = this.TypeCodeData;
-            MemoryMarshal.Write(spanBytes.Slice(offset, sizeof(ulong)), ref typeCodeData);
-            offset += sizeof(ulong);
+            offset += sizeof(ulong) * 3;
 
             // Copy KeyExt
             if (extBytes != null)
             {
-                MemoryMarshal.Write(spanBytes.Slice(offset, sizeof(int)), ref extBytesLength);
+                MemoryMarshal.Cast<byte, int>(spanBytes.Slice(offset, sizeof(int)))[0] = extBytesLength;
                 offset += sizeof(int);
                 extBytes.CopyTo(spanBytes.Slice(offset, extBytesLength));
             }
             else
             {
-                var length = -1;
-                MemoryMarshal.Write(spanBytes.Slice(offset, sizeof(int)), ref length);
+                MemoryMarshal.Cast<byte, int>(spanBytes.Slice(offset, sizeof(int)))[0] = -1;
             }
 
             return bytes;
