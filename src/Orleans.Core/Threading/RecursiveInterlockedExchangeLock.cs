@@ -12,7 +12,7 @@ namespace Orleans.Threading
         private const int UNLOCKED = -1;
 
         [ThreadStatic]
-        private static int threadId;
+        private static int localThreadId;
         private int lockState = UNLOCKED;
         private readonly Func<bool> spinCondition;
 
@@ -21,7 +21,7 @@ namespace Orleans.Threading
             this.spinCondition = this.TryGet;
         }
 
-        private static int ThreadId => threadId != 0 ? threadId : threadId = Thread.CurrentThread.ManagedThreadId;
+        private static int ThreadId => localThreadId != 0 ? localThreadId : localThreadId = Thread.CurrentThread.ManagedThreadId;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryGet()
@@ -45,7 +45,12 @@ namespace Orleans.Threading
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Release() => Interlocked.Exchange(ref this.lockState, UNLOCKED);
+        public bool TryRelease()
+        {
+            var threadId = ThreadId;
+            var previousValue = Interlocked.CompareExchange(ref this.lockState, UNLOCKED, threadId);
+            return previousValue == UNLOCKED || previousValue == threadId;
+        }
 
         public override string ToString()
         {

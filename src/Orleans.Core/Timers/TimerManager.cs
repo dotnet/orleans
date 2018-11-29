@@ -30,9 +30,7 @@ namespace Orleans.Timers
             public Task Completion => this.completion.Task;
 
             public DateTime DueTime { get; }
-
-            public bool IsCanceled => false;
-
+            
             public void OnTimeout() => this.completion.TrySetResult(0);
 
             DelayTimer ILinkedListElement<DelayTimer>.Next { get; set; }
@@ -48,12 +46,12 @@ namespace Orleans.Timers
         /// <summary>
         /// The maximum number of times a queue can be denied servicing before servicing is mandatory.
         /// </summary>
-        private const int MaxStarvation = 2;
+        private const int MAX_STARVATION = 2;
 
         /// <summary>
         /// The number of milliseconds between timer servicing ticks.
         /// </summary>
-        private const int TimerTickMilliseconds = 50;
+        private const int TIMER_TICK_MILLISECONDS = 50;
 
         /// <summary>
         /// Lock protecting <see cref="allQueues"/>.
@@ -78,7 +76,7 @@ namespace Orleans.Timers
 
         static TimerManager()
         {
-            var timerPeriod = TimeSpan.FromMilliseconds(TimerTickMilliseconds);
+            var timerPeriod = TimeSpan.FromMilliseconds(TIMER_TICK_MILLISECONDS);
             QueueChecker = new Timer(_ => CheckQueues(), null, timerPeriod, timerPeriod);
         }
 
@@ -89,13 +87,13 @@ namespace Orleans.Timers
         {
             ExpiredTimers expired = null;
             var queue = EnsureCurrentThreadHasQueue();
-            queue.Lock.Get();
 
             try
             {
+                queue.Lock.Get();
                 queue.AddTail(timer);
 
-                if (queue.StarvationCount >= MaxStarvation)
+                if (queue.StarvationCount >= MAX_STARVATION)
                 {
                     // If the queue is too starved, service it now.
                     expired = new ExpiredTimers();
@@ -105,7 +103,7 @@ namespace Orleans.Timers
             }
             finally
             {
-                queue.Lock.Release();
+                queue.Lock.TryRelease();
 
                 // Fire expired timers outside of lock.
                 expired?.FireTimers();
@@ -128,7 +126,7 @@ namespace Orleans.Timers
                     if (!queue.Lock.TryGet())
                     {
                         // Check for starvation.
-                        if (Interlocked.Increment(ref queue.StarvationCount) > MaxStarvation)
+                        if (Interlocked.Increment(ref queue.StarvationCount) > MAX_STARVATION)
                         {
                             // If the queue starved, block until the lock can be acquired.
                             queue.Lock.Get();
@@ -147,7 +145,7 @@ namespace Orleans.Timers
                     }
                     finally
                     {
-                        queue.Lock.Release();
+                        queue.Lock.TryRelease();
                     }
                 }
             }
@@ -164,12 +162,7 @@ namespace Orleans.Timers
 
             for (var current = queue.Head; current != null; current = current.Next)
             {
-                if (current.IsCanceled)
-                {
-                    // Dequeue and discard.
-                    queue.Remove(previous, current);
-                }
-                else if (current.DueTime < now)
+                if (current.DueTime < now)
                 {
                     // Dequeue and add to expired list for later execution.
                     queue.Remove(previous, current);
@@ -194,7 +187,7 @@ namespace Orleans.Timers
 
             ThreadLocalQueue InitializeThreadLocalQueue()
             {
-                var threadLocals = new ThreadLocalQueue();
+                var threadLocal = new ThreadLocalQueue();
                 while (true)
                 {
                     lock (AllQueuesLock)
@@ -206,17 +199,17 @@ namespace Orleans.Timers
                         {
                             if (Volatile.Read(ref queues[i]) == null)
                             {
-                                Volatile.Write(ref queues[i], threadLocals);
-                                return threadLocals;
+                                Volatile.Write(ref queues[i], threadLocal);
+                                return threadLocal;
                             }
                         }
 
                         // The existing array is full, so copy all values to a new, larger array and register this thread.
                         var newQueues = new ThreadLocalQueue[queues.Length * 2];
                         Array.Copy(queues, newQueues, queues.Length);
-                        newQueues[queues.Length] = threadLocals;
+                        newQueues[queues.Length] = threadLocal;
                         Volatile.Write(ref allQueues, newQueues);
-                        return threadLocals;
+                        return threadLocal;
                     }
                 }
             }
@@ -274,9 +267,7 @@ namespace Orleans.Timers
         /// The UTC time when this timer is due.
         /// </summary>
         DateTime DueTime { get; }
-
-        bool IsCanceled { get; }
-
+        
         void OnTimeout();
     }
 
