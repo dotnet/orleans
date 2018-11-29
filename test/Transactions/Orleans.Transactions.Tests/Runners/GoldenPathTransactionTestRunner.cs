@@ -1,4 +1,4 @@
-﻿using Orleans.Transactions.Tests.Consistency;
+using Orleans.Transactions.Tests.Consistency;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -165,5 +165,62 @@ namespace Orleans.Transactions.Tests
             }
         }
 
+        [SkippableTheory]
+        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions)]
+        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions / 2)]
+        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain, 1)]
+        public virtual async Task RWRWTest(string grainStates, int grainCount)
+        {
+            const int delta = 5;
+
+            List<ITransactionTestGrain> grains =
+                Enumerable.Range(0, grainCount)
+                    .Select(i => RandomTestGrain(grainStates))
+                    .ToList();
+
+            ITransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+
+            await coordinator.MultiGrainDoubleByRWRW(grains, delta);
+
+            int expected = delta + delta;
+            foreach (var grain in grains)
+            {
+                int[] actualValues = await grain.Get();
+                foreach (var actual in actualValues)
+                {
+                    if (expected != actual) this.output.WriteLine($"{grain} - failed");
+                    Assert.Equal(expected, actual);
+                }
+            }
+        }
+
+        [SkippableTheory]
+        [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions)]
+        [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions / 2)]
+        [InlineData(TransactionTestConstants.MaxStateTransactionalGrain, 1)]
+        public virtual async Task WRWRTest(string grainStates, int grainCount)
+        {
+            const int delta = 5;
+
+            List<ITransactionTestGrain> grains =
+                Enumerable.Range(0, grainCount)
+                    .Select(i => RandomTestGrain(grainStates))
+                    .ToList();
+
+            ITransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+
+            await coordinator.MultiGrainDoubleByWRWR(grains, delta);
+
+            int expected = delta + delta;
+            foreach (var grain in grains)
+            {
+                int[] actualValues = await grain.Get();
+                foreach (var actual in actualValues)
+                {
+                    if (expected != actual) this.output.WriteLine($"{grain} - failed");
+                    Assert.Equal(expected, actual);
+                }
+            }
+        }
     }
 }

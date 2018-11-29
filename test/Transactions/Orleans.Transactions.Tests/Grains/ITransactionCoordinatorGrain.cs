@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.Tests.Correctness;
@@ -15,6 +15,12 @@ namespace Orleans.Transactions.Tests
 
         [Transaction(TransactionOption.Create)]
         Task MultiGrainDouble(List<ITransactionTestGrain> grains);
+
+        [Transaction(TransactionOption.Create)]
+        Task MultiGrainDoubleByRWRW(List<ITransactionTestGrain> grains, int numberToAdd);
+
+        [Transaction(TransactionOption.Create)]
+        Task MultiGrainDoubleByWRWR(List<ITransactionTestGrain> grains, int numberToAdd);
 
         [Transaction(TransactionOption.Create)]
         Task OrphanCallTransaction(ITransactionTestGrain grain);

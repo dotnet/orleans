@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -61,6 +61,22 @@ namespace Orleans.Transactions.Tests
         {
             int[] values = await grain.Get();
             await grain.Add(values[0]);
+        }
+
+        public async Task MultiGrainDoubleByRWRW(List<ITransactionTestGrain> grains, int numberToAdd)
+        {
+            await Task.WhenAll(grains.Select(g => g.Get()));
+            await Task.WhenAll(grains.Select(g => g.Add(numberToAdd)));
+            await Task.WhenAll(grains.Select(g => g.Get()));
+            await Task.WhenAll(grains.Select(g => g.Add(numberToAdd)));
+        }
+
+        public async Task MultiGrainDoubleByWRWR(List<ITransactionTestGrain> grains, int numberToAdd)
+        {
+            await Task.WhenAll(grains.Select(g => g.Add(numberToAdd)));
+            await Task.WhenAll(grains.Select(g => g.Get()));
+            await Task.WhenAll(grains.Select(g => g.Add(numberToAdd)));
+            await Task.WhenAll(grains.Select(g => g.Get()));
         }
     }
 }
