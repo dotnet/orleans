@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.CompilerServices;
 using System.Threading;
 
@@ -8,15 +9,25 @@ namespace Orleans.Threading
     /// </summary>
     internal sealed class RecursiveInterlockedExchangeLock
     {
-        private const int Unlocked = -1;
-        private int lockState = Unlocked;
+        private const int UNLOCKED = -1;
+
+        [ThreadStatic]
+        private static int threadId;
+        private int lockState = UNLOCKED;
+        private readonly Func<bool> spinCondition;
+
+        public RecursiveInterlockedExchangeLock()
+        {
+            this.spinCondition = this.TryGet;
+        }
+
+        private static int ThreadId => threadId != 0 ? threadId : threadId = Thread.CurrentThread.ManagedThreadId;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryGet()
         {
-            var threadId = Thread.CurrentThread.ManagedThreadId;
-            var previousValue = Interlocked.CompareExchange(ref this.lockState, threadId, Unlocked);
-            return previousValue == Unlocked || previousValue == threadId;
+            var previousValue = Interlocked.CompareExchange(ref this.lockState, ThreadId, UNLOCKED);
+            return previousValue == UNLOCKED || previousValue == ThreadId;
         }
         
         /// <summary>
@@ -30,25 +41,16 @@ namespace Orleans.Threading
                 return;
             }
 
-            Spin();
-
-            void Spin()
-            {
-                var spinWait = new SpinWait();
-                while (!this.TryGet())
-                {
-                    spinWait.SpinOnce();
-                }
-            }
+            SpinWait.SpinUntil(this.spinCondition);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Release() => Interlocked.Exchange(ref this.lockState, Unlocked);
+        public void Release() => Interlocked.Exchange(ref this.lockState, UNLOCKED);
 
         public override string ToString()
         {
             var state = Volatile.Read(ref this.lockState);
-            return state == Unlocked ? "Unlocked" : $"Locked by Thread {state}";
+            return state == UNLOCKED ? "Unlocked" : $"Locked by Thread {state}";
         }
     }
 }
