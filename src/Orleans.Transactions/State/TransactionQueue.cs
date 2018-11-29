@@ -9,6 +9,7 @@ using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 using Orleans.Storage;
 using Orleans.Configuration;
+using Orleans.Timers.Internal;
 
 namespace Orleans.Transactions.State
 {
@@ -53,7 +54,8 @@ namespace Orleans.Transactions.State
             ITransactionalStateStorage<TState> storage,
             JsonSerializerSettings serializerSettings,
             IClock clock,
-            ILogger logger)
+            ILogger logger,
+            ITimerManager timerManager)
         {
             this.options = options.Value;
             this.resource = resource;
@@ -63,7 +65,7 @@ namespace Orleans.Transactions.State
             this.logger = logger;
             this.storageWorker = new BatchWorkerFromDelegate(StorageWork);
             this.RWLock = new ReadWriteLock<TState>(options, this, this.storageWorker, logger);
-            this.confirmationWorker = new ConfirmationWorker<TState>(options, this.resource, this.storageWorker, () => this.storageBatch, this.logger);
+            this.confirmationWorker = new ConfirmationWorker<TState>(options, this.resource, this.storageWorker, () => this.storageBatch, this.logger, timerManager);
             this.unprocessedPreparedMessages = new Dictionary<DateTime, PreparedMessages>();
             this.commitQueue = new CommitQueue<TState>();
             this.readyTask = Task.CompletedTask;

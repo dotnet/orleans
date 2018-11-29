@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
+using Orleans.Timers.Internal;
 
 namespace Orleans
 {
@@ -81,7 +82,7 @@ namespace Orleans
 
         private async Task ScheduleNotify(DateTime time, DateTime now)
         {
-            await Task.Delay(time - now);
+            await TimerManager.Delay(time - now);
 
             if (scheduledNotify == time)
             {

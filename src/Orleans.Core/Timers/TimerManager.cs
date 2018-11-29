@@ -4,11 +4,21 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Threading;
 
-namespace Orleans.Timers
+namespace Orleans.Timers.Internal
 {
-    public static class TimerManager
+    public interface ITimerManager
     {
-        public static Task Delay(TimeSpan timeout) => DelayUntil(DateTime.UtcNow + timeout);
+        Task Delay(TimeSpan timeSpan);
+    }
+
+    internal class TimerManagerImpl : ITimerManager
+    {
+        public Task Delay(TimeSpan timeSpan) => TimerManager.Delay(timeSpan);
+    }
+
+    internal static class TimerManager
+    {
+        public static Task Delay(TimeSpan timeSpan) => DelayUntil(DateTime.UtcNow + timeSpan);
 
         public static Task DelayUntil(DateTime dueTime)
         {
