@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Text;
 using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -294,14 +295,13 @@ namespace Orleans.Runtime
         /// If KeyExt exists, adds additional KeyExt bytes length
         /// </summary>
         /// <returns></returns>
-        internal byte[] ToByteArray()
+        internal ReadOnlySpan<byte> ToByteArray()
         {
             var extBytes = this.KeyExt != null ? Encoding.UTF8.GetBytes(KeyExt) : null;
             var extBytesLength = extBytes?.Length ?? 0;
             var sizeWithoutExtBytes = sizeof(ulong) * 3 + sizeof(int);
 
-            byte[] bytes = new byte[sizeWithoutExtBytes + extBytesLength];
-            var spanBytes = bytes.AsSpan();
+            var spanBytes = new byte[sizeWithoutExtBytes + extBytesLength].AsSpan();
 
             var offset = 0;
             var ulongBytes = MemoryMarshal.Cast<byte, ulong>(spanBytes.Slice(offset, sizeof(ulong) * 3));
@@ -324,7 +324,7 @@ namespace Orleans.Runtime
                 MemoryMarshal.Cast<byte, int>(spanBytes.Slice(offset, sizeof(int)))[0] = -1;
             }
 
-            return bytes;
+            return spanBytes;
         }
 
         private Guid ConvertToGuid()
