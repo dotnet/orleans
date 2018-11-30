@@ -20,7 +20,7 @@ namespace Orleans.Transactions.State
         private readonly ParticipantId resource;
         private readonly Action deactivate;
         private readonly ITransactionalStateStorage<TState> storage;
-        private readonly BatchWorker storageWorker;
+        private readonly SimpleBatchWorkerFromDelegate storageWorker;
         protected readonly ILogger logger;
         private readonly ConfirmationWorker<TState> confirmationWorker;
         private CommitQueue<TState> commitQueue;
@@ -63,7 +63,7 @@ namespace Orleans.Transactions.State
             this.storage = storage;
             this.Clock = new CausalClock(clock);
             this.logger = logger;
-            this.storageWorker = new BatchWorkerFromDelegate(StorageWork);
+            this.storageWorker = new SimpleBatchWorkerFromDelegate(StorageWork);
             this.RWLock = new ReadWriteLock<TState>(options, this, this.storageWorker, logger);
             this.confirmationWorker = new ConfirmationWorker<TState>(options, this.resource, this.storageWorker, () => this.storageBatch, this.logger, timerManager);
             this.unprocessedPreparedMessages = new Dictionary<DateTime, PreparedMessages>();

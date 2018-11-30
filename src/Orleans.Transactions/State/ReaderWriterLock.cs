@@ -15,8 +15,8 @@ namespace Orleans.Transactions.State
     {
         private readonly TransactionalStateOptions options;
         private readonly TransactionQueue<TState> queue;
-        private BatchWorker lockWorker;
-        private BatchWorker storageWorker;
+        private SimpleBatchWorkerFromDelegate lockWorker;
+        private SimpleBatchWorkerFromDelegate storageWorker;
         private readonly ILogger logger;
 
         // the linked list of lock groups
@@ -47,14 +47,14 @@ namespace Orleans.Transactions.State
         public ReadWriteLock(
             IOptions<TransactionalStateOptions> options,
             TransactionQueue<TState> queue,
-            BatchWorker storageWorker,
+            SimpleBatchWorkerFromDelegate storageWorker,
             ILogger logger)
         {
             this.options = options.Value;
             this.queue = queue;
             this.storageWorker = storageWorker;
             this.logger = logger;
-            this.lockWorker = new BatchWorkerFromDelegate(LockWork);
+            this.lockWorker = new SimpleBatchWorkerFromDelegate(LockWork);
         }
 
         public async Task<TResult> EnterLock<TResult>(Guid transactionId, DateTime priority,

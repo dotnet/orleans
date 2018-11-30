@@ -17,13 +17,13 @@ namespace Orleans.Transactions.State
     {
         private readonly TransactionalStateOptions options;
         private readonly ParticipantId me;
-        private readonly BatchWorker storageWorker;
+        private readonly SimpleBatchWorkerFromDelegate storageWorker;
         private readonly Func<StorageBatch<TState>> getStorageBatch;
         private readonly ILogger logger;
         private readonly ITimerManager timerManager;
         private readonly HashSet<Guid> pending;
 
-        public ConfirmationWorker(IOptions<TransactionalStateOptions> options, ParticipantId me, BatchWorker storageWorker, Func<StorageBatch<TState>> getStorageBatch, ILogger logger, ITimerManager timerManager)
+        public ConfirmationWorker(IOptions<TransactionalStateOptions> options, ParticipantId me, SimpleBatchWorkerFromDelegate storageWorker, Func<StorageBatch<TState>> getStorageBatch, ILogger logger, ITimerManager timerManager)
         {
             this.options = options.Value;
             this.me = me;

@@ -1,9 +1,95 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Timers.Internal;
 
 namespace Orleans
 {
+    public class SimpleBatchWorkerFromDelegate : SimpleBatchWorker
+    {
+        private readonly Func<Task> work;
+
+        public SimpleBatchWorkerFromDelegate(Func<Task> work)
+        {
+            this.work = work;
+        }
+
+        protected override Task Work() => this.work();
+    }
+
+    public abstract class SimpleBatchWorker
+    {
+        private const int MAX_WORK_CYCLES_BEFORE_YIELD = 3;
+        private const int STATUS_IDLE = 0;
+        private const int STATUS_RUNNING = 1;
+        private const int STATUS_LOOP = 2;
+        private static readonly TimeSpan DelayBetweenTurns = TimeSpan.FromSeconds(1);
+
+        private int status;
+
+        /// <summary>Implement this member in derived classes to define what constitutes a work cycle</summary>
+        protected abstract Task Work();
+
+        /// <summary>
+        /// Notify the worker that there is more work.
+        /// </summary>
+        public void Notify()
+        {
+            // If already running, loop, otherwise start running.
+            if (Interlocked.CompareExchange(ref this.status, STATUS_LOOP, STATUS_RUNNING) == STATUS_IDLE)
+            {
+                this.Run().Ignore();
+            }
+        }
+
+        public void Notify(DateTime dueTime) => this.RunAfterDelay(dueTime).Ignore();
+
+        private async Task RunAfterDelay(DateTime dueTime)
+        {
+            if (dueTime > DateTime.UtcNow)
+            {
+                await TimerManager.DelayUntil(dueTime);
+            }
+
+            // If already running, loop, otherwise start running.
+            if (Interlocked.CompareExchange(ref this.status, STATUS_LOOP, STATUS_RUNNING) == STATUS_IDLE)
+            {
+                await this.Run();
+            }
+        }
+
+        private async Task Run()
+        {
+            // If already running/looping, exit.
+            if (Interlocked.CompareExchange(ref this.status, STATUS_RUNNING, STATUS_IDLE) != STATUS_IDLE) return;
+
+            var didUnlock = false;
+            try
+            {
+                var loopIterations = 0;
+                do
+                {
+                    if (loopIterations++ > MAX_WORK_CYCLES_BEFORE_YIELD)
+                    {
+                        loopIterations = 0;
+                        await TimerManager.Delay(DelayBetweenTurns);
+                    }
+
+                    // If we were told to loop, reset the loop status.
+                    Interlocked.CompareExchange(ref this.status, STATUS_RUNNING, STATUS_LOOP);
+
+                    await this.Work();
+                } while (Interlocked.CompareExchange(ref this.status, STATUS_IDLE, STATUS_RUNNING) == STATUS_LOOP);
+
+                didUnlock = true;
+            }
+            finally
+            {
+                if (!didUnlock) Interlocked.Exchange(ref this.status, STATUS_IDLE);
+            }
+        }
+    }
+
     /// <summary>
     /// General pattern for an asynchronous worker that performs a work task, when notified,
     /// to service queued work. Each work cycle handles ALL the queued work. 
