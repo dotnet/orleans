@@ -85,13 +85,22 @@ namespace Orleans.Threading
                     {
                         if (ShouldStop())
                         {
-                            return;
+                            break;
                         }
 
                         context.ExecuteWithFilters(workItem);
                     }
 
                     workQueue.WaitForWork();
+                }
+
+                if (options.DrainAfterCancel)
+                {
+                    // Give a chance to drain all pending items fast
+                    while (workQueue.TryDequeue(threadLocals, out var workItem))
+                    {
+                        context.ExecuteWithFilters(workItem);
+                    }
                 }
             }
             catch (Exception ex)
@@ -110,7 +119,7 @@ namespace Orleans.Threading
 
             bool ShouldStop()
             {
-                return context.CancellationTokenSource.IsCancellationRequested && !options.DrainAfterCancel;
+                return context.CancellationTokenSource.IsCancellationRequested;
             }
         }
 
