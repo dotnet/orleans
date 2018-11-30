@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
@@ -53,24 +53,21 @@ namespace Orleans.Transactions
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.Trace($"{stopwatch.Elapsed.TotalMilliseconds:f2} prepare {transactionInfo}");
 
-            List<ParticipantId> writeParticipants = null;
-            foreach (KeyValuePair<ParticipantId,AccessCounter> p in transactionInfo.Participants.SelectResources())
+            if (transactionInfo.Participants.Count == 0)
             {
-                if (p.Value.Writes > 0)
-                {
-                    if (writeParticipants == null)
-                    {
-                        writeParticipants = new List<ParticipantId>();
-                    }
-                    writeParticipants.Add(p.Key);
-                }
+                this.statistics.TrackTransactionSucceeded();
+                return TransactionalStatus.Ok;
             }
 
+            List<ParticipantId> writeParticipants = null;
+            List<KeyValuePair<ParticipantId, AccessCounter>> resources = null;
+            KeyValuePair<ParticipantId, AccessCounter>? manager;
+            CollateParticipants(transactionInfo.Participants, out writeParticipants, out resources, out manager);
             try
             {
                 TransactionalStatus status = (writeParticipants == null)
-                    ? await CommitReadOnlyTransaction(transactionInfo)
-                    : await CommitReadWriteTransaction(transactionInfo, writeParticipants);
+                    ? await CommitReadOnlyTransaction(transactionInfo, resources)
+                    : await CommitReadWriteTransaction(transactionInfo, writeParticipants, resources, manager.Value);
                 if (status == TransactionalStatus.Ok)
                     this.statistics.TrackTransactionSucceeded();
                 else
@@ -84,80 +81,108 @@ namespace Orleans.Transactions
             }
         }
 
-        private async Task<TransactionalStatus> CommitReadOnlyTransaction(TransactionInfo transactionInfo)
+        private async Task<TransactionalStatus> CommitReadOnlyTransaction(TransactionInfo transactionInfo, List<KeyValuePair<ParticipantId, AccessCounter>> resources)
         {
-            var resources = transactionInfo.Participants.SelectResources().ToList();
-
+            TransactionalStatus status = TransactionalStatus.Ok;
             var tasks = new List<Task<TransactionalStatus>>();
-            foreach (KeyValuePair<ParticipantId,AccessCounter> resource in resources)
-            {
-                tasks.Add(resource.Key.Reference.AsReference<ITransactionalResourceExtension>()
-                               .CommitReadOnly(resource.Key.Name, transactionInfo.TransactionId, resource.Value, transactionInfo.TimeStamp));
-            }
-
             try
             {
+                foreach (KeyValuePair<ParticipantId, AccessCounter> resource in resources)
+                {
+                    tasks.Add(resource.Key.Reference.AsReference<ITransactionalResourceExtension>()
+                                   .CommitReadOnly(resource.Key.Name, transactionInfo.TransactionId, resource.Value, transactionInfo.TimeStamp));
+                }
+
                 // wait for all responses
-                await Task.WhenAll(tasks);
+                TransactionalStatus[] results = await Task.WhenAll(tasks);
 
                 // examine the return status
-                foreach (var s in tasks)
+                foreach (var s in results)
                 {
-                    var status = s.Result;
-                    if (status != TransactionalStatus.Ok)
+                    if (s != TransactionalStatus.Ok)
                     {
+                        status = s;
                         if (logger.IsEnabled(LogLevel.Debug))
                             logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} fail {transactionInfo.TransactionId} prepare response status={status}");
-
-                        await Task.WhenAll(resources.Select(r => r.Key.Reference.AsReference<ITransactionalResourceExtension>()
-                                             .Abort(r.Key.Name, transactionInfo.TransactionId)));
-
-                        return status;
+                        break;
                     }
                 }
             }
             catch (TimeoutException)
             {
                 if (logger.IsEnabled(LogLevel.Debug))
-                    logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} timeout {transactionInfo.TransactionId} prepare responses");
+                    logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} timeout {transactionInfo.TransactionId} on CommitReadOnly");
+                status = TransactionalStatus.ParticipantResponseTimeout;
+            }
+            catch (Exception ex)
+            {
+                if (logger.IsEnabled(LogLevel.Debug))
+                    logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} failure {transactionInfo.TransactionId} CommitReadOnly");
+                this.logger.LogWarning(ex, "Unknown error while commiting readonly transaction {TransactionId}", transactionInfo.TransactionId);
+                status = TransactionalStatus.PresumedAbort;
+            }
 
-                await Task.WhenAll(resources.Select(r => r.Key.Reference.AsReference<ITransactionalResourceExtension>()
-                                     .Abort(r.Key.Name, transactionInfo.TransactionId)));
-
-                return TransactionalStatus.ParticipantResponseTimeout;
+            if (status != TransactionalStatus.Ok)
+            {
+                try
+                {
+                    await Task.WhenAll(resources.Select(r => r.Key.Reference.AsReference<ITransactionalResourceExtension>()
+                                .Abort(r.Key.Name, transactionInfo.TransactionId)));
+                }
+                catch (Exception ex)
+                {
+                    if (logger.IsEnabled(LogLevel.Debug))
+                        logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} failure aborting {transactionInfo.TransactionId} CommitReadOnly");
+                    this.logger.LogWarning(ex, "Failed to abort readonly transaction {TransactionId}", transactionInfo.TransactionId);
+                }
             }
 
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.Trace($"{stopwatch.Elapsed.TotalMilliseconds:f2} finish (reads only) {transactionInfo.TransactionId}");
 
-            return TransactionalStatus.Ok;
+            return status;
         }
 
-        private async Task<TransactionalStatus> CommitReadWriteTransaction(TransactionInfo transactionInfo, List<ParticipantId> writeResources)
+        private async Task<TransactionalStatus> CommitReadWriteTransaction(TransactionInfo transactionInfo, List<ParticipantId> writeResources, List<KeyValuePair<ParticipantId, AccessCounter>> resources, KeyValuePair<ParticipantId, AccessCounter> manager)
         {
-            ParticipantId manager = SelectManager(transactionInfo, writeResources);
-            Dictionary<ParticipantId, AccessCounter> participants = transactionInfo.Participants;
-
-            foreach (var p in participants
-                .SelectResources()
-                .Where(kvp => !kvp.Key.Equals(manager)))
-            {
-                // one-way prepare message
-                p.Key.Reference.AsReference<ITransactionalResourceExtension>()
-                        .Prepare(p.Key.Name, transactionInfo.TransactionId, p.Value, transactionInfo.TimeStamp, manager)
-                        .Ignore();
-            }
+            TransactionalStatus status = TransactionalStatus.Ok;
 
             try
             {
-                // wait for the TM to commit the transaction
-                TransactionalStatus status = await manager.Reference.AsReference<ITransactionManagerExtension>()
-                    .PrepareAndCommit(manager.Name, transactionInfo.TransactionId, participants[manager], transactionInfo.TimeStamp, writeResources, participants.Count);
+                foreach (var p in resources)
+                {
+                    if (p.Key.Equals(manager.Key))
+                        continue;
+                    // one-way prepare message
+                    p.Key.Reference.AsReference<ITransactionalResourceExtension>()
+                            .Prepare(p.Key.Name, transactionInfo.TransactionId, p.Value, transactionInfo.TimeStamp, manager.Key)
+                            .Ignore();
+                }
 
-                if (status != TransactionalStatus.Ok)
+                // wait for the TM to commit the transaction
+                status = await manager.Key.Reference.AsReference<ITransactionManagerExtension>()
+                    .PrepareAndCommit(manager.Key.Name, transactionInfo.TransactionId, manager.Value, transactionInfo.TimeStamp, writeResources, resources.Count);
+            }
+            catch (TimeoutException)
+            {
+                if (logger.IsEnabled(LogLevel.Debug))
+                    logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} timeout {transactionInfo.TransactionId} on CommitReadWriteTransaction");
+                status = TransactionalStatus.TMResponseTimeout;
+            }
+            catch (Exception ex)
+            {
+                if (logger.IsEnabled(LogLevel.Debug))
+                    logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} failure {transactionInfo.TransactionId} CommitReadWriteTransaction");
+                this.logger.LogWarning(ex, "Unknown error while commiting transaction {TransactionId}", transactionInfo.TransactionId);
+                status = TransactionalStatus.PresumedAbort;
+            }
+
+            if (status != TransactionalStatus.Ok)
+            {
+                try
                 {
                     if (logger.IsEnabled(LogLevel.Debug))
-                        logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} fail {transactionInfo.TransactionId} TM response status={status}");
+                        logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} failed {transactionInfo.TransactionId} with status={status}");
 
                     // notify participants 
                     if (status.DefinitelyAborted())
@@ -165,24 +190,22 @@ namespace Orleans.Transactions
                         await Task.WhenAll(writeResources
                             .Where(p => !p.Equals(manager))
                             .Select(p => p.Reference.AsReference<ITransactionalResourceExtension>()
-                                 .Cancel(p.Name, transactionInfo.TransactionId, transactionInfo.TimeStamp, status)));
+                                    .Cancel(p.Name, transactionInfo.TransactionId, transactionInfo.TimeStamp, status)));
                     }
-
-                    return status;
+                }
+                catch (Exception ex)
+                {
+                    if (logger.IsEnabled(LogLevel.Debug))
+                        logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} failure aborting {transactionInfo.TransactionId} CommitReadWriteTransaction");
+                    this.logger.LogWarning(ex, "Failed to abort transaction {TransactionId}", transactionInfo.TransactionId);
                 }
             }
-            catch (TimeoutException)
-            {
-                if (logger.IsEnabled(LogLevel.Debug))
-                    logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} timeout {transactionInfo.TransactionId} TM response");
 
-                return TransactionalStatus.TMResponseTimeout;
-            }
 
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.Trace($"{stopwatch.Elapsed.TotalMilliseconds:f2} finish {transactionInfo.TransactionId}");
 
-            return TransactionalStatus.Ok;
+            return status;
         }
 
         public async Task Abort(ITransactionInfo info)
@@ -200,32 +223,45 @@ namespace Orleans.Transactions
                  .Abort(p.Name, transactionInfo.TransactionId)));
         }
 
-        // TODO: make overridable - jbragg
-        private ParticipantId SelectManager(TransactionInfo transactionInfo, List<ParticipantId> candidates)
+        private void CollateParticipants(Dictionary<ParticipantId, AccessCounter> participants, out List<ParticipantId> writers, out List<KeyValuePair<ParticipantId, AccessCounter>> resources, out KeyValuePair<ParticipantId, AccessCounter>? manager)
         {
-            ParticipantId? priorityManager = null;
-            List<ParticipantId> priorityManagers = transactionInfo.Participants.Keys.SelectPriorityManagers().ToList();
-            if (priorityManagers.Count > 1)
+            writers = null;
+            resources = null;
+            manager = null;
+            KeyValuePair<ParticipantId, AccessCounter>? priorityManager = null;
+            foreach (KeyValuePair<ParticipantId, AccessCounter> participant in participants)
             {
-                throw new ArgumentOutOfRangeException(nameof(transactionInfo), "Only one priority transaction manager allowed in transaction");
-            }
-            if (priorityManagers.Count == 1)
-            {
-                return priorityManagers[0];
-            }
-
-            foreach (var p in candidates)
-            {
-                if (p.IsPriorityManager())
+                ParticipantId id = participant.Key;
+                // priority manager
+                if (id.IsPriorityManager())
                 {
-                    if (priorityManager != null)
+                    manager = priorityManager = (priorityManager == null)
+                        ? participant
+                        : throw new ArgumentOutOfRangeException(nameof(participants), "Only one priority transaction manager allowed in transaction");
+                }
+                // resource
+                if(id.IsResource())
+                {
+                    if(resources == null)
                     {
-                        throw new ArgumentOutOfRangeException(nameof(transactionInfo), "Only one priority transaction manager allowed in transaction");
+                        resources = new List<KeyValuePair<ParticipantId, AccessCounter>>();
                     }
-                    priorityManager = p;
+                    resources.Add(participant);
+                    if(participant.Value.Writes > 0)
+                    {
+                        if (writers == null)
+                        {
+                            writers = new List<ParticipantId>();
+                        }
+                        writers.Add(id);
+                    }
+                }
+                // manager
+                if (manager == null && id.IsManager())
+                {
+                    manager = participant;
                 }
             }
-            return priorityManager ?? candidates[0];
         }
     }
 }

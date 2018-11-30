@@ -1,10 +1,10 @@
-﻿using Xunit.Abstractions;
+using Xunit.Abstractions;
 using Xunit;
 using Orleans.Transactions.Tests;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {
-    [TestCategory("Azure"), TestCategory("Transactions")]
+    [TestCategory("Azure"), TestCategory("Transactions-dev")]
     public class ConsistencySkewedClockTests : ConsistencyTransactionTestRunner, IClassFixture<SkewedClockTestFixture>
     {
         public ConsistencySkewedClockTests(SkewedClockTestFixture fixture, ITestOutputHelper output)

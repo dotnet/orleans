@@ -1,9 +1,9 @@
-﻿using Xunit.Abstractions;
+using Xunit.Abstractions;
 using Xunit;
 
 namespace Orleans.Transactions.Tests
 {
-    [TestCategory("Transactions")]
+    [TestCategory("Transactions-dev")]
     public class ConsistencySkewedClockTests : ConsistencyTransactionTestRunner, IClassFixture<SkewedClockMemoryTransactionsFixture>
     {
         public ConsistencySkewedClockTests(SkewedClockMemoryTransactionsFixture fixture, ITestOutputHelper output)
