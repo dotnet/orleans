@@ -11,6 +11,7 @@ using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.State;
 using Orleans.Configuration;
+using Orleans.Timers.Internal;
 
 namespace Orleans.Transactions
 {
@@ -219,7 +220,8 @@ namespace Orleans.Transactions
             Action deactivate = () => grainRuntime.DeactivateOnIdle(context.GrainInstance);
             var options = this.context.ActivationServices.GetRequiredService<IOptions<TransactionalStateOptions>>();
             var clock = this.context.ActivationServices.GetRequiredService<IClock>();
-            this.queue = new TransactionQueue<TState>(options, this.participantId, deactivate, storage, this.serializerSettings, clock, logger);
+            var timerManager = this.context.ActivationServices.GetRequiredService<ITimerManager>();
+            this.queue = new TransactionQueue<TState>(options, this.participantId, deactivate, storage, this.serializerSettings, clock, logger, timerManager);
 
             setupResourceFactory(this.context, this.config.StateName, queue);
 
