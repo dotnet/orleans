@@ -19,7 +19,7 @@ using Xunit.Abstractions;
 
 namespace Orleans.Transactions.Azure.Tests
 {
-    public class TestState
+    public class TestState : TestKit.Base.ITestState
     {
         public int state { get; set; } = 1;
     }
