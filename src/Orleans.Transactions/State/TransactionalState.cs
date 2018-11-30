@@ -78,7 +78,7 @@ namespace Orleans.Transactions
 
             // schedule read access to happen under the lock
             return this.queue.RWLock.EnterLock<TResult>(info.TransactionId, info.Priority, recordedaccesses, true,
-                 new Task<TResult>(() =>
+                 () =>
                  {
                      // check if our record is gone because we expired while waiting
                      if (!this.queue.RWLock.TryGetRecord(info.TransactionId, out TransactionRecord<TState> record))
@@ -117,7 +117,7 @@ namespace Orleans.Transactions
                      }
 
                      return result;
-                 }));
+                 });
         }
 
         /// <inheritdoc/>
@@ -142,7 +142,7 @@ namespace Orleans.Transactions
             info.Participants.TryGetValue(this.participantId, out var recordedaccesses);
 
             return this.queue.RWLock.EnterLock<TResult>(info.TransactionId, info.Priority, recordedaccesses, false,
-                new Task<TResult>(() =>
+                () =>
                 {
                     // check if we expired while waiting
                     if (!this.queue.RWLock.TryGetRecord(info.TransactionId, out TransactionRecord<TState> record))
@@ -188,7 +188,7 @@ namespace Orleans.Transactions
                         detectReentrancy = false;
                     }
                 }
-            ));
+            );
         }
 
         public void Participate(IGrainLifecycle lifecycle)
@@ -221,7 +221,7 @@ namespace Orleans.Transactions
             var options = this.context.ActivationServices.GetRequiredService<IOptions<TransactionalStateOptions>>();
             var clock = this.context.ActivationServices.GetRequiredService<IClock>();
             var timerManager = this.context.ActivationServices.GetRequiredService<ITimerManager>();
-            this.queue = new TransactionQueue<TState>(options, this.participantId, deactivate, storage, this.serializerSettings, clock, logger, timerManager);
+            this.queue = new TransactionQueue<TState>(options, this.participantId, deactivate, storage, clock, logger, timerManager);
 
             setupResourceFactory(this.context, this.config.StateName, queue);
 

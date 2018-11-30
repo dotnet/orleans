@@ -76,7 +76,7 @@ namespace Orleans.Transactions
             info.Participants.TryGetValue(this.participantId, out var recordedaccesses);
 
             return this.queue.RWLock.EnterLock<bool>(info.TransactionId, info.Priority, recordedaccesses, false,
-                new Task<bool>(() =>
+                () =>
                 {
                     // check if we expired while waiting
                     if (!this.queue.RWLock.TryGetRecord(info.TransactionId, out TransactionRecord<OperationState> record))
@@ -123,7 +123,7 @@ namespace Orleans.Transactions
                         detectReentrancy = false;
                     }
                 }
-            ));
+            );
         }
 
         public void Participate(IGrainLifecycle lifecycle)

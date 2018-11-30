@@ -24,7 +24,7 @@ namespace Orleans.Transactions.TOC
             IClock clock,
             ILogger logger,
             ITimerManager timerManager)
-            : base(options, resource, deactivate, storage, serializerSettings, clock, logger, timerManager)
+            : base(options, resource, deactivate, storage, clock, logger, timerManager)
         {
             this.service = service;
         }
