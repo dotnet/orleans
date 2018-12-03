@@ -87,7 +87,7 @@ namespace Orleans
         }
     }
 
-    internal class DefaultOptionsFormatterResolver<T> : IOptionFormatterResolver<T> 
+    internal class DefaultOptionsFormatterResolver<T> : IOptionFormatterResolver<T>
         where T: class, new()
     {
         private IOptionsSnapshot<T> optionsSnapshot;

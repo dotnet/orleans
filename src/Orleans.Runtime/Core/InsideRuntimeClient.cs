@@ -99,7 +99,7 @@ namespace Orleans.Runtime
         private SiloAddress MySilo { get; }
 
         public GrainFactory ConcreteGrainFactory { get; }
-        
+
         private Catalog Catalog => this.catalog ?? (this.catalog = this.ServiceProvider.GetRequiredService<Catalog>());
 
         private ILocalGrainDirectory Directory
@@ -252,12 +252,12 @@ namespace Orleans.Runtime
                 //// 1:
                 //// Also record sending activation address for responses only in the cache.
                 //// We don't record sending addresses for requests, since it is not clear that this silo ever wants to send messages to the grain sending this request.
-                //// However, it is sure that this silo does send messages to the sender of a reply. 
+                //// However, it is sure that this silo does send messages to the sender of a reply.
                 //// In most cases it will already have its address cached, unless it had a wrong outdated address cached and now this is a fresher address.
                 //// It is anyway always safe to cache the replier address.
-                //// 2: 
+                //// 2:
                 //// after further thought decided not to do it.
-                //// It seems to better not bother caching the sender of a response at all, 
+                //// It seems to better not bother caching the sender of a response at all,
                 //// and instead to take a very occasional hit of a full remote look-up instead of this small but non-zero hit on every response.
                 //if (message.Direction.Equals(Message.Directions.Response) && message.Result.Equals(Message.ResponseTypes.Success))
                 //{
@@ -289,9 +289,20 @@ namespace Orleans.Runtime
                 }
 
                 RequestContextExtensions.Import(message.RequestContextData);
-                if (schedulingOptions.PerformDeadlockDetection && !message.TargetGrain.IsSystemTarget)
+
+                if (!message.TargetGrain.IsSystemTarget)
                 {
-                    UpdateDeadlockInfoInRequestContext(new RequestInvocationHistory(message.TargetGrain, message.TargetActivation, message.DebugContext));
+                    if (schedulingOptions.PerformDeadlockDetection)
+                    {
+                        UpdateInvocationHistoryInRequestContext(
+                            new RequestInvocationHistory(message.TargetGrain, message.TargetActivation, message.DebugContext));
+                    }
+                    else if (schedulingOptions.AllowCallChainReentrancy)
+                    {
+                        UpdateInvocationHistoryInRequestContext(
+                            new RequestInvocationHistorySummary(message.TargetActivation));
+                    }
+
                     // RequestContext is automatically saved in the msg upon send and propagated to the next hop
                     // in RuntimeClient.CreateMessage -> RequestContextExtensions.ExportToMessage(message);
                 }
@@ -329,7 +340,7 @@ namespace Orleans.Runtime
                         !(target is IGrainExtension) &&
                         !TryInstallExtension(request.InterfaceId, invokable, message.GenericGrainType, ref invoker))
                     {
-                        // We are trying the invoke a grain extension method on a grain 
+                        // We are trying the invoke a grain extension method on a grain
                         // -- most likely reason is that the dynamic extension is not installed for this grain
                         // So throw a specific exception here rather than a general InvalidCastException
                         var error = String.Format(
@@ -345,7 +356,7 @@ namespace Orleans.Runtime
 
                         throw exc;
                     }
-                    
+
                     var requestInvoker = new GrainMethodInvoker(target, request, invoker, GrainCallFilters, interfaceToImplementationMapping);
                     await requestInvoker.Invoke();
                     resultObject = requestInvoker.Result;
@@ -366,7 +377,7 @@ namespace Orleans.Runtime
                     if (transactionInfo != null)
                     {
                         transactionInfo.ReconcilePending();
-                        
+
                         // Record reason for abort, if not alread set
                         transactionInfo.RecordException(exc1, serializationManager);
 
@@ -508,7 +519,7 @@ namespace Orleans.Runtime
 
         private static readonly Lazy<Func<Exception, Exception>> prepForRemotingLazy =
             new Lazy<Func<Exception, Exception>>(CreateExceptionPrepForRemotingMethod);
-        
+
         private static Func<Exception, Exception> CreateExceptionPrepForRemotingMethod()
         {
             var methodInfo = typeof(Exception).GetMethod(
@@ -568,19 +579,20 @@ namespace Orleans.Runtime
         }
 
         // assumes deadlock information was already loaded into RequestContext from the message
-        private static void UpdateDeadlockInfoInRequestContext(RequestInvocationHistory thisInvocation)
+        private static void UpdateInvocationHistoryInRequestContext(RequestInvocationHistorySummary thisInvocation)
         {
-            IList prevChain;
-            object obj = RequestContext.Get(RequestContext.CALL_CHAIN_REQUEST_CONTEXT_HEADER);
-            if (obj != null)
+            IList<RequestInvocationHistorySummary> prevChain;
+
+            if (RequestContext.Get(RequestContext.CALL_CHAIN_REQUEST_CONTEXT_HEADER) is IList<RequestInvocationHistorySummary> obj)
             {
-                prevChain = ((IList)obj);
+                prevChain = obj;
             }
             else
             {
-                prevChain = new List<RequestInvocationHistory>();
+                prevChain = new List<RequestInvocationHistorySummary>();
                 RequestContext.Set(RequestContext.CALL_CHAIN_REQUEST_CONTEXT_HEADER, prevChain);
             }
+
             // append this call to the end of the call chain. Update in place.
             prevChain.Add(thisInvocation);
         }
@@ -612,7 +624,7 @@ namespace Orleans.Runtime
                         if (message.CacheInvalidationHeader == null)
                         {
                             // Remove from local directory cache. Note that SendingGrain is the original target, since message is the rejection response.
-                            // If CacheMgmtHeader is present, we already did this. Otherwise, we left this code for backward compatability. 
+                            // If CacheMgmtHeader is present, we already did this. Otherwise, we left this code for backward compatability.
                             // It should be retired as we move to use CacheMgmtHeader in all relevant places.
                             this.Directory.InvalidateCacheEntry(message.SendingAddress);
                         }
@@ -635,7 +647,7 @@ namespace Orleans.Runtime
                     callbackData.TransactionInfo.Join(message.TransactionInfo);
                 }
                 // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
-                // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items. 
+                // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items.
                 callbackData.DoCallback(message);
             }
             else

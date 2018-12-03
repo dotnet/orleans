@@ -44,6 +44,8 @@ namespace UnitTests.General
             this.fixture = fixture;
         }
 
+        // TODO add test 6
+
         // 2 silos, loop across all cases (to force all grains to be local and remote):
         //      Non Reentrant A, B
         //      Reentrant C
