@@ -60,19 +60,6 @@ namespace UnitTests.MembershipTests
             await Assert.ThrowsAsync<SiloUnavailableException>(() => promise);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Liveness")]
-        public async Task SiloUngracefulShutdown_ClientOutstandingRequestsBreak()
-        {
-            var grain = GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
-            var task = grain.LongRunningTask(true, TimeSpan.FromSeconds(7));
-            await Task.Delay(500);
-
-            await HostedCluster.KillSiloAsync(HostedCluster.SecondarySilos[0]);
-            await HostedCluster.KillSiloAsync(HostedCluster.Primary);
-
-            await Assert.ThrowsAsync<SiloUnavailableException>(() => task);
-        }
-
         private async Task<ILongRunningTaskGrain<bool>> GetGrainOnTargetSilo(SiloHandle siloHandle)
         {
             const int maxRetry = 10;
