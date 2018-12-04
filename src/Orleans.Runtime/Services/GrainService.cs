@@ -36,7 +36,10 @@ namespace Orleans.Runtime
             }
         }
 
-        /// <summary>Only to make Reflection happy</summary>
+        /// <summary>Only to make Reflection happy. Do not use it in your implementation</summary>
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        [System.Diagnostics.DebuggerHidden]
+        
         protected GrainService() : base(null, null, null)
         {
             throw new Exception("This should not be constructed by client code.");
