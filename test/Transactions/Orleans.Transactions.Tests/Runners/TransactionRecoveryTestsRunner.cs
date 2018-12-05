@@ -84,6 +84,8 @@ namespace Orleans.Transactions.Tests
                 .Select(i => Guid.NewGuid())
                 .Select(grainId => new ExpectedGrainActivity(grainId, TestGrain<ITransactionalBitArrayGrain>(transactionTestGrainClassName, grainId)))
                 .ToList();
+            //ping all grains to activate them
+            await WakeupGrains(txGrains.Select(g=>g.Grain).ToList());
             List<ExpectedGrainActivity>[] transactionGroups = txGrains
                 .Select((txGrain, i) => new { index = i, value = txGrain })
                 .GroupBy(v => v.index / 2)
@@ -116,6 +118,16 @@ namespace Orleans.Transactions.Tests
             await TestingUtils.WaitUntilAsync(lastTry => CheckTxResult(transactionGroupsRef, getIndex, lastTry), RecoveryTimeout, RetryDelay);
             this.Log($"Recovery completed. Performed {index[0]} transactions on each group. Validating results.");
             await ValidateResults(txGrains, transactionGroups);
+        }
+
+        private Task WakeupGrains(List<ITransactionalBitArrayGrain> grains)
+        {
+            var tasks =  new List<Task>();
+            foreach (var grain in grains)
+            {
+                tasks.Add(grain.Ping());
+            }
+            return Task.WhenAll(tasks);
         }
 
         private async Task<bool> RunWhileSucceeding(List<ExpectedGrainActivity>[] transactionGroups, Func<int> getIndex, bool[] end)

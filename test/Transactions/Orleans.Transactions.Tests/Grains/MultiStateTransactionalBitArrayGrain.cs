@@ -211,13 +211,18 @@ namespace Orleans.Transactions.Tests.Correctness
             this.dataArray = dataArray;
             this.loggerFactory = loggerFactory;
         }
-
+        
         public override Task OnActivateAsync()
         {
             this.logger = this.loggerFactory.CreateLogger(this.GetGrainIdentity().ToString());
-            this.logger.LogInformation($"GrainId : {this.GetPrimaryKey()}.");
+            this.logger.LogTrace($"GrainId : {this.GetPrimaryKey()}.");
 
             return base.OnActivateAsync();
+        }
+
+        public Task Ping()
+        {
+            return Task.CompletedTask;
         }
 
         public Task SetBit(int index)
@@ -225,9 +230,9 @@ namespace Orleans.Transactions.Tests.Correctness
             return Task.WhenAll(this.dataArray
                 .Select(data => data.PerformUpdate(state =>
                 {
-                    this.logger.LogInformation($"Setting bit {index} in state {state}. Transaction {TransactionContext.CurrentTransactionId}");
+                    this.logger.LogTrace($"Setting bit {index} in state {state}. Transaction {TransactionContext.CurrentTransactionId}");
                     state.Set(index, true);
-                    this.logger.LogInformation($"Set bit {index} in state {state}.");
+                    this.logger.LogTrace($"Set bit {index} in state {state}.");
                 })));
         }
 
@@ -236,7 +241,7 @@ namespace Orleans.Transactions.Tests.Correctness
             return (await Task.WhenAll(this.dataArray
                 .Select(state => state.PerformRead(s =>
                 {
-                    this.logger.LogInformation($"Get state {s}.");
+                    this.logger.LogTrace($"Get state {s}.");
                     return s;
                 })))).ToList();
         }
