@@ -7,6 +7,7 @@ using Orleans.AzureUtils;
 using Orleans.Runtime.Configuration;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Logging;
 using Orleans.AzureUtils.Utilities;
 using Orleans.Configuration;
@@ -51,8 +52,6 @@ namespace Orleans.Runtime.Host
         public Action<ISiloHostBuilder> ConfigureSiloHostDelegate { get; set; }
 
         private SiloHost host;
-        private OrleansSiloInstanceManager siloInstanceManager;
-        private SiloInstanceTableEntry myEntry;
         private readonly ILogger logger;
         private readonly IServiceRuntimeWrapper serviceRuntimeWrapper;
         //TODO: hook this up with SiloBuilder when SiloBuilder supports create AzureSilo
@@ -111,7 +110,7 @@ namespace Orleans.Runtime.Host
 
                 try
                 {
-                    var manager = siloInstanceManager ?? await OrleansSiloInstanceManager.GetManager(clusterId, connectionString, AzureStorageClusteringOptions.DEFAULT_TABLE_NAME, loggerFactory);
+                    var manager = await OrleansSiloInstanceManager.GetManager(clusterId, connectionString, AzureStorageClusteringOptions.DEFAULT_TABLE_NAME, loggerFactory);
                     var instances = await manager.DumpSiloInstanceTable();
                     logger.Debug(instances);
                 }
@@ -220,10 +219,6 @@ namespace Orleans.Runtime.Host
 
             host.SetSiloType(Silo.SiloType.Secondary);
 
-            int generation = SiloAddress.AllocateNewGeneration();
-
-            // Bootstrap this Orleans silo instance
-
             // If clusterId was not direclty provided, take the value in the config. If it is not 
             // in the config too, just take the ClusterId from Azure
             if (clusterId == null)
@@ -231,42 +226,8 @@ namespace Orleans.Runtime.Host
                     ? serviceRuntimeWrapper.DeploymentId
                     : host.Config.Globals.ClusterId;
 
-            myEntry = new SiloInstanceTableEntry
-            {
-                DeploymentId = clusterId,
-                Address = myEndpoint.Address.ToString(),
-                Port = myEndpoint.Port.ToString(CultureInfo.InvariantCulture),
-                Generation = generation.ToString(CultureInfo.InvariantCulture),
-
-                HostName = host.Config.GetOrCreateNodeConfigurationForSilo(host.Name).DNSHostName,
-                ProxyPort = (proxyEndpoint != null ? proxyEndpoint.Port : 0).ToString(CultureInfo.InvariantCulture),
-
-                RoleName = serviceRuntimeWrapper.RoleName,
-                SiloName = instanceName,
-                UpdateZone = serviceRuntimeWrapper.UpdateDomain.ToString(CultureInfo.InvariantCulture),
-                FaultZone = serviceRuntimeWrapper.FaultDomain.ToString(CultureInfo.InvariantCulture),
-                StartTime = LogFormatter.PrintDate(DateTime.UtcNow),
-
-                PartitionKey = clusterId,
-                RowKey = myEndpoint.Address + "-" + myEndpoint.Port + "-" + generation
-            };
-
-			if (connectionString == null)
-				connectionString = serviceRuntimeWrapper.GetConfigurationSettingValue(DataConnectionConfigurationSettingName);
-
-            try
-            {
-                siloInstanceManager = OrleansSiloInstanceManager.GetManager(
-                    clusterId, connectionString, AzureStorageClusteringOptions.DEFAULT_TABLE_NAME, this.loggerFactory).WithTimeout(AzureTableDefaultPolicies.TableCreationTimeout).Result;
-            }
-            catch (Exception exc)
-            {
-                var error = String.Format("Failed to create OrleansSiloInstanceManager. This means CreateTableIfNotExist for silo instance table has failed with {0}",
-                    LogFormatter.PrintException(exc));
-                Trace.TraceError(error);
-                logger.Error((int)AzureSiloErrorCode.AzureTable_34, error, exc);
-                throw new OrleansException(error, exc);
-            }
+            if (connectionString == null)
+                connectionString = serviceRuntimeWrapper.GetConfigurationSettingValue(DataConnectionConfigurationSettingName);
 
             // Always use Azure table for membership when running silo in Azure
             host.SetSiloLivenessType(GlobalConfiguration.LivenessProviderType.AzureTable);
@@ -276,11 +237,10 @@ namespace Orleans.Runtime.Host
                 host.SetReminderServiceType(GlobalConfiguration.ReminderServiceProviderType.AzureTable);
             }
             host.SetExpectedClusterSize(serviceRuntimeWrapper.RoleInstanceCount);
-            siloInstanceManager.RegisterSiloInstance(myEntry);
 
             // Initialize this Orleans silo instance
             host.SetDeploymentId(clusterId, connectionString);
-            host.SetSiloEndpoint(myEndpoint, generation);
+            host.SetSiloEndpoint(myEndpoint, 0);
             host.SetProxyEndpoint(proxyEndpoint);
 
             host.ConfigureSiloHostDelegate = ConfigureSiloHostDelegate;
