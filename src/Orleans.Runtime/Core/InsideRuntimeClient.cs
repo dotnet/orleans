@@ -292,17 +292,11 @@ namespace Orleans.Runtime
 
                 if (!message.TargetGrain.IsSystemTarget)
                 {
-                    if (schedulingOptions.PerformDeadlockDetection)
+                    if (schedulingOptions.PerformDeadlockDetection || schedulingOptions.AllowCallChainReentrancy)
                     {
                         UpdateInvocationHistoryInRequestContext(
                             new RequestInvocationHistory(message.TargetGrain, message.TargetActivation, message.DebugContext));
                     }
-                    else if (schedulingOptions.AllowCallChainReentrancy)
-                    {
-                        UpdateInvocationHistoryInRequestContext(
-                            new RequestInvocationHistorySummary(message.TargetActivation));
-                    }
-
                     // RequestContext is automatically saved in the msg upon send and propagated to the next hop
                     // in RuntimeClient.CreateMessage -> RequestContextExtensions.ExportToMessage(message);
                 }
@@ -579,17 +573,17 @@ namespace Orleans.Runtime
         }
 
         // assumes deadlock information was already loaded into RequestContext from the message
-        private static void UpdateInvocationHistoryInRequestContext(RequestInvocationHistorySummary thisInvocation)
+        private static void UpdateInvocationHistoryInRequestContext(RequestInvocationHistory thisInvocation)
         {
-            IList<RequestInvocationHistorySummary> prevChain;
+            IList<RequestInvocationHistory> prevChain;
 
-            if (RequestContext.Get(RequestContext.CALL_CHAIN_REQUEST_CONTEXT_HEADER) is IList<RequestInvocationHistorySummary> obj)
+            if (RequestContext.Get(RequestContext.CALL_CHAIN_REQUEST_CONTEXT_HEADER) is IList<RequestInvocationHistory> obj)
             {
                 prevChain = obj;
             }
             else
             {
-                prevChain = new List<RequestInvocationHistorySummary>();
+                prevChain = new List<RequestInvocationHistory>();
                 RequestContext.Set(RequestContext.CALL_CHAIN_REQUEST_CONTEXT_HEADER, prevChain);
             }
 
