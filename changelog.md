@@ -7,6 +7,28 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [2.2.0-rc1] (changes since 2.2.0-beta1)
+
+- Breaking changes
+  - None
+
+- Non-breaking improvements
+  - Internal transactional states are now immutable (#5149)
+  - Log warning when ClusterMembershipOptions.ValidateInitialConnectivity=true (#5148)
+  - Start using Span and new language features for increasing Orleans perfomance (#5061)
+  - Lock worker error handling improvements (#5175)
+  - Add TimerManager as Task.Delay replacement (#5201)
+  - Cleanup Transaction Agent (#5188)
+  - Replace Task.RunSynchronously usage with alternative (#5204)
+  - fix multicluster registration test (#5186)
+
+- Non-breaking bug fixes
+  - Fix rootKvFolder is not backward compatible (#5100)
+  - Fix test cluster deploy deadlock (#5167)
+  - Fix drain logic in ThreadPoolExecutor (#5208)
+  - Don't throw SiloUnavailableException when a gateway stops (#5209)
+  - Fix call chain reentrancy (#5145)
+
 ### [2.2.0-beta1] (changes since 2.1.0)
 
 - Breaking changes
