@@ -7,6 +7,11 @@ namespace Orleans.Transactions.Tests.Correctness
     public interface ITransactionalBitArrayGrain : IGrainWithGuidKey
     {
         /// <summary>
+        /// Ping 
+        /// </summary>
+        /// <returns></returns>
+        Task Ping();
+        /// <summary>
         /// apply set operation to every transaction state
         /// </summary>
         /// <param name="newValue"></param>
