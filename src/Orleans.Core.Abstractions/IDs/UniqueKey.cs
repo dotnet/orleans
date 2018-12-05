@@ -1,6 +1,8 @@
 using System;
+using System.Buffers.Text;
 using System.Globalization;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Orleans.Runtime
@@ -287,47 +289,42 @@ namespace Orleans.Runtime
             // ReSharper restore NonReadonlyFieldInGetHashCode
         }
 
-        internal byte[] ToByteArray()
+        /// <summary>
+        /// If KeyExt not exists, returns following structure
+        /// |8 bytes|8 bytes|8 bytes|4 bytes| - total 28 bytes.
+        /// If KeyExt exists, adds additional KeyExt bytes length
+        /// </summary>
+        /// <returns></returns>
+        internal ReadOnlySpan<byte> ToByteArray()
         {
-            byte[] bytes, extBytes = null;
-            var tmpArray = new ulong[1];
+            var extBytes = this.KeyExt != null ? Encoding.UTF8.GetBytes(KeyExt) : null;
+            var extBytesLength = extBytes?.Length ?? 0;
+            var sizeWithoutExtBytes = sizeof(ulong) * 3 + sizeof(int);
+
+            var spanBytes = new byte[sizeWithoutExtBytes + extBytesLength].AsSpan();
+
             var offset = 0;
-            if (this.KeyExt != null)
-            {
-                extBytes = Encoding.UTF8.GetBytes(KeyExt);
-                // N0 + N1 + TypeCodeData + length(KeyExt in bytes) + KeyExt in bytes
-                bytes = new byte[sizeof(ulong) * 3 + sizeof(int) + extBytes.Length];
-            }
-            else
-            {
-                // N0 + N1 + TypeCodeData + length(-1)
-                bytes = new byte[sizeof(ulong) * 3 + sizeof(int)];
-            }
-            // Copy N0
-            tmpArray[0] = this.N0;
-            Buffer.BlockCopy(tmpArray, 0, bytes, offset, sizeof(ulong));
-            offset += sizeof(ulong);
-            // Copy N1
-            tmpArray[0] = this.N1;
-            Buffer.BlockCopy(tmpArray, 0, bytes, offset, sizeof(ulong));
-            offset += sizeof(ulong);
-            // Copy TypeCodeData
-            tmpArray[0] = this.TypeCodeData;
-            Buffer.BlockCopy(tmpArray, 0, bytes, offset, sizeof(ulong));
-            offset += sizeof(ulong);
+            var ulongBytes = MemoryMarshal.Cast<byte, ulong>(spanBytes.Slice(offset, sizeof(ulong) * 3));
+
+            ulongBytes[0] = this.N0;
+            ulongBytes[1] = this.N1;
+            ulongBytes[2] = this.TypeCodeData;
+
+            offset += sizeof(ulong) * 3;
+
             // Copy KeyExt
             if (extBytes != null)
             {
-                Buffer.BlockCopy(new[] {extBytes.Length}, 0, bytes, offset, sizeof(int));
+                MemoryMarshal.Cast<byte, int>(spanBytes.Slice(offset, sizeof(int)))[0] = extBytesLength;
                 offset += sizeof(int);
-                Buffer.BlockCopy(extBytes, 0, bytes, offset, extBytes.Length);
+                extBytes.CopyTo(spanBytes.Slice(offset, extBytesLength));
             }
             else
             {
-                Buffer.BlockCopy(new[] {-1}, 0, bytes, offset, sizeof(int));
+                MemoryMarshal.Cast<byte, int>(spanBytes.Slice(offset, sizeof(int)))[0] = -1;
             }
 
-            return bytes;
+            return spanBytes;
         }
 
         private Guid ConvertToGuid()
