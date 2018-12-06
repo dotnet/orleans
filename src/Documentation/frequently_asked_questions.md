@@ -2,7 +2,7 @@
 layout: page
 title: Frequently Asked Questions
 ---
-///TODO: after files are rearranged and checked for accuracy, put links back
+[//]: # (TODO: after files are rearranged and checked for accuracy, put links back)
 
 # Frequently Asked Questions
 
@@ -49,7 +49,7 @@ While based on the same base principles of the Actor Model, Orleans took a step 
 ### Microsoft has another actor model implementation - Azure Service Fabric Reliable Actors. How do I choose between the two?
 
 Reliable Actors are tightly integrated with Service Fabric to leverage its core features, such as replicated in-cluster storage.
-Orleans has a reacher feature set, is not tied to any particular hosting platform, and can run in almost any environment.
+Orleans has a richer feature set, is not tied to any particular hosting platform, and can run in almost any environment.
 Orleans provides an [optional integration package](https://www.nuget.org/packages/Microsoft.Orleans.Hosting.ServiceFabric/) for hosting Orleans applications in Service Fabric.
 
 In the end, it's the application developer's decision of how much they would benefit from the tight integration of Reliable Actors with the underlying platform of Service Fabric versus the flexibility to run anywhere and the feature set of Orleans.
