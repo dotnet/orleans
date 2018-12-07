@@ -115,76 +115,76 @@ namespace Orleans.Runtime
 
             while (hasToRefreshClusterGrainInterfaceMap)
             {
-            hasToRefreshClusterGrainInterfaceMap = false;
+                hasToRefreshClusterGrainInterfaceMap = false;
 
-            if (this.logger.IsEnabled(LogLevel.Debug)) logger.Debug("OnRefreshClusterMapTimer: refresh start");
-            var activeSilos = statusOracle.GetApproximateSiloStatuses(onlyActive: true);
-            var knownSilosClusterGrainInterfaceMap = grainTypeManager.GrainInterfaceMapsBySilo;
+                if (this.logger.IsEnabled(LogLevel.Debug)) logger.Debug("OnRefreshClusterMapTimer: refresh start");
+                var activeSilos = statusOracle.GetApproximateSiloStatuses(onlyActive: true);
+                var knownSilosClusterGrainInterfaceMap = grainTypeManager.GrainInterfaceMapsBySilo;
 
-            // Build the new map. Always start by himself
-            var newSilosClusterGrainInterfaceMap = new Dictionary<SiloAddress, GrainInterfaceMap>
-            {
-                {this.Silo, grainTypeManager.GetTypeCodeMap()}
-            };
-            var getGrainInterfaceMapTasks = new List<Task<KeyValuePair<SiloAddress, GrainInterfaceMap>>>();
-
-
-            foreach (var siloAddress in activeSilos.Keys)
-            {
-                if (siloAddress.Equals(this.Silo)) continue;
-
-                GrainInterfaceMap value;
-                if (knownSilosClusterGrainInterfaceMap.TryGetValue(siloAddress, out value))
+                // Build the new map. Always start by himself
+                var newSilosClusterGrainInterfaceMap = new Dictionary<SiloAddress, GrainInterfaceMap>
                 {
-                    if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace("OnRefreshClusterMapTimer: value already found locally for {SiloAddress}", siloAddress);
-                    newSilosClusterGrainInterfaceMap[siloAddress] = value;
-                }
-                else
-                {
-                    // Value not found, let's get it
-                    if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("OnRefreshClusterMapTimer: value not found locally for {SiloAddress}", siloAddress);
-                    getGrainInterfaceMapTasks.Add(GetTargetSiloGrainInterfaceMap(siloAddress));
-                }
-            }
+                    {this.Silo, grainTypeManager.GetTypeCodeMap()}
+                };
+                var getGrainInterfaceMapTasks = new List<Task<KeyValuePair<SiloAddress, GrainInterfaceMap>>>();
 
-            if (getGrainInterfaceMapTasks.Any())
-            {
-                foreach (var keyValuePair in await Task.WhenAll(getGrainInterfaceMapTasks))
-                {
-                    if (keyValuePair.Value != null)
-                        newSilosClusterGrainInterfaceMap.Add(keyValuePair.Key, keyValuePair.Value);
-                }
-            }
 
-            grainTypeManager.SetInterfaceMapsBySilo(newSilosClusterGrainInterfaceMap);
-
-            if (this.versionStore.IsEnabled)
-            {
-                await this.GetAndSetDefaultCompatibilityStrategy();
-                foreach (var kvp in await GetStoredCompatibilityStrategies())
+                foreach (var siloAddress in activeSilos.Keys)
                 {
-                    this.versionSelectorManager.CompatibilityDirectorManager.SetStrategy(kvp.Key, kvp.Value);
+                    if (siloAddress.Equals(this.Silo)) continue;
+
+                    GrainInterfaceMap value;
+                    if (knownSilosClusterGrainInterfaceMap.TryGetValue(siloAddress, out value))
+                    {
+                        if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace("OnRefreshClusterMapTimer: value already found locally for {SiloAddress}", siloAddress);
+                        newSilosClusterGrainInterfaceMap[siloAddress] = value;
+                    }
+                    else
+                    {
+                        // Value not found, let's get it
+                        if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("OnRefreshClusterMapTimer: value not found locally for {SiloAddress}", siloAddress);
+                        getGrainInterfaceMapTasks.Add(GetTargetSiloGrainInterfaceMap(siloAddress));
+                    }
                 }
 
-                await this.GetAndSetDefaultSelectorStrategy();
-                foreach (var kvp in await GetSelectorStrategies())
+                if (getGrainInterfaceMapTasks.Any())
                 {
-                    this.versionSelectorManager.VersionSelectorManager.SetSelector(kvp.Key, kvp.Value);
-                }
-            }
-
-            versionSelectorManager.ResetCache();
-
-            // Either a new silo joined or a refresh failed, so continue until no refresh is required.
-            if (hasToRefreshClusterGrainInterfaceMap)
-            {
-                if (this.logger.IsEnabled(LogLevel.Debug))
-                {
-                    this.logger.LogDebug("OnRefreshClusterMapTimer: cluster type map still requires a refresh and will be refreshed again after a short delay");
+                    foreach (var keyValuePair in await Task.WhenAll(getGrainInterfaceMapTasks))
+                    {
+                        if (keyValuePair.Value != null)
+                            newSilosClusterGrainInterfaceMap.Add(keyValuePair.Key, keyValuePair.Value);
+                    }
                 }
 
-                await Task.Delay(TimeSpan.FromSeconds(1));
-            }
+                grainTypeManager.SetInterfaceMapsBySilo(newSilosClusterGrainInterfaceMap);
+
+                if (this.versionStore.IsEnabled)
+                {
+                    await this.GetAndSetDefaultCompatibilityStrategy();
+                    foreach (var kvp in await GetStoredCompatibilityStrategies())
+                    {
+                        this.versionSelectorManager.CompatibilityDirectorManager.SetStrategy(kvp.Key, kvp.Value);
+                    }
+
+                    await this.GetAndSetDefaultSelectorStrategy();
+                    foreach (var kvp in await GetSelectorStrategies())
+                    {
+                        this.versionSelectorManager.VersionSelectorManager.SetSelector(kvp.Key, kvp.Value);
+                    }
+                }
+
+                versionSelectorManager.ResetCache();
+
+                // Either a new silo joined or a refresh failed, so continue until no refresh is required.
+                if (hasToRefreshClusterGrainInterfaceMap)
+                {
+                    if (this.logger.IsEnabled(LogLevel.Debug))
+                    {
+                        this.logger.LogDebug("OnRefreshClusterMapTimer: cluster type map still requires a refresh and will be refreshed again after a short delay");
+                    }
+
+                    await Task.Delay(TimeSpan.FromSeconds(1));
+                }
             }
         }
 
