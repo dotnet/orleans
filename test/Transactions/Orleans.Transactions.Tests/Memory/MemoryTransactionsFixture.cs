@@ -1,6 +1,7 @@
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using Orleans.Hosting;
+using Orleans.Transactions.TestKit.Base;
 using TestExtensions;
 
 namespace Orleans.Transactions.Tests

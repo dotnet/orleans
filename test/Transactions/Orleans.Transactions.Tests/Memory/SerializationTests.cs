@@ -6,6 +6,7 @@ using Xunit;
 using Orleans.Runtime;
 using Xunit.Abstractions;
 using Orleans.Transactions.Abstractions;
+using Orleans.Transactions.TestKit.Base;
 
 namespace Orleans.Transactions.Tests.Memory
 {
@@ -14,7 +15,7 @@ namespace Orleans.Transactions.Tests.Memory
     {
         private MemoryTransactionsFixture fixture;
         public SerializationTests(MemoryTransactionsFixture fixture, ITestOutputHelper output)
-            :base(fixture.GrainFactory, output)
+            :base(fixture.GrainFactory, output.WriteLine)
         {
             this.fixture = fixture;
         }
