@@ -1,9 +1,10 @@
-﻿using Orleans.Configuration;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers.GCP.Streams.PubSub;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Orleans.Providers.Streams.Common;
 
 namespace Orleans.Streams
 {
@@ -14,7 +15,11 @@ namespace Orleans.Streams
             : base(name, builder, PubSubAdapterFactory<TDataAdapter>.Create)
         {
             this.siloBuilder
-                .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(PubSubAdapterFactory<>).Assembly))
+                .ConfigureApplicationParts(parts =>
+                {
+                    parts.AddFrameworkPart(typeof(PubSubAdapterFactory<>).Assembly)
+                        .AddFrameworkPart(typeof(EventSequenceTokenV2).Assembly);
+                })
                 .ConfigureServices(services =>
                 {
                     services.ConfigureNamedOptionForLogging<PubSubOptions>(name)
@@ -48,7 +53,11 @@ namespace Orleans.Streams
             : base(name, builder, PubSubAdapterFactory<TDataAdapter>.Create)
         {
             this.clientBuilder
-                .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(PubSubAdapterFactory<>).Assembly))
+                .ConfigureApplicationParts(parts =>
+                {
+                    parts.AddFrameworkPart(typeof(PubSubAdapterFactory<>).Assembly)
+                        .AddFrameworkPart(typeof(EventSequenceTokenV2).Assembly);
+                })
                 .ConfigureServices(services => services.ConfigureNamedOptionForLogging<PubSubOptions>(name));
         }
 
