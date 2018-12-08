@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.ServiceBus.Providers;
@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
+using Orleans.Providers.Streams.Common;
 
 namespace Orleans.Streams
 {
@@ -14,7 +15,11 @@ namespace Orleans.Streams
         public SiloEventHubStreamConfigurator(string name, ISiloHostBuilder builder)
             : base(name, builder, EventHubAdapterFactory.Create)
         {
-            this.siloBuilder.ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(EventHubAdapterFactory).Assembly))
+            this.siloBuilder.ConfigureApplicationParts(parts =>
+                {
+                    parts.AddFrameworkPart(typeof(EventHubAdapterFactory).Assembly)
+                        .AddFrameworkPart(typeof(EventSequenceTokenV2).Assembly);
+                })
                 .ConfigureServices(services => services.ConfigureNamedOptionForLogging<EventHubOptions>(name)
                     .ConfigureNamedOptionForLogging<EventHubReceiverOptions>(name)
                     .ConfigureNamedOptionForLogging<EventHubStreamCachePressureOptions>(name)
@@ -53,7 +58,11 @@ namespace Orleans.Streams
         public ClusterClientEventHubStreamConfigurator(string name, IClientBuilder builder)
            : base(name, builder, EventHubAdapterFactory.Create)
         {
-            this.clientBuilder.ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(EventHubAdapterFactory).Assembly))
+            this.clientBuilder.ConfigureApplicationParts(parts =>
+                {
+                    parts.AddFrameworkPart(typeof(EventHubAdapterFactory).Assembly)
+                        .AddFrameworkPart(typeof(EventSequenceTokenV2).Assembly);
+                })
                 .ConfigureServices(services => services.ConfigureNamedOptionForLogging<EventHubOptions>(name)
                 .AddTransient<IConfigurationValidator>(sp => new EventHubOptionsValidator(sp.GetOptionsByName<EventHubOptions>(name), name)));
         }

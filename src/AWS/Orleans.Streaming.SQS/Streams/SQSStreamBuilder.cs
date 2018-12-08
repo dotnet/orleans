@@ -1,9 +1,10 @@
-﻿using Orleans.Configuration;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using OrleansAWSUtils.Streams;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Orleans.Providers.Streams.Common;
 
 namespace Orleans.Streams
 {
@@ -13,7 +14,11 @@ namespace Orleans.Streams
             : base(name, builder, SQSAdapterFactory.Create)
         {
             this.siloBuilder
-                .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(SQSAdapterFactory).Assembly))
+                .ConfigureApplicationParts(parts =>
+                {
+                    parts.AddFrameworkPart(typeof(SQSAdapterFactory).Assembly)
+                        .AddFrameworkPart(typeof(EventSequenceTokenV2).Assembly);
+                })
                 .ConfigureServices(services =>
                 {
                     services.ConfigureNamedOptionForLogging<SqsOptions>(name)
@@ -46,7 +51,11 @@ namespace Orleans.Streams
             : base(name, builder, SQSAdapterFactory.Create)
         {
             this.clientBuilder
-                .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(SQSAdapterFactory).Assembly))
+                .ConfigureApplicationParts(parts =>
+                {
+                    parts.AddFrameworkPart(typeof(SQSAdapterFactory).Assembly)
+                        .AddFrameworkPart(typeof(EventSequenceTokenV2).Assembly);
+                })
                 .ConfigureServices(services =>
                 {
                     services.ConfigureNamedOptionForLogging<SqsOptions>(name)
