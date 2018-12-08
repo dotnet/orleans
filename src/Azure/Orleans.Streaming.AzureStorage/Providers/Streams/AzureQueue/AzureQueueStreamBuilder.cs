@@ -1,4 +1,4 @@
-﻿using Orleans.Configuration;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Streams;
@@ -7,6 +7,7 @@ using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans;
+using Orleans.Providers.Streams.Common;
 
 namespace Orleans.Streaming
 {
@@ -17,7 +18,11 @@ namespace Orleans.Streaming
             : base(name, builder, AzureQueueAdapterFactory<TDataAdapter>.Create)
         {
             this.siloBuilder
-                .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(AzureQueueAdapterFactory<>).Assembly))
+                .ConfigureApplicationParts(parts =>
+                {
+                    parts.AddFrameworkPart(typeof(AzureQueueAdapterFactory<>).Assembly)
+                        .AddFrameworkPart(typeof(EventSequenceTokenV2).Assembly);
+                })
                 .ConfigureServices(services =>
                 {
                     services.ConfigureNamedOptionForLogging<AzureQueueOptions>(name)
@@ -57,7 +62,11 @@ namespace Orleans.Streaming
         public ClusterClientAzureQueueStreamConfigurator(string name, IClientBuilder builder)
             : base(name, builder, AzureQueueAdapterFactory<TDataAdapter>.Create)
         {
-            this.clientBuilder.ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(AzureQueueAdapterFactory<>).Assembly))
+            this.clientBuilder.ConfigureApplicationParts(parts =>
+                {
+                    parts.AddFrameworkPart(typeof(AzureQueueAdapterFactory<>).Assembly)
+                        .AddFrameworkPart(typeof(EventSequenceTokenV2).Assembly);
+                })
                  .ConfigureServices(services =>
                     services.ConfigureNamedOptionForLogging<AzureQueueOptions>(name)
                     .AddTransient<IConfigurationValidator>(sp => new AzureQueueOptionsValidator(sp.GetOptionsByName<AzureQueueOptions>(name), name))
