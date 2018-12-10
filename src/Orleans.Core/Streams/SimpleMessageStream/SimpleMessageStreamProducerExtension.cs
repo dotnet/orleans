@@ -6,6 +6,7 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Microsoft.Extensions.Logging;
+using System.Threading;
 
 namespace Orleans.Providers.Streams.SimpleMessageStream
 {
@@ -206,7 +207,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                             continue;
                     }
 
-                    Task task = DeliverToRemote(remoteConsumer, streamId, subscriptionKvp.Key, item, optimizeForImmutableData);
+                    Task task = DeliverToRemote(remoteConsumer, streamId, subscriptionKvp.Key, item, optimizeForImmutableData, fireAndForgetDelivery);
                     if (fireAndForgetDelivery) task.Ignore();
                     else tasks.Add(task);
                 }
@@ -214,7 +215,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 return fireAndForgetDelivery ? Task.CompletedTask : Task.WhenAll(tasks);
             }
 
-            private async Task DeliverToRemote(IStreamConsumerExtension remoteConsumer, StreamId streamId, GuidId subscriptionId, object item, bool optimizeForImmutableData)
+            private async Task DeliverToRemote(IStreamConsumerExtension remoteConsumer, StreamId streamId, GuidId subscriptionId, object item, bool optimizeForImmutableData, bool fireAndForgetDelivery)
             {
                 try
                 {
@@ -233,16 +234,24 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                             "Consumer {0} on stream {1} is no longer active - permanently removing Consumer.", remoteConsumer, streamId);
                     }
                 }
+                catch(Exception ex)
+                {
+                    if (!fireAndForgetDelivery)
+                    {
+                        throw;
+                    }
+                    this.logger.LogWarning(ex, "Failed to deliver message to consumer on {SubscriptionId} for stream {StreamId}.", subscriptionId, streamId);
+                }
             }
-        
+
             internal Task CompleteStream(StreamId streamId, bool fireAndForgetDelivery)
             {
                 var tasks = fireAndForgetDelivery ? null : new List<Task>();
-                foreach (GuidId subscriptionId in consumers.Keys)
+                foreach (KeyValuePair<GuidId, Tuple<IStreamConsumerExtension, IStreamFilterPredicateWrapper>> kvp in consumers)
                 {
-                    var data = consumers[subscriptionId];
-                    IStreamConsumerExtension remoteConsumer = data.Item1;
-                    Task task = remoteConsumer.CompleteStream(subscriptionId);
+                    IStreamConsumerExtension remoteConsumer = kvp.Value.Item1;
+                    GuidId subscriptionId = kvp.Key;
+                    Task task = NotifyComplete(remoteConsumer, subscriptionId, streamId, fireAndForgetDelivery);
                     if (fireAndForgetDelivery) task.Ignore();
                     else tasks.Add(task);
                 }
@@ -250,19 +259,50 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 return fireAndForgetDelivery ? Task.CompletedTask : Task.WhenAll(tasks);
             }
 
+            private async Task NotifyComplete(IStreamConsumerExtension remoteConsumer, GuidId subscriptionId, StreamId streamId, bool fireAndForgetDelivery)
+            {
+                try
+                {
+                    await remoteConsumer.CompleteStream(subscriptionId);
+                } catch(Exception ex)
+                {
+                    if (!fireAndForgetDelivery)
+                    {
+                        throw;
+                    }
+                    this.logger.LogWarning(ex, "Failed to notify consumer of stream completion on {SubscriptionId} for stream {StreamId}.", subscriptionId, streamId);
+                }
+            }
+
             internal Task ErrorInStream(StreamId streamId, Exception exc, bool fireAndForgetDelivery)
             {
                 var tasks = fireAndForgetDelivery ? null : new List<Task>();
-                foreach (GuidId subscriptionId in consumers.Keys)
+                foreach (KeyValuePair<GuidId, Tuple<IStreamConsumerExtension, IStreamFilterPredicateWrapper>> kvp in consumers)
                 {
-                    var data = consumers[subscriptionId];
-                    IStreamConsumerExtension remoteConsumer = data.Item1;
-                    Task task = remoteConsumer.ErrorInStream(subscriptionId, exc);
+                    IStreamConsumerExtension remoteConsumer = kvp.Value.Item1;
+                    GuidId subscriptionId = kvp.Key;
+                    Task task = NotifyError(remoteConsumer, subscriptionId, exc, streamId, fireAndForgetDelivery);
                     if (fireAndForgetDelivery) task.Ignore();
                     else tasks.Add(task);
                 }
                 // If there's no subscriber, presumably we just drop the item on the floor
                 return fireAndForgetDelivery ? Task.CompletedTask : Task.WhenAll(tasks);
+            }
+
+            private async Task NotifyError(IStreamConsumerExtension remoteConsumer, GuidId subscriptionId, Exception exc, StreamId streamId, bool fireAndForgetDelivery)
+            {
+                try
+                {
+                    await remoteConsumer.ErrorInStream(subscriptionId, exc);
+                }
+                catch (Exception ex)
+                {
+                    if (!fireAndForgetDelivery)
+                    {
+                        throw;
+                    }
+                    this.logger.LogWarning(ex, "Failed to notify consumer of stream error on {SubscriptionId} for stream {StreamId}. Error: {ErrorException}", subscriptionId, streamId, exc);
+                }
             }
         }
     }

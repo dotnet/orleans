@@ -606,13 +606,28 @@ namespace Orleans.Streams
 
         private async Task<StreamHandshakeToken> DeliverBatchToConsumer(StreamConsumerData consumerData, IBatchContainer batch)
         {
-            StreamHandshakeToken prevToken = consumerData.LastToken;
-            Task<StreamHandshakeToken> batchDeliveryTask;
+            try
+            {
+                StreamHandshakeToken newToken = await ContextualizedDeliverBatchToConsumer(consumerData, batch);
+                consumerData.LastToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken); // this is the currently delivered token
+                return newToken;
+            }
+            catch (Exception ex)
+            {
+                this.logger.LogWarning(ex, "Failed to deliver message to consumer on {SubscriptionId} for stream {StreamId}, may retry.", consumerData.SubscriptionId, consumerData.StreamId);
+                throw;
+            }
+        }
 
+        /// <summary>
+        /// Add call context for batch delivery call, then clear context immediately, without giving up turn.
+        /// </summary>
+        private Task<StreamHandshakeToken> ContextualizedDeliverBatchToConsumer(StreamConsumerData consumerData, IBatchContainer batch)
+        {
             bool isRequestContextSet = batch.ImportRequestContext();
             try
             {
-                batchDeliveryTask = consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, consumerData.StreamId, batch.AsImmutable(), prevToken);
+                return consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, consumerData.StreamId, batch.AsImmutable(), consumerData.LastToken);
             }
             finally
             {
@@ -622,10 +637,8 @@ namespace Orleans.Streams
                     RequestContext.Clear();
                 }
             }
-            StreamHandshakeToken newToken = await batchDeliveryTask;
-            consumerData.LastToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken); // this is the currently delivered token
-            return newToken;
         }
+
 
         private static async Task DeliverErrorToConsumer(StreamConsumerData consumerData, Exception exc, IBatchContainer batch)
         {
