@@ -94,7 +94,7 @@
     <NewtonsoftJsonVersion>10.0.3</NewtonsoftJsonVersion>
     <NpgsqlVersion>3.1.9</NpgsqlVersion>
     <NSubstituteVersion>1.10.0</NSubstituteVersion>
-    <ZooKeeperNetExVersion>3.4.9.4</ZooKeeperNetExVersion>
+    <ZooKeeperNetExVersion>3.4.12.1</ZooKeeperNetExVersion>
 
     <!-- Test related packages -->
     <MicrosoftTestSdkVersion>15.5.0</MicrosoftTestSdkVersion>
