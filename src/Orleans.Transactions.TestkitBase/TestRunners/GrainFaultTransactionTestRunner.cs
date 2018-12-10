@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using FluentAssertions;
 
-namespace Orleans.Transactions.TestKit.Base
+namespace Orleans.Transactions.TestKit
 {
     public abstract class GrainFaultTransactionTestRunner : TransactionTestRunnerBase
     {

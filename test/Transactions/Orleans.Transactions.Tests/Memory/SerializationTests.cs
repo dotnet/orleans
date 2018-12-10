@@ -6,7 +6,7 @@ using Xunit;
 using Orleans.Runtime;
 using Xunit.Abstractions;
 using Orleans.Transactions.Abstractions;
-using Orleans.Transactions.TestKit.Base;
+using Orleans.Transactions.TestKit;
 
 namespace Orleans.Transactions.Tests.Memory
 {

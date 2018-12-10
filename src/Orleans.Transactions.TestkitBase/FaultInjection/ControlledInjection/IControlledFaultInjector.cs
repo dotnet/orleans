@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Orleans.Transactions.Abstractions;
 
-namespace Orleans.Transactions.TestKit.Base
+namespace Orleans.Transactions.TestKit
 {
     public interface IControlledTransactionFaultInjector : ITransactionFaultInjector
     {

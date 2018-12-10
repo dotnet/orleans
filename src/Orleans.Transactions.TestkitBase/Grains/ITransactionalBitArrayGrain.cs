@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace Orleans.Transactions.TestKit.Base.Correctnesss
+namespace Orleans.Transactions.TestKit.Correctnesss
 {
     public interface ITransactionalBitArrayGrain : IGrainWithGuidKey
     {

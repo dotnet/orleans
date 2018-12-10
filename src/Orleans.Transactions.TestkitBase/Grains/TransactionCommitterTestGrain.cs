@@ -2,7 +2,7 @@
 using Microsoft.Extensions.Logging;
 using Orleans.Transactions.Abstractions;
 
-namespace Orleans.Transactions.TestKit.Base
+namespace Orleans.Transactions.TestKit
 {
     public class TransactionCommitterTestGrain : Grain, ITransactionCommitterTestGrain
     {

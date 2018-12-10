@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.TestingHost;
 
-namespace Orleans.Transactions.TestKit.Base
+namespace Orleans.Transactions.TestKit
 {
     public class SkewedClockConfigurator : ISiloBuilderConfigurator
     {

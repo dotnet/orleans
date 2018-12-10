@@ -5,7 +5,7 @@ using FluentAssertions;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 
-namespace Orleans.Transactions.TestKit.Base
+namespace Orleans.Transactions.TestKit
 {
     public abstract class TransactionalStateStorageTestRunner<TState> : TransactionTestRunnerBase
         where TState : class, ITestState, new()

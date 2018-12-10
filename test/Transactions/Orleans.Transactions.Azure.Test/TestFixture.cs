@@ -1,10 +1,8 @@
 using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Orleans.Hosting;
 using Orleans.TestingHost;
-using Orleans.Transactions.Azure.Tests;
-using Orleans.Transactions.TestKit.Base;
+using Orleans.Transactions.TestKit;
 using Orleans.Transactions.Tests;
 using TestExtensions;
 using Tester;

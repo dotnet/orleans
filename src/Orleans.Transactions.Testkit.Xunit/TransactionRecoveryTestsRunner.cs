@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 using Orleans.TestingHost;
-using Orleans.Transactions.TestKit.Base;
+using Orleans.Transactions.TestKit;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Orleans.Transactions.TestKit.xUnit
 {
-    public class TransactionRecoveryTestsRunnerxUnit : Base.TransactionRecoveryTestsRunner
+    public class TransactionRecoveryTestsRunnerxUnit : TransactionRecoveryTestsRunner
     {
         public TransactionRecoveryTestsRunnerxUnit(TestCluster cluster, ITestOutputHelper testOutput)
             :base(cluster, testOutput.WriteLine)

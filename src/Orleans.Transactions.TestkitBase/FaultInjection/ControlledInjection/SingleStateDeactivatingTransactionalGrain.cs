@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 
-namespace Orleans.Transactions.TestKit.Base
+namespace Orleans.Transactions.TestKit
 {
 
     public interface IFaultInjectionTransactionTestGrain : IGrainWithGuidKey

@@ -10,7 +10,7 @@ using Newtonsoft.Json;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 
-namespace Orleans.Transactions.TestKit.Base
+namespace Orleans.Transactions.TestKit
 {
     public interface IFaultInjectionTransactionalStateConfiguration : ITransactionalStateConfiguration
     {

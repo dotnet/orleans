@@ -1,7 +1,7 @@
 ﻿
 using System;
 
-namespace Orleans.Transactions.TestKit.Base
+namespace Orleans.Transactions.TestKit
 {
     public class SkewedClock : IClock
     {

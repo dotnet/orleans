@@ -1,10 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace Orleans.Transactions.TestKit.Base.Consistency
+namespace Orleans.Transactions.TestKit.Consistency
 {
     [Serializable]
     public struct Observation

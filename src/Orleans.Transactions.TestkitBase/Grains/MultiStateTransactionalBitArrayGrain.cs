@@ -1,17 +1,14 @@
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 
-namespace Orleans.Transactions.TestKit.Base.Correctnesss
+namespace Orleans.Transactions.TestKit.Correctnesss
 {
     [Serializable]
     public class BitArrayState

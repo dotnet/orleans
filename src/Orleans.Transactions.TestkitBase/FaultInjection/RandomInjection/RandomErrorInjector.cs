@@ -2,7 +2,7 @@
 using System;
 using System.Runtime.Serialization;
 
-namespace Orleans.Transactions.TestKit.Base
+namespace Orleans.Transactions.TestKit
 {
     public class RandomErrorInjector : ITransactionFaultInjector
     {

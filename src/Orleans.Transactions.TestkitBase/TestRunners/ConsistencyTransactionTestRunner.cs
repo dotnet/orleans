@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 using FluentAssertions;
 using Orleans.Hosting;
 using Orleans.TestingHost;
-using Orleans.Transactions.TestKit.Base.Consistency;
+using Orleans.Transactions.TestKit.Consistency;
 
-namespace Orleans.Transactions.TestKit.Base
+namespace Orleans.Transactions.TestKit
 {
     public abstract class ConsistencyTransactionTestRunner : TransactionTestRunnerBase
     {

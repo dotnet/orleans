@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 using Orleans.TestingHost;
-using Orleans.Transactions.TestKit.Base.Consistency;
+using Orleans.Transactions.TestKit.Consistency;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Orleans.Transactions.TestKit.xUnit
 {
-    public class ConsistencyTransactionTestRunnerxUnit : Base.ConsistencyTransactionTestRunner
+    public class ConsistencyTransactionTestRunnerxUnit : ConsistencyTransactionTestRunner
     {
         public ConsistencyTransactionTestRunnerxUnit(IGrainFactory grainFactory, ITestOutputHelper output)
             :base(grainFactory, output.WriteLine)

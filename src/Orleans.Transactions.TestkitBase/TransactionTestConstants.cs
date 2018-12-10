@@ -1,5 +1,5 @@
 ﻿
-namespace Orleans.Transactions.TestKit.Base
+namespace Orleans.Transactions.TestKit
 {
     public static class TransactionTestConstants
     {

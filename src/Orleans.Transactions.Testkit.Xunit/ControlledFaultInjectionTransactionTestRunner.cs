@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using FluentAssertions;
-using Orleans.Transactions.TestKit.Base;
+using Orleans.Transactions.TestKit;
 using Xunit;
 using Xunit.Abstractions;
 

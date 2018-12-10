@@ -10,7 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 
-namespace Orleans.Transactions.TestKit.Base
+namespace Orleans.Transactions.TestKit
 {
     public class FaultInjectionAzureTableTransactionStateStorage<TState> : ITransactionalStateStorage<TState>
         where TState : class, new()

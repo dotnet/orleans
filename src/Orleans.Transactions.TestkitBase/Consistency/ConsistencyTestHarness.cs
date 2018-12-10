@@ -9,7 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
 
-namespace Orleans.Transactions.TestKit.Base.Consistency
+namespace Orleans.Transactions.TestKit.Consistency
 {
     public class ConsistencyTestHarness
     {

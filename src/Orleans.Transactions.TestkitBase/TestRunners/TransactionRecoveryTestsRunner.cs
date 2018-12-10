@@ -9,9 +9,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using Orleans.Hosting;
-using Orleans.Transactions.TestKit.Base.Correctnesss;
+using Orleans.Transactions.TestKit.Correctnesss;
 
-namespace Orleans.Transactions.TestKit.Base
+namespace Orleans.Transactions.TestKit
 {
     public class TransactionRecoveryTestsRunner : TransactionTestRunnerBase
     {

@@ -4,9 +4,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Transactions.Abstractions;
-using Orleans.Transactions.TestKit.Base.Correctnesss;
+using Orleans.Transactions.TestKit.Correctnesss;
 
-namespace Orleans.Transactions.TestKit.Base
+namespace Orleans.Transactions.TestKit
 {
     [StatelessWorker]
     public class TransactionCoordinatorGrain : Grain, ITransactionCoordinatorGrain

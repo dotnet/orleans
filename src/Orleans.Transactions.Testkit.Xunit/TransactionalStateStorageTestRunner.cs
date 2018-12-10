@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Orleans.Transactions.TestKit.Base;
 using Orleans.Transactions.Abstractions;
 using Xunit;
 using Xunit.Abstractions;
