@@ -15,6 +15,7 @@ namespace Orleans.Runtime.Configuration
     /// <summary>
     /// Orleans client configuration parameters.
     /// </summary>
+    [Obsolete("This type is obsolete and may be removed in a future release. Use configuration methods on ClientBuilder to configure specific types.")]
     [Serializable]
     public class ClientConfiguration : MessagingConfiguration, IStatisticsConfiguration
     {

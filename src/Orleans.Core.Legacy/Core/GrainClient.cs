@@ -14,7 +14,7 @@ namespace Orleans
     /// <summary>
     /// Client runtime for connecting to Orleans system
     /// </summary>
-    /// TODO: Make this class non-static and inject it where it is needed.
+    [Obsolete("This type is obsolete and may be removed in a future release. Use ClientBuilder to create an instance of IClusterClient instead.")]
     public static class GrainClient
     {
         /// <summary>
