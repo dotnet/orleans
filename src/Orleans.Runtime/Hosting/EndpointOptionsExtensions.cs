@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Sockets;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -87,8 +87,12 @@ namespace Orleans.Hosting
 
         internal static IPEndPoint GetPublicProxyEndpoint(this EndpointOptions options)
         {
-            return options.GatewayPort != 0 
-                ? new IPEndPoint(options.AdvertisedIPAddress, options.GatewayPort)
+            var gatewayPort = options.GatewayPort != 0
+                ? options.GatewayPort
+                : options.GatewayListeningEndpoint?.Port ?? 0;
+
+            return gatewayPort != 0
+                ? new IPEndPoint(options.AdvertisedIPAddress, gatewayPort)
                 : null;
         }
 
@@ -99,9 +103,6 @@ namespace Orleans.Hosting
 
         internal static IPEndPoint GetListeningProxyEndpoint(this EndpointOptions options)
         {
-            if (options.GatewayPort == 0)
-                return null;
-
             return options.GatewayListeningEndpoint ?? options.GetPublicProxyEndpoint();
         }
     }
