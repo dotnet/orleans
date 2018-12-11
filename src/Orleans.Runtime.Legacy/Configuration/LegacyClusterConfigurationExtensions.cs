@@ -167,6 +167,13 @@ namespace Orleans.Hosting
                         options.AdvertisedIPAddress = nodeConfig.Endpoint.Address;
                         options.SiloPort = nodeConfig.Endpoint.Port;
                     }
+
+                    var gatewayEndpoint = nodeConfig.ProxyGatewayEndpoint;
+                    if (gatewayEndpoint != null)
+                    {
+                        options.GatewayPort = gatewayEndpoint.Port;
+                        options.GatewayListeningEndpoint = gatewayEndpoint;
+                    }
                 });
 
             services.Configure<SerializationProviderOptions>(options =>
