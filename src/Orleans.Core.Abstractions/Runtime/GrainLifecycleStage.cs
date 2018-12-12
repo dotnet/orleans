@@ -10,7 +10,7 @@ namespace Orleans.Runtime
     public static class GrainLifecycleStage
     {
         /// <summary>
-        /// First stage in grain's lifecycle
+        /// First valid stage in grain's lifecycle
         /// </summary>
         public const int First = int.MinValue;
 
@@ -25,7 +25,7 @@ namespace Orleans.Runtime
         public const int Activate = 2000;
 
         /// <summary>
-        /// Last stage in grain's lifecycle
+        /// Last valid stage in grain's lifecycle
         /// </summary>
         public const int Last = int.MaxValue;
     }
