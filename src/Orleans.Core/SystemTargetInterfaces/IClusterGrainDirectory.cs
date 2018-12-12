@@ -95,5 +95,9 @@ namespace Orleans.SystemTargetInterfaces
         /// <param name="grainId"></param>
         Task ProcessDeletion(GrainId grainId);
 
+        /// <summary>
+        /// Called on remote clusters to ping availability of a silo and determine cluster id.
+        /// </summary>
+        Task<string> Ping();
     }
 }
