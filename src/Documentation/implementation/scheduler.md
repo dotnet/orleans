@@ -57,8 +57,11 @@ Scheduling Context is a tag, just an opaque object that represents scheduling ta
 4.	When a Task is put into a WorkItemGroup queue, WorkItemGroup makes sure it appears in OrleansTaskScheduler global RunQueue. RunQueue is the global queue of runnable WorkItemGroups, those that have at least one Task queued, and thus ready to be executed. 
 5.	Worker threads scan the RunQueue of OrleansTaskScheduler which hold WorkItemGroups and call WorkItemGroups.Execute 
 6.	WorkItemGroups.Execute scans the queue of its tasks and executes them via ActivationTaskScheduler.RunTask(Task)
+
     6.1	ActivationTaskScheduler.RunTask(Task) calls base.TryExecute.
-    6.2	Task that were enqueued directly to the scheduler via TPL will just execute
+    
+    6.2	Task that were enqueued directly to the scheduler via TPL will just execute.
+    
     6.3	Tasks that wrap work items will call workItem.Execute which will execute the Closure work item delegate.
 
 
@@ -66,26 +69,44 @@ Scheduling Context is a tag, just an opaque object that represents scheduling ta
 ### Low level design – Work Items:
 1.	Queueing work items to OrleansTaskScheduler is how the whole chain of execution for every request starts in the Orleans runtime. This is our entry point into the Scheduler.
 2.	Work items are first submitted to OrleansTaskScheduler (since this is the interface presented to the rest of the system).
+
     2.1	Only closure/invoke/resume work items can be submitted this way. 
+    
     2.2	TaskWorkItem cannot be submitted to OrleansTaskScheduler directly (read more below on handling of TaskWorkItem).
+    
 3.	Every work item must be wrapped into Task and enqueued to the right scheduler via Task.Start.
+
     3.1	This will make sure the TaskScheduler.Current is set correctly on any Task that is created implicitly during execution of this workItem.
+    
     3.2	Wrapping is done by creating a Task via WrapWorkItemAsTask that will execute the work item and enqueuing it to the right scheduler via Task.Start(scheduler).
+    
     3.3	Work items for the null context are queued to OrleansTaskScheduler.
-    3.4	Work items for non-null contexts are queued to ActivationTaskScheduler 
+    
+    3.4	Work items for non-null contexts are queued to ActivationTaskScheduler. 
  
 ### Low level design – Queueing Tasks:
 1.	Tasks are queued directly to the right scheduler
+
     1.1	Tasks are queued implicitly by TPL via protected override void QueueTask(Task task)
+    
     1.2	A Task that has a non-null context is always enqueued to ActivationTaskScheduler 
+    
     1.3	A Task that has the null context is always enqueued to OrleansTaskScheduler
+    
 2.	Queueing Tasks to ActivationTaskScheduler:
+
     2.1	We never wrap a Task in another Task. A Task gets added directly to the WorkItem Group queue
+    
 3. Queueing Tasks to OrleansTaskScheduler:
+
     3.1	When a Task is enqueued to the OrleansTaskScheduler, we wrap it into a TaskWorkItem and put it into this scheduler’s queue of work items. 
+    
     3.2	This is just a matter of data structures, nothing inherent about it:
+    
     3.3	OrleansTaskScheduler usually holds work item groups to schedule them, so its RunQueue has a BlockingCollection<IWorkItem>.
+    
     3.4	Since tasks to the null context are also queued to OrleansTaskScheduler, we reuse the same data structure, thus we have to wrap each Task in a TaskWorkItem.
+    
     3.5	We should be able to get rid of this wrapping completely by adjusting the RunQueue data structure. This may simplify the code a bit, but in general should not matter. Also, in the future we should move away from the null context anyway, so this issue will be gone anyway
  
 
