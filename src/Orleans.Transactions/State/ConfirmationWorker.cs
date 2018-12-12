@@ -23,7 +23,7 @@ namespace Orleans.Transactions.State
         private readonly ITimerManager timerManager;
         private readonly HashSet<Guid> pending;
 
-        public ConfirmationWorker(IOptions<TransactionalStateOptions> options, ParticipantId me, BatchWorker storageWorker, Func<StorageBatch<TState>> getStorageBatch, ILogger logger, ITimerManager timerManager)
+        public ConfirmationWorker(IOptions<TransactionalStateOptions> options, ParticipantId me, BatchWorker storageWorker, Func<StorageBatch<TState>> getStorageBatch, ILogger<ConfirmationWorker<TState>> logger, ITimerManager timerManager)
         {
             this.options = options.Value;
             this.me = me;
@@ -126,7 +126,7 @@ namespace Orleans.Transactions.State
             private Task pending;
             private bool complete;
 
-            public Confirmation(ParticipantId paricipant, Guid transactionId, DateTime timestamp, Func<Task> call, ILogger logger)
+            public Confirmation(ParticipantId paricipant, Guid transactionId, DateTime timestamp, Func<Task> call, ILogger<ConfirmationWorker<TState>> logger)
             {
                 this.paricipant = paricipant;
                 this.transactionId = transactionId;

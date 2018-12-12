@@ -22,7 +22,7 @@ namespace Orleans.Transactions.TOC
             ITransactionalStateStorage<TransactionCommitter<TService>.OperationState> storage,
             JsonSerializerSettings serializerSettings,
             IClock clock,
-            ILogger logger,
+            ILogger<TocTransactionQueue<TService>> logger,
             ITimerManager timerManager)
             : base(options, resource, deactivate, storage, clock, logger, timerManager)
         {

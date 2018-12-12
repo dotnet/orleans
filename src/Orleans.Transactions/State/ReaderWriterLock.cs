@@ -51,7 +51,7 @@ namespace Orleans.Transactions.State
             IOptions<TransactionalStateOptions> options,
             TransactionQueue<TState> queue,
             BatchWorker storageWorker,
-            ILogger logger)
+            ILogger<ReadWriteLock<TState>> logger)
         {
             this.options = options.Value;
             this.queue = queue;

@@ -53,7 +53,7 @@ namespace Orleans.Transactions.State
             Action deactivate,
             ITransactionalStateStorage<TState> storage,
             IClock clock,
-            ILogger logger,
+            ILogger<TransactionQueue<TState>> logger,
             ITimerManager timerManager)
         {
             this.options = options.Value;
