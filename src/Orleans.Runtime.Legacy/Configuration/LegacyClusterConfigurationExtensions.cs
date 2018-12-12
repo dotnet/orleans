@@ -192,7 +192,7 @@ namespace Orleans.Hosting
                 var nodeConfig = configuration.GetOrCreateNodeConfigurationForSilo(siloOptions.Value.SiloName);
                 options.ExcludedGrainTypes.AddRange(nodeConfig.ExcludedGrainTypes);
             });
-
+            
             services.AddOptions<SchedulingOptions>()
                 .Configure<GlobalConfiguration>((options, config) =>
                 {
@@ -280,7 +280,7 @@ namespace Orleans.Hosting
                 {
                     options.IsRunningAsUnitTest = config.IsRunningAsUnitTest;
                 });
-
+            
             services.AddOptions<GrainVersioningOptions>()
                 .Configure<GlobalConfiguration>((options, config) =>
                 {

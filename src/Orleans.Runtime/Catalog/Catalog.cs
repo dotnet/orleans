@@ -35,7 +35,7 @@ namespace Orleans.Runtime
 
             public NonExistentActivationException() : base("NonExistentActivationException") { }
             public NonExistentActivationException(string msg) : base(msg) { }
-            public NonExistentActivationException(string message, Exception innerException)
+            public NonExistentActivationException(string message, Exception innerException) 
                 : base(message, innerException) { }
 
             public NonExistentActivationException(string msg, ActivationAddress nonExistentActivation, bool isStatelessWorker)
@@ -274,7 +274,7 @@ namespace Orleans.Runtime
 
                     // TODO: generic type expansion
                     var grainTypeName = TypeUtils.GetFullName(data.GrainInstanceType);
-
+                    
                     Dictionary<GrainId, int> grains;
                     int n;
                     if (!counts.TryGetValue(grainTypeName, out grains))
@@ -347,8 +347,8 @@ namespace Orleans.Runtime
             }
 
             List<ActivationData> acts = activations.FindTargets(grain);
-            report.LocalActivations = acts != null ?
-                acts.Select(activationData => activationData.ToDetailedString()).ToList() :
+            report.LocalActivations = acts != null ? 
+                acts.Select(activationData => activationData.ToDetailedString()).ToList() : 
                 new List<string>();
             return report;
         }
@@ -397,18 +397,18 @@ namespace Orleans.Runtime
             int numActsBefore = acts.Count;
             foreach (var act in acts)
                 UnregisterMessageTarget(act);
-
+            
             return numActsBefore;
         }
 
         internal bool CanInterleave(ActivationId running, Message message)
         {
-            return this.TryGetActivationData(running, out ActivationData target)
-                   && target.GrainInstance != null
-                   && this.GrainTypeManager.TryGetData(TypeUtils.GetFullName(target.GrainInstanceType), out GrainTypeData data)
-                   && (data.IsReentrant
-                       || (message.GetDeserializedBody(this.serializationManager) is InvokeMethodRequest invokeMethodRequest
-                           && data.MayInterleave((invokeMethodRequest))));
+            ActivationData target;
+            GrainTypeData data;
+            return TryGetActivationData(running, out target) &&
+                target.GrainInstance != null &&
+                GrainTypeManager.TryGetData(TypeUtils.GetFullName(target.GrainInstanceType), out data) &&
+                (data.IsReentrant || data.MayInterleave((InvokeMethodRequest)message.GetDeserializedBody(this.serializationManager)));
         }
 
         public void GetGrainTypeInfo(int typeCode, out string grainClass, out PlacementStrategy placement, out MultiClusterRegistrationStrategy activationStrategy, string genericArguments = null)
@@ -449,7 +449,7 @@ namespace Orleans.Runtime
                 {
                     return result;
                 }
-
+                
                 int typeCode = address.Grain.TypeCode;
                 string actualGrainType = null;
                 MultiClusterRegistrationStrategy activationStrategy;
@@ -502,7 +502,7 @@ namespace Orleans.Runtime
                 CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_NON_EXISTENT_ACTIVATIONS).Increment();
                 throw new NonExistentActivationException(msg, address, placement is StatelessWorkerPlacement);
             }
-
+   
             SetupActivationInstance(result, grainType, genericArguments);
             activatedPromise = InitActivation(result, grainType, genericArguments, requestContextData);
             return result;
@@ -714,7 +714,7 @@ namespace Orleans.Runtime
                 data.SetupContext(grainTypeData, this.serviceProvider);
 
                 Grain grain = grainCreator.CreateGrainInstance(data);
-
+                
                 //if grain implements IStreamSubscriptionObserver, then install stream consumer extension on it
                 if(grain is IStreamSubscriptionObserver)
                     InstallStreamConsumerExtension(data, grain as IStreamSubscriptionObserver);
@@ -722,7 +722,7 @@ namespace Orleans.Runtime
                 grain.Data = data;
                 data.SetGrainInstance(grain);
             }
-
+            
             activations.IncrementGrainCounter(grainClassName);
 
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("CreateGrainInstance {0}{1}", data.Grain, data.ActivationId);
@@ -932,11 +932,11 @@ namespace Orleans.Runtime
         /// <returns></returns>
         // Overall code flow:
         // Deactivating state was already set before, in the correct context under lock.
-        //      that means no more new requests will be accepted into this activation and all timer were stopped (no new ticks will be delivered or enqueued)
+        //      that means no more new requests will be accepted into this activation and all timer were stopped (no new ticks will be delivered or enqueued) 
         // Wait for all already scheduled ticks to finish
         // CallGrainDeactivate
         //      when AsyncDeactivate promise is resolved (NOT when all Deactivate turns are done, which may be orphan tasks):
-        // Unregister in the directory
+        // Unregister in the directory 
         //      when all AsyncDeactivate turns are done (Dispatcher.OnActivationCompletedRequest):
         // Set Invalid state
         // UnregisterMessageTarget -> no new tasks will be enqueue (if an orphan task get enqueud, it is ignored and dropped on the floor).
@@ -1003,7 +1003,7 @@ namespace Orleans.Runtime
                 //logger.Info(ErrorCode.Catalog_DestroyActivations_Done, "Starting FinishDestroyActivations #{0} - with {1} Activations.", number, list.Count);
                 // step 3 - UnregisterManyAsync
                 try
-                {
+                {            
                     List<ActivationAddress> activationsToDeactivate = list.
                         Where((ActivationData d) => d.IsUsingGrainDirectory).
                         Select((ActivationData d) => ActivationAddress.GetAddress(LocalSilo, d.Grain, d.ActivationId)).ToList();
@@ -1039,7 +1039,7 @@ namespace Orleans.Runtime
 
                     // IMPORTANT: no more awaits and .Ignore after that point.
 
-                    // Just use this opportunity to invalidate local Cache Entry as well.
+                    // Just use this opportunity to invalidate local Cache Entry as well. 
                     // If this silo is not the grain directory partition for this grain, it may have it in its cache.
                     try
                     {
@@ -1188,7 +1188,7 @@ namespace Orleans.Runtime
                     if (TryGetActivationData(activation.ActivationId, out ignore) &&
                         activation.State == ActivationState.Deactivating)
                     {
-                        RequestContext.Clear(); // Clear any previous RC, so it does not leak into this call by mistake.
+                        RequestContext.Clear(); // Clear any previous RC, so it does not leak into this call by mistake. 
                         await activation.Lifecycle.OnStop().WithCancellation(ct);
                     }
                     if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Catalog_AfterCallingDeactivate, "Returned from calling {1} grain's OnDeactivateAsync() method {0}", activation, grainTypeName);
@@ -1233,7 +1233,7 @@ namespace Orleans.Runtime
             /// </summary>
             public static readonly ActivationRegistrationResult Success = new ActivationRegistrationResult
             {
-                IsSuccess = true
+                IsSuccess = true       
             };
 
             public ActivationRegistrationResult(ActivationAddress existingActivationAddress)
@@ -1242,7 +1242,7 @@ namespace Orleans.Runtime
                 ExistingActivationAddress = existingActivationAddress;
                 IsSuccess = false;
             }
-
+            
             /// <summary>
             /// Returns true if this instance represents a successful registration, false otherwise.
             /// </summary>
@@ -1264,13 +1264,13 @@ namespace Orleans.Runtime
         {
             ActivationAddress address = activation.Address;
 
-            // Currently, the only grain type that is not registered in the Grain Directory is StatelessWorker.
+            // Currently, the only grain type that is not registered in the Grain Directory is StatelessWorker. 
             // Among those that are registered in the directory, we currently do not have any multi activations.
             if (activation.IsUsingGrainDirectory)
             {
                 var result = await scheduler.RunOrQueueTask(() => directory.RegisterAsync(address, singleActivation:true), this.SchedulingContext);
                 if (address.Equals(result.Address)) return ActivationRegistrationResult.Success;
-
+               
                 return new ActivationRegistrationResult(existingActivationAddress: result.Address);
             }
             else if (activation.PlacedUsing is StatelessWorkerPlacement stPlacement)
@@ -1302,7 +1302,7 @@ namespace Orleans.Runtime
                 }
             }
 
-            // We currently don't have any other case for multiple activations except for StatelessWorker.
+            // We currently don't have any other case for multiple activations except for StatelessWorker. 
         }
 
         /// <summary>
@@ -1388,7 +1388,7 @@ namespace Orleans.Runtime
         }
 
         private void OnSiloStatusChange(SiloAddress updatedSilo, SiloStatus status)
-        {
+        { 
             // ignore joining events and also events on myself.
             if (updatedSilo.Equals(LocalSilo)) return;
 
