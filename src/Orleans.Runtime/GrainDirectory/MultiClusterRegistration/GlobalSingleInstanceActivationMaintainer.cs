@@ -222,24 +222,38 @@ namespace Orleans.Runtime.GrainDirectory
             var multiClusterConfig = this.multiClusterOracle.GetMultiClusterConfiguration();
             string clusterId = null;
 
-            // if we are still in a multi-cluster try to find out which cluster the silo belongs to
+            // If this silo is a part of a multi-cluster, try to find out which cluster the target silo belongs to.
+            // The check here is a simple ping used to check if the remote silo is available and, if so, which cluster
+            // it belongs to.
+            // This is a used to determine whether or not the local silo should invalidate directory cache entries
+            // pointing to the remote silo.
+            // A preferable approach would be to flow cluster membership or grain directory information from the remote
+            // cluster to the local one. That would avoid heuristic checks such as this. Additionally, information
+            // about which cluster a particular silo belongs (or belonged) to could be maintained. That would allow
+            // us to skip this first step.
             if (multiClusterConfig != null)
             {
                 try
                 {
-                    var validator = this.grainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, silo);
+                    var validator = this.grainFactory.GetSystemTarget<IClusterGrainDirectory>(
+                        Constants.ClusterDirectoryServiceId,
+                        silo);
                     clusterId = await validator.Ping();
                 }
-                catch { }
+                catch (Exception exception)
+                {
+                    // A failure here may indicate a transient error, but for simplicity we will continue as though
+                    // the remote silo is no longer a part of the multi-cluster.
+                    this.logger.LogWarning("Failed to ping remote silo {Silo}: {Exception}", silo, exception);
+                }
             }
 
             // if the silo could not be contacted or is not part of the multicluster, unregister
-            if (clusterId == null
-                || ! multiClusterConfig.Clusters.Contains(clusterId))
+            if (clusterId == null || !multiClusterConfig.Clusters.Contains(clusterId))
             {
-                logger.Debug("GSIP:M removing {count} cache entries pointing to {silo}", list.Count, silo);
+                this.logger.Debug("GSIP:M removing {Count} cache entries pointing to {Silo}", list.Count, silo);
 
-                var registrar = registrarManager.GetRegistrar(GlobalSingleInstanceRegistration.Singleton);
+                var registrar = this.registrarManager.GetRegistrar(GlobalSingleInstanceRegistration.Singleton);
 
                 foreach (var kvp in list)
                 {
