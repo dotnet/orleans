@@ -369,7 +369,7 @@ namespace Orleans.Runtime
             // check if the target activation already appears in the call chain.
             foreach (object invocationObj in prevChain)
             {
-                var prevId = ((RequestInvocationHistory)invocationObj).ActivationId;
+                var prevId = ((RequestInvocationHistorySummary)invocationObj).ActivationId;
                 if (prevId.Equals(nextActivationId))
                 {
                     return true;
