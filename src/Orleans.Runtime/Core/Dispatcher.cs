@@ -33,8 +33,8 @@ namespace Orleans.Runtime
         private readonly SchedulingOptions schedulingOptions;
         private readonly ILogger invokeWorkItemLogger;
         internal Dispatcher(
-            OrleansTaskScheduler scheduler,
-            ISiloMessageCenter transport,
+            OrleansTaskScheduler scheduler, 
+            ISiloMessageCenter transport, 
             Catalog catalog,
             IOptions<SiloMessagingOptions> messagingOptions,
             PlacementDirectorsManager placementDirectorsManager,
@@ -93,10 +93,10 @@ namespace Orleans.Runtime
             {
                 Task ignore;
                 ActivationData target = catalog.GetOrCreateActivation(
-                    message.TargetAddress,
+                    message.TargetAddress, 
                     message.IsNewPlacement,
                     message.NewGrainType,
-                    String.IsNullOrEmpty(message.GenericGrainType) ? null : message.GenericGrainType,
+                    String.IsNullOrEmpty(message.GenericGrainType) ? null : message.GenericGrainType, 
                     message.RequestContextData,
                     out ignore);
 
@@ -125,7 +125,7 @@ namespace Orleans.Runtime
                 try
                 {
                     MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "Non-existent activation");
-
+              
                     var nea = ex as Catalog.NonExistentActivationException;
                     if (nea == null)
                     {
@@ -199,9 +199,9 @@ namespace Orleans.Runtime
         }
 
         public void RejectMessage(
-            Message message,
-            Message.RejectionTypes rejectType,
-            Exception exc,
+            Message message, 
+            Message.RejectionTypes rejectType, 
+            Exception exc, 
             string rejectInfo = null)
         {
             if (message.Direction == Message.Directions.Request)
@@ -276,13 +276,13 @@ namespace Orleans.Runtime
                     {
                         try
                         {
-                            CheckDeadlock(targetActivation, message);
+                            CheckDeadlock(message);
                         }
                         catch (DeadlockException exc)
                         {
                             // Record that this message is no longer flowing through the system
                             MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "Deadlock");
-                            logger.Warn(ErrorCode.Dispatcher_DetectedDeadlock,
+                            logger.Warn(ErrorCode.Dispatcher_DetectedDeadlock, 
                                 "Detected Application Deadlock: {0}", exc.Message);
                             // We want to send DeadlockException back as an application exception, rather than as a system rejection.
                             SendResponse(message, Response.ExceptionResponse(exc));
@@ -316,19 +316,18 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Whether an incoming message can interleave
+        /// Whether an incoming message can interleave 
         /// </summary>
         /// <param name="targetActivation"></param>
         /// <param name="incoming"></param>
         /// <returns></returns>
         public bool CanInterleave(ActivationData targetActivation, Message incoming)
         {
-            bool canInterleave =
+            bool canInterleave = 
                    incoming.IsAlwaysInterleave
                 || targetActivation.Running == null
-                || targetActivation.Running.IsReadOnly && incoming.IsReadOnly
-                || schedulingOptions.AllowCallChainReentrancy
-                   && IsMessageACallChainLoop(incoming)
+                || (targetActivation.Running.IsReadOnly && incoming.IsReadOnly)
+                || (schedulingOptions.AllowCallChainReentrancy && targetActivation.ActivationId.Equals(incoming.SendingActivation))
                 || catalog.CanInterleave(targetActivation.ActivationId, incoming);
 
             return canInterleave;
@@ -337,78 +336,56 @@ namespace Orleans.Runtime
         /// <summary>
         /// https://github.com/dotnet/orleans/issues/3184
         /// Checks whether reentrancy is allowed for calls to grains that are already part of the call chain.
-        /// Covers following case: grain A calls grain B, and while executing the invoked method B calls back to A.
+        /// Covers following case: grain A calls grain B, and while executing the invoked method B calls back to A. 
         /// Design: Senders collection `RunningRequestsSenders` contains sending grains references
-        /// during duration of request processing. If target of outgoing request is found in that collection -
+        /// during duration of request processing. If target of outgoing request is found in that collection - 
         /// such request will be marked as interleaving in order to prevent deadlocks.
         /// </summary>
         private void MarkSameCallChainMessageAsInterleaving(ActivationData sendingActivation, Message outgoing)
         {
-            if (schedulingOptions.AllowCallChainReentrancy && IsMessageACallChainLoop(outgoing))
+            if (!schedulingOptions.AllowCallChainReentrancy)
+            {
+                return;
+            }
+
+            if (sendingActivation?.RunningRequestsSenders.Contains(outgoing.TargetActivation) == true)
             {
                 outgoing.IsAlwaysInterleave = true;
             }
         }
 
         /// <summary>
-        /// Check if the current message will cause a loop in the existing call chain
-        /// </summary>
-        /// <param name="message">Message to analyze</param>
-        /// <returns></returns>
-        private bool IsMessageACallChainLoop(Message message)
-        {
-            var requestContext = message.RequestContextData;
-
-            if (requestContext == null ||
-                !requestContext.TryGetValue(RequestContext.CALL_CHAIN_REQUEST_CONTEXT_HEADER, out object obj) ||
-                obj == null) return false; // first call in a chain
-
-            var prevChain = ((IList)obj);
-            ActivationId nextActivationId = message.TargetActivation;
-
-            // check if the target activation already appears in the call chain.
-            foreach (object invocationObj in prevChain)
-            {
-                var prevId = ((RequestInvocationHistorySummary)invocationObj).ActivationId;
-                if (prevId.Equals(nextActivationId))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        /// <summary>
         /// Check if the current message will cause deadlock.
         /// Throw DeadlockException if yes.
         /// </summary>
-        /// <param name="targetActivation"></param>
         /// <param name="message">Message to analyze</param>
-        private void CheckDeadlock(ActivationData targetActivation, Message message)
+        private void CheckDeadlock(Message message)
         {
-            if (IsMessageACallChainLoop(message) && !catalog.CanInterleave(targetActivation.ActivationId, message))
+            var requestContext = message.RequestContextData;
+            object obj;
+            if (requestContext == null ||
+                !requestContext.TryGetValue(RequestContext.CALL_CHAIN_REQUEST_CONTEXT_HEADER, out obj) ||
+                obj == null) return; // first call in a chain
+
+            var prevChain = ((IList)obj);
+            ActivationId nextActivationId = message.TargetActivation;
+            // check if the target activation already appears in the call chain.
+            foreach (object invocationObj in prevChain)
             {
-                IEnumerable<Tuple<GrainId, string>> callChain = Enumerable.Empty<Tuple<GrainId, string>>();
-                string exceptionMessage = string.Empty;
-                var requestContext = message.RequestContextData;
+                var prevId = ((RequestInvocationHistory)invocationObj).ActivationId;
+                if (!prevId.Equals(nextActivationId) || catalog.CanInterleave(nextActivationId, message)) continue;
 
-                if (requestContext != null
-                    && requestContext.TryGetValue(RequestContext.CALL_CHAIN_REQUEST_CONTEXT_HEADER, out object obj)
-                    && obj is IList prevChain)
-                {
-                    var newChain = new List<RequestInvocationHistory>();
-                    newChain.AddRange(prevChain.Cast<RequestInvocationHistory>());
-                    newChain.Add(new RequestInvocationHistory(message.TargetGrain, message.TargetActivation,
-                        message.DebugContext));
-
-                    exceptionMessage = Utils.EnumerableToString(newChain,
-                        elem => $"{elem.GrainId}.{elem.DebugContext}");
-                    callChain = newChain.Select(req => new Tuple<GrainId, string>(req.GrainId, req.DebugContext));
-                }
+                var newChain = new List<RequestInvocationHistory>();
+                newChain.AddRange(prevChain.Cast<RequestInvocationHistory>());
+                newChain.Add(new RequestInvocationHistory(message.TargetGrain, message.TargetActivation, message.DebugContext));
 
                 throw new DeadlockException(
-                    $"Deadlock Exception for grain call chain {exceptionMessage}.", callChain.ToList());
+                    String.Format(
+                        "Deadlock Exception for grain call chain {0}.",
+                        Utils.EnumerableToString(
+                            newChain,
+                            elem => String.Format("{0}.{1}", elem.GrainId, elem.DebugContext))),
+                    newChain.Select(req => new Tuple<GrainId, string>(req.GrainId, req.DebugContext)).ToList());
             }
         }
 
@@ -487,13 +464,13 @@ namespace Orleans.Runtime
         }
 
         internal void ProcessRequestToInvalidActivation(
-            Message message,
-            ActivationAddress oldAddress,
-            ActivationAddress forwardingAddress,
-            string failedOperation,
+            Message message, 
+            ActivationAddress oldAddress, 
+            ActivationAddress forwardingAddress, 
+            string failedOperation, 
             Exception exc = null)
         {
-            // Just use this opportunity to invalidate local Cache Entry as well.
+            // Just use this opportunity to invalidate local Cache Entry as well. 
             if (oldAddress != null)
             {
                 this.localGrainDirectory.InvalidateCacheEntry(oldAddress);
@@ -507,12 +484,12 @@ namespace Orleans.Runtime
         internal void ProcessRequestsToInvalidActivation(
             List<Message> messages,
             ActivationAddress oldAddress,
-            ActivationAddress forwardingAddress,
+            ActivationAddress forwardingAddress, 
             string failedOperation,
             Exception exc = null,
             bool rejectMessages = false)
         {
-            // Just use this opportunity to invalidate local Cache Entry as well.
+            // Just use this opportunity to invalidate local Cache Entry as well. 
             if (oldAddress != null)
             {
                 this.localGrainDirectory.InvalidateCacheEntry(oldAddress);
@@ -538,7 +515,7 @@ namespace Orleans.Runtime
                         {
                             TryForwardRequest(message, oldAddress, forwardingAddress, failedOperation, exc);
                         }
-
+                        
                     }
                 }
                 ), catalog.SchedulingContext);
@@ -668,7 +645,7 @@ namespace Orleans.Runtime
         /// - may buffer for transaction completion / commit if it ends a transaction
         /// - choose target placement address, maintaining send order
         /// - add ordering info and maintain send order
-        ///
+        /// 
         /// </summary>
         /// <param name="message"></param>
         /// <param name="sendingActivation"></param>
@@ -814,7 +791,7 @@ namespace Orleans.Runtime
 
         internal void SendSystemTargetMessage(Message message)
         {
-            message.Category = message.TargetGrain.Equals(Constants.MembershipOracleId) ?
+            message.Category = message.TargetGrain.Equals(Constants.MembershipOracleId) ? 
                 Message.Categories.Ping : Message.Categories.System;
 
             if (message.TargetSilo == null)
@@ -845,7 +822,7 @@ namespace Orleans.Runtime
         /// Invoked when an activation has finished a transaction and may be ready for additional transactions
         /// </summary>
         /// <param name="activation">The activation that has just completed processing this message</param>
-        /// <param name="message">The message that has just completed processing.
+        /// <param name="message">The message that has just completed processing. 
         /// This will be <c>null</c> for the case of completion of Activate/Deactivate calls.</param>
         internal void OnActivationCompletedRequest(ActivationData activation, Message message)
         {
@@ -892,7 +869,7 @@ namespace Orleans.Runtime
                 var nextMessage = activation.PeekNextWaitingMessage();
                 if (nextMessage == null) continue;
                 if (!ActivationMayAcceptRequest(activation, nextMessage)) continue;
-
+                
                 activation.DequeueNextWaitingMessage();
                 // we might be over-writing an already running read only request.
                 HandleIncomingRequest(nextMessage, activation);
