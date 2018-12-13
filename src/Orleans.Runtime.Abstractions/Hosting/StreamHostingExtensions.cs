@@ -20,7 +20,7 @@ namespace Orleans.Hosting
             Action<ISiloPersistentStreamConfigurator> configureStream)
         {
             //the constructor wire up DI with all default components of the streams , so need to be called regardless of configureStream null or not
-            var streamConfigurator = new SiloPersistentStreamConfigurator(name, builder, adapterFactory);
+            var streamConfigurator = new SiloPersistentStreamConfigurator(name, configureDelegate => builder.ConfigureServices(configureDelegate), adapterFactory);
             configureStream?.Invoke(streamConfigurator);
             return builder;
         }
@@ -60,11 +60,46 @@ namespace Orleans.Hosting
         /// Configure silo to use simple message provider
         /// </summary>
         public static IServiceCollection AddSiloSimpleMessageStreamProvider(this IServiceCollection services, string name,
-        Action<OptionsBuilder<SimpleMessageStreamProviderOptions>> configureOptions = null)
+            Action<OptionsBuilder<SimpleMessageStreamProviderOptions>> configureOptions = null)
         {
             configureOptions?.Invoke(services.AddOptions<SimpleMessageStreamProviderOptions>(name));
             return services.ConfigureNamedOptionForLogging<SimpleMessageStreamProviderOptions>(name)
                            .AddSingletonNamedService<IStreamProvider>(name, SimpleMessageStreamProvider.Create);
+        }
+
+        /// <summary>
+        /// Configure silo to use persistent streams.
+        /// </summary>
+        public static ISiloBuilder AddPersistentStreams(this ISiloBuilder builder, string name,
+            Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory,
+            Action<ISiloPersistentStreamConfigurator> configureStream)
+        {
+            //the constructor wire up DI with all default components of the streams , so need to be called regardless of configureStream null or not
+            var streamConfigurator = new SiloPersistentStreamConfigurator(name, configureDelegate => builder.ConfigureServices(configureDelegate), adapterFactory);
+            configureStream?.Invoke(streamConfigurator);
+            return builder;
+        }
+
+        /// <summary>
+        /// Configure silo to use SimpleMessageProvider
+        /// </summary>
+        public static ISiloBuilder AddSimpleMessageStreamProvider(this ISiloBuilder builder, string name,
+            Action<SimpleMessageStreamProviderOptions> configureOptions)
+
+        {
+            return builder.ConfigureServices(services =>
+                services.AddSiloSimpleMessageStreamProvider(name, configureOptions));
+        }
+
+        /// <summary>
+        /// Configure silo to use SimpleMessageProvider
+        /// </summary>
+        public static ISiloBuilder AddSimpleMessageStreamProvider(this ISiloBuilder builder, string name,
+            Action<OptionsBuilder<SimpleMessageStreamProviderOptions>> configureOptions = null)
+
+        {
+            return builder.ConfigureServices(services =>
+                services.AddSiloSimpleMessageStreamProvider(name, configureOptions));
         }
     }
 }

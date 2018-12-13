@@ -15,7 +15,10 @@ namespace Orleans.Hosting
              where TSerializer : class, IMemoryMessageBodySerializer
         {
             //the constructor wire up DI with all default components of the streams , so need to be called regardless of configureStream null or not
-            var memoryStreamConfiguretor = new SiloMemoryStreamConfigurator<TSerializer>(name, builder);
+            var memoryStreamConfiguretor = new SiloMemoryStreamConfigurator<TSerializer>(name,
+                configureDelegate => builder.ConfigureServices(configureDelegate),
+                configureDelegate => builder.ConfigureApplicationParts(configureDelegate)
+            );
             configure?.Invoke(memoryStreamConfiguretor);
             return builder;
         }

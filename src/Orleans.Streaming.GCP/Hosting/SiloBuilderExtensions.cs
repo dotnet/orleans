@@ -29,7 +29,9 @@ namespace Orleans.Hosting
             string name, Action<SiloPubSubStreamConfigurator<TDataAdapter>> configure)
             where TDataAdapter : IPubSubDataAdapter
         {
-            var configurator = new SiloPubSubStreamConfigurator<TDataAdapter>(name, builder);
+            var configurator = new SiloPubSubStreamConfigurator<TDataAdapter>(name,
+                configureServicesDelegate => builder.ConfigureServices(configureServicesDelegate),
+                configureAppPartsDelegate => builder.ConfigureApplicationParts(configureAppPartsDelegate));
             configure?.Invoke(configurator);
             return builder;
         }

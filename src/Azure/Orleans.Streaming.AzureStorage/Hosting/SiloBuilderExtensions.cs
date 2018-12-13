@@ -6,15 +6,17 @@ using Orleans.Streaming;
 namespace Orleans.Hosting
 {
     public static class SiloBuilderExtensions
-    { 
+    {
         /// <summary>
-        /// Configure silo to use azure queue persistent streams. 
+        /// Configure silo to use azure queue persistent streams.
         /// </summary>
         public static ISiloHostBuilder AddAzureQueueStreams<TDataAdapter>(this ISiloHostBuilder builder, string name,
             Action<SiloAzureQueueStreamConfigurator<TDataAdapter>> configure)
            where TDataAdapter : IAzureQueueDataAdapter
         {
-            var configurator = new SiloAzureQueueStreamConfigurator<TDataAdapter>(name, builder);
+            var configurator = new SiloAzureQueueStreamConfigurator<TDataAdapter>(name,
+                configureServicesDelegate => builder.ConfigureServices(configureServicesDelegate),
+                configureAppPartsDelegate => builder.ConfigureApplicationParts(configureAppPartsDelegate));
             configure?.Invoke(configurator);
             return builder;
         }

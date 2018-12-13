@@ -89,6 +89,58 @@ namespace Orleans.Hosting
             return builder;
         }
 
+        /// <summary>
+        /// Adds a startup task to be executed when the silo has started.
+        /// </summary>
+        /// <param name="builder">
+        /// The builder.
+        /// </param>
+        /// <param name="startupTask">
+        /// The startup task.
+        /// </param>
+        /// <param name="stage">
+        /// The stage to execute the startup task, see values in <see cref="ServiceLifecycleStage"/>.
+        /// </param>
+        /// <returns>
+        /// The provided <see cref="ISiloBuilder"/>.
+        /// </returns>
+        public static ISiloBuilder AddStartupTask(
+            this ISiloBuilder builder,
+            IStartupTask startupTask,
+            int stage = ServiceLifecycleStage.Active)
+        {
+            return builder.AddStartupTask((sp, ct) => startupTask.Execute(ct), stage);
+        }
+
+        /// <summary>
+        /// Adds a startup task to be executed when the silo has started.
+        /// </summary>
+        /// <param name="builder">
+        /// The builder.
+        /// </param>
+        /// <param name="startupTask">
+        /// The startup task.
+        /// </param>
+        /// <param name="stage">
+        /// The stage to execute the startup task, see values in <see cref="ServiceLifecycleStage"/>.
+        /// </param>
+        /// <returns>
+        /// The provided <see cref="ISiloBuilder"/>.
+        /// </returns>
+        public static ISiloBuilder AddStartupTask(
+            this ISiloBuilder builder,
+            Func<IServiceProvider, CancellationToken, Task> startupTask,
+            int stage = ServiceLifecycleStage.Active)
+        {
+            builder.ConfigureServices(services =>
+                services.AddTransient<ILifecycleParticipant<ISiloLifecycle>>(sp =>
+                    new StartupTask(
+                        sp,
+                        startupTask,
+                        stage)));
+            return builder;
+        }
+
         /// <inheritdoc />
         private class StartupTask : ILifecycleParticipant<ISiloLifecycle>
         {

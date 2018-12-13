@@ -40,15 +40,15 @@ namespace Orleans.Streams
     public class SiloPersistentStreamConfigurator : ISiloPersistentStreamConfigurator
     {
         protected readonly string name;
-        protected readonly ISiloHostBuilder siloBuilder;
+        protected readonly Action<Action<IServiceCollection>> configureDelegate;
         private Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory;
-        public SiloPersistentStreamConfigurator(string name, ISiloHostBuilder siloBuilder, Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory)
+        public SiloPersistentStreamConfigurator(string name, Action<Action<IServiceCollection>> configureDelegate, Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory)
         {
             this.name = name;
-            this.siloBuilder = siloBuilder;
+            this.configureDelegate = configureDelegate;
             this.adapterFactory = adapterFactory;
-            //wire stream provider into lifecycle 
-            this.siloBuilder.ConfigureServices(services => this.AddPersistentStream(services));
+            //wire stream provider into lifecycle
+            this.configureDelegate(services => this.AddPersistentStream(services));
         }
 
         private void AddPersistentStream(IServiceCollection services)
@@ -65,9 +65,9 @@ namespace Orleans.Streams
         }
 
         public ISiloPersistentStreamConfigurator Configure<TOptions>(Action<OptionsBuilder<TOptions>> configureOptions)
-            where TOptions: class, new()
+            where TOptions : class, new()
         {
-            siloBuilder.ConfigureServices(services =>
+            this.configureDelegate(services =>
             {
                 configureOptions?.Invoke(services.AddOptions<TOptions>(this.name));
                 services.ConfigureNamedOptionForLogging<TOptions>(this.name);
@@ -77,7 +77,7 @@ namespace Orleans.Streams
 
         public ISiloPersistentStreamConfigurator ConfigureComponent<TOptions, TComponent>(Func<IServiceProvider, string, TComponent> factory, Action<OptionsBuilder<TOptions>> configureOptions = null)
             where TOptions : class, new()
-            where TComponent: class
+            where TComponent : class
         {
             this.Configure<TOptions>(configureOptions);
             this.ConfigureComponent<TComponent>(factory);
@@ -87,7 +87,7 @@ namespace Orleans.Streams
         public ISiloPersistentStreamConfigurator ConfigureComponent<TComponent>(Func<IServiceProvider, string, TComponent> factory)
            where TComponent : class
         {
-            siloBuilder.ConfigureServices(services =>
+            this.configureDelegate(services =>
             {
                 services.AddSingletonNamedService<TComponent>(name, factory);
             });

@@ -16,7 +16,9 @@ namespace Orleans.Hosting
             string name,
             Action<SiloEventHubStreamConfigurator> configure)
         {
-            var configurator = new SiloEventHubStreamConfigurator(name, builder);
+            var configurator = new SiloEventHubStreamConfigurator(name,
+                configureServicesDelegate => builder.ConfigureServices(configureServicesDelegate),
+                configureAppPartsDelegate => builder.ConfigureApplicationParts(configureAppPartsDelegate));
             configure?.Invoke(configurator);
             return builder;
         }

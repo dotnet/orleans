@@ -23,7 +23,9 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloHostBuilder AddSqsStreams(this ISiloHostBuilder builder, string name, Action<SiloSqsStreamConfigurator> configure)
         {
-            var configurator = new SiloSqsStreamConfigurator(name, builder);
+            var configurator = new SiloSqsStreamConfigurator(name,
+                configureServicesDelegate => builder.ConfigureServices(configureServicesDelegate),
+                configureAppPartsDelegate => builder.ConfigureApplicationParts(configureAppPartsDelegate));
             configure?.Invoke(configurator);
             return builder;
         }

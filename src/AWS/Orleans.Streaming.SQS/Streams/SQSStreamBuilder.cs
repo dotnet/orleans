@@ -5,26 +5,28 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using Orleans.Providers.Streams.Common;
+using Orleans.ApplicationParts;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Streams
 {
-    public class SiloSqsStreamConfigurator: SiloPersistentStreamConfigurator
+    public class SiloSqsStreamConfigurator : SiloPersistentStreamConfigurator
     {
-        public SiloSqsStreamConfigurator(string name, ISiloHostBuilder builder)
-            : base(name, builder, SQSAdapterFactory.Create)
+        public SiloSqsStreamConfigurator(string name, Action<Action<IServiceCollection>> configureServicesDelegate, Action<Action<IApplicationPartManager>> configureAppPartsDelegate)
+            : base(name, configureServicesDelegate, SQSAdapterFactory.Create)
         {
-            this.siloBuilder
-                .ConfigureApplicationParts(parts =>
-                {
-                    parts.AddFrameworkPart(typeof(SQSAdapterFactory).Assembly)
-                        .AddFrameworkPart(typeof(EventSequenceTokenV2).Assembly);
-                })
-                .ConfigureServices(services =>
-                {
-                    services.ConfigureNamedOptionForLogging<SqsOptions>(name)
-                        .ConfigureNamedOptionForLogging<SimpleQueueCacheOptions>(name)
-                        .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name);
-                });
+            configureAppPartsDelegate(parts =>
+            {
+                parts.AddFrameworkPart(typeof(SQSAdapterFactory).Assembly)
+                    .AddFrameworkPart(typeof(EventSequenceTokenV2).Assembly);
+            });
+
+            this.configureDelegate(services =>
+            {
+                services.ConfigureNamedOptionForLogging<SqsOptions>(name)
+                    .ConfigureNamedOptionForLogging<SimpleQueueCacheOptions>(name)
+                    .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name);
+            });
         }
 
         public SiloSqsStreamConfigurator ConfigureSqs(Action<OptionsBuilder<SqsOptions>> configureOptions)

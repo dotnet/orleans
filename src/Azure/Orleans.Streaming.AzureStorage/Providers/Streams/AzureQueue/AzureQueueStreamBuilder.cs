@@ -8,29 +8,29 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Providers.Streams.Common;
+using Orleans.ApplicationParts;
 
 namespace Orleans.Streaming
 {
     public class SiloAzureQueueStreamConfigurator<TDataAdapter> : SiloPersistentStreamConfigurator
         where TDataAdapter : IAzureQueueDataAdapter
     {
-        public SiloAzureQueueStreamConfigurator(string name, ISiloHostBuilder builder)
-            : base(name, builder, AzureQueueAdapterFactory<TDataAdapter>.Create)
+        public SiloAzureQueueStreamConfigurator(string name, Action<Action<IServiceCollection>> configureServicesDelegate, Action<Action<IApplicationPartManager>> configureAppPartsDelegate)
+            : base(name, configureServicesDelegate, AzureQueueAdapterFactory<TDataAdapter>.Create)
         {
-            this.siloBuilder
-                .ConfigureApplicationParts(parts =>
+            configureAppPartsDelegate(parts =>
                 {
                     parts.AddFrameworkPart(typeof(AzureQueueAdapterFactory<>).Assembly)
                         .AddFrameworkPart(typeof(EventSequenceTokenV2).Assembly);
-                })
-                .ConfigureServices(services =>
-                {
-                    services.ConfigureNamedOptionForLogging<AzureQueueOptions>(name)
-                            .AddTransient<IConfigurationValidator>(sp => new AzureQueueOptionsValidator(sp.GetOptionsByName<AzureQueueOptions>(name), name))
-                        .ConfigureNamedOptionForLogging<SimpleQueueCacheOptions>(name)
-                        .AddTransient<IConfigurationValidator>(sp => new SimpleQueueCacheOptionsValidator(sp.GetOptionsByName<SimpleQueueCacheOptions>(name), name))
-                        .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name);
                 });
+            this.configureDelegate(services =>
+            {
+                services.ConfigureNamedOptionForLogging<AzureQueueOptions>(name)
+                        .AddTransient<IConfigurationValidator>(sp => new AzureQueueOptionsValidator(sp.GetOptionsByName<AzureQueueOptions>(name), name))
+                    .ConfigureNamedOptionForLogging<SimpleQueueCacheOptions>(name)
+                    .AddTransient<IConfigurationValidator>(sp => new SimpleQueueCacheOptionsValidator(sp.GetOptionsByName<SimpleQueueCacheOptions>(name), name))
+                    .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name);
+            });
             //configure default queue names
             this.ConfigureAzureQueue(ob => ob.PostConfigure<IOptions<ClusterOptions>>((op, clusterOp) =>
             {
@@ -55,7 +55,7 @@ namespace Orleans.Streaming
             return this;
         }
     }
-    
+
     public class ClusterClientAzureQueueStreamConfigurator<TDataAdapter> : ClusterClientPersistentStreamConfigurator
           where TDataAdapter : IAzureQueueDataAdapter
     {
