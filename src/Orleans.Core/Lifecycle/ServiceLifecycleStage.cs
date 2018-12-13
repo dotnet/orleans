@@ -7,7 +7,7 @@ namespace Orleans
     public static class ServiceLifecycleStage
     {
         /// <summary>
-        /// First stage in service's lifecycle
+        /// First valid stage in service's lifecycle
         /// </summary>
         public const int First = int.MinValue;
 
@@ -50,7 +50,7 @@ namespace Orleans
         public const int Active = 20000;
 
         /// <summary>
-        /// Last stage in service's lifecycle
+        /// Last valid stage in service's lifecycle
         /// </summary>
         public const int Last = int.MaxValue;
     }
