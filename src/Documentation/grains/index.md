@@ -3,15 +3,15 @@ layout: page
 title: Developing a Grain
 ---
 
-### Setup
+# Setup
 
-Before you write code to implement a grain class, create a new Class Library project targeting .NET 4.6.1 or higher in Visual Studio and add the `Microsoft.Orleans.OrleansCodeGenerator.Build` NuGet package to it.
+Before you write code to implement a grain class, create a new Class Library project targeting .NET 4.6.1 or higher in Visual Studio and add the `Microsoft.Orleans.CodeGenerator.MSBuild` NuGet package to it.
 
+``` powershell
+PM> Install-Package Microsoft.Orleans.CodeGenerator.MSBuild
 ```
-PM> Install-Package Microsoft.Orleans.OrleansCodeGenerator.Build
-```
 
-### Grain Interfaces and Classes
+# Grain Interfaces and Classes
 
 Grains interact with each other and get called from outside by invoking methods declared as part of the respective grain interfaces.
 A grain class implements one or more previously declared grain interfaces.
@@ -44,7 +44,7 @@ public class PlayerGrain : Grain, IPlayerGrain
     {
        currentGame = game;
        Console.WriteLine(
-           "Player {0} joined game {1}", 
+           "Player {0} joined game {1}",
            this.GetPrimaryKey(),
            game.GetPrimaryKey());
 
@@ -65,10 +65,11 @@ public class PlayerGrain : Grain, IPlayerGrain
 }
 ```
 
-### Returning Values from Grain Methods
+# Returning Values from Grain Methods
 
 A grain method that returns a value of type `T` is defined in a grain interface as returning a `Task<T>`.
 For grain methods not marked with the `async` keyword, when the return value is available, it is usually returned via the following statement:
+
 ```csharp
 public Task<SomeType> GrainMethod1()
 {
@@ -80,6 +81,7 @@ public Task<SomeType> GrainMethod1()
 A grain method that returns no value, effectively a void method, is defined in a grain interface as returning a `Task`.
 The returned `Task` indicates asynchronous execution and completion of the method.
 For grain methods not marked with the `async` keyword, when a "void" method completes its execution, it needs to return the special value of `Task.CompletedTask`:
+
 ```csharp
 public Task GrainMethod2()
 {
@@ -89,6 +91,7 @@ public Task GrainMethod2()
 ```
 
 A grain method marked as `async` returns the value directly:
+
 ```csharp
 public async Task<SomeType> GrainMethod3()
 {
@@ -96,7 +99,9 @@ public async Task<SomeType> GrainMethod3()
     return <variable or constant with result>;
 }
 ```
+
 A "void" grain methods marked as `async` that returns no value simply returns at the end of their execution:
+
 ```csharp
 public async Task GrainMethod4()
 {
@@ -106,6 +111,7 @@ public async Task GrainMethod4()
 ```
 
 If a grain method receives the return value from another asynchronous method call, to a grain or not, and doesn't need to perform error handling of that call, it can simply return the `Task` it receives from that asynchronous call as its return value:
+
 ```csharp
 public Task<SomeType> GrainMethod5()
 {
@@ -114,7 +120,9 @@ public Task<SomeType> GrainMethod5()
     return task;
 }
 ```
+
 Similarly, a "void" grain method can return a `Task` returned to it by another call instead of awaiting it.
+
 ```csharp
 public Task GrainMethod6()
 {
@@ -124,7 +132,7 @@ public Task GrainMethod6()
 }
 ```
 
-### Grain Reference
+# Grain Reference
 
 A Grain Reference is a proxy object that implements the same grain interface as the corresponding grain class.
 It encapsulates a logical identity (type and unique key) of the target grain.
@@ -133,9 +141,9 @@ Each grain reference is for a single grain (a single instance of the grain class
 
 Since a grain reference represents a logical identity of the target grain, it is independent from the physical location of the grain, and stays valid even after a complete restart of the system.
 Developers can use grain references like any other .NET object.
-It can be passed to a method, used as a method return value, etc., and even saved to persistent storage. 
+It can be passed to a method, used as a method return value, etc., and even saved to persistent storage.
 
-A grain reference can be obtained by passing the identity of a grain to the `GrainFactory.GetGrain<T>(key)` method, where `T` is the grain interface and `key` is the unique key of the grain within the type. 
+A grain reference can be obtained by passing the identity of a grain to the `GrainFactory.GetGrain<T>(key)` method, where `T` is the grain interface and `key` is the unique key of the grain within the type.
 
 The following are examples of how to obtain a grain reference of the `IPlayerGrain` interface defined above.
 
@@ -149,16 +157,18 @@ From inside a grain class:
 From Orleans Client code.
 
 Prior to 1.5.0:
+
 ```csharp
     IPlayerGrain player = GrainClient.GrainFactory.GetGrain<IPlayerGrain>(playerId);
 ```
 
 Since 1.5.0:
+
 ```csharp
     IPlayerGrain player = client.GetGrain<IPlayerGrain>(playerId);
 ```
 
-### Grain Method Invocation
+# Grain Method Invocation
 
 The Orleans programming model is based on the [Asynchronous Programming with Async and Await](https://msdn.microsoft.com/en-us/library/hh191443.aspx).
 
@@ -197,11 +207,10 @@ await joinedTask;
 // Execution of the rest of the method will continue asynchronously after joinedTask is resolve.
 ```
 
-### Virtual methods
+# Virtual methods
 
 A grain class can optionally override `OnActivateAsync` and `OnDeactivateAsync` virtual methods that get invoked by the Orleans runtime upon activation and deactivation of each grain of the class.
 This gives the grain code a chance to perform additional initialization and cleanup operations.
 An exception thrown by `OnActivateAsync` fails the activation process.
 While `OnActivateAsync`, if overridden, is always called as part of the grain activation process, `OnDeactivateAsync` is not guaranteed to get called in all situations, for example, in case of a server failure or other abnormal events.
 Because of that, applications should not rely on OnDeactivateAsync for performing critical operations, such as persistence of state changes, and only use it for best effort operations.
-
