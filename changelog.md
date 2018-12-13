@@ -7,6 +7,24 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [2.2.0] (changes since 2.2.0-rc1)
+
+- Breaking changes
+  - None
+
+- Non-breaking improvements
+  - Fix AzureSilo startup (#5213)
+  - UniqueKey serialization optimizations (#5193)
+  - Expedite TypeManager refresh upon cluster membership change  (#5233)
+  - Ensure OrleansProviders is added as an ApplicationPart in streams providers (#5234)
+  - Update ZooKeeperNetEx package to 3.4.12.1 (#5236)
+  - Include exception in TryForwardRequest info log (#5238)
+  - Improve logging of stream delivery errors. (#5230)
+
+- Non-breaking bug fixes
+  - Support ProxyGatewayEndpoint from legacy configuration (#5214)
+  - Add GSI cache maintentance and tests (#5184)
+
 ### [2.2.0-rc1] (changes since 2.2.0-beta1)
 
 - Breaking changes
