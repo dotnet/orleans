@@ -34,6 +34,28 @@ namespace Orleans.Hosting
         }
 
         /// <summary>Adds reminder storage using ADO.NET.</summary>
+        /// <param name="builder">The builder.</param>
+        /// <param name="configureOptions">Configuration delegate.</param>
+        /// <returns>The provided <see cref="ISiloBuilder"/>, for chaining.</returns>
+        public static ISiloBuilder UseAdoNetReminderService(
+            this ISiloBuilder builder,
+            Action<AdoNetReminderTableOptions> configureOptions)
+        {
+            return builder.UseAdoNetReminderService(ob => ob.Configure(configureOptions));
+        }
+
+        /// <summary>Adds reminder storage using ADO.NET.</summary>
+        /// <param name="builder">The builder.</param>
+        /// <param name="configureOptions">Configuration delegate.</param>
+        /// <returns>The provided <see cref="ISiloBuilder"/>, for chaining.</returns>
+        public static ISiloBuilder UseAdoNetReminderService(
+            this ISiloBuilder builder,
+            Action<OptionsBuilder<AdoNetReminderTableOptions>> configureOptions)
+        {
+            return builder.ConfigureServices(services => services.UseAdoNetReminderService(configureOptions));
+        }
+
+        /// <summary>Adds reminder storage using ADO.NET.</summary>
         /// <param name="services">The service collection.</param>
         /// <param name="configureOptions">Configuration delegate.</param>
         /// <returns>The provided <see cref="ISiloHostBuilder"/>, for chaining.</returns>

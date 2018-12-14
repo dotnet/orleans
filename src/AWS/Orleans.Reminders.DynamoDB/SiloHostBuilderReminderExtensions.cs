@@ -31,6 +31,24 @@ namespace Orleans.Hosting
         /// <summary>
         /// Adds reminder storage backed by Amazon DynamoDB.
         /// </summary>
+        /// <param name="builder">
+        /// The builder.
+        /// </param>
+        /// <param name="configure">
+        /// The delegate used to configure the reminder store.
+        /// </param>
+        /// <returns>
+        /// The provided <see cref="ISiloBuilder"/>, for chaining.
+        /// </returns>
+        public static ISiloBuilder UseDynamoDBReminderService(this ISiloBuilder builder, Action<DynamoDBReminderStorageOptions> configure)
+        {
+            builder.ConfigureServices(services => services.UseDynamoDBReminderService(configure));
+            return builder;
+        }
+
+        /// <summary>
+        /// Adds reminder storage backed by Amazon DynamoDB.
+        /// </summary>
         /// <param name="services">
         /// The service collection.
         /// </param>

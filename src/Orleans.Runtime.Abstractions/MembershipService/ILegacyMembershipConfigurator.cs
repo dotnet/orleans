@@ -31,6 +31,13 @@ namespace Orleans.Runtime.MembershipService
         /// <param name="configuration">The legacy GlobalConfiguration object.</param>
         /// <param name="builder">The silo host builder.</param>
         void Configure(object configuration, ISiloHostBuilder builder);
+
+        /// <summary>
+        /// Configures the provided <paramref name="builder"/> using <paramref name="configuration"/>.
+        /// </summary>
+        /// <param name="configuration">The legacy GlobalConfiguration object.</param>
+        /// <param name="builder">The silo builder.</param>
+        void Configure(object configuration, ISiloBuilder builder);
     }
 
     /// <summary>
@@ -40,7 +47,7 @@ namespace Orleans.Runtime.MembershipService
     {
         private readonly object configuration;
         private readonly Type type;
-        
+
         public GlobalConfigurationReader(object configuration)
         {
             this.configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));

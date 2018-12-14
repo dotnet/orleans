@@ -13,8 +13,30 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloHostBuilder AddSqsStreams(this ISiloHostBuilder builder, string name, Action<SqsOptions> configureOptions)
         {
-            builder.AddSqsStreams(name, b=>
+            builder.AddSqsStreams(name, b =>
                 b.ConfigureSqs(ob => ob.Configure(configureOptions)));
+            return builder;
+        }
+
+        /// <summary>
+        /// Configure silo to use SQS persistent streams.
+        /// </summary>
+        public static ISiloBuilder AddSqsStreams(this ISiloBuilder builder, string name, Action<SqsOptions> configureOptions)
+        {
+            builder.AddSqsStreams(name, b =>
+                b.ConfigureSqs(ob => ob.Configure(configureOptions)));
+            return builder;
+        }
+
+        /// <summary>
+        /// Configure silo to use SQS persistent streams.
+        /// </summary>
+        public static ISiloBuilder AddSqsStreams(this ISiloBuilder builder, string name, Action<SiloSqsStreamConfigurator> configure)
+        {
+            var configurator = new SiloSqsStreamConfigurator(name,
+                configureServicesDelegate => builder.ConfigureServices(configureServicesDelegate),
+                configureAppPartsDelegate => builder.ConfigureApplicationParts(configureAppPartsDelegate));
+            configure?.Invoke(configurator);
             return builder;
         }
 

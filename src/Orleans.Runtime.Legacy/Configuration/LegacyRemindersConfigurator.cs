@@ -73,5 +73,64 @@ namespace Orleans.Runtime.MembershipService
                         $"The {nameof(configuration.ReminderServiceType)} value {serviceType} is not supported.");
             }
         }
+
+        /// <summary>
+        /// Configures reminders using legacy configuration.
+        /// </summary>
+        /// <param name="configuration">The configuration.</param>
+        /// <param name="builder"></param>
+        internal static void Configure(GlobalConfiguration configuration, ISiloBuilder builder)
+        {
+            var serviceType = configuration.ReminderServiceType;
+
+            switch (serviceType)
+            {
+                case GlobalConfiguration.ReminderServiceProviderType.AdoNet:
+                {
+                    var adapter = LegacyAssemblyLoader.LoadAndCreateInstance<ILegacyReminderTableAdapter>(Constants.ORLEANS_REMINDERS_ADONET);
+                    adapter.Configure(configuration, builder);
+                    break;
+                }
+
+                case GlobalConfiguration.ReminderServiceProviderType.AzureTable:
+                {
+                    var adapter = LegacyAssemblyLoader.LoadAndCreateInstance<ILegacyReminderTableAdapter>(Constants.ORLEANS_REMINDERS_AZURESTORAGE);
+                    adapter.Configure(configuration, builder);
+                    break;
+                }
+
+                case GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain:
+                    builder.UseInMemoryReminderService();
+                    break;
+
+                case GlobalConfiguration.ReminderServiceProviderType.MockTable:
+                    builder.ConfigureServices(services =>
+                    {
+                        services.AddSingleton<IReminderTable, MockReminderTable>();
+                        services.AddOptions<MockReminderTableOptions>()
+                            .Configure<GlobalConfiguration>((options, config) => { options.OperationDelay = config.MockReminderTableTimeout; });
+                        services.ConfigureFormatter<MockReminderTableOptions>();
+                    });
+                    break;
+
+                case GlobalConfiguration.ReminderServiceProviderType.Custom:
+                    builder.ConfigureServices(services => services.AddSingleton<IReminderTable>(
+                        serviceProvider =>
+                        {
+                            var logger = serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("ReminderTableFactory");
+                            return AssemblyLoader.LoadAndCreateInstance<IReminderTable>(configuration.ReminderTableAssembly, logger, serviceProvider);
+                        }));
+                    break;
+
+                case GlobalConfiguration.ReminderServiceProviderType.NotSpecified:
+                case GlobalConfiguration.ReminderServiceProviderType.Disabled:
+                    break;
+
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(configuration.ReminderServiceType),
+                        $"The {nameof(configuration.ReminderServiceType)} value {serviceType} is not supported.");
+            }
+        }
     }
 }

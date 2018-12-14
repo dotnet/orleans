@@ -15,5 +15,15 @@ namespace Orleans.Runtime.MembershipService
                 options.Address = new Uri(reader.GetPropertyValue<string>("DataConnectionString"));
             });
         }
+
+        public void Configure(object configuration, ISiloBuilder builder)
+        {
+            var reader = new GlobalConfigurationReader(configuration);
+
+            builder.UseConsulClustering(options =>
+            {
+                options.Address = new Uri(reader.GetPropertyValue<string>("DataConnectionString"));
+            });
+        }
     }
 }

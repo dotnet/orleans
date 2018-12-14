@@ -85,5 +85,16 @@ namespace Orleans.Clustering.DynamoDB
                     options.WriteCapacityUnits = int.Parse(value[1]);
             }
         }
+
+        public void Configure(object configuration, ISiloBuilder builder)
+        {
+            var reader = new GlobalConfigurationReader(configuration);
+
+            builder.UseDynamoDBClustering(options =>
+            {
+                var cs = reader.GetPropertyValue<string>("DataConnectionString");
+                ParseDataConnectionString(cs, options);
+            });
+        }
     }
 }

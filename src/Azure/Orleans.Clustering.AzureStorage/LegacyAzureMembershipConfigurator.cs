@@ -20,5 +20,15 @@ namespace Orleans.Runtime.MembershipService
                 options.ConnectionString = reader.GetPropertyValue<string>("DataConnectionString");
             });
         }
+
+        public void Configure(object configuration, ISiloBuilder builder)
+        {
+            builder.UseAzureStorageClustering(options =>
+            {
+                var reader = new GlobalConfigurationReader(configuration);
+                options.MaxStorageBusyRetries = reader.GetPropertyValue<int>("MaxStorageBusyRetries");
+                options.ConnectionString = reader.GetPropertyValue<string>("DataConnectionString");
+            });
+        }
     }
 }

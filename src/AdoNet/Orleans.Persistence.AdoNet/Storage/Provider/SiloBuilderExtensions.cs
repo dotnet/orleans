@@ -45,6 +45,38 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
+        /// Configure silo to use AdoNet grain storage as the default grain storage.
+        /// </summary>
+        public static ISiloBuilder AddAdoNetGrainStorageAsDefault(this ISiloBuilder builder, Action<AdoNetGrainStorageOptions> configureOptions)
+        {
+            return builder.AddAdoNetGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
+        }
+
+        /// <summary>
+        /// Configure silo to use  AdoNet grain storage for grain storage.
+        /// </summary>
+        public static ISiloBuilder AddAdoNetGrainStorage(this ISiloBuilder builder, string name, Action<AdoNetGrainStorageOptions> configureOptions)
+        {
+            return builder.ConfigureServices(services => services.AddAdoNetGrainStorage(name, configureOptions));
+        }
+
+        /// <summary>
+        /// Configure silo to use  AdoNet grain storage as the default grain storage.
+        /// </summary>
+        public static ISiloBuilder AddAdoNetGrainStorageAsDefault(this ISiloBuilder builder, Action<OptionsBuilder<AdoNetGrainStorageOptions>> configureOptions = null)
+        {
+            return builder.AddAdoNetGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
+        }
+
+        /// <summary>
+        /// Configure silo to use AdoNet grain storage for grain storage.
+        /// </summary>
+        public static ISiloBuilder AddAdoNetGrainStorage(this ISiloBuilder builder, string name, Action<OptionsBuilder<AdoNetGrainStorageOptions>> configureOptions = null)
+        {
+            return builder.ConfigureServices(services => services.AddAdoNetGrainStorage(name, configureOptions));
+        }
+
+        /// <summary>
         /// Configure silo to use  AdoNet grain storage as the default grain storage.
         /// </summary>
         public static IServiceCollection AddAdoNetGrainStorage(this IServiceCollection services, Action<AdoNetGrainStorageOptions> configureOptions)

@@ -67,6 +67,60 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
+        /// Configures this silo to use ADO.NET for clustering.
+        /// </summary>
+        /// <param name="builder">
+        /// The builder.
+        /// </param>
+        /// <param name="configureOptions">
+        /// The configuration delegate.
+        /// </param>
+        /// <returns>
+        /// The provided <see cref="ISiloBuilder"/>.
+        /// </returns>
+        public static ISiloBuilder UseAdoNetClustering(
+            this ISiloBuilder builder,
+            Action<AdoNetClusteringSiloOptions> configureOptions)
+        {
+            return builder.ConfigureServices(
+                services =>
+                {
+                    if (configureOptions != null)
+                    {
+                        services.Configure(configureOptions);
+                    }
+
+                    services.AddSingleton<IMembershipTable, AdoNetClusteringTable>();
+                    services.AddSingleton<IConfigurationValidator, AdoNetClusteringSiloOptionsValidator>();
+                });
+        }
+
+        /// <summary>
+        /// Configures this silo to use ADO.NET for clustering.
+        /// </summary>
+        /// <param name="builder">
+        /// The builder.
+        /// </param>
+        /// <param name="configureOptions">
+        /// The configuration delegate.
+        /// </param>
+        /// <returns>
+        /// The provided <see cref="ISiloBuilder"/>.
+        /// </returns>
+        public static ISiloBuilder UseAdoNetClustering(
+            this ISiloBuilder builder,
+            Action<OptionsBuilder<AdoNetClusteringSiloOptions>> configureOptions)
+        {
+            return builder.ConfigureServices(
+                services =>
+                {
+                    configureOptions?.Invoke(services.AddOptions<AdoNetClusteringSiloOptions>());
+                    services.AddSingleton<IMembershipTable, AdoNetClusteringTable>();
+                    services.AddSingleton<IConfigurationValidator, AdoNetClusteringSiloOptionsValidator>();
+                });
+        }
+
+        /// <summary>
         /// Configures this client to use ADO.NET for clustering.
         /// </summary>
         /// <param name="builder">
