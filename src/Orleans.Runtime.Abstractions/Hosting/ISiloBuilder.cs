@@ -20,6 +20,6 @@ namespace Orleans.Hosting
         /// <param name="configureDelegate">The delegate for configuring the <see cref="IServiceCollection"/> that will be used
         /// to construct the <see cref="IServiceProvider"/>.</param>
         /// <returns>The same instance of the host builder for chaining.</returns>
-        ISiloBuilder ConfigureServices(Action<HostBuilderContext, IServiceCollection> configureDelegate);
+        ISiloBuilder ConfigureServices(Action<Microsoft.Extensions.Hosting.HostBuilderContext, IServiceCollection> configureDelegate);
     }
 }

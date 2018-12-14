@@ -55,7 +55,7 @@ namespace Orleans.Hosting
         /// <param name="builder">The <see cref="ISiloBuilder" /> to configure.</param>
         /// <param name="configureLogging">The delegate that configures the <see cref="ILoggingBuilder"/>.</param>
         /// <returns>The same instance of the <see cref="ISiloBuilder"/> for chaining.</returns>
-        public static ISiloBuilder ConfigureLogging(this ISiloBuilder builder, Action<HostBuilderContext, ILoggingBuilder> configureLogging)
+        public static ISiloBuilder ConfigureLogging(this ISiloBuilder builder, Action<Microsoft.Extensions.Hosting.HostBuilderContext, ILoggingBuilder> configureLogging)
         {
             return builder.ConfigureServices((context, collection) => collection.AddLogging(loggingBuilder => configureLogging(context, loggingBuilder)));
         }

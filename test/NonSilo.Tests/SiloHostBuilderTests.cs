@@ -4,6 +4,7 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -60,6 +61,22 @@ namespace NonSilo.Tests
     [TestCategory("SiloHostBuilder")]
     public class SiloHostBuilderTests
     {
+
+        [Fact]
+        public void SiloBuilderTest()
+        {
+            var host = new HostBuilder()
+                .AddOrleans(siloBuilder =>
+                {
+                    siloBuilder
+                        .UseLocalhostClustering()
+                        .EnableDirectClient();
+                })
+                .Build();
+
+            var clusterClient = host.Services.GetRequiredService<IClusterClient>();
+        }
+
         /// <summary>
         /// Tests that a silo cannot be created without specifying a ClusterId and a ServiceId.
         /// </summary>
