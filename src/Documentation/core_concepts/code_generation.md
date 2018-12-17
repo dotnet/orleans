@@ -2,6 +2,7 @@
 layout: page
 title: Code Generation
 ---
+
 # Code Generation
 
 The Orleans runtime makes use of generated code in order to ensure proper serialization of types that are used across the cluster as well as for generating boilerplate which abstracts away the implementation details of method shipping, exception propagation, and other internal runtime concepts.
@@ -12,9 +13,14 @@ Code generation can be performed either when your projects are being built or wh
 
 ### During Build
 
-The preferred method for performing code generation is at build time. Enable build time code generation by installing the `Microsoft.Orleans.OrleansCodeGenerator.Build` package into all projects which contain grains, grain interfaces, custom serializers, or types which are sent between grains. Installing this package injects a target into the project which will generate code at build time.
+The preferred method for performing code generation is at build time. Build time code generation could be enabled by using one of the following packages:
 
-The `Microsoft.Orleans.OrleansCodeGenerator.Build` package only supports C# projects. Other languages are supported either using the `Microsoft.Orleans.OrleansCodeGenerator` package described below, or by creating a C# project which can act as the target for code generated from assemblies written in other languages.
++ [Microsoft.Orleans.OrleansCodeGenerator.Build](https://www.nuget.org/packages/Microsoft.Orleans.OrleansCodeGenerator.Build/). A package that uses Roslyn for code generation and uses .NET Reflection for analysis.
++ [Microsoft.Orleans.CodeGenerator.MSBuild](https://www.nuget.org/packages/Microsoft.Orleans.CodeGenerator.MSBuild/). A new code generation package that leverages Roslyn both for code generation and code analysis. It does not load application binaries and as a result avoids issues caused by clashing dependency versions and differing target frameworks. The new code generator also improves support for incremental builds, which should result in shorter build times.
+
+ One of these packages should be installed into all projects which contain grains, grain interfaces, custom serializers, or types which are sent between grains. Installing a package injects a target into the project which will generate code at build time.
+
+Both packages (`Microsoft.Orleans.CodeGenerator.MSBuild` and `Microsoft.Orleans.OrleansCodeGenerator.Build`) only support C# projects. Other languages are supported either using the `Microsoft.Orleans.OrleansCodeGenerator` package described below, or by creating a C# project which can act as the target for code generated from assemblies written in other languages.
 
 Additional diagnostics can be emitted at build-time by specifying value for `OrleansCodeGenLogLevel` in the target project's *csproj* file. For example, `<OrleansCodeGenLogLevel>Trace</OrleansCodeGenLogLevel>`.
 
@@ -63,10 +69,10 @@ There are cases where generated code can not be included in a particular assembl
 
 In order to enable this for an assembly:
 
-1. Create a C# project
-2. Install the `Microsoft.Orleans.OrleansCodeGenerator.Build` package
-3. Add a reference to the target assembly
-4. Add `[assembly: KnownAssembly("OtherAssembly")]` at the top level of a C# file
+1. Create a C# project.
+1. Install the `Microsoft.Orleans.CodeGenerator.MSBuild` or the `Microsoft.Orleans.OrleansCodeGenerator.Build` package.
+1. Add a reference to the target assembly.
+1. Add `[assembly: KnownAssembly("OtherAssembly")]` at the top level of a C# file.
 
 The `KnownAssembly` attribute instructs the code generator to inspect the specified assembly and generate code for the types within it. The attribute can be used multiple times within a project.
 
@@ -80,4 +86,3 @@ builder.ConfigureApplicationParts(
 In the above example, `builder` may be an instance of either `ISiloHostBuilder` or `IClientBuilder`.
 
 `KnownAssemblyAttribute` has an optional property, `TreatTypesAsSerializable`, which can be set to `true` to instruct the code generator to act as though all types within that assembly are marked as serializable.
-

@@ -54,8 +54,9 @@ Let's breakdown the steps used in this sample:
 ```
 
 Here we do two things:
-- Set the `ClusterId` to `"my-first-cluster"`: this is a unique ID for the Orleans cluster. All clients and silos that use this ID will be able to talk directly to each other. You can choose to use a different `ClusterId` for different deployments, though.
-- Set the `ServiceId` to `"AspNetSampleApp"`: this is a unique ID for your application that will be used by some providers, such as persistence providers. **This ID should remain stable and not change across deployments**.
+
+* Set the `ClusterId` to `"my-first-cluster"`: this is a unique ID for the Orleans cluster. All clients and silos that use this ID will be able to talk directly to each other. You can choose to use a different `ClusterId` for different deployments, though.
+* Set the `ServiceId` to `"AspNetSampleApp"`: this is a unique ID for your application that will be used by some providers, such as persistence providers. **This ID should remain stable and not change across deployments**.
 
 ## Clustering provider
 
@@ -89,10 +90,10 @@ An Orleans silo has two typical types of endpoint configuration:
 * Silo-to-silo endpoints, used for communication between silos in the same cluster
 * Client-to-silo endpoints (or gateway), used for communication between clients and silos in the same cluster
 
-In the sample, we are using the helper method `.ConfigureEndpoints(siloPort: 11111, gatewayPort: 30000)` which sets the port used for silo-to-silo communication to `11111` and and the port for the gateway to `30000`. 
+In the sample, we are using the helper method `.ConfigureEndpoints(siloPort: 11111, gatewayPort: 30000)` which sets the port used for silo-to-silo communication to `11111` and and the port for the gateway to `30000`.
 This method will detect which interface to listen to.
 
-This method should be sufficient in most cases, but you can customize it further if you need to. 
+This method should be sufficient in most cases, but you can customize it further if you need to.
 Here is an example of how to use an external IP address with some port-forwarding:
 
 ``` csharp
@@ -126,11 +127,11 @@ Internally, the silo will listen on `0.0.0.0:40000` and `0.0.0.0:50000`, but the
 ```
 
 Although this step is not technically required (if not configured, Orleans will scan all assemblies in the current folder), developers are encouraged to configure this.
-This step will help Orleans to load user assemblies and types. 
+This step will help Orleans to load user assemblies and types.
 These assemblies are referred to as Application Parts.
 All Grains, Grain Interfaces, and Serializers are discovered using Application Parts.
 
-Application Parts are configured using `IApplicationPartsManager`, which can be accessed using the `ConfigureApplicationParts` extension method on `IClientBuilder` and `ISiloHostBuilder`. 
+Application Parts are configured using `IApplicationPartsManager`, which can be accessed using the `ConfigureApplicationParts` extension method on `IClientBuilder` and `ISiloHostBuilder`.
 The `ConfigureApplicationParts` method accepts a delegate, `Action<IApplicationPartManager>`.
 
 The following extension methods on `IApplicationPartManager` support common uses:
@@ -140,10 +141,11 @@ The following extension methods on `IApplicationPartManager` support common uses
 * `AddFromApplicationBaseDirectory()` loads and adds all assemblies in the current base path (see `AppDomain.BaseDirectory`).
 
 Assemblies added by the above methods can be supplemented using the following extension methods on their return type, `IApplicationPartManagerWithAssemblies`:
+
 * `WithReferences()` adds all referenced assemblies from the added parts. This immediately loads any transitively referenced assemblies. Assembly loading errors are ignored.
 * `WithCodeGeneration()` generates support code for the added parts and adds it to the part manager. Note that this requires the `Microsoft.Orleans.OrleansCodeGenerator` package to be installed and is commonly referred to as runtime code generation.
 
 Type discovery requires that the provided Application Parts include specific attributes.
-Adding the build-time code generation package `Microsoft.Orleans.OrleansCodeGenerator.Build` to each project containing Grains, Grain Interfaces, or Serializers is the recommended approach for ensuring that these attributes are present.
+Adding the build-time code generation package (`Microsoft.Orleans.CodeGenerator.MSBuild` or `Microsoft.Orleans.OrleansCodeGenerator.Build`) to each project containing Grains, Grain Interfaces, or Serializers is the recommended approach for ensuring that these attributes are present.
 Build-time code generation only supports C#.
-For F#, Visual Basic, and other .NET languages, code can be generated during configuration time via the `WithCodeGeneration()` method described above.
+For F#, Visual Basic, and other .NET languages, code can be generated during configuration time via the `WithCodeGeneration()` method described above. More info regarding code generation could be found in [the corresponding section](../../core_concepts/code_generation.md).
