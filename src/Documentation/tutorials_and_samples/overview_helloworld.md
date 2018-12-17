@@ -138,6 +138,7 @@ The client is passed to the `DoClientWork()` method.
             var response = await friend.SayHello("Good morning, my friend!");
             Console.WriteLine("\n\n{0}\n\n", response);
         }
+
 ```
 
 At this point, OrleansClient creates a reference to the IHello grain and calls its SayHello() method through its interface, IHello.
