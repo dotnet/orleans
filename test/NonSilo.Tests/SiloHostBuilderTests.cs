@@ -69,7 +69,8 @@ namespace NonSilo.Tests
                 .AddOrleans(siloBuilder =>
                 {
                     siloBuilder
-                        .UseLocalhostClustering()
+                        .Configure<ClusterOptions>(options => options.ClusterId = "someClusterId")
+                        .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
                         .EnableDirectClient();
                 })
                 .Build();
