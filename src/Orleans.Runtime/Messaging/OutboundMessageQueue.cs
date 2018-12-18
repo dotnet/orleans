@@ -28,6 +28,15 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
+        public int ApplicationMessageCount
+        {
+            get
+            {
+                int n = senders.Where(sender => sender.IsValueCreated).Sum(sender => sender.Value.Count);
+                return n;
+            }
+        }
+
         internal const string QUEUED_TIME_METADATA = "QueuedTime";
 
         internal OutboundMessageQueue(MessageCenter mc, IOptions<SiloMessagingOptions> options, SerializationManager serializationManager, ExecutorService executorService, ILoggerFactory loggerFactory)

@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Messaging;
 using Orleans.Serialization;
@@ -31,7 +32,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ILoggerFactory loggerFactory;
         private readonly ExecutorService executorService;
         private readonly Action<Message>[] localMessageHandlers;
-
+        private SiloMessagingOptions messagingOptions;
         internal bool IsBlockingApplicationMessages { get; private set; }
 
         public void SetHostedClient(IHostedClient client) => this.hostedClient = client;
@@ -60,6 +61,7 @@ namespace Orleans.Runtime.Messaging
             ILoggerFactory loggerFactory,
             IOptions<StatisticsOptions> statisticsOptions)
         {
+            this.messagingOptions = messagingOptions.Value;
             this.loggerFactory = loggerFactory;
             this.log = loggerFactory.CreateLogger<MessageCenter>();
             this.serializationManager = serializationManager;
@@ -117,6 +119,19 @@ namespace Orleans.Runtime.Messaging
         {
         }
 
+        private void WaitToRerouteAllQueuedMessages()
+        {
+            DateTime maxWaitTime = DateTime.UtcNow + this.messagingOptions.RerouteQueuedMessagesOnSiloShutdownTimeout;
+            while (DateTime.UtcNow < maxWaitTime)
+            {
+                var applicationMessageQueueLength = this.OutboundQueue.ApplicationMessageCount;
+                if (applicationMessageQueueLength == 0)
+                    break;
+                Task.Delay(TimeSpan.FromSeconds(1)).Wait();
+            }
+            
+        }
+
         public void Stop()
         {
             IsBlockingApplicationMessages = true;
@@ -134,6 +149,7 @@ namespace Orleans.Runtime.Messaging
 
             try
             {
+                WaitToRerouteAllQueuedMessages();
                 OutboundQueue.Stop();
             }
             catch (Exception exc)

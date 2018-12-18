@@ -761,6 +761,8 @@ namespace Orleans.Runtime
                         .WithCancellation(ct, "MembershipOracle Shutting down failed because the task was cancelled");
                     // Deactivate all grains
                     SafeExecute(() => catalog.DeactivateAllActivations().Wait(ct));
+                    //wait for all queued message sent to OutboundMessageQueue before MessageCenter stop and OutboundMessageQueue stop. 
+                    await Task.Delay(TimeSpan.FromSeconds(2));
                 }
                 else
                 {
