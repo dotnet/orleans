@@ -154,6 +154,7 @@ namespace Orleans.CodeGenerator
         public string GenerateSourceForAssembly(Assembly input)
         {
             if (input.GetCustomAttribute<GeneratedCodeAttribute>() != null
+                || input.GetCustomAttribute<OrleansCodeGenerationTargetAttribute>() != null
                 || input.GetCustomAttribute<SkipCodeGenerationAttribute>() != null)
             {
                 return string.Empty;
@@ -652,6 +653,7 @@ namespace Orleans.CodeGenerator
             return !assembly.IsDynamic
                    && TypeUtils.IsOrleansOrReferencesOrleans(assembly)
                    && assembly.GetCustomAttribute<GeneratedCodeAttribute>() == null
+                   && assembly.GetCustomAttribute<OrleansCodeGenerationTargetAttribute>() == null
                    && assembly.GetCustomAttribute<SkipCodeGenerationAttribute>() == null;
         }
 

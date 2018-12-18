@@ -45,15 +45,7 @@ namespace Orleans.CodeGenerator
                                 .AddArgumentListArguments(
                                     SF.AttributeArgument(asm.GetName().FullName.GetLiteralExpression()))).ToArray())
                     .WithTarget(SF.AttributeTargetSpecifier(SF.Token(SyntaxKind.AssemblyKeyword)));
-            var generatedCodeAttribute =
-                SF.AttributeList()
-                    .AddAttributes(
-                        SF.Attribute(typeof(GeneratedCodeAttribute).GetNameSyntax())
-                            .AddArgumentListArguments(
-                                SF.AttributeArgument(ToolName.GetLiteralExpression()),
-                                SF.AttributeArgument(RuntimeVersion.FileVersion.GetLiteralExpression())))
-                    .WithTarget(SF.AttributeTargetSpecifier(SF.Token(SyntaxKind.AssemblyKeyword)));
-            return generatedSyntax.Syntax.AddAttributeLists(generatedCodeAttribute, codeGenTargetAttributes);
+            return generatedSyntax.Syntax.AddAttributeLists(codeGenTargetAttributes);
         }
 
         internal static AttributeSyntax GetGeneratedCodeAttributeSyntax()
