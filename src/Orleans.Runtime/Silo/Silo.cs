@@ -38,7 +38,7 @@ namespace Orleans.Runtime
     {
         /// <summary> Standard name for Primary silo. </summary>
         public const string PrimarySiloName = "Primary";
-
+        private static TimeSpan WaitForMessageToBeQueuedForOutbound = TimeSpan.FromSeconds(2);
         /// <summary> Silo Types. </summary>
         public enum SiloType
         {
@@ -762,7 +762,7 @@ namespace Orleans.Runtime
                     // Deactivate all grains
                     SafeExecute(() => catalog.DeactivateAllActivations().Wait(ct));
                     //wait for all queued message sent to OutboundMessageQueue before MessageCenter stop and OutboundMessageQueue stop. 
-                    await Task.Delay(TimeSpan.FromSeconds(2));
+                    await Task.Delay(WaitForMessageToBeQueuedForOutbound);
                 }
                 else
                 {

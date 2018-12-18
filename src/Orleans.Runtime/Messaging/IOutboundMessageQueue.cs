@@ -22,11 +22,11 @@ namespace Orleans.Runtime.Messaging
         /// <summary>
         /// Current queue length
         /// </summary>
-        int Count { get; }
+        int GetCount();
 
         /// <summary>
         /// Application level message queue length
         /// </summary>
-        int ApplicationMessageCount { get; }
+        int GetApplicationMessageCount();
     }
 }

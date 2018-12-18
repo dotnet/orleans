@@ -77,12 +77,12 @@ namespace Orleans.Configuration
         /// </summary>
         public bool AssumeHomogenousSilosForTesting { get; set; } = false;
 
-        public static TimeSpan DEFAULT_REROUTE_QUEUED_MESSAFES_On_SILO_SHUTDOWN_TIMEOUT { get; set; } = TimeSpan.FromSeconds(10);
+        public static TimeSpan DEFAULT_SHUTDOWN_REROUTE_TIMEOUT { get; set; } = TimeSpan.FromSeconds(10);
 
         /// <summary>
         /// How long the silo will wait for rerouting queued mesages, before it continues shutting down. 
         /// </summary>
-        public TimeSpan RerouteQueuedMessagesOnSiloShutdownTimeout { get; set; } =
-            DEFAULT_REROUTE_QUEUED_MESSAFES_On_SILO_SHUTDOWN_TIMEOUT;
+        public TimeSpan ShutdownRerouteTimeout { get; set; } =
+            DEFAULT_SHUTDOWN_REROUTE_TIMEOUT;
     }
 }

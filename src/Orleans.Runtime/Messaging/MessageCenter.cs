@@ -121,13 +121,13 @@ namespace Orleans.Runtime.Messaging
 
         private void WaitToRerouteAllQueuedMessages()
         {
-            DateTime maxWaitTime = DateTime.UtcNow + this.messagingOptions.RerouteQueuedMessagesOnSiloShutdownTimeout;
+            DateTime maxWaitTime = DateTime.UtcNow + this.messagingOptions.ShutdownRerouteTimeout;
             while (DateTime.UtcNow < maxWaitTime)
             {
                 var applicationMessageQueueLength = this.OutboundQueue.ApplicationMessageCount;
                 if (applicationMessageQueueLength == 0)
                     break;
-                Task.Delay(TimeSpan.FromSeconds(1)).Wait();
+                Thread.Sleep(100);
             }
             
         }
