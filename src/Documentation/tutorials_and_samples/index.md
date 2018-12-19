@@ -5,7 +5,7 @@ title: Samples Overview
 
 # Tutorials
 
-## [Tutorial 1: OrleansTest](tutorial_1_orleanstest.md)
+## [Tutorial 1: OrleansTest](tutorial_1.md)
 
 Tutorial one guides you through the steps to create the structure and set up the packages and references of your first Orleans app.
 
