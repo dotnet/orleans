@@ -24,12 +24,12 @@ There are several packages, one for each different project type (interfaces, gra
 In the grain interfaces project:
 ```
 PM> Install-Package Microsoft.Orleans.Core.Abstractions
-PM> Install-Package Microsoft.Orleans.OrleansCodeGenerator.Build
+PM> Install-Package Microsoft.Orleans.CodeGenerator.MSBuild
 ```
 In the grain implementations project:
 ```
 PM> Install-Package Microsoft.Orleans.Core.Abstractions
-PM> Install-Package Microsoft.Orleans.OrleansCodeGenerator.Build
+PM> Install-Package Microsoft.Orleans.CodeGenerator.MSBuild
 ```
 In the server (silo) project:
 ```
