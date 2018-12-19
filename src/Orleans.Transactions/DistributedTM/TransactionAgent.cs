@@ -184,7 +184,7 @@ namespace Orleans.Transactions
                     if (logger.IsEnabled(LogLevel.Debug))
                         logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} failed {transactionInfo.TransactionId} with status={status}");
 
-                    // notify participants 
+                    // notify participants
                     if (status.DefinitelyAborted())
                     {
                         await Task.WhenAll(writeResources
@@ -257,7 +257,7 @@ namespace Orleans.Transactions
                     }
                 }
                 // manager
-                if (manager == null && id.IsManager())
+                if (manager == null && id.IsManager() && participant.Value.Writes > 0)
                 {
                     manager = participant;
                 }
