@@ -124,7 +124,7 @@ namespace Orleans.Runtime.Messaging
             DateTime maxWaitTime = DateTime.UtcNow + this.messagingOptions.ShutdownRerouteTimeout;
             while (DateTime.UtcNow < maxWaitTime)
             {
-                var applicationMessageQueueLength = this.OutboundQueue.ApplicationMessageCount;
+                var applicationMessageQueueLength = this.OutboundQueue.GetApplicationMessageCount();
                 if (applicationMessageQueueLength == 0)
                     break;
                 Thread.Sleep(100);
@@ -279,7 +279,7 @@ namespace Orleans.Runtime.Messaging
             GC.SuppressFinalize(this);
         }
 
-        public int SendQueueLength { get { return OutboundQueue.Count; } }
+        public int SendQueueLength { get { return OutboundQueue.GetCount(); } }
 
         public int ReceiveQueueLength { get { return InboundQueue.Count; } }
 
