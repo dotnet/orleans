@@ -1,8 +1,10 @@
 - name: Tutorial and Sample Overview
   href: index.md
-- name: HelloWorld
-  href: tutorial_1_helloworld.md
-- name: MathGrains
-  href: MathGrains.md
-- name: Adventure
+- name: Tutorial 1 - Orleans Basics
+  href: tutorial_1.md
+- name: Sample - Hello World
+  href: Hello-World.md
+- name: Sample - Hello World Overview
+  href: overview_helloworld.md
+- name: Sample - Adventure
   href: Adventure.md
