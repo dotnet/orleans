@@ -195,6 +195,8 @@ namespace UnitTests.GrainInterfaces
     public interface ILongRunningTaskGrain<T> : IGrainWithGuidKey
     {
         Task<string> GetRuntimeInstanceId();
+        Task<string> GetRuntimeInstanceIdWithDelay(TimeSpan delay);
+
         Task LongWait(GrainCancellationToken tc, TimeSpan delay);
         Task<T> LongRunningTask(T t, TimeSpan delay);
         Task<T> CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, T t, TimeSpan delay);
