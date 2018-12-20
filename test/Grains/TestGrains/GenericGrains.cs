@@ -673,6 +673,12 @@ namespace UnitTests.Grains
         {
             return Task.FromResult(RuntimeIdentity);
         }
+
+        public async Task<string> GetRuntimeInstanceIdWithDelay(TimeSpan delay)
+        {
+            await Task.Delay(delay);
+            return RuntimeIdentity;
+        }
     }
 
     public class GenericGrainWithContraints<A, B, C>: Grain, IGenericGrainWithConstraints<A, B, C>
