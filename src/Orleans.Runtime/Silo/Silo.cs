@@ -38,7 +38,7 @@ namespace Orleans.Runtime
     {
         /// <summary> Standard name for Primary silo. </summary>
         public const string PrimarySiloName = "Primary";
-
+        private static TimeSpan WaitForMessageToBeQueuedForOutbound = TimeSpan.FromSeconds(2);
         /// <summary> Silo Types. </summary>
         public enum SiloType
         {
@@ -761,6 +761,8 @@ namespace Orleans.Runtime
                         .WithCancellation(ct, "MembershipOracle Shutting down failed because the task was cancelled");
                     // Deactivate all grains
                     SafeExecute(() => catalog.DeactivateAllActivations().Wait(ct));
+                    //wait for all queued message sent to OutboundMessageQueue before MessageCenter stop and OutboundMessageQueue stop. 
+                    await Task.Delay(WaitForMessageToBeQueuedForOutbound);
                 }
                 else
                 {
