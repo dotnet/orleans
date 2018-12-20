@@ -5,7 +5,7 @@ using System.Linq;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
 
-namespace Orleans.Transactions.TestKit.Base
+namespace Orleans.Transactions.TestKit
 {
     [Serializable]
     public class GrainData

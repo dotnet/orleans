@@ -5,6 +5,7 @@
     <Title>Microsoft Orleans Transactions test kit base</Title>
     <Description>Testkit base library for transactions</Description>
     <PackageTags>$(PackageTags) TransactionTestkKit</PackageTags>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -26,6 +27,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Azure\Orleans.Transactions.AzureStorage\Orleans.Transactions.AzureStorage.csproj" />
+    <ProjectReference Include="..\Orleans.TestingHost\Orleans.TestingHost.csproj" />
     <ProjectReference Include="..\Orleans.Transactions\Orleans.Transactions.csproj" />
   </ItemGroup>
 
