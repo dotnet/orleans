@@ -15,7 +15,7 @@ PM> Install-Package Microsoft.Orleans.CodeGenerator.MSBuild
 
 Grains interact with each other and get called from outside by invoking methods declared as part of the respective grain interfaces.
 A grain class implements one or more previously declared grain interfaces.
-All methods of a grain interface must return a `Task` (for `void` methods) or a `Task<T>` (for methods returning values of type `T`).
+All methods of a grain interface must return a `Task` (for `void` methods), a `Task<T>` or a `ValueTask<T>`(for methods returning values of type `T`).
 
 The following is an excerpt from the Orleans version 1.5 Presence Service sample:
 
@@ -132,7 +132,9 @@ public Task GrainMethod6()
 }
 ```
 
-# Grain Reference
+`ValueTask<T>` can be used instead of `Task<T>`
+
+### Grain Reference
 
 A Grain Reference is a proxy object that implements the same grain interface as the corresponding grain class.
 It encapsulates a logical identity (type and unique key) of the target grain.
@@ -156,23 +158,15 @@ From inside a grain class:
 
 From Orleans Client code.
 
-Prior to 1.5.0:
-
-```csharp
-    IPlayerGrain player = GrainClient.GrainFactory.GetGrain<IPlayerGrain>(playerId);
-```
-
-Since 1.5.0:
-
 ```csharp
     IPlayerGrain player = client.GetGrain<IPlayerGrain>(playerId);
 ```
 
-# Grain Method Invocation
+### Grain Method Invocation
 
-The Orleans programming model is based on the [Asynchronous Programming with Async and Await](https://msdn.microsoft.com/en-us/library/hh191443.aspx).
+The Orleans programming model is based on [Asynchronous Programming](https://docs.microsoft.com/en-us/dotnet/csharp/async).
 
-Using the grain reference from the previous example, here's how one performs a grain method invocation:
+Using the grain reference from the previous example, here's how to perform a grain method invocation:
 
 ```csharp
 //Invoking a grain method asynchronously
@@ -207,10 +201,11 @@ await joinedTask;
 // Execution of the rest of the method will continue asynchronously after joinedTask is resolve.
 ```
 
-# Virtual methods
+### Virtual methods
 
 A grain class can optionally override `OnActivateAsync` and `OnDeactivateAsync` virtual methods that get invoked by the Orleans runtime upon activation and deactivation of each grain of the class.
 This gives the grain code a chance to perform additional initialization and cleanup operations.
 An exception thrown by `OnActivateAsync` fails the activation process.
 While `OnActivateAsync`, if overridden, is always called as part of the grain activation process, `OnDeactivateAsync` is not guaranteed to get called in all situations, for example, in case of a server failure or other abnormal events.
-Because of that, applications should not rely on OnDeactivateAsync for performing critical operations, such as persistence of state changes, and only use it for best effort operations.
+Because of that, applications should not rely on `OnDeactivateAsync` for performing critical operations such as persistence of state changes.
+They should use it only for best effort operations.
