@@ -757,9 +757,12 @@ namespace Orleans.Runtime
                 {
                     logger.Info(ErrorCode.SiloShuttingDown, "Silo starting to Shutdown()");
                     // Write "ShutDown" state in the table + broadcast gossip msgs to re-read the table to everyone
+                    //We do a 30 ms wait on the async silo status gossip in shutdown senario.
                     await scheduler.QueueTask(this.membershipOracle.ShutDown, this.membershipOracleContext)
                         .WithCancellation(ct, "MembershipOracle Shutting down failed because the task was cancelled");
-                    // Deactivate all grains
+                    //Stop LocalGrainDirectory
+                    await scheduler.QueueTask(()=>localGrainDirectory.Stop(true), localGrainDirectory.CacheValidator.SchedulingContext)
+                        .WithCancellation(ct, "localGrainDirectory Stop failed because the task was cancelled");
                     SafeExecute(() => catalog.DeactivateAllActivations().Wait(ct));
                     //wait for all queued message sent to OutboundMessageQueue before MessageCenter stop and OutboundMessageQueue stop. 
                     await Task.Delay(WaitForMessageToBeQueuedForOutbound);

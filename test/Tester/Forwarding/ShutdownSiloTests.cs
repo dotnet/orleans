@@ -40,7 +40,7 @@ namespace Tester.Forwarding
             });
         }
 
-        [Fact, TestCategory("Forward")]
+        [Fact, TestCategory("Forward"), TestCategory("Functional")]
         public async Task SiloGracefulShutdown_ForwardPendingRequest()
         {
             var grain = await GetLongRunningTaskGrainOnSecondary<bool>();
