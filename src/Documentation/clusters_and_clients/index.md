@@ -24,22 +24,35 @@ In a typical setup, a frontend web server:
 
 Before a grain client can be used for making calls to grains hosted in an Orleans cluster, it needs to be configured, initialized, and connected to the cluster.
 
-Configuration is provided via a `ClientConfiguration` object that contains a hierarchy of configuration properties for programmatically configuring a client.
-There is also a way to configure a client via a XML file, but that option will be deprecated in the future.
-More information is in the [Client Configuration guide](../clusters_and_clients/configuration_guide/client_configuration.md).
-Here we will simply use a helper method that creates a configuration object hardcoded for connecting to a local silo running as `localhost`.
-```csharp
-ClientConfiguration clientConfig = ClientConfiguration.LocalhostSilo(); 
-```
+Configuration is provided via  `ClientBuilder` and a number of supplemental option classes that contain a hierarchy of configuration properties for programmatically configuring a client.
 
-Once we have a configuration object, we can build a client via the `ClientBuilder` class.
+More information can be in the [Client Configuration guide](../clusters_and_clients/configuration_guide/client_configuration.md).
+
+Example of a client configuration:
+
 ```csharp
-IClusterClient client = new ClientBuilder().UseConfiguration(clientConfig).Build();
+
+var client = new ClientBuilder()
+    // Clustering information
+    .Configure<ClusterOptions>(options =>
+    {
+        options.ClusterId = "my-first-cluster";
+        options.ServiceId = "MyOrleansService";
+    })
+    // Clustering provider
+    .UseAzureStorageClustering(options => options.ConnectionString = connectionString)
+    // Application parts: just reference one of the grain interfaces that we use
+    .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IValueGrain).Assembly))
+    .Build();
+
 ```
 
 Lastly, we need to call `Connect()` method on the constructed client object to make it connect to the Orleans cluster. It's an asynchronous method that returns a `Task`. So we need to wait for its completion with an `await` or `.Wait()`.
+
 ```csharp
-await client.Connect(); 
+
+await client.Connect();
+
 ```
 
 ### Making Calls to Grains
