@@ -3,9 +3,9 @@ layout: page
 title: Tutorial 1 Hello World
 ---
 
-# Tutorial 1: Hello World
+# Overview: Hello World
 
-This process ties into the Hello World sample application available [here](https://github.com/dotnet/orleans/tree/master/Samples/2.0/HelloWorld).
+This overview ties into the Hello World sample application available [here](https://github.com/dotnet/orleans/tree/master/Samples/2.0/HelloWorld).
 
 The main concepts of Orleans involve a silo, a client, and one or more grains.
 Creating an Orleans app involves configuring the silo, configuring the client, and writing the grains.
