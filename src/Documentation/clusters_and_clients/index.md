@@ -113,10 +113,18 @@ namespace PlayerWatcher
             try
 
             {
-                // Connect to local silo
-                var config = ClientConfiguration.LocalhostSilo();
-                var client = new ClientBuilder().UseConfiguration(config).Build();
-                await client.Connect();
+            var client = new ClientBuilder()
+                // Clustering information
+                .Configure<ClusterOptions>(options =>
+                {
+                    options.ClusterId = "my-first-cluster";
+                    options.ServiceId = "MyAwesomeOrleansService";
+                })
+                // Clustering provider
+                .UseAzureStorageClustering(options => options.ConnectionString = connectionString)
+                // Application parts: just reference one of the grain interfaces that we use
+                .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IValueGrain).Assembly))
+                .Build();
 
                 // Hardcoded player ID
                 Guid playerId = new Guid("{2349992C-860A-4EDA-9590-000000000006}");
