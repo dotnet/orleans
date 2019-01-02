@@ -399,7 +399,14 @@ namespace Orleans.Runtime.MembershipService
                     membershipOracleData.UpdateMyStatusLocal(status);
                     if (status == SiloStatus.Stopping || status == SiloStatus.ShuttingDown || status == SiloStatus.Dead)
                     {
-                        GossipMyStatus().Wait(shutdownGossipTimeout);
+                        try
+                        {
+                            await GossipMyStatus().WithTimeout(shutdownGossipTimeout);
+                        }
+                        catch (Exception e)
+                        {
+                            this.logger.LogWarning($"GossipMyStatus failed when silo {status}, due to exception {e}");
+                        }
                     }
                     else
                     {

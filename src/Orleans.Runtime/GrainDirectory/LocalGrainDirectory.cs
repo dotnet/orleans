@@ -975,7 +975,7 @@ namespace Orleans.Runtime.GrainDirectory
             // for multi-cluster registration, the local directory may cache remote activations
             // and we need to remove them here, on the fast path, to avoid forwarding the message
             // to the wrong destination again
-            if (invalidateDirectoryAlso && CalculateGrainDirectoryPartition(grainId).Equals(MyAddress))
+            if (invalidateDirectoryAlso && MyAddress.Equals(CalculateGrainDirectoryPartition(grainId)))
             {
                 var registrar = this.registrarManager.GetRegistrarForGrain(grainId);
                 registrar.InvalidateCache(activationAddress);
