@@ -188,7 +188,7 @@ namespace Orleans.Transactions
                     if (status.DefinitelyAborted())
                     {
                         await Task.WhenAll(writeResources
-                            .Where(p => !p.Equals(manager))
+                            .Where(p => !p.Equals(manager.Key))
                             .Select(p => p.Reference.AsReference<ITransactionalResourceExtension>()
                                     .Cancel(p.Name, transactionInfo.TransactionId, transactionInfo.TimeStamp, status)));
                     }
