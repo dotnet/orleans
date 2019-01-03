@@ -16,12 +16,11 @@ namespace Orleans.Runtime.GrainDirectory
         /// Stops the local portion of the directory service.
         /// </summary>
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1716:IdentifiersShouldNotMatchKeywords", MessageId = "Stop")]
-        void Stop(bool doOnStopHandoff);
+        Task Stop(bool doOnStopHandoff);
 
         RemoteGrainDirectory RemoteGrainDirectory { get; }
         RemoteGrainDirectory CacheValidator { get; }
         ClusterGrainDirectory RemoteClusterGrainDirectory { get; }
-        Task StopPreparationCompletion { get; }  // Will be resolved when this directory is prepared to stop
 
         /// <summary>
         /// Removes the record for an non-existing activation from the directory service.
