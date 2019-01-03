@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Configuration;
@@ -157,12 +158,12 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        internal void ProcessSiloStoppingEvent()
+        internal Task ProcessSiloStoppingEvent()
         {
-            ProcessSiloStoppingEvent_Impl();
+            return ProcessSiloStoppingEvent_Impl();
         }
 
-        private async void ProcessSiloStoppingEvent_Impl()
+        private async Task ProcessSiloStoppingEvent_Impl()
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Processing silo stopping event");
 
@@ -181,15 +182,8 @@ namespace Orleans.Runtime.GrainDirectory
             }
             // take a copy of the current directory partition
             Dictionary<GrainId, IGrainInfo> batchUpdate = localDirectory.DirectoryPartition.GetItems();
-            try
-            {
-                await HandoffMyPartitionUponStop(batchUpdate, silosHoldingMyPartitionCopy, true);
-                localDirectory.MarkStopPreparationCompleted();
-            }
-            catch (Exception exc)
-            {
-                localDirectory.MarkStopPreparationFailed(exc);
-            }
+
+            await HandoffMyPartitionUponStop(batchUpdate, silosHoldingMyPartitionCopy, true);
         }
 
         internal void ProcessSiloAddEvent(SiloAddress addedSilo)
@@ -215,7 +209,7 @@ namespace Orleans.Runtime.GrainDirectory
                     GrainDirectoryPartition splitPart = localDirectory.DirectoryPartition.Split(
                         grain =>
                         {
-                            var s = localDirectory.CalculateTargetSilo(grain);
+                            var s = localDirectory.CalculateGrainDirectoryPartition(grain);
                             return (s != null) && !localDirectory.MyAddress.Equals(s);
                         }, false);
                     List<ActivationAddress> splitPartListSingle = splitPart.ToListOfActivations(true);
@@ -261,7 +255,7 @@ namespace Orleans.Runtime.GrainDirectory
                             grain =>
                             {
                                 // Need to review the 2nd line condition.
-                                var s = localDirectory.CalculateTargetSilo(grain);
+                                var s = localDirectory.CalculateGrainDirectoryPartition(grain);
                                 return (s != null) && !predecessorOfNewSilo.Equals(s);
                             }, true);
                         directoryPartitionsMap[addedSilo] = splitPart;

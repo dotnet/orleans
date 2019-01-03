@@ -70,7 +70,7 @@ namespace Orleans.Runtime.GrainDirectory
                     GrainId grain = pair.Key;
                     var entry = pair.Value;
 
-                    SiloAddress owner = router.CalculateTargetSilo(grain);
+                    SiloAddress owner = router.CalculateGrainDirectoryPartition(grain);
                     if (owner == null) // Null means there's no other silo and we're shutting down, so skip this entry
                     {
                         continue;

@@ -1414,7 +1414,7 @@ namespace Orleans.Runtime
                         {
                             var activationData = activation.Value;
                             if (!activationData.IsUsingGrainDirectory) continue;
-                            if (!directory.GetPrimaryForGrain(activationData.Grain).Equals(updatedSilo)) continue;
+                            if (!updatedSilo.Equals(directory.GetPrimaryForGrain(activationData.Grain))) continue;
 
                             lock (activationData)
                             {
