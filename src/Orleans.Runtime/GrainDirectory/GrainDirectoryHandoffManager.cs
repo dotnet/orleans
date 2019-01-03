@@ -184,7 +184,6 @@ namespace Orleans.Runtime.GrainDirectory
             Dictionary<GrainId, IGrainInfo> batchUpdate = localDirectory.DirectoryPartition.GetItems();
 
             await HandoffMyPartitionUponStop(batchUpdate, silosHoldingMyPartitionCopy, true);
-            localDirectory.DirectoryPartition.Clear();
         }
 
         internal void ProcessSiloAddEvent(SiloAddress addedSilo)

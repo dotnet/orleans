@@ -705,10 +705,6 @@ namespace Orleans.Runtime
             // Stop scheduling/executing application turns
             SafeExecute(scheduler.StopApplicationTurns);
 
-            // Directory: Speed up directory handoff
-            // will be started automatically when directory receives SiloStatusChangeNotification(Stopping)
-            SafeExecute(() => LocalGrainDirectory.StopPreparationCompletion.WithCancellation(ct));
-
             return Task.CompletedTask;
         }
 

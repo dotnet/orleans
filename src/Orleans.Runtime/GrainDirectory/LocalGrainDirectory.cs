@@ -52,9 +52,6 @@ namespace Orleans.Runtime.GrainDirectory
         public RemoteGrainDirectory CacheValidator { get; private set; }
         public ClusterGrainDirectory RemoteClusterGrainDirectory { get; private set; }
 
-        private readonly TaskCompletionSource<bool> stopPreparationResolver;
-        public Task StopPreparationCompletion { get { return stopPreparationResolver.Task; } }
-
         internal OrleansTaskScheduler Scheduler { get; private set; }
 
         internal GrainDirectoryHandoffManager HandoffManager { get; private set; }
@@ -144,8 +141,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 this.seed = this.MyAddress.Endpoint.Equals(primarySiloEndPoint) ? this.MyAddress : SiloAddress.New(primarySiloEndPoint, 0);
             }
-
-            stopPreparationResolver = new TaskCompletionSource<bool>();
+            
             DirectoryPartition = grainDirectoryPartitionFactory();
             HandoffManager = new GrainDirectoryHandoffManager(this, siloStatusOracle, grainFactory, grainDirectoryPartitionFactory, loggerFactory);
 
@@ -262,24 +258,14 @@ namespace Orleans.Runtime.GrainDirectory
                 try
                 {
                     await HandoffManager.ProcessSiloStoppingEvent();
-                }catch (Exception exc)
-                {
-                    MarkStopPreparationFailed(exc);
                 }
-
+                catch (Exception exc)
+                {
+                    this.log.LogWarning($"GrainDirectoryHandOffManager failed ProcessSiloStoppingEvent due to exception {exc}");
+                }
             }
+            DirectoryPartition.Clear();
             DirectoryCache.Clear();
-            MarkStopPreparationCompleted();
-        }
-
-        internal void MarkStopPreparationCompleted()
-        {
-            stopPreparationResolver.TrySetResult(true);
-        }
-
-        internal void MarkStopPreparationFailed(Exception ex)
-        {
-            stopPreparationResolver.TrySetException(ex);
         }
 
         /// <inheritdoc />

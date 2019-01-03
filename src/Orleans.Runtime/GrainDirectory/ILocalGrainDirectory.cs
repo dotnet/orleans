@@ -21,7 +21,6 @@ namespace Orleans.Runtime.GrainDirectory
         RemoteGrainDirectory RemoteGrainDirectory { get; }
         RemoteGrainDirectory CacheValidator { get; }
         ClusterGrainDirectory RemoteClusterGrainDirectory { get; }
-        Task StopPreparationCompletion { get; }  // Will be resolved when this directory is prepared to stop
 
         /// <summary>
         /// Removes the record for an non-existing activation from the directory service.
