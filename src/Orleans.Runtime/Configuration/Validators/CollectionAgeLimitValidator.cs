@@ -19,7 +19,7 @@ namespace Orleans.Configuration
             {
                 throw new OrleansConfigurationException(
                     $"{nameof(GrainCollectionOptions.CollectionAge)} is set to {options.Value.CollectionAge}. " +
-                    $"{nameof(GrainCollectionOptions.CollectionAge)} must be bigger than {nameof(GrainCollectionOptions.CollectionQuantum)}, " +
+                    $"{nameof(GrainCollectionOptions.CollectionAge)} must be greater than {nameof(GrainCollectionOptions.CollectionQuantum)}, " +
                     $"which is set to {this.options.Value.CollectionQuantum}");
             }
             foreach(var classSpecificCollectionAge in this.options.Value.ClassSpecificCollectionAge)
