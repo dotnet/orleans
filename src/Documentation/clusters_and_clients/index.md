@@ -118,7 +118,7 @@ namespace PlayerWatcher
                 .Configure<ClusterOptions>(options =>
                 {
                     options.ClusterId = "my-first-cluster";
-                    options.ServiceId = "MyAwesomeOrleansService";
+                    options.ServiceId = "MyOrleansService";
                 })
                 // Clustering provider
                 .UseAzureStorageClustering(options => options.ConnectionString = connectionString)
