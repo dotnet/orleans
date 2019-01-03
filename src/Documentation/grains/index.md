@@ -9,7 +9,7 @@ Before you write code to implement a grain class, create a new Class Library pro
 Grain interfaces and grain classes can be defined in the same Class Library project or in two different projects for better separation of interfaces from implementation.
 In either case, the projects need to reference `Microsoft.Orleans.Core.Abstractions` and `Microsoft.Orleans.CodeGenerator.MSBuild` NuGet packages.
 
-For more through instructions, see the [Project Setup]( http://dotnet.github.io/orleans/Documentation/tutorials_and_samples/tutorial_1.html#project-setup) section of [Tutorial One – Orleans Basics]( http://dotnet.github.io/orleans/Documentation/tutorials_and_samples/tutorial_1.html).
+For more thorough instructions, see the [Project Setup](../tutorials_and_samples/tutorial_1.md#project-setup) section of [Tutorial One – Orleans Basics](../tutorials_and_samples/tutorial_1.md).
 
 
 # Grain Interfaces and Classes
