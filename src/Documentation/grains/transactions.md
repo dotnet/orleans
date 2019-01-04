@@ -39,26 +39,26 @@ var builder = new SiloHostBuilder()
 
 ```
 
-For development purposes, if transaction specific storage is not available for the data store you need, an `IGrainStorage` implementation may be used instead.
-For any transactional state which does not have a store configured for it, transactions will attempt to fail over to grains storage using a bridge.
-Accessing transactional state via a bridge to grains storage will be less efficient and is not a pattern we intend to support long term, hence the recommendation that this only be used for development purposes.
+For development purposes, if transaction-specific storage is not available for the data store you need, an `IGrainStorage` implementation may be used instead.
+For any transactional state that does not have a store configured for it, transactions will attempt to fail over to grain storage using a bridge.
+Accessing transactional state via a bridge to grain storage will be less efficient and is not a pattern we intend to support long term, hence the recommendation that this only be used for development purposes.
 
 ## Programming Model
 
 ### Grain Interfaces
 
-For a grain to support transactions, transactional operations on a grain interface must be marked as being part of a transaction using the “Transaction” attribute.
-The attribute needs indicate how the grain call behaves in a transactional environment.
-It indicates this via the transaction options below:
+For a grain to support transactions, transactional methods on a grain interface must be marked as being part of a transaction using the “Transaction” attribute.
+The attribute needs indicate how the grain call behaves in a transactional environment via the transaction options below:
 
-- `TransactionOption.Create` - Call is transactional and will always create a new transaction context, even if called within an existing transaction context.
-- `TransactionOption.Join` - Call logic is transactional but can only be called within the context of an existing transaction.
+- `TransactionOption.Create` - Call is transactional and will always create a new transaction context (i.e., it will start a new transaction), even if called within an existing transaction context.
+- `TransactionOption.Join` - Call is transactional but can only be called within the context of an existing transaction.
 - `TransactionOption.CreateOrJoin` - Call is transactional. If called within the context of a transaction, it will use that context, else it will create a new context.
 - `TransactionOption.Suppress` - Call is not transactional but can be called from within a transaction. If called within the context of a transaction, the context will not be passed to the call.
 - `TransactionOption.Supported` - Call is not transactional but supports transactions. If called within the context of a transaction, the context will be passed to the call.
 - `TransactionOption.NotAllowed` - Call is not transactional and cannot be called from within a transaction. If called within the context of a transaction, it will throw a `NotSupportedException`.
 
 Calls can be marked as “Create”, meaning the call will always start its own transaction.
+For example, the Transfer operation in the ATM grain below will always start a new transaction which involves the two referenced accounts.
 
 ```csharp
 
@@ -70,7 +70,6 @@ public interface IATMGrain : IGrainWithIntegerKey
 
 ```
 
-The Transfer operation in the above ATM grain will always start a new transaction which involves the two referenced accounts.
 The transactional operations Withdraw and Deposit on the account grain are marked “Join”, indicating that they can only be called within the context of an existing transaction, which would be the case if they were called during `IATMGrain.Transfer(…)`.
 The `GetBalance` call is marked `CreateOrJoin` so it can be called from within an existing transaction, like via `IATMGrain.Transfer(…)`, or on its own.
 
@@ -107,7 +106,7 @@ A grain implementation needs to use an `ITransactionalState` facet (see Facet Sy
 
 All read or write access to the persisted state must be performed via synchronous functions passed to the transactional state facet.
 This allows the transaction system to perform or cancel these operations transactionally.
-To use a transactional state within a grain, one needs only define a serializable state class to be persisted and declare the transactional state in the grain’s constructor with a `TransactionalState` attribute which declares the state name, and (optionally) which transactional state storage to use (see Setup).
+To use a transactional state within a grain, one only needs to define a serializable state class to be persisted and to declare the transactional state in the grain’s constructor with a `TransactionalState` attribute. The latter declares the state name and (optionally) which transactional state storage to use (see Setup).
 
 ```csharp
 
@@ -158,7 +157,7 @@ public class AccountGrain : Grain, IAccountGrain
 In the above example, the attribute `TransactionalState` is used to declare that the ‘balance’ constructor argument should be associated with a transactional state named “balance”.
 With this declaration, Orleans will inject an `ITransactionalState` instance with a state loaded from the transactional state storage named "TransactionStore" (see Setup).
 The state can be modified via `PerformUpdate` or read via `PerformRead`.
-The transaction infrastructure will ensure that any such changes performed as part of a transaction, even among multiple grains distributed over an Orleans cluster, will either all be committed or reverted upon completion of the grain call which created the transaction (`IATMGrain.Transfer` in the above examples).
+The transaction infrastructure will ensure that any such changes performed as part of a transaction, even among multiple grains distributed over an Orleans cluster, will either all be committed or all be undone upon completion of the grain call that created the transaction (`IATMGrain.Transfer` in the above examples).
 
 ### Calling Transactions
 
@@ -180,7 +179,7 @@ After the transfer is complete, both accounts are queried to get their current b
 The currency transfer as well as both account queries are performed as ACID transactions.
 
 As seen in the above example, transactions can return values within a task, like other grain calls, but upon call failure they will not throw application exceptions, but rather an `OrleansTransactionException` or `TimeoutException`.
-If the application throws an exception during the transaction and that exception causes the transaction to fail (as opposed to other system failures) the application exception will be the inner exception of the `OrleansTransactionException`.
+If the application throws an exception during the transaction and that exception causes the transaction to fail (as opposed failing because of other system failures), the application exception will be the inner exception of the `OrleansTransactionException`.
 If a transaction exception is thrown of type `OrleansTransactionAbortedException`, the transaction failed and can be retried.
 Any other exception thrown indicates that the transaction terminated with an unknown state.
 Since transactions are distributed operations, a transaction in an unknown state could have succeeded, failed, or still be in progress.
