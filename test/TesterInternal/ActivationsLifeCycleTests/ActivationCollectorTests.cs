@@ -22,7 +22,7 @@ namespace UnitTests.ActivationsLifeCycleTests
     public class ActivationCollectorTests : OrleansTestingBase, IDisposable
     {
         private static readonly TimeSpan DEFAULT_COLLECTION_QUANTUM = TimeSpan.FromSeconds(10);
-        private static readonly TimeSpan DEFAULT_IDLE_TIMEOUT = DEFAULT_COLLECTION_QUANTUM;
+        private static readonly TimeSpan DEFAULT_IDLE_TIMEOUT = DEFAULT_COLLECTION_QUANTUM + TimeSpan.FromSeconds(1);
         private static readonly TimeSpan WAIT_TIME = DEFAULT_IDLE_TIMEOUT.Multiply(3.0);
 
         private TestCluster testCluster;
@@ -38,8 +38,8 @@ namespace UnitTests.ActivationsLifeCycleTests
                 var config = legacy.ClusterConfiguration;
                 config.Globals.CollectionQuantum = quantum;
                 config.Globals.Application.SetDefaultCollectionAgeLimit(collectionAgeLimit);
-                config.Globals.Application.SetCollectionAgeLimit(typeof(IdleActivationGcTestGrain2), TimeSpan.FromSeconds(10));
-                config.Globals.Application.SetCollectionAgeLimit(typeof(BusyActivationGcTestGrain2), TimeSpan.FromSeconds(10));
+                config.Globals.Application.SetCollectionAgeLimit(typeof(IdleActivationGcTestGrain2), DEFAULT_IDLE_TIMEOUT);
+                config.Globals.Application.SetCollectionAgeLimit(typeof(BusyActivationGcTestGrain2), DEFAULT_IDLE_TIMEOUT);
             });
             testCluster = builder.Build();
             testCluster.Deploy();
@@ -48,7 +48,7 @@ namespace UnitTests.ActivationsLifeCycleTests
 
         private void Initialize(TimeSpan collectionAgeLimit)
         {
-            Initialize(collectionAgeLimit, collectionAgeLimit);
+            Initialize(collectionAgeLimit, DEFAULT_COLLECTION_QUANTUM);
         }
 
         private void Initialize()
