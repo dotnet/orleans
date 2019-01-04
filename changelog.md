@@ -7,6 +7,15 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [2.2.1] (changes since 2.2.0)
+
+- Breaking changes
+  - None
+
+- Non-breaking bug fixes
+  - Don't allow read only transaction participants to be selected as the manager (#5267)
+  - Fix invalid comparison in TransactionAgent (#5289)
+
 ### [2.2.0] (changes since 2.1.0)
 
 - Breaking changes
