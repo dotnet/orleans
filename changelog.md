@@ -112,6 +112,101 @@ The idea is to track end-user facing changes as they occur.*
   - Revert #4382 (#5086, #5088)
   - Fixed bug in transaction confirmation logic (#5098)
 
+### [2.1.2] (changes since 2.1.1)
+
+- Non-breaking bug fixes
+  - Revert "Don't enforce reentrancy for one way requests" #4382 (#5086). Fixed a regression that could in certain cases lead to a violation of non-reentrant execution of a grain.
+
+### [2.1.1] (changes since 2.1.0)
+
+- Non-breaking bug fixes
+  - Avoid modification of interned SiloAddresses in Consul and ZooKeeper providers #5054 
+
+### [2.1.0] (changes since 2.0.0)
+
+- Major changes
+  - New scheduler (#3792)
+  - Hosted Client (#3362)
+  - Distributed Transaction Manager (#3820, #4502, #4538, #4566, #4568, #4591, #4599, #4613, #4609, #4616, #4608, #4628, #4638, #4685, #4714, #4739, #4768, #4799, #4781, #4810, #4820, #4838, #4831, #4871, #4887)
+  - New Code Generator (#4934, #5010, #5011)
+  - Support for Tansfer of Coordination in transaction (#4860, #4894, #4949, #5026, #5024)
+  
+- Breaking changes
+  - None
+
+- Non-breaking improvements
+  - Test clustering: minor fixups (#4342)
+  - TestCluster: wait for cluster stabilization before starting tests (#4343)
+  - Avoid continuation in synchronous case (#4422)
+  - Improve Dictionary allocation in RequestContext (#4435)
+  - Copy elements in-place in InvokeMethodAsync (#4463)
+  - Azure blob storage provider: respect UseJson setting (#4455)
+  - Fix orleans integration with third party DI solution which requires public constructor (#4453)
+  - Remove unused Stopwatch in Grain<T>.OnSetupState (#4403) (#4472)
+  - Add validator for ClusterOptions (#4450)
+  - Non-static statistics: Round 1 (#4515)
+  - Remove saving of minidumps because that functionality is platform specific. (#4558)
+  - Fix Dependency Injection without changing Abstractions project (#4573)
+  - Sanitize "." from azure queue name (#4582)
+  - Add Client/SiloHost builder delegate to legacy GrainClient and Silo/AzureSilo (#4552)
+  - Support of ValueTask as a grain method return type (#4562)
+  - Convert IMembershipTableGrain into a SystemTarget (#4479)
+  - Convert counter values before calling ITelemetryProducer.TrackMetric (#4623)
+  - Optimize removing consumed buffers from read buffer (#4629)
+  - Remove unused settings MaxPendingWorkItemsHardLimit in SchedulingOptions (#4672)
+  - Udpate reference links in sql files (#4684)
+  - Use netcoreapp2.0 for msbuild target dll if using dotnet core msbuild but targeting full .net (#4689)
+  - Make AzureBasedReminderTable public to allow reuse in extensions (#4699)
+  - Remove per-call timer (#4399)
+  - Make LifecycleSubject logging less verbose (#4660)
+  - Do not use ip address from interface not operational (#4713)
+  - Updated Ignore(this Task) method (#4729)
+  - Make azure queue name configurable (#4762)
+  - Auto-installing grain extensions (#4815)
+  - Allow implicit subscription attribute to be inheritable (#4824)
+  - Do not place stateless worker locally if the silo is stopping (#4853)
+  - When deactivating a grain, do not stop timers if there are running requests  (#4830)
+  - No default grains storage added to container if one is not configured. (#4861)
+  - Revisit silo stop/shutdown timeout (#4875)
+  - Add timeout mechanism for grain deactivation (#4883)
+  - Do not try to register GrainVersionStore if an implementation of IVersionStore is already registered (#4911)
+  - Consul clustering enhancements (#4942)
+  - IsOrleansShallowCopyable fixes (#4945)
+  - Feature per grain collection attribute (#4890)
+  - Add Microsoft.Orleans.Streaming.AzureStorage as a dependency to Microsoft.Orleans.OrleansAzureUtils. (#4954)
+  - Migrate Orleans.TelemetryConsumers.Counters to netstandard (#4914)
+  - Add TableName to AzureStorageClusteringOptions, AzureStorageGatewayOptions and AzureTableReminderStorageOptions (#4978)
+  - Added support for TableName on AWS legacy configurator (#4983)
+  - Added Validations for Blob Names and refactored the AzureUtils for Blob & Container names. (#5020)
+  - Add LargeMessageWarningThreshold back to Silo(Client)MessagingOptions (#5022)
+  - Make MaxSockets in SocketManager configurable. (#5033)
+  - Cleanup types in transaction state storage interface (#5030)
+
+- Non-breaking bug fixes
+  - Fix telemetry consumer construction (#4392)
+  - Fix client connection retry (#4429)
+  - Fix routing in Silo Gateway (#4483)
+  - Don't generate serializers for foreign types in Orleans.Streaming.EventHubs (#4487)
+  - Fix NRE on AWS DynamoDB storage provider. #4482 (#4513)
+  - Fix Exception thrown in MembershipOracle.TryToSuspectOrKill (#4508)
+  - Fix logging level check on Grain exception (#451
+  - Assign Issue property in RecordedConnectionIssue.Record(...) (#4598)
+  - Fix (or workaround?) for codegen using netcore/netstandard 2.1 (#4673)
+  - Don't enforce reentrancy for one way requests (#4382)
+  - Cleanup Reminders PartitionKey (#4749)
+  - Fix NullReferenceException in ExecutingWorkItemsTracker (#4850)
+  - Fix NullReferenceException in LocalGrainDirectory when trace logging is enabled (#4854)
+  - Fix dependency injection cycle when OrleansJsonSerializer is used as a serialization provider (#4876)
+  - Propagate unserializable exceptions to callers (#4907)
+  - Fixing race condition with simple queue cache (#4936)
+  - More fixed to Transfer of Coordination (transactions) (#4968)
+  - Ensure AsyncAgent restarts on fault (#5023)
+
+### [1.5.6] (changes since 1.5.5)
+
+- Non-breaking improvements
+  - Make MaxSockets in SocketManager configurable #5033
+
 ### [2.1.0-rc2] (changes since 2.1.0-rc1)
 
 - Major changes
@@ -145,6 +240,14 @@ The idea is to track end-user facing changes as they occur.*
 - Non-breaking bug fixes
   - Propagate unserializable exceptions to callers (#4907)
   - Fixing race condition with simple queue cache (#4936)
+
+### [1.5.5] (changes since 1.5.4)
+
+- Non-breaking bug fixes
+  - Fix programmatic subscribe bugs (#4943 - #3843) 
+  - Propagate message serialization errors to callers (#4944 - #4907)
+- Breaking bug fixes
+  - Add StreamSubscriptionHandleFactory to subscribe on behalf feature (#4943 - #3851). While technically a breaking change, it only impacts users of the programmatic subscriptions feature that tried to use it with SMS stream by fixing that scenario (along with #3843).
 
 ### [2.0.5]
 - Non-breaking bug fixes
@@ -217,6 +320,16 @@ The idea is to track end-user facing changes as they occur.*
 - Non-breaking bug fixes
   - Workaround for [CoreFx/#30781](https://github.com/dotnet/corefx/issues/30781) when running on .NET Core (#4736)
   - Fix for .NET Core 2.1 build-time code generation (#4673)
+
+### [1.5.4] (changes since 1.5.3)
+
+- Non-breaking bug fixes
+  - Fixing codegen when a type's name contains comma (#3639)
+  - Set a timeout value for the synchronous socket read operations (#3716)
+- Non-breaking improvements
+  - Add MaxSocketAge to OrleansConfiguration.xsd (#3721)
+  - Avoid overload checks for response messages (#3743)
+  - Expedite gateway retries when gateway list is exhausted (#3758)
 
 ### [2.0.3]
 
@@ -417,6 +530,11 @@ The idea is to track end-user facing changes as they occur.*
   - Disallow creating an observer reference via `CreateObjectReference` from within a grain (#3757)
   - Expedite gateway retries when gateway list is exhausted (#3758)
   - Support for serialization life cycle methods that re-enables serialization of F# types and other such types (#3749)
+
+### [1.5.3] (changes since 1.5.2)
+
+- Non-breaking improvements
+  - CodeGen: support builds which use reference assemblies (#3753)
 
 ### [2.0.0-beta1]
 
