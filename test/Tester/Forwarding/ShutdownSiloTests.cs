@@ -24,7 +24,8 @@ namespace Tester.Forwarding
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
-                hostBuilder.Configure<GrainCollectionOptions>(options => options.DeactivationTimeout = DeactivationTimeout);
+                hostBuilder.Configure<GrainCollectionOptions>(options => options.DeactivationTimeout = DeactivationTimeout)
+                    .UseAzureStorageClustering(options=>options.ConnectionString = TestDefaultConfiguration.DataConnectionString);
             }
         }
 
@@ -40,7 +41,7 @@ namespace Tester.Forwarding
             });
         }
 
-        [Fact, TestCategory("Forward")]
+        [Fact, TestCategory("Forward"), TestCategory("Functional")]
         public async Task SiloGracefulShutdown_ForwardPendingRequest()
         {
             var grain = await GetLongRunningTaskGrainOnSecondary<bool>();
