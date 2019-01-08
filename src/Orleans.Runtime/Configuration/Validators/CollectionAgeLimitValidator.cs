@@ -15,7 +15,7 @@ namespace Orleans.Configuration
 
         public void ValidateConfiguration()
         {
-            if (this.options.Value.CollectionAge > TimeSpan.Zero && this.options.Value.CollectionAge < this.options.Value.CollectionQuantum)
+            if (this.options.Value.CollectionAge <= this.options.Value.CollectionQuantum)
             {
                 throw new OrleansConfigurationException(
                     $"{nameof(GrainCollectionOptions.CollectionAge)} is set to {options.Value.CollectionAge}. " +
@@ -24,17 +24,17 @@ namespace Orleans.Configuration
             }
             foreach(var classSpecificCollectionAge in this.options.Value.ClassSpecificCollectionAge)
             {
-                if(classSpecificCollectionAge.Value <= TimeSpan.Zero)
-                {
-                    throw new OrleansConfigurationException($"{classSpecificCollectionAge.Key} CollectionAgeLimit is set to {classSpecificCollectionAge.Value}. CollectionAgeLimit must be greater than zero.");
-                }
-
-                if (this.options.Value.CollectionAge > TimeSpan.Zero && classSpecificCollectionAge.Value < this.options.Value.CollectionQuantum)
+                if (classSpecificCollectionAge.Value <= this.options.Value.CollectionQuantum)
                 {
                     throw new OrleansConfigurationException(
                         $"{classSpecificCollectionAge.Key} CollectionAgeLimit is set to {classSpecificCollectionAge.Value}. " +
                         $"CollectionAgeLimit must be greater than {nameof(GrainCollectionOptions.CollectionQuantum)}, " +
                         $"which is set to {this.options.Value.CollectionQuantum}");
+                }
+
+                if (classSpecificCollectionAge.Value <= TimeSpan.Zero)
+                {
+                    throw new OrleansConfigurationException($"{classSpecificCollectionAge.Key} CollectionAgeLimit is set to {classSpecificCollectionAge.Value}. CollectionAgeLimit must be greater than zero.");
                 }
             }
         }
