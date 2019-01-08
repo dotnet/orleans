@@ -40,6 +40,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                 config.Globals.Application.SetDefaultCollectionAgeLimit(collectionAgeLimit);
                 config.Globals.Application.SetCollectionAgeLimit(typeof(IdleActivationGcTestGrain2), DEFAULT_IDLE_TIMEOUT);
                 config.Globals.Application.SetCollectionAgeLimit(typeof(BusyActivationGcTestGrain2), DEFAULT_IDLE_TIMEOUT);
+                config.Globals.Application.SetCollectionAgeLimit(typeof(CollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain), TimeSpan.FromSeconds(12));
             });
             testCluster = builder.Build();
             testCluster.Deploy();
