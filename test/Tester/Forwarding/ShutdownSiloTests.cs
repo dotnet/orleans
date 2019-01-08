@@ -19,7 +19,6 @@ namespace Tester.Forwarding
         public const int NumberOfSilos = 2;
 
         public static readonly TimeSpan DeactivationTimeout = TimeSpan.FromSeconds(10);
-        public static readonly TimeSpan CollectionQuantum = TimeSpan.FromSeconds(10);
         internal class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
             public void Configure(ISiloHostBuilder hostBuilder)
@@ -27,7 +26,6 @@ namespace Tester.Forwarding
                 hostBuilder.Configure<GrainCollectionOptions>(options =>
                 {
                     options.DeactivationTimeout = DeactivationTimeout;
-                    options.CollectionQuantum = CollectionQuantum;
                 }).UseAzureStorageClustering(options => options.ConnectionString = TestDefaultConfiguration.DataConnectionString);
             }
         }
