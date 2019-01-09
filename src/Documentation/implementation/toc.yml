@@ -1,3 +1,6 @@
+- name: Orleans Lifecycle
+  href: orleans_lifecycle.md
+  homepage: index.md
 - name: Messaging Delivery Guarantees
   href: messaging_delivery_guarantees.md
 - name: Scheduler

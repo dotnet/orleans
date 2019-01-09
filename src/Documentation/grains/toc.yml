@@ -1,5 +1,7 @@
 - name: Developing a Grain
   href: index.md
+- name: Grain Lifecycle
+  href: grain_lifecycle.md
 - name: Grain Identity
   href: grain_identity.md
 - name: Timers and Reminders
