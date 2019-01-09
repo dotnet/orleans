@@ -47,8 +47,8 @@ namespace Orleans.Transactions.Abstractions
         /// Request sent by TM to participants to let them know a transaction has committed.
         /// Participants respond after cleaning up all prepare records.
         /// </summary>
-        /// <param name="transactionId">The id of the aborted transaction</param>
-        /// <param name="timeStamp">The commit timestamp of the aborted transaction</param>
+        /// <param name="transactionId">The id of the committed transaction</param>
+        /// <param name="timeStamp">The commit timestamp of the committed transaction</param>
         Task Confirm(Guid transactionId, DateTime timeStamp);
     }
 }
