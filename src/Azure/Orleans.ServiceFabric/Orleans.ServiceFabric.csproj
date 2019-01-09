@@ -2,7 +2,7 @@
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.ServiceFabric</PackageId>
     <Title>Microsoft Orleans Service Fabric Support Metapackage</Title>
-    <Description>Metapackage providing support for hosing Microsoft Orleans on Service Fabric.</Description>
+    <Description>Metapackage providing support for hosting Microsoft Orleans on Service Fabric.</Description>
     <PackageTags>$(PackageTags) Azure ServiceFabric</PackageTags>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <TargetFramework>netstandard2.0</TargetFramework>
