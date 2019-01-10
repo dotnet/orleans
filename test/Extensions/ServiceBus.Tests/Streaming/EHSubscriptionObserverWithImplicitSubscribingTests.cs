@@ -1,68 +1,82 @@
-using System;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using Orleans;
+using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Streams;
 using Orleans.TestingHost;
-using Tester.StreamingTests;
+using Tester.StreamingTests.ProgrammaticSubscribeTests;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace ServiceBus.Tests.Streaming
+namespace ServiceBus.Tests.StreamingTests
 {
     [TestCategory("EventHub"), TestCategory("Streaming")]
-    public class EHProgrammaticSubscribeTest : ProgrammaticSubcribeTestsRunner, IClassFixture<EHProgrammaticSubscribeTest.Fixture>
+    public class EHSubscriptionObserverWithImplicitSubscribingTests : SubscriptionObserverWithImplicitSubscribingTestRunner, IClassFixture<EHSubscriptionObserverWithImplicitSubscribingTests.Fixture>
     {
         private const string EHPath = "ehorleanstest";
         private const string EHPath2 = "ehorleanstest2";
         private const string EHConsumerGroup = "orleansnightly";
+
         public class Fixture : BaseTestClusterFixture
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             }
+        }
 
-            private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+        private class SiloConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
-                {
-                    hostBuilder
-                        .AddEventHubStreams(StreamProviderName, b=>b
-                        .ConfigureEventHub(ob=>ob.Configure(options =>
+                hostBuilder
+                    .AddEventHubStreams(StreamProviderName, b => b
+                        .ConfigureEventHub(ob => ob.Configure(options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
                             options.ConsumerGroup = EHConsumerGroup;
                             options.Path = EHPath;
                         }))
-                        .UseEventHubCheckpointer(ob=>ob.Configure(options =>
+                        .UseEventHubCheckpointer(ob => ob.Configure(options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.PersistInterval = TimeSpan.FromSeconds(10);
-                        })));
+                        }))
+                        .Configure<StreamPubSubOptions>(ob => ob.Configure(op => op.PubSubType = StreamPubSubType.ImplicitOnly)));
 
-                    hostBuilder
-                        .AddEventHubStreams(StreamProviderName2, b=>b
+                hostBuilder
+                    .AddEventHubStreams(StreamProviderName2, b => b
                         .ConfigureEventHub(ob => ob.Configure(options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
                             options.ConsumerGroup = EHConsumerGroup;
                             options.Path = EHPath2;
-                          
+
                         }))
                         .UseEventHubCheckpointer(ob => ob.Configure(options => {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.PersistInterval = TimeSpan.FromSeconds(10);
-                        })));
+                        }))
+                        .Configure<StreamPubSubOptions>(ob => ob.Configure(op => op.PubSubType = StreamPubSubType.ImplicitOnly)));
 
-                    hostBuilder
-                          .AddMemoryGrainStorage("PubSubStore");
-                }
+                hostBuilder
+                    .AddMemoryGrainStorage("PubSubStore");
             }
         }
 
-        public EHProgrammaticSubscribeTest(ITestOutputHelper output, Fixture fixture)
+        public EHSubscriptionObserverWithImplicitSubscribingTests(ITestOutputHelper output, Fixture fixture)
             : base(fixture)
         {
+            fixture.EnsurePreconditionsMet();
         }
     }
 }

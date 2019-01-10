@@ -10,7 +10,7 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    public class Passive_ConsumerGrain : Grain, IPassive_ConsumerGrain
+    public class Passive_ConsumerGrain : Grain, IPassive_ConsumerGrain, IStreamSubscriptionObserver
     {
         internal Logger logger;
         private List<ICounterObserver> consumerObservers;
@@ -71,7 +71,7 @@ namespace UnitTests.Grains
         }
     }
 
-    public class Jerk_ConsumerGrain : Grain, IJerk_ConsumerGrain
+    public class Jerk_ConsumerGrain : Grain, IJerk_ConsumerGrain, IStreamSubscriptionObserver
     {
         internal Logger logger;
         public override Task OnActivateAsync()
