@@ -146,7 +146,7 @@
     <OrleansGoogleCloudProviderVersion>2.2.0</OrleansGoogleCloudProviderVersion>
     <OrleansAzureCloudServicesVersion>2.2.0</OrleansAzureCloudServicesVersion>
     <OrleansTestingHostVersion>2.2.0</OrleansTestingHostVersion>
-    <OrleansTransactionsVersion>2.2.1</OrleansTransactionsVersion>
+    <OrleansTransactionsVersion>2.2.2</OrleansTransactionsVersion>
     <OrleansServiceFabricVersion>2.2.0</OrleansServiceFabricVersion>
     <OrleansSerializersVersion>2.2.0</OrleansSerializersVersion>
     <OrleansToolsVersion>2.2.0</OrleansToolsVersion>
