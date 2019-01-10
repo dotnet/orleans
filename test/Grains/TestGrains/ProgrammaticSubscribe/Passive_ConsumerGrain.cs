@@ -10,7 +10,7 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    public class Passive_ConsumerGrain : Grain, IPassive_ConsumerGrain
+    public class Passive_ConsumerGrain : Grain, IPassive_ConsumerGrain, IStreamSubscriptionObserver
     {
         internal Logger logger;
         private List<ICounterObserver> consumerObservers;
@@ -71,7 +71,7 @@ namespace UnitTests.Grains
         }
     }
 
-    public class Jerk_ConsumerGrain : Grain, IJerk_ConsumerGrain
+    public class Jerk_ConsumerGrain : Grain, IJerk_ConsumerGrain, IStreamSubscriptionObserver
     {
         internal Logger logger;
         public override Task OnActivateAsync()
@@ -125,8 +125,10 @@ namespace UnitTests.Grains
     }
 
     [ImplicitStreamSubscription(StreamNameSpace)]
-    public class ImplicitSubscribeGrain : Grain, IImplicitSubscribeGrain
+    [ImplicitStreamSubscription(StreamNameSpace2)]
+    public class ImplicitSubscribeGrain : Passive_ConsumerGrain, IImplicitSubscribeGrain
     {
-        public const string StreamNameSpace = "ImplicitSubscriptionSpace";
+        public const string StreamNameSpace = "ImplicitSubscriptionSpace11";
+        public const string StreamNameSpace2 = "ImplicitSubscriptionSpace22";
     }
 }
