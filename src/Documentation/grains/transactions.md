@@ -31,7 +31,7 @@ Example:
 ```csharp
 
 var builder = new SiloHostBuilder()
-    .AddAzureTableTransactionalStateStorage("TransactionStore, options =>
+    .AddAzureTableTransactionalStateStorage("TransactionStore", options =>
     {
         options.ConnectionString = ”YOUR_STORAGE_CONNECTION_STRING”);
     })
