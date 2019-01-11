@@ -19,10 +19,11 @@ using UnitTests.Grains;
 using Xunit;
 using Orleans.Hosting;
 using Orleans.Configuration;
+using Tester;
 
 namespace ServiceBus.Tests.StreamingTests
 {
-    [TestCategory("EventHub"), TestCategory("Streaming")]
+    [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
     public class EHStreamProviderCheckpointTests : TestClusterPerTest
     {
         private static readonly string StreamProviderTypeName = typeof(PersistentStreamProvider).FullName;
@@ -32,6 +33,7 @@ namespace ServiceBus.Tests.StreamingTests
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
+            TestUtils.CheckForEventHub();
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
         }
@@ -82,14 +84,14 @@ namespace ServiceBus.Tests.StreamingTests
             }
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task ReloadFromCheckpointTest()
         {
             logger.Info("************************ EHReloadFromCheckpointTest *********************************");
             await this.ReloadFromCheckpointTestRunner(ImplicitSubscription_RecoverableStream_CollectorGrain.StreamNamespace, 1, 256);
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task RestartSiloAfterCheckpointTest()
         {
             logger.Info("************************ EHRestartSiloAfterCheckpointTest *********************************");

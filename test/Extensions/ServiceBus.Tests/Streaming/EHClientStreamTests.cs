@@ -18,10 +18,11 @@ using Xunit;
 using Xunit.Abstractions;
 using Orleans.Streams;
 using Orleans.ServiceBus.Providers;
+using Tester;
 
 namespace ServiceBus.Tests.StreamingTests
 {
-    [TestCategory("EventHub"), TestCategory("Streaming")]
+    [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
     public class EHClientStreamTests : TestClusterPerTest
     {
         private const string StreamProviderName = "EventHubStreamProvider";
@@ -39,6 +40,7 @@ namespace ServiceBus.Tests.StreamingTests
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
+            TestUtils.CheckForEventHub();
             builder.ConfigureLegacyConfiguration(legacy =>
             {
                 AdjustConfig(legacy.ClusterConfiguration);
@@ -85,14 +87,14 @@ namespace ServiceBus.Tests.StreamingTests
             }
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task EHStreamProducerOnDroppedClientTest()
         {
             logger.Info("************************ EHStreamProducerOnDroppedClientTest *********************************");
             await runner.StreamProducerOnDroppedClientTest(StreamProviderName, StreamNamespace);
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task EHStreamConsumerOnDroppedClientTest()
         {
             logger.Info("************************ EHStreamConsumerOnDroppedClientTest *********************************");

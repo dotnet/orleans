@@ -2,13 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.WindowsAzure.Storage.Table;
 using Microsoft.Extensions.Configuration;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Configuration;
-using Orleans.Streaming.EventHubs;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
@@ -21,7 +18,7 @@ using Orleans.ServiceBus.Providers;
 
 namespace ServiceBus.Tests.StreamingTests
 {
-    [TestCategory("EventHub"), TestCategory("Streaming")]
+    [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
     public class EHStreamPerPartitionTests : OrleansTestingBase, IClassFixture<EHStreamPerPartitionTests.Fixture>
     {
         private readonly Fixture fixture;
@@ -29,7 +26,7 @@ namespace ServiceBus.Tests.StreamingTests
         private const string EHPath = "ehorleanstest";
         private const string EHConsumerGroup = "orleansnightly";
 
-        public class Fixture : BaseTestClusterFixture
+        public class Fixture : BaseEventHubTestClusterFixture
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
@@ -83,9 +80,10 @@ namespace ServiceBus.Tests.StreamingTests
         public EHStreamPerPartitionTests(Fixture fixture)
         {
             this.fixture = fixture;
+            fixture.EnsurePreconditionsMet();
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task EH100StreamsTo4PartitionStreamsTest()
         {
             this.fixture.Logger.Info("************************ EH100StreamsTo4PartitionStreamsTest *********************************");
