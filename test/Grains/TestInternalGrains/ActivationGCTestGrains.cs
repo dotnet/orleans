@@ -85,7 +85,6 @@ namespace UnitTests.Grains
         }
     }
 
-    [CollectionAgeLimit(Minutes = 0.2)]
     public class CollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain : Grain, ICollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain
     {
         public Task Nop()
