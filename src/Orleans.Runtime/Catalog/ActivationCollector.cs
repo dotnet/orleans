@@ -25,11 +25,6 @@ namespace Orleans.Runtime
 
         public ActivationCollector(IOptions<GrainCollectionOptions> options, ILogger<ActivationCollector> logger)
         {
-            if (TimeSpan.Zero == options.Value.CollectionQuantum)
-            {
-                throw new ArgumentException("Globals.CollectionQuantum cannot be zero.", "config");
-            }
-
             quantum = options.Value.CollectionQuantum;
             shortestAgeLimit = TimeSpan.FromTicks(options.Value.ClassSpecificCollectionAge.Values
                 .Aggregate(options.Value.CollectionAge.Ticks, (a,v) => Math.Min(a,v.Ticks)));
@@ -57,12 +52,6 @@ namespace Orleans.Runtime
         // Return the number of activations that were used (touched) in the last recencyPeriod.
         public int GetNumRecentlyUsed(TimeSpan recencyPeriod)
         {
-            if (TimeSpan.Zero == shortestAgeLimit)
-            {
-                // Collection has been disabled for some types.
-                return ApproximateCount;
-            }
-
             var now = DateTime.UtcNow;
             int sum = 0;
             foreach (var bucket in buckets)
@@ -90,11 +79,6 @@ namespace Orleans.Runtime
                 }
 
                 TimeSpan timeout = item.CollectionAgeLimit;
-                if (TimeSpan.Zero == timeout)
-                {
-                    // either the CollectionAgeLimit hasn't been initialized (will be rectified later) or it's been disabled.
-                    return;
-                }
 
                 DateTime ticket = MakeTicketFromTimeSpan(timeout);
             
