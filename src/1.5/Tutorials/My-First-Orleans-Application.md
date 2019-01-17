@@ -33,11 +33,11 @@ https://marketplace.visualstudio.com/items?itemName=sbykov.MicrosoftOrleansTools
 After starting Visual Studio, go to create a new project.
 Under "Visual C#," you should see the following:
 
-![](../Images/New DevTest 1.PNG)
+![](../Images/New%20DevTest%201.PNG)
 
 Choose the "Orleans Dev/Test Host" project type, create a directory for the solution, and create the project:
 
-![](../Images/New DevTest 2.PNG)
+![](../Images/New%20DevTest%202.PNG)
 
 At this point go ahead and compile your project to download the packages.
 
@@ -85,13 +85,13 @@ Separating the two is a best practice since the interface project is shared betw
 
 In addition to the Dev/Test host, there are two more Orleans projects, and we should create one of each in our solution:
 
-![](../Images/New DevTest 4.PNG)
+![](../Images/New%20DevTest%204.PNG)
 
 Once you have them in your solution, make sure to add a reference to the grain interface project from each of the other projects: the host, which will contain our client code, and the grain collection project.
 
 Add a reference for the grain collection project to the host project, so that it is automatically (re-)built and copied when starting the debugger.
 
-![](../Images/New DevTest 7.PNG)
+![](../Images/New%20DevTest%207.PNG)
 
 Open the _IGrain1.cs_ file and add a method `SayHello()` to it.
 We should have something like this:
@@ -148,7 +148,7 @@ Hit F5, let the silo initialization code take its time.
 This will take a few seconds, maybe as much as ten, and there will be a lot of log messages printed.
 At the very end, you should see the printout of the greeting.
 
-![](../Images/New DevTest 6.PNG)
+![](../Images/New%20DevTest%206.PNG)
 
 These are the essential steps to create and run Orleans-based code: define communication interfaces, implement them using grain classes, and write some client code to communicate with the grains in order to test them.
 In a realistic production environment, the grain code would be deployed in a silo hosted by Windows Azure or Windows Server and the client would most likely be a Web site or service using Orleans for the backend logic.
