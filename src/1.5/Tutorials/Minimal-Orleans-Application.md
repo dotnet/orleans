@@ -230,7 +230,7 @@ Within the appropriate bin directory (Debug/Release) there will be a number of l
 ## Further Reading
 
  - [List of Orleans Packages](http://dotnet.github.io/orleans/Documentation/Installation/NuGets.html)
- - [Orleans Configuration Guide](http://dotnet.github.io/orleans/Documentation/Orleans-Configuration-Guide/)
+ - [Orleans Configuration Guide](http://dotnet.github.io/orleans/1.5/Documentation/Deployment-and-Operations/Configuration-Guide)
  - [Orleans Best Practices](https://www.microsoft.com/en-us/research/publication/orleans-best-practices)
  - [Running in a Stand Alone Silo](Running-in-a-Stand-alone-Silo.md)
- - [Azure Web Sample](http://dotnet.github.io/orleans/Documentation/Samples-Overview/Azure-Web-Sample)
+ - [Azure Web Sample](http://dotnet.github.io/orleans/1.5/Documentation/Samples-Overview/Azure-Web-Sample)
