@@ -101,7 +101,7 @@ A grain that uses reminders must implement the **IRemindable.RecieveReminder** m
 Task IRemindable.ReceiveReminder(string reminderName, TickStatus status)
 {
     Console.WriteLine("Thanks for reminding me-- I almost forgot!");
-    return TaskDone.Done;
+    return Task.CompletedTask;
 }
 ```
 
