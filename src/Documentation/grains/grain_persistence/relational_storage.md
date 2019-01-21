@@ -27,7 +27,7 @@ but for the sake of a remark, not all are listed, such as [Teradata](https://dow
 In many cases, the servers and databases are hosted by a third party in contractual relation with the client. It is not an unusual
 situation the hosting environment is virtualized and performance fluctuates due to unforeseen factors, such as noisy neighbors or faulty hardware. It may
 not be possible to alter and re-deploy either Orleans binaries (contractual reasons) or even application binaries, but usually it is possible to tweak the
-database deployment. Altering *standard components*, such as Orleans binaries, requires a lenghtier procedure as to what is afforded in a given situation.
+database deployment. Altering *standard components*, such as Orleans binaries, requires a lengthier procedure as to what is afforded in a given situation.
 
 #### 3. **Allow one to make use of vendor and version specific abilities**
 Vendors have implemented different extensions and features within their products. It is sensible to make use of these features when they are available.
@@ -81,7 +81,7 @@ The interface contract between the database and Orleans is defined as follows:
 3. The implementation across vendor specific scripts **should** preserve the constraint names.
    This simplifies troubleshooting by virtue of uniform naming across concrete implementations.
 4. **Version** &ndash; or **ETag** in application code &ndash; for Orleans represents a unique version.
-   The type of its actual implementation is not important as long as it represents a unique version. In the implementation Orleans code excepts a signed 32-bit integer.
+   The type of its actual implementation is not important as long as it represents a unique version. In the implementation, Orleans code expects a signed 32-bit integer.
 5. For the sake of being explicit and removing ambiguity, Orleans expects some queries to return either **TRUE as > 0** value
    or **FALSE as = 0** value. That is, affected rows or such does not matter. If an error is raised or an exception is thrown
    the query **must** ensure the entire transaction is rolled back and may either return FALSE or propagate the exception.
@@ -112,5 +112,5 @@ The altered scripts can be tested running the Orleans test suite or straight in 
 ## Guidelines for adding new ADO.NET providers
 
 1. Add a new database setup script according to the [Realization of the goals](#realization-of-the-goals) section above.
-2. Add the vendor ADO invariant name to [AdoNetInvariants](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/AdoNetInvariants.cs#L34) and ADO.NET provider specific data to [DbConstantsStore](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/DbConstantsStore.cs). These are (potentially) used in some query operations. e.g. to select the correct statistics insert mode (i.e. the ``UNION ALL`` with or without ``FROM DUAL``).
-3. Orleans has comprehensive tests for all system stores: membership, reminders and statistics. Adding tests for the new database script is done by copy-pasting existing test classes and changing the ADO invariant name. Also, derive from [RelationalStorageForTesting](https://github.com/dotnet/orleans/blob/master/test/TesterSQLUtils/RelationalUtilities/RelationalStorageForTesting.cs) in order to define test functionality for the ADO invariant.
+2. Add the vendor ADO invariant name to [AdoNetInvariants](https://github.com/dotnet/orleans/blob/master/src/AdoNet/Shared/Storage/AdoNetInvariants.cs#L34) and ADO.NET provider specific data to [DbConstantsStore](https://github.com/dotnet/orleans/blob/master/src/AdoNet/Shared/Storage/DbConstantsStore.cs). These are (potentially) used in some query operations. e.g. to select the correct statistics insert mode (i.e. the ``UNION ALL`` with or without ``FROM DUAL``).
+3. Orleans has comprehensive tests for all system stores: membership, reminders and statistics. Adding tests for the new database script is done by copy-pasting existing test classes and changing the ADO invariant name. Also, derive from [RelationalStorageForTesting](https://github.com/dotnet/orleans/blob/master/test/Extensions/TesterAdoNet/RelationalUtilities/RelationalStorageForTesting.cs) in order to define test functionality for the ADO invariant.
