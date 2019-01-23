@@ -107,7 +107,7 @@ namespace Orleans.LogConsistency
                 : this.ServiceProvider.GetService<ILogViewAdaptorFactory>();
             if (attr != null && defaultFactory == null)
             {
-                var errMsg = $"Cannot find consistency provider with Name={attr.ProviderName} for grain type {this.GetType().FullName}"
+                var errMsg = $"Cannot find consistency provider with Name={attr.ProviderName} for grain type {this.GetType().FullName}";
                 throw new BadGrainStorageConfigException(errMsg);
             }
 
