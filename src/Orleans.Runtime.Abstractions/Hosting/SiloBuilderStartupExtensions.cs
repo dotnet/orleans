@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -87,6 +87,29 @@ namespace Orleans.Hosting
                         startupTask,
                         stage)));
             return builder;
+        }
+
+        /// <summary>
+        /// Adds a startup task to be executed when the silo has started.
+        /// </summary>
+        /// <param name="builder">
+        /// The builder.
+        /// </param>
+        /// <param name="stage">
+        /// The stage to execute the startup task, see values in <see cref="ServiceLifecycleStage"/>.
+        /// </param>
+        /// <typeparam name="TStartup">
+        /// The startup task type.
+        /// </typeparam>
+        /// <returns>
+        /// The provided <see cref="ISiloBuilder"/>.
+        /// </returns>
+        public static ISiloBuilder AddStartupTask<TStartup>(
+            this ISiloBuilder builder,
+            int stage = ServiceLifecycleStage.Active)
+            where TStartup : class, IStartupTask
+        {
+            return builder.AddStartupTask((sp, ct) => ActivatorUtilities.GetServiceOrCreateInstance<TStartup>(sp).Execute(ct), stage);
         }
 
         /// <summary>

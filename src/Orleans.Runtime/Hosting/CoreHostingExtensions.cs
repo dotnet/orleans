@@ -31,7 +31,7 @@ namespace Orleans.Hosting
                             ?? $"Silo_{Guid.NewGuid().ToString("N").Substring(0, 5)}");
 
                     services.TryAddSingleton<Silo>();
-                    DefaultSiloServices.AddDefaultServices(context, services);
+                    DefaultSiloServices.AddDefaultServices(context.GetApplicationPartManager(), services);
 
                     context.Properties.Add("OrleansServicesAdded", true);
                 }
@@ -159,8 +159,8 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure the container to use Orleans.
         /// </summary>
-        /// <param name="builder">The host builder.</param>
-        /// <returns>The host builder.</returns>
+        /// <param name="builder">The silo builder.</param>
+        /// <returns>The silo builder.</returns>
         public static ISiloBuilder ConfigureDefaults(this ISiloBuilder builder)
         {
             return builder.ConfigureServices((context, services) =>
@@ -174,7 +174,7 @@ namespace Orleans.Hosting
                             ?? $"Silo_{Guid.NewGuid().ToString("N").Substring(0, 5)}");
 
                     services.TryAddSingleton<Silo>();
-                    DefaultSiloServices.AddDefaultServices(context, services);
+                    DefaultSiloServices.AddDefaultServices(context.GetApplicationPartManager(), services);
 
                     context.Properties.Add("OrleansServicesAdded", true);
                 }
