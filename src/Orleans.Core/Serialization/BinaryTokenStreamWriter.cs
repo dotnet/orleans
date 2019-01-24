@@ -91,7 +91,7 @@ namespace Orleans.Serialization
 
         static BinaryTokenStreamWriter()
         {
-            typeTokens = new Dictionary<RuntimeTypeHandle, SerializationTokenType>();
+            typeTokens = new Dictionary<RuntimeTypeHandle, SerializationTokenType>(RuntimeTypeHandlerEqualityComparer.Instance);
             typeTokens[typeof(bool).TypeHandle] = SerializationTokenType.Boolean;
             typeTokens[typeof(int).TypeHandle] = SerializationTokenType.Int;
             typeTokens[typeof(uint).TypeHandle] = SerializationTokenType.Uint;
@@ -137,7 +137,7 @@ namespace Orleans.Serialization
             typeTokens[typeof(Tuple<,,,,,>).TypeHandle] = SerializationTokenType.Tuple + 6;
             typeTokens[typeof(Tuple<,,,,,,>).TypeHandle] = SerializationTokenType.Tuple + 7;
 
-            writers = new Dictionary<RuntimeTypeHandle, Action<BinaryTokenStreamWriter, object>>();
+            writers = new Dictionary<RuntimeTypeHandle, Action<BinaryTokenStreamWriter, object>>(RuntimeTypeHandlerEqualityComparer.Instance);
             writers[typeof(bool).TypeHandle] = (stream, obj) => stream.Write((bool) obj);
             writers[typeof(int).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.Int); stream.Write((int) obj); };
             writers[typeof(uint).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.Uint); stream.Write((uint) obj); };
