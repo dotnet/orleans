@@ -52,6 +52,7 @@
     <SystemReflectionTypeExtensionsVersion>4.4.0</SystemReflectionTypeExtensionsVersion>
     <SystemValueTupleVersion>4.4.0</SystemValueTupleVersion>
     <SystemThreadingTasksExtensionsVersion>4.4.0</SystemThreadingTasksExtensionsVersion>
+    <SystemMemoryVersion>4.5.1</SystemMemoryVersion>
 
     <!-- Microsoft packages -->
     <MicrosoftBuildVersion>15.7.179</MicrosoftBuildVersion>
@@ -78,9 +79,6 @@
 
     <SystemManagementAutomationdllVersion>10.0.10586</SystemManagementAutomationdllVersion>
 	
-    <SystemMemoryVersion>4.5.1</SystemMemoryVersion>
-
-
     <!-- 3rd party packages -->
     <AWSSDKDynamoDBv2Version>3.3.4.17</AWSSDKDynamoDBv2Version>
     <AWSSDKSQSVersion>3.3.2.7</AWSSDKSQSVersion>
