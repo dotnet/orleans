@@ -5,14 +5,13 @@ using Orleans.Configuration;
 
 namespace Orleans.Runtime
 {
-    internal class BufferPool: MemoryPool<byte>
+    internal sealed class BufferPool
     {
         private readonly int minimumBufferSize;
         public static BufferPool GlobalPool;
-        public int MinimumSize
-        {
-            get { return minimumBufferSize; }
-        }
+
+        private const int MaximumBufferSize = int.MaxValue;
+        public int MinimumSize => this.minimumBufferSize;
 
         internal static void InitGlobalBufferPool(MessagingOptions messagingOptions)
         {
@@ -27,10 +26,10 @@ namespace Orleans.Runtime
         {
             this.minimumBufferSize = minimumBufferSize;
         }
-
+        
         public byte[] GetBuffer()
         {
-            byte[] buffer = ArrayPool<byte>.Shared.Rent(minimumBufferSize);
+            byte[] buffer = ArrayPool<byte>.Shared.Rent(this.minimumBufferSize);
             return buffer;
         }
 
@@ -39,17 +38,14 @@ namespace Orleans.Runtime
             var list = new List<ArraySegment<byte>>();
             while (totalSize > 0)
             {
-                var buff = GetBuffer();
-                list.Add(new ArraySegment<byte>(buff, 0, Math.Min(minimumBufferSize, totalSize)));
-                totalSize -= minimumBufferSize;
+                var buff = this.GetBuffer();
+                list.Add(new ArraySegment<byte>(buff, 0, Math.Min(this.minimumBufferSize, totalSize)));
+                totalSize -= this.minimumBufferSize;
             }
             return list;
         }
 
-        public void Release(byte[] buffer)
-        {
-            ArrayPool<byte>.Shared.Return(buffer);
-        }
+        public void Release(byte[] buffer) => ArrayPool<byte>.Shared.Return(buffer);
 
         public void Release(List<ArraySegment<byte>> list)
         {
@@ -57,63 +53,8 @@ namespace Orleans.Runtime
 
             foreach (var segment in list)
             {
-                Release(segment.Array);
+                this.Release(segment.Array);
             }
         }
-
-        #region MemoryPool<byte>
-
-        private const int MaximumBufferSize = int.MaxValue;
-
-        public sealed override int MaxBufferSize => MaximumBufferSize;
-
-        public sealed override IMemoryOwner<byte> Rent(int minimumBufferSize = -1)
-        {
-            if (minimumBufferSize == -1)
-                minimumBufferSize = this.minimumBufferSize;
-            else if (((uint)minimumBufferSize) > MaximumBufferSize)
-                throw new ArgumentOutOfRangeException(nameof(minimumBufferSize));
-
-            return new ArrayMemoryPoolBuffer(minimumBufferSize);
-        }
-
-        protected sealed override void Dispose(bool disposing) { }
-
-        private sealed class ArrayMemoryPoolBuffer : IMemoryOwner<byte>
-        {
-            private byte[] _array;
-
-            public ArrayMemoryPoolBuffer(int size)
-            {
-                _array = ArrayPool<byte>.Shared.Rent(size);
-            }
-
-            public Memory<byte> Memory
-            {
-                get
-                {
-                    byte[] array = _array;
-                    if (array == null)
-                    {
-                        throw new ObjectDisposedException("ArrayMemoryPoolBuffer");
-                    }
-
-                    return new Memory<byte>(array);
-                }
-            }
-
-            public void Dispose()
-            {
-                byte[] array = _array;
-                if (array != null)
-                {
-                    _array = null;
-                    ArrayPool<byte>.Shared.Return(array);
-                }
-            }
-        }
-
-        #endregion
-
     }
 }
