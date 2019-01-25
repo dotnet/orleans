@@ -18,18 +18,6 @@ namespace Orleans.Hosting
         public SiloBuilder(IHostBuilder hostBuilder)
         {
             this.hostBuilder = hostBuilder;
-            this.ConfigureDefaults();
-
-            this.hostBuilder.ConfigureServices((context, services) =>
-            {
-                services.AddHostedService<SiloHostedService>();
-            });
-
-            this.ConfigureApplicationParts(parts =>
-            {
-                // If the user has not added any application parts, add some defaults.
-                parts.ConfigureDefaults();
-            });
         }
 
         /// <inheritdoc />

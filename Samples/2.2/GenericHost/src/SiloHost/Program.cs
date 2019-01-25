@@ -17,7 +17,7 @@ namespace OrleansSiloHost
             try
             {
                 var host = new HostBuilder()
-                    .AddOrleans(orleansBuilder =>
+                    .UseOrleans(orleansBuilder =>
                     {
                         orleansBuilder
                             .UseLocalhostClustering()
@@ -32,8 +32,6 @@ namespace OrleansSiloHost
                     })
                     .Build();
                 await host.RunAsync();
-
-                await host.StopAsync();
 
                 return 0;
             }

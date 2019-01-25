@@ -66,7 +66,7 @@ namespace NonSilo.Tests
         public void SiloBuilderTest()
         {
             var host = new HostBuilder()
-                .AddOrleans(siloBuilder =>
+                .UseOrleans(siloBuilder =>
                 {
                     siloBuilder
                         .Configure<ClusterOptions>(options => options.ClusterId = "someClusterId")

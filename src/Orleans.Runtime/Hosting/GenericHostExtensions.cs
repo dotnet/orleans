@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 namespace Orleans.Hosting
@@ -18,23 +19,31 @@ namespace Orleans.Hosting
         /// Calling this method multiple times on the same <see cref="IHostBuilder"/> instance will result in one silo being configured.
         /// However, the effects of <paramref name="configureDelegate"/> will be applied once for each call.
         /// </remarks>
-        public static IHostBuilder AddOrleans(this IHostBuilder hostBuilder, Action<ISiloBuilder> configureDelegate)
+        public static IHostBuilder UseOrleans(this IHostBuilder hostBuilder, Action<ISiloBuilder> configureDelegate)
         {
-            const string siloBuilderKey = "SiloBuilder";
             if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
 
+            const string siloBuilderKey = "SiloBuilder";
             SiloBuilder siloBuilder;
             if (!hostBuilder.Properties.ContainsKey(siloBuilderKey))
             {
                 siloBuilder = new SiloBuilder(hostBuilder);
                 hostBuilder.Properties.Add(siloBuilderKey, siloBuilder);
+                siloBuilder
+                    .ConfigureDefaults()
+                    .ConfigureServices((context, services) => services.AddHostedService<SiloHostedService>());
+
+                // Allow the user to override default behaviors and add application parts.
+                configureDelegate.Invoke(siloBuilder);
+
+                siloBuilder.ConfigureApplicationParts(parts => parts.ConfigureDefaults());
             }
             else
             {
                 siloBuilder = (SiloBuilder)hostBuilder.Properties[siloBuilderKey];
+                configureDelegate.Invoke(siloBuilder);
             }
 
-            configureDelegate.Invoke(siloBuilder);
             return hostBuilder;
         }
     }
