@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Concurrency;
@@ -99,5 +99,16 @@ namespace UnitTests.GrainInterfaces
     public interface IReentrantTestSupportGrain : IGrainWithIntegerKey
     {
         Task<bool> IsReentrant(string fullTypeName);
+    }
+
+    public interface INonReentrantWithDependencyGrain : IGrainWithIntegerKey
+    {
+        Task<int> Init(int v);
+        Task<int> Get();
+    }
+
+    public interface INonReentrantWithOnActivateDependencyGrain : IGrainWithIntegerKey
+    {
+        Task<int> Init();
     }
 }

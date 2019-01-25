@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
@@ -552,5 +552,55 @@ namespace UnitTests.Grains
         {
             return Task.FromResult(++count);
         }
+    }
+
+    public class NonReentrantWithDependencyGrain : Grain, INonReentrantWithDependencyGrain
+    {
+        private Logger logger;
+        private int value;
+
+        public override Task OnActivateAsync()
+        {
+            logger = this.GetLogger();
+            logger.Info("OnActivateAsync");
+            return base.OnActivateAsync();
+        }
+
+        public async Task<int> Three()
+        {
+            logger.Info("Entering Three");
+            var destination = this.GetPrimaryKeyLong();
+            logger.Info("Before GetCounter - OtherId={0}", destination);
+            var otherGrain = GrainFactory.GetGrain<INonReentrantWithOnActivateDependencyGrain>(destination);
+            var ctr = await otherGrain.Init();
+            logger.Info("After GetCounter(), exiting Three");
+            return ctr;
+        }
+
+        public async Task<int> Init(int v)
+        {
+            logger.Info("Entering Three");
+            value = v;
+            var destination = this.GetPrimaryKeyLong();
+            logger.Info("Before Init");
+            var otherGrain = GrainFactory.GetGrain<INonReentrantWithOnActivateDependencyGrain>(destination);
+            var ctr = await otherGrain.Init();
+            logger.Info("After Init(), exiting Three");
+            return ctr;
+        }
+
+        public Task<int> Get() =>
+            Task.FromResult(value);
+    }
+
+    public class NonReentrantWithOnActivateDependencyGrain : Grain, INonReentrantWithOnActivateDependencyGrain
+    {
+        private int count;
+
+        public override async Task OnActivateAsync() =>
+            count = await GrainFactory.GetGrain<INonReentrantWithDependencyGrain>(this.GetPrimaryKeyLong()).Get();
+
+        public Task<int> Init() =>
+            Task.FromResult(count);
     }
 }

@@ -529,6 +529,21 @@ namespace UnitTests
 
             this.fixture.Logger.Info("Reentrancy UnorderedNonReentrantGrain Test finished OK.");
         }
+
+        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        public void NonReentrantWithOnActivateDependencyGrain()
+        {
+            var reentrant = this.fixture.GrainFactory.GetGrain<INonReentrantWithDependencyGrain>(GetRandomGrainId());
+            try
+            {
+                Assert.True(reentrant.Init(1).Wait(2000), "Grain should reenter");
+            }
+            catch (Exception ex)
+            {
+                Assert.True(false, string.Format("Unexpected exception {0}: {1}", ex.Message, ex.StackTrace));
+            }
+            this.fixture.Logger.Info("Reentrancy NonReentrantWithOnActivateDependencyGrain Test finished OK.");
+        }
     }
 
     internal class ReentrancyTestsSiloBuilderConfigurator : ISiloBuilderConfigurator
