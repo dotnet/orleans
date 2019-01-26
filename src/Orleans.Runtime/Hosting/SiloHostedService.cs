@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,17 +10,17 @@ namespace Orleans.Hosting
 {
     internal class SiloHostedService : IHostedService
     {
-        private readonly IServiceProvider serviceProvider;
         private readonly ILogger logger;
         private readonly ISiloHost siloHost;
 
-        public SiloHostedService(IServiceProvider serviceProvider)
+        public SiloHostedService(
+            ISiloHost siloHost,
+            IEnumerable<IConfigurationValidator> configurationValidators,
+            ILogger<SiloHostedService> logger)
         {
-            this.serviceProvider = serviceProvider;
-            this.ValidateSystemConfiguration();
-
-            this.siloHost = serviceProvider.GetRequiredService<ISiloHost>();
-            this.logger = serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<SiloHostedService>();
+            this.ValidateSystemConfiguration(configurationValidators);
+            this.siloHost = siloHost;
+            this.logger = logger;
         }
 
         public async Task StartAsync(CancellationToken cancellationToken)
@@ -36,10 +37,9 @@ namespace Orleans.Hosting
             this.logger.LogInformation("Orleans Silo stopped.");
         }
 
-        private void ValidateSystemConfiguration()
+        private void ValidateSystemConfiguration(IEnumerable<IConfigurationValidator> configurationValidators)
         {
-            var validators = this.serviceProvider.GetServices<IConfigurationValidator>();
-            foreach (var validator in validators)
+            foreach (var validator in configurationValidators)
             {
                 validator.ValidateConfiguration();
             }
