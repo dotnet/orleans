@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net;
 using System.Threading.Tasks;
 using HelloWorld.Grains;
@@ -17,9 +17,9 @@ namespace OrleansSiloHost
             try
             {
                 var host = new HostBuilder()
-                    .UseOrleans(orleansBuilder =>
+                    .UseOrleans((context, siloBuilder) =>
                     {
-                        orleansBuilder
+                        siloBuilder
                             .UseLocalhostClustering()
                             .Configure<ClusterOptions>(options =>
                             {
@@ -27,9 +27,9 @@ namespace OrleansSiloHost
                                 options.ServiceId = "HelloWorldApp";
                             })
                             .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
-                            .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(HelloGrain).Assembly).WithReferences())
-                            .ConfigureLogging(logging => logging.AddConsole());
+                            .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(HelloGrain).Assembly).WithReferences());
                     })
+                    .ConfigureLogging(logging => logging.AddConsole())
                     .Build();
                 await host.RunAsync();
 

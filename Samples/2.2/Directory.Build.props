@@ -1,7 +1,0 @@
-<Project>
-
-  <PropertyGroup>
-    <OrleansPackageVersion Condition=" '$(OrleansPackageVersion)'=='' ">2.2*</OrleansPackageVersion>
-  </PropertyGroup>
-
-</Project>
