@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
@@ -61,6 +62,11 @@ namespace TestExtensions
         }
 
         public static SerializationTestEnvironment Initialize(List<TypeInfo> serializationProviders = null, TypeInfo fallbackProvider = null)
+        {
+            return Initialize(serializationProviders?.Select(t => t.AsType()).ToList(), fallbackProvider?.AsType());
+        }
+
+        public static SerializationTestEnvironment Initialize(List<Type> serializationProviders = null, Type fallbackProvider = null)
         {
             var config = new ClientConfiguration {FallbackSerializationProvider = fallbackProvider};
             if (serializationProviders != null) config.SerializationProviders.AddRange(serializationProviders);

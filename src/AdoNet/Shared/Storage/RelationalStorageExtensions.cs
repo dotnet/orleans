@@ -77,7 +77,7 @@ namespace Orleans.Tests.SqlUtils
                 //The following assumes the property names will be retrieved in the same
                 //order as is the index iteration done.                                
                 var onlyOnceRow = new List<string>();
-                var properties = parameters.First().GetType().GetTypeInfo().GetProperties();
+                var properties = parameters.First().GetType().GetProperties();
                 columns = string.Join(",", nameMap == null ? properties.Select(pn => string.Format("{0}{1}{2}", startEscapeIndicator, pn.Name, endEscapeIndicator)) : properties.Select(pn => string.Format("{0}{1}{2}", startEscapeIndicator, (nameMap.ContainsKey(pn.Name) ? nameMap[pn.Name] : pn.Name), endEscapeIndicator)));
                 if(onlyOnceColumns != null && onlyOnceColumns.Any())
                 {

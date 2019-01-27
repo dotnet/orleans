@@ -19,8 +19,8 @@ namespace UnitTests.Serialization
             {
                 SerializationProviders =
                 {
-                    typeof(FakeSerializer1).GetTypeInfo(),
-                    typeof(FakeSerializer2).GetTypeInfo()
+                    typeof(FakeSerializer1),
+                    typeof(FakeSerializer2)
                 }
             };
 

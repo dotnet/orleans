@@ -25,19 +25,19 @@ namespace Benchmarks.Serialization
     {
         private void InitializeSerializer(SerializerToUse serializerToUse)
         {
-            TypeInfo fallback = null;
+            Type fallback = null;
             switch (serializerToUse)
             {
                 case SerializerToUse.Default:
                     break;
                 case SerializerToUse.IlBasedFallbackSerializer:
-                    fallback = typeof(ILBasedSerializer).GetTypeInfo();
+                    fallback = typeof(ILBasedSerializer);
                     break;
                 case SerializerToUse.BinaryFormatterFallbackSerializer:
-                    fallback = typeof(BinaryFormatterSerializer).GetTypeInfo();
+                    fallback = typeof(BinaryFormatterSerializer);
                     break;
                 case SerializerToUse.ProtoBufNet:
-                    fallback = typeof(ProtobufNetSerializer).GetTypeInfo();
+                    fallback = typeof(ProtobufNetSerializer);
                     break;
                 default:
                     throw new InvalidOperationException("Invalid Serializer was selected");

@@ -14,7 +14,7 @@ namespace Orleans.Runtime
         {
             get
             {
-                Assembly thisProg = typeof(RuntimeVersion).GetTypeInfo().Assembly;
+                Assembly thisProg = typeof(RuntimeVersion).Assembly;
                 FileVersionInfo progVersionInfo = FileVersionInfo.GetVersionInfo(thisProg.Location);
                 bool isDebug = IsAssemblyDebugBuild(thisProg);
                 string productVersion = progVersionInfo.ProductVersion + (isDebug ? " (Debug)." : " (Release)."); // progVersionInfo.IsDebug; does not work
@@ -29,7 +29,7 @@ namespace Orleans.Runtime
         {
             get
             {
-                AssemblyName libraryInfo = typeof(RuntimeVersion).GetTypeInfo().Assembly.GetName();
+                AssemblyName libraryInfo = typeof(RuntimeVersion).Assembly.GetName();
                 return libraryInfo.Version.ToString();
             }
         }
@@ -41,7 +41,7 @@ namespace Orleans.Runtime
         {
             get
             {
-                Assembly thisProg = typeof(RuntimeVersion).GetTypeInfo().Assembly;
+                Assembly thisProg = typeof(RuntimeVersion).Assembly;
                 FileVersionInfo progVersionInfo = FileVersionInfo.GetVersionInfo(thisProg.Location);
                 string fileVersion = progVersionInfo.FileVersion;
                 return string.IsNullOrEmpty(fileVersion) ? ApiVersion : fileVersion;
@@ -56,7 +56,7 @@ namespace Orleans.Runtime
         {
             get
             {
-                Assembly thisProg = Assembly.GetEntryAssembly() ?? typeof(RuntimeVersion).GetTypeInfo().Assembly;
+                Assembly thisProg = Assembly.GetEntryAssembly() ?? typeof(RuntimeVersion).Assembly;
                 AssemblyName progInfo = thisProg.GetName();
                 return progInfo.Name;
             }

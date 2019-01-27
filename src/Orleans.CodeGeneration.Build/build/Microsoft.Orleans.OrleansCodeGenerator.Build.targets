@@ -63,6 +63,7 @@
       <Output TaskParameter="DotNetHost" PropertyName="DotNetHost" />
     </Orleans.CodeGeneration.GetDotNetHost>
     <ItemGroup>
+      <CodeGenArgs Include="/waitForDebugger" Condition="'$(OrleansCodeGenWaitForDebugger)' != ''" />
       <CodeGenArgs Include="/in:$(InputAssembly)"/>
       <CodeGenArgs Include="/out:$(OutputFileName)"/>
       <CodeGenArgs Include="/loglevel:$(OrleansCodeGenLogLevel)"/>

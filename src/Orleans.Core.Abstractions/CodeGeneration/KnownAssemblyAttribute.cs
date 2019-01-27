@@ -14,7 +14,7 @@ namespace Orleans.CodeGeneration
         /// The type itself is not relevant, and it's just a way to indirectly identify the assembly.</param>
         public KnownAssemblyAttribute(Type type)
         {
-            this.Assembly = type.GetTypeInfo().Assembly;
+            this.Assembly = type.Assembly;
         }
 
         /// <summary>

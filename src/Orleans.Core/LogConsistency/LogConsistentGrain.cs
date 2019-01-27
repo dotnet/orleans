@@ -100,7 +100,7 @@ namespace Orleans.LogConsistency
 
         private ILogViewAdaptorFactory SetupLogConsistencyProvider(IGrainActivationContext activationContext)
         {
-            var attr = this.GetType().GetTypeInfo().GetCustomAttributes<LogConsistencyProviderAttribute>(true).FirstOrDefault();
+            var attr = this.GetType().GetCustomAttributes<LogConsistencyProviderAttribute>(true).FirstOrDefault();
 
             ILogViewAdaptorFactory defaultFactory = attr != null
                 ? this.ServiceProvider.GetServiceByName<ILogViewAdaptorFactory>(attr.ProviderName)

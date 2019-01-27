@@ -12,7 +12,7 @@ namespace Orleans.Counter.Control
             var prog = new CounterControl(CounterControl.InitDefaultLogging());
 
             // Program ident
-            AssemblyName thisProgram = typeof(Program).GetTypeInfo().Assembly.GetName();
+            AssemblyName thisProgram = typeof(Program).Assembly.GetName();
             var progTitle = string.Format("{0} v{1}", thisProgram.Name, thisProgram.Version.ToString());
             ConsoleText.WriteStatus(progTitle);
             Console.Title = progTitle;

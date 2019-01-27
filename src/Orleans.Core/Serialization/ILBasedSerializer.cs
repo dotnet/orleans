@@ -80,7 +80,7 @@
         /// <param name="t">The type of the item to be serialized</param>
         /// <returns>A value indicating whether the item can be serialized.</returns>
         public bool IsSupportedType(Type t)
-            => this.serializers.ContainsKey(t) || ILSerializerGenerator.IsSupportedType(t.GetTypeInfo());
+            => this.serializers.ContainsKey(t) || ILSerializerGenerator.IsSupportedType(t);
 
         /// <inheritdoc />
         public object DeepCopy(object source, ICopyContext context)
@@ -151,7 +151,7 @@
 
         private SerializerBundle GenerateSerializer(Type type)
         {
-            if (type.GetTypeInfo().IsGenericTypeDefinition) return this.thisSerializer;
+            if (type.IsGenericTypeDefinition) return this.thisSerializer;
 
             if (TypeType.IsAssignableFrom(type))
             {

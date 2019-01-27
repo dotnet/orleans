@@ -345,7 +345,7 @@ namespace Orleans.Serialization
                 return;
             }
 
-            if (t.GetTypeInfo().IsGenericType)
+            if (t.IsGenericType)
             {
                 if (typeTokens.TryGetValue(t.GetGenericTypeDefinition().TypeHandle, out token))
                 {

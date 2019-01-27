@@ -799,11 +799,11 @@ namespace UnitTests.Grains
 
 
             Type GetImmediateSubclass(Type subject) {
-                if(subject.GetTypeInfo().BaseType == typeof(BasicGrain)) {
+                if(subject.BaseType == typeof(BasicGrain)) {
                     return subject;
                 }
 
-                return GetImmediateSubclass(subject.GetTypeInfo().BaseType);
+                return GetImmediateSubclass(subject.BaseType);
             }
         }
 

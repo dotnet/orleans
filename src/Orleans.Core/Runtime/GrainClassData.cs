@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 
@@ -54,10 +54,9 @@ namespace Orleans.Runtime
 
         internal long GetTypeCode(Type interfaceType)
         {
-            var typeInfo = interfaceType.GetTypeInfo();
-            if (typeInfo.IsGenericType && this.IsGeneric)
+            if (interfaceType.IsGenericType && this.IsGeneric)
             {
-                string args = TypeUtils.GetGenericTypeArgs(typeInfo.GetGenericArguments(), t => true);
+                string args = TypeUtils.GetGenericTypeArgs(interfaceType.GetGenericArguments(), t => true);
                 int hash = Utils.CalculateIdHash(args);
                 return (((long)(hash & 0x00FFFFFF)) << 32) + GrainTypeCode;
             }

@@ -19,7 +19,7 @@ namespace BondUtils.Tests.Serialization
                 {
                     SerializationProviders =
                     {
-                        typeof(BondSerializer).GetTypeInfo()
+                        typeof(BondSerializer)
                     }
                 });
         }

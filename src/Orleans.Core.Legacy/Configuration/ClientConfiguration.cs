@@ -360,13 +360,12 @@ namespace Orleans.Runtime.Configuration
         /// <param name="properties">Properties that will be passed to stream provider upon initialization</param>
         public void RegisterStreamProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : Orleans.Streams.IStreamProvider
         {
-            TypeInfo providerTypeInfo = typeof(T).GetTypeInfo();
-            if (providerTypeInfo.IsAbstract ||
-                providerTypeInfo.IsGenericType ||
-                !typeof(Orleans.Streams.IStreamProvider).IsAssignableFrom(typeof(T)))
+            if (typeof(T).IsAbstract ||
+                typeof(T).IsGenericType ||
+                !typeof(Streams.IStreamProvider).IsAssignableFrom(typeof(T)))
                 throw new ArgumentException("Expected non-generic, non-abstract type which implements IStreamProvider interface", "typeof(T)");
 
-            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerTypeInfo.FullName, providerName, properties);
+            ProviderConfigurationUtility.RegisterProvider(this.ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, typeof(T).FullName, providerName, properties);
         }
 
         /// <summary>

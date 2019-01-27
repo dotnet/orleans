@@ -87,9 +87,8 @@ namespace Orleans.CodeGenerator
         /// </returns>
         internal static TypeDeclarationSyntax GenerateClass(string className, Type type, Action<Type> onEncounteredType)
         {
-            var typeInfo = type;
-            var genericTypes = typeInfo.IsGenericTypeDefinition
-                                   ? typeInfo.GetGenericArguments().Select(_ => SF.TypeParameter(_.ToString())).ToArray()
+            var genericTypes = type.IsGenericTypeDefinition
+                                   ? type.GetGenericArguments().Select(_ => SF.TypeParameter(_.ToString())).ToArray()
                                    : new TypeParameterSyntax[0];
 
             var attributes = new List<AttributeSyntax>
@@ -137,7 +136,7 @@ namespace Orleans.CodeGenerator
         {
             var body = new List<StatementSyntax>();
 
-            Expression<Action<TypeInfo>> getField = _ => _.GetField(string.Empty, BindingFlags.Default);
+            Expression<Action<Type>> getField = _ => _.GetField(string.Empty, BindingFlags.Default);
             Expression<Action<IFieldUtils>> getGetter = _ => _.GetGetter(default(FieldInfo));
             Expression<Action<IFieldUtils>> getReferenceSetter = _ => _.GetReferenceSetter(default(FieldInfo));
             Expression<Action<IFieldUtils>> getValueSetter = _ => _.GetValueSetter(default(FieldInfo));
@@ -510,15 +509,15 @@ namespace Orleans.CodeGenerator
         }
 
         /// <summary>
-        /// Return a parameterless ctor if found. Since typeInfo.GetConstructor can throw BadImageFormatException, 
+        /// Return a parameterless ctor if found. Since type.GetConstructor can throw BadImageFormatException, 
         /// we have to do the manual filtering here.
         /// </summary>
-        /// <param name="typeInfo">The typeInfo</param>
+        /// <param name="type">The type</param>
         /// <returns>Given ctor or null if not found.</returns>
-        private static ConstructorInfo GetEmptyConstructor(Type typeInfo)
+        private static ConstructorInfo GetEmptyConstructor(Type type)
         {
             var result = default(ConstructorInfo);
-            var ctors = typeInfo.GetConstructors();
+            var ctors = type.GetConstructors();
 
             foreach (var ctor in ctors)
             {
