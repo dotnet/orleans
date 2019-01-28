@@ -23,7 +23,7 @@ namespace ServiceBus.Tests.StreamingTests
     {
         private readonly Fixture fixture;
         private const string StreamProviderName = "EHStreamPerPartition";
-        private const string EHPath = "ehorleanstest";
+        private const string EHPath = "ehorleanstest5";
         private const string EHConsumerGroup = "orleansnightly";
 
         public class Fixture : BaseEventHubTestClusterFixture

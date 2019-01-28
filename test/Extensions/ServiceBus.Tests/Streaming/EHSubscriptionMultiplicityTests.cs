@@ -21,7 +21,7 @@ namespace ServiceBus.Tests.StreamingTests
     {
         private const string StreamProviderName = "EventHubStreamProvider";
         private const string StreamNamespace = "EHSubscriptionMultiplicityTestsNamespace";
-        private const string EHPath = "ehorleanstest";
+        private const string EHPath = "ehorleanstest7";
         private const string EHConsumerGroup = "orleansnightly";
 
         private readonly SubscriptionMultiplicityTestRunner runner;

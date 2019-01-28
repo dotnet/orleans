@@ -28,7 +28,7 @@ namespace ServiceBus.Tests.StreamingTests
     {
         private static readonly string StreamProviderTypeName = typeof(PersistentStreamProvider).FullName;
         private const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
-        private const string EHPath = "ehorleanstest";
+        private const string EHPath = "ehorleanstest6";
         private const string EHConsumerGroup = "orleansnightly";
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)

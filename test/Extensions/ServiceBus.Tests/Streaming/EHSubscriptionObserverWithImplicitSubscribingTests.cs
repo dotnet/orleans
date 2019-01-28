@@ -22,8 +22,8 @@ namespace ServiceBus.Tests.StreamingTests
     [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
     public class EHSubscriptionObserverWithImplicitSubscribingTests : SubscriptionObserverWithImplicitSubscribingTestRunner, IClassFixture<EHSubscriptionObserverWithImplicitSubscribingTests.Fixture>
     {
-        private const string EHPath = "ehorleanstest";
-        private const string EHPath2 = "ehorleanstest2";
+        private const string EHPath = "ehorleanstest8";
+        private const string EHPath2 = "ehorleanstest9";
         private const string EHConsumerGroup = "orleansnightly";
 
         public class Fixture : BaseEventHubTestClusterFixture

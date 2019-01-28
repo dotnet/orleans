@@ -21,7 +21,7 @@ namespace ServiceBus.Tests.StreamingTests
     {
         private readonly Fixture fixture;
         private const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
-        private const string EHPath = "ehorleanstest";
+        private const string EHPath = "ehorleanstest2";
         private const string EHConsumerGroup = "orleansnightly";
 
         private readonly ImplicitSubscritionRecoverableStreamTestRunner runner;
