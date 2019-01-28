@@ -1,13 +1,11 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
     [Serializable]
-    internal class StreamSubscriptionHandleImpl<T> : StreamSubscriptionHandle<T>, IStreamSubscriptionHandle
+    internal class StreamSubscriptionHandleImpl<T> : StreamSubscriptionHandle<T>, IStreamSubscriptionHandle 
     {
         private StreamImpl<T> streamImpl;
         private readonly IStreamFilterPredicateWrapper filterWrapper;
@@ -18,7 +16,6 @@ namespace Orleans.Streams
         private IAsyncObserver<T> observer;
         [NonSerialized]
         private StreamHandshakeToken expectedToken;
-        private bool isBatchObserver { get; }
         internal bool IsValid { get { return streamImpl != null; } }
         internal GuidId SubscriptionId { get { return subscriptionId; } }
         internal bool IsRewindable { get { return isRewindable; } }
@@ -36,11 +33,6 @@ namespace Orleans.Streams
         {
             if (subscriptionId == null) throw new ArgumentNullException("subscriptionId");
             if (streamImpl == null) throw new ArgumentNullException("streamImpl");
-
-            if (observer is IAsyncBatchObserver<T>)
-            {
-                this.isBatchObserver = true;
-            }
 
             this.subscriptionId = subscriptionId;
             this.observer = observer;
@@ -85,16 +77,9 @@ namespace Orleans.Streams
                     return expectedToken;
             }
 
-            if (this.isBatchObserver)
+            foreach (var itemTuple in batch.GetEvents<T>())
             {
-                await DeliverBatchToBatchObserver(batch);
-            }
-            else
-            {
-                foreach (var itemTuple in batch.GetEvents<T>())
-                {
-                    await NextItem(itemTuple.Item1, itemTuple.Item2);
-                }
+                await NextItem(itemTuple.Item1, itemTuple.Item2);
             }
 
             if (IsRewindable)
@@ -102,22 +87,6 @@ namespace Orleans.Streams
                 expectedToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken);
             }
             return null;
-        }
-
-        private async Task DeliverBatchToBatchObserver(IBatchContainer batch)
-        {
-            if (batch is IBatchContainerBatch)
-            {
-                var batchContainerBatch = batch as IBatchContainerBatch;
-                foreach (var batchContainer in batchContainerBatch.BatchContainers)
-                {
-                    await NextBatch(batchContainer.GetEvents<T>(), batchContainer.SequenceToken);
-                }
-            }
-            else
-            {
-                await NextBatch(batch.GetEvents<T>(), batch.SequenceToken);
-            }
         }
 
         public async Task<StreamHandshakeToken> DeliverItem(object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
@@ -143,39 +112,6 @@ namespace Orleans.Streams
             return null;
         }
 
-        private Task NextBatch(IEnumerable<object> items, StreamSequenceToken token)
-        {
-            IEnumerable<T> typedItems;
-            try
-            {
-                typedItems = items.Cast<T>();
-            }
-            catch (InvalidCastException)
-            {
-                // We got an illegal item on the stream -- close it with a Cast exception
-                var types = items.Select(item => item.GetType().Name).ToList();
-                throw new InvalidCastException("Received an item of invalid type in the batch types:" + string.Join(" ", types) + ", expected only" + typeof(T).FullName);
-            }
-
-            // This method could potentially be invoked after Dispose() has been called, 
-            // so we have to ignore the request or we risk breaking unit tests AQ_01 - AQ_04.
-            if (observer == null || !IsValid)
-                return Task.CompletedTask;
-
-            typedItems.Where(typedItem =>
-            {
-                if (filterWrapper != null && !filterWrapper.ShouldReceive(streamImpl, filterWrapper.FilterData, typedItem))
-                    return false;
-                return true;
-            });
-
-            if (typedItems.Count() == 0)
-            {
-                return Task.CompletedTask;
-            }
-
-            return (observer as IAsyncBatchObserver<T>).OnNextBatchAsync(typedItems, token);
-        }
 
         private Task NextItem(object item, StreamSequenceToken token)
         {
