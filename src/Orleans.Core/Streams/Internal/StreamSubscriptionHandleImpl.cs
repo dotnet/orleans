@@ -106,7 +106,7 @@ namespace Orleans.Streams
 
         private async Task DeliverBatchToBatchObserver(IBatchContainer batch)
         {
-            if (batch is BatchContainerBatch)
+            if (batch is IBatchContainerBatch)
             {
                 var batchContainerBatch = batch as IBatchContainerBatch;
                 foreach (var batchContainer in batchContainerBatch.BatchContainers)

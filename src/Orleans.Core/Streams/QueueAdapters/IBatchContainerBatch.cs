@@ -10,6 +10,6 @@ namespace Orleans.Streams
         /// <summary>
         /// Batch containers comprising this batch
         /// </summary>
-        IEnumerable<IBatchContainer> BatchContainers { get; }
+        List<IBatchContainer> BatchContainers { get; }
     }
 }

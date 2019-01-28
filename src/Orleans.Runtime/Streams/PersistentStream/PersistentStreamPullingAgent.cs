@@ -524,7 +524,7 @@ namespace Orleans.Streams
                     Exception exceptionOccured = null;
                     try
                     {
-                        batch = GetBatchForConsumer(consumerData.Cursor);
+                        batch = GetBatchForConsumer(consumerData.Cursor, filterWrapper, consumerData.StreamId);
                         if (batch == null)
                         {
                             break;
@@ -604,9 +604,9 @@ namespace Orleans.Streams
             }
         }
 
-        private IBatchContainer GetBatchForConsumer(IQueueCacheCursor cursor)
+        private IBatchContainer GetBatchForConsumer(IQueueCacheCursor cursor, IStreamFilterPredicateWrapper filterWrapper, StreamId streamId)
         {
-            if (this.options.BatchContainerBatchSize == 1)
+            if (this.options.BatchContainerBatchSize <= 1)
             {
                 Exception ignore;
 
@@ -620,17 +620,24 @@ namespace Orleans.Streams
             else if (this.options.BatchContainerBatchSize > 1)
             {
                 Exception ignore;
-                int i;
+                int i = 0;
                 var batchContainers = new List<IBatchContainer>();
 
-                for (i = 0; i < this.options.BatchContainerBatchSize; i++)
+                while (i < this.options.BatchContainerBatchSize)
                 {
                     if (!cursor.MoveNext())
                     {
                         break;
                     }
 
-                    batchContainers.Add(cursor.GetCurrent(out ignore));
+                    var batchContainer = cursor.GetCurrent(out ignore);
+                    if (!batchContainer.ShouldDeliver(
+                                streamId,
+                                filterWrapper.FilterData,
+                                filterWrapper.ShouldReceive)) continue;
+
+                    batchContainers.Add(batchContainer);
+                    i++;
                 }
 
                 if (i == 0)
@@ -640,10 +647,8 @@ namespace Orleans.Streams
 
                 return new BatchContainerBatch(batchContainers);
             }
-            else
-            {
-                throw new OrleansConfigurationException("StreamPullingAgentOptions.BatchContainerBatchSize is negative");
-            }
+
+            return null;
         }
 
         private async Task<StreamHandshakeToken> DeliverBatchToConsumer(StreamConsumerData consumerData, IBatchContainer batch)

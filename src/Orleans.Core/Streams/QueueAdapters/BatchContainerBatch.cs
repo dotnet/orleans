@@ -31,9 +31,9 @@ namespace Orleans.Streams
         /// <summary>
         /// Batch containers comprising this batch
         /// </summary>
-        public IEnumerable<IBatchContainer> BatchContainers { get; }
+        public List<IBatchContainer> BatchContainers { get; }
 
-        public BatchContainerBatch(IEnumerable<IBatchContainer> batchContainers)
+        public BatchContainerBatch(List<IBatchContainer> batchContainers)
         {
             if ((batchContainers == null) || !batchContainers.Any())
             {
