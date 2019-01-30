@@ -201,7 +201,7 @@ namespace Orleans.Transactions.TestKit
             loadresponse.PendingStates[0].State.state.Should().Be(123);
         }
 
-        private async Task ConfirmOne(bool useTwoSteps)
+        public virtual async Task ConfirmOne(bool useTwoSteps)
         { 
             var stateStorage = await this.stateStorageFactory();
             var loadresponse = await stateStorage.Load();
@@ -234,7 +234,7 @@ namespace Orleans.Transactions.TestKit
             loadresponse.Metadata.CommitRecords.Count.Should().Be(0);
         }
 
-        private async Task CancelOne()
+        public virtual async Task CancelOne()
         {
             var stateStorage = await this.stateStorageFactory();
             var loadresponse = await stateStorage.Load();
@@ -260,7 +260,7 @@ namespace Orleans.Transactions.TestKit
             loadresponse.Metadata.CommitRecords.Count.Should().Be(0);
         }
 
-        private async Task ReplaceOne()
+        public virtual async Task ReplaceOne()
         {
             var stateStorage = await this.stateStorageFactory();
             var loadresponse = await stateStorage.Load();
@@ -290,7 +290,7 @@ namespace Orleans.Transactions.TestKit
         }
 
 
-        private async Task ConfirmOneAndCancelOne(bool useTwoSteps = false, bool reverseOrder = false)
+        public virtual async Task ConfirmOneAndCancelOne(bool useTwoSteps = false, bool reverseOrder = false)
         {
             var stateStorage = await this.stateStorageFactory();
             var loadresponse = await stateStorage.Load();
@@ -334,7 +334,7 @@ namespace Orleans.Transactions.TestKit
             loadresponse.Metadata.CommitRecords.Count.Should().Be(0);
         }
 
-        private async Task PrepareMany(int count)
+        public virtual async Task PrepareMany(int count)
         {
             var stateStorage = await this.stateStorageFactory();
             var loadresponse = await stateStorage.Load();
@@ -368,7 +368,7 @@ namespace Orleans.Transactions.TestKit
             }
         }
 
-        private async Task ConfirmMany(int count, bool useTwoSteps)
+        public virtual async Task ConfirmMany(int count, bool useTwoSteps)
         {
             var stateStorage = await this.stateStorageFactory();
             var loadresponse = await stateStorage.Load();
@@ -405,7 +405,7 @@ namespace Orleans.Transactions.TestKit
             loadresponse.Metadata.CommitRecords.Count.Should().Be(0);
         }
 
-        private async Task CancelMany(int count)
+        public virtual async Task CancelMany(int count)
         {
             var stateStorage = await this.stateStorageFactory();
             var loadresponse = await stateStorage.Load();
@@ -435,7 +435,7 @@ namespace Orleans.Transactions.TestKit
             loadresponse.Metadata.CommitRecords.Count.Should().Be(0);
         }
 
-        private async Task ReplaceMany(int count)
+        public virtual async Task ReplaceMany(int count)
         {
             var stateStorage = await this.stateStorageFactory();
             var loadresponse = await stateStorage.Load();
@@ -477,7 +477,7 @@ namespace Orleans.Transactions.TestKit
         }
 
 
-        private async Task GrowingBatch()
+        public virtual async Task GrowingBatch()
         {
             var stateStorage = await this.stateStorageFactory();
             var loadresponse = await stateStorage.Load();
@@ -526,7 +526,7 @@ namespace Orleans.Transactions.TestKit
             loadresponse.PendingStates[1].State.state.Should().Be(88);
         }
 
-        private async Task ShrinkingBatch()
+        public virtual async Task ShrinkingBatch()
         {
             var stateStorage = await this.stateStorageFactory();
             var loadresponse = await stateStorage.Load();
@@ -569,34 +569,6 @@ namespace Orleans.Transactions.TestKit
             loadresponse.PendingStates[0].TransactionId.Should().Be(pendingstate4b.TransactionId);
             loadresponse.PendingStates[0].State.state.Should().Be(44);
         }
-
-
-        public virtual async Task RunAll()
-        {
-            await ConfirmOne(true);
-            await ConfirmOne(false);
-            await CancelOne();
-            await ReplaceOne();
-            await ConfirmOneAndCancelOne();
-            await ConfirmOneAndCancelOne(true, true);
-            await ConfirmOneAndCancelOne(true, false);
-            await GrowingBatch();
-            await ShrinkingBatch();
-            await PrepareMany(99);
-            await PrepareMany(100);
-            await PrepareMany(200);
-            await ConfirmMany(99, true);
-            await ConfirmMany(99, false);
-            await ConfirmMany(100, true);
-            await ConfirmMany(100, false);
-            await ConfirmMany(200, true);
-            await ConfirmMany(200, false);
-            await CancelMany(99);
-            await CancelMany(100);
-            await CancelMany(200);
-            await ReplaceMany(99);
-            await ReplaceMany(100);
-            await ReplaceMany(200);
-        }
+        
     }
 }
