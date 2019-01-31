@@ -456,7 +456,7 @@ namespace Orleans.Runtime
         /// </summary>
         internal bool IsUsingGrainDirectory => this.PlacedUsing.IsUsingGrainDirectory;
 
-        public Message Running { get; private set; }
+        public Message Blocking { get; private set; }
 
         // the number of requests that are currently executing on this activation.
         // includes reentrant and non-reentrant requests.
@@ -466,7 +466,7 @@ namespace Orleans.Runtime
         private DateTime becameIdle;
         private DateTime deactivationStartTime;
 
-        public void RecordRunning(Message message)
+        public void RecordRunning(Message message, bool isInterleavable)
         {
             // Note: This method is always called while holding lock on this activation, so no need for additional locks here
 
@@ -478,11 +478,11 @@ namespace Orleans.Runtime
                 RunningRequestsSenders.Add(message.SendingActivation);
             }
 
-            if (Running != null) return;
+            if (this.Blocking != null || isInterleavable) return;
 
             // This logic only works for non-reentrant activations
             // Consider: Handle long request detection for reentrant activations.
-            Running = message;
+            this.Blocking = message;
             currentRequestStartTime = DateTime.UtcNow;
         }
 
@@ -501,9 +501,9 @@ namespace Orleans.Runtime
             }
 
             // The below logic only works for non-reentrant activations.
-            if (Running != null && !message.Equals(Running)) return;
+            if (this.Blocking != null && !message.Equals(this.Blocking)) return;
 
-            Running = null;
+            this.Blocking = null;
             currentRequestStartTime = DateTime.MinValue;
         }
 
@@ -577,13 +577,13 @@ namespace Orleans.Runtime
                         return EnqueueMessageResult.ErrorStuckActivation;
                     }
                 }
-                if (Running != null)
+                if (this.Blocking != null)
                 {
                     var currentRequestActiveTime = DateTime.UtcNow - currentRequestStartTime;
                     if (currentRequestActiveTime > maxRequestProcessingTime)
                     {
                         logger.Error(ErrorCode.Dispatcher_StuckActivation,
-                            $"Current request has been active for {currentRequestActiveTime} for activation {ToDetailedString()}. Currently executing {Running}.  Trying  to enqueue {message}.");
+                            $"Current request has been active for {currentRequestActiveTime} for activation {ToDetailedString()}. Currently executing {this.Blocking}.  Trying  to enqueue {message}.");
                         return EnqueueMessageResult.ErrorStuckActivation;
                     }
                     // Consider: Handle long request detection for reentrant activations -- this logic only works for non-reentrant activations
@@ -591,7 +591,7 @@ namespace Orleans.Runtime
                     {
                         logger.Warn(ErrorCode.Dispatcher_ExtendedMessageProcessing,
                              "Current request has been active for {0} for activation {1}. Currently executing {2}. Trying  to enqueue {3}.",
-                             currentRequestActiveTime, this.ToDetailedString(), Running, message);
+                             currentRequestActiveTime, this.ToDetailedString(), this.Blocking, message);
                     }
                 }
 
@@ -826,9 +826,9 @@ namespace Orleans.Runtime
             lock (this)
             {
                 sb.AppendFormat("   {0}", ToDetailedString());
-                if (Running != null)
+                if (this.Blocking != null)
                 {
-                    sb.AppendFormat("   Processing message: {0}", Running);
+                    sb.AppendFormat("   Processing message: {0}", this.Blocking);
                 }
 
                 if (waiting!=null && waiting.Count > 0)
@@ -865,7 +865,7 @@ namespace Orleans.Runtime
                     numRunning,                     // 8 NumRunning
                     GetIdleness(DateTime.UtcNow),   // 9 IdlenessTimeSpan
                     CollectionAgeLimit,             // 10 CollectionAgeLimit
-                    (includeExtraDetails && Running != null) ? " CurrentlyExecuting=" + Running : "");  // 11: Running
+                    (includeExtraDetails && this.Blocking != null) ? " CurrentlyExecuting=" + this.Blocking : "");  // 11: Running
         }
 
         public string Name
