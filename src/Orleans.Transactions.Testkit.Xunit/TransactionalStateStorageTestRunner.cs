@@ -29,11 +29,84 @@ namespace Orleans.Transactions.TestKit.xUnit
             return base.FirstTime_Load_ShouldReturnEmptyLoadResponse();
         }
 
-        [Fact]
-        public override Task RunAll()
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public override Task ConfirmOne(bool useTwoSteps)
         {
-            return base.RunAll();
+            return base.ConfirmOne(useTwoSteps);
         }
 
+        [Fact]
+        public override Task CancelOne()
+        {
+            return base.CancelOne();
+        }
+
+        [Fact]
+        public override Task ReplaceOne()
+        {
+            return base.ReplaceOne();
+        }
+
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(true, true)]
+        [InlineData(true, false)]
+        public override Task ConfirmOneAndCancelOne(bool useTwoSteps, bool reverseOrder)
+        {
+            return base.ConfirmOneAndCancelOne(useTwoSteps, reverseOrder);
+        }
+
+        [Fact]
+        public override Task GrowingBatch()
+        {
+            return base.GrowingBatch();
+        }
+
+        [Fact]
+        public override Task ShrinkingBatch()
+        {
+            return base.ShrinkingBatch();
+        }
+
+        [Theory]
+        [InlineData(99)]
+        [InlineData(100)]
+        [InlineData(200)]
+        public override Task PrepareMany(int count)
+        {
+            return base.PrepareMany(count);
+        }
+
+        [Theory]
+        [InlineData(99, true)]
+        [InlineData(99, false)]
+        [InlineData(100, true)]
+        [InlineData(100, false)]
+        [InlineData(200, true)]
+        [InlineData(200, false)]
+        public override Task ConfirmMany(int count, bool useTwoSteps)
+        {
+            return base.ConfirmMany(count, useTwoSteps);
+        }
+
+        [Theory]
+        [InlineData(99)]
+        [InlineData(100)]
+        [InlineData(200)]
+        public override Task CancelMany(int count)
+        {
+            return base.CancelMany(count);
+        }
+
+        [Theory]
+        [InlineData(99)]
+        [InlineData(100)]
+        [InlineData(200)]
+        public override Task ReplaceMany(int count)
+        {
+            return base.ReplaceMany(count);
+        }
     }
 }
