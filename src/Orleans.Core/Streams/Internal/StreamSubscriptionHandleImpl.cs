@@ -77,9 +77,17 @@ namespace Orleans.Streams
                     return expectedToken;
             }
 
-            foreach (var itemTuple in batch.GetEvents<T>())
+            if (batch is IBatchContainerBatch)
             {
-                await NextItem(itemTuple.Item1, itemTuple.Item2);
+                var batchContainerBatch = batch as IBatchContainerBatch;
+                await NextBatch(batchContainerBatch);
+            }
+            else
+            {
+                foreach (var itemTuple in batch.GetEvents<T>())
+                {
+                    await NextItem(itemTuple.Item1, itemTuple.Item2);
+                }
             }
 
             if (IsRewindable)
@@ -112,6 +120,23 @@ namespace Orleans.Streams
             return null;
         }
 
+        public async Task NextBatch(IBatchContainerBatch batchContainerBatch)
+        {
+            bool isRequestContextSet;
+            foreach (var batchContainer in batchContainerBatch.BatchContainers)
+            {
+                isRequestContextSet = batchContainer.ImportRequestContext();
+                foreach (var itemTuple in batchContainer.GetEvents<T>())
+                {
+                    await NextItem(itemTuple.Item1, itemTuple.Item2);
+                }
+
+                if (isRequestContextSet)
+                {
+                    RequestContext.Clear();
+                }
+            }
+        }
 
         private Task NextItem(object item, StreamSequenceToken token)
         {

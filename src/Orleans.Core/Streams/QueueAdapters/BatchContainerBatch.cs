@@ -55,11 +55,13 @@ namespace Orleans.Streams
 
         public bool ImportRequestContext()
         {
-            return true;
+            return this.BatchContainers.First().ImportRequestContext();
         }
 
         public bool ShouldDeliver(IStreamIdentity stream, object filterData, StreamFilterPredicate shouldReceiveFunc)
         {
+            // ShouldDeliver is called on a per IBatchContainer basis for each IBatchContainer that composes this BatchContainerBatch.
+            // Therefore, no filtering is done on the BatchContainerBatch level.
             return true;
         }
 
