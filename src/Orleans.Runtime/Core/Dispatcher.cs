@@ -325,8 +325,8 @@ namespace Orleans.Runtime
         {
             bool canInterleave = 
                    incoming.IsAlwaysInterleave
-                || targetActivation.Running == null
-                || (targetActivation.Running.IsReadOnly && incoming.IsReadOnly)
+                || targetActivation.Blocking == null
+                || (targetActivation.Blocking.IsReadOnly && incoming.IsReadOnly)
                 || (schedulingOptions.AllowCallChainReentrancy && targetActivation.ActivationId.Equals(incoming.SendingActivation))
                 || catalog.CanInterleave(targetActivation.ActivationId, incoming);
 
@@ -414,7 +414,7 @@ namespace Orleans.Runtime
                 }
 
                 // Now we can actually scheduler processing of this request
-                targetActivation.RecordRunning(message);
+                targetActivation.RecordRunning(message, message.IsAlwaysInterleave);
 
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedOk(message);
                 scheduler.QueueWorkItem(new InvokeWorkItem(targetActivation, message, this, this.invokeWorkItemLogger), targetActivation.SchedulingContext);
