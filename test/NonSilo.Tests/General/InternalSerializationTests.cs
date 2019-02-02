@@ -106,28 +106,27 @@ namespace UnitTests.Serialization
         /// </returns>
         public GrainReference GetGrainReference<TGrainInterface>()
         {
-            var grainType = typeof(TGrainInterface);
+            var originalGrainType = typeof(TGrainInterface);
 
-            if (grainType.IsGenericTypeDefinition)
+            if (originalGrainType.IsGenericTypeDefinition)
             {
                 throw new ArgumentException("Cannot create grain reference for non-concrete grain type");
             }
 
-            if (grainType.IsConstructedGenericType)
-            {
-                grainType = grainType.GetGenericTypeDefinition();
-            }
+            // The type used in attributes will not be a constructed generic type, so if this is a constructed generic type then we need to
+            // get its corresponding unconstructed type definition.
+            var searchGrainType = originalGrainType.IsConstructedGenericType ? originalGrainType.GetGenericTypeDefinition() : originalGrainType;
 
-            var type = grainType.Assembly.DefinedTypes.First(
+            var type = originalGrainType.Assembly.DefinedTypes.First(
                 _ =>
                 {
                     var attr = _.GetCustomAttribute<GrainReferenceAttribute>();
-                    return attr != null && attr.TargetType == grainType;
+                    return attr != null && attr.TargetType == searchGrainType;
                 }).AsType();
 
-            if (grainType.IsConstructedGenericType)
+            if (originalGrainType.IsConstructedGenericType)
             {
-                type = type.MakeGenericType(grainType.GetGenericArguments());
+                type = type.MakeGenericType(originalGrainType.GetGenericArguments());
             }
 
             var regularGrainId = GrainId.GetGrainIdForTesting(Guid.NewGuid());
