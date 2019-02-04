@@ -44,6 +44,14 @@ namespace Tester
             }
         }
 
+        public static void CheckForEventHub()
+        {
+            if (string.IsNullOrWhiteSpace(TestDefaultConfiguration.EventHubConnectionString))
+            {
+                throw new SkipException("No connection string found. Skipping");
+            }
+        }
+
         public static double CalibrateTimings()
         {
             const int NumLoops = 10000;

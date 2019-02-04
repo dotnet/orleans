@@ -9,13 +9,13 @@ using Xunit.Abstractions;
 
 namespace ServiceBus.Tests.Streaming
 {
-    [TestCategory("EventHub"), TestCategory("Streaming")]
+    [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
     public class EHProgrammaticSubscribeTest : ProgrammaticSubcribeTestsRunner, IClassFixture<EHProgrammaticSubscribeTest.Fixture>
     {
-        private const string EHPath = "ehorleanstest";
-        private const string EHPath2 = "ehorleanstest2";
+        private const string EHPath = "ehorleanstest4";
+        private const string EHPath2 = "ehorleanstest3";
         private const string EHConsumerGroup = "orleansnightly";
-        public class Fixture : BaseTestClusterFixture
+        public class Fixture : BaseEventHubTestClusterFixture
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
@@ -63,6 +63,7 @@ namespace ServiceBus.Tests.Streaming
         public EHProgrammaticSubscribeTest(ITestOutputHelper output, Fixture fixture)
             : base(fixture)
         {
+            fixture.EnsurePreconditionsMet();
         }
     }
 }
