@@ -146,7 +146,7 @@ namespace Tests.GeoClusterTests
             }
         }
 
-        [SkippableFact(), TestCategory("Functional")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/3929"), TestCategory("Functional")]
         public async Task TestMultiClusterConf_3_3()
         {
             // use a random global service id for testing purposes
