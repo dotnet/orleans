@@ -10,7 +10,9 @@
           "Community/**.yml",
           "Community/**.md",
           "1.5/**.yml",
-          "1.5/**.md"
+          "1.5/**.md",
+          "blog/**.yml",
+          "blog/**.md"
         ]
       },
       {
@@ -37,7 +39,9 @@
           "1.5/Documentation/**/**.png",
           "1.5/Documentation/**/**.gif",
           "1.5/Tutorials/**.png",
-          "Community/**.png"
+          "Community/**.png",
+          "blog/media/**.png",
+          "blog/media/**.jpg"
         ],
         "exclude": [
           "obj/**",
