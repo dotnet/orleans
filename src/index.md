@@ -63,8 +63,10 @@ Start with the MathGrains tutorial to learn how to create and deploy an Orleans 
 You can use this and other samples as starting points for your own application. 
 
 ### [Resources](Documentation/resources/index.md)
- Information about contributing, links to articles about Orleans, and the sections about Migration, and Presentations.
+Information about contributing, links to articles about Orleans, and the sections about Migration, and Presentations.
 
 Discuss your Orleans questions in the [gitter chat room](https://gitter.im/dotnet/orleans).
 
 Fork the code on the [GitHub Respository](https://github.com/dotnet/orleans).
+
+Read the [Orleans Blog](blog/index.md)

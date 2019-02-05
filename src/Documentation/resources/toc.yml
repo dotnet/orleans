@@ -10,3 +10,5 @@
   href: migration/toc.yml
 - name: Presentations
   href: presentations/index.md
+- name: Blog
+  href: ../../blog/index.md
