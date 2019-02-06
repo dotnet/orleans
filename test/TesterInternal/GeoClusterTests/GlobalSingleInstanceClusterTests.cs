@@ -76,9 +76,9 @@ namespace Tests.GeoClusterTests
                 return toWait.GetResult();
             }
 
-            public void InjectMultiClusterConf(params string[] args)
+            public void InjectMultiClusterConf(string[] clusters, string comment = "", bool checkForLaggingSilos = true)
             {
-                systemManagement.InjectMultiClusterConfiguration(args).GetResult();
+                systemManagement.InjectMultiClusterConfiguration(clusters, comment, checkForLaggingSilos).GetResult();
             }
 
             IManagementGrain systemManagement;
@@ -134,7 +134,7 @@ namespace Tests.GeoClusterTests
                 await WaitForLivenessToStabilizeAsync();
 
                 // Configure multicluster
-                clients[0].InjectMultiClusterConf(cluster0, cluster1);
+                clients[0].InjectMultiClusterConf(new string[] { cluster0, cluster1 });
                 await WaitForMultiClusterGossipToStabilizeAsync(false);
             });
         }
