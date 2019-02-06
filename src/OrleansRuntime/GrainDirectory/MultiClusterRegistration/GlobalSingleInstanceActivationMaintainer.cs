@@ -22,6 +22,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly IInternalGrainFactory grainFactory;
         private readonly TimeSpan period;
         private readonly IMultiClusterOracle multiClusterOracle;
+        private readonly RegistrarManager registrarManager;
 
         // scanning the entire directory for doubtful activations is too slow.
         // therefore, we maintain a list of potentially doubtful activations on the side.
@@ -36,7 +37,8 @@ namespace Orleans.Runtime.GrainDirectory
             Logger logger,
             GlobalConfiguration config,
             IInternalGrainFactory grainFactory,
-            IMultiClusterOracle multiClusterOracle)
+            IMultiClusterOracle multiClusterOracle,
+            RegistrarManager registrarManager)
         {
             this.router = router;
             this.logger = logger;
@@ -44,7 +46,8 @@ namespace Orleans.Runtime.GrainDirectory
             this.config = config;
             this.multiClusterOracle = multiClusterOracle;
             this.period = config.GlobalSingleInstanceRetryInterval;
-            multiClusterOracle.SubscribeToMultiClusterConfigurationEvents(this);
+            this.registrarManager = registrarManager;
+            this.multiClusterOracle.SubscribeToMultiClusterConfigurationEvents(this);
             logger.Verbose("GSIP:M GlobalSingleInstanceActivationMaintainer Started, Period = {0}", period);
         }
 
@@ -127,17 +130,23 @@ namespace Orleans.Runtime.GrainDirectory
                     else
                     {
                         // we are joined to the multicluster.
-
                         List<KeyValuePair<string, SiloAddress>> remoteClusters = multiClusterConfig.Clusters
                             .Where(id => id != myClusterId)
                             .Select(id => new KeyValuePair<string, SiloAddress>(id, this.multiClusterOracle.GetRandomClusterGateway(id)))
                             .ToList();
+
+                        // validate entries that point to remote clusters
+                        router.Scheduler.QueueTask(
+                                  () => RunBatchedValidation(),
+                                  router.CacheValidator.SchedulingContext
+                              ).Wait();
 
                         if (!remoteClusters.Any(kvp => kvp.Value == null))
                         {
                             // all clusters have at least one gateway reporting.
                             // go through all doubtful entries and broadcast ownership requests for each
 
+                            // take them all out of the list for processing.
                             List<GrainId> grains;
                             lock (lockable)
                             {
@@ -146,7 +155,7 @@ namespace Orleans.Runtime.GrainDirectory
                             }
 
                             if(logger.IsVerbose)
-                                logger.Verbose(String.Format("GSIP:M retry {0} doubtful entries {1}", grains.Count, string.Join(",", grains)));
+                                logger.Verbose("GSIP:M retry {0} doubtful entries {1}", grains.Count, logger.IsVerbose2 ? string.Join(",", grains) : "");
 
                             router.Scheduler.QueueTask(
                                 () => RunBatchedActivationRequests(remoteClusters, grains),
@@ -173,6 +182,81 @@ namespace Orleans.Runtime.GrainDirectory
             return Task.CompletedTask;
         }
 
+        private Task RunBatchedValidation()
+        {
+            // organize remote references by silo
+            var allEntries = router.DirectoryPartition.GetItems();
+            var cachedEntries = FilterByMultiClusterStatus(allEntries, GrainDirectoryEntryStatus.Cached).ToList();
+            var entriesBySilo = new Dictionary<SiloAddress, List<KeyValuePair<GrainId, IGrainInfo>>>();
+
+            if(logger.IsVerbose)
+                logger.Verbose("GSIP:M validating {0} cache entries", cachedEntries.Count);
+
+            foreach (var entry in cachedEntries)
+            {
+                var silo = entry.Value.Instances.FirstOrDefault().Value.SiloAddress;
+                if (!entriesBySilo.TryGetValue(silo, out var list))
+                {
+                    list = entriesBySilo[silo] = new List<KeyValuePair<GrainId, IGrainInfo>>();
+                }
+                list.Add(entry);
+            }
+
+            // process by silo
+            var tasks = new List<Task>();
+            foreach (var kvp in entriesBySilo)
+            {
+                tasks.Add(RunBatchedValidation(kvp.Key, kvp.Value));
+            }
+            return Task.WhenAll(tasks);
+        }
+
+        private async Task RunBatchedValidation(SiloAddress silo, List<KeyValuePair<GrainId, IGrainInfo>> list)
+        {
+            var multiClusterConfig = this.multiClusterOracle.GetMultiClusterConfiguration();
+            string clusterId = null;
+
+            // If this silo is a part of a multi-cluster, try to find out which cluster the target silo belongs to.
+            // The check here is a simple ping used to check if the remote silo is available and, if so, which cluster
+            // it belongs to.
+            // This is a used to determine whether or not the local silo should invalidate directory cache entries
+            // pointing to the remote silo.
+            // A preferable approach would be to flow cluster membership or grain directory information from the remote
+            // cluster to the local one. That would avoid heuristic checks such as this. Additionally, information
+            // about which cluster a particular silo belongs (or belonged) to could be maintained. That would allow
+            // us to skip this first step.
+            if (multiClusterConfig != null)
+            {
+                try
+                {
+                    var validator = this.grainFactory.GetSystemTarget<IClusterGrainDirectory>(
+                        Constants.ClusterDirectoryServiceId,
+                        silo);
+                    clusterId = await validator.Ping();
+                }
+                catch (Exception exception)
+                {
+                    // A failure here may indicate a transient error, but for simplicity we will continue as though
+                    // the remote silo is no longer a part of the multi-cluster.
+                    this.logger.Warn(ErrorCode.GlobalSingleInstance_FailedPing, $"Failed to ping remote silo {silo}", exception);
+                }
+            }
+
+            // if the silo could not be contacted or is not part of the multicluster, unregister
+            if (clusterId == null || !multiClusterConfig.Clusters.Contains(clusterId))
+            {
+                if(logger.IsVerbose)
+                    logger.Verbose("GSIP:M removing {0} cache entries pointing to {1}", list.Count, silo);
+
+                var registrar = this.registrarManager.GetRegistrar(GlobalSingleInstanceRegistration.Singleton);
+
+                foreach (var kvp in list)
+                {
+                    registrar.InvalidateCache(ActivationAddress.GetAddress(silo, kvp.Key, kvp.Value.Instances.FirstOrDefault().Key));
+                }
+            }
+        }
+        
         private async Task RunBatchedActivationRequests(List<KeyValuePair<string, SiloAddress>> remoteClusters, List<GrainId> grains)
         {
             var addresses = new List<ActivationAddress>();
@@ -205,8 +289,9 @@ namespace Orleans.Runtime.GrainDirectory
                 // find gateway and send batched request
                 try
                 {
-                    var clusterGrainDir = this.grainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, remotecluster.Value);
-                    var r = await clusterGrainDir.ProcessActivationRequestBatch(addresses.Select(a => a.Grain).ToArray(), this.config.ClusterId).WithCancellation(Cts.Token);
+                    var clusterGatewayAddress = this.multiClusterOracle.GetRandomClusterGateway(remotecluster.Key);
+                    var clusterGrainDir = this.grainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
+                    var r = await clusterGrainDir.ProcessActivationRequestBatch(addresses.Select(a => a.Grain).ToArray(), this.config.ClusterId);
                     batchResponses.Add(r);
                 }
                 catch (Exception e)

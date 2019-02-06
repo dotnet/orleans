@@ -1095,10 +1095,11 @@ namespace Orleans
         CancellationExtensionCreationFailed = CancellationTokenManagerBase + 2,
 
         GlobalSingleInstanceBase = Runtime + 4100,
-        GlobalSingleInstance_ProtocolError = GlobalSingleInstanceBase + 1,
-        GlobalSingleInstance_WarningInvalidOrigin = GlobalSingleInstanceBase + 2,
-        GlobalSingleInstance_MaintainerException = GlobalSingleInstanceBase + 3,
-        GlobalSingleInstance_MultipleOwners = GlobalSingleInstanceBase + 4,
+        GlobalSingleInstance_ProtocolError          = GlobalSingleInstanceBase + 1,
+        GlobalSingleInstance_WarningInvalidOrigin   = GlobalSingleInstanceBase + 2,
+        GlobalSingleInstance_MaintainerException    = GlobalSingleInstanceBase + 3,
+        GlobalSingleInstance_MultipleOwners         = GlobalSingleInstanceBase + 4,
+        GlobalSingleInstance_FailedPing             = GlobalSingleInstanceBase + 5,
 
         TypeManagerBase = Runtime + 4200,
         TypeManager_GetSiloGrainInterfaceMapError = TypeManagerBase + 1,

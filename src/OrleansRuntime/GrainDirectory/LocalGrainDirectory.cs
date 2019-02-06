@@ -127,7 +127,7 @@ namespace Orleans.Runtime.GrainDirectory
                     this.DirectoryCache,
                     activations => activations.Select(a => Tuple.Create(a.Silo, a.Activation)).ToList().AsReadOnly(),
                     grainFactory);
-            GsiActivationMaintainer = new GlobalSingleInstanceActivationMaintainer(this, this.Logger, globalConfig, grainFactory, multiClusterOracle);
+            GsiActivationMaintainer = new GlobalSingleInstanceActivationMaintainer(this, this.Logger, globalConfig, grainFactory, multiClusterOracle, registrarManager);
 
             if (globalConfig.SeedNodes.Count > 0)
             {

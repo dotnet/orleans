@@ -205,7 +205,12 @@ namespace Orleans.Runtime.GrainDirectory
             return router.DeleteGrainAsync(grainId, 0);
         }
 
-
-
+        /// <summary>
+        /// Called on remote clusters to ping availability of a silo and determine cluster id.
+        /// </summary>
+        public Task<string> Ping()
+        {
+            return Task.FromResult(clusterId);
+        }
     }
 }
