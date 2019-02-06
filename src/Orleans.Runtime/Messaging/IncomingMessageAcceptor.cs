@@ -585,6 +585,10 @@ namespace Orleans.Runtime.Messaging
                 Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Transient,
                     string.Format("The target silo is no longer active: target was {0}, but this silo is {1}. The rejected message is {2}.",
                         msg.TargetSilo.ToLongString(), MessageCenter.MyAddress.ToLongString(), msg));
+
+                // Invalidate the remote caller's activation cache entry.
+                if (msg.TargetAddress != null) rejection.AddToCacheInvalidationHeader(msg.TargetAddress);
+
                 MessageCenter.OutboundQueue.SendMessage(rejection);
                 if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Rejecting an obsolete request; target was {0}, but this silo is {1}. The rejected message is {2}.",
                     msg.TargetSilo.ToLongString(), MessageCenter.MyAddress.ToLongString(), msg);
