@@ -49,7 +49,20 @@ namespace Orleans.CodeGeneration
 
                     if (arg.StartsWith("/"))
                     {
-                        if (arg.StartsWith("/reference:") || arg.StartsWith("/r:"))
+                        if (arg.StartsWith("/waitForDebugger"))
+                        {
+                            var i = 0;
+                            while (!Debugger.IsAttached)
+                            {
+                                if (i++ % 50 == 0)
+                                {
+                                    Console.WriteLine("Waiting for debugger to attach.");
+                                }
+
+                                Thread.Sleep(100);
+                            }
+                        }
+                        else if (arg.StartsWith("/reference:") || arg.StartsWith("/r:"))
                         {
                             // list of references passed from from project file. separator =';'
                             string refstr = arg.Substring(arg.IndexOf(':') + 1);

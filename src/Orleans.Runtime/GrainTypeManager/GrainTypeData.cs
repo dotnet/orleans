@@ -25,14 +25,13 @@ namespace Orleans.Runtime
    
         public GrainTypeData(Type type)
         {
-            var typeInfo = type.GetTypeInfo();
             Type = type;
-            IsReentrant = typeInfo.GetCustomAttributes(typeof (ReentrantAttribute), true).Any();
+            this.IsReentrant = type.GetCustomAttributes(typeof (ReentrantAttribute), true).Any();
             // TODO: shouldn't this use GrainInterfaceUtils.IsStatelessWorker?
-            IsStatelessWorker = typeInfo.GetCustomAttributes(typeof(StatelessWorkerAttribute), true).Any();
-            GrainClass = TypeUtils.GetFullName(typeInfo);
+            this.IsStatelessWorker = type.GetCustomAttributes(typeof(StatelessWorkerAttribute), true).Any();
+            this.GrainClass = TypeUtils.GetFullName(type);
             RemoteInterfaceTypes = GetRemoteInterfaces(type);
-            MayInterleave = GetMayInterleavePredicate(typeInfo) ?? (_ => false);
+            this.MayInterleave = GetMayInterleavePredicate(type) ?? (_ => false);
         }
 
         /// <summary>
@@ -55,7 +54,7 @@ namespace Orleans.Runtime
                 }
 
                 // Traverse the class hierarchy
-                grainType = grainType.GetTypeInfo().BaseType;
+                grainType = grainType.BaseType;
             }
 
             return interfaceTypes;
@@ -65,7 +64,7 @@ namespace Orleans.Runtime
             Type grainInterface, Func<T, PlacementStrategy> extract, out PlacementStrategy placement)
                 where T : Attribute
         {
-            var attribs = grainInterface.GetTypeInfo().GetCustomAttributes<T>(inherit: true).ToArray();
+            var attribs = grainInterface.GetCustomAttributes<T>(inherit: true).ToArray();
             switch (attribs.Length)
             {
                 case 0:
@@ -106,7 +105,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="grainType">Grain class.</param>
         /// <returns></returns>
-        private static Func<InvokeMethodRequest, bool> GetMayInterleavePredicate(TypeInfo grainType)
+        private static Func<InvokeMethodRequest, bool> GetMayInterleavePredicate(Type grainType)
         {
             if (!grainType.GetCustomAttributes<MayInterleaveAttribute>().Any())
                 return null;

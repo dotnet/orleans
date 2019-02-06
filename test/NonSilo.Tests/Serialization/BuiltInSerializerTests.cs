@@ -71,17 +71,17 @@ namespace UnitTests.Serialization
                 serializerToUse,
                 _ =>
                 {
-                    TypeInfo fallback;
+                    Type fallback;
                     switch (serializerToUse)
                     {
                         case SerializerToUse.IlBasedFallbackSerializer:
-                            fallback = typeof(ILBasedSerializer).GetTypeInfo();
+                            fallback = typeof(ILBasedSerializer);
                             break;
                         case SerializerToUse.BinaryFormatterFallbackSerializer:
-                            fallback = typeof(BinaryFormatterSerializer).GetTypeInfo();
+                            fallback = typeof(BinaryFormatterSerializer);
                             break;
                         case SerializerToUse.NoFallback:
-                            fallback = typeof(SupportsNothingSerializer).GetTypeInfo();
+                            fallback = typeof(SupportsNothingSerializer);
                             break;
                         default:
                             throw new InvalidOperationException("Invalid Serializer was selected");

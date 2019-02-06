@@ -43,8 +43,7 @@ namespace Orleans.CodeGenerator
         {
             var baseTypes = new List<BaseTypeSyntax> { SF.SimpleBaseType(typeof(IGrainMethodInvoker).GetTypeSyntax()) };
 
-            var grainTypeInfo = grainType.GetTypeInfo();
-            var genericTypes = grainTypeInfo.IsGenericTypeDefinition
+            var genericTypes = grainType.IsGenericTypeDefinition
                                    ? grainType.GetGenericArguments()
                                          .Select(_ => SF.TypeParameter(_.ToString()))
                                          .ToArray()
@@ -72,7 +71,7 @@ namespace Orleans.CodeGenerator
             };
 
             // If this is an IGrainExtension, make the generated class implement IGrainExtensionMethodInvoker.
-            if (typeof(IGrainExtension).GetTypeInfo().IsAssignableFrom(grainTypeInfo))
+            if (typeof(IGrainExtension).IsAssignableFrom(grainType))
             {
                 baseTypes.Add(SF.SimpleBaseType(typeof(IGrainExtensionMethodInvoker).GetTypeSyntax()));
                 members.Add(GenerateExtensionInvokeMethod(grainType));

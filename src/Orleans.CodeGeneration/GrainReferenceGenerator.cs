@@ -52,9 +52,8 @@ namespace Orleans.CodeGenerator
         /// </returns>
         internal static TypeDeclarationSyntax GenerateClass(Type grainType, string generatedTypeName, Action<Type> onEncounteredType)
         {
-            var grainTypeInfo = grainType.GetTypeInfo();
-            var genericTypes = grainTypeInfo.IsGenericTypeDefinition
-                                   ? grainTypeInfo.GetGenericArguments()
+            var genericTypes = grainType.IsGenericTypeDefinition
+                                   ? grainType.GetGenericArguments()
                                          .Select(_ => SF.TypeParameter(_.ToString()))
                                          .ToArray()
                                    : new TypeParameterSyntax[0];
@@ -104,7 +103,7 @@ namespace Orleans.CodeGenerator
         private static MemberDeclarationSyntax[] GenerateConstructors(string className)
         {
             var baseConstructors =
-                typeof(GrainReference).GetTypeInfo().GetConstructors(
+                typeof(GrainReference).GetConstructors(
                     BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance).Where(_ => !_.IsPrivate);
             var constructors = new List<MemberDeclarationSyntax>();
             foreach (var baseConstructor in baseConstructors)
@@ -150,7 +149,7 @@ namespace Orleans.CodeGenerator
                 foreach (var parameter in parameters)
                 {
                     onEncounteredType(parameter.ParameterType);
-                    if (typeof(IGrainObserver).GetTypeInfo().IsAssignableFrom(parameter.ParameterType))
+                    if (typeof(IGrainObserver).IsAssignableFrom(parameter.ParameterType))
                     {
                         body.Add(
                             SF.ExpressionStatement(
@@ -332,8 +331,8 @@ namespace Orleans.CodeGenerator
             var argIdentifier = arg.GetOrCreateName(argIndex).ToIdentifierName();
 
             // Addressable arguments must be converted to references before passing.
-            if (typeof(IAddressable).GetTypeInfo().IsAssignableFrom(arg.ParameterType)
-                && arg.ParameterType.GetTypeInfo().IsInterface)
+            if (typeof(IAddressable).IsAssignableFrom(arg.ParameterType)
+                && arg.ParameterType.IsInterface)
             {
                 return
                     SF.ConditionalExpression(

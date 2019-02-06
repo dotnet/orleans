@@ -1016,10 +1016,9 @@ namespace Orleans.Runtime.Configuration
         public void RegisterStreamProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : Orleans.Streams.IStreamProvider
         {            
             Type providerType = typeof(T);
-            var providerTypeInfo = providerType.GetTypeInfo();
-            if (providerTypeInfo.IsAbstract ||
-                providerTypeInfo.IsGenericType ||
-                !typeof(Orleans.Streams.IStreamProvider).IsAssignableFrom(providerType))
+            if (providerType.IsAbstract ||
+                providerType.IsGenericType ||
+                !typeof(Streams.IStreamProvider).IsAssignableFrom(providerType))
                 throw new ArgumentException("Expected non-generic, non-abstract type which implements IStreamProvider interface", "typeof(T)");
 
             ProviderConfigurationUtility.RegisterProvider(this.ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
@@ -1045,13 +1044,12 @@ namespace Orleans.Runtime.Configuration
         public void RegisterStorageProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IStorageProvider
         {
             Type providerType = typeof(T);
-            var providerTypeInfo = providerType.GetTypeInfo();
-            if (providerTypeInfo.IsAbstract ||
-                providerTypeInfo.IsGenericType ||
+            if (providerType.IsAbstract ||
+                providerType.IsGenericType ||
                 !typeof(IStorageProvider).IsAssignableFrom(providerType))
                 throw new ArgumentException("Expected non-generic, non-abstract type which implements IStorageProvider interface", "typeof(T)");
 
-            ProviderConfigurationUtility.RegisterProvider(this.ProviderConfigurations, ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME, providerTypeInfo.FullName, providerName, properties);
+            ProviderConfigurationUtility.RegisterProvider(this.ProviderConfigurations, ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
         }
 
         /// <summary>
@@ -1086,9 +1084,8 @@ namespace Orleans.Runtime.Configuration
         public void RegisterLogConsistencyProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : ILogConsistencyProvider
         {
             Type providerType = typeof(T);
-            var providerTypeInfo = providerType.GetTypeInfo();
-            if (providerTypeInfo.IsAbstract ||
-                providerTypeInfo.IsGenericType ||
+            if (providerType.IsAbstract ||
+                providerType.IsGenericType ||
                 !typeof(ILogConsistencyProvider).IsAssignableFrom(providerType))
                 throw new ArgumentException("Expected non-generic, non-abstract type which implements ILogConsistencyProvider interface", "typeof(T)");
 

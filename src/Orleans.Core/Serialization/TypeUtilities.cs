@@ -118,15 +118,14 @@ namespace Orleans.Serialization
             if (typeKeyStringCache.TryGetValue(t, out key))
                 return key;
 
-            var typeInfo = t.GetTypeInfo();
             var sb = new StringBuilder();
-            if (typeInfo.IsGenericTypeDefinition)
+            if (t.IsGenericTypeDefinition)
             {
                 sb.Append(GetBaseTypeKey(t));
                 sb.Append('\'');
-                sb.Append(typeInfo.GetGenericArguments().Length);
+                sb.Append(t.GetGenericArguments().Length);
             }
-            else if (typeInfo.IsGenericType)
+            else if (t.IsGenericType)
             {
                 sb.Append(GetBaseTypeKey(t));
                 sb.Append('<');
@@ -165,20 +164,18 @@ namespace Orleans.Serialization
 
         private static string GetBaseTypeKey(Type t)
         {
-            var typeInfo = t.GetTypeInfo();
-
             string namespacePrefix = "";
-            if ((typeInfo.Namespace != null) && !typeInfo.Namespace.StartsWith("System.") && !typeInfo.Namespace.Equals("System"))
+            if ((t.Namespace != null) && !t.Namespace.StartsWith("System.") && !t.Namespace.Equals("System"))
             {
-                namespacePrefix = typeInfo.Namespace + '.';
+                namespacePrefix = t.Namespace + '.';
             }
 
-            if (typeInfo.IsNestedPublic)
+            if (t.IsNestedPublic)
             {
-                return namespacePrefix + OrleansTypeKeyString(typeInfo.DeclaringType) + "." + typeInfo.Name;
+                return namespacePrefix + OrleansTypeKeyString(t.DeclaringType) + "." + t.Name;
             }
 
-            return namespacePrefix + typeInfo.Name;
+            return namespacePrefix + t.Name;
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
@@ -221,7 +218,6 @@ namespace Orleans.Serialization
             if (type.IsPointer || type.IsByRef) return false;
 
             // Generic types are only accessible if their generic arguments are accessible.
-            var typeInfo = type.GetTypeInfo();
             if (type.IsConstructedGenericType)
             {
                 foreach (var parameter in type.GetGenericArguments())
@@ -229,12 +225,12 @@ namespace Orleans.Serialization
                     if (!IsAccessibleFromAssembly(parameter, assembly)) return false;
                 }
             }
-            else if (typeInfo.IsGenericTypeDefinition)
+            else if (type.IsGenericTypeDefinition)
             {
                 // Guard against unrepresentable type constraints, which appear when generating code for some languages, such as F#.
-                foreach (var parameter in typeInfo.GenericTypeParameters)
+                foreach (var parameter in type.GetTypeInfo().GenericTypeParameters)
                 {
-                    foreach (var constraint in parameter.GetTypeInfo().GetGenericParameterConstraints())
+                    foreach (var constraint in parameter.GetGenericParameterConstraints())
                     {
                         if (constraint == typeof(Array) || constraint == typeof(Delegate) || constraint == typeof(Enum)) return false;
                     }
@@ -242,16 +238,16 @@ namespace Orleans.Serialization
             }
 
             // Internal types are accessible only if the declaring assembly exposes its internals to the target assembly.
-            if (typeInfo.IsNotPublic || typeInfo.IsNestedAssembly || typeInfo.IsNestedFamORAssem)
+            if (type.IsNotPublic || type.IsNestedAssembly || type.IsNestedFamORAssem)
             {
-                if (!AreInternalsVisibleTo(typeInfo.Assembly, assembly)) return false;
+                if (!AreInternalsVisibleTo(type.Assembly, assembly)) return false;
             }
 
             // Nested types which are private or protected are not accessible.
-            if (typeInfo.IsNestedPrivate || typeInfo.IsNestedFamily || typeInfo.IsNestedFamANDAssem) return false;
+            if (type.IsNestedPrivate || type.IsNestedFamily || type.IsNestedFamANDAssem) return false;
 
             // Nested types are otherwise accessible if their declaring type is accessible.
-            if (typeInfo.IsNested)
+            if (type.IsNested)
             {
                 return IsAccessibleFromAssembly(type.DeclaringType, assembly);
             }

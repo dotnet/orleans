@@ -143,7 +143,7 @@ namespace UnitTests.General
             Type grainBase = typeof(Grain);
             Assert.True(grainMarker.IsAssignableFrom(grainClass), $"{grainClass} is {grainMarker}");
             Assert.True(grainBase.IsAssignableFrom(grainClass), $"{grainClass} is {grainBase}");
-            Assert.True(grainBase.GetTypeInfo().IsAssignableFrom(grainClass), $"{grainClass} is {grainBase}");
+            Assert.True(grainBase.IsAssignableFrom(grainClass), $"{grainClass} is {grainBase}");
 
             Assert.True(isConcreteGrainClass, $"IsConcreteGrainClass {grainClass}");
         }

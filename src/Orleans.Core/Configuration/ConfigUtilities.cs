@@ -215,7 +215,7 @@ namespace Orleans.Runtime.Configuration
             return returnValue;
         }
 
-        internal static void ValidateSerializationProvider(TypeInfo type)
+        internal static void ValidateSerializationProvider(Type type)
         {
             if (type.IsClass == false)
             {
@@ -232,7 +232,7 @@ namespace Orleans.Runtime.Configuration
                 throw new FormatException(string.Format("The serialization provider type {0} is not public", type.FullName));
             }
 
-            if (type.IsGenericType && type.IsConstructedGenericType() == false)
+            if (type.IsGenericType && type.IsConstructedGenericType == false)
             {
                 throw new FormatException(string.Format("The serialization provider type {0} is generic and has a missing type parameter specification", type.FullName));
             }
@@ -537,7 +537,7 @@ namespace Orleans.Runtime.Configuration
         public static string FindConfigFile(bool isSilo)
         {
             // Add directory containing Orleans binaries to the search locations for config files
-            defaultConfigDirs[0] = Path.GetDirectoryName(typeof(ConfigUtilities).GetTypeInfo().Assembly.Location);
+            defaultConfigDirs[0] = Path.GetDirectoryName(typeof(ConfigUtilities).Assembly.Location);
 
             var notFound = new List<string>();
             foreach (string dir in defaultConfigDirs)

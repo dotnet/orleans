@@ -300,7 +300,7 @@ namespace Orleans.Tests.SqlUtils
         {
             if (!EqualityComparer<T>.Default.Equals(parameters, default(T)))
             {
-                var properties = parameters.GetType().GetTypeInfo().GetProperties();
+                var properties = parameters.GetType().GetProperties();
                 for (int i = 0; i < properties.Length; ++i)
                 {
                     var property = properties[i];

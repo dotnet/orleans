@@ -319,11 +319,10 @@ namespace Orleans.CodeGenerator.Utilities
         /// </returns>
         public static TypeParameterConstraintClauseSyntax[] GetTypeConstraintSyntax(this Type type)
         {
-            var typeInfo = type.GetTypeInfo();
-            if (typeInfo.IsGenericTypeDefinition)
+            if (type.IsGenericTypeDefinition)
             {
                 var constraints = new List<TypeParameterConstraintClauseSyntax>();
-                foreach (var genericParameter in typeInfo.GetGenericArguments())
+                foreach (var genericParameter in type.GetGenericArguments())
                 {
                     constraints.AddRange(GetTypeParameterConstraints(genericParameter));
                 }
@@ -338,7 +337,7 @@ namespace Orleans.CodeGenerator.Utilities
         {
             var results = new List<TypeParameterConstraintClauseSyntax>();
             var parameterConstraints = new List<TypeParameterConstraintSyntax>();
-            var attributes = genericParameter.GetTypeInfo().GenericParameterAttributes;
+            var attributes = genericParameter.GenericParameterAttributes;
 
             // The "class" or "struct" constraints must come first.
             if (attributes.HasFlag(GenericParameterAttributes.ReferenceTypeConstraint))
@@ -351,7 +350,7 @@ namespace Orleans.CodeGenerator.Utilities
             }
 
             // Follow with the base class or interface constraints.
-            foreach (var genericType in genericParameter.GetTypeInfo().GetGenericParameterConstraints())
+            foreach (var genericType in genericParameter.GetGenericParameterConstraints())
             {
                 // If the "struct" constraint was specified, skip the corresponding "ValueType" constraint.
                 if (genericType == typeof(ValueType))

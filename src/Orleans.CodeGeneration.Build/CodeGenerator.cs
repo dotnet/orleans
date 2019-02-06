@@ -102,7 +102,7 @@ namespace Orleans.CodeGeneration
             AppDomain appDomain = null;
             try
             {
-                var assembly = typeof(CodeGenerator).GetTypeInfo().Assembly;
+                var assembly = typeof(CodeGenerator).Assembly;
 
                 // Create AppDomain.
                 var thisAssemblyPath = new Uri(assembly.CodeBase).LocalPath;

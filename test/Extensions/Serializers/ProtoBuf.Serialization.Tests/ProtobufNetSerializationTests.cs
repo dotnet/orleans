@@ -20,7 +20,7 @@ namespace ProtoBuf.Serialization.Tests
             {
                 SerializationProviders =
                 {
-                    typeof(ProtobufNetSerializer).GetTypeInfo()
+                    typeof(ProtobufNetSerializer)
                 }
             }))
         {

@@ -83,12 +83,12 @@ namespace Orleans.Runtime.Configuration
         /// <summary>
         /// The list of serialization providers
         /// </summary>
-        List<TypeInfo> SerializationProviders { get; }
+        List<Type> SerializationProviders { get; }
 
         /// <summary>
         /// Gets the fallback serializer, used as a last resort when no other serializer is able to serialize an object.
         /// </summary>
-        TypeInfo FallbackSerializationProvider { get; set; }
+        Type FallbackSerializationProvider { get; set; }
 
         /// <summary>
         /// The LargeMessageWarningThreshold attribute specifies when to generate a warning trace message for large messages.
@@ -130,8 +130,8 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public int LargeMessageWarningThreshold { get; set; }
 
-        public List<TypeInfo> SerializationProviders { get; private set; }
-        public TypeInfo FallbackSerializationProvider { get; set; }
+        public List<Type> SerializationProviders { get; private set; }
+        public Type FallbackSerializationProvider { get; set; }
 
         internal const int DEFAULT_MAX_FORWARD_COUNT = 2;
         private const bool DEFAULT_RESEND_ON_TIMEOUT = false;
@@ -169,7 +169,7 @@ namespace Orleans.Runtime.Configuration
             {
                 MaxForwardCount = 0;
             }
-            SerializationProviders = new List<TypeInfo>();
+            SerializationProviders = new List<Type>();
         }
 
         public override string ToString()
@@ -311,11 +311,10 @@ namespace Orleans.Runtime.Configuration
                                 $"The type specification for the 'type' attribute of the Provider element could not be loaded. Type specification: '{t}'."));
                     foreach (var type in types)
                     {
-                        var typeinfo = type.GetTypeInfo();
-                        ConfigUtilities.ValidateSerializationProvider(typeinfo);
-                        if (SerializationProviders.Contains(typeinfo) == false)
+                        ConfigUtilities.ValidateSerializationProvider(type);
+                        if (this.SerializationProviders.Contains(type) == false)
                         {
-                            SerializationProviders.Add(typeinfo);
+                            this.SerializationProviders.Add((Type)type);
                         }
                     }
                 }
@@ -333,7 +332,7 @@ namespace Orleans.Runtime.Configuration
                     var type = ConfigUtilities.ParseFullyQualifiedType(
                         typeName,
                         $"The type specification for the 'type' attribute of the FallbackSerializationProvider element could not be loaded. Type specification: '{typeName}'.");
-                    this.FallbackSerializationProvider = type.GetTypeInfo();
+                    this.FallbackSerializationProvider = type;
                 }
             }
         }

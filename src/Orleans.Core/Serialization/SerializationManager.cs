@@ -281,14 +281,13 @@ namespace Orleans.Serialization
                 Register(iface);
             }
             // Do the same for abstract base classes
-            var baseType = t.GetTypeInfo().BaseType;
+            var baseType = t.BaseType;
             while (baseType != null)
             {
-                var baseTypeInfo = baseType.GetTypeInfo();
-                if (baseTypeInfo.IsAbstract)
+                if (baseType.IsAbstract)
                     Register(baseType);
 
-                baseType = baseTypeInfo.BaseType;
+                baseType = baseType.BaseType;
             }
         }
 
@@ -322,14 +321,13 @@ namespace Orleans.Serialization
             }
 
             // Do the same for abstract base classes
-            var baseType = t.GetTypeInfo().BaseType;
+            var baseType = t.BaseType;
             while (baseType != null)
             {
-                var baseTypeInfo = baseType.GetTypeInfo();
-                if (baseTypeInfo.IsAbstract)
+                if (baseType.IsAbstract)
                     Register(baseType);
 
-                baseType = baseTypeInfo.BaseType;
+                baseType = baseType.BaseType;
             }
         }
 
@@ -366,7 +364,7 @@ namespace Orleans.Serialization
 
             try
             {
-                if (type.GetTypeInfo().IsGenericTypeDefinition)
+                if (type.IsGenericTypeDefinition)
                 {
                     object DeepCopyGeneric(object obj, ICopyContext context)
                     {
@@ -428,7 +426,7 @@ namespace Orleans.Serialization
         /// </param>
         private void RegisterGrainReferenceSerializers(Type type)
         {
-            var attr = type.GetTypeInfo().GetCustomAttribute<GrainReferenceAttribute>();
+            var attr = type.GetCustomAttribute<GrainReferenceAttribute>();
             if (attr?.TargetType == null)
             {
                 return;
@@ -462,8 +460,7 @@ namespace Orleans.Serialization
 
         private static Func<GrainReference, GrainReference> CreateGrainRefConstructorDelegate(Type type, Type[] genericArgs)
         {
-            TypeInfo typeInfo = type.GetTypeInfo();
-            if (typeInfo.IsGenericType)
+            if (type.IsGenericType)
             {
                 if (type.IsConstructedGenericType == false && genericArgs == null)
                 {
@@ -478,7 +475,7 @@ namespace Orleans.Serialization
                 ".ctor_" + type.Name,
                 typeof(GrainReference),
                 new[] { typeof(GrainReference) },
-                typeof(SerializationManager).GetTypeInfo().Module,
+                typeof(SerializationManager).Module,
                 true);
             var il = method.GetILGenerator();
             il.Emit(OpCodes.Ldarg_0);
@@ -566,8 +563,7 @@ namespace Orleans.Serialization
                 if (copiers.TryGetValue(t.TypeHandle, out copier))
                     return copier;
 
-                var typeInfo = t.GetTypeInfo();
-                if (typeInfo.IsGenericType && copiers.TryGetValue(typeInfo.GetGenericTypeDefinition().TypeHandle, out copier))
+                if (t.IsGenericType && this.copiers.TryGetValue(t.GetGenericTypeDefinition().TypeHandle, out copier))
                     return copier;
             }
 
@@ -594,9 +590,9 @@ namespace Orleans.Serialization
 
             object copy = DeepCopyInner(original, context);
             context.Reset();
-            
 
-            if (timer!=null)
+
+            if (timer != null)
             {
                 timer.Stop();
                 context.SerializationManager.serializationStatistics.CopyTimeStatistic.IncrementBy(timer.ElapsedTicks);
@@ -703,11 +699,10 @@ namespace Orleans.Serialization
                 }
 
                 var et = t.GetElementType();
-                var etInfo = et.GetTypeInfo();
                 if (et.IsOrleansShallowCopyable())
                 {
                     // Only check the size for primitive types because otherwise Buffer.ByteLength throws
-                    if (etInfo.IsPrimitive && Buffer.ByteLength(originalArray) > this.LargeObjectSizeThreshold)
+                    if (et.IsPrimitive && Buffer.ByteLength(originalArray) > this.LargeObjectSizeThreshold)
                     {
                         logger.Info(ErrorCode.Ser_LargeObjectAllocated,
                             $"Large {t.OrleansTypeName()} array of total byte size {Buffer.ByteLength(originalArray)} is being copied. This will result in an allocation on the large object heap. " +
@@ -743,7 +738,7 @@ namespace Orleans.Serialization
                     var sizes = new int[rank];
                     sizes[rank - 1] = 1;
                     for (var k = rank - 2; k >= 0; k--)
-                        sizes[k] = sizes[k + 1]*lengths[k + 1];
+                        sizes[k] = sizes[k + 1] * lengths[k + 1];
 
                     for (var i = 0; i < originalArray.Length; i++)
                     {
@@ -770,7 +765,7 @@ namespace Orleans.Serialization
             if (fallbackSerializer.IsSupportedType(t))
                 return FallbackSerializationDeepCopy(original, context);
 
-            throw new OrleansException("No copier found for object of type " + t.OrleansTypeName() + 
+            throw new OrleansException("No copier found for object of type " + t.OrleansTypeName() +
                 ". Perhaps you need to mark it [Serializable] or define a custom serializer for it?");
         }
 
@@ -785,12 +780,11 @@ namespace Orleans.Serialization
             {
                 Serializer ser;
                 if (serializers.TryGetValue(t.TypeHandle, out ser)) return true;
-                var typeInfo = t.GetTypeInfo();
-                if (typeInfo.IsOrleansPrimitive()) return true;
-                if (!typeInfo.IsGenericType) return false;
-                var genericTypeDefinition = typeInfo.GetGenericTypeDefinition();
-                return serializers.TryGetValue(genericTypeDefinition.TypeHandle, out ser) &&
-                       typeInfo.GetGenericArguments().All(type => HasSerializer(type));
+                if (t.IsOrleansPrimitive()) return true;
+                if (!t.IsGenericType) return false;
+                var genericTypeDefinition = t.GetGenericTypeDefinition();
+                return this.serializers.TryGetValue(genericTypeDefinition.TypeHandle, out ser) &&
+                       t.GetGenericArguments().All(type => this.HasSerializer(type));
             }
         }
 
@@ -802,9 +796,8 @@ namespace Orleans.Serialization
                 if (serializers.TryGetValue(t.TypeHandle, out ser))
                     return ser;
 
-                var typeInfo = t.GetTypeInfo();
-                if (typeInfo.IsGenericType)
-                    if (serializers.TryGetValue(typeInfo.GetGenericTypeDefinition().TypeHandle, out ser))
+                if (t.IsGenericType)
+                    if (this.serializers.TryGetValue(t.GetGenericTypeDefinition().TypeHandle, out ser))
                         return ser;
             }
 
@@ -831,8 +824,8 @@ namespace Orleans.Serialization
             context.StreamWriter = stream;
             SerializeInner(raw, context, null);
             context.Reset();
-            
-            if (timer!=null)
+
+            if (timer != null)
             {
                 timer.Stop();
                 serializationStatistics.SerTimeStatistic.IncrementBy(timer.ElapsedTicks);
@@ -866,10 +859,9 @@ namespace Orleans.Serialization
             }
 
             var t = obj.GetType();
-            var typeInfo = t.GetTypeInfo();
 
             // Enums are extra-special
-            if (typeInfo.IsEnum)
+            if (t.IsEnum)
             {
                 writer.WriteTypeHeader(t, expected);
                 WriteEnum(obj, writer, t);
@@ -884,7 +876,7 @@ namespace Orleans.Serialization
             // At this point, we're either an object or a non-trivial value type
 
             // Start by checking to see if we're a back-reference, and recording us for possible future back-references if not
-            if (!typeInfo.IsValueType)
+            if (!t.IsValueType)
             {
                 int reference = context.CheckObjectWhileSerializing(obj);
                 if (reference >= 0)
@@ -905,7 +897,7 @@ namespace Orleans.Serialization
             }
 
             // Arrays get handled specially
-            if (typeInfo.IsArray)
+            if (t.IsArray)
             {
                 var et = t.GetElementType();
                 SerializeArray((Array)obj, context, expected, et);
@@ -1116,7 +1108,7 @@ namespace Orleans.Serialization
                 var sizes = new int[rank];
                 sizes[rank - 1] = 1;
                 for (var k = rank - 2; k >= 0; k--)
-                    sizes[k] = sizes[k + 1]*lengths[k + 1];
+                    sizes[k] = sizes[k + 1] * lengths[k + 1];
 
                 for (var i = 0; i < array.Length; i++)
                 {
@@ -1200,8 +1192,8 @@ namespace Orleans.Serialization
 
             result = DeserializeInner(t, context);
             context.Reset();
-            
-            if (timer!=null)
+
+            if (timer != null)
             {
                 timer.Stop();
                 context.SerializationManager.serializationStatistics.DeserTimeStatistic.IncrementBy(timer.ElapsedTicks);
@@ -1293,15 +1285,14 @@ namespace Orleans.Serialization
                     return new object();
                 }
 
-                var resultTypeInfo = resultType.GetTypeInfo();
                 // Handle enums
-                if (resultTypeInfo.IsEnum)
+                if (resultType.IsEnum)
                 {
                     result = ReadEnum(reader, resultType);
                     return result;
                 }
 
-                if (resultTypeInfo.IsArray)
+                if (resultType.IsArray)
                 {
                     result = DeserializeArray(resultType, context);
                     context.RecordObject(result);
@@ -1445,7 +1436,7 @@ namespace Orleans.Serialization
                 var sizes = new int[rank];
                 sizes[rank - 1] = 1;
                 for (var k = rank - 2; k >= 0; k--)
-                    sizes[k] = sizes[k + 1]*lengths[k + 1];
+                    sizes[k] = sizes[k + 1] * lengths[k + 1];
 
                 for (var i = 0; i < array.Length; i++)
                 {
@@ -1482,7 +1473,7 @@ namespace Orleans.Serialization
                     return deser;
             }
 
-            if (t.GetTypeInfo().IsGenericType)
+            if (t.IsGenericType)
             {
                 lock (deserializers)
                 {
@@ -1541,8 +1532,8 @@ namespace Orleans.Serialization
                 timer.Start();
             }
 
-             var des = sm.GetDeserializer(typeof(Message.HeadersContainer));
-             var headers = (Message.HeadersContainer)des(typeof(Message.HeadersContainer), context);
+            var des = sm.GetDeserializer(typeof(Message.HeadersContainer));
+            var headers = (Message.HeadersContainer)des(typeof(Message.HeadersContainer), context);
 
             if (timer != null)
             {
@@ -1644,12 +1635,12 @@ namespace Orleans.Serialization
             return retVal;
         }
 
-        private IExternalSerializer GetFallbackSerializer(IServiceProvider serviceProvider, TypeInfo fallbackType)
+        private IExternalSerializer GetFallbackSerializer(IServiceProvider serviceProvider, Type fallbackType)
         {
             IExternalSerializer serializer;
             if (fallbackType != null)
             {
-                serializer = (IExternalSerializer)ActivatorUtilities.CreateInstance(serviceProvider, fallbackType.AsType());
+                serializer = (IExternalSerializer)ActivatorUtilities.CreateInstance(serviceProvider, fallbackType);
             }
             else
             {
@@ -1797,7 +1788,7 @@ namespace Orleans.Serialization
         /// Loads the external serializers and places them into a hash set
         /// </summary>
         /// <param name="providerTypes">The list of types that implement <see cref="IExternalSerializer"/></param>
-        private void RegisterSerializationProviders(List<TypeInfo> providerTypes)
+        private void RegisterSerializationProviders(List<Type> providerTypes)
         {
             if (providerTypes == null)
             {
@@ -1807,16 +1798,16 @@ namespace Orleans.Serialization
             externalSerializers.Clear();
             typeToExternalSerializerDictionary.Clear();
             providerTypes.ForEach(
-                typeInfo =>
+                type =>
                 {
                     try
                     {
-                        var serializer = ActivatorUtilities.CreateInstance(serviceProvider, typeInfo.AsType()) as IExternalSerializer;
+                        var serializer = ActivatorUtilities.CreateInstance(serviceProvider, type) as IExternalSerializer;
                         externalSerializers.Add(serializer);
                     }
                     catch (Exception exception)
                     {
-                        logger.Error(ErrorCode.SerMgr_ErrorLoadingAssemblyTypes, "Failed to create instance of type: " + typeInfo.FullName, exception);
+                        logger.Error(ErrorCode.SerMgr_ErrorLoadingAssemblyTypes, "Failed to create instance of type: " + type.FullName, exception);
                     }
                 });
 

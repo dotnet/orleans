@@ -523,7 +523,7 @@ namespace Orleans.Runtime
                 "PrepForRemoting",
                 typeof(Exception),
                 new[] { typeof(Exception) },
-                typeof(SerializationManager).GetTypeInfo().Module,
+                typeof(SerializationManager).Module,
                 true);
             var il = method.GetILGenerator();
             il.Emit(OpCodes.Ldarg_0);
