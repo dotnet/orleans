@@ -67,6 +67,8 @@
     <MicrosoftExtensionsLoggingVersion>2.0.0</MicrosoftExtensionsLoggingVersion>
     <MicrosoftExtensionsOptionsConfigurationExtensionsVersion>2.0.0</MicrosoftExtensionsOptionsConfigurationExtensionsVersion>
     <MicrosoftExtensionsOptionsVersion>2.0.0</MicrosoftExtensionsOptionsVersion>
+    <MicrosoftExtensionsHostingAbstractionsVersion>2.1.0</MicrosoftExtensionsHostingAbstractionsVersion>
+    <MicrosoftExtensionsHostingVersion>2.1.0</MicrosoftExtensionsHostingVersion>
 
     <MicrosoftApplicationInsightsVersion>2.4.0</MicrosoftApplicationInsightsVersion>
     <MicrosoftAzureEventHubsVersion>1.0.3</MicrosoftAzureEventHubsVersion>
@@ -78,7 +80,7 @@
     <FSharpCoreVersion>4.5.2</FSharpCoreVersion>
 
     <SystemManagementAutomationdllVersion>10.0.10586</SystemManagementAutomationdllVersion>
-	
+
     <!-- 3rd party packages -->
     <AWSSDKDynamoDBv2Version>3.3.4.17</AWSSDKDynamoDBv2Version>
     <AWSSDKSQSVersion>3.3.2.7</AWSSDKSQSVersion>

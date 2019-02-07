@@ -15,6 +15,15 @@ namespace Orleans.Runtime.Development
             return builder.ConfigureServices(UseInMemoryLeaseProvider);
         }
 
+        /// <summary>
+        /// Configure silo with test/development features.
+        /// NOT FOR PRODUCTION USE - dev/test only
+        /// </summary>
+        public static ISiloBuilder UseInMemoryLeaseProvider(this ISiloBuilder builder)
+        {
+            return builder.ConfigureServices(UseInMemoryLeaseProvider);
+        }
+
         private static void UseInMemoryLeaseProvider(IServiceCollection services)
         {
             services.AddTransient<ILeaseProvider, InMemoryLeaseProvider>();

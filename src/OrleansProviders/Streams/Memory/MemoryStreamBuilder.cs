@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Orleans.ApplicationParts;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers.Streams.Common;
@@ -13,18 +14,17 @@ namespace Orleans.Providers
     public class SiloMemoryStreamConfigurator<TSerializer> : SiloRecoverableStreamConfigurator
           where TSerializer : class, IMemoryMessageBodySerializer
     {
-        public SiloMemoryStreamConfigurator(string name, ISiloHostBuilder builder)
-            :base(name, builder, MemoryAdapterFactory<TSerializer>.Create)
+        public SiloMemoryStreamConfigurator(
+            string name, Action<Action<IServiceCollection>> configureServicesDelegate, Action<Action<IApplicationPartManager>> configureAppPartsDelegate)
+            : base(name, configureServicesDelegate, MemoryAdapterFactory<TSerializer>.Create)
         {
-            this.siloBuilder
-                .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(MemoryAdapterFactory<>).Assembly))
-                .ConfigureServices(services => services.ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name));
-                
+            this.configureDelegate(services => services.ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name));
+            configureAppPartsDelegate(parts => parts.AddFrameworkPart(typeof(MemoryAdapterFactory<>).Assembly));
         }
 
         public SiloMemoryStreamConfigurator<TSerializer> ConfigurePartitioning(int numOfQueues = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
         {
-            this.Configure<HashRingStreamQueueMapperOptions>(ob=>ob.Configure(options => options.TotalQueueCount = numOfQueues));
+            this.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfQueues));
             return this;
         }
     }

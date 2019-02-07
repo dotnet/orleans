@@ -26,6 +26,13 @@ namespace Orleans
         /// </summary>
         /// <param name="context">The context.</param>
         /// <returns>The <see cref="ApplicationPartManager"/> belonging to the provided context.</returns>
+        public static ApplicationPartManager GetApplicationPartManager(this Microsoft.Extensions.Hosting.HostBuilderContext context) => GetApplicationPartManager(context.Properties);
+
+        /// <summary>
+        /// Returns the <see cref="ApplicationPartManager"/> for the provided context.
+        /// </summary>
+        /// <param name="context">The context.</param>
+        /// <returns>The <see cref="ApplicationPartManager"/> belonging to the provided context.</returns>
         public static ApplicationPartManager GetApplicationPartManager(this HostBuilderContext context) => GetApplicationPartManager(context.Properties);
 
         /// <summary>
@@ -101,7 +108,7 @@ namespace Orleans
             {
                 throw new ArgumentNullException(nameof(assembly));
             }
-            
+
             return new ApplicationPartManagerWithAssemblies(manager.AddApplicationPart(new AssemblyPart(assembly)), new[] { assembly });
         }
 
@@ -246,9 +253,9 @@ namespace Orleans
                 dependencyContext = DependencyContext.Load(entryAssembly) ?? DependencyContext.Default;
                 manager = manager.AddApplicationPart(entryAssembly);
             }
-            
+
             if (dependencyContext == null) return new ApplicationPartManagerWithAssemblies(manager, Array.Empty<Assembly>());
-            
+
             var assemblies = new List<Assembly>();
             foreach (var lib in dependencyContext.RuntimeLibraries)
             {

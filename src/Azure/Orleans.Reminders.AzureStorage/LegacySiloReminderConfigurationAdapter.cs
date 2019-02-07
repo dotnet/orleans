@@ -14,5 +14,13 @@ namespace Orleans.Hosting
             var connectionString = reader.GetPropertyValue<string>("DataConnectionStringForReminders");
             builder.UseAzureTableReminderService(connectionString);
         }
+
+        /// <inheritdoc />
+        public void Configure(object configuration, ISiloBuilder builder)
+        {
+            var reader = new GlobalConfigurationReader(configuration);
+            var connectionString = reader.GetPropertyValue<string>("DataConnectionStringForReminders");
+            builder.UseAzureTableReminderService(connectionString);
+        }
     }
 }

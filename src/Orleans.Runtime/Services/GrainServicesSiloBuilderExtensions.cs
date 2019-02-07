@@ -19,6 +19,15 @@ namespace Orleans.Hosting
             return builder.ConfigureServices(services => services.AddGrainService<T>());
         }
 
+        /// <summary>
+        /// Registers an application grain service to be started with the silo.
+        /// </summary>
+        public static ISiloBuilder AddGrainService<T>(this ISiloBuilder builder)
+            where T : GrainService
+        {
+            return builder.ConfigureServices(services => services.AddGrainService<T>());
+        }
+
         private static IGrainService GrainServiceFactory(Type serviceType, IServiceProvider services)
         {
             var grainServiceInterfaceType = serviceType.GetInterfaces().FirstOrDefault(x => x.GetInterfaces().Contains(typeof(IGrainService)));

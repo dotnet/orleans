@@ -61,6 +61,52 @@ namespace Orleans.Hosting
             return builder.ConfigureServices(services => AddLegacyClusterConfigurationSupport(services, configuration));
         }
 
+        /// <summary>
+        /// Specifies the configuration to use for this silo.
+        /// </summary>
+        /// <param name="builder">The host builder.</param>
+        /// <param name="configuration">The configuration.</param>
+        /// <remarks>This method may only be called once per builder instance.</remarks>
+        /// <returns>The silo builder.</returns>
+        public static ISiloBuilder UseConfiguration(this ISiloBuilder builder, ClusterConfiguration configuration)
+        {
+            if (configuration == null) throw new ArgumentNullException(nameof(configuration));
+            return builder.AddLegacyClusterConfigurationSupport(configuration);
+        }
+
+        /// <summary>
+        /// Loads <see cref="ClusterConfiguration"/> using <see cref="ClusterConfiguration.StandardLoad"/>.
+        /// </summary>
+        /// <param name="builder">The host builder.</param>
+        /// <returns>The silo builder.</returns>
+        public static ISiloBuilder LoadClusterConfiguration(this ISiloBuilder builder)
+        {
+            var configuration = new ClusterConfiguration();
+            configuration.StandardLoad();
+            return builder.UseConfiguration(configuration);
+        }
+
+        /// <summary>
+        /// Configures a localhost silo.
+        /// </summary>
+        /// <param name="builder">The host builder.</param>
+        /// <param name="siloPort">The silo-to-silo communication port.</param>
+        /// <param name="gatewayPort">The client-to-silo communication port.</param>
+        /// <returns>The silo builder.</returns>
+        public static ISiloBuilder ConfigureLocalHostPrimarySilo(this ISiloBuilder builder, int siloPort = 22222, int gatewayPort = 40000)
+        {
+            string siloName = Silo.PrimarySiloName;
+            builder.Configure<SiloOptions>(options => options.SiloName = siloName);
+            return builder.UseConfiguration(ClusterConfiguration.LocalhostPrimarySilo(siloPort, gatewayPort));
+        }
+
+        public static ISiloBuilder AddLegacyClusterConfigurationSupport(this ISiloBuilder builder, ClusterConfiguration configuration)
+        {
+            LegacyMembershipConfigurator.ConfigureServices(configuration.Globals, builder);
+            LegacyRemindersConfigurator.Configure(configuration.Globals, builder);
+            return builder.ConfigureServices(services => AddLegacyClusterConfigurationSupport(services, configuration));
+        }
+
         private static void AddLegacyClusterConfigurationSupport(IServiceCollection services, ClusterConfiguration configuration)
         {
             if (configuration == null) throw new ArgumentNullException(nameof(configuration));

@@ -7,24 +7,26 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 using Orleans.Providers.Streams.Common;
+using Orleans.ApplicationParts;
 
 namespace Orleans.Streams
 {
     public class SiloEventHubStreamConfigurator : SiloRecoverableStreamConfigurator
     {
-        public SiloEventHubStreamConfigurator(string name, ISiloHostBuilder builder)
-            : base(name, builder, EventHubAdapterFactory.Create)
+        public SiloEventHubStreamConfigurator(string name,
+            Action<Action<IServiceCollection>> configureServicesDelegate, Action<Action<IApplicationPartManager>> configureAppPartsDelegate)
+            : base(name, configureServicesDelegate, EventHubAdapterFactory.Create)
         {
-            this.siloBuilder.ConfigureApplicationParts(parts =>
+            configureAppPartsDelegate(parts =>
                 {
                     parts.AddFrameworkPart(typeof(EventHubAdapterFactory).Assembly)
                         .AddFrameworkPart(typeof(EventSequenceTokenV2).Assembly);
-                })
-                .ConfigureServices(services => services.ConfigureNamedOptionForLogging<EventHubOptions>(name)
-                    .ConfigureNamedOptionForLogging<EventHubReceiverOptions>(name)
-                    .ConfigureNamedOptionForLogging<EventHubStreamCachePressureOptions>(name)
-                    .AddTransient<IConfigurationValidator>(sp => new EventHubOptionsValidator(sp.GetOptionsByName<EventHubOptions>(name), name))
-                    .AddTransient<IConfigurationValidator>(sp => new StreamCheckpointerConfigurationValidator(sp, name)));
+                });
+            this.configureDelegate(services => services.ConfigureNamedOptionForLogging<EventHubOptions>(name)
+                .ConfigureNamedOptionForLogging<EventHubReceiverOptions>(name)
+                .ConfigureNamedOptionForLogging<EventHubStreamCachePressureOptions>(name)
+                .AddTransient<IConfigurationValidator>(sp => new EventHubOptionsValidator(sp.GetOptionsByName<EventHubOptions>(name), name))
+                .AddTransient<IConfigurationValidator>(sp => new StreamCheckpointerConfigurationValidator(sp, name)));
         }
 
         public SiloEventHubStreamConfigurator ConfigureCheckpointer<TOptions>(Func<IServiceProvider, string, IStreamQueueCheckpointerFactory> checkpointerFactoryBuilder, Action<OptionsBuilder<TOptions>> configureOptions)

@@ -44,7 +44,7 @@ namespace Orleans.Hosting
 {
     internal static class DefaultSiloServices
     {
-        internal static void AddDefaultServices(HostBuilderContext context, IServiceCollection services)
+        internal static void AddDefaultServices(IApplicationPartManager applicationPartManager, IServiceCollection services)
         {
             services.AddOptions();
 
@@ -225,7 +225,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
 
             // Serialization
-            services.TryAddSingleton<SerializationManager>(sp=>ActivatorUtilities.CreateInstance<SerializationManager>(sp, 
+            services.TryAddSingleton<SerializationManager>(sp=>ActivatorUtilities.CreateInstance<SerializationManager>(sp,
                 sp.GetRequiredService<IOptions<SiloMessagingOptions>>().Value.LargeMessageWarningThreshold));
             services.TryAddSingleton<ITypeResolver, CachedTypeResolver>();
             services.TryAddSingleton<IFieldUtils, FieldUtils>();
@@ -239,7 +239,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ITransactionAgent, DisabledTransactionAgent>();
 
             // Application Parts
-            var applicationPartManager = context.GetApplicationPartManager();
             services.TryAddSingleton<IApplicationPartManager>(applicationPartManager);
             applicationPartManager.AddApplicationPart(new AssemblyPart(typeof(RuntimeVersion).Assembly) { IsFrameworkAssembly = true });
             applicationPartManager.AddApplicationPart(new AssemblyPart(typeof(Silo).Assembly) { IsFrameworkAssembly = true });
@@ -249,7 +248,7 @@ namespace Orleans.Hosting
             applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<SerializerFeature>());
             services.AddTransient<IConfigurationValidator, ApplicationPartValidator>();
 
-            //Add default option formatter if none is configured, for options which are required to be configured 
+            //Add default option formatter if none is configured, for options which are required to be configured
             services.ConfigureFormatter<SiloOptions>();
             services.ConfigureFormatter<ProcessExitHandlingOptions>();
             services.ConfigureFormatter<SchedulingOptions>();
