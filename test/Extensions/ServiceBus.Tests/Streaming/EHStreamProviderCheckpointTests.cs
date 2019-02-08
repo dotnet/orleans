@@ -84,14 +84,14 @@ namespace ServiceBus.Tests.StreamingTests
             }
         }
 
-        [SkippableFact]
+        [SkippableFact(Skip="Investigating intermitent failures")]
         public async Task ReloadFromCheckpointTest()
         {
             logger.Info("************************ EHReloadFromCheckpointTest *********************************");
             await this.ReloadFromCheckpointTestRunner(ImplicitSubscription_RecoverableStream_CollectorGrain.StreamNamespace, 1, 256);
         }
 
-        [SkippableFact]
+        [SkippableFact(Skip="Investigating intermitent failures")]
         public async Task RestartSiloAfterCheckpointTest()
         {
             logger.Info("************************ EHRestartSiloAfterCheckpointTest *********************************");
