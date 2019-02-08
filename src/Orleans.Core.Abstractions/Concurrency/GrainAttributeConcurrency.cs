@@ -14,7 +14,7 @@ namespace Orleans.Concurrency
     /// </para>
     /// </summary>
     [AttributeUsage(AttributeTargets.Method)]
-    internal sealed class ReadOnlyAttribute : Attribute
+    public sealed class ReadOnlyAttribute : Attribute
     {
     }
 
