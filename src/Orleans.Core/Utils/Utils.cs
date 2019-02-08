@@ -368,5 +368,11 @@ namespace Orleans.Runtime
         {
             return GrainReference.FromKeyString(key, runtime);
         }
+
+        public static IEnumerable<Type> GetConcreteGrainClasses(this Assembly assembly, ILogger logger)
+        {
+            // To avoid exposing TypeUtils just for this.
+            return TypeUtils.GetTypes(assembly, TypeUtils.IsConcreteGrainClass, logger);
+        }
     }
 }
