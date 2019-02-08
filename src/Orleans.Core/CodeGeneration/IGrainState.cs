@@ -20,21 +20,14 @@ namespace Orleans
     /// </summary>
     /// <typeparam name="T">The type of application level payload.</typeparam>
     [Serializable]
-    internal class GrainState<T> : IGrainState
+    public class GrainState<T> : IGrainState
     {
         public T State;
 
         object IGrainState.State
         {
-            get
-            {
-                return State;
-
-            }
-            set
-            {
-                State = (T)value;
-            }
+            get => State;
+            set => State = (T)value;
         }
 
         /// <inheritdoc />
