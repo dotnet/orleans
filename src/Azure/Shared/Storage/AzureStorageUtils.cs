@@ -8,10 +8,11 @@ using Microsoft.WindowsAzure.Storage.RetryPolicies;
 using Microsoft.WindowsAzure.Storage.Shared.Protocol;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.Runtime;
+using Orleans.Storage;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 //
-// Number of #ifs can be reduced (or removed), once we separate test projects by feature/area, otherwise we are ending up with ambigous types and build errors.
+// Number of #ifs can be reduced (or removed), once we separate test projects by feature/area, otherwise we are ending up with ambiguous types and build errors.
 //
 
 #if ORLEANS_CLUSTERING
@@ -37,10 +38,7 @@ namespace Orleans.Transactions.AzureStorage
     /// </summary>
     internal static class AzureTableConstants
     {
-        /// <summary>
-        /// ETag of value "*" to match any etag for conditional table operations (update, nerge, delete).
-        /// </summary>
-        public const string ANY_ETAG = "*";
+        public const string ANY_ETAG = StorageProviderUtils.ANY_ETAG;
 
         public const string PKProperty = nameof(TableEntity.PartitionKey);
         public const string RKProperty = nameof(TableEntity.RowKey);

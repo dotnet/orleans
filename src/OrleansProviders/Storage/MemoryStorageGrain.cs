@@ -129,8 +129,8 @@ namespace Orleans.Storage
                 if (string.IsNullOrEmpty(currentETag) && receivedEtag == null)
                     return;
 
-                // if current state and new state have matching etags, we're good
-                if (receivedEtag == currentETag)
+                // if current state and new state have matching etags, or we're to ignore the ETag, we're good
+                if (receivedEtag == currentETag || receivedEtag == StorageProviderUtils.ANY_ETAG)
                     return;
 
                 // else we have an etag mismatch
