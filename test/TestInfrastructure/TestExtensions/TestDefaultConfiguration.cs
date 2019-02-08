@@ -30,6 +30,12 @@ namespace TestExtensions
         public static string EventHubConnectionString => defaultConfiguration[nameof(EventHubConnectionString)];
         public static string ZooKeeperConnectionString => defaultConfiguration[nameof(ZooKeeperConnectionString)];
 
+        public static bool GetValue(string key, out string value)
+        {
+            value = defaultConfiguration[key];
+            return value != null;
+        }
+
         private static IConfiguration BuildDefaultConfiguration()
         {
             var builder = new ConfigurationBuilder();
