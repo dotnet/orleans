@@ -84,14 +84,14 @@ namespace ServiceBus.Tests.StreamingTests
             }
         }
 
-        [SkippableFact(Skip="Investigating intermitent failures")]
+        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5356")]
         public async Task ReloadFromCheckpointTest()
         {
             logger.Info("************************ EHReloadFromCheckpointTest *********************************");
             await this.ReloadFromCheckpointTestRunner(ImplicitSubscription_RecoverableStream_CollectorGrain.StreamNamespace, 1, 256);
         }
 
-        [SkippableFact(Skip="Investigating intermitent failures")]
+        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5356")]
         public async Task RestartSiloAfterCheckpointTest()
         {
             logger.Info("************************ EHRestartSiloAfterCheckpointTest *********************************");
