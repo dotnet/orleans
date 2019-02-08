@@ -170,7 +170,7 @@ namespace Orleans
             return this.Cast<TGrainObserverInterface>(this.runtimeClient.CreateObjectReference(obj, invoker));
         }
 
-        private IAddressable MakeGrainReferenceFromType(Type interfaceType, GrainId grainId)
+        internal IAddressable MakeGrainReferenceFromType(Type interfaceType, GrainId grainId)
         {
             return GrainReference.FromGrainId(
                 grainId,
