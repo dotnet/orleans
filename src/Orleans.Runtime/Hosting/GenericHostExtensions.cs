@@ -1,9 +1,7 @@
 using System;
-using System.Linq;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using Orleans.Hosting;
 
-namespace Orleans.Hosting
+namespace Microsoft.Extensions.Hosting
 {
     /// <summary>
     /// Extension methods for <see cref="IHostBuilder"/>.
@@ -22,7 +20,7 @@ namespace Orleans.Hosting
         /// </remarks>
         public static IHostBuilder UseOrleans(
             this IHostBuilder hostBuilder,
-            Action<Microsoft.Extensions.Hosting.HostBuilderContext, ISiloBuilder> configureDelegate)
+            Action<HostBuilderContext, ISiloBuilder> configureDelegate)
         {
             if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
 
