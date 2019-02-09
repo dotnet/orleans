@@ -460,7 +460,7 @@ namespace Orleans.Streams
                     }
                     else
                     {
-                        this.logger.LogInformation($"Pulled new messages in stream {streamId} from the queue, but pulling agent haven't succeeded in" +
+                        this.logger.LogWarning($"Pulled new messages in stream {streamId} from the queue, but pulling agent haven't succeeded in" +
                                                    $"RegisterStream yet, will start deliver on this stream after RegisterStream succeeded");
                     }
 
@@ -777,7 +777,6 @@ namespace Orleans.Streams
                 var callPubsubSucceed = false;
                 while (!callPubsubSucceed)
                 {
-                    var retryInterval = TimeSpan.FromSeconds(1);
                     try
                     {
                         streamData = await pubSub.RegisterProducer(streamId, streamProviderName, meAsStreamProducer);
@@ -787,7 +786,7 @@ namespace Orleans.Streams
                     catch (Exception e)
                     {
                         logger.Error(ErrorCode.PersistentStreamPullingAgent_17, $"RegisterAsStreamProducer failed due to {e}, retrying after {retryInterval}", e);
-                        await Task.Delay(retryInterval);
+                        await Task.Delay(this.options.RetryPubsubInterval);
                     }
                 }
                 
