@@ -1,4 +1,4 @@
-﻿using BenchmarkDotNet.Configs;
+using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Jobs;
 
 namespace Benchmarks.MapReduce
@@ -11,7 +11,7 @@ namespace Benchmarks.MapReduce
             {
                 Run = {
                     LaunchCount = 1,
-                    TargetCount = 2,
+                    InvocationCount = 2,
                     WarmupCount = 0
                 }
             });
