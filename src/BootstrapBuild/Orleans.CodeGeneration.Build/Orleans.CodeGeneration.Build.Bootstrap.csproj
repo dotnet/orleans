@@ -33,7 +33,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
     <ProjectReference Include="..\Orleans.CodeGeneration\Orleans.CodeGeneration.Bootstrap.csproj" />
-    <ProjectReference Include="..\Orleans.Core\Orleans.Core.Bootstrap.csproj" />
   </ItemGroup>
 
   <Target Name="PostBuildPublish" AfterTargets="Build">

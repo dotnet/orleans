@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk" DefaultTargets="Build;PostBuildPublish">
+<Project Sdk="Microsoft.NET.Sdk" DefaultTargets="Build;PostBuildPublish">
 
   <PropertyGroup>
     <TargetFramework>netcoreapp2.0</TargetFramework>
@@ -51,10 +51,10 @@
     <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.Workspaces" Version="$(MicrosoftCodeAnalysisVersion)" />
   </ItemGroup>
 
-  <Target Name="PostBuildPublish" AfterTargets="Build">
-    <!-- So that we can create a nuget package which includes all dependencies, we publish the build. -->
-    <!-- However, we cannot publish during the cross-targeting build, so we skip that. -->
-    <CallTarget Targets="Publish" Condition="'$(TargetFramework)' != '' and '$(DesignTimeBuild)' == ''" />
+  
+  <!-- So that we can create a nuget package which includes all dependencies, we publish the build. -->
+  <!-- However, we cannot publish during the cross-targeting build, so we skip that. -->
+  <Target Name="PostBuildPublish" AfterTargets="Build" DependsOnTargets="Publish" Condition="'$(TargetFramework)' != '' and '$(DesignTimeBuild)' == ''" >
   </Target>
 
 </Project>

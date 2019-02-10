@@ -1,24 +1,31 @@
-<Project Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' ">
+<Project>
   <!-- Begin Orleans: Without these lines the project won't build properly -->
   <!-- Set path to code generator -->
+  <PropertyGroup>
+    <OrleansGenerateCodeDependsOn Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' ">$(OrleansGenerateCodeDependsOn)</OrleansGenerateCodeDependsOn>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' ">
+    <Asm>Orleans.CodeGenerator.MSBuild.Bootstrap</Asm>
+    <OrleansCodeGenCoreAssembly>$(MSBuildThisFileDirectory)src/BootstrapBuild/$(Asm)/bin/$(Configuration)/publish/netcoreapp2.0/$(Asm).dll</OrleansCodeGenCoreAssembly>
+    <OrleansCodeGenTasksAssembly>$(MSBuildThisFileDirectory)src/BootstrapBuild/$(Asm)/bin/$(Configuration)/publish/netcoreapp2.0/Orleans.CodeGenerator.MSBuild.Tasks.dll</OrleansCodeGenTasksAssembly>
+    <OrleansBootstrapBuildProject>$(MSBuildThisFileDirectory)src/BootstrapBuild/Orleans.CodeGenerator.MSBuild.Bootstrap/Orleans.CodeGenerator.MSBuild.Bootstrap.csproj</OrleansBootstrapBuildProject>
+  </PropertyGroup>
+
   <ItemGroup>
-    <ProjectReference Include="$(SourceRoot)/src/BootstrapBuild/Orleans.CodeGeneration.Build/Orleans.CodeGeneration.Build.Bootstrap.csproj" Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' ">
-      <Project>{F7D70028-7E3B-48E3-92B9-DB889AE5ABD1}</Project>
-      <Name>Orleans.CodeGeneration.Build.Bootstrap</Name>
+    <ProjectReference Include="$(OrleansBootstrapBuildProject)" Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' ">
+      <Project>{CB36EF45-6E90-443F-AEE4-394677068147}</Project>
+      <Name>Orleans.CodeGenerator.MSBuild.Bootstrap</Name>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <AssetTargetFallback>netcoreapp2.0</AssetTargetFallback>
       <!-- Workaround. See: https://github.com/dotnet/sdk/issues/939#issuecomment-284641613 -->
       <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
       <UndefineProperties>TargetFramework</UndefineProperties>
       <!-- /Workaround -->
     </ProjectReference>
   </ItemGroup>
-  <PropertyGroup Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' ">
-    <OrleansCodeGeneratorAssembly>$(SourceRoot)Bootstrap/$(Configuration)/Orleans.CodeGeneration.Build.exe</OrleansCodeGeneratorAssembly>
-    <!-- For non-windows OS we force .Net Core  -->
-    <OrleansCodeGeneratorAssembly Condition=" '$(OS)' != 'Windows_NT' ">$(SourceRoot)Bootstrap/$(Configuration)/Orleans.CodeGeneration.Build.dll</OrleansCodeGeneratorAssembly>
-  </PropertyGroup>
-  <Import Project="$(SourceRoot)src/Orleans.CodeGeneration.Build/build/Microsoft.Orleans.OrleansCodeGenerator.Build.targets" Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' " />
-  <!--End Orleans -->
+  
+  <Import Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' " Project="$(MSBuildThisFileDirectory)src/Orleans.CodeGenerator.MSBuild/build/Microsoft.Orleans.CodeGenerator.MSBuild.targets" /><!--End Orleans -->
 
   <!-- Set InformationVersion here, since $(Version) is already set at this point. -->
   <PropertyGroup>
