@@ -9,7 +9,7 @@
     <Authors>Microsoft</Authors>
     <Product>Microsoft Orleans</Product>
     <Copyright>© Microsoft Corporation. All rights reserved.</Copyright>
-    <PackageLicense>MIT</PackageLicense>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/dotnet/Orleans</PackageProjectUrl>
     <PackageIconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</PackageIconUrl>
     <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</PackageTags>
