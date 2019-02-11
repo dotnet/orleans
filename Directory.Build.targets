@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' ">
+    <DotNetHost Condition="'$(DotNetHost)' == ''">dotnet</DotNetHost>
     <Asm>Orleans.CodeGenerator.MSBuild.Bootstrap</Asm>
     <OrleansCodeGenCoreAssembly>$(MSBuildThisFileDirectory)src/BootstrapBuild/$(Asm)/bin/$(Configuration)/publish/netcoreapp2.0/$(Asm).dll</OrleansCodeGenCoreAssembly>
     <OrleansCodeGenTasksAssembly>$(MSBuildThisFileDirectory)src/BootstrapBuild/$(Asm)/bin/$(Configuration)/publish/netcoreapp2.0/Orleans.CodeGenerator.MSBuild.Tasks.dll</OrleansCodeGenTasksAssembly>
