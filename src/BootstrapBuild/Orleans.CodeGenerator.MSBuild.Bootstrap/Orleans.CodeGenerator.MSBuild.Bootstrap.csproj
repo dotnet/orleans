@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk" DefaultTargets="Build;PostBuildPublish">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netcoreapp2.0</TargetFramework>
@@ -50,11 +50,36 @@
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="$(MicrosoftCodeAnalysisVersion)" />
     <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.Workspaces" Version="$(MicrosoftCodeAnalysisVersion)" />
   </ItemGroup>
-
   
+  <!-- Properties used to support correct, incremental builds. -->
+  <PropertyGroup>
+    <BootstrapPublishCacheFile>$(IntermediateOutputPath)$(MSBuildProjectFile).BootstrapPublish.cache</BootstrapPublishCacheFile>
+  </PropertyGroup>
+
   <!-- So that we can create a nuget package which includes all dependencies, we publish the build. -->
   <!-- However, we cannot publish during the cross-targeting build, so we skip that. -->
-  <Target Name="PostBuildPublish" AfterTargets="Build" DependsOnTargets="Publish" Condition="'$(TargetFramework)' != '' and '$(DesignTimeBuild)' == ''" >
+  <Target
+    Name="PostBuildPublish"
+    AfterTargets="Build"
+    DependsOnTargets="ResolveAssemblyReferences;Publish"
+    Inputs="@(Compile);@(ReferencePath)"
+    Outputs="$(BootstrapPublishCacheFile)"
+    Condition="'$(TargetFramework)' != '' and '$(DesignTimeBuild)' == ''" >
+    
+    <Hash ItemsToHash="@(Compile);@(ReferencePath)">
+      <Output TaskParameter="HashResult" PropertyName="Orleans_UpdatedInputPubCacheContents" />
+    </Hash>
+
+    <WriteLinesToFile
+      Overwrite="true"
+      File="$(BootstrapPublishCacheFile)"
+      Lines="$(Orleans_UpdatedInputPubCacheContents)"
+      WriteOnlyWhenDifferent="True" />
+
+    <ItemGroup>
+      <FileWrites Include="$(BootstrapPublishCacheFile)" />
+    </ItemGroup>
+
   </Target>
 
 </Project>
