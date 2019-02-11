@@ -11,7 +11,7 @@ namespace Benchmarks.MapReduce
             {
                 Run = {
                     LaunchCount = 1,
-                    InvocationCount = 2,
+                    IterationCount = 2,
                     WarmupCount = 0
                 }
             });
