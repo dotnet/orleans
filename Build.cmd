@@ -13,6 +13,7 @@ set Platform=
 set DOTNET_MULTILEVEL_LOOKUP=0 
 
 call Ensure-DotNetSdk.cmd
+SET DotNetHost=%_dotnet%
 
 SET SOLUTION=%CMDHOME%\Orleans.sln
 

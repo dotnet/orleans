@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk" DefaultTargets="Build;PostBuildPublish">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.CodeGenerator.MSBuild</PackageId>
@@ -72,11 +72,40 @@
     <ProjectReference Include="..\Orleans.CodeGenerator.MSBuild.Tasks\Orleans.CodeGenerator.MSBuild.Tasks.csproj" PrivateAssets="all" Publish="true" />
   </ItemGroup>
 
-  <Target Name="PostBuildPublish" AfterTargets="Build">
-    <!-- So that we can create a nuget package which includes all dependencies, we publish the build. -->
-    <!-- However, we cannot publish during the cross-targeting build, so we skip that. -->
-    <CallTarget Targets="Publish" Condition="'$(TargetFramework)' != '' and '$(DesignTimeBuild)' == ''" />
+  <!-- Start: PostBuildPublish -->
+  <!-- In order to support incremental builds, only call the Publish target if inputs have changed. -->
+  <PropertyGroup>
+    <PublishCacheFile>$(IntermediateOutputPath)$(MSBuildProjectFile).Publish.cache</PublishCacheFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PostBuildPublishInputs Include="@(Compile);@(ReferencePath)" />
+    <PostBuildPublishInputs Remove="@(GeneratedAssemblyInfoFile)" />
+  </ItemGroup>
+
+  <Target
+    Name="PostBuildPublish"
+    AfterTargets="Build"
+    DependsOnTargets="ResolveAssemblyReferences;Publish"
+    Inputs="@(PostBuildPublishInputs)"
+    Outputs="$(PublishCacheFile)"
+    Condition="'$(TargetFramework)' != '' and '$(DesignTimeBuild)' == ''" >
+    
+    <Hash ItemsToHash="@(PostBuildPublishInputs)">
+      <Output TaskParameter="HashResult" PropertyName="Orleans_UpdatedInputPubCacheContents" />
+    </Hash>
+
+    <WriteLinesToFile
+      Overwrite="true"
+      File="$(PublishCacheFile)"
+      Lines="$(Orleans_UpdatedInputPubCacheContents)"
+      WriteOnlyWhenDifferent="True" />
+
+    <ItemGroup>
+      <FileWrites Include="$(PublishCacheFile)" />
+    </ItemGroup>
   </Target>
+  <!-- END: PostBuildPublish -->
   
   <Target Name="PackTaskDependencies" BeforeTargets="GenerateNuspec">
    <!-- 
