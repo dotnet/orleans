@@ -51,35 +51,38 @@
     <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.Workspaces" Version="$(MicrosoftCodeAnalysisVersion)" />
   </ItemGroup>
   
-  <!-- Properties used to support correct, incremental builds. -->
+  <!-- Start: PostBuildPublish -->
+  <!-- In order to support incremental builds, only call the Publish target if inputs have changed. -->
   <PropertyGroup>
-    <BootstrapPublishCacheFile>$(IntermediateOutputPath)$(MSBuildProjectFile).BootstrapPublish.cache</BootstrapPublishCacheFile>
+    <PublishCacheFile>$(IntermediateOutputPath)$(MSBuildProjectFile).Publish.cache</PublishCacheFile>
   </PropertyGroup>
 
-  <!-- So that we can create a nuget package which includes all dependencies, we publish the build. -->
-  <!-- However, we cannot publish during the cross-targeting build, so we skip that. -->
+  <ItemGroup>
+    <PostBuildPublishInputs Include="@(Compile);@(ReferencePath)" />
+    <PostBuildPublishInputs Remove="@(GeneratedAssemblyInfoFile)" />
+  </ItemGroup>
+
   <Target
     Name="PostBuildPublish"
     AfterTargets="Build"
     DependsOnTargets="ResolveAssemblyReferences;Publish"
-    Inputs="@(Compile);@(ReferencePath)"
-    Outputs="$(BootstrapPublishCacheFile)"
+    Inputs="@(PostBuildPublishInputs)"
+    Outputs="$(PublishCacheFile)"
     Condition="'$(TargetFramework)' != '' and '$(DesignTimeBuild)' == ''" >
     
-    <Hash ItemsToHash="@(Compile);@(ReferencePath)">
+    <Hash ItemsToHash="@(PostBuildPublishInputs)">
       <Output TaskParameter="HashResult" PropertyName="Orleans_UpdatedInputPubCacheContents" />
     </Hash>
 
     <WriteLinesToFile
       Overwrite="true"
-      File="$(BootstrapPublishCacheFile)"
+      File="$(PublishCacheFile)"
       Lines="$(Orleans_UpdatedInputPubCacheContents)"
       WriteOnlyWhenDifferent="True" />
 
     <ItemGroup>
-      <FileWrites Include="$(BootstrapPublishCacheFile)" />
+      <FileWrites Include="$(PublishCacheFile)" />
     </ItemGroup>
-
   </Target>
-
+  <!-- END: PostBuildPublish -->
 </Project>

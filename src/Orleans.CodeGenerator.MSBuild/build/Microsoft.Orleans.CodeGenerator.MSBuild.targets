@@ -69,7 +69,9 @@
   -->
   <Target Name="OrleansGenerateInputCache"
           DependsOnTargets="ResolveAssemblyReferences"
-          BeforeTargets="OrleansGenerateCode">
+          BeforeTargets="OrleansGenerateCode"
+          Inputs="@(Orleans_CodeGenInputs)"
+          Outputs="$(Orleans_CodeGenInputCache)">
 
     <Hash ItemsToHash="@(Orleans_CodeGenInputs)">
       <Output TaskParameter="HashResult" PropertyName="Orleans_UpdatedInputCacheContents" />
@@ -120,19 +122,10 @@
 
     <!-- Use dotnet to execute the process. -->
     <Exec Command="&quot;$(Orleans_DotNetHost)&quot; &quot;$(Orleans_GeneratorAssembly)&quot; SourceToSource &quot;$(Orleans_ArgsFile)&quot;" Outputs="$(Orleans_OutputFileName)" />
-
-    <ItemGroup>
-      <Compile Include="$(Orleans_OutputFileName)" Condition="Exists('$(Orleans_OutputFileName)')" />
-      <FileWrites Include="$(Orleans_OutputFileName)" Condition="Exists('$(Orleans_OutputFileName)')"/>
-    </ItemGroup>
   </Target>
 
-  <Target Name="OrleansIncludeCodegenOutputDuringDesignTimeBuild"
-          BeforeTargets="AssignTargetPaths"
-          Condition="'$(Orleans_CodeGeneratorEnabled)' != 'true' and Exists('$(Orleans_OutputFileName)')">
-    <ItemGroup>
-      <Compile Include="$(Orleans_OutputFileName)"/>
-      <FileWrites Include="$(Orleans_OutputFileName)"/>
-    </ItemGroup>
-  </Target>
+  <ItemGroup>
+    <Compile Include="$(Orleans_OutputFileName)" Condition="Exists('$(Orleans_OutputFileName)')" />
+    <FileWrites Include="$(Orleans_OutputFileName)" Condition="Exists('$(Orleans_OutputFileName)')"/>
+  </ItemGroup>
 </Project>
