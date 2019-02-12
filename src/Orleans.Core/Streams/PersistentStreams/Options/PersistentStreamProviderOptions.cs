@@ -33,9 +33,6 @@ namespace Orleans.Configuration
 
     public class StreamPullingAgentOptions
     {
-        public static readonly TimeSpan DEFAULT_RETRY_PUBSUB_INTERVAL = TimeSpan.FromSeconds(1);
-        public TimeSpan RetryPubsubInterval = DEFAULT_RETRY_PUBSUB_INTERVAL;
-
         public int BatchContainerBatchSize { get; set; } = DEFAULT_BATCH_CONTAINER_BATCH_SIZE;
         public static readonly int DEFAULT_BATCH_CONTAINER_BATCH_SIZE = 1;
 

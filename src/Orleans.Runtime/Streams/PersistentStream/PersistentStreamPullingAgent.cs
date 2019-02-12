@@ -460,7 +460,8 @@ namespace Orleans.Streams
                     }
                     else
                     {
-                        this.logger.LogWarning($"Pulled new messages in stream {streamId} from the queue, but pulling agent haven't succeeded in" +
+                        if(this.logger.IsEnabled(LogLevel.Debug))
+                            this.logger.LogDebug($"Pulled new messages in stream {streamId} from the queue, but pulling agent haven't succeeded in" +
                                                    $"RegisterStream yet, will start deliver on this stream after RegisterStream succeeded");
                     }
 
@@ -766,6 +767,21 @@ namespace Orleans.Streams
             return false;
         }
 
+        private static async Task<ISet<PubSubSubscriptionState>> PubsubRegisterProducer(IStreamPubSub pubSub, StreamId streamId, string streamProviderName,
+            IStreamProducerExtension meAsStreamProducer, ILogger logger)
+        {
+            try
+            {
+                var streamData = await pubSub.RegisterProducer(streamId, streamProviderName, meAsStreamProducer);
+                return streamData;
+            }
+            catch (Exception e)
+            {
+                logger.Error(ErrorCode.PersistentStreamPullingAgent_17, $"RegisterAsStreamProducer failed due to {e}", e);
+                throw e;
+            }
+        }
+
         private async Task RegisterAsStreamProducer(StreamId streamId, StreamSequenceToken streamStartToken)
         {
             try
@@ -774,21 +790,14 @@ namespace Orleans.Streams
 
                 IStreamProducerExtension meAsStreamProducer = this.AsReference<IStreamProducerExtension>();
                 ISet<PubSubSubscriptionState> streamData = null;
-                var callPubsubSucceed = false;
-                while (!callPubsubSucceed)
-                {
-                    try
-                    {
-                        streamData = await pubSub.RegisterProducer(streamId, streamProviderName, meAsStreamProducer);
-                        callPubsubSucceed = true;
-                        break;
-                    }
-                    catch (Exception e)
-                    {
-                        logger.Error(ErrorCode.PersistentStreamPullingAgent_17, $"RegisterAsStreamProducer failed due to {e}, retrying after {retryInterval}", e);
-                        await Task.Delay(this.options.RetryPubsubInterval);
-                    }
-                }
+                await AsyncExecutorWithRetries.ExecuteWithRetries(
+                                async i => { streamData = 
+                                    await PubsubRegisterProducer(pubSub, streamId, streamProviderName, meAsStreamProducer, logger); },
+                                AsyncExecutorWithRetries.INFINITE_RETRIES,
+                                (exception, i) => !IsShutdown,
+                                Constants.INFINITE_TIMESPAN,
+                                DeliveryBackoffProvider);
+               
                 
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.PersistentStreamPullingAgent_16, "Got back {0} Subscribers for stream {1}.", streamData.Count, streamId);
 
