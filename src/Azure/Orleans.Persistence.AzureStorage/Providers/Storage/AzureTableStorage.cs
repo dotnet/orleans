@@ -80,7 +80,8 @@ namespace Orleans.Storage
                 var entity = record.Entity;
                 if (entity != null)
                 {
-                    var loadedState = ConvertFromStorageFormat(entity);
+                    var stateType = grainState.State.GetType();
+                    var loadedState = ConvertFromStorageFormat(entity, stateType);
                     grainState.State = loadedState ?? Activator.CreateInstance(grainState.State.GetType());
                     grainState.ETag = record.ETag;
                 }
@@ -336,7 +337,8 @@ namespace Orleans.Storage
         /// Deserialize from Azure storage format
         /// </summary>
         /// <param name="entity">The Azure table entity the stored data</param>
-        internal object ConvertFromStorageFormat(DynamicTableEntity entity)
+        /// <param name="stateType">The state type</param>
+        internal object ConvertFromStorageFormat(DynamicTableEntity entity, Type stateType)
         {
             var binaryData = ReadBinaryData(entity);
             var stringData = ReadStringData(entity);
@@ -351,7 +353,7 @@ namespace Orleans.Storage
                 }
                 else if (!string.IsNullOrEmpty(stringData))
                 {
-                    dataValue = Newtonsoft.Json.JsonConvert.DeserializeObject<object>(stringData, this.JsonSettings);
+                    dataValue = Newtonsoft.Json.JsonConvert.DeserializeObject(stringData, stateType, this.JsonSettings);
                 }
 
                 // Else, no data found
