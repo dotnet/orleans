@@ -18,6 +18,8 @@ using TestExtensions;
 using UnitTests.StorageTests;
 using UnitTests.Persistence;
 using Samples.StorageProviders;
+using Newtonsoft.Json;
+using System.Globalization;
 
 namespace Tester.AzureUtils.Persistence
 {
@@ -193,11 +195,28 @@ namespace Tester.AzureUtils.Persistence
 
             storage.ConvertToStorageFormat(initialState, entity);
 
-            var convertedState = (TestStoreGrainState)storage.ConvertFromStorageFormat(entity);
+            var convertedState = (TestStoreGrainState)storage.ConvertFromStorageFormat(entity, typeof(TestStoreGrainState));
             Assert.NotNull(convertedState);
             Assert.Equal(initialState.A, convertedState.A);
             Assert.Equal(initialState.B, convertedState.B);
             Assert.Equal(initialState.C, convertedState.C);
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Azure")]
+        public async Task AzureTableStorage_ConvertJsonToFromStorageFormatWithCustomJsonProperties()
+        {
+            var state = TestStoreGrainStateWithCustomJsonProperties.NewRandomState(null);
+
+            var storage = await InitAzureTableGrainStorage(useJson: true, typeNameHandling: TypeNameHandling.None);
+            var initialState = state.State;
+
+            var entity = new DynamicTableEntity();
+
+            storage.ConvertToStorageFormat(initialState, entity);
+
+            var convertedState = (TestStoreGrainStateWithCustomJsonProperties)storage.ConvertFromStorageFormat(entity, typeof(TestStoreGrainStateWithCustomJsonProperties));
+            Assert.NotNull(convertedState);
+            Assert.Equal(initialState.String, convertedState.String);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
@@ -277,12 +296,13 @@ namespace Tester.AzureUtils.Persistence
             return store;
         }
 
-        private Task<AzureTableGrainStorage> InitAzureTableGrainStorage(bool useJson = false)
+        private Task<AzureTableGrainStorage> InitAzureTableGrainStorage(bool useJson = false, TypeNameHandling? typeNameHandling = null)
         {
             var options = new AzureTableStorageOptions
             {
                 ConnectionString = TestDefaultConfiguration.DataConnectionString,
-                UseJson = useJson
+                UseJson = useJson,
+                TypeNameHandling = typeNameHandling
             };
             return InitAzureTableGrainStorage(options);
         }
@@ -387,6 +407,35 @@ namespace Tester.AzureUtils.Persistence
             }
 
             TestUtils.CheckForAzureStorage();
+        }
+
+        public class TestStoreGrainStateWithCustomJsonProperties
+        {
+            [JsonProperty("s")]
+            public string String { get; set; }
+
+            internal static GrainState<TestStoreGrainStateWithCustomJsonProperties> NewRandomState(int? aPropertyLength = null)
+            {
+                return new GrainState<TestStoreGrainStateWithCustomJsonProperties>
+                {
+                    State = new TestStoreGrainStateWithCustomJsonProperties
+                    {
+                        String = aPropertyLength == null
+                            ? TestConstants.random.Next().ToString(CultureInfo.InvariantCulture)
+                            : GenerateRandomDigitString(aPropertyLength.Value)
+                    }
+                };
+            }
+
+            private static string GenerateRandomDigitString(int stringLength)
+            {
+                var characters = new char[stringLength];
+                for (var i = 0; i < stringLength; ++i)
+                {
+                    characters[i] = (char)TestConstants.random.Next('0', '9' + 1);
+                }
+                return new string(characters);
+            }
         }
     }
 }
