@@ -79,7 +79,11 @@ namespace Orleans.EventSourcing.StateStorage
                     // for manual testing
                     //await Task.Delay(5000);
 
-                    await globalStorageProvider.ReadStateAsync(grainTypeName, Services.GrainReference, GlobalStateCache);
+                    var readState = new GrainStateWithMetaDataAndETag<TLogView>();
+
+                    await globalStorageProvider.ReadStateAsync(grainTypeName, Services.GrainReference, readState);
+
+                    GlobalStateCache = readState;
 
                     Services.Log(Severity.Verbose, "read success {0}", GlobalStateCache);
 

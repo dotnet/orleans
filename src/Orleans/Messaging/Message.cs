@@ -566,9 +566,9 @@ namespace Orleans.Runtime
             AppendIfExists(HeadersContainer.Headers.CORRELATION_ID, sb, (m) => m.Id);
             AppendIfExists(HeadersContainer.Headers.ALWAYS_INTERLEAVE, sb, (m) => m.IsAlwaysInterleave);
             AppendIfExists(HeadersContainer.Headers.IS_NEW_PLACEMENT, sb, (m) => m.IsNewPlacement);
+            AppendIfExists(HeadersContainer.Headers.IS_RETURNED_FROM_REMOTE_CLUSTER, sb, (m) => m.IsReturnedFromRemoteCluster);
             AppendIfExists(HeadersContainer.Headers.READ_ONLY, sb, (m) => m.IsReadOnly);
             AppendIfExists(HeadersContainer.Headers.IS_UNORDERED, sb, (m) => m.IsUnordered);
-            AppendIfExists(HeadersContainer.Headers.IS_RETURNED_FROM_REMOTE_CLUSTER, sb, (m) => m.IsReturnedFromRemoteCluster);
             AppendIfExists(HeadersContainer.Headers.NEW_GRAIN_TYPE, sb, (m) => m.NewGrainType);
             AppendIfExists(HeadersContainer.Headers.REJECTION_INFO, sb, (m) => m.RejectionInfo);
             AppendIfExists(HeadersContainer.Headers.REJECTION_TYPE, sb, (m) => m.RejectionType);
@@ -1080,6 +1080,7 @@ namespace Orleans.Runtime
                 headers = _sendingGrain == null ? headers & ~Headers.SENDING_GRAIN : headers | Headers.SENDING_GRAIN;
                 headers = _sendingActivation == null ? headers & ~Headers.SENDING_ACTIVATION : headers | Headers.SENDING_ACTIVATION;
                 headers = _isNewPlacement == default(bool) ? headers & ~Headers.IS_NEW_PLACEMENT : headers | Headers.IS_NEW_PLACEMENT;
+                headers = _isReturnedFromRemoteCluster == default(bool) ? headers & ~Headers.IS_RETURNED_FROM_REMOTE_CLUSTER : headers | Headers.IS_RETURNED_FROM_REMOTE_CLUSTER;
                 headers = _isUsingIfaceVersion == default(bool) ? headers & ~Headers.IS_USING_INTERFACE_VERSION : headers | Headers.IS_USING_INTERFACE_VERSION;
                 headers = _result == default(ResponseTypes)? headers & ~Headers.RESULT : headers | Headers.RESULT;
                 headers = _timeToLive == null ? headers & ~Headers.TIME_TO_LIVE : headers | Headers.TIME_TO_LIVE;
@@ -1144,6 +1145,9 @@ namespace Orleans.Runtime
 
                 if ((headers & Headers.IS_NEW_PLACEMENT) != Headers.NONE)
                     writer.Write(input.IsNewPlacement);
+
+                if ((headers & Headers.IS_RETURNED_FROM_REMOTE_CLUSTER) != Headers.NONE)
+                    writer.Write(input.IsReturnedFromRemoteCluster);
 
                 // Nothing to do with Headers.IS_USING_INTERFACE_VERSION since the value in
                 // the header is sufficient
@@ -1264,6 +1268,9 @@ namespace Orleans.Runtime
 
                 if ((headers & Headers.IS_NEW_PLACEMENT) != Headers.NONE)
                     result.IsNewPlacement = ReadBool(reader);
+
+                if ((headers & Headers.IS_RETURNED_FROM_REMOTE_CLUSTER) != Headers.NONE)
+                    result.IsReturnedFromRemoteCluster = ReadBool(reader);
 
                 if ((headers & Headers.IS_USING_INTERFACE_VERSION) != Headers.NONE)
                     result.IsUsingIfaceVersion = true;

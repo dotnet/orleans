@@ -152,7 +152,7 @@ namespace Orleans
             return completion.Task;
         }
 
-        private static Task<T> TaskFromCanceled<T>()
+        internal static Task<T> TaskFromCanceled<T>()
         {
             var completion = new TaskCompletionSource<T>();
             completion.SetCanceled();
@@ -284,6 +284,46 @@ namespace Orleans
             throw new TimeoutException(String.Format("WithTimeout has timed out after {0}.", timeSpan));
         }
 
+        /// <summary>
+        /// For making an uncancellable task cancellable, by ignoring its result.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="taskToComplete">The task to wait for unless cancelled</param>
+        /// <param name="cancellationToken">A cancellation token for cancelling the wait</param>
+        /// <returns></returns>
+        internal static Task<T> WithCancellation<T>(this Task<T> taskToComplete, CancellationToken cancellationToken)
+        {
+            if (taskToComplete.IsCompleted || !cancellationToken.CanBeCanceled)
+            {
+                return taskToComplete;
+            }
+            else if (cancellationToken.IsCancellationRequested)
+            {
+                return PublicOrleansTaskExtensions.TaskFromCanceled<T>();
+            }
+            else 
+            {
+                return MakeCancellable(taskToComplete, cancellationToken);
+            }
+        }
+
+        private static async Task<T> MakeCancellable<T>(Task<T> task, CancellationToken cancellationToken)
+        {
+            var tcs = new TaskCompletionSource<T>();
+            using (cancellationToken.Register(() =>
+                      tcs.TrySetCanceled(cancellationToken), useSynchronizationContext: false))
+            {
+                var firstToComplete = await Task.WhenAny(task, tcs.Task).ConfigureAwait(false);
+
+                if (firstToComplete != task)
+                {
+                    task.Ignore();
+                }
+
+                return await firstToComplete.ConfigureAwait(false);
+            }
+        }
+        
         internal static Task WrapInTask(Action action)
         {
             try

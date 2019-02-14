@@ -13,7 +13,7 @@ using Tester;
 
 namespace Tests.GeoClusterTests
 {
-    [TestCategory("GeoCluster")]
+    [TestCategory("GeoCluster"), TestCategory("Functional")]
     public class BasicLogTestGrainTests : IClassFixture<BasicLogTestGrainTests.Fixture>
     {
         private readonly Fixture fixture;
