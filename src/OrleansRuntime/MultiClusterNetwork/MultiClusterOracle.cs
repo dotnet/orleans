@@ -117,14 +117,14 @@ namespace Orleans.Runtime.MultiClusterNetwork
             this.ScheduleTask(() => Utils.SafeExecute(() => this.PublishChanges())).Ignore();
         }
 
-        public bool SubscribeToMultiClusterConfigurationEvents(GrainReference observer)
+        public bool SubscribeToMultiClusterConfigurationEvents(IMultiClusterConfigurationListener listener)
         {
-            return localData.SubscribeToMultiClusterConfigurationEvents(observer);
+            return localData.SubscribeToMultiClusterConfigurationEvents(listener);
         }
 
-        public bool UnSubscribeFromMultiClusterConfigurationEvents(GrainReference observer)
+        public bool UnSubscribeFromMultiClusterConfigurationEvents(IMultiClusterConfigurationListener listener)
         {
-            return localData.UnSubscribeFromMultiClusterConfigurationEvents(observer);
+            return localData.UnSubscribeFromMultiClusterConfigurationEvents(listener);
         }
 
 
@@ -621,6 +621,12 @@ namespace Orleans.Runtime.MultiClusterNetwork
                     || !oracle.localData.Current.IsActiveGatewayForCluster(Silo, Cluster)))
                 {
                     Silo = oracle.GetRandomClusterGateway(Cluster);
+                }
+
+                // if the cluster has no gateways reporting, skip
+                if (Silo == null)
+                {
+                    return;
                 }
 
                 oracle.logger.Verbose("-{0} Publish to silo {1} ({2}) {3}", id, Silo, Cluster ?? "local", data);

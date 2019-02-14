@@ -26,11 +26,6 @@ namespace Orleans.TestingHost
         {
             {
                 var props = new Dictionary<string, string>();
-                props.Add("DataConnectionString", dataConnectionString);
-                config.Globals.RegisterStorageProvider("Orleans.Storage.AzureTableStorage", "AzureStore", props);
-            }
-            {
-                var props = new Dictionary<string, string>();
                 config.Globals.RegisterLogConsistencyProvider("Orleans.EventSourcing.StateStorage.LogConsistencyProvider", "StateStorage", props);
             }
             {

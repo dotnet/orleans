@@ -16,7 +16,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
         }
         private volatile IReadOnlyDictionary<string, List<SiloAddress>> activeGatewaysByCluster;
 
-        private readonly HashSet<GrainReference> confListeners;
+        private readonly HashSet<IMultiClusterConfigurationListener> confListeners;
 
         private readonly Logger logger;
         private readonly IInternalGrainFactory grainFactory;
@@ -29,7 +29,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
             this.grainFactory = grainFactory;
             localData = new MultiClusterData();
             activeGatewaysByCluster = new Dictionary<string, List<SiloAddress>>();
-            confListeners = new HashSet<GrainReference>();
+            confListeners = new HashSet<IMultiClusterConfigurationListener>();
         }
 
         private void ComputeAvailableGatewaysPerCluster()
@@ -48,30 +48,30 @@ namespace Orleans.Runtime.MultiClusterNetwork
             activeGatewaysByCluster = gws;
         }
 
-        internal bool SubscribeToMultiClusterConfigurationEvents(GrainReference observer)
+        internal bool SubscribeToMultiClusterConfigurationEvents(IMultiClusterConfigurationListener listener)
         {
             if (logger.IsVerbose2)
-                logger.Verbose2("SubscribeToMultiClusterConfigurationEvents: {0}", observer);
+                logger.Verbose2("SubscribeToMultiClusterConfigurationEvents: {0}", listener);
 
             lock (confListeners)
             {
-                if (confListeners.Contains(observer))
+                if (confListeners.Contains(listener))
                     return false;
 
-                confListeners.Add(observer);
+                confListeners.Add(listener);
                 return true;
             }
         }
 
 
-        internal bool UnSubscribeFromMultiClusterConfigurationEvents(GrainReference observer)
+        internal bool UnSubscribeFromMultiClusterConfigurationEvents(IMultiClusterConfigurationListener listener)
         {
             if (logger.IsVerbose3)
-                logger.Verbose3("UnSubscribeFromMultiClusterConfigurationEvents: {0}", observer);
+                logger.Verbose3("UnSubscribeFromMultiClusterConfigurationEvents: {0}", listener);
 
             lock (confListeners)
             {
-                return confListeners.Remove(observer);
+                return confListeners.Remove(listener);
             }
         }
 
@@ -101,7 +101,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
             {
                 // notify configuration listeners of change
 
-                List<GrainReference> listenersToNotify;
+                List<IMultiClusterConfigurationListener> listenersToNotify;
                 lock (confListeners)
                 {
                     // make a copy under the lock
@@ -112,12 +112,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
                 {
                     try
                     {
-                        if (logger.IsVerbose2)
-                            logger.Verbose2("-NotificationWork: notify IProtocolParticipant {0} of configuration {1}", listener, delta.Configuration);
-
-                        // enqueue conf change event as grain call
-                        var g = this.grainFactory.Cast<ILogConsistencyProtocolParticipant>(listener);
-                        g.OnMultiClusterConfigurationChange(delta.Configuration).Ignore();
+                        listener.OnMultiClusterConfigurationChange(delta.Configuration);
                     }
                     catch (Exception exc)
                     {
