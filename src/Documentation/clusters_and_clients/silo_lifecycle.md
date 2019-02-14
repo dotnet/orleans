@@ -42,15 +42,18 @@ public static class ServiceLifecycleStage
 
 Due to the inversion of control, where participants join the lifecycle rather than the lifecycle having some centralized set of initialization steps, it’s not always clear from the code what the startup/shutdown order is.
 To help address this, logging has been added prior to silo startup to report what components are participating at each stage.
-These logs are recorded at Information log level on the `Orleans.Runtime.SiloLifecycleSubject` logger.
-For instance:
+These logs are recorded at Information log level on the `Orleans.Runtime.SiloLifecycleSubject` logger.  For instance:
+
 _Information, Orleans.Runtime.SiloLifecycleSubject, “Stage 2000: Orleans.Statistics.PerfCounterEnvironmentStatistics, Orleans.Runtime.InsideRuntimeClient, Orleans.Runtime.Silo”_
+
 _Information, Orleans.Runtime.SiloLifecycleSubject, “Stage 4000: Orleans.Runtime.Silo”_
+
 _Information, Orleans.Runtime.SiloLifecycleSubject, “Stage 10000: Orleans.Runtime.Versions.GrainVersionStore, Orleans.Storage.AzureTableGrainStorage-Default, Orleans.Storage.AzureTableGrainStorage-PubSubStore”_
 
-Additionally, timing and error information are similarly logged for each component by stage.
-For instance:
+Additionally, timing and error information are similarly logged for each component by stage.  For instance:
+
 _Information, Orleans.Runtime.SiloLifecycleSubject, “Lifecycle observer Orleans.Runtime.InsideRuntimeClient started in stage 2000 which took 33 Milliseconds.”_
+
 _Information, Orleans.Runtime.SiloLifecycleSubject, “Lifecycle observer Orleans.Statistics.PerfCounterEnvironmentStatistics started in stage 2000 which took 17 Milliseconds.”_
 
 ## Silo Lifecycle Participation
@@ -71,7 +74,9 @@ public interface ILifecycleParticipant<TLifecycleObservable>
 
 Upon silo start, all participants (`ILifecycleParticipant<ISiloLifecycle>`) in the container will be given an opportunity to participate by calling their `Participate(..)` behavior.
 Once all have had the opportunity to participate, the silo’s observable lifecycle will start all stages in order.
-Example
+
+## Example
+
 With the introduction of the silo lifecycle, bootstrap providers, which used to allow application developers to inject logic at the provider initialization phase, are no longer necessary, since application logic can now be injected at any stage of silo startup.
 Nonetheless, we added a ‘startup task’ façade to aid the transition for developers who had been using bootstrap providers.
 As an example of how components can be developed which take part in the silo’s lifecycle, we’ll look at the startup task façade.
@@ -105,9 +110,12 @@ class StartupTask : ILifecycleParticipant<ISiloLifecycle>
 ```
 
 From the above implementation, we can see that in the StartupTask’s `Participate(..)` call it subscribes to the silo lifecycle at the configured stage, passing the application callback rather than its own initialization logic.
+
 Components that need to be initialized at a given stage would provide their own callback, but the pattern is the same.
+
 Now that we have a StartupTask which will ensure that the application’s hook is called at the configured stage, we need to ensure that the StartupTask participates in the silo lifecycle.
 For this we need only register it in the container.
+
 We do this with an extension function on the SiloHost builder.
 
 ```csharp
