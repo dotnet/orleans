@@ -129,7 +129,7 @@ Console.WriteLine(await friend.SayHello("Good morning, my friend!"));
 
 Blog
 =========
-[Orleans Blog](https://blogs.msdn.microsoft.com/orleans/) is a place to share our thoughts, plans, learnings, tips and tricks, and ideas, crazy and otherwise, which don’t easily fit the documentation format. We would also like to see here posts from the community members, sharing their experiences, ideas, and wisdom. 
+[Orleans Blog](https://dotnet.github.io/orleans/blog/) is a place to share our thoughts, plans, learnings, tips and tricks, and ideas, crazy and otherwise, which don’t easily fit the documentation format. We would also like to see here posts from the community members, sharing their experiences, ideas, and wisdom. 
 So, welcome to Orleans Blog, both as a reader and as a blogger!
 
 Community
