@@ -1,10 +1,10 @@
-using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Core;
 using Orleans.Storage;
+using Orleans.Utilities;
 
 namespace Orleans.Runtime
 {
@@ -28,7 +28,7 @@ namespace Orleans.Runtime
 
         protected virtual string GetFullStateName(IGrainActivationContext context, IPersistentStateConfiguration cfg)
         {
-            return $"{context.GrainType.FullName}.{cfg.StateName}";
+            return $"{RuntimeTypeNameFormatter.Format(context.GrainType)}.{cfg.StateName}";
         }
 
         private static void ThrowMissingProviderException(IGrainActivationContext context, IPersistentStateConfiguration cfg)
