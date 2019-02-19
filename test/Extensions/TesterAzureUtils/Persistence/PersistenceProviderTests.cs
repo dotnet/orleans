@@ -202,7 +202,7 @@ namespace Tester.AzureUtils.Persistence
             Assert.Equal(initialState.C, convertedState.C);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Azure")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("Azure")]
         public async Task AzureTableStorage_ConvertJsonToFromStorageFormatWithCustomJsonProperties()
         {
             var state = TestStoreGrainStateWithCustomJsonProperties.NewRandomState(null);
