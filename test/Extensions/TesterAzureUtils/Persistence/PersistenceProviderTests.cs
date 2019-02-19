@@ -205,6 +205,7 @@ namespace Tester.AzureUtils.Persistence
         [SkippableFact, TestCategory("Functional"), TestCategory("Azure")]
         public async Task AzureTableStorage_ConvertJsonToFromStorageFormatWithCustomJsonProperties()
         {
+            TestUtils.CheckForAzureStorage();
             var state = TestStoreGrainStateWithCustomJsonProperties.NewRandomState(null);
 
             var storage = await InitAzureTableGrainStorage(useJson: true, typeNameHandling: TypeNameHandling.None);
