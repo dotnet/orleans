@@ -299,6 +299,10 @@ namespace Orleans.Hosting
             services.AddTransient<IConfigurationValidator, GrainCollectionOptionsValidator>();
 
             services.TryAddSingleton<ITimerManager, TimerManagerImpl>();
+
+            // persistent state facet support
+            services.TryAddSingleton<IPersistentStateFactory, PersistentStateFactory>();
+            services.TryAddSingleton(typeof(IAttributeToFactoryMapper<PersistentStateAttribute>), typeof(PersistentStateAttributeMapper));
         }
     }
 }
