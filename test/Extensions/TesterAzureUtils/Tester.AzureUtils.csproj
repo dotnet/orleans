@@ -13,7 +13,6 @@
     <PackageReference Include="FluentAssertions" Version="$(FluentAssertionsVersion)" />
     <PackageReference Include="xunit" Version="$(xUnitVersion)" />
     <PackageReference Include="Xunit.SkippableFact" Version="$(XunitSkippableFactVersion)" />
-    <PackageReference Include="Newtonsoft.Json" Version="$(NewtonsoftJsonVersion)" />
     <DotNetCliToolReference Include="dotnet-xunit" Version="$(xUnitVersion)" />
   </ItemGroup>
 

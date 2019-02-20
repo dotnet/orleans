@@ -6,6 +6,7 @@ using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Streams
 {

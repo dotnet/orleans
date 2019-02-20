@@ -2,7 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Azure.EventHubs;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
+using Microsoft.Extensions.Options;
 using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.TestingHost;

@@ -4,6 +4,7 @@ using System;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Streams
 {
