@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -8,6 +8,7 @@ using Orleans.Storage;
 using Orleans.Utilities;
 using Orleans.Transactions.Abstractions;
 using Orleans.CodeGeneration;
+using Microsoft.Extensions.DependencyInjection;
 
 [assembly: GenerateSerializer(typeof(Orleans.Transactions.TransactionalStateRecord<>))]
 
@@ -103,7 +104,8 @@ namespace Orleans.Transactions
         {
             string formattedTypeName = RuntimeTypeNameFormatter.Format(this.context.GrainInstance.GetType());
             string fullStateName = $"{formattedTypeName}-{this.stateName}";
-            return new StateStorageBridge<TransactionalStateRecord<TState>>(fullStateName, this.context.GrainInstance.GrainReference, grainStorage, this.loggerFactory);
+            Factory<TransactionalStateRecord<TState>> stateFactory = () => ActivatorUtilities.CreateInstance<TransactionalStateRecord<TState>>(this.context.ActivationServices);
+            return new StateStorageBridge<TransactionalStateRecord<TState>>(fullStateName, stateFactory, this.context.GrainInstance.GrainReference, grainStorage, this.loggerFactory);
         }
     }
 

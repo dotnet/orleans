@@ -11,7 +11,6 @@ namespace Orleans.Runtime
     public class PersistentStateFactory : IPersistentStateFactory
     {
         public IPersistentState<TState> Create<TState>(IGrainActivationContext context, IPersistentStateConfiguration cfg)
-            where TState : new()
         {
             IGrainStorage storageProvider = !string.IsNullOrWhiteSpace(cfg.StorageName)
                 ? context.ActivationServices.GetServiceByName<IGrainStorage>(cfg.StorageName)
@@ -48,7 +47,6 @@ namespace Orleans.Runtime
         }
 
         private class PersistentStateBridge<TState> : IPersistentState<TState>, ILifecycleParticipant<IGrainLifecycle>
-            where TState : new()
         {
             private readonly string fullStateName;
             private readonly IGrainActivationContext context;
@@ -94,7 +92,8 @@ namespace Orleans.Runtime
             {
                 if (ct.IsCancellationRequested)
                     return Task.CompletedTask;
-                this.storage = new StateStorageBridge<TState>(this.fullStateName, context.GrainInstance.GrainReference, this.storageProvider, context.ActivationServices.GetService<ILoggerFactory>());
+                Factory<TState> stateFactory = () => ActivatorUtilities.CreateInstance<TState>(this.context.ActivationServices);
+                this.storage = new StateStorageBridge<TState>(this.fullStateName, stateFactory, this.context.GrainInstance.GrainReference, this.storageProvider, context.ActivationServices.GetService<ILoggerFactory>());
                 return this.ReadStateAsync();
             }
         }

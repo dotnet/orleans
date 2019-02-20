@@ -5,6 +5,7 @@ using Orleans.Configuration;
 using Orleans.Core;
 using Orleans.Timers;
 using Orleans.Storage;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime
 {
@@ -92,11 +93,12 @@ namespace Orleans.Runtime
             grain.Data.DelayDeactivation(timeSpan);
         }
 
-        public IStorage<TGrainState> GetStorage<TGrainState>(Grain grain) where TGrainState : new()
+        public IStorage<TGrainState> GetStorage<TGrainState>(Grain grain)
         {
             IGrainStorage grainStorage = grain.GetGrainStorage(ServiceProvider);
             string grainTypeName = grain.GetType().FullName;
-            return new StateStorageBridge<TGrainState>(grainTypeName, grain.GrainReference, grainStorage, this.loggerFactory);
+            Factory< TGrainState> stateFactory = () => ActivatorUtilities.CreateInstance<TGrainState>(this.ServiceProvider);
+            return new StateStorageBridge<TGrainState>(grainTypeName, stateFactory, grain.GrainReference, grainStorage, this.loggerFactory);
         }
 
         private static void CheckRuntimeContext()

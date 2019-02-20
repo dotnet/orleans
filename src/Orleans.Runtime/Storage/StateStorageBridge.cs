@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Storage;
@@ -9,9 +10,9 @@ using Orleans.Storage;
 namespace Orleans.Core
 {
     public class StateStorageBridge<TState> : IStorage<TState>
-        where TState : new()
     {
         private readonly string name;
+        private readonly Factory<TState> stateFactory;
         private readonly GrainReference grainRef;
         private readonly IGrainStorage store;
         private readonly GrainState<TState> grainState;
@@ -37,18 +38,17 @@ namespace Orleans.Core
             get { return grainState.ETag; }
         }
 
-        public StateStorageBridge(string name, GrainReference grainRef, IGrainStorage store, ILoggerFactory loggerFactory)
+        public StateStorageBridge(string name, Factory<TState> stateFactory, GrainReference grainRef, IGrainStorage store, ILoggerFactory loggerFactory)
         {
-            if (name == null) throw new ArgumentNullException(nameof(name));
-            if (grainRef == null) throw new ArgumentNullException(nameof(grainRef));
-            if (store == null) throw new ArgumentNullException(nameof(store));
             if (loggerFactory == null) throw new ArgumentNullException(nameof(loggerFactory));
 
+            this.name = name ?? throw new ArgumentNullException(nameof(name));
+            this.stateFactory = stateFactory ?? throw new ArgumentNullException(nameof(stateFactory));
+            this.grainRef = grainRef ?? throw new ArgumentNullException(nameof(grainRef));
+            this.store = store ?? throw new ArgumentNullException(nameof(store));
             this.logger = loggerFactory.CreateLogger(store.GetType().FullName);
-            this.name = name;
-            this.grainRef = grainRef;
-            this.store = store;
-            this.grainState = new GrainState<TState>(new TState());
+
+            this.grainState = new GrainState<TState>(this.stateFactory());
         }
 
         /// <summary>
@@ -130,7 +130,7 @@ namespace Orleans.Core
                 sw.Stop();
 
                 // Reset the in-memory copy of the state
-                grainState.State = new TState();
+                grainState.State = this.stateFactory();
 
                 // Update counters
                 StorageStatisticsGroup.OnStorageDelete(name, grainRef, sw.Elapsed);

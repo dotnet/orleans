@@ -3,6 +3,6 @@ namespace Orleans.Runtime
 {
     public interface IPersistentStateFactory
     {
-        IPersistentState<TState> Create<TState>(IGrainActivationContext context, IPersistentStateConfiguration config) where TState : new();
+        IPersistentState<TState> Create<TState>(IGrainActivationContext context, IPersistentStateConfiguration config);
     }
 }
