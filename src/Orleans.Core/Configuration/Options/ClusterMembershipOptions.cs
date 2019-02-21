@@ -92,6 +92,19 @@ namespace Orleans.Configuration
         public const int DEFAULT_LIVENESS_NUM_VOTES_FOR_DEATH_DECLARATION = 2;
 
         /// <summary>
+        /// To be used with <see cref="CleanupDeadEntriesTimeout"/>
+        /// </summary>
+        public TimeSpan DeleteEntriesOlderThan { get; set; } = DEFAULT_DELETE_ENTRIES_OLDER_THAN;
+        public static readonly TimeSpan DEFAULT_DELETE_ENTRIES_OLDER_THAN = TimeSpan.FromDays(7);
+
+        /// <summary>
+        /// If set, will check if there are older entries than <see cref="DeleteEntriesOlderThan"/> in the membership table,
+        /// and will delete them
+        /// </summary>
+        public TimeSpan? CleanupDeadEntriesTimeout { get; set; } = DEFAULT_DELETE_ENTRIES_OLDER_THAN;
+        public static readonly TimeSpan? DEFAULT_CLEANUP_DEAD_ENTRIES_TIMEOUT = null;
+
+        /// <summary>
         /// TEST ONLY - Do not modify in production environments
         /// </summary>
         public bool IsRunningAsUnitTest { get; set; } = false;
