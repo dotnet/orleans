@@ -96,7 +96,7 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Factory to create a IEventHubReceiver
         /// </summary>
-        protected Func<EventHubPartitionSettings, string, ILogger, ITelemetryProducer, Task<IEventHubReceiver>> EventHubReceiverFactory;
+        protected Func<EventHubPartitionSettings, string, ILogger, ITelemetryProducer, IEventHubReceiver> EventHubReceiverFactory;
         internal ConcurrentDictionary<QueueId, EventHubAdapterReceiver> EventHubReceivers { get { return this.receivers; } }
         internal IEventHubQueueMapper EventHubQueueMapper { get { return this.streamQueueMapper; } }
 

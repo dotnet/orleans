@@ -47,7 +47,7 @@
     <SystemRuntimeVersion>4.3.0</SystemRuntimeVersion>
 
     <SystemCollectionsImmutableVersion>1.4.0</SystemCollectionsImmutableVersion>
-    <SystemNetHttpVersion>4.3.2</SystemNetHttpVersion>
+    <SystemNetHttpVersion>4.3.3</SystemNetHttpVersion>
     <SystemReflectionMetadataVersion>1.5.0</SystemReflectionMetadataVersion>
     <SystemReflectionTypeExtensionsVersion>4.4.0</SystemReflectionTypeExtensionsVersion>
     <SystemValueTupleVersion>4.4.0</SystemValueTupleVersion>
@@ -71,7 +71,7 @@
     <MicrosoftExtensionsHostingVersion>2.1.0</MicrosoftExtensionsHostingVersion>
 
     <MicrosoftApplicationInsightsVersion>2.4.0</MicrosoftApplicationInsightsVersion>
-    <MicrosoftAzureEventHubsVersion>1.0.3</MicrosoftAzureEventHubsVersion>
+    <MicrosoftAzureEventHubsVersion>2.2.1</MicrosoftAzureEventHubsVersion>
     <MicrosoftDataSQLiteVersion>2.0.0</MicrosoftDataSQLiteVersion>
     <MicrosoftPowerShell5ReferenceAssembliesVersion>1.1.0</MicrosoftPowerShell5ReferenceAssembliesVersion>
     <MicrosoftServiceFabricServicesVersion>3.0.472</MicrosoftServiceFabricServicesVersion>

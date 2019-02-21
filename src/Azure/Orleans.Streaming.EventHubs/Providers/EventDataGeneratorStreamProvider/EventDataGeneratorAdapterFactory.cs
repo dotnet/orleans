@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Azure.EventHubs;
@@ -51,13 +51,12 @@ namespace Orleans.ServiceBus.Providers.Testing
             return Task.FromResult(GenerateEventHubPartitions(this.ehGeneratorOptions.EventHubPartitionCount));
         }
 
-        private Task<IEventHubReceiver> EHGeneratorReceiverFactory(EventHubPartitionSettings settings, string offset, ILogger logger, ITelemetryProducer telemetryProducer)
+        private IEventHubReceiver EHGeneratorReceiverFactory(EventHubPartitionSettings settings, string offset, ILogger logger, ITelemetryProducer telemetryProducer)
         {
             Func<IStreamIdentity, IStreamDataGenerator<EventData>> streamGeneratorFactory = this.serviceProvider.GetServiceByName<Func<IStreamIdentity, IStreamDataGenerator<EventData>>>(this.Name)
                 ?? SimpleStreamEventDataGenerator.CreateFactory(this.serviceProvider);
             var generator = new EventHubPartitionDataGenerator(this.ehGeneratorOptions, streamGeneratorFactory, logger);
-            var generatorReceiver = new EventHubPartitionGeneratorReceiver(generator);
-            return Task.FromResult<IEventHubReceiver>(generatorReceiver);
+            return new EventHubPartitionGeneratorReceiver(generator);
         }
 
         private void RandomlyPlaceStreamToQueue(StreamRandomPlacementArg args)
