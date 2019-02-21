@@ -97,7 +97,7 @@ namespace Orleans.Runtime
         {
             IGrainStorage grainStorage = grain.GetGrainStorage(ServiceProvider);
             string grainTypeName = grain.GetType().FullName;
-            Factory< TGrainState> stateFactory = () => ActivatorUtilities.CreateInstance<TGrainState>(this.ServiceProvider);
+            Factory< TGrainState> stateFactory = () => Activator.CreateInstance<TGrainState>();
             return new StateStorageBridge<TGrainState>(grainTypeName, stateFactory, grain.GrainReference, grainStorage, this.loggerFactory);
         }
 
