@@ -23,6 +23,7 @@ namespace Orleans.Runtime.MembershipService
         private GrainTimer timerGetTableUpdates;
         private GrainTimer timerProbeOtherSilos;
         private GrainTimer timerIAmAliveUpdateInTable;
+        private GrainTimer timerCleanupEntries;
         private int pingCounter; // for logging and diagnostics only
 
         private const int NUM_CONDITIONAL_WRITE_CONTENTION_ATTEMPTS = -1; // unlimited
@@ -91,6 +92,8 @@ namespace Orleans.Runtime.MembershipService
                 await UpdateMyStatusGlobal(SiloStatus.Joining);
 
                 StartIAmAliveUpdateTimer();
+
+                StartCleanupEntriesTimer();
 
                 // read the table and look for my node migration occurrences
                 await DetectNodeMigration(membershipOracleData.MyHostname);
@@ -216,6 +219,29 @@ namespace Orleans.Runtime.MembershipService
                 "Membership.IAmAliveTimer");
 
             timerIAmAliveUpdateInTable.Start();
+        }
+
+        private void StartCleanupEntriesTimer()
+        {
+            // If timeout value not set, cleanup disabled
+            if (this.clusterMembershipOptions.CleanupDeadEntriesTimeout == default(TimeSpan))
+                return;
+
+            logger.Info(ErrorCode.MembershipStartingIAmAliveTimer, "Starting StartCleanupEntriesTimer.");
+
+            if (this.timerCleanupEntries != null)
+                this.timerCleanupEntries.Dispose();
+
+            this.timerCleanupEntries = GrainTimer.FromTimerCallback(
+                this.RuntimeClient.Scheduler,
+                this.timerLogger,
+                OnCleanupEntriesTimer,
+                null,
+                this.clusterMembershipOptions.CleanupDeadEntriesTimeout.Value,
+                this.clusterMembershipOptions.CleanupDeadEntriesTimeout.Value,
+                "Membership.OnCleanupEntriesTimer");
+
+            this.timerCleanupEntries.Start();
         }
 
         public async Task ShutDown()
@@ -896,6 +922,30 @@ namespace Orleans.Runtime.MembershipService
                     }
                     return true;
                 }).Ignore();
+        }
+
+        private void OnCleanupEntriesTimer(object data)
+        {
+            var dateLimit = DateTime.UtcNow - this.clusterMembershipOptions.DeleteEntriesOlderThan;
+
+            try
+            {
+                this.membershipTableProvider
+                        .DeleteDeadMembershipTableEntries(dateLimit)
+                        .ContinueWith(task =>
+                        {
+                            if (task.IsFaulted)
+                                this.logger.Error(ErrorCode.MembershipCleanDeadEntriesFailure, "CleanupEntries failed", task.Exception);
+                            return true;
+                        }).Ignore();
+            }
+            catch (MissingMethodException)
+            {
+                this.logger.Error(
+                    ErrorCode.MembershipCleanDeadEntriesFailure,
+                    "DeleteDeadMembershipTableEntries operation is not supported by the current implementation of IMembershipTable. Disabling the timer now.");
+                this.timerCleanupEntries.Dispose();
+            }
         }
 
         private Task SendPing(SiloAddress siloAddress, int pingNumber)
