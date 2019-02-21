@@ -190,5 +190,10 @@ namespace Orleans.Runtime.MembershipService
                 throw;
             }
         }
+
+        public Task DeleteDeadMembershipTableEntries(DateTime beforeDate)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

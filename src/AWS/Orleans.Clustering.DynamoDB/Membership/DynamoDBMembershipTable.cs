@@ -1,4 +1,4 @@
-﻿using Amazon.DynamoDBv2;
+using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -357,6 +357,11 @@ namespace Orleans.Clustering.DynamoDB
                 IAmAliveTime = LogFormatter.PrintDate(memEntry.IAmAliveTime),
                 SiloIdentity = SiloInstanceRecord.ConstructSiloIdentity(memEntry.SiloAddress)
             };
+        }
+
+        public Task DeleteDeadMembershipTableEntries(DateTime beforeDate)
+        {
+            throw new NotImplementedException();
         }
     }
 }

@@ -329,5 +329,10 @@ namespace Orleans.Runtime.MembershipService
                 RowKey = SiloInstanceTableEntry.ConstructRowKey(memEntry.SiloAddress)
             };
         }
+
+        public Task DeleteDeadMembershipTableEntries(DateTime beforeDate)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

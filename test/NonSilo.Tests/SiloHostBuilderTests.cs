@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Net;
 using System.Threading;
@@ -18,6 +18,11 @@ namespace NonSilo.Tests
 {
     public class NoOpMembershipTable : IMembershipTable
     {
+        public Task DeleteDeadMembershipTableEntries(DateTime beforeDate)
+        {
+            return Task.CompletedTask;
+        }
+
         public Task DeleteMembershipTableEntries(string clusterId)
         {
             return Task.CompletedTask;

@@ -40,7 +40,13 @@ namespace Orleans.Runtime.MembershipService
         private TimeSpan AllowedIAmAliveMissPeriod { get { return this.clusterMembershipOptions.IAmAliveTablePublishTimeout.Multiply(this.clusterMembershipOptions.NumMissedTableIAmAliveLimit); } }
         private readonly ILoggerFactory loggerFactory;
 
-        public MembershipOracle(ILocalSiloDetails siloDetails, IOptions<ClusterMembershipOptions> clusterMembershipOptions, IMembershipTable membershipTable, IInternalGrainFactory grainFactory, IOptions<MultiClusterOptions> multiClusterOptions, ILoggerFactory loggerFactory)
+        public MembershipOracle(
+            ILocalSiloDetails siloDetails,
+            IOptions<ClusterMembershipOptions> clusterMembershipOptions,
+            IMembershipTable membershipTable,
+            IInternalGrainFactory grainFactory,
+            IOptions<MultiClusterOptions> multiClusterOptions,
+            ILoggerFactory loggerFactory)
             : base(Constants.MembershipOracleId, siloDetails.SiloAddress, loggerFactory)
         {
             this.loggerFactory = loggerFactory;
