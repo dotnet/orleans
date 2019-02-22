@@ -1,4 +1,6 @@
 
+using Orleans.Statistics;
+
 namespace Orleans.Configuration
 {
     public class LoadSheddingOptions
@@ -6,6 +8,9 @@ namespace Orleans.Configuration
         /// <summary>
         /// Specifies whether or not load shedding in the client gateway and stream providers is enabled.
         /// The default value is false, meaning that load shedding is disabled.
+        ///
+        /// In addition to LoadSheddingEnabled being true, in order for the cluster to utilize LoadShedding
+        /// a valid <see cref="IHostEnvironmentStatistics"/> implementation must be registered within the ISiloHost.
         /// </summary>
         public bool LoadSheddingEnabled { get; set; }
 
