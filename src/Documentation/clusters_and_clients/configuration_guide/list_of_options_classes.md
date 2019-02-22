@@ -33,7 +33,7 @@ All Options classes used to configure Orleans should be in the `Orleans.Configur
 | `EndpointOptions` | Setting the Silo endpoint options |
 | `GrainCollectionOptions` | Options for grain garbage collection |
 | `GrainVersioningOptions` |  Governs grain implementation selection in heterogeneous deployments |
-| `LoadSheddingOptions` | Settings for load shedding configuration |
+| `LoadSheddingOptions` | Settings for load shedding configuration. Must have a registered implementation of `IHostEnvironmentStatistics` such as through `builder.UsePerfCounterEnvironmentStatistics()` (Windows only) for `LoadShedding` to function. |
 | `MultiClusterOptions` | Options for configuring multi-cluster support |
 | `PerformanceTuningOptions` | Performance tuning options (networking, number of threads) |
 | `ProcessExitHandlingOptions` | Configure silo behavior on process exit |
