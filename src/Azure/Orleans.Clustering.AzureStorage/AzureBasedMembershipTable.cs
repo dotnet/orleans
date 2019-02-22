@@ -59,6 +59,11 @@ namespace Orleans.Runtime.MembershipService
             return tableManager.DeleteTableEntries(clusterId);
         }
 
+        public Task DeleteDeadMembershipTableEntries(DateTime beforeDate)
+        {
+            return tableManager.DeleteDeadMembershipTableEntries(beforeDate);
+        }
+
         public async Task<MembershipTableData> ReadRow(SiloAddress key)
         {
             try
@@ -328,11 +333,6 @@ namespace Orleans.Runtime.MembershipService
                 PartitionKey = deploymentId,
                 RowKey = SiloInstanceTableEntry.ConstructRowKey(memEntry.SiloAddress)
             };
-        }
-
-        public Task DeleteDeadMembershipTableEntries(DateTime beforeDate)
-        {
-            throw new NotImplementedException();
         }
     }
 }
