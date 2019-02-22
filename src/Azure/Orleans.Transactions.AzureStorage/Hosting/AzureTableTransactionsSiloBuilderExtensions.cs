@@ -4,6 +4,7 @@ using Orleans.Runtime;
 using Orleans.Configuration;
 using Orleans.Transactions.Abstractions;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Orleans.Providers;
 using Orleans.Transactions.AzureStorage;
 

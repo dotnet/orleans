@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Hosting.AzureCloudServices</PackageId>
     <Title>Microsoft Orleans Hosting on Azure Cloud Services</Title>
@@ -12,7 +12,7 @@
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <DefineConstants>$(DefineConstants);ORLEANS_HOSTING_CLOUDSERVICES</DefineConstants>
   </PropertyGroup>
-
+  
   <ItemGroup>
     <Compile Include="..\Shared\Storage\AzureTableDefaultPolicies.cs" Link="Storage\AzureTableDefaultPolicies.cs" />
   </ItemGroup>

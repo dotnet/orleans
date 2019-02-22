@@ -7,6 +7,7 @@ using System.Text;
 using Orleans.Providers.Streams.Common;
 using Orleans.ApplicationParts;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Streams
 {
