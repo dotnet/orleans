@@ -19,6 +19,7 @@ namespace Orleans.Runtime.Host
     /// <summary>
     /// Wrapper class for an Orleans silo running in the current host process.
     /// </summary>
+    [Obsolete("This type is obsolete and may be removed in a future release. Use SiloHostBuilder to create an instance of ISiloHost instead.")]
     public class AzureSilo
     {
         /// <summary>

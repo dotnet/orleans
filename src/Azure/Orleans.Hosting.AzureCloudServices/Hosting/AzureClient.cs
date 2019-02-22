@@ -13,6 +13,7 @@ namespace Orleans.Runtime.Host
     /// <summary>
     /// Utility class for initializing an Orleans client running inside Azure.
     /// </summary>
+    [Obsolete("This type is obsolete and may be removed in a future release. Use ClientBuilder to create an instance of IClusterClient instead.")]
     public static class AzureClient
     {
         private static readonly IServiceRuntimeWrapper serviceRuntimeWrapper = new ServiceRuntimeWrapper(AzureSilo.CreateDefaultLoggerFactory("AzureClient.log"));

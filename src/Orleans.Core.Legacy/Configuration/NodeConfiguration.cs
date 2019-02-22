@@ -14,6 +14,7 @@ namespace Orleans.Runtime.Configuration
     /// <summary>
     /// Individual node-specific silo configuration parameters.
     /// </summary>
+    [Obsolete("This type is obsolete and may be removed in a future release. Use configuration methods on ISiloHostBuilder to configure specific types.")]
     [Serializable]
     public class NodeConfiguration :IStatisticsConfiguration
     {

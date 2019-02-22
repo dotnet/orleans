@@ -17,6 +17,7 @@ namespace Orleans.Runtime.Host
     /// <summary>
     /// Allows programmatically hosting an Orleans silo in the current app domain.
     /// </summary>
+    [Obsolete("This type is obsolete and may be removed in a future release. Use SiloHostBuilder to create an instance of ISiloHost instead.")]
     public class SiloHost :
         MarshalByRefObject,
         IDisposable
