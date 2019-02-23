@@ -125,34 +125,34 @@
   <!-- Inner dependency versions -->
   <PropertyGroup Condition="$(FullBuild) != 'true'">
     <OrleansCoreAbstractionsVersion>2.2.0</OrleansCoreAbstractionsVersion>
-    <OrleansRuntimeAbstractionsVersion>2.2.0</OrleansRuntimeAbstractionsVersion>
-    <OrleansCoreVersion>2.2.0</OrleansCoreVersion>
-    <OrleansRuntimeVersion>2.2.3</OrleansRuntimeVersion>
-    <OrleansCoreLegacyVersion>2.2.0</OrleansCoreLegacyVersion>
-    <OrleansRuntimeLegacyVersion>2.2.3</OrleansRuntimeLegacyVersion>
-    <OrleansProvidersVersion>2.2.3</OrleansProvidersVersion>
-    <OrleansExtensionsVersion>2.2.3</OrleansExtensionsVersion>
-    <OrleansEventSourcingVersion>2.2.0</OrleansEventSourcingVersion>
-    <OrleansAdoNetVersion>2.2.3</OrleansAdoNetVersion>
-    <OrleansAWSVersion>2.2.3</OrleansAWSVersion>
-    <OrleansAzureClusteringVersion>2.2.3</OrleansAzureClusteringVersion>
-    <OrleansAzureStreamingVersion>2.2.3</OrleansAzureStreamingVersion>
-    <OrleansAzureEventHubsVersion>2.2.3</OrleansAzureEventHubsVersion>
-    <OrleansAzurePersistenceVersion>2.2.3</OrleansAzurePersistenceVersion>
-    <OrleansAzureRemindersVersion>2.2.3</OrleansAzureRemindersVersion>
-    <OrleansAzureMetapackageVersion>2.2.3</OrleansAzureMetapackageVersion>
-    <OrleansGoogleCloudProviderVersion>2.2.3</OrleansGoogleCloudProviderVersion>
-    <OrleansAzureCloudServicesVersion>2.2.3</OrleansAzureCloudServicesVersion>
-    <OrleansTestingHostVersion>2.2.3</OrleansTestingHostVersion>
-    <OrleansTransactionsVersion>2.2.3</OrleansTransactionsVersion>
-    <OrleansServiceFabricVersion>2.2.3</OrleansServiceFabricVersion>
-    <OrleansSerializersVersion>2.2.0</OrleansSerializersVersion>
-    <OrleansToolsVersion>2.2.3</OrleansToolsVersion>
-    <OrleansClientVersion>2.2.0</OrleansClientVersion>
-    <OrleansServerVersion>2.2.3</OrleansServerVersion>
-    <OrleansCodegenVersion>2.2.3</OrleansCodegenVersion>
-    <OrleansEventHubProviderVersion>2.2.3</OrleansEventHubProviderVersion>
-    <OrleansTelemetryConsumersVersion>2.2.0</OrleansTelemetryConsumersVersion>
+    <OrleansRuntimeAbstractionsVersion>2.2.4</OrleansRuntimeAbstractionsVersion>
+    <OrleansCoreVersion>2.2.4</OrleansCoreVersion>
+    <OrleansRuntimeVersion>2.2.4</OrleansRuntimeVersion>
+    <OrleansCoreLegacyVersion>2.2.4</OrleansCoreLegacyVersion>
+    <OrleansRuntimeLegacyVersion>2.2.4</OrleansRuntimeLegacyVersion>
+    <OrleansProvidersVersion>2.2.4</OrleansProvidersVersion>
+    <OrleansExtensionsVersion>2.2.4</OrleansExtensionsVersion>
+    <OrleansEventSourcingVersion>2.2.4</OrleansEventSourcingVersion>
+    <OrleansAdoNetVersion>2.2.4</OrleansAdoNetVersion>
+    <OrleansAWSVersion>2.2.4</OrleansAWSVersion>
+    <OrleansAzureClusteringVersion>2.2.4</OrleansAzureClusteringVersion>
+    <OrleansAzureStreamingVersion>2.2.4</OrleansAzureStreamingVersion>
+    <OrleansAzureEventHubsVersion>2.2.4</OrleansAzureEventHubsVersion>
+    <OrleansAzurePersistenceVersion>2.2.4</OrleansAzurePersistenceVersion>
+    <OrleansAzureRemindersVersion>2.2.4</OrleansAzureRemindersVersion>
+    <OrleansAzureMetapackageVersion>2.2.4</OrleansAzureMetapackageVersion>
+    <OrleansGoogleCloudProviderVersion>2.2.4</OrleansGoogleCloudProviderVersion>
+    <OrleansAzureCloudServicesVersion>2.2.4</OrleansAzureCloudServicesVersion>
+    <OrleansTestingHostVersion>2.2.4</OrleansTestingHostVersion>
+    <OrleansTransactionsVersion>2.2.4</OrleansTransactionsVersion>
+    <OrleansServiceFabricVersion>2.2.4</OrleansServiceFabricVersion>
+    <OrleansSerializersVersion>2.2.4</OrleansSerializersVersion>
+    <OrleansToolsVersion>2.2.4</OrleansToolsVersion>
+    <OrleansClientVersion>2.2.4</OrleansClientVersion>
+    <OrleansServerVersion>2.2.4</OrleansServerVersion>
+    <OrleansCodegenVersion>2.2.4</OrleansCodegenVersion>
+    <OrleansEventHubProviderVersion>2.2.4</OrleansEventHubProviderVersion>
+    <OrleansTelemetryConsumersVersion>2.2.4</OrleansTelemetryConsumersVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="$(FullBuild) == 'true'">
