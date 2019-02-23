@@ -136,25 +136,10 @@ namespace Orleans.Hosting
         /// <summary>
         /// Enables support for interacting with the runtime from an external context. For example, outside the context of a grain.
         /// </summary>
-        public static ISiloHostBuilder EnableDirectClient(
-            this ISiloHostBuilder builder)
+        [Obsolete("This method is no longer necessary and will be removed in a future release.")]
+        public static ISiloHostBuilder EnableDirectClient(this ISiloHostBuilder builder)
         {
-            return builder.ConfigureServices(services =>
-            {
-                services.RemoveAll<IHostedClient>();
-                services.TryAddSingleton<IHostedClient, HostedClient>();
-                services.TryAddSingleton<InvokableObjectManager>();
-                services.TryAddSingleton<IClusterClient>(
-                    sp =>
-                    {
-                        var result = ActivatorUtilities.CreateInstance<ClusterClient>(sp);
-                        var task = result.Connect();
-                        if (!task.IsCompleted)
-                            throw new InvalidOperationException(
-                                $"{nameof(result.Connect)}() method for internal {nameof(IClusterClient)} must complete synchronously.");
-                        return result;
-                    });
-            });
+            return builder;
         }
 
         /// <summary>
@@ -279,25 +264,11 @@ namespace Orleans.Hosting
         /// <summary>
         /// Enables support for interacting with the runtime from an external context. For example, outside the context of a grain.
         /// </summary>
-        public static ISiloBuilder EnableDirectClient(
-            this ISiloBuilder builder)
+        [Obsolete("This method is no longer necessary and will be removed in a future release.")]
+        public static ISiloBuilder EnableDirectClient(this ISiloBuilder builder)
         {
-            return builder.ConfigureServices(services =>
-            {
-                services.RemoveAll<IHostedClient>();
-                services.TryAddSingleton<IHostedClient, HostedClient>();
-                services.TryAddSingleton<InvokableObjectManager>();
-                services.TryAddSingleton<IClusterClient>(
-                    sp =>
-                    {
-                        var result = ActivatorUtilities.CreateInstance<ClusterClient>(sp);
-                        var task = result.Connect();
-                        if (!task.IsCompleted)
-                            throw new InvalidOperationException(
-                                $"{nameof(result.Connect)}() method for internal {nameof(IClusterClient)} must complete synchronously.");
-                        return result;
-                    });
-            });
+            // Note that this method was added with [Obsolete] to ease migration from ISiloHostBuilder to ISiloBuilder.
+            return builder;
         }
     }
 }
