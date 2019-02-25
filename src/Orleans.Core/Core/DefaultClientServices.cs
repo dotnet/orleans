@@ -61,8 +61,10 @@ namespace Orleans
             services.AddSingleton<BinaryFormatterSerializer>();
             services.AddSingleton<BinaryFormatterISerializableSerializer>();
             services.AddFromExisting<IKeyedSerializer, BinaryFormatterISerializableSerializer>();
+#pragma warning disable CS0618 // Type or member is obsolete
             services.TryAddSingleton<ILBasedSerializer>();
             services.AddFromExisting<IKeyedSerializer, ILBasedSerializer>();
+#pragma warning restore CS0618 // Type or member is obsolete
 
             // Application parts
             var parts = builder.GetApplicationPartManager();
