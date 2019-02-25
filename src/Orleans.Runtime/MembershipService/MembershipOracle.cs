@@ -224,7 +224,7 @@ namespace Orleans.Runtime.MembershipService
         private void StartCleanupEntriesTimer()
         {
             // If timeout value not set, cleanup disabled
-            if (this.clusterMembershipOptions.CleanupDeadEntriesTimeout == default(TimeSpan))
+            if (this.clusterMembershipOptions.DefunctSiloCleanupPeriod == default(TimeSpan))
                 return;
 
             logger.Info(ErrorCode.MembershipStartingIAmAliveTimer, "Starting StartCleanupEntriesTimer.");
@@ -237,8 +237,8 @@ namespace Orleans.Runtime.MembershipService
                 this.timerLogger,
                 OnCleanupEntriesTimer,
                 null,
-                this.clusterMembershipOptions.CleanupDeadEntriesTimeout.Value,
-                this.clusterMembershipOptions.CleanupDeadEntriesTimeout.Value,
+                this.clusterMembershipOptions.DefunctSiloCleanupPeriod.Value,
+                this.clusterMembershipOptions.DefunctSiloCleanupPeriod.Value,
                 "Membership.OnCleanupEntriesTimer");
 
             this.timerCleanupEntries.Start();
@@ -926,7 +926,7 @@ namespace Orleans.Runtime.MembershipService
 
         private void OnCleanupEntriesTimer(object data)
         {
-            var dateLimit = DateTime.UtcNow - this.clusterMembershipOptions.DeleteEntriesOlderThan;
+            var dateLimit = DateTime.UtcNow - this.clusterMembershipOptions.DefunctSiloExpiration;
 
             try
             {
@@ -939,7 +939,7 @@ namespace Orleans.Runtime.MembershipService
                             return true;
                         }).Ignore();
             }
-            catch (MissingMethodException)
+            catch (Exception ex) when (ex is NotImplementedException || ex is NotImplementedException)
             {
                 this.logger.Error(
                     ErrorCode.MembershipCleanDeadEntriesFailure,

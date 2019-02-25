@@ -92,17 +92,17 @@ namespace Orleans.Configuration
         public const int DEFAULT_LIVENESS_NUM_VOTES_FOR_DEATH_DECLARATION = 2;
 
         /// <summary>
-        /// To be used with <see cref="CleanupDeadEntriesTimeout"/>
+        /// To be used with <see cref="DefunctSiloCleanupPeriod"/>
         /// </summary>
-        public TimeSpan DeleteEntriesOlderThan { get; set; } = DEFAULT_DELETE_ENTRIES_OLDER_THAN;
-        public static readonly TimeSpan DEFAULT_DELETE_ENTRIES_OLDER_THAN = TimeSpan.FromDays(7);
+        public TimeSpan DefunctSiloExpiration { get; set; } = DEFAULT_DEFUNCT_SILO_EXPIRATION;
+        public static readonly TimeSpan DEFAULT_DEFUNCT_SILO_EXPIRATION = TimeSpan.FromDays(7);
 
         /// <summary>
-        /// If set, will check if there are older entries than <see cref="DeleteEntriesOlderThan"/> in the membership table,
-        /// and will delete them
+        /// The duration between membership table cleanup operations. When this period elapses, all defunct silo
+        /// entries older than <see cref="DefunctSiloExpiration" /> are removed. This value is per-silo.
         /// </summary>
-        public TimeSpan? CleanupDeadEntriesTimeout { get; set; } = DEFAULT_DELETE_ENTRIES_OLDER_THAN;
-        public static readonly TimeSpan? DEFAULT_CLEANUP_DEAD_ENTRIES_TIMEOUT = null;
+        public TimeSpan? DefunctSiloCleanupPeriod { get; set; } = DEFAULT_DEFUNCT_SILO_CLEANUP_PERIOD;
+        public static readonly TimeSpan? DEFAULT_DEFUNCT_SILO_CLEANUP_PERIOD = null;
 
         /// <summary>
         /// TEST ONLY - Do not modify in production environments
