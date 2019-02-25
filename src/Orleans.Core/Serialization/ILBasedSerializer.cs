@@ -1,4 +1,4 @@
-﻿namespace Orleans.Serialization
+namespace Orleans.Serialization
 {
     using System;
     using System.Collections.Concurrent;
@@ -8,6 +8,7 @@
     /// <summary>
     /// Fallback serializer to be used when other serializers are unavailable.
     /// </summary>
+    [Obsolete("Obsolete in favor of other serializers.")]
     public class ILBasedSerializer : IKeyedSerializer
     {
         private static readonly Type ExceptionType = typeof(Exception);
