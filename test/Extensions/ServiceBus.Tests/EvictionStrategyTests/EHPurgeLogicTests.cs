@@ -240,11 +240,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             var eventData = new EventData(ignore);
             DateTime now = DateTime.UtcNow;
             var offSet = Guid.NewGuid().ToString() + now.ToString();
-            eventData.SetOffset(offSet);
-            //set sequence number
-            eventData.SetSequenceNumber(sequenceNumber);
-            //set enqueue time
-            eventData.SetEnqueuedTimeUtc(now);
+            eventData.SystemProperties = new EventData.SystemPropertiesCollection(sequenceNumber, now, offSet, null);
             return eventData;
         }
 

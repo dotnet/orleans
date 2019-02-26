@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Azure.EventHubs;
@@ -57,19 +57,11 @@ namespace Orleans.ServiceBus.Providers.Testing
                 var eventData = EventHubBatchContainer.ToEventData<int>(this.serializationManager, this.StreamId.Guid, this.StreamId.Namespace,
                     this.GenerateEvent(this.SequenceNumberCounter.Value), RequestContextExtensions.Export(this.serializationManager));
 
-                //set partition key
-                eventData.SetPartitionKey(this.StreamId.Guid.ToString());
-
-                //set offset
                 DateTime now = DateTime.UtcNow;
                 var offSet = this.StreamId.Guid.ToString() + now.ToString();
-                eventData.SetOffset(offSet);
-                //set sequence number
-                eventData.SetSequenceNumber(this.SequenceNumberCounter.Value);
-                //set enqueue time
-                eventData.SetEnqueuedTimeUtc(now);
+                eventData.SystemProperties = new EventData.SystemPropertiesCollection(this.SequenceNumberCounter.Value, now, offSet, this.StreamId.Guid.ToString());
                 eventDataList.Add(eventData);
-                this.logger.Info($"Generate data of SequemceNumber {SequenceNumberCounter.Value} for stream {this.StreamId.Namespace}-{this.StreamId.Guid}");
+                this.logger.Info($"Generate data of SequenceNumber {SequenceNumberCounter.Value} for stream {this.StreamId.Namespace}-{this.StreamId.Guid}");
             }
 
             events = eventDataList;
