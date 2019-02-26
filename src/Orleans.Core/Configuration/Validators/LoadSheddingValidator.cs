@@ -25,9 +25,9 @@ namespace Orleans.Configuration.Validators
         /// <inheritdoc />
         public void ValidateConfiguration()
         {
-            // With no registered LoadSheddingOptions, return as there's nothing to validate.
+            // When Load Shedding is disabled, don't validate configuration.
             var options = this.serviceProvider.GetService<IOptions<LoadSheddingOptions>>();
-            if (options == null)
+            if (!options.Value.LoadSheddingEnabled)
             {
                 return;
             }
