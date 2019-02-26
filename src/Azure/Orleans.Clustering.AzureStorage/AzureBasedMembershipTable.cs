@@ -59,7 +59,7 @@ namespace Orleans.Runtime.MembershipService
             return tableManager.DeleteTableEntries(clusterId);
         }
 
-        public Task DeleteDeadMembershipTableEntries(DateTime beforeDate)
+        public Task DeleteDeadMembershipTableEntries(DateTimeOffset beforeDate)
         {
             return tableManager.DeleteDeadMembershipTableEntries(beforeDate);
         }

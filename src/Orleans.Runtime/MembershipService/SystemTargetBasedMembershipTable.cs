@@ -103,7 +103,7 @@ namespace Orleans.Runtime.MembershipService
 
         public Task UpdateIAmAlive(MembershipEntry entry) => this.grain.UpdateIAmAlive(entry);
 
-        public Task DeleteDeadMembershipTableEntries(DateTime beforeDate)
+        public Task DeleteDeadMembershipTableEntries(DateTimeOffset beforeDate)
         {
             throw new NotImplementedException();
         }
@@ -182,7 +182,7 @@ namespace Orleans.Runtime.MembershipService
             return Task.CompletedTask;
         }
 
-        public Task DeleteDeadMembershipTableEntries(DateTime beforeDate)
+        public Task DeleteDeadMembershipTableEntries(DateTimeOffset beforeDate)
         {
             throw new NotImplementedException();
         }

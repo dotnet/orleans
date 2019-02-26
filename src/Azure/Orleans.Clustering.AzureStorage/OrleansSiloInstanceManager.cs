@@ -196,7 +196,7 @@ namespace Orleans.AzureUtils
             return entriesList.Count();
         }
 
-        public async Task DeleteDeadMembershipTableEntries(DateTime beforeDate)
+        public async Task DeleteDeadMembershipTableEntries(DateTimeOffset beforeDate)
         {
             var entriesList = (await FindAllSiloEntries())
                 .Where(entry => entry.Item1.Status == INSTANCE_STATUS_DEAD && entry.Item1.Timestamp < beforeDate)
