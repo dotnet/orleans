@@ -18,9 +18,6 @@ namespace Orleans
     /// <param name="sender">The sender.</param>
     /// <param name="e">The event arguments.</param>
     public delegate void GatewayCountChangedHandler(object sender, GatewayCountChangedEventArgs e);
-
-    // Used to notify the client that the count of gateways has changed
-
     public class GatewayCountChangedEventArgs : EventArgs
     {
         /// <summary>
@@ -34,14 +31,14 @@ namespace Orleans
         public int PreviousNumberOfConnectedGateways { get; }
 
         /// <summary>
-        /// Helper to detect situations where we (probably) regained connection to the cluster.
+        /// Helper to detect situations where cluster connectivity was regained.
         /// </summary>
-        public bool ConnectionRecovered => NumberOfConnectedGateways > 0 && PreviousNumberOfConnectedGateways <= 0;
+        public bool ConnectionRecovered => this.NumberOfConnectedGateways > 0 && this.PreviousNumberOfConnectedGateways <= 0;
 
         public GatewayCountChangedEventArgs(int currentNumberOfConnectedGateways, int previousNumberOfConnectedGateways)
         {
-            NumberOfConnectedGateways = currentNumberOfConnectedGateways;
-            PreviousNumberOfConnectedGateways = previousNumberOfConnectedGateways;
+            this.NumberOfConnectedGateways = currentNumberOfConnectedGateways;
+            this.PreviousNumberOfConnectedGateways = previousNumberOfConnectedGateways;
         }
     }
 

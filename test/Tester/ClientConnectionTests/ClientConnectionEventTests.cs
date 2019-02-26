@@ -12,7 +12,7 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 
-namespace Tester.ClientConnectionTests
+namespace Tester
 {
     public class ClientConnectionEventTests : TestClusterPerTest
     {

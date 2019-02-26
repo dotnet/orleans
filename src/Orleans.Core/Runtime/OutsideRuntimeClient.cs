@@ -684,6 +684,7 @@ namespace Orleans
                 this.logger.Error(ErrorCode.ClientError, "Error when sending cluster disconnection notification", ex);
             }
         }
+
         /// <inheritdoc />
         public void NotifyGatewayCountChanged(int currentNumberOfGateways, int previousNumberOfGateways)
         {
