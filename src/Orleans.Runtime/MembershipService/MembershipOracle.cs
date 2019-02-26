@@ -931,7 +931,7 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 this.membershipTableProvider
-                        .DeleteDeadMembershipTableEntries(dateLimit)
+                        .CleanupDefunctSiloEntries(dateLimit)
                         .ContinueWith(task =>
                         {
                             if (task.IsFaulted)

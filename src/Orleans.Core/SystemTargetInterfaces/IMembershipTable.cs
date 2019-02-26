@@ -24,7 +24,10 @@ namespace Orleans
         /// </summary>
         Task DeleteMembershipTableEntries(string clusterId);
 
-        Task DeleteDeadMembershipTableEntries(DateTimeOffset beforeDate);
+        /// <summary>
+        /// Delete all dead silo entries older than <paramref name="beforeDate"/>
+        /// </summary>
+        Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate);
 
         /// <summary>
         /// Atomically reads the Membership Table information about a given silo.

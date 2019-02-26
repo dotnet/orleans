@@ -337,7 +337,7 @@ namespace Orleans.Runtime.Membership
             return JsonConvert.DeserializeObject<T>(Encoding.UTF8.GetString(data), MembershipSerializerSettings.Instance);
         }
 
-        public Task DeleteDeadMembershipTableEntries(DateTimeOffset beforeDate)
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {
             throw new NotImplementedException();
         }

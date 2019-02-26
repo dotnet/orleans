@@ -18,7 +18,7 @@ namespace NonSilo.Tests
 {
     public class NoOpMembershipTable : IMembershipTable
     {
-        public Task DeleteDeadMembershipTableEntries(DateTimeOffset beforeDate)
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {
             return Task.CompletedTask;
         }

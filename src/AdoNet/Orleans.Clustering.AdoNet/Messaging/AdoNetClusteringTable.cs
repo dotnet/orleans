@@ -191,7 +191,7 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        public Task DeleteDeadMembershipTableEntries(DateTimeOffset beforeDate)
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {
             throw new NotImplementedException();
         }

@@ -173,7 +173,7 @@ namespace Orleans.Runtime.Membership
             return new MembershipTableData(membershipEntries, _tableVersion);
         }
 
-        public Task DeleteDeadMembershipTableEntries(DateTimeOffset beforeDate)
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {
             throw new NotImplementedException();
         }

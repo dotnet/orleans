@@ -115,7 +115,7 @@ namespace Tester.AzureUtils
 
             await Task.Delay(TimeSpan.FromSeconds(3));
 
-            await manager.DeleteDeadMembershipTableEntries(DateTime.Now - TimeSpan.FromSeconds(1));
+            await manager.CleanupDefunctSiloEntries(DateTime.Now - TimeSpan.FromSeconds(1));
 
             var entries = await manager.FindAllSiloEntries();
             Assert.Equal(5, entries.Count);

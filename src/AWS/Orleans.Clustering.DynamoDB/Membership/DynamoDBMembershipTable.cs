@@ -359,7 +359,7 @@ namespace Orleans.Clustering.DynamoDB
             };
         }
 
-        public Task DeleteDeadMembershipTableEntries(DateTimeOffset beforeDate)
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {
             throw new NotImplementedException();
         }
