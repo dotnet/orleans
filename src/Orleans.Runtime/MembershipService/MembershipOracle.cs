@@ -227,7 +227,7 @@ namespace Orleans.Runtime.MembershipService
             if (this.clusterMembershipOptions.DefunctSiloCleanupPeriod == default)
                 return;
 
-            logger.Info(ErrorCode.MembershipStartingIAmAliveTimer, "Starting StartCleanupEntriesTimer.");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.MembershipStartingIAmAliveTimer, "Starting StartCleanupEntriesTimer.");
 
             if (this.timerCleanupEntries != null)
                 this.timerCleanupEntries.Dispose();
