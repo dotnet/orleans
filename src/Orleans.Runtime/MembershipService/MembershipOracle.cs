@@ -224,7 +224,7 @@ namespace Orleans.Runtime.MembershipService
         private void StartCleanupEntriesTimer()
         {
             // If timeout value not set, cleanup disabled
-            if (this.clusterMembershipOptions.DefunctSiloCleanupPeriod == default(TimeSpan))
+            if (this.clusterMembershipOptions.DefunctSiloCleanupPeriod == default)
                 return;
 
             logger.Info(ErrorCode.MembershipStartingIAmAliveTimer, "Starting StartCleanupEntriesTimer.");
