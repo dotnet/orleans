@@ -92,7 +92,8 @@ namespace Orleans.Configuration
         public const int DEFAULT_LIVENESS_NUM_VOTES_FOR_DEATH_DECLARATION = 2;
 
         /// <summary>
-        /// To be used with <see cref="DefunctSiloCleanupPeriod"/>
+        /// The period of time after which membership entries for defunct silos are eligible for removal.
+        /// Valid only if <see cref="DefunctSiloCleanupPeriod"/> is not <see langword="null" />.
         /// </summary>
         public TimeSpan DefunctSiloExpiration { get; set; } = DEFAULT_DEFUNCT_SILO_EXPIRATION;
         public static readonly TimeSpan DEFAULT_DEFUNCT_SILO_EXPIRATION = TimeSpan.FromDays(7);
