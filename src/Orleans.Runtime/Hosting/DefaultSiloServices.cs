@@ -275,20 +275,11 @@ namespace Orleans.Hosting
             services.AddTransient<IConfigurationValidator, SiloClusteringValidator>();
 
             // Enable hosted client.
-            services.AddSingleton<HostedClient>();
-            services.AddFromExisting<IHostedClient, HostedClient>();
+            services.TryAddSingleton<HostedClient>();
+            services.TryAddFromExisting<IHostedClient, HostedClient>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, HostedClient>();
             services.TryAddSingleton<InvokableObjectManager>();
-            services.TryAddSingleton<IClusterClient>(
-                sp =>
-                {
-                    var result = ActivatorUtilities.CreateInstance<ClusterClient>(sp);
-                    var task = result.Connect();
-                    if (!task.IsCompleted)
-                        throw new InvalidOperationException(
-                            $"{nameof(result.Connect)}() method for internal {nameof(IClusterClient)} must complete synchronously.");
-                    return result;
-                });
+            services.TryAddSingleton<IClusterClient, ClusterClient>();
 
             // Enable collection specific Age limits
             services.AddOptions<GrainCollectionOptions>()
