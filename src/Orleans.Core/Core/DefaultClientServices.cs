@@ -85,6 +85,7 @@ namespace Orleans
 
             services.AddTransient<IConfigurationValidator, ClusterOptionsValidator>();
             services.AddTransient<IConfigurationValidator, ClientClusteringValidator>();
+            services.AddTransient<IConfigurationValidator, LoadSheddingValidator>();
         }
     }
 }
