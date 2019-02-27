@@ -89,7 +89,6 @@ namespace Orleans.Serialization
         internal static bool TryReadSimpleType<TReader>(this TReader @this, out object result, out SerializationTokenType token) where TReader : IBinaryTokenStreamReader
         {
             token = @this.ReadToken();
-            byte[] bytes;
             switch (token)
             {
                 case SerializationTokenType.True:
@@ -144,8 +143,22 @@ namespace Orleans.Serialization
                     result = @this.ReadChar();
                     break;
                 case SerializationTokenType.Guid:
-                    bytes = @this.ReadBytes(16);
+#if NETSTANDARD2_1
+                    if (@this is BinaryTokenStreamReader2 reader)
+                    {
+                        Span<byte> bytes = stackalloc byte[16];
+                        reader.ReadBytes(in bytes);
+                        result = new Guid(bytes);
+                    }
+                    else
+                    {
+                        var bytes = @this.ReadBytes(16);
+                        result = new Guid(bytes);
+                    }
+#else
+                    var bytes = @this.ReadBytes(16);
                     result = new Guid(bytes);
+#endif
                     break;
                 case SerializationTokenType.Date:
                     result = DateTime.FromBinary(@this.ReadLong());
@@ -416,7 +429,8 @@ namespace Orleans.Serialization
                     var typeName = @this.ReadString();
                     try
                     {
-                        return serializationManager.ResolveTypeName(typeName);
+                        var type = serializationManager.ResolveTypeName(typeName);
+                        return type;
                     }
                     catch (TypeAccessException ex)
                     {

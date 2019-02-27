@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime;
+using Orleans.Runtime.Messaging;
 
 namespace Orleans.Messaging
 {
@@ -19,30 +22,31 @@ namespace Orleans.Messaging
     {
         internal readonly IGatewayListProvider ListProvider;
         private SafeTimer gatewayRefreshTimer;
-        private readonly Dictionary<Uri, DateTime> knownDead;
-        private IList<Uri> cachedLiveGateways;
+        private readonly Dictionary<SiloAddress, DateTime> knownDead;
+        private List<SiloAddress> cachedLiveGateways;
         private DateTime lastRefreshTime;
         private int roundRobinCounter;
         private readonly SafeRandom rand;
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
+        private readonly ConnectionManager connectionManager;
         private readonly object lockable;
-        private readonly ClientMessageCenter messageCenter;
+
         private readonly GatewayOptions gatewayOptions;
         private bool gatewayRefreshCallInitiated;
 
         public GatewayManager(
-            ClientMessageCenter messageCenter,
-            GatewayOptions gatewayOptions,
+            IOptions<GatewayOptions> gatewayOptions,
             IGatewayListProvider gatewayListProvider,
-            ILoggerFactory loggerFactory)
+            ILoggerFactory loggerFactory,
+            ConnectionManager connectionManager)
         {
-            this.messageCenter = messageCenter;
-            this.gatewayOptions = gatewayOptions;
-            knownDead = new Dictionary<Uri, DateTime>();
+            this.gatewayOptions = gatewayOptions.Value;
+            knownDead = new Dictionary<SiloAddress, DateTime>();
             rand = new SafeRandom();
             logger = loggerFactory.CreateLogger<GatewayManager>();
             this.loggerFactory = loggerFactory;
+            this.connectionManager = connectionManager;
             lockable = new object();
             gatewayRefreshCallInitiated = false;
 
@@ -67,7 +71,7 @@ namespace Orleans.Messaging
 
             roundRobinCounter = this.gatewayOptions.PreferedGatewayIndex >= 0 ? this.gatewayOptions.PreferedGatewayIndex : rand.Next(knownGateways.Count);
 
-            cachedLiveGateways = knownGateways;
+            cachedLiveGateways = knownGateways.Select(gw => gw.ToSiloAddress()).ToList();
 
             lastRefreshTime = DateTime.UtcNow;
             if (ListProvider.IsUpdatable)
@@ -92,12 +96,12 @@ namespace Orleans.Messaging
             }
         }
 
-        public void MarkAsDead(Uri gateway)
+        public void MarkAsDead(SiloAddress gateway)
         {
             lock (lockable)
             {
                 knownDead[gateway] = DateTime.UtcNow;
-                var copy = cachedLiveGateways.ToList();
+                var copy = new List<SiloAddress>(cachedLiveGateways);
                 copy.Remove(gateway);
                 // swap the reference, don't mutate cachedLiveGateways, so we can access cachedLiveGateways without the lock.
                 cachedLiveGateways = copy;
@@ -134,9 +138,9 @@ namespace Orleans.Messaging
         /// is in the same order every time.
         /// </summary>
         /// <returns></returns>
-        public Uri GetLiveGateway()
+        public SiloAddress GetLiveGateway()
         {
-            IList<Uri> live = GetLiveGateways();
+            IList<SiloAddress> live = GetLiveGateways();
             int count = live.Count;
             if (count > 0)
             {
@@ -151,7 +155,7 @@ namespace Orleans.Messaging
             return null;
         }
 
-        public IList<Uri> GetLiveGateways()
+        public List<SiloAddress> GetLiveGateways()
         {
             // Never takes a lock and returns the cachedLiveGateways list quickly without any operation.
             // Asynchronously starts gateway refresh only when it is empty.
@@ -185,7 +189,7 @@ namespace Orleans.Messaging
         {
             try
             {
-                UpdateLiveGatewaysSnapshot(gateways, ListProvider.MaxStaleness);
+                UpdateLiveGatewaysSnapshot(gateways.Select(gw => gw.ToSiloAddress()), ListProvider.MaxStaleness);
             }
             catch (Exception exc)
             {
@@ -201,7 +205,7 @@ namespace Orleans.Messaging
                 if (ListProvider == null || !ListProvider.IsUpdatable) return;
 
                 // the listProvider.GetGateways() is not under lock.
-                var currentKnownGateways = ListProvider.GetGateways().GetResult();
+                var currentKnownGateways = ListProvider.GetGateways().GetResult().Select(gw => gw.ToSiloAddress()).ToList();
                 if (logger.IsEnabled(LogLevel.Debug))
                 {
                     logger.Debug("Found {0} knownGateways from Gateway listProvider {1}", currentKnownGateways.Count, Utils.EnumerableToString(currentKnownGateways));
@@ -217,18 +221,18 @@ namespace Orleans.Messaging
         }
 
         // This function is called asynchronously from gateway refresh timer.
-        private void UpdateLiveGatewaysSnapshot(IEnumerable<Uri> currentKnownGateways, TimeSpan maxStaleness)
+        private void UpdateLiveGatewaysSnapshot(IEnumerable<SiloAddress> currentKnownGateways, TimeSpan maxStaleness)
         {
             // this is a short lock, protecting the access to knownDead and cachedLiveGateways.
             lock (lockable)
             {
                 // now take whatever listProvider gave us and exclude those we think are dead.
 
-                var live = new List<Uri>();
+                var live = new List<SiloAddress>();
                 var now = DateTime.UtcNow;
 
-                var knownGateways = currentKnownGateways as IList<Uri> ?? currentKnownGateways.ToList();
-                foreach (Uri trial in knownGateways)
+                var knownGateways = currentKnownGateways as List<SiloAddress> ?? currentKnownGateways.ToList();
+                foreach (SiloAddress trial in knownGateways)
                 {
                     // We consider a node to be dead if we recorded it is dead due to socket error
                     // and it was recorded (diedAt) not too long ago (less than maxStaleness ago).
@@ -278,15 +282,39 @@ namespace Orleans.Messaging
                             Utils.EnumerableToString(cachedLiveGateways),
                             prevRefresh);
                 }
+
+                this.AbortEvictedGatewayConnections(live);
+            }
+        }
+
+        private void AbortEvictedGatewayConnections(IList<SiloAddress> liveGateways)
+        {
+            if (this.connectionManager == null) return;
+
+            var liveGatewayEndpoints = new HashSet<SiloAddress>();
+            foreach (var endpoint in liveGateways)
+            {
+                liveGatewayEndpoints.Add(endpoint);
             }
 
-            this.messageCenter?.CleanupGatewayConnections(cachedLiveGateways);
+            var connectedGateways = this.connectionManager.GetConnectedAddresses();
+            foreach (var address in connectedGateways)
+            {
+                if (!liveGatewayEndpoints.Contains(address))
+                {
+                    if (logger.IsEnabled(LogLevel.Information))
+                    {
+                        this.logger.LogInformation("Aborting connection to {Endpoint} because it has been marked as dead", address);
+                    }
+
+                    this.connectionManager.Abort(address);
+                }
+            }
         }
 
         public void Dispose()
         {
-            var timer = gatewayRefreshTimer;
-            if (timer != null) timer.Dispose();
+            this.gatewayRefreshTimer?.Dispose();
         }
     }
 }

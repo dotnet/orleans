@@ -50,16 +50,7 @@ namespace Orleans.Runtime
             get { return _maxRetries; }
             set { _maxRetries = value; }
         }
-
-        /// <summary>
-        /// NOTE: The contents of bodyBytes should never be modified
-        /// </summary>
-        private List<ArraySegment<byte>> bodyBytes;
-
-        private List<ArraySegment<byte>> headerBytes;
-
-        private object bodyObject;
-
+        
         // Cache values of TargetAddess and SendingAddress as they are used very frequently
         private ActivationAddress targetAddress;
         private ActivationAddress sendingAddress;
@@ -396,76 +387,7 @@ namespace Orleans.Runtime
             set { Headers.RequestContextData = value; }
         }
 
-        public object GetDeserializedBody(SerializationManager serializationManager)
-        {
-            if (this.bodyObject != null) return this.bodyObject;
-            
-            try
-            {
-                this.bodyObject = DeserializeBody(serializationManager, this.bodyBytes);
-            }
-            finally
-            {
-                if (this.bodyBytes != null)
-                {
-                    BufferPool.GlobalPool.Release(bodyBytes);
-                    this.bodyBytes = null;
-                }
-            }
-
-            return this.bodyObject;
-        }
-
-        public object BodyObject
-        {
-            set
-            {
-                bodyObject = value;
-                if (bodyBytes == null) return;
-
-                BufferPool.GlobalPool.Release(bodyBytes);
-                bodyBytes = null;
-            }
-        }
-
-        private static object DeserializeBody(SerializationManager serializationManager, List<ArraySegment<byte>> bytes)
-        {
-            if (bytes == null)
-            {
-                return null;
-            }
-
-            var stream = new BinaryTokenStreamReader(bytes);
-            return serializationManager.Deserialize(stream);
-        }
-
-        public Message()
-        {
-            bodyObject = null;
-            bodyBytes = null;
-            headerBytes = null;
-        }
-        
-        /// <summary>
-        /// Clears the current body and sets the serialized body contents to the provided value.
-        /// </summary>
-        /// <param name="body">The serialized body contents.</param>
-        public void SetBodyBytes(List<ArraySegment<byte>> body)
-        {
-            // Dispose of the current body.
-            this.BodyObject = null;
-            this.bodyBytes = body;
-        }
-
-        /// <summary>
-        /// Deserializes the provided value into this instance's <see cref="BodyObject"/>.
-        /// </summary>
-        /// <param name="serializationManager">The serialization manager.</param>
-        /// <param name="body">The serialized body contents.</param>
-        public void DeserializeBodyObject(SerializationManager serializationManager, List<ArraySegment<byte>> body)
-        {
-            this.BodyObject = DeserializeBody(serializationManager, body);
-        }
+        public object BodyObject { get; set; }
 
         public void ClearTargetAddress()
         {
@@ -486,70 +408,7 @@ namespace Orleans.Runtime
         {
             return Equals(SendingSilo, other.SendingSilo) && Equals(Id, other.Id);
         }
-
-        public List<ArraySegment<byte>> Serialize(SerializationManager serializationManager, out int headerLengthOut, out int bodyLengthOut)
-        {
-            var headerWriter = new BinaryTokenStreamWriter();
-            var context = new SerializationContext(serializationManager)
-            {
-                StreamWriter = headerWriter
-            };
-            SerializationManager.SerializeMessageHeaders(Headers, context);
-
-            if (bodyBytes == null)
-            {
-                var bodyStream = new BinaryTokenStreamWriter();
-                serializationManager.Serialize(bodyObject, bodyStream);
-                // We don't bother to turn this into a byte array and save it in bodyBytes because Serialize only gets called on a message
-                // being sent off-box. In this case, the likelihood of needed to re-serialize is very low, and the cost of capturing the
-                // serialized bytes from the steam -- where they're a list of ArraySegment objects -- into an array of bytes is actually
-                // pretty high (an array allocation plus a bunch of copying).
-                bodyBytes = bodyStream.ToBytes();
-            }
-
-            if (headerBytes != null)
-            {
-                BufferPool.GlobalPool.Release(headerBytes);
-            }
-            headerBytes = headerWriter.ToBytes();
-            int headerLength = context.StreamWriter.CurrentOffset;
-            int bodyLength = BufferLength(bodyBytes);
-
-            var bytes = new List<ArraySegment<byte>>();
-            bytes.Add(new ArraySegment<byte>(BitConverter.GetBytes(headerLength)));
-            bytes.Add(new ArraySegment<byte>(BitConverter.GetBytes(bodyLength)));
-           
-            bytes.AddRange(headerBytes);
-            bytes.AddRange(bodyBytes);
-
-            headerLengthOut = headerLength;
-            bodyLengthOut = bodyLength;
-            return bytes;
-        }
-
-
-        public void ReleaseBodyAndHeaderBuffers()
-        {
-            ReleaseHeadersOnly();
-            ReleaseBodyOnly();
-        }
-
-        public void ReleaseHeadersOnly()
-        {
-            if (headerBytes == null) return;
-
-            BufferPool.GlobalPool.Release(headerBytes);
-            headerBytes = null;
-        }
-
-        public void ReleaseBodyOnly()
-        {
-            if (bodyBytes == null) return;
-
-            BufferPool.GlobalPool.Release(bodyBytes);
-            bodyBytes = null;
-        }
-
+                
         // For testing and logging/tracing
         public string ToLongString()
         {
@@ -717,7 +576,6 @@ namespace Orleans.Runtime
         internal void DropExpiredMessage(MessagingStatisticsGroup.Phase phase)
         {
             MessagingStatisticsGroup.OnMessageExpired(phase);
-            ReleaseBodyAndHeaderBuffers();
         }
 
         private static int BufferLength(List<ArraySegment<byte>> buffer)
@@ -1159,6 +1017,7 @@ namespace Orleans.Runtime
             public static void Serializer(object untypedInput, ISerializationContext context, Type expected)
             {
                 HeadersContainer input = (HeadersContainer)untypedInput;
+                var sm = context.GetSerializationManager();
                 var headers = input.GetHeadersMask();
                 var writer = context.StreamWriter;
                 writer.Write((int)headers);
@@ -1168,7 +1027,7 @@ namespace Orleans.Runtime
                     writer.Write(input.CacheInvalidationHeader.Count);
                     for (int i = 0; i < count; i++)
                     {
-                        WriteObj(context, typeof(ActivationAddress), input.CacheInvalidationHeader[i]);
+                        WriteObj(sm, context, typeof(ActivationAddress), input.CacheInvalidationHeader[i]);
                     }
                 }
 
@@ -1267,7 +1126,7 @@ namespace Orleans.Runtime
 
                 if ((headers & Headers.TARGET_OBSERVER) != Headers.NONE)
                 {
-                    WriteObj(context, typeof(GuidId), input.TargetObserverId);
+                    WriteObj(sm, context, typeof(GuidId), input.TargetObserverId);
                 }
 
                 if ((headers & Headers.CALL_CHAIN_ID) != Headers.NONE)
@@ -1292,6 +1151,7 @@ namespace Orleans.Runtime
             [DeserializerMethod]
             public static object Deserializer(Type expected, IDeserializationContext context)
             {
+                var sm = context.GetSerializationManager();
                 var result = new HeadersContainer();
                 var reader = context.StreamReader;
                 context.RecordObject(result);
@@ -1305,7 +1165,7 @@ namespace Orleans.Runtime
                        var list = result.CacheInvalidationHeader = new List<ActivationAddress>(n);
                         for (int i = 0; i < n; i++)
                         {
-                            list.Add((ActivationAddress)ReadObj(typeof(ActivationAddress), context));
+                            list.Add((ActivationAddress)ReadObj(sm, typeof(ActivationAddress), context));
                         }
                     }
                 }
@@ -1329,7 +1189,7 @@ namespace Orleans.Runtime
                     result.GenericGrainType = reader.ReadString();
 
                 if ((headers & Headers.CORRELATION_ID) != Headers.NONE)
-                    result.Id = (Orleans.Runtime.CorrelationId)ReadObj(typeof(Orleans.Runtime.CorrelationId), context);
+                    result.Id = (Orleans.Runtime.CorrelationId)ReadObj(sm, typeof(CorrelationId), context);
 
                 if ((headers & Headers.ALWAYS_INTERLEAVE) != Headers.NONE)
                     result.IsAlwaysInterleave = ReadBool(reader);
@@ -1391,7 +1251,7 @@ namespace Orleans.Runtime
                     result.TargetGrain = reader.ReadGrainId();
 
                 if ((headers & Headers.TARGET_OBSERVER) != Headers.NONE)
-                    result.TargetObserverId = (Orleans.Runtime.GuidId)ReadObj(typeof(Orleans.Runtime.GuidId), context);
+                    result.TargetObserverId = (GuidId)ReadObj(sm, typeof(GuidId), context);
 
                 if ((headers & Headers.CALL_CHAIN_ID) != Headers.NONE)
                     result.CallChainId = reader.ReadCorrelationId();
@@ -1415,15 +1275,15 @@ namespace Orleans.Runtime
                 return stream.ReadByte() == (byte) SerializationTokenType.True;
             }
 
-            private static void WriteObj(ISerializationContext context, Type type, object input)
+            private static void WriteObj(SerializationManager sm, ISerializationContext context, Type type, object input)
             {
-                var ser = context.GetSerializationManager().GetSerializer(type);
+                var ser = sm.GetSerializer(type);
                 ser.Invoke(input, context, type);
             }
 
-            private static object ReadObj(Type t, IDeserializationContext context)
+            private static object ReadObj(SerializationManager sm, Type t, IDeserializationContext context)
             {
-                var des = context.GetSerializationManager().GetDeserializer(t);
+                var des = sm.GetDeserializer(t);
                 return des.Invoke(t, context);
             }
         }

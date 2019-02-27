@@ -60,6 +60,12 @@ namespace Orleans.Runtime
 
         private SiloAddress(IPEndPoint endpoint, int gen)
         {
+            // Normalize endpoints
+            if (endpoint.Address.IsIPv4MappedToIPv6)
+            {
+                endpoint = new IPEndPoint(endpoint.Address.MapToIPv4(), endpoint.Port);
+            }
+
             Endpoint = endpoint;
             Generation = gen;
         }

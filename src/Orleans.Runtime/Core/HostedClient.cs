@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -16,8 +17,7 @@ namespace Orleans.Runtime
     /// </summary>
     internal sealed class HostedClient : IDisposable, IHostedClient, ILifecycleParticipant<ISiloLifecycle>
     {
-        private readonly BlockingCollection<Message> incomingMessages = new BlockingCollection<Message>();
-        private readonly CancellationTokenSource listeningCts = new CancellationTokenSource();
+        private readonly Channel<Message> incomingMessages;
         private readonly Dictionary<Type, Tuple<IGrainExtension, IAddressable>> extensionsTable = new Dictionary<Type, Tuple<IGrainExtension, IAddressable>>();
         private readonly AsyncLock lockable = new AsyncLock();
         private readonly IGrainReferenceRuntime grainReferenceRuntime;
@@ -28,7 +28,7 @@ namespace Orleans.Runtime
         private readonly IInternalGrainFactory grainFactory;
         private readonly ISiloMessageCenter siloMessageCenter;
         private bool disposing;
-        private Thread messagePump;
+        private Task messagePump;
 
         public HostedClient(
             IRuntimeClient runtimeClient,
@@ -40,6 +40,13 @@ namespace Orleans.Runtime
             InvokableObjectManager invokableObjectManager,
             ISiloMessageCenter messageCenter)
         {
+            this.incomingMessages = Channel.CreateUnbounded<Message>(new UnboundedChannelOptions
+            {
+                SingleReader = true,
+                SingleWriter = false,
+                AllowSynchronousContinuations = false,
+            });
+
             this.runtimeClient = runtimeClient;
             this.clientObserverRegistrar = clientObserverRegistrar;
             this.grainReferenceRuntime = grainReferenceRuntime;
@@ -142,7 +149,7 @@ namespace Orleans.Runtime
             else
             {
                 // Requests agrainst client objects are scheduled for execution on the client.
-                this.incomingMessages.Add(message);
+                this.incomingMessages.Writer.TryWrite(message);
             }
 
             return true;
@@ -156,44 +163,48 @@ namespace Orleans.Runtime
             Utils.SafeExecute(() => this.clientObserverRegistrar.ClientDropped(this.ClientId));
             Utils.SafeExecute(() => this.clientObserverRegistrar.SetHostedClient(null));
             Utils.SafeExecute(() => this.siloMessageCenter.SetHostedClient(null));
-            Utils.SafeExecute(() => this.listeningCts.Cancel(false));
-            Utils.SafeExecute(() => this.incomingMessages.Add(null));
-            Utils.SafeExecute(() => this.listeningCts.Dispose());
-            Utils.SafeExecute(() => this.messagePump?.Join());
+            Utils.SafeExecute(() => this.incomingMessages.Writer.TryComplete());
+            Utils.SafeExecute(() => this.messagePump?.GetAwaiter().GetResult());
         }
 
         private void Start()
         {
-            this.messagePump = new Thread(_ => this.RunClientMessagePump())
-            {
-                Name = nameof(HostedClient) + "." + nameof(RunClientMessagePump),
-                IsBackground = true,
-            };
-            this.messagePump.Start();
+            this.messagePump = Task.Run(this.RunClientMessagePump);
         }
 
-        private void RunClientMessagePump()
+        private async Task RunClientMessagePump()
         {
-            while (!this.listeningCts.IsCancellationRequested)
+            var reader = this.incomingMessages.Reader;
+            while (true)
             {
                 try
                 {
-                    var message = this.incomingMessages.Take();
-                    if (message == null) continue;
-                    switch (message.Direction)
+                    var moreTask = reader.WaitToReadAsync();
+                    var more = moreTask.IsCompletedSuccessfully ? moreTask.Result : await moreTask;
+                    if (!more)
                     {
-                        case Message.Directions.OneWay:
-                        case Message.Directions.Request:
-                            this.invokableObjects.Dispatch(message);
-                            break;
-                        default:
-                            this.logger.Error(ErrorCode.Runtime_Error_100327, string.Format("Message not supported: {0}.", message));
-                            break;
+                        this.logger.LogInformation($"{nameof(HostedClient)} completed processing all messages. Shutting down.");
+                        break;
+                    }
+
+                    while (reader.TryRead(out var message))
+                    {
+                        if (message == null) continue;
+                        switch (message.Direction)
+                        {
+                            case Message.Directions.OneWay:
+                            case Message.Directions.Request:
+                                this.invokableObjects.Dispatch(message);
+                                break;
+                            default:
+                                this.logger.LogError((int)ErrorCode.Runtime_Error_100327, "Message not supported: {Message}", message);
+                                break;
+                        }
                     }
                 }
-                catch (Exception exc)
+                catch (Exception exception)
                 {
-                    this.logger.Error(ErrorCode.Runtime_Error_100326, "RunClientMessagePump has thrown exception", exc);
+                    this.logger.LogError((int)ErrorCode.Runtime_Error_100326, "RunClientMessagePump has thrown an exception: {Exception}. Continuing.", exception);
                 }
             }
         }
@@ -218,12 +229,19 @@ namespace Orleans.Runtime
                 return clusterClient.Connect();
             }
 
-            Task OnStop(CancellationToken cancellation)
+            async Task OnStop(CancellationToken cancellation)
             {
-                if (cancellation.IsCancellationRequested) return Task.CompletedTask;
+                this.incomingMessages.Writer.TryComplete();
+                
+                if (this.messagePump != null)
+                {
+                    await Task.WhenAny(cancellation.WhenCancelled(), this.messagePump);
+                }
+                
+                if (cancellation.IsCancellationRequested) return;
 
                 var clusterClient = this.runtimeClient.ServiceProvider.GetRequiredService<IClusterClient>();
-                return clusterClient.Close();
+                await clusterClient.Close();
             }
         }
     }

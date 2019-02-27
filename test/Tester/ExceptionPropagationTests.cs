@@ -268,7 +268,13 @@ namespace UnitTests.General
             var objRef = grainFactory.CreateObjectReference<IMessageSerializationClientObject>(obj);
             var grain = grainFactory.GetGrain<IMessageSerializationGrain>(GetRandomGrainId());
             
-            var exception = await Assert.ThrowsAnyAsync<NotSupportedException>(() => grain.GetFromClient(objRef));
+            var exception = await Assert.ThrowsAnyAsync<Exception>(() => grain.GetFromClient(objRef));
+
+            // Sometimes the client connection will be terminated (due to the serialization failure which the client caused)
+            // before the response can be sent and therefore the response message will be dropped.
+            // Ideally we would quickly throw for requests sent to connections which are then terminated before
+            // a response is received.
+            Assert.True(exception is NotSupportedException || exception is TimeoutException);
             Assert.Contains(UndeserializableType.FailureMessage, exception.Message);
         }
 

@@ -22,7 +22,7 @@ namespace Orleans.Serialization
         }
     }
 
-    public class DeserializationContext : SerializationContextBase, IDeserializationContext
+    public sealed class DeserializationContext : SerializationContextBase, IDeserializationContext
     {
         private readonly Dictionary<int, object> taggedObjects;
 

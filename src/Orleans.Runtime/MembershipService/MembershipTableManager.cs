@@ -283,17 +283,7 @@ namespace Orleans.Runtime.MembershipService
                     // the status before continuing regardless of the outcome.
                     var updateTask = updateMyStatusTask(0);
                     updateTask.Ignore();
-                    var result = await Task.WhenAny(Task.Delay(TimeSpan.FromSeconds(5)), updateTask);
-
-                    if (ReferenceEquals(result, updateTask))
-                    {
-                        await result;
-                    }
-                    else
-                    {
-                        this.log.LogWarning(
-                            "Failed to update status to dead in the alotted time during shutdown");
-                    }
+                    await Task.WhenAny(Task.Delay(TimeSpan.FromMilliseconds(500)), updateTask);
 
                     this.CurrentStatus = status;
                     return;

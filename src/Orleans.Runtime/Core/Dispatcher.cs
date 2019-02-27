@@ -226,7 +226,6 @@ namespace Orleans.Runtime
             if (rejection.Result == Message.ResponseTypes.Rejection)
             {
                 Transport.SendMessage(rejection);
-                rejection.ReleaseBodyAndHeaderBuffers();
             }
             else
             {
@@ -402,7 +401,7 @@ namespace Orleans.Runtime
             {
                 if (targetActivation.Grain.IsGrain && message.IsUsingInterfaceVersions)
                 {
-                    var request = ((InvokeMethodRequest)message.GetDeserializedBody(this.serializationManager));
+                    var request = (InvokeMethodRequest)message.BodyObject;
                     var compatibilityDirector = compatibilityDirectorManager.GetDirector(request.InterfaceId);
                     var currentVersion = catalog.GrainTypeManager.GetLocalSupportedVersion(request.InterfaceId);
                     if (!compatibilityDirector.IsCompatible(request.InterfaceVersion, currentVersion))
@@ -667,32 +666,6 @@ namespace Orleans.Runtime
         /// <param name="sendingActivation"></param>
         public Task AsyncSendMessage(Message message, ActivationData sendingActivation = null)
         {
-            Action<Exception> onAddressingFailure = ex =>
-            {
-                if (ShouldLogError(ex))
-                {
-                    logger.Error(ErrorCode.Dispatcher_SelectTarget_Failed, $"SelectTarget failed with {ex.Message}", ex);
-                }
-
-                MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "SelectTarget failed");
-                RejectMessage(message, Message.RejectionTypes.Unrecoverable, ex);
-            };
-
-            Func<Task, Task> transportMessageAfterAddressing = async addressMessageTask =>
-            {
-                try
-                {
-                    await addressMessageTask;
-                }
-                catch (Exception ex)
-                {
-                    onAddressingFailure(ex);
-                    return;
-                }
-
-                TransportMessage(message, sendingActivation);
-            };
-
             try
             {
                 var messageAddressingTask = AddressMessage(message);
@@ -702,15 +675,41 @@ namespace Orleans.Runtime
                 }
                 else
                 {
-                    return transportMessageAfterAddressing(messageAddressingTask);
+                    return TransportMessageAferSending(messageAddressingTask, message, sendingActivation);
                 }
             }
             catch (Exception ex)
             {
-                onAddressingFailure(ex);
+                OnAddressingFailure(ex, message);
             }
 
             return Task.CompletedTask;
+
+            async Task TransportMessageAferSending(Task addressMessageTask, Message m, ActivationData activation)
+            {
+                try
+                {
+                    await addressMessageTask;
+                }
+                catch (Exception ex)
+                {
+                    OnAddressingFailure(ex, message);
+                    return;
+                }
+
+                TransportMessage(m, activation);
+            }
+
+            void OnAddressingFailure(Exception ex, Message m)
+            {
+                if (ShouldLogError(ex))
+                {
+                    logger.Error(ErrorCode.Dispatcher_SelectTarget_Failed, $"SelectTarget failed with {ex.Message}", ex);
+                }
+
+                MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "SelectTarget failed");
+                RejectMessage(m, Message.RejectionTypes.Unrecoverable, ex);
+            }
         }
 
         private bool ShouldLogError(Exception ex)
@@ -746,7 +745,7 @@ namespace Orleans.Runtime
             var strategy = targetAddress.Grain.IsGrain ? catalog.GetGrainPlacementStrategy(targetAddress.Grain) : null;
 
             var request = message.IsUsingInterfaceVersions
-                ? message.GetDeserializedBody(this.serializationManager) as InvokeMethodRequest
+                ? message.BodyObject as InvokeMethodRequest
                 : null;
             var target = new PlacementTarget(
                 message.TargetGrain,

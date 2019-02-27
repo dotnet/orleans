@@ -206,9 +206,9 @@ namespace Orleans.Runtime
 
             // Now the incoming message agents
             var messageFactory = this.Services.GetRequiredService<MessageFactory>();
-            incomingSystemAgent = new IncomingMessageAgent(Message.Categories.System, messageCenter, activationDirectory, scheduler, catalog.Dispatcher, messageFactory, executorService, this.loggerFactory);
-            incomingPingAgent = new IncomingMessageAgent(Message.Categories.Ping, messageCenter, activationDirectory, scheduler, catalog.Dispatcher, messageFactory, executorService, this.loggerFactory);
-            incomingAgent = new IncomingMessageAgent(Message.Categories.Application, messageCenter, activationDirectory, scheduler, catalog.Dispatcher, messageFactory, executorService, this.loggerFactory);
+            incomingSystemAgent = new IncomingMessageAgent(Message.Categories.System, messageCenter, activationDirectory, scheduler, catalog.Dispatcher, messageFactory, this.loggerFactory);
+            incomingPingAgent = new IncomingMessageAgent(Message.Categories.Ping, messageCenter, activationDirectory, scheduler, catalog.Dispatcher, messageFactory, this.loggerFactory);
+            incomingAgent = new IncomingMessageAgent(Message.Categories.Application, messageCenter, activationDirectory, scheduler, catalog.Dispatcher, messageFactory, this.loggerFactory);
 
             siloStatusOracle = Services.GetRequiredService<ISiloStatusOracle>();
             this.membershipService = Services.GetRequiredService<IMembershipService>();
@@ -328,7 +328,6 @@ namespace Orleans.Runtime
 
             catalog.SiloStatusOracle = this.siloStatusOracle;
             this.siloStatusOracle.SubscribeToSiloStatusEvents(localGrainDirectory);
-            messageCenter.SiloDeadOracle = this.siloStatusOracle.IsDeadSilo;
 
             // consistentRingProvider is not a system target per say, but it behaves like the localGrainDirectory, so it is here
             this.siloStatusOracle.SubscribeToSiloStatusEvents((ISiloStatusListener)RingProvider);
