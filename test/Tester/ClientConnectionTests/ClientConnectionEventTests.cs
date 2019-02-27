@@ -33,7 +33,6 @@ namespace Tester
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder.Configure<GatewayOptions>(options => options.GatewayListRefreshPeriod = TimeSpan.FromSeconds(1));
-                clientBuilder.ConfigureLogging(logging => logging.AddDebug());
             }
         }
 
