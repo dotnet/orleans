@@ -458,7 +458,7 @@ namespace Orleans
                 return;
 
             CallbackData callbackData;
-            var found = callbacks.TryGetValue(response.Id, out callbackData);
+            var found = callbacks.TryRemove(response.Id, out callbackData);
             if (found)
             {
                 // We need to import the RequestContext here as well.
