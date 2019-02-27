@@ -504,6 +504,7 @@ namespace Orleans
         MembershipUpdateIAmAliveFailure        = MembershipBase + 59,
         MembershipStartingIAmAliveTimer        = MembershipBase + 60,
         MembershipJoiningPreconditionFailure   = MembershipBase + 61,
+        MembershipCleanDeadEntriesFailure      = MembershipBase + 62,
 
         NSMembershipStarting                   = MembershipBase + 70,
         NSMembershipBecomeActive               = MembershipBase + 71,

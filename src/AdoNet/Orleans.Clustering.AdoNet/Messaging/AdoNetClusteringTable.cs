@@ -190,5 +190,10 @@ namespace Orleans.Runtime.MembershipService
                 throw;
             }
         }
+
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Consul;
@@ -171,6 +171,11 @@ namespace Orleans.Runtime.Membership
                 .ToList();
 
             return new MembershipTableData(membershipEntries, _tableVersion);
+        }
+
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+        {
+            throw new NotImplementedException();
         }
     }
 }

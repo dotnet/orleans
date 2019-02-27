@@ -17,6 +17,11 @@ namespace NonSilo.Tests
 {
     public class NoOpMembershipTable : IMembershipTable
     {
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+        {
+            return Task.CompletedTask;
+        }
+
         public Task DeleteMembershipTableEntries(string clusterId)
         {
             return Task.CompletedTask;
