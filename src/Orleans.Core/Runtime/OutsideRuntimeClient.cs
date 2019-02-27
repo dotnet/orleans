@@ -670,6 +670,9 @@ namespace Orleans
         public event ConnectionToClusterLostHandler ClusterConnectionLost;
 
         /// <inheritdoc />
+        public event GatewayCountChangedHandler GatewayCountChanged;
+
+        /// <inheritdoc />
         public void NotifyClusterConnectionLost()
         {
             try
@@ -679,6 +682,19 @@ namespace Orleans
             catch (Exception ex)
             {
                 this.logger.Error(ErrorCode.ClientError, "Error when sending cluster disconnection notification", ex);
+            }
+        }
+
+        /// <inheritdoc />
+        public void NotifyGatewayCountChanged(int currentNumberOfGateways, int previousNumberOfGateways)
+        {
+            try
+            {
+                this.GatewayCountChanged?.Invoke(this, new GatewayCountChangedEventArgs(currentNumberOfGateways, previousNumberOfGateways));
+            }
+            catch (Exception ex)
+            {
+                this.logger.Error(ErrorCode.ClientError, "Error when sending gateway count changed notification", ex);
             }
         }
 

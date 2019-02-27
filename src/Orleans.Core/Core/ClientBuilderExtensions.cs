@@ -127,6 +127,15 @@ namespace Orleans
         }
 
         /// <summary>
+        /// Registers a <see cref="GatewayCountChangedHandler"/> event handler.
+        /// </summary>
+        public static IClientBuilder AddGatewayCountChangedHandler(this IClientBuilder builder, GatewayCountChangedHandler handler)
+        {
+            builder.ConfigureServices(services => services.AddSingleton(handler));
+            return builder;
+        }
+
+        /// <summary>
         /// Registers a <see cref="ConnectionToClusterLostHandler"/> event handler.
         /// </summary>
         /// <param name="builder">The builder.</param>
