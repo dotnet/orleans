@@ -1,6 +1,10 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Primitives;
+using Newtonsoft.Json;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Extensions;
 
@@ -48,6 +52,39 @@ namespace TestExtensions
             builder.AddEnvironmentVariables("Orleans");
         }
 
+        /// <summary>
+        /// Hack, allowing PhysicalFileProvider to be serialized using json
+        /// </summary>
+        [Serializable]
+        [JsonObject(MemberSerialization.OptIn)]
+        private class MyPhysicalFileProvider : IFileProvider
+        {
+            private PhysicalFileProvider fileProvider;
+            
+            [JsonProperty]
+            public string Root { get; set; }
+
+            public IDirectoryContents GetDirectoryContents(string subpath)
+            {
+                return this.FileProvider().GetDirectoryContents(subpath);
+            }
+
+            public IFileInfo GetFileInfo(string subpath)
+            {
+                return this.FileProvider().GetFileInfo(subpath);
+            }
+
+            public IChangeToken Watch(string filter)
+            {
+                return this.FileProvider().Watch(filter);
+            }
+
+            private PhysicalFileProvider FileProvider()
+            {
+                return fileProvider ?? (fileProvider = new PhysicalFileProvider(this.Root));
+            }
+        }
+
         /// <summary>Try to find a file with specified name up the folder hierarchy, as some of our CI environments are configured this way.</summary>
         private static void AddJsonFileInAncestorFolder(IConfigurationBuilder builder, string fileName)
         {
@@ -58,7 +95,7 @@ namespace TestExtensions
                 string filePath = Path.Combine(currentDir.FullName, fileName);
                 if (File.Exists(filePath))
                 {
-                    builder.AddJsonFile(filePath);
+                    builder.AddJsonFile(new MyPhysicalFileProvider { Root = currentDir.FullName }, fileName, false, false);
                     return;
                 }
 
