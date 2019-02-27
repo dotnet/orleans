@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Net;
 using System.Threading;
@@ -10,7 +10,6 @@ using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using TestGrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
 
@@ -61,7 +60,6 @@ namespace NonSilo.Tests
     [TestCategory("SiloHostBuilder")]
     public class SiloHostBuilderTests
     {
-
         [Fact]
         public void SiloBuilderTest()
         {
@@ -70,8 +68,7 @@ namespace NonSilo.Tests
                 {
                     siloBuilder
                         .Configure<ClusterOptions>(options => options.ClusterId = "someClusterId")
-                        .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
-                        .EnableDirectClient();
+                        .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback);
                 })
                 .Build();
 

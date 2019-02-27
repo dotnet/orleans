@@ -276,8 +276,12 @@ namespace Orleans.Hosting
             services.AddTransient<IConfigurationValidator, ClusterOptionsValidator>();
             services.AddTransient<IConfigurationValidator, SiloClusteringValidator>();
 
-            // Disable hosted client by default.
-            services.TryAddSingleton<IHostedClient, DisabledHostedClient>();
+            // Enable hosted client.
+            services.TryAddSingleton<HostedClient>();
+            services.TryAddFromExisting<IHostedClient, HostedClient>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, HostedClient>();
+            services.TryAddSingleton<InvokableObjectManager>();
+            services.TryAddSingleton<IClusterClient, ClusterClient>();
 
             // Enable collection specific Age limits
             services.AddOptions<GrainCollectionOptions>()
