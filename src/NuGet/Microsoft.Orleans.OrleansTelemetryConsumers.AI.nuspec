@@ -5,9 +5,10 @@
     <version>$version$</version>
     <title>Microsoft Orleans Telemetry Consumer - Azure Application Insights</title>
     <authors>Microsoft</authors>
-    <owners>Microsoft,Orleans</owners>
+    <owners>Microsoft</owners>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
-    <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
+    <licenseUrl>https://licenses.nuget.org/MIT</licenseUrl>
     <iconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</iconUrl>
     <summary>
       Microsoft Orleans Telemetry Consumer for Azure Application Insights
@@ -15,7 +16,7 @@
     <description>
       Azure Application Insights implementation of Orleans Telemetry API.
     </description>
-    <copyright>Copyright Microsoft 2015</copyright>
+    <copyright>© Microsoft Corporation. All rights reserved.</copyright>
     <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
     <dependencies>
       <dependency id="Microsoft.Orleans.Core" version="$version$" />
