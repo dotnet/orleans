@@ -5,9 +5,10 @@
     <version>$version$</version>
     <title>Microsoft Orleans Silo Host</title>
     <authors>Microsoft</authors>
-    <owners>Microsoft,Orleans</owners>
+    <owners>Microsoft</owners>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
-    <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
+    <licenseUrl>https://licenses.nuget.org/MIT</licenseUrl>
     <iconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</iconUrl>
     <summary>
       Default silo host of Microsoft Orleans - OrleansHost.exe.

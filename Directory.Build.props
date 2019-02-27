@@ -7,8 +7,8 @@
   <PropertyGroup Label="NuGet">
     <Authors>Microsoft</Authors>
     <Product>Microsoft Orleans</Product>
-    <Copyright>Copyright (c) Microsoft Corporation 2017</Copyright>
-    <PackageLicenseUrl>https://github.com/dotnet/Orleans#license</PackageLicenseUrl>
+    <Copyright>© Microsoft Corporation. All rights reserved.</Copyright>
+    <PackageLicenseUrl>https://licenses.nuget.org/MIT</PackageLicenseUrl>
     <PackageProjectUrl>https://github.com/dotnet/Orleans</PackageProjectUrl>
     <PackageIconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</PackageIconUrl>
     <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</PackageTags>
