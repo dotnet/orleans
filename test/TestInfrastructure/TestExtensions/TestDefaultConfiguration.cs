@@ -55,13 +55,11 @@ namespace TestExtensions
         /// <summary>
         /// Hack, allowing PhysicalFileProvider to be serialized using json
         /// </summary>
-        [Serializable]
-        [JsonObject(MemberSerialization.OptIn)]
-        private class MyPhysicalFileProvider : IFileProvider
+        private class SerializablePhysicalFileProvider : IFileProvider
         {
+            [NonSerialized]
             private PhysicalFileProvider fileProvider;
             
-            [JsonProperty]
             public string Root { get; set; }
 
             public IDirectoryContents GetDirectoryContents(string subpath)
@@ -81,7 +79,7 @@ namespace TestExtensions
 
             private PhysicalFileProvider FileProvider()
             {
-                return fileProvider ?? (fileProvider = new PhysicalFileProvider(this.Root));
+                return this.fileProvider ?? (this.fileProvider = new PhysicalFileProvider(this.Root));
             }
         }
 
@@ -95,7 +93,7 @@ namespace TestExtensions
                 string filePath = Path.Combine(currentDir.FullName, fileName);
                 if (File.Exists(filePath))
                 {
-                    builder.AddJsonFile(new MyPhysicalFileProvider { Root = currentDir.FullName }, fileName, false, false);
+                    builder.AddJsonFile(new SerializablePhysicalFileProvider { Root = currentDir.FullName }, fileName, false, false);
                     return;
                 }
 
