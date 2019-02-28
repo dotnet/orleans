@@ -508,7 +508,12 @@ namespace Orleans.CodeGenerator.Generators
                        !baseType.Equals(wellKnownTypes.Object) &&
                        !baseType.Equals(wellKnownTypes.Attribute))
                 {
-                    if (!hasUnsupportedRefAsmBase && baseType.ContainingAssembly.HasAttribute("ReferenceAssemblyAttribute") && !IsSupportedRefAsmType(baseType)) hasUnsupportedRefAsmBase = true;
+                    if (!hasUnsupportedRefAsmBase
+                        && baseType.ContainingAssembly.HasAttribute("ReferenceAssemblyAttribute")
+                        && !IsSupportedRefAsmType(baseType))
+                    {
+                        hasUnsupportedRefAsmBase = true;
+                    }
                     foreach (var field in baseType.GetDeclaredMembers<IFieldSymbol>())
                     {
                         if (hasUnsupportedRefAsmBase) referenceAssemblyHasFields = true;
@@ -531,19 +536,32 @@ namespace Orleans.CodeGenerator.Generators
                         if (location.IsInSource)
                         {
                             var pos = location.GetLineSpan();
-                            fileLocation = $"{pos.Path}({pos.StartLinePosition.Line + 1},{pos.StartLinePosition.Character + 1},{pos.EndLinePosition.Line + 1},{pos.EndLinePosition.Character + 1}): ";
+                            fileLocation = string.Format(
+                                "{0}({1},{2},{3},{4}): ",
+                                pos.Path,
+                                pos.StartLinePosition.Line + 1,
+                                pos.StartLinePosition.Character + 1,
+                                pos.EndLinePosition.Line + 1,
+                                pos.EndLinePosition.Character + 1);
                         }
                     }
 
                     logger.LogWarning(
-                        $"{fileLocation}warning ORL1001: Type {type} has a base type which belongs to a reference assembly. Serializer generation for this type may not include important base type fields.");
+                        $"{fileLocation}warning ORL1001: Type {type} has a base type which belongs to a reference assembly."
+                        + " Serializer generation for this type may not include important base type fields.");
                 }
 
                 bool IsSupportedRefAsmType(INamedTypeSymbol t)
                 {
                     INamedTypeSymbol baseDefinition;
-                    if (t.IsGenericType && !t.IsUnboundGenericType) baseDefinition = t.ConstructUnboundGenericType().OriginalDefinition;
-                    else baseDefinition = t.OriginalDefinition;
+                    if (t.IsGenericType && !t.IsUnboundGenericType)
+                    {
+                        baseDefinition = t.ConstructUnboundGenericType().OriginalDefinition;
+                    }
+                    else
+                    {
+                        baseDefinition = t.OriginalDefinition;
+                    }
 
                     foreach (var refAsmType in wellKnownTypes.SupportedRefAsmBaseTypes)
                     {
