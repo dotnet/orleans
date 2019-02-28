@@ -204,7 +204,8 @@ namespace Orleans.Runtime
             Exception exc, 
             string rejectInfo = null)
         {
-            if (message.Direction == Message.Directions.Request || (message.Direction == Message.Directions.OneWay && message.HasCacheInvalidationHeader))
+            if (message.Direction == Message.Directions.Request
+                || (message.Direction == Message.Directions.OneWay && message.HasCacheInvalidationHeader))
             {
                 var str = String.Format("{0} {1}", rejectInfo ?? "", exc == null ? "" : exc.ToString());
                 MessagingStatisticsGroup.OnRejectedMessage(message);
@@ -573,7 +574,11 @@ namespace Orleans.Runtime
                 // If the message was a one-way message, send a cache invalidation response even if the message was successfully forwarded.
                 if (message.Direction == Message.Directions.OneWay)
                 {
-                    this.RejectMessage(message, Message.RejectionTypes.CacheInvalidation, exc, "OneWay message sent to invalid activation");
+                    this.RejectMessage(
+                        message,
+                        Message.RejectionTypes.CacheInvalidation,
+                        exc,
+                        "OneWay message sent to invalid activation");
                     sentRejection = true;
                 }
 

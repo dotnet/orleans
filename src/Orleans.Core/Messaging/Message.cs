@@ -333,7 +333,8 @@ namespace Orleans.Runtime
             set { Headers.CacheInvalidationHeader = value; }
         }
 
-        public bool HasCacheInvalidationHeader => this.CacheInvalidationHeader != null && this.CacheInvalidationHeader.Count > 0;
+        public bool HasCacheInvalidationHeader => this.CacheInvalidationHeader != null
+                                                  && this.CacheInvalidationHeader.Count > 0;
         
         internal void AddToCacheInvalidationHeader(ActivationAddress address)
         {

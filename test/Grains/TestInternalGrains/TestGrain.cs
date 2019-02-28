@@ -221,7 +221,9 @@ namespace UnitTests.Grains
                     var directorySilo = await candidate.GetPrimaryForGrain();
                     var thisSilo = await this.GetSiloAddress();
                     var candidateSilo = await candidate.GetSiloAddress();
-                    if (!directorySilo.Equals(candidateSilo) && !directorySilo.Equals(thisSilo) && !candidateSilo.Equals(thisSilo))
+                    if (!directorySilo.Equals(candidateSilo)
+                        && !directorySilo.Equals(thisSilo)
+                        && !candidateSilo.Equals(thisSilo))
                     {
                         return candidate;
                     }
