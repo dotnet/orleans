@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.GrainDirectory
@@ -16,6 +15,7 @@ namespace Orleans.Runtime.GrainDirectory
     internal class GrainDirectoryHandoffManager
     {
         private const int HANDOFF_CHUNK_SIZE = 500;
+        private static readonly TimeSpan RetryDelay = TimeSpan.FromMilliseconds(250);
         private readonly LocalGrainDirectory localDirectory;
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IInternalGrainFactory grainFactory;
@@ -24,6 +24,8 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly Dictionary<SiloAddress, Task> lastPromise;
         private readonly ILogger logger;
         private readonly Factory<GrainDirectoryPartition> createPartion;
+        private readonly Queue<Operation> pendingOperations = new Queue<Operation>();
+        private readonly AsyncLock executorLock = new AsyncLock();
 
         internal GrainDirectoryHandoffManager(
             LocalGrainDirectory localDirectory,
@@ -138,11 +140,12 @@ namespace Orleans.Runtime.GrainDirectory
 
                 // at least one predcessor should exist, which is me
                 SiloAddress predecessor = localDirectory.FindPredecessors(removedSilo, 1)[0];
+                Dictionary<SiloAddress, List<ActivationAddress>> duplicates;
                 if (localDirectory.MyAddress.Equals(predecessor))
                 {
                     if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Merging my partition with the copy of silo " + removedSilo);
                     // now I am responsible for this directory part
-                    localDirectory.DirectoryPartition.Merge(directoryPartitionsMap[removedSilo]);
+                    duplicates = localDirectory.DirectoryPartition.Merge(directoryPartitionsMap[removedSilo]);
                     // no need to send our new partition to all others, as they
                     // will realize the change and combine their copies without any additional communication (see below)
                 }
@@ -150,11 +153,13 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Merging partition of " + predecessor + " with the copy of silo " + removedSilo);
                     // adjust copy for the predecessor of the failed silo
-                    directoryPartitionsMap[predecessor].Merge(directoryPartitionsMap[removedSilo]);
+                    duplicates = directoryPartitionsMap[predecessor].Merge(directoryPartitionsMap[removedSilo]);
                 }
+
                 localDirectory.GsiActivationMaintainer.TrackDoubtfulGrains(directoryPartitionsMap[removedSilo].GetItems());
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Removed copied partition of silo " + removedSilo);
                 directoryPartitionsMap.Remove(removedSilo);
+                DestroyDuplicateActivations(duplicates);
             }
         }
 
@@ -178,8 +183,10 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     silosHoldingMyPartition.AddRange(localDirectory.FindPredecessors(localDirectory.MyAddress, 1));
                 }
+
                 silosHoldingMyPartitionCopy = silosHoldingMyPartition.ToList();
             }
+
             // take a copy of the current directory partition
             Dictionary<GrainId, IGrainInfo> batchUpdate = localDirectory.DirectoryPartition.GetItems();
 
@@ -199,7 +206,11 @@ namespace Orleans.Runtime.GrainDirectory
                 // (if yes, adjust local and/or copied directory partitions by splitting them between old successors and the new one)
                 // NOTE: We need to move part of our local directory to the new silo if it is an immediate successor.
                 List<SiloAddress> successors = localDirectory.FindSuccessors(localDirectory.MyAddress, 1);
-                if (!successors.Contains(addedSilo)) return;
+                if (!successors.Contains(addedSilo))
+                {
+                    if (logger.IsEnabled(LogLevel.Debug)) logger.Debug($"{addedSilo} is not one of my successors.");
+                    return;
+                }
 
                 // check if this is an immediate successor
                 if (successors[0].Equals(addedSilo))
@@ -215,29 +226,9 @@ namespace Orleans.Runtime.GrainDirectory
                     List<ActivationAddress> splitPartListSingle = splitPart.ToListOfActivations(true);
                     List<ActivationAddress> splitPartListMulti = splitPart.ToListOfActivations(false);
 
-                    if (splitPartListSingle.Count > 0)
-                    {
-                        if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Sending " + splitPartListSingle.Count + " single activation entries to " + addedSilo);
-                        localDirectory.Scheduler.QueueTask(async () =>
-                        {
-                            await localDirectory.GetDirectoryReference(successors[0]).RegisterMany(splitPartListSingle, singleActivation:true);
-                            splitPartListSingle.ForEach(
-                                activationAddress =>
-                                    localDirectory.DirectoryPartition.RemoveGrain(activationAddress.Grain));
-                        }, localDirectory.RemoteGrainDirectory.SchedulingContext).Ignore();
-                    }
-
-                    if (splitPartListMulti.Count > 0)
-                    {
-                        if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Sending " + splitPartListMulti.Count + " entries to " + addedSilo);
-                        localDirectory.Scheduler.QueueTask(async () =>
-                        {
-                            await localDirectory.GetDirectoryReference(successors[0]).RegisterMany(splitPartListMulti, singleActivation:false);
-                            splitPartListMulti.ForEach(
-                                activationAddress =>
-                                    localDirectory.DirectoryPartition.RemoveGrain(activationAddress.Grain));
-                        }, localDirectory.RemoteGrainDirectory.SchedulingContext).Ignore();
-                    }
+                    EnqueueOperation(
+                        $"{nameof(ProcessSiloAddEvent)}({addedSilo})",
+                        () => ProcessAddedSiloAsync(addedSilo, splitPartListSingle, splitPartListMulti));
                 }
                 else
                 {
@@ -268,6 +259,137 @@ namespace Orleans.Runtime.GrainDirectory
 
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Removing copy of the directory partition of silo " + oldSuccessor + " (holding copy of " + addedSilo + " instead)");
                 directoryPartitionsMap.Remove(oldSuccessor);
+            }
+        }
+
+        private async Task ProcessAddedSiloAsync(SiloAddress addedSilo, List<ActivationAddress> splitPartListSingle, List<ActivationAddress> splitPartListMulti)
+        {
+            if (!this.localDirectory.Running) return;
+
+            if (this.siloStatusOracle.GetApproximateSiloStatus(addedSilo) == SiloStatus.Active)
+            {
+                if (splitPartListSingle.Count > 0)
+                {
+                    if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Sending " + splitPartListSingle.Count + " single activation entries to " + addedSilo);
+                }
+
+                if (splitPartListMulti.Count > 0)
+                {
+                    if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Sending " + splitPartListMulti.Count + " entries to " + addedSilo);
+                }
+
+                await localDirectory.GetDirectoryReference(addedSilo).AcceptSplitPartition(splitPartListSingle, splitPartListMulti);
+            }
+            else
+            {
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Silo " + addedSilo + " is no longer active and therefore cannot receive this partition split");
+            }
+
+            if (splitPartListSingle.Count > 0)
+            {
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Removing " + splitPartListSingle.Count + " single activation after partition split");
+
+                splitPartListSingle.ForEach(
+                    activationAddress =>
+                        localDirectory.DirectoryPartition.RemoveGrain(activationAddress.Grain));
+            }
+
+            if (splitPartListMulti.Count > 0)
+            {
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Removing " + splitPartListMulti.Count + " multiple activation after partition split");
+
+                splitPartListMulti.ForEach(
+                    activationAddress =>
+                        localDirectory.DirectoryPartition.RemoveGrain(activationAddress.Grain));
+            }
+        }
+
+        internal void AcceptExistingRegistrations(List<ActivationAddress> singleActivations, List<ActivationAddress> multiActivations)
+        {
+            this.EnqueueOperation(
+                nameof(AcceptExistingRegistrations),
+                () => AcceptExistingRegistrationsAsync(singleActivations, multiActivations));
+        }
+
+        private async Task AcceptExistingRegistrationsAsync(List<ActivationAddress> singleActivations, List<ActivationAddress> multiActivations)
+        {
+            if (!this.localDirectory.Running) return;
+
+            if (this.logger.IsEnabled(LogLevel.Debug))
+            {
+                this.logger.LogDebug(
+                    $"{nameof(AcceptExistingRegistrations)}: accepting {singleActivations?.Count ?? 0} single-activation registrations and {multiActivations?.Count ?? 0} multi-activation registrations.");
+            }
+
+            if (singleActivations != null && singleActivations.Count > 0)
+            {
+                var tasks = singleActivations.Select(addr => this.localDirectory.RegisterAsync(addr, true, 1)).ToArray();
+                try
+                {
+                    await Task.WhenAll(tasks);
+                }
+                catch (Exception exception)
+                {
+                    if (this.logger.IsEnabled(LogLevel.Warning))
+                        this.logger.LogWarning($"Exception registering activations in {nameof(AcceptExistingRegistrations)}: {LogFormatter.PrintException(exception)}");
+                    throw;
+                }
+                finally
+                {
+                    Dictionary<SiloAddress, List<ActivationAddress>> duplicates = new Dictionary<SiloAddress, List<ActivationAddress>>();
+                    for (var i = tasks.Length - 1; i >= 0; i--)
+                    {
+                        // Retry failed tasks next time.
+                        if (tasks[i].Status != TaskStatus.RanToCompletion) continue;
+
+                        // Record the applications which lost the registration race (duplicate activations).
+                        var winner = await tasks[i];
+                        if (!winner.Address.Equals(singleActivations[i]))
+                        {
+                            var duplicate = singleActivations[i];
+
+                            if (!duplicates.TryGetValue(duplicate.Silo, out var activations))
+                            {
+                                activations = duplicates[duplicate.Silo] = new List<ActivationAddress>(1);
+                            }
+
+                            activations.Add(duplicate);
+                        }
+
+                        // Remove tasks which completed.
+                        singleActivations.RemoveAt(i);
+                    }
+
+                    // Destroy any duplicate activations.
+                    DestroyDuplicateActivations(duplicates);
+                }
+            }
+
+            // Multi-activation grains are much simpler because there is no need for duplicate activation logic.
+            if (multiActivations != null && multiActivations.Count > 0)
+            {
+                var tasks = multiActivations.Select(addr => this.localDirectory.RegisterAsync(addr, false, 1)).ToArray();
+                try
+                {
+                    await Task.WhenAll(tasks);
+                }
+                catch (Exception exception)
+                {
+                    if (this.logger.IsEnabled(LogLevel.Warning))
+                        this.logger.LogWarning($"Exception registering activations in {nameof(AcceptExistingRegistrations)}: {LogFormatter.PrintException(exception)}");
+                    throw;
+                }
+                finally
+                {
+                    for (var i = tasks.Length - 1; i >= 0; i--)
+                    {
+                        // Retry failed tasks next time.
+                        if (tasks[i].Status != TaskStatus.RanToCompletion) continue;
+
+                        // Remove tasks which completed.
+                        multiActivations.RemoveAt(i);
+                    }
+                }
             }
         }
 
@@ -329,6 +451,97 @@ namespace Orleans.Runtime.GrainDirectory
             localDirectory.Scheduler.QueueTask(() =>
                 localDirectory.GetDirectoryReference(silo).RemoveHandoffPartition(localDirectory.MyAddress),
                 localDirectory.RemoteGrainDirectory.SchedulingContext).Ignore();
+        }
+
+        private void DestroyDuplicateActivations(Dictionary<SiloAddress, List<ActivationAddress>> duplicates)
+        {
+            if (duplicates == null || duplicates.Count == 0) return;
+            this.EnqueueOperation(
+                nameof(DestroyDuplicateActivations),
+                () => DestroyDuplicateActivationsAsync(duplicates));
+        }
+
+        private async Task DestroyDuplicateActivationsAsync(Dictionary<SiloAddress, List<ActivationAddress>> duplicates)
+        {
+            while (duplicates.Count > 0)
+            {
+                var pair = duplicates.FirstOrDefault();
+                if (this.siloStatusOracle.GetApproximateSiloStatus(pair.Key) == SiloStatus.Active)
+                {
+                    if (this.logger.IsEnabled(LogLevel.Debug))
+                    {
+                        this.logger.LogDebug(
+                            $"{nameof(DestroyDuplicateActivations)} will destroy {duplicates.Count} duplicate activations on silo {pair.Key}: {string.Join("\n * ", pair.Value.Select(_ => _))}");
+                    }
+
+                    var remoteCatalog = this.grainFactory.GetSystemTarget<ICatalog>(Constants.CatalogId, pair.Key);
+                    await remoteCatalog.DeleteActivations(pair.Value);
+                }
+
+                duplicates.Remove(pair.Key);
+            }
+        }
+
+        private void EnqueueOperation(string name, Func<Task> action)
+        {
+            lock (this)
+            {
+                this.pendingOperations.Enqueue(new Operation(name, action));
+                if (this.pendingOperations.Count <= 2)
+                {
+                    this.localDirectory.Scheduler.QueueTask(this.ExecutePendingOperations, this.localDirectory.RemoteGrainDirectory.SchedulingContext);
+                }
+            }
+        }
+
+        private async Task ExecutePendingOperations()
+        {
+            using (await executorLock.LockAsync())
+            {
+                while (true)
+                {
+                    // Get the next operation, or exit if there are none.
+                    Operation op;
+                    lock (this)
+                    {
+                        if (this.pendingOperations.Count == 0) break;
+
+                        op = this.pendingOperations.Peek();
+                    }
+
+                    try
+                    {
+                        await op.Action();
+                        lock (this)
+                        {
+                            // Remove the successful operation from the queue.
+                            this.pendingOperations.Dequeue();
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        if (this.logger.IsEnabled(LogLevel.Warning))
+                        {
+                            this.logger.LogWarning($"{op.Name} failed: {LogFormatter.PrintException(exception)}");
+                        }
+
+                        await Task.Delay(RetryDelay);
+                    }
+                }
+            }
+        }
+
+        private struct Operation
+        {
+            public Operation(string name, Func<Task> action)
+            {
+                Name = name;
+                Action = action;
+            }
+
+            public string Name { get; }
+
+            public Func<Task> Action { get; }
         }
     }
 }
