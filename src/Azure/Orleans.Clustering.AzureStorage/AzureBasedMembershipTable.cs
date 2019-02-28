@@ -59,6 +59,11 @@ namespace Orleans.Runtime.MembershipService
             return tableManager.DeleteTableEntries(clusterId);
         }
 
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+        {
+            return tableManager.CleanupDefunctSiloEntries(beforeDate);
+        }
+
         public async Task<MembershipTableData> ReadRow(SiloAddress key)
         {
             try

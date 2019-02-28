@@ -92,6 +92,20 @@ namespace Orleans.Configuration
         public const int DEFAULT_LIVENESS_NUM_VOTES_FOR_DEATH_DECLARATION = 2;
 
         /// <summary>
+        /// The period of time after which membership entries for defunct silos are eligible for removal.
+        /// Valid only if <see cref="DefunctSiloCleanupPeriod"/> is not <see langword="null" />.
+        /// </summary>
+        public TimeSpan DefunctSiloExpiration { get; set; } = DEFAULT_DEFUNCT_SILO_EXPIRATION;
+        public static readonly TimeSpan DEFAULT_DEFUNCT_SILO_EXPIRATION = TimeSpan.FromDays(7);
+
+        /// <summary>
+        /// The duration between membership table cleanup operations. When this period elapses, all defunct silo
+        /// entries older than <see cref="DefunctSiloExpiration" /> are removed. This value is per-silo.
+        /// </summary>
+        public TimeSpan? DefunctSiloCleanupPeriod { get; set; } = DEFAULT_DEFUNCT_SILO_CLEANUP_PERIOD;
+        public static readonly TimeSpan? DEFAULT_DEFUNCT_SILO_CLEANUP_PERIOD = null;
+
+        /// <summary>
         /// TEST ONLY - Do not modify in production environments
         /// </summary>
         public bool IsRunningAsUnitTest { get; set; } = false;

@@ -41,7 +41,7 @@ namespace Tester.AzureUtils.Persistence
         }
 
         public PersistenceStateTests_AzureTableGrainStorage(ITestOutputHelper output, Fixture fixture) :
-            base(output, fixture, "UnitTests.Grains.PersistentState")
+            base(output, fixture, "UnitTests.PersistentState.Grains")
         {
             fixture.EnsurePreconditionsMet();
         }

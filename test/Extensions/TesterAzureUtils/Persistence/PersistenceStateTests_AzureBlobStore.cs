@@ -43,7 +43,7 @@ namespace Tester.AzureUtils.Persistence
             }
         }
 
-        public PersistenceStateTests_AzureBlobStore(ITestOutputHelper output, Fixture fixture) : base(output, fixture, "UnitTests.Grains.PersistentState")
+        public PersistenceStateTests_AzureBlobStore(ITestOutputHelper output, Fixture fixture) : base(output, fixture, "UnitTests.PersistentState.Grains")
         {
             fixture.EnsurePreconditionsMet();
         }

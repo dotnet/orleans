@@ -14,6 +14,7 @@ namespace Orleans.Messaging
     /// </summary>
     internal class GatewayConnection : OutgoingMessageSender
     {
+        private int connectedCount;
         private readonly MessageFactory messageFactory;
         internal bool IsLive { get; private set; }
         internal ClientMessageCenter MsgCenter { get; private set; }
@@ -171,6 +172,7 @@ namespace Orleans.Messaging
                         Socket.EnableFastpath();
                         SocketManager.Connect(Socket, Silo.Endpoint, this.openConnectionTimeout);
                         NetworkingStatisticsGroup.OnOpenedGatewayDuplexSocket();
+                        Interlocked.Increment(ref this.connectedCount);
                         MsgCenter.OnGatewayConnectionOpen();
                         SocketManager.WriteConnectionPreamble(Socket, MsgCenter.ClientId);  // Identifies this client
                         Log.Info(ErrorCode.ProxyClient_Connected, "Connected to gateway at address {0} on trial {1}.", Address, i);
@@ -334,7 +336,7 @@ namespace Orleans.Messaging
         {
             SocketManager.CloseSocket(socket);
             NetworkingStatisticsGroup.OnClosedGatewayDuplexSocket();
-            MsgCenter.OnGatewayConnectionClosed();
+            if (Interlocked.Decrement(ref this.connectedCount) == 0) MsgCenter.OnGatewayConnectionClosed();
         }
     }
 }

@@ -20,6 +20,11 @@ namespace NonSilo.Tests
 {
     public class NoOpMembershipTable : IMembershipTable
     {
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+        {
+            return Task.CompletedTask;
+        }
+
         public Task DeleteMembershipTableEntries(string clusterId)
         {
             return Task.CompletedTask;
@@ -63,7 +68,6 @@ namespace NonSilo.Tests
     [TestCategory("SiloHostBuilder")]
     public class SiloHostBuilderTests
     {
-
         [Fact]
         public void SiloBuilderTest()
         {
@@ -72,8 +76,7 @@ namespace NonSilo.Tests
                 {
                     siloBuilder
                         .Configure<ClusterOptions>(options => options.ClusterId = "someClusterId")
-                        .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
-                        .EnableDirectClient();
+                        .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback);
                 })
                 .Build();
 

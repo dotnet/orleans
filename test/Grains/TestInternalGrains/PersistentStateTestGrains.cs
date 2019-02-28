@@ -2,8 +2,9 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
+using UnitTests.Grains;
 
-namespace UnitTests.Grains.PersistentState
+namespace UnitTests.PersistentState.Grains
 {
     public class GrainStorageTestGrain : Grain,
         IGrainStorageTestGrain, IGrainStorageTestGrain_LongKey

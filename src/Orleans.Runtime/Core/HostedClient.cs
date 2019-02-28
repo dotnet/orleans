@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.Messaging;
@@ -13,7 +14,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// A client which is hosted within a silo.
     /// </summary>
-    internal sealed class HostedClient : IDisposable, IHostedClient
+    internal sealed class HostedClient : IDisposable, IHostedClient, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly BlockingCollection<Message> incomingMessages = new BlockingCollection<Message>();
         private readonly CancellationTokenSource listeningCts = new CancellationTokenSource();
@@ -48,14 +49,6 @@ namespace Orleans.Runtime
             this.logger = logger;
 
             this.ClientAddress = ActivationAddress.NewActivationAddress(siloDetails.SiloAddress, GrainId.NewClientId());
-
-            // Register with the directory and message center so that we can receive messages.
-            this.clientObserverRegistrar.SetHostedClient(this);
-            this.clientObserverRegistrar.ClientAdded(this.ClientId);
-            this.siloMessageCenter.SetHostedClient(this);
-
-            // Start pumping messages.
-            this.Start();
         }
 
         /// <inheritdoc />
@@ -201,6 +194,35 @@ namespace Orleans.Runtime
                 {
                     this.logger.Error(ErrorCode.Runtime_Error_100326, "RunClientMessagePump has thrown exception", exc);
                 }
+            }
+        }
+
+        void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
+        {
+            lifecycle.Subscribe("HostedClient", ServiceLifecycleStage.RuntimeGrainServices, OnStart, OnStop);
+
+            Task OnStart(CancellationToken cancellation)
+            {
+                if (cancellation.IsCancellationRequested) return Task.CompletedTask;
+
+                // Register with the directory and message center so that we can receive messages.
+                this.clientObserverRegistrar.SetHostedClient(this);
+                this.clientObserverRegistrar.ClientAdded(this.ClientId);
+                this.siloMessageCenter.SetHostedClient(this);
+
+                // Start pumping messages.
+                this.Start();
+
+                var clusterClient = this.runtimeClient.ServiceProvider.GetRequiredService<IClusterClient>();
+                return clusterClient.Connect();
+            }
+
+            Task OnStop(CancellationToken cancellation)
+            {
+                if (cancellation.IsCancellationRequested) return Task.CompletedTask;
+
+                var clusterClient = this.runtimeClient.ServiceProvider.GetRequiredService<IClusterClient>();
+                return clusterClient.Close();
             }
         }
     }
