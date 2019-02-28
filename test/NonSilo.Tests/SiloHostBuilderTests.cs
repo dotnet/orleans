@@ -10,6 +10,7 @@ using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using UnitTests.DtosRefOrleans;
 using UnitTests.Grains;
 using Xunit;
 
@@ -232,6 +233,20 @@ namespace NonSilo.Tests
                 // The last registered service should be provided by default.
                 Assert.Equal(2, silo.Services.GetRequiredService<MyService>().Id);
             }
+        }
+
+        [Fact]
+        public async Task SiloBuilderThrowsDuringStartupIfNoGrainsAdded()
+        {
+            var host = new HostBuilder()
+                .UseOrleans(siloBuilder =>
+                {
+                    // Add only an assembly with generated serializers but no grain interfaces or grain classes
+                    siloBuilder.UseLocalhostClustering()
+                    .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(ClassReferencingOrleansTypeDto).Assembly));
+                }).Build();
+
+            await Assert.ThrowsAsync<OrleansConfigurationException>(() => host.StartAsync());
         }
 
         private static void RemoveConfigValidatorsAndSetAddress(IServiceCollection services)
