@@ -4,7 +4,7 @@
     <id>Microsoft.Orleans.OrleansConsulUtils</id>
     <version>$version$</version>
     <title>Microsoft Orleans Consul Utilities</title>
-    <authors>Microsoft Research</authors>
+    <authors>Microsoft</authors>
     <owners>Microsoft</owners>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
