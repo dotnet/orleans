@@ -495,46 +495,81 @@ namespace Orleans.CodeGenerator.Generators
                 }
             }
 
-            // Some reference assemblies are compiled without private fields.
-            // Warn the user if they are inheriting from a type in one of these assemblies using a heuristic:
-            // If the type inherits from a type in a reference assembly and there are no fields declared on those
-            // base types, emit a warning.
-            var hasReferenceAssemblyBase = false;
-            var referenceAssemblyHasFields = false;
-            var baseType = type.BaseType;
-            while (baseType != null &&
-                   !baseType.Equals(wellKnownTypes.Object) &&
-                   !baseType.Equals(wellKnownTypes.Attribute))
+            if (type.TypeKind == TypeKind.Class)
             {
-                if (!hasReferenceAssemblyBase && baseType.ContainingAssembly.HasAttribute("ReferenceAssemblyAttribute")) hasReferenceAssemblyBase = true;
-                foreach (var field in baseType.GetDeclaredMembers<IFieldSymbol>())
+                // Some reference assemblies are compiled without private fields.
+                // Warn the user if they are inheriting from a type in one of these assemblies using a heuristic:
+                // If the type inherits from a type in a reference assembly and there are no fields declared on those
+                // base types, emit a warning.
+                var hasUnsupportedRefAsmBase = false;
+                var referenceAssemblyHasFields = false;
+                var baseType = type.BaseType;
+                while (baseType != null &&
+                       !baseType.Equals(wellKnownTypes.Object) &&
+                       !baseType.Equals(wellKnownTypes.Attribute))
                 {
-                    if (hasReferenceAssemblyBase) referenceAssemblyHasFields = true;
-                    if (ShouldSerializeField(wellKnownTypes, field))
+                    if (!hasUnsupportedRefAsmBase
+                        && baseType.ContainingAssembly.HasAttribute("ReferenceAssemblyAttribute")
+                        && !IsSupportedRefAsmType(baseType))
                     {
-                        result.Add(new FieldInfoMember(wellKnownTypes, model, type, field, result.Count));
+                        hasUnsupportedRefAsmBase = true;
                     }
+                    foreach (var field in baseType.GetDeclaredMembers<IFieldSymbol>())
+                    {
+                        if (hasUnsupportedRefAsmBase) referenceAssemblyHasFields = true;
+                        if (ShouldSerializeField(wellKnownTypes, field))
+                        {
+                            result.Add(new FieldInfoMember(wellKnownTypes, model, type, field, result.Count));
+                        }
+                    }
+
+                    baseType = baseType.BaseType;
                 }
 
-                baseType = baseType.BaseType;
-            }
-
-            if (type.TypeKind == TypeKind.Class && hasReferenceAssemblyBase && !referenceAssemblyHasFields)
-            {
-                var fileLocation = string.Empty;
-                var declaration = type.DeclaringSyntaxReferences.FirstOrDefault();
-                if (declaration != null)
+                if (hasUnsupportedRefAsmBase && !referenceAssemblyHasFields)
                 {
-                    var location = declaration.SyntaxTree.GetLocation(declaration.Span);
-                    if (location.IsInSource)
+                    var fileLocation = string.Empty;
+                    var declaration = type.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() as ClassDeclarationSyntax;
+                    if (declaration != null)
                     {
-                        var pos = location.GetMappedLineSpan();
-                        fileLocation = $"{pos.Path}({pos.Span.Start.Line},{pos.Span.Start.Character}): ";
+                        var location = declaration.Identifier.GetLocation();
+                        if (location.IsInSource)
+                        {
+                            var pos = location.GetLineSpan();
+                            fileLocation = string.Format(
+                                "{0}({1},{2},{3},{4}): ",
+                                pos.Path,
+                                pos.StartLinePosition.Line + 1,
+                                pos.StartLinePosition.Character + 1,
+                                pos.EndLinePosition.Line + 1,
+                                pos.EndLinePosition.Character + 1);
+                        }
                     }
+
+                    logger.LogWarning(
+                        $"{fileLocation}warning ORL1001: Type {type} has a base type which belongs to a reference assembly."
+                        + " Serializer generation for this type may not include important base type fields.");
                 }
 
-                logger.LogWarning(
-                    $"{fileLocation}Warning: Type {type} has a base type which belongs to a reference assembly. Serializer generation for this type may not include important base type fields.");
+                bool IsSupportedRefAsmType(INamedTypeSymbol t)
+                {
+                    INamedTypeSymbol baseDefinition;
+                    if (t.IsGenericType && !t.IsUnboundGenericType)
+                    {
+                        baseDefinition = t.ConstructUnboundGenericType().OriginalDefinition;
+                    }
+                    else
+                    {
+                        baseDefinition = t.OriginalDefinition;
+                    }
+
+                    foreach (var refAsmType in wellKnownTypes.SupportedRefAsmBaseTypes)
+                    {
+                        if (baseDefinition.Equals(refAsmType)) return true;
+                    }
+
+                    return false;
+                }
             }
 
             result.Sort(FieldInfoMember.Comparer.Instance);
