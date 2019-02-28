@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 
@@ -101,6 +102,11 @@ namespace Orleans.CodeGenerator
                 KnownBaseTypeAttribute = Type("Orleans.CodeGeneration.KnownBaseTypeAttribute"),
                 ConsiderForCodeGenerationAttribute = Type("Orleans.CodeGeneration.ConsiderForCodeGenerationAttribute"),
                 OrleansCodeGenerationTargetAttribute = Type("Orleans.CodeGeneration.OrleansCodeGenerationTargetAttribute"),
+                SupportedRefAsmBaseTypes =
+                {
+                    Type("System.Collections.Generic.EqualityComparer`1"),
+                    Type("System.Collections.Generic.Comparer`1")
+                }
             };
 
             INamedTypeSymbol Type(string type)
@@ -138,6 +144,7 @@ namespace Orleans.CodeGenerator
             }
         }
 
+        public List<INamedTypeSymbol> SupportedRefAsmBaseTypes { get; } = new List<INamedTypeSymbol>();
         public IAssemblySymbol AbstractionsAssembly { get; private set; }
         public INamedTypeSymbol Attribute { get; private set; }
         public INamedTypeSymbol TimeSpan { get; private set; }
