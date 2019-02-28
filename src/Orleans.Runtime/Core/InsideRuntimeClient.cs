@@ -626,7 +626,7 @@ namespace Orleans.Runtime
             }
 
             CallbackData callbackData;
-            bool found = callbacks.TryGetValue(message.Id, out callbackData);
+            bool found = callbacks.TryRemove(message.Id, out callbackData);
             if (found)
             {
                 if (message.TransactionInfo != null)

@@ -86,8 +86,6 @@ namespace Orleans.Runtime
                 {
                     this.stopwatch.Stop();
                 }
-
-                this.shared.Unregister(this.Message);
             }
 
             if (requestStatistics.CollectApplicationRequestsStats)
