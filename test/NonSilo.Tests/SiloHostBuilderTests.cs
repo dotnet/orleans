@@ -13,6 +13,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Statistics;
 using TestGrainInterfaces;
+using UnitTests.DtosRefOrleans;
 using UnitTests.Grains;
 using Xunit;
 
@@ -337,6 +338,20 @@ namespace NonSilo.Tests
             {
                 Assert.NotNull(host);
             }
+        }
+
+        [Fact]
+        public async Task SiloBuilderThrowsDuringStartupIfNoGrainsAdded()
+        {
+            var host = new HostBuilder()
+                .UseOrleans(siloBuilder =>
+                {
+                    // Add only an assembly with generated serializers but no grain interfaces or grain classes
+                    siloBuilder.UseLocalhostClustering()
+                    .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(ClassReferencingOrleansTypeDto).Assembly));
+                }).Build();
+
+            await Assert.ThrowsAsync<OrleansConfigurationException>(() => host.StartAsync());
         }
 
         private static void RemoveConfigValidatorsAndSetAddress(IServiceCollection services)

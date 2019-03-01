@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 
-namespace Orleans.Core.Abstractions.Internal
+namespace Orleans
 {
     internal static class InternerConstants
     {
@@ -135,7 +135,32 @@ namespace Orleans.Core.Abstractions.Internal
         /// <returns>Object with specified key - either previous cached copy or justed passed in</returns>
         public T Intern(K key, T obj)
         {
-            return FindOrCreate(key, _ => obj);
+            T result;
+            WeakReference<T> cacheEntry;
+
+            // Attempt to get the existing value from cache.
+            internCache.TryGetValue(key, out cacheEntry);
+
+            // If no cache entry exists, create and insert a new one using the creator function.
+            if (cacheEntry == null)
+            {
+                result = obj;
+                cacheEntry = new WeakReference<T>(result);
+                internCache[key] = cacheEntry;
+                return result;
+            }
+
+            // If a cache entry did exist, determine if it still holds a valid value.
+            cacheEntry.TryGetTarget(out result);
+            if (result == null)
+            {
+                // Create new object and ensure the entry is still valid by re-inserting it into the cache.
+                result = obj;
+                cacheEntry.SetTarget(result);
+                internCache[key] = cacheEntry;
+            }
+
+            return result;
         }
 
         public void StopAndClear()

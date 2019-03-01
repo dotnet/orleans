@@ -153,9 +153,8 @@ namespace Orleans.CodeGenerator
         /// </returns>
         public string GenerateSourceForAssembly(Assembly input)
         {
-            if (input.GetCustomAttribute<GeneratedCodeAttribute>() != null
-                || input.GetCustomAttribute<OrleansCodeGenerationTargetAttribute>() != null
-                || input.GetCustomAttribute<SkipCodeGenerationAttribute>() != null)
+            if (input.GetCustomAttributes<OrleansCodeGenerationTargetAttribute>().Any()
+                || input.GetCustomAttributes<SkipCodeGenerationAttribute>().Any())
             {
                 return string.Empty;
             }
@@ -652,9 +651,8 @@ namespace Orleans.CodeGenerator
         {
             return !assembly.IsDynamic
                    && TypeUtils.IsOrleansOrReferencesOrleans(assembly)
-                   && assembly.GetCustomAttribute<GeneratedCodeAttribute>() == null
-                   && assembly.GetCustomAttribute<OrleansCodeGenerationTargetAttribute>() == null
-                   && assembly.GetCustomAttribute<SkipCodeGenerationAttribute>() == null;
+                   && !assembly.GetCustomAttributes<OrleansCodeGenerationTargetAttribute>().Any()
+                   && !assembly.GetCustomAttributes<SkipCodeGenerationAttribute>().Any();
         }
 
         private bool IsOrleansGeneratedCode(MemberInfo type) =>
