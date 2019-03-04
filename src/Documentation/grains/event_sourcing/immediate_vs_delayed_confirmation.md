@@ -56,4 +56,4 @@ In particular, note that:
 
 - But such changes can only happen while stuck at an await.
 
-These guarantees assume that the user code stays within the [recommended practice](/grains/external_tasks_and_grains.md) with respect to tasks and async/await (in particular, does not use thread pool tasks, or only uses them for code that does not call grain functionality and that are properly awaited).  
+These guarantees assume that the user code stays within the [recommended practice](../external_tasks_and_grains.md) with respect to tasks and async/await (in particular, does not use thread pool tasks, or only uses them for code that does not call grain functionality and that are properly awaited).  
