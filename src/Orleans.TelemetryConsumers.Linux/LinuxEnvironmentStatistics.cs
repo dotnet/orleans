@@ -174,8 +174,6 @@ namespace Orleans.Statistics
 
         private static async Task<string> ReadLineStartingWithAsync(string path, string lineStartsWith, CancellationToken ct)
         {
-            var lines = new List<string>();
-
             using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.SequentialScan | FileOptions.Asynchronous))
             using (var r = new StreamReader(fs, Encoding.ASCII))
             {
