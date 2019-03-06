@@ -16,6 +16,7 @@ namespace Orleans.Runtime.GrainDirectory
     {
         private const int HANDOFF_CHUNK_SIZE = 500;
         private static readonly TimeSpan RetryDelay = TimeSpan.FromMilliseconds(250);
+        private const int MAX_OPERATION_DEQUEUE = 2;
         private readonly LocalGrainDirectory localDirectory;
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IInternalGrainFactory grainFactory;
@@ -498,6 +499,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             using (await executorLock.LockAsync())
             {
+                var dequeueCount = 0;
                 while (true)
                 {
                     // Get the next operation, or exit if there are none.
@@ -509,23 +511,36 @@ namespace Orleans.Runtime.GrainDirectory
                         op = this.pendingOperations.Peek();
                     }
 
+                    dequeueCount++;
+
                     try
                     {
                         await op.Action();
-                        lock (this)
-                        {
-                            // Remove the successful operation from the queue.
-                            this.pendingOperations.Dequeue();
-                        }
+                        // Success, reset the dequeue count
+                        dequeueCount = 0;
                     }
                     catch (Exception exception)
                     {
-                        if (this.logger.IsEnabled(LogLevel.Warning))
+                        if (dequeueCount < MAX_OPERATION_DEQUEUE)
                         {
-                            this.logger.LogWarning($"{op.Name} failed: {LogFormatter.PrintException(exception)}");
+                            if (this.logger.IsEnabled(LogLevel.Warning))
+                                this.logger.LogWarning($"{op.Name} failed, will be retried: {LogFormatter.PrintException(exception)}.");
+                            await Task.Delay(RetryDelay);
                         }
-
-                        await Task.Delay(RetryDelay);
+                        else
+                        {
+                            if (this.logger.IsEnabled(LogLevel.Warning))
+                                this.logger.LogWarning($"{op.Name} failed, will NOT be retried: {LogFormatter.PrintException(exception)}");
+                        }
+                    }
+                }
+                if (dequeueCount == 0 || dequeueCount >= MAX_OPERATION_DEQUEUE)
+                {
+                    lock (this)
+                    {
+                        // Remove the operation from the queue if it was a success
+                        // or if we tried too many times
+                        this.pendingOperations.Dequeue();
                     }
                 }
             }
