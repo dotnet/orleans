@@ -192,7 +192,6 @@ namespace Orleans.Streams
                 return Task.CompletedTask;
 
             IList<SequentialItem<T>> batch = items
-                .Where(item => filterWrapper == null || !filterWrapper.ShouldReceive(streamImpl, filterWrapper.FilterData, item))
                 .Select(item => new SequentialItem<T>(item.Item1, item.Item2))
                 .ToList();
 
