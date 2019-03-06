@@ -253,6 +253,12 @@ namespace NonSilo.Tests
                     {
                         options.LoadSheddingEnabled = false;
                         options.LoadSheddingLimit = 95;
+                    })
+                    .ConfigureServices(svcCollection =>
+                    {
+                        svcCollection.AddSingleton<FakeHostEnvironmentStatistics>();
+                        svcCollection.AddFromExisting<IHostEnvironmentStatistics, FakeHostEnvironmentStatistics>();
+                        svcCollection.AddTransient<IConfigurationValidator, LoadSheddingValidator>();
                     });
 
             using (var host = builder.Build())
@@ -279,17 +285,17 @@ namespace NonSilo.Tests
                             options.LoadSheddingLimit = 101;
                         })
                         .ConfigureServices(svcCollection =>
-                            {
-                                svcCollection.AddSingleton<FakeHostEnvironmentStatistics>();
-                                svcCollection.AddFromExisting<IHostEnvironmentStatistics, FakeHostEnvironmentStatistics>();
-                                svcCollection.AddTransient<IConfigurationValidator, LoadSheddingValidator>();
-                            })
+                        {
+                            svcCollection.AddSingleton<FakeHostEnvironmentStatistics>();
+                            svcCollection.AddFromExisting<IHostEnvironmentStatistics, FakeHostEnvironmentStatistics>();
+                            svcCollection.AddTransient<IConfigurationValidator, LoadSheddingValidator>();
+                        })
                         .Build());
         }
 
         /// <summary>
         /// Ensures <see cref="LoadSheddingValidator"/> fails validation when invalid/no instance of
-        /// <see cref="IHostEnvironmentStatistics"/> is registered.
+        /// <see cref="IHostEnvironmentStatistics"/> is registered using otherwise valid <see cref="LoadSheddingOptions"/>.
         /// </summary>
         [Fact]
         public void SiloHostBuilder_LoadSheddingValidatorFailsWithNoRegisteredHostEnvironmentStatistics()
@@ -303,7 +309,7 @@ namespace NonSilo.Tests
                     .Configure<LoadSheddingOptions>(options =>
                     {
                         options.LoadSheddingEnabled = true;
-                        options.LoadSheddingLimit = 101;
+                        options.LoadSheddingLimit = 95;
                     }).ConfigureServices(svcCollection =>
                     {
                         svcCollection.AddTransient<IConfigurationValidator, LoadSheddingValidator>();
