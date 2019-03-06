@@ -25,7 +25,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly Dictionary<SiloAddress, Task> lastPromise;
         private readonly ILogger logger;
         private readonly Factory<GrainDirectoryPartition> createPartion;
-        private readonly Queue<Operation> pendingOperations = new Queue<Operation>();
+        private readonly Queue<(string name, Func<Task> action)> pendingOperations = new Queue<(string name, Func<Task> action)>();
         private readonly AsyncLock executorLock = new AsyncLock();
 
         internal GrainDirectoryHandoffManager(
@@ -487,7 +487,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             lock (this)
             {
-                this.pendingOperations.Enqueue(new Operation(name, action));
+                this.pendingOperations.Enqueue((name, action));
                 if (this.pendingOperations.Count <= 2)
                 {
                     this.localDirectory.Scheduler.QueueTask(this.ExecutePendingOperations, this.localDirectory.RemoteGrainDirectory.SchedulingContext);
@@ -503,7 +503,7 @@ namespace Orleans.Runtime.GrainDirectory
                 while (true)
                 {
                     // Get the next operation, or exit if there are none.
-                    Operation op;
+                    (string Name, Func<Task> Action) op;
                     lock (this)
                     {
                         if (this.pendingOperations.Count == 0) break;
@@ -544,19 +544,6 @@ namespace Orleans.Runtime.GrainDirectory
                     }
                 }
             }
-        }
-
-        private struct Operation
-        {
-            public Operation(string name, Func<Task> action)
-            {
-                Name = name;
-                Action = action;
-            }
-
-            public string Name { get; }
-
-            public Func<Task> Action { get; }
         }
     }
 }
