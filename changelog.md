@@ -7,6 +7,90 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [2.3.0-rc1] (changes since 2.2.0)
+
+- Breaking changes
+  - No changes breaking the wire protocol or persisted state that would break a rolling upgrade
+  - Migration to Microsoft.Extensions.Options 2.1.1 (#5385) requires a namespace change in the code
+
+- Non-breaking improvements
+  - Added 'First' and 'Last' to grain lifecycle stages. (#5248)
+  - Avoid emitting assembly-level GeneratedCodeAttribute (#5270)
+  - Use alias-qualified name in GetBindingFlagsParenthesizedExpressionSyntax (#5269)
+  - Don't allow read only transaction participants to be selected as the manager (#5267)
+  - Add configurable timeout to wait for queued messages being forwarded (#5268)
+  - Sort out LocalGrainDirectory shutdown sequence (#5276)
+  - Add CollectionAge validation to GrainCollectionOptions (#5290)
+  - Optimize memory allocation with custom EqualityComparer (#5210)
+  - Always Interleave modified to also be interleavable. (#5344)
+  - Batching batch containers pulling agent retrieves from cache (#5336)
+  - Invalidate activation cache entries from old epochs (#5352)
+  - Change usages of TypeInfo back to Type (#5338)
+  - Microsoft.Extensions.Hosting support (#5261, #5355)
+  - Persistent state facet (#5373)
+  - Updates XML documentation to call out prereq of `LoadShedding`. (#5387)
+  - Enable tx test kit pkg (#5380)
+  - Update to Microsoft.Extensions.Options 2.1.1 (#5385)
+  - Mark key legacy types/methods as [Obsolete] (#5239)
+  - Upgrade to EventHub 2.2.1 (#5384)
+  - Mark ILBasedSerializer as obsolete (#5396)
+  - Add event on gateway count changed (#5133)
+  - Enable HostedClient by default (#5395)
+  - Enable "cleaning" of all dead entries in the membership table (#5389)
+  - Remove delegate allocation from interner (#5410)
+  - Remove response callback using a single operation (#5406)
+  - Throw during startup if no grain classes/interfaces in app parts (#5413)
+  - Fix OneWay cache invalidation (#5401)
+  - Adds a LoadSheddingValidator class (#5400)
+
+- Non-breaking bug fixes
+  - Fix invalid comparison in TransactionAgent (#5289)
+  - Fix package dependency condition for Microsoft.Orleans.Transactions. (#5307)
+  - Fix defensive check in LogConsistentGrain (#5319)
+  - Fix package versioning in csproj files (#5333)
+  - Fix #5342: Incorrect specification of global alias (#5343)
+  - Add handling when pulling agent fails RegisterAsProducer to pubsub (#5354)
+  - Use grain state type when deserializing json state in azure table storage (#4994)
+  - Pulling agent losing subscriptions fix (#5372)
+  - Fix #5398: AmbiguousMatchException in code generator (#5407)
+
+### [1.5.7] (changes since 1.5.6)
+
+Two fixes backported from v2.x
+- Non-breaking bug fixes
+  - Fixes for Multi-Cluster Support (#3974)
+  - Add GSI cache maintenance and tests (#5184)
+
+### [2.2.4] (changes since 2.2.3)
+
+- Non-breaking improvements
+  - Add CollectionAge validation to GrainCollectionOptions (#5290)
+  - Fix package versioning in csproj files (#5333)
+  - Invalidate activation cache entries from old epochs (#5352)
+  - Use grain state type when deserializing json state in azure table storage (#4994)
+  - Updates XML documentation to call out prereq of `LoadShedding`. (#5387)
+
+- Non-breaking bug fixes
+  - Fix defensive check in LogConsistentGrain (#5319)
+  - Fix #5342: Incorrect specification of global alias (#5343)
+  - Add handling when pulling agent fails RegisterAsProducer to pubsub (#5354)
+  - Pulling agent losing subscriptions fix (#5372)
+
+### [2.2.3] (changes since 2.2.2)
+
+- Non-breaking improvements
+  - Avoid emitting assembly-level GeneratedCodeAttribute (#5270)
+  - Add configurable timeout to wait for queued messages being forwarded (#5268)
+  - Sort out LocalGrainDirectory shutdown sequence (#5276)
+
+- Non-breaking bug fixes
+  - Use alias-qualified name in GetBindingFlagsParenthesizedExpressionSyntax (#5269)
+
+### [2.2.2] (changes since 2.2.1)
+
+- Non-breaking bug fixes
+  - Fix package dependency condition for Microsoft.Orleans.Transactions. (#5307)
+
 ### [2.2.1] (changes since 2.2.0)
 
 - Breaking changes
