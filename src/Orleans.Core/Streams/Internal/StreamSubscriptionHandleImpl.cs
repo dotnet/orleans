@@ -10,7 +10,6 @@ namespace Orleans.Streams
     internal class StreamSubscriptionHandleImpl<T> : StreamSubscriptionHandle<T>, IStreamSubscriptionHandle 
     {
         private StreamImpl<T> streamImpl;
-        private readonly IStreamFilterPredicateWrapper filterWrapper;
         private readonly GuidId subscriptionId;
         private readonly bool isRewindable;
 
@@ -29,17 +28,16 @@ namespace Orleans.Streams
         public override Guid HandleId { get { return subscriptionId.Guid; } }
 
         public StreamSubscriptionHandleImpl(GuidId subscriptionId, StreamImpl<T> streamImpl)
-            : this(subscriptionId, null, null, streamImpl, null, null)
+            : this(subscriptionId, null, null, streamImpl, null)
         {
         }
 
-        public StreamSubscriptionHandleImpl(GuidId subscriptionId, IAsyncObserver<T> observer, IAsyncBatchObserver<T> batchObserver, StreamImpl<T> streamImpl, IStreamFilterPredicateWrapper filterWrapper, StreamSequenceToken token)
+        public StreamSubscriptionHandleImpl(GuidId subscriptionId, IAsyncObserver<T> observer, IAsyncBatchObserver<T> batchObserver, StreamImpl<T> streamImpl, StreamSequenceToken token)
         {
             this.subscriptionId = subscriptionId ?? throw new ArgumentNullException("subscriptionId");
             this.observer = observer;
             this.batchObserver = batchObserver;
             this.streamImpl = streamImpl ?? throw new ArgumentNullException("streamImpl");
-            this.filterWrapper = filterWrapper;
             this.isRewindable = streamImpl.IsRewindable;
             if (IsRewindable)
             {
@@ -176,9 +174,6 @@ namespace Orleans.Streams
             // This method could potentially be invoked after Dispose() has been called, 
             // so we have to ignore the request or we risk breaking unit tests AQ_01 - AQ_04.
             if (this.observer == null || !IsValid)
-                return Task.CompletedTask;
-
-            if (filterWrapper != null && !filterWrapper.ShouldReceive(streamImpl, filterWrapper.FilterData, typedItem))
                 return Task.CompletedTask;
 
             return this.observer.OnNextAsync(typedItem, token);

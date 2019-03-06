@@ -1,4 +1,4 @@
-﻿using Orleans.Runtime;
+using Orleans.Runtime;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -23,7 +23,7 @@ namespace Orleans.Streams.Core
             var streamId = StreamId.GetStreamId(streamIdentity.Guid, streamProviderName, streamIdentity.Namespace);
             var subscriptionId = streamPubSub.CreateSubscriptionId(
                 streamId, consumer);
-            await streamPubSub.RegisterConsumer(subscriptionId, streamId, streamProviderName, consumer, null);
+            await streamPubSub.RegisterConsumer(subscriptionId, streamId, streamProviderName, consumer);
             var newSub = new StreamSubscription(subscriptionId.Guid, streamProviderName, streamId, grainRef.GrainId);
             return newSub;
         }

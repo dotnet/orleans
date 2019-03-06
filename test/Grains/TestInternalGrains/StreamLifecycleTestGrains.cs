@@ -247,7 +247,7 @@ namespace UnitTests.Grains
             GuidId subscriptionId = GuidId.GetNewGuidId();
             await pubsub.RegisterConsumer(subscriptionId, ((StreamImpl<int>)State.Stream).StreamId, myExtensionReference, null);
 
-            myExtension.SetObserver(subscriptionId, ((StreamImpl<int>)State.Stream), observer, null, null, null);
+            myExtension.SetObserver(subscriptionId, ((StreamImpl<int>)State.Stream), observer, null, null);
         }
 
         public async Task RemoveConsumer(Guid streamId, string streamNamespace, string providerName, StreamSubscriptionHandle<int> subsHandle)
@@ -273,98 +273,6 @@ namespace UnitTests.Grains
             State.IsProducer = false;
             Observers.Clear();
             await ClearStateAsync();
-        }
-    }
-
-    [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
-    internal class FilteredStreamConsumerGrain : StreamLifecycleConsumerGrain, IFilteredStreamConsumerGrain
-    {
-        private static Logger _logger;
-
-        private const int FilterDataOdd = 1;
-        private const int FilterDataEven = 2;
-
-        public FilteredStreamConsumerGrain(ISiloRuntimeClient runtimeClient, IStreamProviderRuntime streamProviderRuntime)
-            : base(runtimeClient, streamProviderRuntime)
-        {
-        }
-
-        public override Task BecomeConsumer(Guid streamId, string streamNamespace, string providerName)
-        {
-            throw new InvalidOperationException("Should not be calling unfiltered BecomeConsumer method on " + GetType());
-        }
-
-        public async Task BecomeConsumer(Guid streamId, string streamNamespace, string providerName, bool sendEvensOnly)
-        {
-            _logger = logger;
-            if (logger.IsVerbose)
-                logger.Verbose("BecomeConsumer StreamId={0} StreamProvider={1} Filter={2} Grain={3}",
-                streamId, providerName, sendEvensOnly, this.AsReference<IFilteredStreamConsumerGrain>());
-            InitStream(streamId, streamNamespace, providerName);
-
-            var observer = new MyStreamObserver<int>(logger);
-
-            StreamFilterPredicate filterFunc;
-            object filterData;
-            if (sendEvensOnly)
-            {
-                filterFunc = FilterIsEven;
-                filterData = FilterDataEven;
-            }
-            else
-            {
-                filterFunc = FilterIsOdd;
-                filterData = FilterDataOdd;
-            }
-
-            var subsHandle = await State.Stream.SubscribeAsync(observer, null, filterFunc, filterData);
-
-            State.ConsumerSubscriptionHandles.Add(subsHandle);
-            Observers.Add(subsHandle, observer);
-            await WriteStateAsync();
-        }
-
-        public async Task SubscribeWithBadFunc(Guid streamId, string streamNamespace, string providerName)
-        {
-            logger.Info("SubscribeWithBadFunc StreamId={0} StreamProvider={1}Grain={2}",
-                streamId, providerName, this.AsReference<IFilteredStreamConsumerGrain>());
-
-            InitStream(streamId, streamNamespace, providerName);
-
-            var observer = new MyStreamObserver<int>(logger);
-
-            StreamFilterPredicate filterFunc = BadFunc;
-
-            // This next call should fail because func is not static
-            await State.Stream.SubscribeAsync(observer, null, filterFunc);
-        }
-
-        public static bool FilterIsEven(IStreamIdentity stream, object filterData, object item)
-        {
-            if (!FilterDataEven.Equals(filterData))
-            {
-                throw new Exception("Should have got the correct filter data passed in, but got: " + filterData);
-            }
-            int val = (int) item;
-            bool result = val % 2 == 0;
-            if (_logger != null) _logger.Info("FilterIsEven(Stream={0},FilterData={1},Item={2}) Filter = {3}", stream, filterData, item, result);
-            return result;
-        }
-        public static bool FilterIsOdd(IStreamIdentity stream, object filterData, object item)
-        {
-            if (!FilterDataOdd.Equals(filterData))
-            {
-                throw new Exception("Should have got the correct filter data passed in, but got: " + filterData);
-            }
-            int val = (int) item;
-            bool result = val % 2 == 1;
-            if (_logger != null) _logger.Info("FilterIsOdd(Stream={0},FilterData={1},Item={2}) Filter = {3}", stream, filterData, item, result);
-            return result;
-        }
-        // Function is not static, so cannot be used as a filter predicate function.
-        public bool BadFunc(IStreamIdentity stream, object filterData, object item)
-        {
-            return true;
         }
     }
 

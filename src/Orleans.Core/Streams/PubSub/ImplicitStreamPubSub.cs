@@ -42,7 +42,7 @@ namespace Orleans.Streams
             return Task.CompletedTask;
         }
 
-        public Task RegisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter)
+        public Task RegisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer)
         {
             if (!IsImplicitSubscriber(streamConsumer, streamId))
             {

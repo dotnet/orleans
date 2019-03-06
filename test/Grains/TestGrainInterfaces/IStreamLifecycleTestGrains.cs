@@ -17,12 +17,6 @@ namespace UnitTests.GrainInterfaces
         Task ClearGrain();
     }
 
-    public interface IFilteredStreamConsumerGrain : IStreamLifecycleConsumerGrain
-    {
-        Task BecomeConsumer(Guid streamId, string streamNamespace, string providerName, bool sendEvensOnly);
-        Task SubscribeWithBadFunc(Guid streamId, string streamNamespace, string providerName);
-    }
-
     public interface IStreamLifecycleProducerGrain : IGrainWithGuidKey
     {
         Task<int> GetSendCount();

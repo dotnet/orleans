@@ -4,14 +4,12 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
-    [Serializable]
     internal enum StreamConsumerDataState
     {
         Active, // Indicates that events are activly being delivered to this consumer.
         Inactive, // Indicates that events are not activly being delivered to this consumers.  If adapter produces any events on this consumers stream, the agent will need begin delivering events
     }
 
-    [Serializable]
     internal class StreamConsumerData
     {
         public GuidId SubscriptionId;
@@ -19,15 +17,13 @@ namespace Orleans.Streams
         public IStreamConsumerExtension StreamConsumer;
         public StreamConsumerDataState State = StreamConsumerDataState.Inactive;
         public IQueueCacheCursor Cursor;
-        public IStreamFilterPredicateWrapper Filter;
         public StreamHandshakeToken LastToken;
 
-        public StreamConsumerData(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter)
+        public StreamConsumerData(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer)
         {
             SubscriptionId = subscriptionId;
             StreamId = streamId;
             StreamConsumer = streamConsumer;
-            Filter = filter;
         }
 
         internal void SafeDisposeCursor(ILogger logger)

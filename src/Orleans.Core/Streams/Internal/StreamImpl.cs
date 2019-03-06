@@ -55,11 +55,9 @@ namespace Orleans.Streams
             return GetConsumerInterface().SubscribeAsync(observer, null);
         }
 
-        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer, StreamSequenceToken token,
-            StreamFilterPredicate filterFunc = null,
-            object filterData = null)
+        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer, StreamSequenceToken token)
         {
-            return GetConsumerInterface().SubscribeAsync(observer, token, filterFunc, filterData);
+            return GetConsumerInterface().SubscribeAsync(observer, token);
         }
 
         public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncBatchObserver<T> batchObserver)

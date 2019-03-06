@@ -65,7 +65,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             {
                 foreach (var newSubscriber in newSubscribers)
                 {
-                    consumers.AddRemoteSubscriber(newSubscriber.SubscriptionId, newSubscriber.Consumer, newSubscriber.Filter);
+                    consumers.AddRemoteSubscriber(newSubscriber.SubscriptionId, newSubscriber.Consumer);
                 }
             }
             else
@@ -136,7 +136,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             StreamConsumerExtensionCollection consumers;
             if (remoteConsumers.TryGetValue(streamId, out consumers))
             {
-                consumers.AddRemoteSubscriber(subscriptionId, streamConsumer, filter);
+                consumers.AddRemoteSubscriber(subscriptionId, streamConsumer);
             }
             else
             {
@@ -161,12 +161,10 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             return Task.CompletedTask;
         }
 
-
-
         [Serializable]
         internal class StreamConsumerExtensionCollection
         {
-            private readonly ConcurrentDictionary<GuidId, Tuple<IStreamConsumerExtension, IStreamFilterPredicateWrapper>> consumers;
+            private readonly ConcurrentDictionary<GuidId, IStreamConsumerExtension> consumers;
             private readonly IStreamPubSub streamPubSub;
             private readonly ILogger logger;
 
@@ -174,18 +172,17 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             {
                 streamPubSub = pubSub;
                 this.logger = loggerFactory.CreateLogger<StreamConsumerExtensionCollection>();
-                consumers = new ConcurrentDictionary<GuidId, Tuple<IStreamConsumerExtension, IStreamFilterPredicateWrapper>>();
+                consumers = new ConcurrentDictionary<GuidId, IStreamConsumerExtension>();
             }
 
-            internal void AddRemoteSubscriber(GuidId subscriptionId, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter)
+            internal void AddRemoteSubscriber(GuidId subscriptionId, IStreamConsumerExtension streamConsumer)
             {
-                consumers.TryAdd(subscriptionId, Tuple.Create(streamConsumer, filter));
+                consumers.TryAdd(subscriptionId, streamConsumer);
             }
 
             internal void RemoveRemoteSubscriber(GuidId subscriptionId)
             {
-                Tuple<IStreamConsumerExtension, IStreamFilterPredicateWrapper> ignore;
-                consumers.TryRemove(subscriptionId, out ignore);
+                consumers.TryRemove(subscriptionId, out IStreamConsumerExtension ignore);
                 if (consumers.Count == 0)
                 {
                     // Unsubscribe from PubSub?
@@ -195,17 +192,9 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             internal Task DeliverItem(StreamId streamId, object item, bool fireAndForgetDelivery, bool optimizeForImmutableData)
             {
                 var tasks = fireAndForgetDelivery ? null : new List<Task>();
-                foreach (KeyValuePair<GuidId, Tuple<IStreamConsumerExtension, IStreamFilterPredicateWrapper>> subscriptionKvp in consumers)
+                foreach (KeyValuePair<GuidId, IStreamConsumerExtension> subscriptionKvp in consumers)
                 {
-                    IStreamConsumerExtension remoteConsumer = subscriptionKvp.Value.Item1;
-
-                    // Apply filter(s) to see if we should forward this item to this consumer
-                    IStreamFilterPredicateWrapper filter = subscriptionKvp.Value.Item2;
-                    if (filter != null)
-                    {
-                        if (!filter.ShouldReceive(streamId, filter.FilterData, item))
-                            continue;
-                    }
+                    IStreamConsumerExtension remoteConsumer = subscriptionKvp.Value;
 
                     Task task = DeliverToRemote(remoteConsumer, streamId, subscriptionKvp.Key, item, optimizeForImmutableData, fireAndForgetDelivery);
                     if (fireAndForgetDelivery) task.Ignore();
@@ -226,8 +215,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 }
                 catch (ClientNotAvailableException)
                 {
-                    Tuple<IStreamConsumerExtension, IStreamFilterPredicateWrapper> discard;
-                    if (consumers.TryRemove(subscriptionId, out discard))
+                    if (consumers.TryRemove(subscriptionId, out IStreamConsumerExtension discard))
                     {
                         streamPubSub.UnregisterConsumer(subscriptionId, streamId, streamId.ProviderName).Ignore();
                         logger.Warn(ErrorCode.Stream_ConsumerIsDead,
@@ -247,9 +235,9 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             internal Task CompleteStream(StreamId streamId, bool fireAndForgetDelivery)
             {
                 var tasks = fireAndForgetDelivery ? null : new List<Task>();
-                foreach (KeyValuePair<GuidId, Tuple<IStreamConsumerExtension, IStreamFilterPredicateWrapper>> kvp in consumers)
+                foreach (KeyValuePair<GuidId, IStreamConsumerExtension> kvp in consumers)
                 {
-                    IStreamConsumerExtension remoteConsumer = kvp.Value.Item1;
+                    IStreamConsumerExtension remoteConsumer = kvp.Value;
                     GuidId subscriptionId = kvp.Key;
                     Task task = NotifyComplete(remoteConsumer, subscriptionId, streamId, fireAndForgetDelivery);
                     if (fireAndForgetDelivery) task.Ignore();
@@ -277,9 +265,9 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             internal Task ErrorInStream(StreamId streamId, Exception exc, bool fireAndForgetDelivery)
             {
                 var tasks = fireAndForgetDelivery ? null : new List<Task>();
-                foreach (KeyValuePair<GuidId, Tuple<IStreamConsumerExtension, IStreamFilterPredicateWrapper>> kvp in consumers)
+                foreach (KeyValuePair<GuidId, IStreamConsumerExtension> kvp in consumers)
                 {
-                    IStreamConsumerExtension remoteConsumer = kvp.Value.Item1;
+                    IStreamConsumerExtension remoteConsumer = kvp.Value;
                     GuidId subscriptionId = kvp.Key;
                     Task task = NotifyError(remoteConsumer, subscriptionId, exc, streamId, fireAndForgetDelivery);
                     if (fireAndForgetDelivery) task.Ignore();

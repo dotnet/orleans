@@ -198,8 +198,7 @@ namespace UnitTests.StreamingTests
                 id = Guid.NewGuid();
             }
 
-            public Task AddSubscriber(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer,
-                IStreamFilterPredicateWrapper filter)
+            public Task AddSubscriber(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter)
             {
                 return Task.CompletedTask;
             }

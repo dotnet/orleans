@@ -32,8 +32,6 @@ namespace Orleans.Streams
         [JsonIgnore]
         public IStreamConsumerExtension Consumer { get { return consumerReference as IStreamConsumerExtension; } }
         [JsonIgnore]
-        public IStreamFilterPredicateWrapper Filter { get { return filterWrapper as IStreamFilterPredicateWrapper; } }
-        [JsonIgnore]
         public bool IsFaulted { get { return state == SubscriptionStates.Faulted; } }
 
         // This constructor has to be public for JSonSerialization to work!
@@ -47,25 +45,6 @@ namespace Orleans.Streams
             Stream = streamId;
             consumerReference = streamConsumer as GrainReference;
             state = SubscriptionStates.Active;
-        }
-
-        internal void AddFilter(IStreamFilterPredicateWrapper newFilter)
-        {
-            if (filterWrapper == null)
-            {
-                // No existing filter - add single
-                filterWrapper = newFilter;
-            }
-            else if (filterWrapper is OrFilter)
-            {
-                // Existing multi-filter - add new filter to it
-                ((OrFilter)filterWrapper).AddFilter(newFilter);
-            }
-            else
-            {
-                // Exsiting single filter - convert to multi-filter
-                filterWrapper = new OrFilter(Filter, newFilter);
-            }
         }
 
         public override bool Equals(object obj)
