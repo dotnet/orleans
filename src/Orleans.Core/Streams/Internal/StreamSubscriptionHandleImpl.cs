@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
@@ -15,6 +17,8 @@ namespace Orleans.Streams
         [NonSerialized]
         private IAsyncObserver<T> observer;
         [NonSerialized]
+        private IAsyncBatchObserver<T> batchObserver;
+        [NonSerialized]
         private StreamHandshakeToken expectedToken;
         internal bool IsValid { get { return streamImpl != null; } }
         internal GuidId SubscriptionId { get { return subscriptionId; } }
@@ -25,18 +29,16 @@ namespace Orleans.Streams
         public override Guid HandleId { get { return subscriptionId.Guid; } }
 
         public StreamSubscriptionHandleImpl(GuidId subscriptionId, StreamImpl<T> streamImpl)
-            : this(subscriptionId, null, streamImpl, null, null)
+            : this(subscriptionId, null, null, streamImpl, null, null)
         {
         }
 
-        public StreamSubscriptionHandleImpl(GuidId subscriptionId, IAsyncObserver<T> observer, StreamImpl<T> streamImpl, IStreamFilterPredicateWrapper filterWrapper, StreamSequenceToken token)
+        public StreamSubscriptionHandleImpl(GuidId subscriptionId, IAsyncObserver<T> observer, IAsyncBatchObserver<T> batchObserver, StreamImpl<T> streamImpl, IStreamFilterPredicateWrapper filterWrapper, StreamSequenceToken token)
         {
-            if (subscriptionId == null) throw new ArgumentNullException("subscriptionId");
-            if (streamImpl == null) throw new ArgumentNullException("streamImpl");
-
-            this.subscriptionId = subscriptionId;
+            this.subscriptionId = subscriptionId ?? throw new ArgumentNullException("subscriptionId");
             this.observer = observer;
-            this.streamImpl = streamImpl;
+            this.batchObserver = batchObserver;
+            this.streamImpl = streamImpl ?? throw new ArgumentNullException("streamImpl");
             this.filterWrapper = filterWrapper;
             this.isRewindable = streamImpl.IsRewindable;
             if (IsRewindable)
@@ -47,34 +49,42 @@ namespace Orleans.Streams
 
         public void Invalidate()
         {
-            streamImpl = null;
-            observer = null;
+            this.streamImpl = null;
+            this.observer = null;
+            this.batchObserver = null;
         }
 
         public StreamHandshakeToken GetSequenceToken()
         {
-            return expectedToken;
+            return this.expectedToken;
         }
 
         public override Task UnsubscribeAsync()
         {
             if (!IsValid) throw new InvalidOperationException("Handle is no longer valid. It has been used to unsubscribe or resume.");
-            return streamImpl.UnsubscribeAsync(this);
+            return this.streamImpl.UnsubscribeAsync(this);
         }
 
         public override Task<StreamSubscriptionHandle<T>> ResumeAsync(IAsyncObserver<T> obs, StreamSequenceToken token = null)
         {
             if (!IsValid) throw new InvalidOperationException("Handle is no longer valid. It has been used to unsubscribe or resume.");
-            return streamImpl.ResumeAsync(this, obs, token);
+            return this.streamImpl.ResumeAsync(this, obs, token);
+        }
+
+
+        public override Task<StreamSubscriptionHandle<T>> ResumeAsync(IAsyncBatchObserver<T> observer, StreamSequenceToken token = null)
+        {
+            if (!IsValid) throw new InvalidOperationException("Handle is no longer valid. It has been used to unsubscribe or resume.");
+            return this.streamImpl.ResumeAsync(this, observer, token);
         }
 
         public async Task<StreamHandshakeToken> DeliverBatch(IBatchContainer batch, StreamHandshakeToken handshakeToken)
         {
             // we validate expectedToken only for ordered (rewindable) streams
-            if (expectedToken != null)
+            if (this.expectedToken != null)
             {
-                if (!expectedToken.Equals(handshakeToken))
-                    return expectedToken;
+                if (!this.expectedToken.Equals(handshakeToken))
+                    return this.expectedToken;
             }
 
             if (batch is IBatchContainerBatch)
@@ -84,57 +94,67 @@ namespace Orleans.Streams
             }
             else
             {
-                foreach (var itemTuple in batch.GetEvents<T>())
+                if (this.observer != null)
                 {
-                    await NextItem(itemTuple.Item1, itemTuple.Item2);
+                    foreach (var itemTuple in batch.GetEvents<T>())
+                    {
+                        await NextItem(itemTuple.Item1, itemTuple.Item2);
+                    }
+                } else
+                {
+                    await NextItems(batch.GetEvents<T>());
                 }
             }
 
             if (IsRewindable)
             {
-                expectedToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken);
+                this.expectedToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken);
             }
             return null;
         }
 
         public async Task<StreamHandshakeToken> DeliverItem(object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
         {
-            if (expectedToken != null)
+            if (this.expectedToken != null)
             {
-                if (!expectedToken.Equals(handshakeToken))
-                    return expectedToken;
+                if (!this.expectedToken.Equals(handshakeToken))
+                    return this.expectedToken;
             }
 
             await NextItem(item, currentToken);
 
             // check again, in case the expectedToken was changed indiretly via ResumeAsync()
-            if (expectedToken != null)
+            if (this.expectedToken != null)
             {
-                if (!expectedToken.Equals(handshakeToken))
-                    return expectedToken;
+                if (!this.expectedToken.Equals(handshakeToken))
+                    return this.expectedToken;
             }
             if (IsRewindable)
             {
-                expectedToken = StreamHandshakeToken.CreateDeliveyToken(currentToken);
+                this.expectedToken = StreamHandshakeToken.CreateDeliveyToken(currentToken);
             }
             return null;
         }
 
         public async Task NextBatch(IBatchContainerBatch batchContainerBatch)
         {
-            bool isRequestContextSet;
-            foreach (var batchContainer in batchContainerBatch.BatchContainers)
+            if (this.observer != null)
             {
-                isRequestContextSet = batchContainer.ImportRequestContext();
-                foreach (var itemTuple in batchContainer.GetEvents<T>())
-                {
-                    await NextItem(itemTuple.Item1, itemTuple.Item2);
-                }
 
-                if (isRequestContextSet)
+                foreach (var batchContainer in batchContainerBatch.BatchContainers)
                 {
-                    RequestContext.Clear();
+                    if (this.observer != null)
+                    {
+                        foreach (var itemTuple in batchContainer.GetEvents<T>())
+                        {
+                            await NextItem(itemTuple.Item1, itemTuple.Item2);
+                        }
+                    }
                 }
+            }
+            else
+            {
+                await NextItems(batchContainerBatch.BatchContainers.SelectMany(batch => batch.GetEvents<T>()));
             }
         }
 
@@ -153,23 +173,38 @@ namespace Orleans.Streams
 
             // This method could potentially be invoked after Dispose() has been called, 
             // so we have to ignore the request or we risk breaking unit tests AQ_01 - AQ_04.
-            if (observer == null || !IsValid)
+            if (this.observer == null || !IsValid)
                 return Task.CompletedTask;
 
             if (filterWrapper != null && !filterWrapper.ShouldReceive(streamImpl, filterWrapper.FilterData, typedItem))
                 return Task.CompletedTask;
 
-            return observer.OnNextAsync(typedItem, token);
+            return this.observer.OnNextAsync(typedItem, token);
+        }
+
+        private Task NextItems(IEnumerable<Tuple<T, StreamSequenceToken>> items)
+        {
+            // This method could potentially be invoked after Dispose() has been called, 
+            // so we have to ignore the request or we risk breaking unit tests AQ_01 - AQ_04.
+            if (this.batchObserver == null || !IsValid)
+                return Task.CompletedTask;
+
+            IList<OrderedItem<T>> batch = items
+                .Where(item => filterWrapper == null || !filterWrapper.ShouldReceive(streamImpl, filterWrapper.FilterData, item))
+                .Select(item => new OrderedItem<T>(item.Item1, item.Item2))
+                .ToList();
+
+            return batch.Count != 0 ? this.batchObserver.OnNextAsync(batch) : Task.CompletedTask;
         }
 
         public Task CompleteStream()
         {
-            return observer == null ? Task.CompletedTask : observer.OnCompletedAsync();
+            return this.observer == null ? Task.CompletedTask : this.observer.OnCompletedAsync();
         }
 
         public Task ErrorInStream(Exception ex)
         {
-            return observer == null ? Task.CompletedTask : observer.OnErrorAsync(ex);
+            return this.observer == null ? Task.CompletedTask : this.observer.OnErrorAsync(ex);
         }
 
         internal bool SameStreamId(StreamId streamId)
