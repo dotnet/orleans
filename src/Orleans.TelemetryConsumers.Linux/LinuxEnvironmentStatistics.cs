@@ -21,7 +21,7 @@ namespace Orleans.Statistics
 
         public long? AvailableMemory { get; private set; }
 
-        private readonly TimeSpan CPU_CHECK_PERIOD = TimeSpan.FromSeconds(5);
+        private readonly TimeSpan MONITOR_PERIOD = TimeSpan.FromSeconds(5);
 
         private CancellationTokenSource _cts;
         private Task _monitorTask;
@@ -162,12 +162,12 @@ namespace Orleans.Statistics
 
                     _logger.LogTrace($"LinuxEnvironmentStatistics: CPU={CpuUsage?.ToString("0.0")}, MemTotal={TotalPhysicalMemory}, MemAvailable={AvailableMemory}");
 
-                    await Task.Delay(CPU_CHECK_PERIOD, ct);
+                    await Task.Delay(MONITOR_PERIOD, ct);
                 }
                 catch (Exception ex) when (ex.GetType() != typeof(TaskCanceledException))
                 {
                     _logger.LogError(ex, "LinuxEnvironmentStatistics: error");
-                    await Task.Delay(CPU_CHECK_PERIOD + CPU_CHECK_PERIOD + CPU_CHECK_PERIOD, ct);
+                    await Task.Delay(MONITOR_PERIOD + MONITOR_PERIOD + MONITOR_PERIOD, ct);
                 }
             }
         }
@@ -182,7 +182,6 @@ namespace Orleans.Statistics
                 {
                     return line;
                 }
-                await fs.FlushAsync(ct);
             }
 
             return null;
