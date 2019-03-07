@@ -1,8 +1,7 @@
 using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -25,6 +24,12 @@ namespace Orleans.Statistics
 
         private CancellationTokenSource _cts;
         private Task _monitorTask;
+
+        private static readonly string StartErrMsg_Win = $"Tried to start {nameof(LinuxEnvironmentStatistics)}, but detected OS Windows. " +
+            "Call 'UsePerfCounterEnvironmentStatistics' instead for implementation based on Windows Performance Counters";
+
+        private static readonly string StartErrMsg_Unknown = $"Tried to start {nameof(LinuxEnvironmentStatistics)}, " +
+            $"but detected OS is not Linux: '{RuntimeInformation.OSDescription}'";
 
         public LinuxEnvironmentStatistics(ILoggerFactory loggerFactory)
         {
@@ -49,6 +54,19 @@ namespace Orleans.Statistics
 
         public async Task OnStart(CancellationToken ct)
         {
+            var isLinux = RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
+
+            if (!isLinux)
+            {
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    _logger.LogWarning(StartErrMsg_Win);
+                else
+                    _logger.LogWarning(StartErrMsg_Unknown);
+                return;
+            }
+
+            _logger.LogTrace($"Starting {nameof(LinuxEnvironmentStatistics)}");
+
             _cts = new CancellationTokenSource();
             ct.Register(() => _cts.Cancel());
 
@@ -58,21 +76,38 @@ namespace Orleans.Statistics
                 TaskCreationOptions.DenyChildAttach | TaskCreationOptions.RunContinuationsAsynchronously,
                 TaskScheduler.Default
             );
+
+            _logger.LogTrace($"Started {nameof(LinuxEnvironmentStatistics)}");
         }
 
         public async Task OnStop(CancellationToken ct)
         {
-            _cts.Cancel();
+            if (_cts == null)
+                return;
+
+            _logger.LogTrace($"Stopping {nameof(LinuxEnvironmentStatistics)}");
             try
             {
-                await _monitorTask;
+                _cts.Cancel();
+                try
+                {
+                    await _monitorTask;
+                }
+                catch (TaskCanceledException) { }
             }
-            catch (TaskCanceledException) { }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error stopping {nameof(LinuxEnvironmentStatistics)}");
+            }
+            finally
+            {
+                _logger.LogTrace($"Stopped {nameof(LinuxEnvironmentStatistics)}");
+            }
         }
 
-        private async Task UpdateTotalPhysicalMemory(CancellationToken ct)
+        private async Task UpdateTotalPhysicalMemory()
         {
-            var memTotalLine = await ReadLineStartingWithAsync("/proc/meminfo", "MemTotal", ct);
+            var memTotalLine = await ReadLineStartingWithAsync("/proc/meminfo", "MemTotal");
 
             if (string.IsNullOrWhiteSpace(memTotalLine))
             {
@@ -93,9 +128,9 @@ namespace Orleans.Statistics
         private long _prevIdleTime;
         private long _prevTotalTime;
 
-        private async Task UpdateCpuUsage(int i, CancellationToken ct)
+        private async Task UpdateCpuUsage(int i)
         {
-            var cpuUsageLine = await ReadLineStartingWithAsync("/proc/stat", "cpu  ", ct);
+            var cpuUsageLine = await ReadLineStartingWithAsync("/proc/stat", "cpu  ");
 
             if (string.IsNullOrWhiteSpace(cpuUsageLine))
             {
@@ -104,27 +139,36 @@ namespace Orleans.Statistics
             }
 
             // Format: "cpu  20546715 4367 11631326 215282964 96602 0 584080 0 0 0"
-            var nums = cpuUsageLine.Split(' ').Skip(2).Select(long.Parse).ToArray();
-            var idleTime = nums[3];
-            var totalTime = nums.Sum();
+            var cpuNumberStrings = cpuUsageLine.Split(' ').Skip(2);
+
+            if (cpuNumberStrings.Any(n => !long.TryParse(n, out _)))
+            {
+                _logger.LogWarning($"Failed to parse '/proc/stat' output correctly. Line: {cpuUsageLine}");
+                return;
+            }
+
+            var cpuNumbers = cpuNumberStrings.Select(long.Parse).ToArray();
+            var idleTime = cpuNumbers[3];
+            var totalTime = cpuNumbers.Sum();
 
             if (i > 0)
             {
                 var deltaIdleTime = idleTime - _prevIdleTime;
                 var deltaTotalTime = totalTime - _prevTotalTime;
 
-                var cpuUsage = (1.0f - deltaIdleTime / ((float)deltaTotalTime)) * 100f;
+                var currentCpuUsage = (1.0f - deltaIdleTime / ((float)deltaTotalTime)) * 100f;
 
-                CpuUsage = ((CpuUsage ?? 0f) + (2f * cpuUsage)) / 3f;
+                var previousCpuUsage = CpuUsage ?? 0f;
+                CpuUsage = (previousCpuUsage + 2 * currentCpuUsage) / 3;
             }
 
             _prevIdleTime = idleTime;
             _prevTotalTime = totalTime;
         }
 
-        private async Task UpdateAvailableMemory(int _, CancellationToken ct)
+        private async Task UpdateAvailableMemory()
         {
-            var memAvailableLine = await ReadLineStartingWithAsync("/proc/meminfo", "MemAvailable", ct);
+            var memAvailableLine = await ReadLineStartingWithAsync("/proc/meminfo", "MemAvailable");
 
             if (string.IsNullOrWhiteSpace(memAvailableLine))
             {
@@ -150,17 +194,17 @@ namespace Orleans.Statistics
 
                 try
                 {
-                    if (i == 0)
-                    {
-                        await UpdateTotalPhysicalMemory(ct);
-                    }
-
                     await Task.WhenAll(
-                        UpdateCpuUsage(i, ct),
-                        UpdateAvailableMemory(i, ct)
+                        i == 0 ? UpdateTotalPhysicalMemory() : Task.CompletedTask,
+                        UpdateCpuUsage(i),
+                        UpdateAvailableMemory()
                     );
 
-                    _logger.LogTrace($"LinuxEnvironmentStatistics: CPU={CpuUsage?.ToString("0.0")}, MemTotal={TotalPhysicalMemory}, MemAvailable={AvailableMemory}");
+                    var logStr = $"LinuxEnvironmentStatistics: CpuUsage={CpuUsage?.ToString("0.0")}, TotalPhysicalMemory={TotalPhysicalMemory}, AvailableMemory={AvailableMemory}";
+                    if (i == 1 || i % 100 == 0)
+                        _logger.LogInformation(logStr);
+                    else
+                        _logger.LogTrace(logStr);
 
                     await Task.Delay(MONITOR_PERIOD, ct);
                 }
@@ -172,9 +216,9 @@ namespace Orleans.Statistics
             }
         }
 
-        private static async Task<string> ReadLineStartingWithAsync(string path, string lineStartsWith, CancellationToken ct)
+        private static async Task<string> ReadLineStartingWithAsync(string path, string lineStartsWith)
         {
-            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.SequentialScan | FileOptions.Asynchronous))
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 512, FileOptions.SequentialScan | FileOptions.Asynchronous))
             using (var r = new StreamReader(fs, Encoding.ASCII))
             {
                 string line;
