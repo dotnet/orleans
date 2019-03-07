@@ -23,7 +23,7 @@ namespace Orleans.Streams
         /// The consumer may unsubscribe by using this handle.
         /// The subscription remains active for as long as it is not explicitly unsubscribed.</returns>
         public static Task<StreamSubscriptionHandle<T>> SubscribeAsync<T>(this IAsyncBatchObservable<T> obs,
-                                                                           Func<IList<OrderedItem<T>>, Task> onNextAsync,
+                                                                           Func<IList<SequentialItem<T>>, Task> onNextAsync,
                                                                            Func<Exception, Task> onErrorAsync,
                                                                            Func<Task> onCompletedAsync)
         {
@@ -44,7 +44,7 @@ namespace Orleans.Streams
         /// The consumer may unsubscribe by using this handle.
         /// The subscription remains active for as long as it is not explicitly unsubscribed.</returns>
         public static Task<StreamSubscriptionHandle<T>> SubscribeAsync<T>(this IAsyncBatchObservable<T> obs,
-                                                                           Func<IList<OrderedItem<T>>, Task> onNextAsync,
+                                                                           Func<IList<SequentialItem<T>>, Task> onNextAsync,
                                                                            Func<Exception, Task> onErrorAsync)
         {
             return obs.SubscribeAsync(onNextAsync, onErrorAsync, DefaultOnCompleted);
@@ -63,7 +63,7 @@ namespace Orleans.Streams
         /// The consumer may unsubscribe by using this handle.
         /// The subscription remains active for as long as it is not explicitly unsubscribed.</returns>
         public static Task<StreamSubscriptionHandle<T>> SubscribeAsync<T>(this IAsyncBatchObservable<T> obs,
-                                                                           Func<IList<OrderedItem<T>>, Task> onNextAsync,
+                                                                           Func<IList<SequentialItem<T>>, Task> onNextAsync,
                                                                            Func<Task> onCompletedAsync)
         {
             return obs.SubscribeAsync(onNextAsync, DefaultOnError, onCompletedAsync);
@@ -81,7 +81,7 @@ namespace Orleans.Streams
         /// The consumer may unsubscribe by using this handle.
         /// The subscription remains active for as long as it is not explicitly unsubscribed.</returns>
         public static Task<StreamSubscriptionHandle<T>> SubscribeAsync<T>(this IAsyncBatchObservable<T> obs,
-                                                                           Func<IList<OrderedItem<T>>, Task> onNextAsync)
+                                                                           Func<IList<SequentialItem<T>>, Task> onNextAsync)
         {
             return obs.SubscribeAsync(onNextAsync, DefaultOnError, DefaultOnCompleted);
         }

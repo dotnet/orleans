@@ -10,18 +10,18 @@ namespace Orleans.Streams
     /// <typeparam name="T">The type of object produced by the observable.</typeparam>
     internal class GenericAsyncBatchObserver<T> : IAsyncBatchObserver<T>
     {
-        private Func<IList<OrderedItem<T>>, Task> onNextAsync;
-        private Func<Exception, Task> onErrorAsync;
-        private Func<Task> onCompletedAsync;
+        private readonly Func<IList<SequentialItem<T>>, Task> onNextAsync;
+        private readonly Func<Exception, Task> onErrorAsync;
+        private readonly Func<Task> onCompletedAsync;
 
-        public GenericAsyncBatchObserver(Func<IList<OrderedItem<T>>, Task> onNextAsync, Func<Exception, Task> onErrorAsync, Func<Task> onCompletedAsync)
+        public GenericAsyncBatchObserver(Func<IList<SequentialItem<T>>, Task> onNextAsync, Func<Exception, Task> onErrorAsync, Func<Task> onCompletedAsync)
         {
             this.onNextAsync = onNextAsync ?? throw new ArgumentNullException("onNextAsync");
             this.onErrorAsync = onErrorAsync ?? throw new ArgumentNullException("onErrorAsync");
             this.onCompletedAsync = onCompletedAsync ?? throw new ArgumentNullException("onCompletedAsync");
         }
 
-        public Task OnNextAsync(IList<OrderedItem<T>> items)
+        public Task OnNextAsync(IList<SequentialItem<T>> items)
         {
             return this.onNextAsync(items);
         }

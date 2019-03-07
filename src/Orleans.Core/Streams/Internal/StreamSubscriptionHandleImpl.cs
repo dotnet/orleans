@@ -140,15 +140,17 @@ namespace Orleans.Streams
         {
             if (this.observer != null)
             {
-
                 foreach (var batchContainer in batchContainerBatch.BatchContainers)
                 {
-                    if (this.observer != null)
+                    bool isRequestContextSet = batchContainer.ImportRequestContext();
+                    foreach (var itemTuple in batchContainer.GetEvents<T>())
                     {
-                        foreach (var itemTuple in batchContainer.GetEvents<T>())
-                        {
-                            await NextItem(itemTuple.Item1, itemTuple.Item2);
-                        }
+                        await NextItem(itemTuple.Item1, itemTuple.Item2);
+                    }
+
+                    if (isRequestContextSet)
+                    {
+                        RequestContext.Clear();
                     }
                 }
             }
@@ -189,9 +191,9 @@ namespace Orleans.Streams
             if (this.batchObserver == null || !IsValid)
                 return Task.CompletedTask;
 
-            IList<OrderedItem<T>> batch = items
+            IList<SequentialItem<T>> batch = items
                 .Where(item => filterWrapper == null || !filterWrapper.ShouldReceive(streamImpl, filterWrapper.FilterData, item))
-                .Select(item => new OrderedItem<T>(item.Item1, item.Item2))
+                .Select(item => new SequentialItem<T>(item.Item1, item.Item2))
                 .ToList();
 
             return batch.Count != 0 ? this.batchObserver.OnNextAsync(batch) : Task.CompletedTask;

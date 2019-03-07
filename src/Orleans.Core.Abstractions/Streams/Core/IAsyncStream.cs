@@ -10,7 +10,11 @@ namespace Orleans.Streams
     /// <code>IObserver</code> nor <code>IObservable</code> interfaces.
     /// </summary>
     /// <typeparam name="T">The type of object that flows through the stream.</typeparam>
-    public interface IAsyncStream<T> : IStreamIdentity, IEquatable<IAsyncStream<T>>, IComparable<IAsyncStream<T>>, IAsyncObservable<T>, IAsyncBatchObservable<T>, IAsyncObserver<T>
+    public interface IAsyncStream<T> :
+        IStreamIdentity, // identity
+        IEquatable<IAsyncStream<T>>, IComparable<IAsyncStream<T>>, // comparison
+        IAsyncObservable<T>, IAsyncBatchObservable<T>, // observables
+        IAsyncObserver<T> // observers
     {
         /// <summary>
         /// Determines whether this is a rewindable stream - supports subscribing from previous point in time.

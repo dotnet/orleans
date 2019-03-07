@@ -31,7 +31,7 @@ namespace TestGrains
             await stream.SubscribeAsync(OnNextAsync);
         }
 
-        public Task OnNextAsync(IList<OrderedItem<GeneratedEvent>> items)
+        public Task OnNextAsync(IList<SequentialItem<GeneratedEvent>> items)
         {
             this.accumulated += items.Count;
             logger.Info("Received {Count} generated event.  Accumulated {Accumulated} events so far.", items.Count, this.accumulated);

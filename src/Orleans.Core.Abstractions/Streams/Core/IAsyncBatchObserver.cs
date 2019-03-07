@@ -4,9 +4,9 @@ using System.Threading.Tasks;
 
 namespace Orleans.Streams
 {
-    public class OrderedItem<T>
+    public class SequentialItem<T>
     {
-        public OrderedItem(T item, StreamSequenceToken token)
+        public SequentialItem(T item, StreamSequenceToken token)
         {
             this.Item = item;
             this.Token = token;
@@ -47,7 +47,7 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="items">The item to be passed.</param>
         /// <returns>A Task that is completed when the item has been accepted.</returns>
-        Task OnNextAsync(IList<OrderedItem<T>> items);
+        Task OnNextAsync(IList<SequentialItem<T>> items);
 
         /// <summary>
         /// Notifies the consumer that the stream was completed.
