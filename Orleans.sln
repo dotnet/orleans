@@ -218,7 +218,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Transactions.TestKi
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Transactions.TestKit.xUnit", "src\Orleans.Transactions.Testkit.Xunit\Orleans.Transactions.TestKit.xUnit.csproj", "{B8ABE746-C76F-4E0E-86A5-744E85A55CE8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.TelemetryConsumers.Linux", "src\Orleans.TelemetryConsumers.Linux\Orleans.TelemetryConsumers.Linux.csproj", "{49E24301-040C-4C23-A985-AF30005A413C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.TelemetryConsumers.Linux", "src\TelemetryConsumers\Orleans.TelemetryConsumers.Linux\Orleans.TelemetryConsumers.Linux.csproj", "{49E24301-040C-4C23-A985-AF30005A413C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

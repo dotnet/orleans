@@ -15,10 +15,4 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="$(MicrosoftExtensionsLoggingVersion)" />
   </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" />
-    <ProjectReference Include="..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
-  </ItemGroup>
-
 </Project>
