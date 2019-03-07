@@ -283,7 +283,8 @@ namespace Orleans.Runtime.GrainDirectory
             }
             else
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Silo " + addedSilo + " is no longer active and therefore cannot receive this partition split");
+                if (logger.IsEnabled(LogLevel.Warning)) logger.LogWarning("Silo " + addedSilo + " is no longer active and therefore cannot receive this partition split");
+                return;
             }
 
             if (splitPartListSingle.Count > 0)
