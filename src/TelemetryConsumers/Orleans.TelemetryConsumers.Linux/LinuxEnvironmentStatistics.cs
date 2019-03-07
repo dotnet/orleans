@@ -1,3 +1,5 @@
+#define LOG_MEMORY_PERF_COUNTERS
+
 using System;
 using System.IO;
 using System.Linq;
@@ -14,11 +16,19 @@ namespace Orleans.Statistics
     {
         private readonly ILogger _logger;
 
+        private const float KB = 1024f;
+
+        /// <inheritdoc />
         public long? TotalPhysicalMemory { get; private set; }
 
+        /// <inheritdoc />
         public float? CpuUsage { get; private set; }
 
+        /// <inheritdoc />
         public long? AvailableMemory { get; private set; }
+
+        /// <inheritdoc />
+        public long MemoryUsage => GC.GetTotalMemory(false);
 
         private readonly TimeSpan MONITOR_PERIOD = TimeSpan.FromSeconds(5);
 
@@ -185,6 +195,35 @@ namespace Orleans.Statistics
             AvailableMemory = availableMemInKb * 1_000;
         }
 
+        private void WriteToStatistics()
+        {
+            FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_CPUUSAGE, () => CpuUsage.Value);
+            IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_TOTALMEMORYKB, () => (long)((MemoryUsage + KB - 1.0) / KB)); // Round up
+
+#if LOG_MEMORY_PERF_COUNTERS
+            IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_MEMORY_TOTALPHYSICALMEMORYMB, () => (long)((TotalPhysicalMemory / KB) / KB));
+            IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_MEMORY_AVAILABLEMEMORYMB, () => (long)((AvailableMemory / KB) / KB)); // Round up
+#endif
+
+            IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_DOT_NET_THREADPOOL_INUSE_WORKERTHREADS, () =>
+            {
+                ThreadPool.GetMaxThreads(out var maXworkerThreads, out var maXcompletionPortThreads);
+
+                // GetAvailableThreads Retrieves the difference between the maximum number of thread pool threads
+                // and the number currently active.
+                // So max-Available is the actual number in use. If it goes beyond min, it means we are stressing the thread pool.
+                ThreadPool.GetAvailableThreads(out var workerThreads, out var completionPortThreads);
+                return maXworkerThreads - workerThreads;
+            });
+            IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_DOT_NET_THREADPOOL_INUSE_COMPLETIONPORTTHREADS, () =>
+            {
+                ThreadPool.GetMaxThreads(out var maxWorkerThreads, out var maxCompletionPortThreads);
+
+                ThreadPool.GetAvailableThreads(out var workerThreads, out var completionPortThreads);
+                return maxCompletionPortThreads - completionPortThreads;
+            });
+        }
+
         private async Task Monitor(CancellationToken ct)
         {
             for (int i = 0; ; i++)
@@ -199,6 +238,9 @@ namespace Orleans.Statistics
                         UpdateCpuUsage(i),
                         UpdateAvailableMemory()
                     );
+
+                    if (i == 1)
+                        WriteToStatistics();
 
                     var logStr = $"LinuxEnvironmentStatistics: CpuUsage={CpuUsage?.ToString("0.0")}, TotalPhysicalMemory={TotalPhysicalMemory}, AvailableMemory={AvailableMemory}";
                     if (i == 1 || i % 100 == 0)

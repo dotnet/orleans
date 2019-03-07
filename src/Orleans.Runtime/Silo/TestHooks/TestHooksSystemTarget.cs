@@ -27,6 +27,9 @@ namespace Orleans.Runtime.TestHooks
 
         /// <inheritdoc />
         public long? AvailableMemory { get; set; }
+
+        /// <inheritdoc />
+        public long MemoryUsage { get; set; }
     }
 
     /// <summary>

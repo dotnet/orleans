@@ -22,5 +22,10 @@ namespace Orleans.Statistics
         /// </summary>
         /// <value>14426476000</value>
         long? AvailableMemory { get; }
+
+        /// <summary>
+        /// Total memory usage in bytes as reported from <code>GC.GetTotalMemory(false)</code>
+        /// </summary>
+        long MemoryUsage { get; }
     }
 }
