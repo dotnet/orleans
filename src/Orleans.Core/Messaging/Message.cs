@@ -96,6 +96,7 @@ namespace Orleans.Runtime
             DuplicateRequest,
             Unrecoverable,
             GatewayTooBusy,
+            CacheInvalidation
         }
 
         internal HeadersContainer Headers { get; set; } = new HeadersContainer();
@@ -331,6 +332,9 @@ namespace Orleans.Runtime
             get { return Headers.CacheInvalidationHeader; }
             set { Headers.CacheInvalidationHeader = value; }
         }
+
+        public bool HasCacheInvalidationHeader => this.CacheInvalidationHeader != null
+                                                  && this.CacheInvalidationHeader.Count > 0;
         
         internal void AddToCacheInvalidationHeader(ActivationAddress address)
         {

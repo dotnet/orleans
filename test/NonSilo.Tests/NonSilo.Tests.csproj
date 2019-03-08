@@ -9,6 +9,7 @@
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Grains\TestGrains\TestGrains.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Grains\TestInternalGrains\TestInternalGrains.csproj" />
+    <ProjectReference Include="..\Misc\TestInternalDtosRefOrleans\TestInternalDtosRefOrleans.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -35,6 +35,15 @@ namespace Orleans.Streams
         /// </returns>
         public abstract Task<StreamSubscriptionHandle<T>> ResumeAsync(IAsyncObserver<T> observer, StreamSequenceToken token = null);
 
+        /// <summary>
+        /// Resume batch consumption from a subscription to a stream.
+        /// </summary>
+        /// <param name="observer">The batcj bserver object.</param>
+        /// <param name="token">The stream sequence to be used as an offset to start the subscription from.</param>
+        /// <returns>A promise with an updates subscription handle.
+        /// </returns>
+        public abstract Task<StreamSubscriptionHandle<T>> ResumeAsync(IAsyncBatchObserver<T> observer, StreamSequenceToken token = null);
+
         public abstract bool Equals(StreamSubscriptionHandle<T> other);
     }
 }

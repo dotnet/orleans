@@ -243,7 +243,7 @@ namespace Orleans.Providers.Streams.Generator
                 var watch = Stopwatch.StartNew();
                 await Task.Delay(random.Next(1,MaxDelayMs));
                 List<IBatchContainer> batches;
-                if (QueueGenerator == null || !QueueGenerator.TryReadEvents(DateTime.UtcNow, out batches))
+                if (QueueGenerator == null || !QueueGenerator.TryReadEvents(DateTime.UtcNow, maxCount, out batches))
                 {
                     return new List<IBatchContainer>();
                 }
