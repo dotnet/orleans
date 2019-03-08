@@ -41,6 +41,12 @@ namespace UnitTests.General
             this.fixture = fixture;
         }
 
+        [Fact, TestCategory("Functional")]
+        public void ThisTestWillFail()
+        {
+            Assert.True(false);
+        }
+
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task CanUseCustomGrainActivatorToCreateGrains()
         {
