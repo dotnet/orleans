@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -29,11 +28,6 @@ namespace Orleans.Streams
         public Task OnNextAsync(T item, StreamSequenceToken token)
         {
             return this.queueAdapter.QueueMessageAsync(this.stream.StreamId.Guid, this.stream.StreamId.Namespace, item, token, RequestContextExtensions.Export(this.serializationManager));
-        }
-
-        public Task OnNextBatchAsync(IEnumerable<T> batch, StreamSequenceToken token)
-        {
-            return this.queueAdapter.QueueMessageBatchAsync(this.stream.StreamId.Guid, this.stream.StreamId.Namespace, batch, token, RequestContextExtensions.Export(this.serializationManager));
         }
 
         public Task OnCompletedAsync()
