@@ -375,6 +375,8 @@ namespace NonSilo.Tests
             public float? CpuUsage => 0;
 
             public long? AvailableMemory => 0;
+
+            public long MemoryUsage => 0;
         }
 
         private class MyService
