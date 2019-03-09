@@ -26,7 +26,7 @@ var silo = new SiloHostBuilder()
     .Configure<ClusterOptions>(options =>
     {
         options.ClusterId = "my-first-cluster";
-        options.ServiceId = "MyAwesomeOrleansService";
+        options.ServiceId = "AspNetSampleApp";
     })
     // Clustering provider
     .UseAzureStorageClustering(options => options.ConnectionString = connectionString)
@@ -47,7 +47,7 @@ Let's breakdown the steps used in this sample:
     // Clustering information
     .Configure<ClusterOptions>(options =>
     {
-        options.ClusterId = "orleans-docker";
+        options.ClusterId = "my-first-cluster";
         options.ServiceId = "AspNetSampleApp";
     })
     [...]
