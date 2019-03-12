@@ -1,13 +1,9 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
+using System;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using Orleans.Storage;
 
 namespace Orleans.Streams
@@ -37,15 +33,12 @@ namespace Orleans.Streams
         }
     }
 
-    public class SiloPersistentStreamConfigurator : ISiloPersistentStreamConfigurator
+    public class SiloPersistentStreamConfigurator : NamedServiceConfigurator<ISiloPersistentStreamConfigurator>, ISiloPersistentStreamConfigurator
     {
-        protected readonly string name;
-        protected readonly Action<Action<IServiceCollection>> configureDelegate;
         private Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory;
         public SiloPersistentStreamConfigurator(string name, Action<Action<IServiceCollection>> configureDelegate, Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory)
+            : base(name, configureDelegate)
         {
-            this.name = name;
-            this.configureDelegate = configureDelegate;
             this.adapterFactory = adapterFactory;
             //wire stream provider into lifecycle
             this.configureDelegate(services => this.AddPersistentStream(services));
@@ -64,38 +57,8 @@ namespace Orleans.Streams
                            .ConfigureNamedOptionForLogging<StreamLifecycleOptions>(name);
         }
 
-        public ISiloPersistentStreamConfigurator Configure<TOptions>(Action<OptionsBuilder<TOptions>> configureOptions)
-            where TOptions : class, new()
-        {
-            this.configureDelegate(services =>
-            {
-                configureOptions?.Invoke(services.AddOptions<TOptions>(this.name));
-                services.ConfigureNamedOptionForLogging<TOptions>(this.name);
-            });
-            return this;
-        }
-
-        public ISiloPersistentStreamConfigurator ConfigureComponent<TOptions, TComponent>(Func<IServiceProvider, string, TComponent> factory, Action<OptionsBuilder<TOptions>> configureOptions = null)
-            where TOptions : class, new()
-            where TComponent : class
-        {
-            this.Configure<TOptions>(configureOptions);
-            this.ConfigureComponent<TComponent>(factory);
-            return this;
-        }
-
-        public ISiloPersistentStreamConfigurator ConfigureComponent<TComponent>(Func<IServiceProvider, string, TComponent> factory)
-           where TComponent : class
-        {
-            this.configureDelegate(services =>
-            {
-                services.AddSingletonNamedService<TComponent>(name, factory);
-            });
-            return this;
-        }
         //try configure defaults if required is not configured
         public virtual void TryConfigureDefaults()
         { }
-
     }
 }

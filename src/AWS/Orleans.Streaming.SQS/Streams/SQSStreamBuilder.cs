@@ -1,9 +1,6 @@
 using Orleans.Configuration;
-using Orleans.Hosting;
 using OrleansAWSUtils.Streams;
 using System;
-using System.Collections.Generic;
-using System.Text;
 using Orleans.Providers.Streams.Common;
 using Orleans.ApplicationParts;
 using Microsoft.Extensions.DependencyInjection;
@@ -53,7 +50,7 @@ namespace Orleans.Streams
         public ClusterClientSqsStreamConfigurator(string name, IClientBuilder builder)
             : base(name, builder, SQSAdapterFactory.Create)
         {
-            this.clientBuilder
+            builder
                 .ConfigureApplicationParts(parts =>
                 {
                     parts.AddFrameworkPart(typeof(SQSAdapterFactory).Assembly)
