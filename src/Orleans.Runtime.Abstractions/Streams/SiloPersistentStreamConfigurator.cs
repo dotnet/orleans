@@ -13,7 +13,8 @@ namespace Orleans.Streams
         private IServiceProvider services;
         private const string pubsubStoreName = "PubSubStore";
         private string streamProviderName;
-        public PersistentStreamStorageConfigurationValidator(IServiceProvider services, string streamProviderName)
+
+        private PersistentStreamStorageConfigurationValidator(IServiceProvider services, string streamProviderName)
         {
             this.services = services;
             this.streamProviderName = streamProviderName;
@@ -31,34 +32,22 @@ namespace Orleans.Streams
                         $"to be configured with silo. Please configure one for your stream {streamProviderName}.");
             }
         }
+
+        public static IConfigurationValidator Create(IServiceProvider services, string name)
+        {
+            return new PersistentStreamStorageConfigurationValidator(services, name);
+        }
     }
 
     public class SiloPersistentStreamConfigurator : NamedServiceConfigurator<ISiloPersistentStreamConfigurator>, ISiloPersistentStreamConfigurator
     {
-        private Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory;
         public SiloPersistentStreamConfigurator(string name, Action<Action<IServiceCollection>> configureDelegate, Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory)
             : base(name, configureDelegate)
         {
-            this.adapterFactory = adapterFactory;
-            //wire stream provider into lifecycle
-            this.configureDelegate(services => this.AddPersistentStream(services));
+            ConfigureComponent<IStreamProvider>(PersistentStreamProvider.Create);
+            ConfigureComponent<ILifecycleParticipant<ISiloLifecycle>>((s, n) => ((PersistentStreamProvider)s.GetRequiredServiceByName<IStreamProvider>(n)).ParticipateIn<ISiloLifecycle>());
+            ConfigureComponent<IQueueAdapterFactory>(adapterFactory);
+            ConfigureComponent<IConfigurationValidator>(PersistentStreamStorageConfigurationValidator.Create);
         }
-
-        private void AddPersistentStream(IServiceCollection services)
-        {
-            //wire the stream provider into life cycle
-            services.AddSingletonNamedService<IStreamProvider>(name, PersistentStreamProvider.Create)
-                           .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => ((PersistentStreamProvider)s.GetRequiredServiceByName<IStreamProvider>(n)).ParticipateIn<ISiloLifecycle>())
-                           .AddSingletonNamedService<IQueueAdapterFactory>(name, adapterFactory)
-                           .AddSingletonNamedService(name, (s, n) => s.GetServiceByName<IStreamProvider>(n) as IControllable)
-                           .AddSingleton<IConfigurationValidator>(sp => new PersistentStreamStorageConfigurationValidator(sp, name))
-                           .ConfigureNamedOptionForLogging<StreamPullingAgentOptions>(name)
-                           .ConfigureNamedOptionForLogging<StreamPubSubOptions>(name)
-                           .ConfigureNamedOptionForLogging<StreamLifecycleOptions>(name);
-        }
-
-        //try configure defaults if required is not configured
-        public virtual void TryConfigureDefaults()
-        { }
     }
 }

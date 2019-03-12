@@ -1,5 +1,4 @@
 using System;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime;
@@ -26,24 +25,13 @@ namespace Orleans.Streams
 
     public class ClusterClientPersistentStreamConfigurator : NamedServiceConfigurator<IClusterClientPersistentStreamConfigurator>, IClusterClientPersistentStreamConfigurator
     {
-        private Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory;
         public ClusterClientPersistentStreamConfigurator(string name, IClientBuilder clientBuilder, Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory)
             : base(name, configureDelegate => clientBuilder.ConfigureServices(configureDelegate))
         {
-            this.adapterFactory = adapterFactory;
-            //wire stream provider into lifecycle 
-            this.configureDelegate(services => this.AddPersistentStream(services));
-        }
-
-        private void AddPersistentStream(IServiceCollection services)
-        {
-            //wire the stream provider into life cycle
-            services.AddSingletonNamedService<IStreamProvider>(name, PersistentStreamProvider.Create)
-                           .AddSingletonNamedService<ILifecycleParticipant<IClusterClientLifecycle>>(name, 
-                           (s, n) => ((PersistentStreamProvider)s.GetRequiredServiceByName<IStreamProvider>(n)).ParticipateIn<IClusterClientLifecycle>())
-                           .AddSingletonNamedService<IQueueAdapterFactory>(name, adapterFactory)
-                           .ConfigureNamedOptionForLogging<StreamLifecycleOptions>(name)
-                           .ConfigureNamedOptionForLogging<StreamPubSubOptions>(name);
+            ConfigureComponent<IStreamProvider>(PersistentStreamProvider.Create);
+            ConfigureComponent<ILifecycleParticipant<IClusterClientLifecycle>>(
+                (s, n) => ((PersistentStreamProvider)s.GetRequiredServiceByName<IStreamProvider>(n)).ParticipateIn<IClusterClientLifecycle>());
+            ConfigureComponent<IQueueAdapterFactory>(adapterFactory);
         }
     }
 }

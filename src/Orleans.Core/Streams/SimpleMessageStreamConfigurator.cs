@@ -13,15 +13,7 @@ namespace Orleans.Streams
         public SimpleMessageStreamConfigurator(string name, Action<Action<IServiceCollection>> configureDelegate)
             : base(name, configureDelegate)
         {
-            //wire stream provider into lifecycle 
-            this.configureDelegate(AddClusterClientSimpleMessageStreamProvider);
-        }
-
-        private void AddClusterClientSimpleMessageStreamProvider(
-            IServiceCollection services)
-        {
-            services
-                .AddSingletonNamedService<IStreamProvider>(name, SimpleMessageStreamProvider.Create);
+            ConfigureComponent<IStreamProvider>(SimpleMessageStreamProvider.Create);
         }
     }
 }
