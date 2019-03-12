@@ -45,7 +45,7 @@ namespace Orleans.Streams
             : base(name, configureDelegate)
         {
             ConfigureComponent<IStreamProvider>(PersistentStreamProvider.Create);
-            ConfigureComponent<ILifecycleParticipant<ISiloLifecycle>>((s, n) => ((PersistentStreamProvider)s.GetRequiredServiceByName<IStreamProvider>(n)).ParticipateIn<ISiloLifecycle>());
+            ConfigureComponent<ILifecycleParticipant<ISiloLifecycle>>(PersistentStreamProvider.ParticipateIn<ISiloLifecycle>);
             ConfigureComponent<IQueueAdapterFactory>(adapterFactory);
             ConfigureComponent<IConfigurationValidator>(PersistentStreamStorageConfigurationValidator.Create);
         }

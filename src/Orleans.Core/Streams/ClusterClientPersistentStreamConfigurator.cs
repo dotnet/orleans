@@ -29,8 +29,7 @@ namespace Orleans.Streams
             : base(name, configureDelegate => clientBuilder.ConfigureServices(configureDelegate))
         {
             ConfigureComponent<IStreamProvider>(PersistentStreamProvider.Create);
-            ConfigureComponent<ILifecycleParticipant<IClusterClientLifecycle>>(
-                (s, n) => ((PersistentStreamProvider)s.GetRequiredServiceByName<IStreamProvider>(n)).ParticipateIn<IClusterClientLifecycle>());
+            ConfigureComponent<ILifecycleParticipant<IClusterClientLifecycle>>(PersistentStreamProvider.ParticipateIn<IClusterClientLifecycle>);
             ConfigureComponent<IQueueAdapterFactory>(adapterFactory);
         }
     }
