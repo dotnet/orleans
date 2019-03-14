@@ -1,11 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.ServiceBus.Providers;
 using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Orleans.Providers.Streams.Common;
 using Orleans.ApplicationParts;
@@ -61,7 +57,7 @@ namespace Orleans.Streams
         public ClusterClientEventHubStreamConfigurator(string name, IClientBuilder builder)
            : base(name, builder, EventHubAdapterFactory.Create)
         {
-            this.clientBuilder.ConfigureApplicationParts(parts =>
+            builder.ConfigureApplicationParts(parts =>
                 {
                     parts.AddFrameworkPart(typeof(EventHubAdapterFactory).Assembly)
                         .AddFrameworkPart(typeof(EventSequenceTokenV2).Assembly);

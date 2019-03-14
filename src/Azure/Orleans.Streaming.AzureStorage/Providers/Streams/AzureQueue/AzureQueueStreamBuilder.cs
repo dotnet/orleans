@@ -62,13 +62,14 @@ namespace Orleans.Streaming
         public ClusterClientAzureQueueStreamConfigurator(string name, IClientBuilder builder)
             : base(name, builder, AzureQueueAdapterFactory<TDataAdapter>.Create)
         {
-            this.clientBuilder.ConfigureApplicationParts(parts =>
+            builder
+                .ConfigureApplicationParts(parts =>
                 {
                     parts.AddFrameworkPart(typeof(AzureQueueAdapterFactory<>).Assembly)
                         .AddFrameworkPart(typeof(EventSequenceTokenV2).Assembly);
                 })
-                 .ConfigureServices(services =>
-                    services.ConfigureNamedOptionForLogging<AzureQueueOptions>(name)
+                .ConfigureServices(services => services
+                    .ConfigureNamedOptionForLogging<AzureQueueOptions>(name)
                     .AddTransient<IConfigurationValidator>(sp => new AzureQueueOptionsValidator(sp.GetOptionsByName<AzureQueueOptions>(name), name))
                     .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name));
 

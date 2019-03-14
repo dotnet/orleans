@@ -54,7 +54,7 @@ namespace Orleans.Streams
         public ClusterClientPubSubStreamConfigurator(string name, IClientBuilder builder)
             : base(name, builder, PubSubAdapterFactory<TDataAdapter>.Create)
         {
-            this.clientBuilder
+            builder
                 .ConfigureApplicationParts(parts =>
                 {
                     parts.AddFrameworkPart(typeof(PubSubAdapterFactory<>).Assembly)

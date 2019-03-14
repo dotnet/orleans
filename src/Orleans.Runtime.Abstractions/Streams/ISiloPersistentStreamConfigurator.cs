@@ -1,23 +1,10 @@
-﻿using Orleans.Configuration;
 using System;
-using System.Collections.Generic;
-using System.Text;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace Orleans.Streams
 {
-    public interface ISiloPersistentStreamConfigurator
-    {
-        ISiloPersistentStreamConfigurator Configure<TOptions>(Action<OptionsBuilder<TOptions>> configureOptions)
-          where TOptions : class, new();
-
-        ISiloPersistentStreamConfigurator ConfigureComponent<TOptions, TComponent>(Func<IServiceProvider, string, TComponent> factory, Action<OptionsBuilder<TOptions>> configureOptions = null)
-            where TOptions : class, new()
-            where TComponent : class;
-
-        ISiloPersistentStreamConfigurator ConfigureComponent<TComponent>(Func<IServiceProvider, string, TComponent> factory)
-            where TComponent : class;
-    }
+    public interface ISiloPersistentStreamConfigurator : IComponentConfigurator<ISiloPersistentStreamConfigurator> {}
 
     public static class SiloPersistentStreamConfiguratorExtensions
     {
