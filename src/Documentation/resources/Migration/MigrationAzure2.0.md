@@ -123,7 +123,7 @@ Orleans 2.0 provides a more flexible and modular API for configuring and hosting
             // Build silo host, so that any errors will restart the role instance
             this.host = this.builder.Build();
 
-            base.OnStart();
+            return base.OnStart();
         }
 
         public override void OnStop()
