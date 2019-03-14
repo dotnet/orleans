@@ -3,7 +3,6 @@
 using System;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -34,13 +33,6 @@ namespace Orleans.Statistics
 
         private CancellationTokenSource _cts;
         private Task _monitorTask;
-
-        private static readonly string StartErrMsg_Win = $"Tried to start {nameof(LinuxEnvironmentStatistics)}, but detected OS Windows. " +
-            "Call 'UsePerfCounterEnvironmentStatistics' instead for implementation based on Windows Performance Counters";
-
-        private static readonly string StartErrMsg_Unknown = $"Tried to start {nameof(LinuxEnvironmentStatistics)}, " +
-            $"but detected OS is not Linux: '{RuntimeInformation.OSDescription}'";
-
 
         private const string MEMINFO_FILEPATH = "/proc/meminfo";
         private const string CPUSTAT_FILEPATH = "/proc/stat";
@@ -74,17 +66,6 @@ namespace Orleans.Statistics
 
         public async Task OnStart(CancellationToken ct)
         {
-            var isLinux = RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
-
-            if (!isLinux)
-            {
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                    _logger.LogWarning(StartErrMsg_Win);
-                else
-                    _logger.LogWarning(StartErrMsg_Unknown);
-                return;
-            }
-
             _logger.LogTrace($"Starting {nameof(LinuxEnvironmentStatistics)}");
 
             _cts = new CancellationTokenSource();
