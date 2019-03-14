@@ -2,6 +2,8 @@
   href: index.md
 - name: Tutorial 1 - Orleans Basics
   href: tutorial_1.md
+- name: Unit Testing
+  href: testing.md
 - name: Sample - Hello World Overview
   href: overview_helloworld.md
 - name: Sample - Adventure
