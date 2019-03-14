@@ -5,6 +5,32 @@ title: What's new in Orleans
 
 # What's new in Orleans?
 
+## [v2.3.0-rc2](https://github.com/dotnet/orleans/releases/tag/v2.3.0-rc2) March 13th 2019
+
+`Refactored stream batch behaviors to support batch consumption.` (#5425) is the only change. While technically it is breaking due to the changes to the batch streaming API, it shouldn't break any working application code because the batching functionality wasn't fully wired previously. No breaking change in the wire protocol or persistence. This release is backward-compatible with 2.x releases.
+
+## [v2.3.0-rc1](https://github.com/dotnet/orleans/releases/tag/v2.3.0-rc1) March 5th 2019
+
+- Major improvements
+  - Support for the ASP.NET Core hosting API (Microsoft.Extensions.Hosting).
+  - Replacement of the custom implementation of named options with Microsoft.Extensions.Options.
+  - EventHub stream provider got upgrade to EvenHub 2.2.1 and is also compatible with 3.0.0.
+  - Old dead entries in the cluster membership table now get automatically cleaned up, which is helpful for hosting environments that use new IP endpoints for restarted silos.
+  - Hosted client that enables efficient hosting of frontend code within the silo process is now enabled by default.
+
+## [v1.5.7](https://github.com/dotnet/orleans/releases/tag/v1.5.7) February 28th 2019
+
+Two fixes backported from v2.x
+- Non-breaking bug fixes
+  - Fixes for Multi-Cluster Support (#3974)
+  - Add GSI cache maintenance and tests (#5184)
+
+## [v2.2.0](https://github.com/dotnet/orleans/releases/tag/v2.2.0) December 13th 2018
+
+This release is primarily about bringing support for ACID cross-grain transactions to production-ready quality.
+
+This release includes no breaking changes and is backward compatible with 2.0.* releases, which allows for in-place upgrade of a running cluster.
+
 ## [v2.1.0](https://github.com/dotnet/orleans/releases/tag/v2.1.0) September 28th 2018
 
 - Major changes
