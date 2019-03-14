@@ -33,7 +33,7 @@ namespace Orleans.Statistics
         private bool countersAvailable;
 
         /// <inheritdoc />
-        public long MemoryUsage { get { return GC.GetTotalMemory(false); } }
+        private long MemoryUsage { get { return GC.GetTotalMemory(false); } }
 
         /// <inheritdoc />
         public long? TotalPhysicalMemory { get; private set; }

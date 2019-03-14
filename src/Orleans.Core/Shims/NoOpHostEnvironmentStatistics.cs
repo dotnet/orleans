@@ -12,8 +12,6 @@ namespace Orleans.Runtime
 
         public long? AvailableMemory => null;
 
-        public long MemoryUsage => 0;
-
         public NoOpHostEnvironmentStatistics(ILogger<NoOpHostEnvironmentStatistics> logger)
         {
             logger.Warn(

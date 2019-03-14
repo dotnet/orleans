@@ -28,7 +28,7 @@ namespace Orleans.Statistics
         public long? AvailableMemory { get; private set; }
 
         /// <inheritdoc />
-        public long MemoryUsage => GC.GetTotalMemory(false);
+        private long MemoryUsage => GC.GetTotalMemory(false);
 
         private readonly TimeSpan MONITOR_PERIOD = TimeSpan.FromSeconds(5);
 
@@ -40,6 +40,16 @@ namespace Orleans.Statistics
 
         private static readonly string StartErrMsg_Unknown = $"Tried to start {nameof(LinuxEnvironmentStatistics)}, " +
             $"but detected OS is not Linux: '{RuntimeInformation.OSDescription}'";
+
+
+        private const string MEMINFO_FILEPATH = "/proc/meminfo";
+        private const string CPUSTAT_FILEPATH = "/proc/stat";
+
+        internal static readonly string[] RequiredFiles = new[]
+        {
+            MEMINFO_FILEPATH,
+            CPUSTAT_FILEPATH
+        };
 
         public LinuxEnvironmentStatistics(ILoggerFactory loggerFactory)
         {
@@ -117,11 +127,11 @@ namespace Orleans.Statistics
 
         private async Task UpdateTotalPhysicalMemory()
         {
-            var memTotalLine = await ReadLineStartingWithAsync("/proc/meminfo", "MemTotal");
+            var memTotalLine = await ReadLineStartingWithAsync(MEMINFO_FILEPATH, "MemTotal");
 
             if (string.IsNullOrWhiteSpace(memTotalLine))
             {
-                _logger.LogWarning("Couldn't read 'MemTotal' line from '/proc/meminfo'");
+                _logger.LogWarning($"Couldn't read 'MemTotal' line from '{MEMINFO_FILEPATH}'");
                 return;
             }
 
@@ -140,11 +150,11 @@ namespace Orleans.Statistics
 
         private async Task UpdateCpuUsage(int i)
         {
-            var cpuUsageLine = await ReadLineStartingWithAsync("/proc/stat", "cpu  ");
+            var cpuUsageLine = await ReadLineStartingWithAsync(CPUSTAT_FILEPATH, "cpu  ");
 
             if (string.IsNullOrWhiteSpace(cpuUsageLine))
             {
-                _logger.LogWarning("Couldn't read line from '/proc/stat'");
+                _logger.LogWarning($"Couldn't read line from '{CPUSTAT_FILEPATH}'");
                 return;
             }
 
@@ -153,7 +163,7 @@ namespace Orleans.Statistics
 
             if (cpuNumberStrings.Any(n => !long.TryParse(n, out _)))
             {
-                _logger.LogWarning($"Failed to parse '/proc/stat' output correctly. Line: {cpuUsageLine}");
+                _logger.LogWarning($"Failed to parse '{CPUSTAT_FILEPATH}' output correctly. Line: {cpuUsageLine}");
                 return;
             }
 
@@ -178,11 +188,11 @@ namespace Orleans.Statistics
 
         private async Task UpdateAvailableMemory()
         {
-            var memAvailableLine = await ReadLineStartingWithAsync("/proc/meminfo", "MemAvailable");
+            var memAvailableLine = await ReadLineStartingWithAsync(MEMINFO_FILEPATH, "MemAvailable");
 
             if (string.IsNullOrWhiteSpace(memAvailableLine))
             {
-                _logger.LogWarning("Couldn't read 'MemAvailable' line from '/proc/meminfo'");
+                _logger.LogWarning($"Couldn't read 'MemAvailable' line from '{MEMINFO_FILEPATH}'");
                 return;
             }
 
@@ -226,7 +236,8 @@ namespace Orleans.Statistics
 
         private async Task Monitor(CancellationToken ct)
         {
-            for (int i = 0; ; i++)
+            int i = 0;
+            while (true)
             {
                 if (ct.IsCancellationRequested)
                     throw new TaskCanceledException("Monitor task canceled");
@@ -243,10 +254,7 @@ namespace Orleans.Statistics
                         WriteToStatistics();
 
                     var logStr = $"LinuxEnvironmentStatistics: CpuUsage={CpuUsage?.ToString("0.0")}, TotalPhysicalMemory={TotalPhysicalMemory}, AvailableMemory={AvailableMemory}";
-                    if (i == 1 || i % 100 == 0)
-                        _logger.LogInformation(logStr);
-                    else
-                        _logger.LogTrace(logStr);
+                    _logger.LogTrace(logStr);
 
                     await Task.Delay(MONITOR_PERIOD, ct);
                 }
@@ -255,6 +263,8 @@ namespace Orleans.Statistics
                     _logger.LogError(ex, "LinuxEnvironmentStatistics: error");
                     await Task.Delay(MONITOR_PERIOD + MONITOR_PERIOD + MONITOR_PERIOD, ct);
                 }
+                if (i < 2)
+                    i++;
             }
         }
 
