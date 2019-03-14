@@ -7,6 +7,10 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [2.3.0-rc2] (changes since 2.3.0-rc1)
+
+`Refactored stream batch behaviors to support batch consumption.` (#5425) is the only change. While technically it is breaking due to the changes to the batch streaming API, it shouldn't break any working application code because the batching functionality wasn't fully wired previously. No breaking change in the wire protocol or persistence. This release is backward-compatible with 2.x releases.
+
 ### [2.3.0-rc1] (changes since 2.2.0)
 
 - Breaking changes
