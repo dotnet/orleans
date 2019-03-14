@@ -474,8 +474,9 @@ namespace Orleans.Runtime
 
         private bool TryInstallExtension(int interfaceId, IInvokable invokable, string genericGrainType, ref IGrainMethodInvoker invoker)
         {
-            ActivationData activationData = GetCurrentActivationData();
-            IGrainExtension extension = activationData.ActivationServices.GetServiceByKey<int, IGrainExtension>(interfaceId);
+            IGrainExtension extension = TryGetCurrentActivationData(out ActivationData activationData)
+                ? activationData.ActivationServices.GetServiceByKey<int, IGrainExtension>(interfaceId)
+                : this.ServiceProvider.GetServiceByKey<int, IGrainExtension>(interfaceId);
 
             if (extension == null)
             {
@@ -784,25 +785,24 @@ namespace Orleans.Runtime
 
         public bool TryAddExtension(IGrainExtension handler)
         {
-            var currentActivation = GetCurrentActivationData();
-            var invoker = TryGetExtensionInvoker(this.typeManager, handler.GetType());
-            if (invoker == null)
+            ExtensionInvoker extensionInvoker = GetCurrentExtensionInvoker();
+            var methodInvoker = TryGetExtensionMethodInvoker(this.typeManager, handler.GetType());
+            if (methodInvoker == null)
                 throw new InvalidOperationException("Extension method invoker was not generated for an extension interface");
 
-            return currentActivation.TryAddExtension(invoker, handler);
+            return extensionInvoker.TryAddExtension(methodInvoker, handler);
         }
 
         public void RemoveExtension(IGrainExtension handler)
         {
-            var currentActivation = GetCurrentActivationData();
-            currentActivation.RemoveExtension(handler);
+            GetCurrentExtensionInvoker().Remove(handler);
         }
 
         public bool TryGetExtensionHandler<TExtension>(out TExtension result) where TExtension : IGrainExtension
         {
-            var currentActivation = GetCurrentActivationData();
+            ExtensionInvoker invoker = GetCurrentExtensionInvoker();
             IGrainExtension untypedResult;
-            if (currentActivation.TryGetExtensionHandler(typeof(TExtension), out untypedResult))
+            if (invoker.TryGetExtensionHandler(typeof(TExtension), out untypedResult))
             {
                 result = (TExtension)untypedResult;
                 return true;
@@ -812,15 +812,26 @@ namespace Orleans.Runtime
             return false;
         }
 
-        private ActivationData GetCurrentActivationData()
+        private ExtensionInvoker GetCurrentExtensionInvoker()
         {
-            var activationData = (IActivationData) (RuntimeContext.CurrentActivationContext as SchedulingContext)?.Activation;
-            if (activationData == null)
-                throw new InvalidOperationException("Attempting to GetCurrentActivationData when not in an activation scope");
-            return (ActivationData)activationData;
+            return (RuntimeContext.CurrentActivationContext.ContextType == SchedulingContextType.SystemTarget)
+                ? (RuntimeContext.CurrentActivationContext as SchedulingContext)?.SystemTarget.ExtensionInvoker
+                : GetCurrentActivationData().ExtensionInvoker;
         }
 
-        internal static IGrainExtensionMethodInvoker TryGetExtensionInvoker(GrainTypeManager typeManager, Type handlerType)
+        private ActivationData GetCurrentActivationData()
+        {
+            if (TryGetCurrentActivationData(out ActivationData activationData)) return activationData;
+            throw new InvalidOperationException("Attempting to GetCurrentActivationData when not in an activation scope");
+        }
+
+        private bool TryGetCurrentActivationData(out ActivationData activationData)
+        {
+            activationData = (RuntimeContext.CurrentActivationContext as SchedulingContext)?.Activation;
+            return (activationData != null);
+        }
+
+        internal static IGrainExtensionMethodInvoker TryGetExtensionMethodInvoker(GrainTypeManager typeManager, Type handlerType)
         {
             var interfaces = GrainInterfaceUtils.GetRemoteInterfaces(handlerType).Values;
             if (interfaces.Count != 1)
