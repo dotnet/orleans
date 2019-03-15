@@ -16,8 +16,8 @@
     <PackageReleaseNotes></PackageReleaseNotes>
     <RepositoryUrl>https://github.com/dotnet/Orleans</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <IncludeSymbols>false</IncludeSymbols>
-    <IncludeSource>false</IncludeSource>
+    <IncludeSymbols>true</IncludeSymbols>
+    <IncludeSource>true</IncludeSource>
     <LangVersion>7.3</LangVersion>
   </PropertyGroup>
 
