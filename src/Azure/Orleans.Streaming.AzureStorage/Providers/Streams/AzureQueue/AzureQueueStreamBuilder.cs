@@ -1,36 +1,55 @@
-using Orleans.Configuration;
-using Orleans.Hosting;
-using Orleans.Providers.Streams.AzureQueue;
-using Orleans.Streams;
 using System;
-using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Orleans;
+using Orleans.Configuration;
+using Orleans.Providers.Streams.AzureQueue;
+using Orleans.Streams;
 using Orleans.Providers.Streams.Common;
 using Orleans.ApplicationParts;
+using Microsoft.WindowsAzure.Storage.Queue;
 
-namespace Orleans.Streaming
+namespace Orleans.Configuration
 {
-    public class SiloAzureQueueStreamConfigurator<TDataAdapter> : SiloPersistentStreamConfigurator
-        where TDataAdapter : IAzureQueueDataAdapter
+    public interface ISiloAzureQueueStreamConfigurator : ISiloPersistentStreamConfigurator { }
+
+    public static class SiloAzureQueueStreamConfiguratorExtensions
+    {
+        public static ISiloAzureQueueStreamConfigurator ConfigureAzureQueue(this ISiloAzureQueueStreamConfigurator configurator, Action<OptionsBuilder<AzureQueueOptions>> configureOptions)
+        {
+            configurator.Configure<AzureQueueOptions>(configureOptions);
+            return configurator;
+        }
+
+        public static ISiloAzureQueueStreamConfigurator ConfigureCacheSize(this ISiloAzureQueueStreamConfigurator configurator, int cacheSize = SimpleQueueCacheOptions.DEFAULT_CACHE_SIZE)
+        {
+            configurator.Configure<SimpleQueueCacheOptions>(ob => ob.Configure(options => options.CacheSize = cacheSize));
+            return configurator;
+        }
+
+        public static ISiloAzureQueueStreamConfigurator ConfigureQueueDataAdapter<TQueueDataAdapter>(this ISiloAzureQueueStreamConfigurator configurator, Func<IServiceProvider, string, IQueueDataAdapter<CloudQueueMessage, IBatchContainer>> factory)
+            where TQueueDataAdapter : IQueueDataAdapter<CloudQueueMessage, IBatchContainer>
+        {
+            configurator.ConfigureComponent<IQueueDataAdapter<CloudQueueMessage, IBatchContainer>>(factory);
+            return configurator;
+        }
+
+        public static ISiloAzureQueueStreamConfigurator ConfigureQueueDataAdapter<TQueueDataAdapter>(this ISiloAzureQueueStreamConfigurator configurator)
+            where TQueueDataAdapter : IQueueDataAdapter<CloudQueueMessage, IBatchContainer>
+        {
+            configurator.ConfigureComponent<IQueueDataAdapter<CloudQueueMessage, IBatchContainer>>((sp,n) => ActivatorUtilities.CreateInstance<TQueueDataAdapter>(sp));
+            return configurator;
+        }
+    }
+
+    public class SiloAzureQueueStreamConfigurator : SiloPersistentStreamConfigurator, ISiloAzureQueueStreamConfigurator
     {
         public SiloAzureQueueStreamConfigurator(string name, Action<Action<IServiceCollection>> configureServicesDelegate, Action<Action<IApplicationPartManager>> configureAppPartsDelegate)
-            : base(name, configureServicesDelegate, AzureQueueAdapterFactory<TDataAdapter>.Create)
+            : base(name, configureServicesDelegate, AzureQueueAdapterFactory.Create)
         {
-            configureAppPartsDelegate(parts =>
-                {
-                    parts.AddFrameworkPart(typeof(AzureQueueAdapterFactory<>).Assembly)
-                        .AddFrameworkPart(typeof(EventSequenceTokenV2).Assembly);
-                });
-            this.configureDelegate(services =>
-            {
-                services.ConfigureNamedOptionForLogging<AzureQueueOptions>(name)
-                        .AddTransient<IConfigurationValidator>(sp => new AzureQueueOptionsValidator(sp.GetOptionsByName<AzureQueueOptions>(name), name))
-                    .ConfigureNamedOptionForLogging<SimpleQueueCacheOptions>(name)
-                    .AddTransient<IConfigurationValidator>(sp => new SimpleQueueCacheOptionsValidator(sp.GetOptionsByName<SimpleQueueCacheOptions>(name), name))
-                    .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name);
-            });
+            configureAppPartsDelegate(AzureQueueStreamConfiguratorCommon.AddParts);
+            this.ConfigureComponent<IConfigurationValidator>(AzureQueueOptionsValidator.Create);
+            this.ConfigureComponent<IConfigurationValidator>(SimpleQueueCacheOptionsValidator.Create);
+
             //configure default queue names
             this.ConfigureAzureQueue(ob => ob.PostConfigure<IOptions<ClusterOptions>>((op, clusterOp) =>
             {
@@ -43,35 +62,45 @@ namespace Orleans.Streaming
             }));
         }
 
-        public SiloAzureQueueStreamConfigurator<TDataAdapter> ConfigureAzureQueue(Action<OptionsBuilder<AzureQueueOptions>> configureOptions)
+        public override void ConfigureDefaults()
         {
-            this.Configure<AzureQueueOptions>(configureOptions);
-            return this;
-        }
-
-        public SiloAzureQueueStreamConfigurator<TDataAdapter> ConfigureCache(int cacheSize = SimpleQueueCacheOptions.DEFAULT_CACHE_SIZE)
-        {
-            this.Configure<SimpleQueueCacheOptions>(ob => ob.Configure(options => options.CacheSize = cacheSize));
-            return this;
+            base.ConfigureDefaults();
+            this.ConfigureQueueDataAdapter<AzureQueueDataAdapterV2>();
         }
     }
 
-    public class ClusterClientAzureQueueStreamConfigurator<TDataAdapter> : ClusterClientPersistentStreamConfigurator
-          where TDataAdapter : IAzureQueueDataAdapter
+    public interface IClusterClientAzureQueueStreamConfigurator : IClusterClientPersistentStreamConfigurator { }
+
+    public static class ClusterClientAzureQueueStreamConfiguratorExtensions
+    {
+        public static IClusterClientAzureQueueStreamConfigurator ConfigureAzureQueue(this IClusterClientAzureQueueStreamConfigurator configurator, Action<OptionsBuilder<AzureQueueOptions>> configureOptions)
+        {
+            configurator.Configure<AzureQueueOptions>(configureOptions);
+            return configurator;
+        }
+
+        public static IClusterClientAzureQueueStreamConfigurator ConfigureQueueDataAdapter<TQueueDataAdapter>(this IClusterClientAzureQueueStreamConfigurator configurator, Func<IServiceProvider, string, IQueueDataAdapter<CloudQueueMessage, IBatchContainer>> factory)
+            where TQueueDataAdapter : IQueueDataAdapter<CloudQueueMessage, IBatchContainer>
+        {
+            configurator.ConfigureComponent<IQueueDataAdapter<CloudQueueMessage, IBatchContainer>>(factory);
+            return configurator;
+        }
+
+        public static IClusterClientAzureQueueStreamConfigurator ConfigureQueueDataAdapter<TQueueDataAdapter>(this IClusterClientAzureQueueStreamConfigurator configurator)
+            where TQueueDataAdapter : IQueueDataAdapter<CloudQueueMessage, IBatchContainer>
+        {
+            configurator.ConfigureComponent<IQueueDataAdapter<CloudQueueMessage, IBatchContainer>>((sp, n) => ActivatorUtilities.CreateInstance<TQueueDataAdapter>(sp));
+            return configurator;
+        }
+    }
+
+    public class ClusterClientAzureQueueStreamConfigurator : ClusterClientPersistentStreamConfigurator, IClusterClientAzureQueueStreamConfigurator
     {
         public ClusterClientAzureQueueStreamConfigurator(string name, IClientBuilder builder)
-            : base(name, builder, AzureQueueAdapterFactory<TDataAdapter>.Create)
+            : base(name, builder, AzureQueueAdapterFactory.Create)
         {
-            builder
-                .ConfigureApplicationParts(parts =>
-                {
-                    parts.AddFrameworkPart(typeof(AzureQueueAdapterFactory<>).Assembly)
-                        .AddFrameworkPart(typeof(EventSequenceTokenV2).Assembly);
-                })
-                .ConfigureServices(services => services
-                    .ConfigureNamedOptionForLogging<AzureQueueOptions>(name)
-                    .AddTransient<IConfigurationValidator>(sp => new AzureQueueOptionsValidator(sp.GetOptionsByName<AzureQueueOptions>(name), name))
-                    .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name));
+            builder.ConfigureApplicationParts(AzureQueueStreamConfiguratorCommon.AddParts);
+            this.ConfigureComponent<IConfigurationValidator>(AzureQueueOptionsValidator.Create);
 
             //configure default queue names
             this.ConfigureAzureQueue(ob => ob.PostConfigure<IOptions<ClusterOptions>>((op, clusterOp) =>
@@ -84,10 +113,19 @@ namespace Orleans.Streaming
             }));
         }
 
-        public ClusterClientAzureQueueStreamConfigurator<TDataAdapter> ConfigureAzureQueue(Action<OptionsBuilder<AzureQueueOptions>> configureOptions)
+        public override void ConfigureDefaults()
         {
-            this.Configure<AzureQueueOptions>(configureOptions);
-            return this;
+            base.ConfigureDefaults();
+            this.ConfigureQueueDataAdapter<AzureQueueDataAdapterV2>();
+        }
+    }
+
+    public static class AzureQueueStreamConfiguratorCommon
+    {
+        public static void AddParts(IApplicationPartManager parts)
+        {
+            parts.AddFrameworkPart(typeof(AzureQueueAdapterFactory).Assembly)
+                 .AddFrameworkPart(typeof(EventSequenceTokenV2).Assembly);
         }
     }
 }

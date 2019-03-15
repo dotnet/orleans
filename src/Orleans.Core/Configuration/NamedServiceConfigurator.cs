@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
@@ -15,11 +16,13 @@ namespace Orleans.Configuration
     {
         protected readonly string name;
         protected readonly Action<Action<IServiceCollection>> configureDelegate;
+        protected HashSet<Type> configuredComponents;
 
         protected NamedServiceConfigurator(string name, Action<Action<IServiceCollection>> configureDelegate)
         {
             this.name = name;
             this.configureDelegate = configureDelegate;
+            this.configuredComponents = new HashSet<Type>();
         }
 
         public TConfigurator Configure<TOptions>(Action<OptionsBuilder<TOptions>> configureOptions)
@@ -45,11 +48,18 @@ namespace Orleans.Configuration
         public TConfigurator ConfigureComponent<TComponent>(Func<IServiceProvider, string, TComponent> factory)
            where TComponent : class
         {
-            this.configureDelegate(services =>
+            // ignore if we've already configured this component
+            if (!configuredComponents.Contains(typeof(TComponent)))
             {
-                services.AddSingletonNamedService<TComponent>(name, factory);
-            });
+                this.configureDelegate(services =>
+                {
+                    services.AddSingletonNamedService<TComponent>(name, factory);
+                });
+                configuredComponents.Add(typeof(TComponent));
+            }
             return this as TConfigurator;
         }
+
+        public virtual void ConfigureDefaults(){ }
     }
 }

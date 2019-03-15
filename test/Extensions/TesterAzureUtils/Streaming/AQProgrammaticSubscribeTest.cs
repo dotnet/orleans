@@ -31,13 +31,13 @@ namespace Tester.AzureUtils.Streaming
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamProviderName2, ob=>ob.Configure<IOptions<ClusterOptions>>(
+                        .AddAzureQueueStreams(StreamProviderName2, ob=>ob.Configure<IOptions<ClusterOptions>>(
                             (options, dep) =>
                             {
                                 options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                                 options.QueueNames = AzureQueueUtilities.GenerateQueueNames($"{dep.Value.ClusterId}2", queueCount);
                         }))
-                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamProviderName, ob => ob.Configure<IOptions<ClusterOptions>>(
+                        .AddAzureQueueStreams(StreamProviderName, ob => ob.Configure<IOptions<ClusterOptions>>(
                             (options, dep) =>
                             {
                                 options.ConnectionString = TestDefaultConfiguration.DataConnectionString;

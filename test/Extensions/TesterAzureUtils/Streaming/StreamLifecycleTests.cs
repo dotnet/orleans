@@ -49,7 +49,7 @@ namespace UnitTests.StreamingTests
             {
                 clientBuilder
                     .AddSimpleMessageStreamProvider(SmsStreamProviderName)
-                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName, ob=>ob.Configure<IOptions<ClusterOptions>>(
+                    .AddAzureQueueStreams(AzureQueueStreamProviderName, ob=>ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
@@ -75,13 +75,13 @@ namespace UnitTests.StreamingTests
                         options.DeleteStateOnClear = true;
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     }))
-                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName, ob=>ob.Configure<IOptions<ClusterOptions>>(
+                    .AddAzureQueueStreams(AzureQueueStreamProviderName, ob=>ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                         }))
-                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>("AzureQueueProvider2", ob=>ob.Configure<IOptions<ClusterOptions>>(
+                    .AddAzureQueueStreams("AzureQueueProvider2", ob=>ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;

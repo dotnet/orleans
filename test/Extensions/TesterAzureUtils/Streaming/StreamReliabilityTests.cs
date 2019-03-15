@@ -12,7 +12,6 @@ using Orleans;
 using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -65,7 +64,7 @@ namespace UnitTests.Streaming.Reliability
                 {
                     gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                 })
-                .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AZURE_QUEUE_STREAM_PROVIDER_NAME, ob => ob.Configure<IOptions<ClusterOptions>>(
+                .AddAzureQueueStreams(AZURE_QUEUE_STREAM_PROVIDER_NAME, ob => ob.Configure<IOptions<ClusterOptions>>(
                     (options, dep) =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
@@ -97,13 +96,13 @@ namespace UnitTests.Streaming.Reliability
                     options.DeleteStateOnClear = true;
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                 }))
-                .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AZURE_QUEUE_STREAM_PROVIDER_NAME, ob => ob.Configure<IOptions<ClusterOptions>>(
+                .AddAzureQueueStreams(AZURE_QUEUE_STREAM_PROVIDER_NAME, ob => ob.Configure<IOptions<ClusterOptions>>(
                 (options, dep) =>
                 {
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                 }))
-            .AddAzureQueueStreams<AzureQueueDataAdapterV2>("AzureQueueProvider2", ob => ob.Configure<IOptions<ClusterOptions>>(
+                .AddAzureQueueStreams("AzureQueueProvider2", ob => ob.Configure<IOptions<ClusterOptions>>(
                 (options, dep) =>
                 {
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;

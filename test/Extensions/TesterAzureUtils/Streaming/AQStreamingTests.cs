@@ -38,7 +38,7 @@ namespace Tester.AzureUtils.Streaming
             {
                 clientBuilder
                     .AddSimpleMessageStreamProvider(SmsStreamProviderName)
-                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName, b=>
+                    .AddAzureQueueStreams(AzureQueueStreamProviderName, b=>
                     b.ConfigureAzureQueue(ob=>ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>
                         {
@@ -65,7 +65,7 @@ namespace Tester.AzureUtils.Streaming
                             options.DeleteStateOnClear = true;
                         }))
                     .AddMemoryGrainStorage("MemoryStore")
-                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName, c=>
+                    .AddAzureQueueStreams(AzureQueueStreamProviderName, c=>
                         c.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
                             (options, dep) =>
                             {
