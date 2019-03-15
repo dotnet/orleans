@@ -534,14 +534,14 @@ namespace Orleans.Runtime.GrainDirectory
                                 this.logger.LogWarning($"{op.Name} failed, will NOT be retried: {LogFormatter.PrintException(exception)}");
                         }
                     }
-                }
-                if (dequeueCount == 0 || dequeueCount >= MAX_OPERATION_DEQUEUE)
-                {
-                    lock (this)
+                    if (dequeueCount == 0 || dequeueCount >= MAX_OPERATION_DEQUEUE)
                     {
-                        // Remove the operation from the queue if it was a success
-                        // or if we tried too many times
-                        this.pendingOperations.Dequeue();
+                        lock (this)
+                        {
+                            // Remove the operation from the queue if it was a success
+                            // or if we tried too many times
+                            this.pendingOperations.Dequeue();
+                        }
                     }
                 }
             }
