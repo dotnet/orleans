@@ -814,20 +814,28 @@ namespace Orleans.Runtime
 
         private ExtensionInvoker GetCurrentExtensionInvoker()
         {
-            return (RuntimeContext.CurrentActivationContext.ContextType == SchedulingContextType.SystemTarget)
-                ? (RuntimeContext.CurrentActivationContext as SchedulingContext)?.SystemTarget.ExtensionInvoker
-                : GetCurrentActivationData().ExtensionInvoker;
+            ISchedulingContext context = RuntimeContext.CurrentActivationContext;
+            return (context.ContextType == SchedulingContextType.SystemTarget)
+                ? (context as SchedulingContext)?.SystemTarget.ExtensionInvoker
+                : GetCurrentActivationData(context).ExtensionInvoker;
         }
 
-        private ActivationData GetCurrentActivationData()
+        private ActivationData GetCurrentActivationData(ISchedulingContext context = null)
         {
-            if (TryGetCurrentActivationData(out ActivationData activationData)) return activationData;
-            throw new InvalidOperationException("Attempting to GetCurrentActivationData when not in an activation scope");
+            context = context ?? RuntimeContext.CurrentActivationContext;
+            if (TryGetCurrentActivationData(context, out ActivationData activationData)) return activationData;
+            return ThrowInvalidOperationException();
+            ActivationData ThrowInvalidOperationException() => throw new InvalidOperationException("Attempting to GetCurrentActivationData when not in an activation scope");
         }
 
         private bool TryGetCurrentActivationData(out ActivationData activationData)
         {
-            activationData = (RuntimeContext.CurrentActivationContext as SchedulingContext)?.Activation;
+            return TryGetCurrentActivationData(RuntimeContext.CurrentActivationContext, out activationData);
+        }
+
+        private bool TryGetCurrentActivationData(ISchedulingContext context, out ActivationData activationData)
+        {
+            activationData = (context as SchedulingContext)?.Activation;
             return (activationData != null);
         }
 
