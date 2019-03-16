@@ -85,6 +85,11 @@ namespace Presence.PlayerWatcher
                 }
             });
 
+            await StartWatcherAsync();
+        }
+
+        private async Task StartWatcherAsync()
+        {
             // observing a hardcoded player id for sample purposes
             // the load generator will update player ids within a range that includes this player
             var playerId = new Guid("{2349992C-860A-4EDA-9590-000000000006}");
