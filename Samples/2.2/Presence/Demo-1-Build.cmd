@@ -1,1 +1,2 @@
+dotnet restore
 dotnet build
