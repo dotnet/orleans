@@ -104,7 +104,7 @@ namespace Presence.PlayerWatcher
 
             // Subscribe for updates
             var watcher = client.ServiceProvider.GetService<IGameObserver>();
-            await game.SubscribeForGameUpdatesAsync(
+            await game.ObserveGameUpdatesAsync(
                 await client.CreateObjectReference<IGameObserver>(watcher));
 
             logger.LogInformation("Subscribed successfully to game {@GameKey}",

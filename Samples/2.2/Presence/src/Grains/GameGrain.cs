@@ -121,13 +121,13 @@ namespace Presence.Grains
             return;
         }
 
-        public Task SubscribeForGameUpdatesAsync(IGameObserver observer)
+        public Task ObserveGameUpdatesAsync(IGameObserver observer)
         {
             observers.Add(observer);
             return Task.CompletedTask;
         }
 
-        public Task UnsubscribeForGameUpdatesAsync(IGameObserver observer)
+        public Task UnobserveGameUpdatesAsync(IGameObserver observer)
         {
             observers.Remove(observer);
             return Task.CompletedTask;
