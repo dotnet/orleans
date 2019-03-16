@@ -12,6 +12,8 @@ namespace Presence.PlayerWatcher
     {
         public static async Task Main()
         {
+            Console.Title = nameof(PlayerWatcher);
+
             var program = new Program();
 
             Console.CancelKeyPress += async (sender, eargs) =>

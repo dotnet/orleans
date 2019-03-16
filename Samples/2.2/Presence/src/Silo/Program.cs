@@ -11,6 +11,8 @@ namespace Presence.Silo
     {
         public static async Task Main(string[] args)
         {
+            Console.Title = nameof(Silo);
+
             var host = new SiloHostBuilder()
                 .UseLocalhostClustering()
                 .ConfigureApplicationParts(_ =>

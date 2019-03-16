@@ -15,6 +15,8 @@ namespace Presence.LoadGenerator
     {
         public static async Task Main(string[] args)
         {
+            Console.Title = nameof(LoadGenerator);
+
             // wire-up graceful termination in response to Ctrl+C
             var cancellation = new CancellationTokenSource();
             Console.CancelKeyPress += (sender, eargs) =>
