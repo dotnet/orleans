@@ -15,6 +15,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoadGenerator", "src\LoadGe
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{C89D2AC3-5081-477A-AD11-8FE2E4AEF1E1}"
 	ProjectSection(SolutionItems) = preProject
+		BuildAndRun.ps1 = BuildAndRun.ps1
 		Demo-1-Build.cmd = Demo-1-Build.cmd
 		Demo-2-Start-Silo.cmd = Demo-2-Start-Silo.cmd
 		Demo-3-Start-PlayerWatcher.cmd = Demo-3-Start-PlayerWatcher.cmd
