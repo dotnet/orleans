@@ -7,6 +7,8 @@ namespace Presence.Grains.Models
 {
     /// <summary>
     /// Heartbeat data for a game session.
+    /// This class is immutable.
+    /// Operations on this class always return a new copy.
     /// </summary>
     [Immutable]
     public class HeartbeatData
@@ -14,8 +16,9 @@ namespace Presence.Grains.Models
         public Guid GameKey { get; }
         public GameStatus Status { get; }
 
-        public HeartbeatData(GameStatus status)
+        public HeartbeatData(Guid gameKey, GameStatus status)
         {
+            GameKey = gameKey;
             Status = status;
         }
 
@@ -27,5 +30,10 @@ namespace Presence.Grains.Models
             builder.Append($",Score={Status.Score}");
             return builder.ToString();
         }
+
+        /// <summary>
+        /// Creates an immutable copy of the current heartbeat with the given score.
+        /// </summary>
+        public HeartbeatData WithNewScore(string newScore) => new HeartbeatData(GameKey, Status.WithNewScore(newScore));
     }
 }

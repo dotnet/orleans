@@ -1,5 +1,5 @@
 using System.IO;
-using System.Runtime.Serialization.Formatters.Binary;
+using MsgPack.Serialization;
 
 namespace Presence.Grains.Models
 {
@@ -11,23 +11,22 @@ namespace Presence.Grains.Models
     /// </summary>
     public static class HeartbeatDataDotNetSerializer
     {
-        private static readonly BinaryFormatter Formatter = new BinaryFormatter();
+        private static readonly MessagePackSerializer<HeartbeatData> Serializer = MessagePackSerializer.Get<HeartbeatData>();
 
-        public static byte[] Serialize(object o)
+        public static byte[] Serialize(HeartbeatData item)
         {
-            using (var memoryStream = new MemoryStream())
+            using (var stream = new MemoryStream())
             {
-                Formatter.Serialize(memoryStream, o);
-                memoryStream.Flush();
-                return memoryStream.ToArray();
+                Serializer.Pack(stream, item);
+                return stream.ToArray();
             }
         }
 
         public static HeartbeatData Deserialize(byte[] data)
         {
-            using (var memoryStream = new MemoryStream(data))
+            using (var stream = new MemoryStream(data))
             {
-                return (HeartbeatData)Formatter.Deserialize(memoryStream);
+                return Serializer.Unpack(stream);
             }
         }
     }
