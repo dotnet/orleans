@@ -8,8 +8,8 @@ namespace Presence.Grains
     /// </summary>
     public interface IPlayerGrain : IGrainWithGuidKey
     {
-        Task<IGameGrain> GetCurrentGame();
-        Task JoinGame(IGameGrain game);
-        Task LeaveGame(IGameGrain game);
+        Task<IGameGrain> GetCurrentGameAsync();
+        Task JoinGameAsync(IGameGrain game);
+        Task LeaveGameAsync(IGameGrain game);
     }
 }

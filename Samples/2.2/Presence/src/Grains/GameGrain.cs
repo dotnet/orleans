@@ -43,7 +43,7 @@ namespace Presence.Grains
                     try
                     {
                         // Here we call player grains serially, which is less efficient than a fan-out but simpler to express.
-                        await GrainFactory.GetGrain<IPlayerGrain>(player).JoinGame(this.AsReference<IGameGrain>());
+                        await GrainFactory.GetGrain<IPlayerGrain>(player).JoinGameAsync(this.AsReference<IGameGrain>());
                         players.Add(player);
                     }
                     catch (Exception error)
@@ -65,7 +65,7 @@ namespace Presence.Grains
                 {
                     // Here we do a fan-out with multiple calls going out in parallel. We join the promisses later.
                     // More code to write but we get lower latency when calling multiple player grains.
-                    promises.Add(Tuple.Create(player, GrainFactory.GetGrain<IPlayerGrain>(player).LeaveGame(this.AsReference<IGameGrain>())));
+                    promises.Add(Tuple.Create(player, GrainFactory.GetGrain<IPlayerGrain>(player).LeaveGameAsync(this.AsReference<IGameGrain>())));
                 }
             }
 

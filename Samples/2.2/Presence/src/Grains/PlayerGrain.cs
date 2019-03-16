@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 
 namespace Presence.Grains
@@ -9,30 +10,44 @@ namespace Presence.Grains
     /// </summary>
     public class PlayerGrain : Grain, IPlayerGrain
     {
+        private readonly ILogger<PlayerGrain> logger;
         private IGameGrain currentGame;
+
+        public PlayerGrain(ILogger<PlayerGrain> logger)
+        {
+            this.logger = logger;
+        }
+
+        private Guid GrainKey => this.GetPrimaryKey();
 
         /// <summary>
         /// Game the player is currently in. May be null.
         /// </summary>
-        public Task<IGameGrain> GetCurrentGame() => Task.FromResult(currentGame);
+        public Task<IGameGrain> GetCurrentGameAsync() => Task.FromResult(currentGame);
 
         /// <summary>
         /// Game grain calls this method to notify that the player has joined the game.
         /// </summary>
-        public Task JoinGame(IGameGrain game)
+        public Task JoinGameAsync(IGameGrain game)
         {
             currentGame = game;
-            Console.WriteLine("Player {0} joined game {1}", this.GetPrimaryKey(), game.GetPrimaryKey());
+
+            logger.LogInformation("Player {@PlayerKey} joined game {@GameKey}",
+                GrainKey, game.GetPrimaryKey());
+
             return Task.CompletedTask;
         }
 
         /// <summary>
         /// Game grain calls this method to notify that the player has left the game.
         /// </summary>
-        public Task LeaveGame(IGameGrain game)
+        public Task LeaveGameAsync(IGameGrain game)
         {
             currentGame = null;
-            Console.WriteLine("Player {0} left game {1}", this.GetPrimaryKey(), game.GetPrimaryKey());
+
+            logger.LogInformation("Player {@PlayerKey} left game {@GameKey}",
+                GrainKey, game.GetPrimaryKey());
+
             return Task.CompletedTask;
         }
     }
