@@ -16,7 +16,7 @@ namespace Presence.Grains
         {
             var heartbeatData = HeartbeatDataDotNetSerializer.Deserialize(data);
             var game = GrainFactory.GetGrain<IGameGrain>(heartbeatData.Game);
-            return game.UpdateGameStatus(heartbeatData.Status);
+            return game.UpdateGameStatusAsync(heartbeatData.Status);
         }
     }
 }

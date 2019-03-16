@@ -9,8 +9,8 @@ namespace Presence.Grains
     /// </summary>
     public interface IGameGrain : IGrainWithGuidKey
     {
-        Task UpdateGameStatus(GameStatus status);
-        Task SubscribeForGameUpdates(IGameObserver subscriber);
-        Task UnsubscribeForGameUpdates(IGameObserver subscriber);
+        Task UpdateGameStatusAsync(GameStatus status);
+        Task SubscribeForGameUpdatesAsync(IGameObserver observer);
+        Task UnsubscribeForGameUpdatesAsync(IGameObserver observer);
     }
 }

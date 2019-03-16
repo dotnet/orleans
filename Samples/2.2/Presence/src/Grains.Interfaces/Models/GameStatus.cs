@@ -18,5 +18,7 @@ namespace Presence.Grains.Models
             Players = players;
             Score = score;
         }
+
+        public static GameStatus Empty { get; } = new GameStatus(ImmutableHashSet<Guid>.Empty, string.Empty);
     }
 }

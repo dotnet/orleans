@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Presence.Grains.Models;
 
@@ -14,21 +15,23 @@ namespace Presence.Grains
     /// </summary>
     public class GameGrain : Grain, IGameGrain
     {
-        private GameStatus status;
-        private HashSet<IGameObserver> subscribers;
-        private HashSet<Guid> players;
+        private readonly ILogger<GameGrain> logger;
+        private readonly HashSet<IGameObserver> observers = new HashSet<IGameObserver>();
+        private readonly HashSet<Guid> players = new HashSet<Guid>();
 
-        public override Task OnActivateAsync()
+        private GameStatus status = GameStatus.Empty;
+
+        public GameGrain(ILogger<GameGrain> logger)
         {
-            subscribers = new HashSet<IGameObserver>();
-            players = new HashSet<Guid>();
-            return Task.CompletedTask;
+            this.logger = logger;
         }
+
+        private Guid GrainKey => this.GetPrimaryKey();
 
         /// <summary>
         /// Presense grain calls this method to update the game with its latest status.
         /// </summary>
-        public async Task UpdateGameStatus(GameStatus status)
+        public async Task UpdateGameStatusAsync(GameStatus status)
         {
             this.status = status;
 
@@ -43,63 +46,90 @@ namespace Presence.Grains
                         await GrainFactory.GetGrain<IPlayerGrain>(player).JoinGame(this.AsReference<IGameGrain>());
                         players.Add(player);
                     }
-                    catch (Exception)
+                    catch (Exception error)
                     {
                         // Ignore exceptions while telling player grains to join the game. 
                         // Since we didn't add the player to the list, this will be tried again with next update.
+                        logger.LogWarning(error,
+                            "Failed to tell player {@PlayerKey} to join game {@GameKey}",
+                            player, GrainKey);
                     }
                 }
             }
 
             // Check for players that left the game since last update
-            var promises = new List<Task>();
+            var promises = new List<Tuple<Guid, Task>>();
             foreach (var player in players)
             {
                 if (!status.Players.Contains(player))
                 {
-                    try
-                    {
-                        // Here we do a fan-out with multiple calls going out in parallel. We join the promisses later.
-                        // More code to write but we get lower latency when calling multiple player grains.
-                        promises.Add(GrainFactory.GetGrain<IPlayerGrain>(player).LeaveGame(this.AsReference<IGameGrain>()));
-                        players.Remove(player);
-                    }
-                    catch (Exception)
-                    {
-                        // Ignore exceptions while telling player grains to leave the game.
-                        // Since we didn't remove the player from the list, this will be tried again with next update.
-                    }
+                    // Here we do a fan-out with multiple calls going out in parallel. We join the promisses later.
+                    // More code to write but we get lower latency when calling multiple player grains.
+                    promises.Add(Tuple.Create(player, GrainFactory.GetGrain<IPlayerGrain>(player).LeaveGame(this.AsReference<IGameGrain>())));
                 }
             }
 
             // Joining promises
-            await Task.WhenAll(promises);
-
-            // Notify subscribers about the latest game score
-            foreach (var subscriber in subscribers.ToArray())
+            foreach (var promise in promises)
             {
                 try
                 {
-                    subscriber.UpdateGameScore(status.Score);
+                    await promise.Item2;
+                    players.Remove(promise.Item1);
                 }
-                catch (Exception)
+                catch (Exception error)
                 {
-                    subscribers.Remove(subscriber);
+                    logger.LogWarning(error,
+                        "Failed to tell player {@PlayerKey} to leave the game {@GameKey}",
+                        promise.Item1, GrainKey);
+                }
+            }
+
+            // Notify observers about the latest game score
+            List<IGameObserver> failed = null;
+            foreach (var observer in observers)
+            {
+                try
+                {
+                    observer.UpdateGameScore(status.Score);
+                }
+                catch (Exception error)
+                {
+                    logger.LogWarning(error,
+                        "Failed to notify observer {@ObserverKey} of score for game {@GameKey}. Removing observer.",
+                        observer.GetPrimaryKey(), GrainKey);
+
+                    // add observer to a list of failures
+                    // however defer failed list creation until necessary to avoid incurring an allocation on every call
+                    if (failed == null)
+                    {
+                        failed = new List<IGameObserver>();
+                    }
+                    failed.Add(observer);
+                }
+            }
+
+            // Remove dead observers
+            if (failed != null)
+            {
+                foreach (var observer in failed)
+                {
+                    observers.Remove(observer);
                 }
             }
 
             return;
         }
 
-        public Task SubscribeForGameUpdates(IGameObserver subscriber)
+        public Task SubscribeForGameUpdatesAsync(IGameObserver observer)
         {
-            subscribers.Add(subscriber);
+            observers.Add(observer);
             return Task.CompletedTask;
         }
 
-        public Task UnsubscribeForGameUpdates(IGameObserver subscriber)
+        public Task UnsubscribeForGameUpdatesAsync(IGameObserver observer)
         {
-            subscribers.Remove(subscriber);
+            observers.Remove(observer);
             return Task.CompletedTask;
         }
     }
