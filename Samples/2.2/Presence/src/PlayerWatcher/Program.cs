@@ -64,7 +64,15 @@ namespace Presence.PlayerWatcher
                         "Failed to connect to Orleans cluster on attempt {@Attempt} of {@MaxAttempts}.",
                         attempt, maxAttempts);
 
-                    await Task.Delay(delay, startCancellation.Token);
+                    try
+                    {
+                        await Task.Delay(delay, startCancellation.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        return false;
+                    }
+
                     return true;
                 }
                 else
@@ -102,7 +110,14 @@ namespace Presence.PlayerWatcher
 
                 if (game == null)
                 {
-                    await Task.Delay(1000, startCancellation.Token);
+                    try
+                    {
+                        await Task.Delay(1000, startCancellation.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        return;
+                    }
                 }
             }
 
