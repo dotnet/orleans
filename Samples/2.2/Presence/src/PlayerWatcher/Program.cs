@@ -102,7 +102,7 @@ namespace Presence.PlayerWatcher
             logger.LogInformation("Observing updates for game {@GameKey}",
                 game.GetPrimaryKey());
 
-            // Subscribe for updates
+            // subscribe for updates
             var watcher = client.ServiceProvider.GetService<IGameObserver>();
             await game.ObserveGameUpdatesAsync(
                 await client.CreateObjectReference<IGameObserver>(watcher));
