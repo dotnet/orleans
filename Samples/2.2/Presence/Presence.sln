@@ -11,6 +11,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Silo", "src\Silo\Silo.cspro
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PlayerWatcher", "src\PlayerWatcher\PlayerWatcher.csproj", "{1E40F886-0A20-43A6-AE67-F54BE6643EF4}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoadGenerator", "src\LoadGenerator\LoadGenerator.csproj", "{72B91664-8D69-4290-81E3-E3E216B52CE4}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
 		{1E40F886-0A20-43A6-AE67-F54BE6643EF4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1E40F886-0A20-43A6-AE67-F54BE6643EF4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1E40F886-0A20-43A6-AE67-F54BE6643EF4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{72B91664-8D69-4290-81E3-E3E216B52CE4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{72B91664-8D69-4290-81E3-E3E216B52CE4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{72B91664-8D69-4290-81E3-E3E216B52CE4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{72B91664-8D69-4290-81E3-E3E216B52CE4}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
