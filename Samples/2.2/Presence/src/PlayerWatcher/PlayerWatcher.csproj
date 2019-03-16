@@ -3,8 +3,8 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp2.1</TargetFramework>
-    <AssemblyName>Presence.Client</AssemblyName>
-    <RootNamespace>Presence.Client</RootNamespace>
+    <AssemblyName>Presence.PlayerWatcher</AssemblyName>
+    <RootNamespace>Presence.PlayerWatcher</RootNamespace>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

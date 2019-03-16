@@ -1,6 +1,6 @@
-﻿using System;
+using System;
 
-namespace Client
+namespace Presence.PlayerWatcher
 {
     class Program
     {
