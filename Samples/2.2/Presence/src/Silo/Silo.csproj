@@ -5,6 +5,8 @@
     <TargetFramework>netcoreapp2.1</TargetFramework>
     <AssemblyName>Presence.Silo</AssemblyName>
     <RootNamespace>Presence.Silo</RootNamespace>
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
   </PropertyGroup>
 
   <ItemGroup>
