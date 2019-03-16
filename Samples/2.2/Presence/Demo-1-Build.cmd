@@ -1,2 +1,2 @@
 dotnet restore
-dotnet build
+dotnet build --no-restore
