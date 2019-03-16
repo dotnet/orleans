@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -12,7 +13,6 @@ namespace Presence.PlayerWatcher
         public static async Task Main()
         {
             var program = new Program();
-            await program.StartAsync();
 
             Console.CancelKeyPress += async (sender, eargs) =>
             {
@@ -20,12 +20,14 @@ namespace Presence.PlayerWatcher
                 await program.StopAsync();
             };
 
+            await program.StartAsync();
             await program.Stopped;
         }
 
         private readonly IClusterClient client;
         private readonly ILogger<Program> logger;
         private readonly TaskCompletionSource<bool> stoppedSource = new TaskCompletionSource<bool>();
+        private readonly CancellationTokenSource startCancellation = new CancellationTokenSource();
 
         public Program()
         {
@@ -51,13 +53,18 @@ namespace Presence.PlayerWatcher
             var delay = TimeSpan.FromSeconds(1);
             await client.Connect(async error =>
             {
+                if (startCancellation.IsCancellationRequested)
+                {
+                    return false;
+                }
+
                 if (++attempt < maxAttempts)
                 {
                     logger.LogWarning(error,
                         "Failed to connect to Orleans cluster on attempt {@Attempt} of {@MaxAttempts}.",
                         attempt, maxAttempts);
 
-                    await Task.Delay(delay);
+                    await Task.Delay(delay, startCancellation.Token);
                     return true;
                 }
                 else
@@ -95,7 +102,7 @@ namespace Presence.PlayerWatcher
 
                 if (game == null)
                 {
-                    await Task.Delay(1000);
+                    await Task.Delay(1000, startCancellation.Token);
                 }
             }
 
@@ -113,7 +120,15 @@ namespace Presence.PlayerWatcher
 
         public async Task StopAsync()
         {
-            await client.Close();
+            startCancellation.Cancel();
+            try
+            {
+                await client.Close();
+            }
+            catch (Exception error)
+            {
+                logger.LogError(error, "Error while gracefully disconnecting from Orleans cluster.");
+            }
             stoppedSource.TrySetResult(true);
             await stoppedSource.Task;
         }
