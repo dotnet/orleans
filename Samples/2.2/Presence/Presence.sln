@@ -19,6 +19,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		Demo-2-Start-Silo.cmd = Demo-2-Start-Silo.cmd
 		Demo-3-Start-PlayerWatcher.cmd = Demo-3-Start-PlayerWatcher.cmd
 		Demo-4-Start-LoadGenerator.cmd = Demo-4-Start-LoadGenerator.cmd
+		readme.md = readme.md
 	EndProjectSection
 EndProject
 Global
