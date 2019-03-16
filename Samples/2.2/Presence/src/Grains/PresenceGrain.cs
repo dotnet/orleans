@@ -12,10 +12,10 @@ namespace Presence.Grains
     [StatelessWorker]
     public class PresenceGrain : Grain, IPresenceGrain
     {
-        public Task Heartbeat(byte[] data)
+        public Task HeartbeatAsync(byte[] data)
         {
             var heartbeatData = HeartbeatDataDotNetSerializer.Deserialize(data);
-            var game = GrainFactory.GetGrain<IGameGrain>(heartbeatData.Game);
+            var game = GrainFactory.GetGrain<IGameGrain>(heartbeatData.GameKey);
             return game.UpdateGameStatusAsync(heartbeatData.Status);
         }
     }

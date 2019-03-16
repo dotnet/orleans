@@ -36,7 +36,7 @@ namespace Presence.Grains
             this.status = status;
 
             // Check for new players that joined since last update
-            foreach (var player in status.Players)
+            foreach (var player in status.PlayerKeys)
             {
                 if (!players.Contains(player))
                 {
@@ -61,7 +61,7 @@ namespace Presence.Grains
             var promises = new List<Tuple<Guid, Task>>();
             foreach (var player in players)
             {
-                if (!status.Players.Contains(player))
+                if (!status.PlayerKeys.Contains(player))
                 {
                     // Here we do a fan-out with multiple calls going out in parallel. We join the promisses later.
                     // More code to write but we get lower latency when calling multiple player grains.

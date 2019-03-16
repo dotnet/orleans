@@ -11,7 +11,7 @@ namespace Presence.Grains.Models
     [Immutable]
     public class HeartbeatData
     {
-        public Guid Game { get; }
+        public Guid GameKey { get; }
         public GameStatus Status { get; }
 
         public HeartbeatData(GameStatus status)
@@ -22,8 +22,8 @@ namespace Presence.Grains.Models
         public override string ToString()
         {
             var builder = new StringBuilder();
-            builder.Append($"Heartbeat:Game={Game}");
-            builder.AppendJoin(',', Status.Players.Select((item, idx) => $"Player{idx + 1}={item}"));
+            builder.Append($"Heartbeat:Game={GameKey}");
+            builder.AppendJoin(',', Status.PlayerKeys.Select((item, idx) => $"Player{idx + 1}={item}"));
             builder.Append($",Score={Status.Score}");
             return builder.ToString();
         }

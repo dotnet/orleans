@@ -10,12 +10,12 @@ namespace Presence.Grains.Models
     [Immutable]
     public class GameStatus
     {
-        public ImmutableHashSet<Guid> Players { get; }
+        public ImmutableHashSet<Guid> PlayerKeys { get; }
         public string Score { get; }
 
-        public GameStatus(ImmutableHashSet<Guid> players, string score)
+        public GameStatus(ImmutableHashSet<Guid> playerKeys, string score)
         {
-            Players = players;
+            PlayerKeys = playerKeys;
             Score = score;
         }
 

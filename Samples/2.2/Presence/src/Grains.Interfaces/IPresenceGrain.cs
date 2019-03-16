@@ -9,6 +9,6 @@ namespace Presence.Grains
     /// </summary>
     public interface IPresenceGrain : IGrainWithIntegerKey
     {
-        Task Heartbeat(byte[] data);
+        Task HeartbeatAsync(byte[] data);
     }
 }
