@@ -1,6 +1,6 @@
 # Presence Service
 
-Orleans Presence Service sample targeting .NET Core.
+Orleans Presence Service sample targeting .NET Core 2.1.
 
 ## Build & Run
 
