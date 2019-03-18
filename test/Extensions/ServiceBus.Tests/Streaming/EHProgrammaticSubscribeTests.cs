@@ -34,7 +34,7 @@ namespace ServiceBus.Tests.Streaming
                             options.ConsumerGroup = EHConsumerGroup;
                             options.Path = EHPath;
                         }))
-                        .UseEventHubCheckpointer(ob=>ob.Configure(options =>
+                        .UseAzureTableCheckpointer(ob=>ob.Configure(options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.PersistInterval = TimeSpan.FromSeconds(10);
@@ -49,7 +49,7 @@ namespace ServiceBus.Tests.Streaming
                             options.Path = EHPath2;
                           
                         }))
-                        .UseEventHubCheckpointer(ob => ob.Configure(options => {
+                        .UseAzureTableCheckpointer(ob => ob.Configure(options => {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.PersistInterval = TimeSpan.FromSeconds(10);
                         })));

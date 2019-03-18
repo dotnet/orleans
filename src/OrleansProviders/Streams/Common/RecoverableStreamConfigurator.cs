@@ -1,7 +1,7 @@
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Configuration;
 using System;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Configuration;
 
 namespace Orleans.Streams
 {
@@ -11,12 +11,14 @@ namespace Orleans.Streams
 
     public static class SiloRecoverableStreamConfiguratorExtensions
     {
-        public static ISiloRecoverableStreamConfigurator ConfigureStatistics(this ISiloRecoverableStreamConfigurator configurator, Action<OptionsBuilder<StreamStatisticOptions>> configureOptions)
+        public static TConfigurator ConfigureStatistics<TConfigurator>(this TConfigurator configurator, Action<OptionsBuilder<StreamStatisticOptions>> configureOptions)
+            where TConfigurator : ISiloRecoverableStreamConfigurator
         {
             configurator.Configure<StreamStatisticOptions>(configureOptions);
             return configurator;
         }
-        public static ISiloRecoverableStreamConfigurator ConfigureCacheEviction(this ISiloRecoverableStreamConfigurator configurator, Action<OptionsBuilder<StreamCacheEvictionOptions>> configureOptions)
+        public static TConfigurator ConfigureCacheEviction<TConfigurator>(this TConfigurator configurator, Action<OptionsBuilder<StreamCacheEvictionOptions>> configureOptions)
+            where TConfigurator : ISiloRecoverableStreamConfigurator
         {
             configurator.Configure<StreamCacheEvictionOptions>(configureOptions);
             return configurator;

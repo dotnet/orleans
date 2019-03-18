@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.WindowsAzure.Storage.Table;
 using Orleans;
 using Orleans.Providers.Streams.Common;
 using Orleans.Providers.Streams.Generator;
@@ -50,20 +48,20 @@ namespace ServiceBus.Tests.StreamingTests
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     })
                     .AddEventHubStreams(StreamProviderName, b=>b
-                    .ConfigureEventHub(ob=>ob.Configure(
-                    options =>
-                    {
-                        options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
-                        options.ConsumerGroup = EHConsumerGroup;
-                        options.Path = EHPath;
+                        .UseDynamicClusterConfigDeploymentBalancer()
+                        .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly)
+                        .ConfigureEventHub(ob=>ob.Configure(
+                            options =>
+                            {
+                                options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                                options.ConsumerGroup = EHConsumerGroup;
+                                options.Path = EHPath;
                      
-                    }))
-                    .UseEventHubCheckpointer(ob=>ob.Configure(options => {
-                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        options.PersistInterval = TimeSpan.FromSeconds(1);
-                    }))
-                    .UseDynamicClusterConfigDeploymentBalancer()
-                    .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
+                            }))
+                        .UseAzureTableCheckpointer(ob=>ob.Configure(options => {
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.PersistInterval = TimeSpan.FromSeconds(1);
+                        })));
             }
         }
 

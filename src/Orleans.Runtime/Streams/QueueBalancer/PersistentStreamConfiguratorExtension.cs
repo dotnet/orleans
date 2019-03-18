@@ -1,24 +1,24 @@
-﻿using Microsoft.Extensions.Options;
-using Orleans.Configuration;
-using Orleans.Streams;
 using System;
 using Microsoft.Extensions.DependencyInjection;
-using System.Text;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Hosting;
 
 namespace Orleans.Streams
 {
     public static class SiloPersistentStreamConfiguratorExtension
     {
-        public static ISiloPersistentStreamConfigurator UseConsistentRingQueueBalancer(this ISiloPersistentStreamConfigurator configurator)
+        public static TConfigurator UseConsistentRingQueueBalancer<TConfigurator>(this TConfigurator configurator)
+            where TConfigurator : ISiloPersistentStreamConfigurator
         {
             return configurator.ConfigurePartitionBalancing(ConsistentRingQueueBalancer.Create);
         }
 
-        public static ISiloPersistentStreamConfigurator UseStaticClusterConfigDeploymentBalancer(this ISiloPersistentStreamConfigurator configurator, 
+        public static TConfigurator UseStaticClusterConfigDeploymentBalancer<TConfigurator>(this TConfigurator configurator, 
             TimeSpan? siloMaturityPeriod = null)
+            where TConfigurator : ISiloPersistentStreamConfigurator
         {
-            return configurator.ConfigurePartitionBalancing<DeploymentBasedQueueBalancerOptions>(
+            return configurator.ConfigurePartitionBalancing<TConfigurator,DeploymentBasedQueueBalancerOptions>(
                 (s, n) => DeploymentBasedQueueBalancer.Create(s, n, s.GetService<IOptions<StaticClusterDeploymentOptions>>().Value),
                 options => options.Configure(op =>
             {
@@ -28,10 +28,11 @@ namespace Orleans.Streams
             }));
         }
 
-        public static ISiloPersistentStreamConfigurator UseDynamicClusterConfigDeploymentBalancer(this ISiloPersistentStreamConfigurator configurator,
+        public static TConfigurator UseDynamicClusterConfigDeploymentBalancer<TConfigurator>(this TConfigurator configurator,
            TimeSpan? siloMaturityPeriod = null)
+            where TConfigurator : ISiloPersistentStreamConfigurator
         {
-            return configurator.ConfigurePartitionBalancing<DeploymentBasedQueueBalancerOptions>(
+            return configurator.ConfigurePartitionBalancing<TConfigurator,DeploymentBasedQueueBalancerOptions>(
                 (s, n) => DeploymentBasedQueueBalancer.Create(s, n, s.GetService<IOptions<StaticClusterDeploymentOptions>>().Value),
                 options => options.Configure(op =>
                 {
@@ -41,10 +42,11 @@ namespace Orleans.Streams
                 }));
         }
 
-        public static ISiloPersistentStreamConfigurator UseClusterConfigDeploymentLeaseBasedBalancer(this ISiloPersistentStreamConfigurator configurator, 
+        public static TConfigurator UseClusterConfigDeploymentLeaseBasedBalancer<TConfigurator>(this TConfigurator configurator, 
             Action<OptionsBuilder<LeaseBasedQueueBalancerOptions>> configureOptions = null)
+            where TConfigurator : ISiloPersistentStreamConfigurator
         {
-            return configurator.ConfigurePartitionBalancing<LeaseBasedQueueBalancerOptions>((s, n) => LeaseBasedQueueBalancer.Create(s, n, s.GetService<IOptions<StaticClusterDeploymentOptions>>().Value),
+            return configurator.ConfigurePartitionBalancing<TConfigurator,LeaseBasedQueueBalancerOptions>((s, n) => LeaseBasedQueueBalancer.Create(s, n, s.GetService<IOptions<StaticClusterDeploymentOptions>>().Value),
                 configureOptions);
         }
     }

@@ -1,14 +1,57 @@
+using System;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.ServiceBus.Providers;
-using System;
-using Microsoft.Extensions.Options;
 using Orleans.Providers.Streams.Common;
 using Orleans.ApplicationParts;
 
 namespace Orleans.Streams
 {
-    public class SiloEventHubStreamConfigurator : SiloRecoverableStreamConfigurator
+    public interface ISiloEventHubStreamConfigurator : ISiloRecoverableStreamConfigurator
+    {
+    }
+
+    public static class SiloEventHubStreamConfiguratorExtensions
+    {
+        public static TConfigurator ConfigureCheckpointer<TConfigurator,TOptions>(this TConfigurator configurator, Func<IServiceProvider, string, IStreamQueueCheckpointerFactory> checkpointerFactoryBuilder, Action<OptionsBuilder<TOptions>> configureOptions)
+            where TConfigurator : ISiloEventHubStreamConfigurator
+            where TOptions : class, new()
+        {
+            configurator.ConfigureComponent<TOptions, IStreamQueueCheckpointerFactory>(checkpointerFactoryBuilder, configureOptions);
+            return configurator;
+        }
+
+        public static TConfigurator ConfigureEventHub<TConfigurator>(this TConfigurator configurator, Action<OptionsBuilder<EventHubOptions>> configureOptions)
+            where TConfigurator : ISiloEventHubStreamConfigurator
+        {
+            configurator.Configure<EventHubOptions>(configureOptions);
+            return configurator;
+        }
+
+        public static TConfigurator ConfigurePartitionReceiver<TConfigurator>(this TConfigurator configurator, Action<OptionsBuilder<EventHubReceiverOptions>> configureOptions)
+            where TConfigurator : ISiloEventHubStreamConfigurator
+        {
+            configurator.Configure<EventHubReceiverOptions>(configureOptions);
+            return configurator;
+        }
+
+        public static TConfigurator ConfigureCachePressuring<TConfigurator>(this TConfigurator configurator, Action<OptionsBuilder<EventHubStreamCachePressureOptions>> configureOptions)
+            where TConfigurator : ISiloEventHubStreamConfigurator
+        {
+            configurator.Configure<EventHubStreamCachePressureOptions>(configureOptions);
+            return configurator;
+        }
+
+        public static TConfigurator UseAzureTableCheckpointer<TConfigurator>(this TConfigurator configurator, Action<OptionsBuilder<AzureTableStreamCheckpointerOptions>> configureOptions)
+            where TConfigurator : ISiloEventHubStreamConfigurator
+        {
+            configurator.ConfigureCheckpointer<TConfigurator,AzureTableStreamCheckpointerOptions>(EventHubCheckpointerFactory.CreateFactory, configureOptions);
+            return configurator;
+        }
+    }
+
+    public class SiloEventHubStreamConfigurator : SiloRecoverableStreamConfigurator, ISiloEventHubStreamConfigurator
     {
         public SiloEventHubStreamConfigurator(string name,
             Action<Action<IServiceCollection>> configureServicesDelegate, Action<Action<IApplicationPartManager>> configureAppPartsDelegate)
@@ -25,34 +68,21 @@ namespace Orleans.Streams
                 .AddTransient<IConfigurationValidator>(sp => new EventHubOptionsValidator(sp.GetOptionsByName<EventHubOptions>(name), name))
                 .AddTransient<IConfigurationValidator>(sp => new StreamCheckpointerConfigurationValidator(sp, name)));
         }
+    }
 
-        public SiloEventHubStreamConfigurator ConfigureCheckpointer<TOptions>(Func<IServiceProvider, string, IStreamQueueCheckpointerFactory> checkpointerFactoryBuilder, Action<OptionsBuilder<TOptions>> configureOptions)
-            where TOptions : class, new()
-        {
-            this.ConfigureComponent<TOptions, IStreamQueueCheckpointerFactory>(checkpointerFactoryBuilder, configureOptions);
-            return this;
-        }
+    public interface IClusterClientEventHubStreamConfigurator : IClusterClientPersistentStreamConfigurator { }
 
-        public SiloEventHubStreamConfigurator ConfigureEventHub(Action<OptionsBuilder<EventHubOptions>> configureOptions)
+    public static class ClusterClientEventHubStreamConfiguratorExtensions
+    {
+        public static TConfigurator ConfigureEventHub<TConfigurator>(this TConfigurator configurator, Action<OptionsBuilder<EventHubOptions>> configureOptions)
+            where TConfigurator : IClusterClientEventHubStreamConfigurator
         {
-            this.Configure<EventHubOptions>(configureOptions);
-            return this;
-        }
-
-        public SiloEventHubStreamConfigurator ConfigurePartitionReceiver(Action<OptionsBuilder<EventHubReceiverOptions>> configureOptions)
-        {
-            this.Configure<EventHubReceiverOptions>(configureOptions);
-            return this;
-        }
-
-        public SiloEventHubStreamConfigurator ConfigureCachePressuring(Action<OptionsBuilder<EventHubStreamCachePressureOptions>> configureOptions)
-        {
-            this.Configure<EventHubStreamCachePressureOptions>(configureOptions);
-            return this;
+            configurator.Configure<EventHubOptions>(configureOptions);
+            return configurator;
         }
     }
 
-    public class ClusterClientEventHubStreamConfigurator : ClusterClientPersistentStreamConfigurator
+    public class ClusterClientEventHubStreamConfigurator : ClusterClientPersistentStreamConfigurator, IClusterClientEventHubStreamConfigurator
     {
         public ClusterClientEventHubStreamConfigurator(string name, IClientBuilder builder)
            : base(name, builder, EventHubAdapterFactory.Create)
@@ -64,12 +94,6 @@ namespace Orleans.Streams
                 })
                 .ConfigureServices(services => services.ConfigureNamedOptionForLogging<EventHubOptions>(name)
                 .AddTransient<IConfigurationValidator>(sp => new EventHubOptionsValidator(sp.GetOptionsByName<EventHubOptions>(name), name)));
-        }
-
-        public ClusterClientEventHubStreamConfigurator ConfigureEventHub(Action<OptionsBuilder<EventHubOptions>> configureOptions)
-        {
-            this.Configure<EventHubOptions>(configureOptions);
-            return this;
         }
     }
 }

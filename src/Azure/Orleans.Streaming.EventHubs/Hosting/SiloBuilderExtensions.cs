@@ -1,6 +1,5 @@
 using System;
 using Orleans.Configuration;
-using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 
 namespace Orleans.Hosting
@@ -32,7 +31,7 @@ namespace Orleans.Hosting
         {
             builder.AddEventHubStreams(name, b =>
                     b.ConfigureEventHub(ob => ob.Configure(configureEventHub))
-                    .UseEventHubCheckpointer(ob => ob.Configure(configureDefaultCheckpointer)));
+                    .UseAzureTableCheckpointer(ob => ob.Configure(configureDefaultCheckpointer)));
             return builder;
         }
 
@@ -60,7 +59,7 @@ namespace Orleans.Hosting
         {
             builder.AddEventHubStreams(name, b =>
                     b.ConfigureEventHub(ob => ob.Configure(configureEventHub))
-                    .UseEventHubCheckpointer(ob => ob.Configure(configureDefaultCheckpointer)));
+                    .UseAzureTableCheckpointer(ob => ob.Configure(configureDefaultCheckpointer)));
             return builder;
         }
     }

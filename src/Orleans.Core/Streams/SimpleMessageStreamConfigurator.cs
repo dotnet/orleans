@@ -2,7 +2,6 @@ using System;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Providers.Streams.SimpleMessageStream;
-using Orleans.Runtime;
 
 namespace Orleans.Streams
 {

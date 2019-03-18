@@ -1,15 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
-using Orleans;
+using System;
 using Orleans.Configuration;
 using Orleans.Hosting;
-using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Tester.StreamingTests.ProgrammaticSubscribeTests;
@@ -46,7 +37,7 @@ namespace ServiceBus.Tests.StreamingTests
                             options.ConsumerGroup = EHConsumerGroup;
                             options.Path = EHPath;
                         }))
-                        .UseEventHubCheckpointer(ob => ob.Configure(options =>
+                        .UseAzureTableCheckpointer(ob => ob.Configure(options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.PersistInterval = TimeSpan.FromSeconds(10);
@@ -62,7 +53,7 @@ namespace ServiceBus.Tests.StreamingTests
                             options.Path = EHPath2;
 
                         }))
-                        .UseEventHubCheckpointer(ob => ob.Configure(options => {
+                        .UseAzureTableCheckpointer(ob => ob.Configure(options => {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.PersistInterval = TimeSpan.FromSeconds(10);
                         }))
