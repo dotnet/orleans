@@ -294,7 +294,7 @@ namespace Orleans
             }
             catch(Exception ex)
             {
-                this.logger.Warn(ErrorCode.TypeManager_GetClusterGrainTypeResolverError, "Refresh the GrainTypeResolver failed. WIll be retried after", ex);
+                this.logger.Warn(ErrorCode.TypeManager_GetClusterGrainTypeResolverError, "Refresh the GrainTypeResolver failed. Will be retried after", ex);
             }
         }
 
