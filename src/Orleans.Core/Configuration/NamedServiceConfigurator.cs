@@ -16,13 +16,11 @@ namespace Orleans.Configuration
     {
         protected readonly string name;
         protected readonly Action<Action<IServiceCollection>> configureDelegate;
-        protected HashSet<Type> configuredComponents;
 
         protected NamedServiceConfigurator(string name, Action<Action<IServiceCollection>> configureDelegate)
         {
             this.name = name;
             this.configureDelegate = configureDelegate;
-            this.configuredComponents = new HashSet<Type>();
         }
 
         public TConfigurator Configure<TOptions>(Action<OptionsBuilder<TOptions>> configureOptions)
@@ -48,18 +46,11 @@ namespace Orleans.Configuration
         public TConfigurator ConfigureComponent<TComponent>(Func<IServiceProvider, string, TComponent> factory)
            where TComponent : class
         {
-            // ignore if we've already configured this component
-            if (!configuredComponents.Contains(typeof(TComponent)))
+            this.configureDelegate(services =>
             {
-                this.configureDelegate(services =>
-                {
-                    services.AddSingletonNamedService<TComponent>(name, factory);
-                });
-                configuredComponents.Add(typeof(TComponent));
-            }
+                services.AddSingletonNamedService<TComponent>(name, factory);
+            });
             return this as TConfigurator;
         }
-
-        public virtual void ConfigureDefaults(){ }
     }
 }

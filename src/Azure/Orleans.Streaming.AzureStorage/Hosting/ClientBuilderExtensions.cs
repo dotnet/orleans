@@ -17,7 +17,6 @@ namespace Orleans.Hosting
             //the constructor wires up DI with AzureQueueStream, so has to be called regardless configure is null or not
             var configurator = new ClusterClientAzureQueueStreamConfigurator(name, builder);
             configure?.Invoke(configurator);
-            configurator.ConfigureDefaults();
             return builder;
         }
 

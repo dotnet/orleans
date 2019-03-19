@@ -1,12 +1,12 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Orleans.Configuration;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Streams;
 using Orleans.Providers.Streams.Common;
 using Orleans.ApplicationParts;
 using Microsoft.WindowsAzure.Storage.Queue;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Orleans.Configuration
 {
@@ -60,12 +60,7 @@ namespace Orleans.Configuration
                             this.name);
                 }
             }));
-        }
-
-        public override void ConfigureDefaults()
-        {
-            base.ConfigureDefaults();
-            this.ConfigureQueueDataAdapter<AzureQueueDataAdapterV2>();
+            base.configureDelegate(services => services.TryAddSingleton<IQueueDataAdapter<CloudQueueMessage, IBatchContainer>, AzureQueueDataAdapterV2>());
         }
     }
 
@@ -111,12 +106,7 @@ namespace Orleans.Configuration
                         AzureQueueStreamProviderUtils.GenerateDefaultAzureQueueNames(clusterOp.Value.ServiceId, this.name);
                 }
             }));
-        }
-
-        public override void ConfigureDefaults()
-        {
-            base.ConfigureDefaults();
-            this.ConfigureQueueDataAdapter<AzureQueueDataAdapterV2>();
+            base.configureDelegate(services => services.TryAddSingleton<IQueueDataAdapter<CloudQueueMessage, IBatchContainer>, AzureQueueDataAdapterV2>());
         }
     }
 

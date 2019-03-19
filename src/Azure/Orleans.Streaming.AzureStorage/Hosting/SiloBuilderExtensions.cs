@@ -16,7 +16,6 @@ namespace Orleans.Hosting
                 configureServicesDelegate => builder.ConfigureServices(configureServicesDelegate),
                 configureAppPartsDelegate => builder.ConfigureApplicationParts(configureAppPartsDelegate));
             configure?.Invoke(configurator);
-            configurator.ConfigureDefaults();
             return builder;
         }
 
@@ -40,7 +39,6 @@ namespace Orleans.Hosting
                 configureServicesDelegate => builder.ConfigureServices(configureServicesDelegate),
                 configureAppPartsDelegate => builder.ConfigureApplicationParts(configureAppPartsDelegate));
             configure?.Invoke(configurator);
-            configurator.ConfigureDefaults();
             return builder;
         }
 
