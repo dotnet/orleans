@@ -87,8 +87,8 @@ namespace Orleans.Streams
         /// <returns></returns>
         public Task Initialize(Immutable<IQueueAdapter> qAdapter, Immutable<IQueueAdapterCache> queueAdapterCache, Immutable<IStreamFailureHandler> failureHandler)
         {
-            if (qAdapter.Value == null) throw new ArgumentNullException("qAdapter", "Init: queueAdapter should not be null");
-            if (failureHandler.Value == null) throw new ArgumentNullException("failureHandler", "Init: streamDeliveryFailureHandler should not be null");
+            if (qAdapter.Value == null) throw new ArgumentNullException(nameof(qAdapter), "Init: queueAdapter should not be null");
+            if (failureHandler.Value == null) throw new ArgumentNullException(nameof(failureHandler), "Init: streamDeliveryFailureHandler should not be null");
             return OrleansTaskExtentions.WrapInTask(() => InitializeInternal(qAdapter.Value, queueAdapterCache.Value, failureHandler.Value));
         }
 

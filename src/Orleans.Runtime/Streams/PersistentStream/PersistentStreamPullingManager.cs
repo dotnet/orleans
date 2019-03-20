@@ -54,9 +54,9 @@ namespace Orleans.Streams
 
             queuesToAgentsMap = new Dictionary<QueueId, PersistentStreamPullingAgent>();
             streamProviderName = strProviderName;
-            providerRuntime = runtime ?? throw new ArgumentNullException("runtime", "IStreamProviderRuntime runtime reference should not be null");
-            pubSub = streamPubSub ?? throw new ArgumentNullException("streamPubSub", "StreamPubSub reference should not be null");
-            this.failureHandler = failureHandler ?? throw new ArgumentNullException("failureHandler", "Stream failure handler should not be null");
+            providerRuntime = runtime ?? throw new ArgumentNullException(nameof(runtime), "IStreamProviderRuntime runtime reference should not be null");
+            pubSub = streamPubSub ?? throw new ArgumentNullException(nameof(streamPubSub), "StreamPubSub reference should not be null");
+            this.failureHandler = failureHandler ?? throw new ArgumentNullException(nameof(failureHandler), "Stream failure handler should not be null");
             this.options = options;
             nonReentrancyGuarantor = new AsyncSerialExecutor();
             latestRingNotificationSequenceNumber = 0;
