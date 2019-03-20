@@ -56,8 +56,19 @@ namespace Tester.AzureUtils.Streaming
                 MessageVisibilityTimeout = TimeSpan.FromSeconds(30),
                 QueueNames = azureQueueNames
             };
-            var adapterFactory = new AzureQueueAdapterFactory<AzureQueueDataAdapterV2>(AZURE_QUEUE_STREAM_PROVIDER_NAME, options, new SimpleQueueCacheOptions(), this.fixture.Services, this.fixture.Services.GetService<IOptions<ClusterOptions>>(), 
-                this.fixture.Services.GetRequiredService<SerializationManager>(), loggerFactory);
+            var serializationManager = this.fixture.Services.GetService<SerializationManager>();
+            var clusterOptions = this.fixture.Services.GetService<IOptions<ClusterOptions>>();
+            var queueCacheOptions = new SimpleQueueCacheOptions();
+            var queueDataAdapter = new AzureQueueDataAdapterV2(serializationManager);
+            var adapterFactory = new AzureQueueAdapterFactory(
+                AZURE_QUEUE_STREAM_PROVIDER_NAME,
+                options,
+                queueCacheOptions,
+                queueDataAdapter,
+                this.fixture.Services,
+                clusterOptions,
+                serializationManager,
+                loggerFactory);
             adapterFactory.Init();
             await SendAndReceiveFromQueueAdapter(adapterFactory);
         }

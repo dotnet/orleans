@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.WindowsAzure.Storage.Queue;
@@ -9,25 +9,9 @@ using Orleans.Streams;
 namespace Orleans.Providers.Streams.AzureQueue
 {
     /// <summary>
-    /// Converts event data to and from cloud queue message
-    /// </summary>
-    public interface IAzureQueueDataAdapter
-    {
-        /// <summary>
-        /// Creates a cloud queue message from stream event data.
-        /// </summary>
-        CloudQueueMessage ToCloudQueueMessage<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, Dictionary<string, object> requestContext);
-
-        /// <summary>
-        /// Creates a batch container from a cloud queue message
-        /// </summary>
-        IBatchContainer FromCloudQueueMessage(CloudQueueMessage cloudMsg, long sequenceId);
-    }
-
-    /// <summary>
     /// Original data adapter.  Here to maintain backwards compatibility, but does not support json and other custom serializers
     /// </summary>
-    public class AzureQueueDataAdapterV1 : IAzureQueueDataAdapter, IOnDeserialized
+    public class AzureQueueDataAdapterV1 : IQueueDataAdapter<CloudQueueMessage, IBatchContainer>, IOnDeserialized
     {
         private SerializationManager serializationManager;
 
@@ -43,7 +27,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <summary>
         /// Creates a cloud queue message from stream event data.
         /// </summary>
-        public CloudQueueMessage ToCloudQueueMessage<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, Dictionary<string, object> requestContext)
+        public CloudQueueMessage ToQueueMessage<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, Dictionary<string, object> requestContext)
         {
             var azureQueueBatchMessage = new AzureQueueBatchContainer(streamGuid, streamNamespace, events.Cast<object>().ToList(), requestContext);
             var rawBytes = this.serializationManager.SerializeToByteArray(azureQueueBatchMessage);
@@ -57,7 +41,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <summary>
         /// Creates a batch container from a cloud queue message
         /// </summary>
-        public IBatchContainer FromCloudQueueMessage(CloudQueueMessage cloudMsg, long sequenceId)
+        public IBatchContainer FromQueueMessage(CloudQueueMessage cloudMsg, long sequenceId)
         {
             var azureQueueBatch = this.serializationManager.DeserializeFromByteArray<AzureQueueBatchContainer>(cloudMsg.AsBytes);
             azureQueueBatch.RealSequenceToken = new EventSequenceToken(sequenceId);
@@ -73,7 +57,7 @@ namespace Orleans.Providers.Streams.AzureQueue
     /// <summary>
     /// Data adapter that uses types that support custom serializers (like json).
     /// </summary>
-    public class AzureQueueDataAdapterV2 : IAzureQueueDataAdapter, IOnDeserialized
+    public class AzureQueueDataAdapterV2 : IQueueDataAdapter<CloudQueueMessage, IBatchContainer>, IOnDeserialized
     {
         private SerializationManager serializationManager;
         
@@ -89,7 +73,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <summary>
         /// Creates a cloud queue message from stream event data.
         /// </summary>
-        public CloudQueueMessage ToCloudQueueMessage<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, Dictionary<string, object> requestContext)
+        public CloudQueueMessage ToQueueMessage<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, Dictionary<string, object> requestContext)
         {
             var azureQueueBatchMessage = new AzureQueueBatchContainerV2(streamGuid, streamNamespace, events.Cast<object>().ToList(), requestContext);
             var rawBytes = this.serializationManager.SerializeToByteArray(azureQueueBatchMessage);
@@ -103,7 +87,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <summary>
         /// Creates a batch container from a cloud queue message
         /// </summary>
-        public IBatchContainer FromCloudQueueMessage(CloudQueueMessage cloudMsg, long sequenceId)
+        public IBatchContainer FromQueueMessage(CloudQueueMessage cloudMsg, long sequenceId)
         {
             var azureQueueBatch = this.serializationManager.DeserializeFromByteArray<AzureQueueBatchContainerV2>(cloudMsg.AsBytes);
             azureQueueBatch.RealSequenceToken = new EventSequenceTokenV2(sequenceId);

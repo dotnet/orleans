@@ -22,12 +22,12 @@ namespace Orleans.Providers.Streams.AzureQueue
         private long lastReadMessage;
         private Task outstandingTask;
         private readonly ILogger logger;
-        private readonly IAzureQueueDataAdapter dataAdapter;
+        private readonly IQueueDataAdapter<CloudQueueMessage, IBatchContainer> dataAdapter;
         private readonly List<PendingDelivery> pending;
 
         private readonly string azureQueueName;
 
-        public static IQueueAdapterReceiver Create(SerializationManager serializationManager, ILoggerFactory loggerFactory, string azureQueueName, string dataConnectionString, IAzureQueueDataAdapter dataAdapter, TimeSpan? messageVisibilityTimeout = null)
+        public static IQueueAdapterReceiver Create(SerializationManager serializationManager, ILoggerFactory loggerFactory, string azureQueueName, string dataConnectionString, IQueueDataAdapter<CloudQueueMessage, IBatchContainer> dataAdapter, TimeSpan? messageVisibilityTimeout = null)
         {
             if (azureQueueName == null) throw new ArgumentNullException(nameof(azureQueueName));
             if (string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException(nameof(dataConnectionString));
@@ -38,7 +38,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             return new AzureQueueAdapterReceiver(serializationManager, azureQueueName, loggerFactory, queue, dataAdapter);
         }
 
-        private AzureQueueAdapterReceiver(SerializationManager serializationManager, string azureQueueName, ILoggerFactory loggerFactory, AzureQueueDataManager queue, IAzureQueueDataAdapter dataAdapter)
+        private AzureQueueAdapterReceiver(SerializationManager serializationManager, string azureQueueName, ILoggerFactory loggerFactory, AzureQueueDataManager queue, IQueueDataAdapter<CloudQueueMessage, IBatchContainer> dataAdapter)
         {
             this.azureQueueName = azureQueueName ?? throw new ArgumentNullException(nameof(azureQueueName));
             this.serializationManager = serializationManager;
@@ -89,7 +89,7 @@ namespace Orleans.Providers.Streams.AzureQueue
                 List<IBatchContainer> azureQueueMessages = new List<IBatchContainer>();
                 foreach (var message in messages)
                 {
-                    IBatchContainer container = this.dataAdapter.FromCloudQueueMessage(message, lastReadMessage++);
+                    IBatchContainer container = this.dataAdapter.FromQueueMessage(message, lastReadMessage++);
                     azureQueueMessages.Add(container);
                     this.pending.Add(new PendingDelivery(container.SequenceToken, message));
                 }

@@ -54,7 +54,7 @@ namespace UnitTests.HaloTests.Streaming
                             options.DeleteStateOnClear = true;
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         }))
-                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName, b=>b
+                        .AddAzureQueueStreams(AzureQueueStreamProviderName, b=>b
                         .ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
                                 (options, dep) =>
                                 {
@@ -62,7 +62,7 @@ namespace UnitTests.HaloTests.Streaming
                                     options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                             })));
                     hostBuilder
-                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>("AzureQueueProvider2", b=>b
+                        .AddAzureQueueStreams("AzureQueueProvider2", b=>b
                         .ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
                                 (options, dep) =>
                                 {
