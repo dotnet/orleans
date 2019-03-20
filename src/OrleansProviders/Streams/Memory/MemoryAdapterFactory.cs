@@ -34,7 +34,6 @@ namespace Orleans.Providers
         private ConcurrentDictionary<QueueId, IMemoryStreamQueueGrain> queueGrains;
         private IObjectPool<FixedSizeBuffer> bufferPool;
         private BlockPoolMonitorDimensions blockPoolMonitorDimensions;
-        private IStreamFailureHandler streamFailureHandler;
         private TimePurgePredicate purgePredicate;
 
         /// <summary>
@@ -53,11 +52,6 @@ namespace Orleans.Providers
         /// </summary>
         /// <returns>The direction in which this adapter provides data.</returns>
         public StreamProviderDirection Direction => StreamProviderDirection.ReadWrite;
-
-        /// <summary>
-        /// Creates a failure handler for a partition.
-        /// </summary>
-        protected Func<string, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { get; set; }
 
         /// <summary>
         /// Create a cache monitor to report cache related metrics
@@ -198,16 +192,6 @@ namespace Orleans.Providers
             var logger = this.loggerFactory.CreateLogger($"{typeof(MemoryPooledCache<TSerializer>).FullName}.{this.Name}.{queueId}");
             var monitor = this.CacheMonitorFactory(new CacheMonitorDimensions(queueId.ToString(), this.blockPoolMonitorDimensions.BlockPoolId), this.telemetryProducer);
             return new MemoryPooledCache<TSerializer>(bufferPool, purgePredicate, logger, this.serializer, monitor, this.statisticOptions.StatisticMonitorWriteInterval);
-        }
-
-        /// <summary>
-        /// Acquire delivery failure handler for a queue
-        /// </summary>
-        /// <param name="queueId"></param>
-        /// <returns></returns>
-        public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
-        {
-            return Task.FromResult(streamFailureHandler ?? (streamFailureHandler = new NoOpStreamDeliveryFailureHandler()));
         }
 
         /// <summary>

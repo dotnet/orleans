@@ -22,6 +22,7 @@ namespace Orleans.Streams
 
         private readonly StreamPullingAgentOptions options;
         private readonly AsyncSerialExecutor nonReentrancyGuarantor; // for non-reentrant execution of queue change notifications.
+        private readonly IStreamFailureHandler failureHandler;
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         private int latestRingNotificationSequenceNumber;
@@ -42,6 +43,7 @@ namespace Orleans.Streams
             IQueueAdapterFactory adapterFactory,
             IStreamQueueBalancer streamQueueBalancer,
             StreamPullingAgentOptions options,
+            IStreamFailureHandler failureHandler,
             ILoggerFactory loggerFactory)
             : base(id, runtime.ExecutingSiloAddress, loggerFactory)
         {
@@ -49,28 +51,17 @@ namespace Orleans.Streams
             {
                 throw new ArgumentNullException("strProviderName");
             }
-            if (runtime == null)
-            {
-                throw new ArgumentNullException("runtime", "IStreamProviderRuntime runtime reference should not be null");
-            }
-            if (streamPubSub == null)
-            {
-                throw new ArgumentNullException("streamPubSub", "StreamPubSub reference should not be null");
-            }
-            if (streamQueueBalancer == null)
-            {
-                throw new ArgumentNullException("streamQueueBalancer", "IStreamQueueBalancer streamQueueBalancer reference should not be null");
-            }
 
             queuesToAgentsMap = new Dictionary<QueueId, PersistentStreamPullingAgent>();
             streamProviderName = strProviderName;
-            providerRuntime = runtime;
-            pubSub = streamPubSub;
+            providerRuntime = runtime ?? throw new ArgumentNullException("runtime", "IStreamProviderRuntime runtime reference should not be null");
+            pubSub = streamPubSub ?? throw new ArgumentNullException("streamPubSub", "StreamPubSub reference should not be null");
+            this.failureHandler = failureHandler ?? throw new ArgumentNullException("failureHandler", "Stream failure handler should not be null");
             this.options = options;
             nonReentrancyGuarantor = new AsyncSerialExecutor();
             latestRingNotificationSequenceNumber = 0;
             latestCommandNumber = 0;
-            queueBalancer = streamQueueBalancer;
+            queueBalancer = streamQueueBalancer ?? throw new ArgumentNullException("streamQueueBalancer", "IStreamQueueBalancer streamQueueBalancer reference should not be null");
             this.adapterFactory = adapterFactory;
 
             queueAdapterCache = adapterFactory.GetQueueAdapterCache();
@@ -259,9 +250,8 @@ namespace Orleans.Streams
             // Init the agent only after it was registered locally.
             var agentGrainRef = agent.AsReference<IPersistentStreamPullingAgent>();
             var queueAdapterCacheAsImmutable = queueAdapterCache != null ? queueAdapterCache.AsImmutable() : new Immutable<IQueueAdapterCache>(null);
-            IStreamFailureHandler deliveryFailureHandler = await adapterFactory.GetDeliveryFailureHandler(agent.QueueId);
             // Need to call it as a grain reference.
-            var task = OrleansTaskExtentions.SafeExecute(() => agentGrainRef.Initialize(queueAdapter.AsImmutable(), queueAdapterCacheAsImmutable, deliveryFailureHandler.AsImmutable()));
+            var task = OrleansTaskExtentions.SafeExecute(() => agentGrainRef.Initialize(queueAdapter.AsImmutable(), queueAdapterCacheAsImmutable, this.failureHandler.AsImmutable()));
             await task.LogException(logger, ErrorCode.PersistentStreamPullingManager_09, String.Format("PersistentStreamPullingAgent {0} failed to Initialize.", agent.QueueId));
         }
 

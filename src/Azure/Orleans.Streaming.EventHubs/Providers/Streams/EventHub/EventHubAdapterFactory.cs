@@ -77,11 +77,6 @@ namespace Orleans.ServiceBus.Providers
         private IStreamQueueCheckpointerFactory checkpointerFactory;
 
         /// <summary>
-        /// Creates a failure handler for a partition.
-        /// </summary>
-        protected Func<string, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { get; set; }
-
-        /// <summary>
         /// Create a queue mapper to map EventHub partitions to queues
         /// </summary>
         protected Func<string[], IEventHubQueueMapper> QueueMapperFactory { get; set; }
@@ -126,12 +121,6 @@ namespace Orleans.ServiceBus.Providers
             if (this.CacheFactory == null)
             {
                 this.CacheFactory = CreateCacheFactory(this.cacheOptions).CreateCache;
-            }
-
-            if (this.StreamFailureHandlerFactory == null)
-            {
-                //TODO: Add a queue specific default failure handler with reasonable error reporting.
-                this.StreamFailureHandlerFactory = partition => Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler());
             }
 
             if (this.QueueMapperFactory == null)
@@ -183,16 +172,6 @@ namespace Orleans.ServiceBus.Providers
         {
             //TODO: CreateAdapter must be called first.  Figure out how to safely enforce this
             return this.streamQueueMapper;
-        }
-
-        /// <summary>
-        /// Acquire delivery failure handler for a queue
-        /// </summary>
-        /// <param name="queueId"></param>
-        /// <returns></returns>
-        public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
-        {
-            return this.StreamFailureHandlerFactory(this.streamQueueMapper.QueueToPartition(queueId));
         }
 
         /// <summary>

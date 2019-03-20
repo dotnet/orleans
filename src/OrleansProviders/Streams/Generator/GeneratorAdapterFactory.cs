@@ -45,7 +45,6 @@ namespace Orleans.Providers.Streams.Generator
         private readonly ILogger<GeneratorAdapterFactory> logger;
         private IStreamGeneratorConfig generatorConfig;
         private IStreamQueueMapper streamQueueMapper;
-        private IStreamFailureHandler streamFailureHandler;
         private ConcurrentDictionary<QueueId, Receiver> receivers;
         private IObjectPool<FixedSizeBuffer> bufferPool;
         private BlockPoolMonitorDimensions blockPoolMonitorDimensions;
@@ -152,16 +151,6 @@ namespace Orleans.Providers.Streams.Generator
         public IStreamQueueMapper GetStreamQueueMapper()
         {
             return streamQueueMapper ?? (streamQueueMapper = new HashRingBasedStreamQueueMapper(this.queueMapperOptions, this.Name));
-        }
-
-        /// <summary>
-        /// Get the delivery failure handler
-        /// </summary>
-        /// <param name="queueId"></param>
-        /// <returns></returns>
-        public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
-        {
-            return Task.FromResult(streamFailureHandler ?? (streamFailureHandler = new NoOpStreamDeliveryFailureHandler()));
         }
 
         /// <summary>

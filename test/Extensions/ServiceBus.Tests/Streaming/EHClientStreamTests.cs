@@ -1,23 +1,19 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.WindowsAzure.Storage.Table;
 using Microsoft.Extensions.Configuration;
 using Orleans.Runtime;
 using Orleans.Hosting;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Runtime.Configuration;
-using Orleans.Streaming.EventHubs;
 using Orleans.TestingHost;
 using Tester.TestStreamProviders;
-using ServiceBus.Tests.TestStreamProviders.EventHub;
 using Tester.StreamingTests;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.Streams;
-using Orleans.ServiceBus.Providers;
 using Tester;
 
 namespace ServiceBus.Tests.StreamingTests
@@ -54,20 +50,20 @@ namespace ServiceBus.Tests.StreamingTests
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
-                    .AddPersistentStreams(StreamProviderName, TestEventHubStreamAdapterFactory.Create, b=>b
-                    .Configure<EventHubOptions>(ob => ob.Configure(options =>
-                      {
-                          options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
-                          options.ConsumerGroup = EHConsumerGroup;
-                          options.Path = EHPath;
-                      }))
-                    .ConfigureComponent<AzureTableStreamCheckpointerOptions, IStreamQueueCheckpointerFactory>(EventHubCheckpointerFactory.CreateFactory, ob => ob.Configure(options =>
-                    {
-                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        options.PersistInterval = TimeSpan.FromSeconds(10);
-                    })));
-                hostBuilder
-                    .AddMemoryGrainStorage("PubSubStore");
+                    .AddMemoryGrainStorage("PubSubStore")
+                    .AddEventHubStreams(StreamProviderName, b => b
+                        .ConfigureFaultHandler(TestAzureTableStorageStreamFailureHandler.Create)
+                        .UseEventHubCheckpointer(ob => ob.Configure(options =>
+                            {
+                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                options.PersistInterval = TimeSpan.FromSeconds(10);
+                            }))
+                        .Configure<EventHubOptions>(ob => ob.Configure(options =>
+                            {
+                                options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                                options.ConsumerGroup = EHConsumerGroup;
+                                options.Path = EHPath;
+                            })));
             }
         }
 
@@ -76,7 +72,7 @@ namespace ServiceBus.Tests.StreamingTests
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddPersistentStreams(StreamProviderName, TestEventHubStreamAdapterFactory.Create, b=>
+                    .AddEventHubStreams(StreamProviderName, b=>
                         b.Configure<EventHubOptions>(ob=>ob.Configure(
                         options =>
                         {

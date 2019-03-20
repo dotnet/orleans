@@ -245,7 +245,7 @@ namespace Orleans.Streams
             StreamConsumerCollection streamDataCollection;
             if (!pubSubCache.TryGetValue(streamId, out streamDataCollection))
             {
-                // If stream is not in pubsub cache, then we've received no events on this stream, and will aquire the subscriptions from pubsub when we do.
+                // If stream is not in pubsub cache, then we've received no events on this stream, and will acquire the subscriptions from pubsub when we do.
                 return;
             }
 
@@ -285,7 +285,7 @@ namespace Orleans.Streams
                     }
                     else
                     {
-                        if (consumerData.Cursor == null) // if the consumer did not ask for a specific token and we already have a cursor, jsut keep using it.
+                        if (consumerData.Cursor == null) // if the consumer did not ask for a specific token and we already have a cursor, just keep using it.
                             consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, cacheToken);
                     }
                 }
@@ -581,6 +581,8 @@ namespace Orleans.Streams
                                 DeliveryBackoffProvider);
                             if (newToken != null)
                             {
+                                this.logger.LogInformation("Stream subscriber {SubscriptionId} requested rewind of stream {StreamId} to {SequenceToken}",
+                                    consumerData.SubscriptionId.Guid, consumerData.StreamId, newToken.Token);
                                 consumerData.LastToken = newToken;
                                 IQueueCacheCursor newCursor = queueCache.GetCacheCursor(consumerData.StreamId, newToken.Token);
                                 consumerData.SafeDisposeCursor(logger);
@@ -668,7 +670,7 @@ namespace Orleans.Streams
             try
             {
                 StreamHandshakeToken newToken = await ContextualizedDeliverBatchToConsumer(consumerData, batch);
-                consumerData.LastToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken); // this is the currently delivered token
+                consumerData.LastToken = StreamHandshakeToken.CreateDeliveryToken(batch.SequenceToken); // this is the currently delivered token
                 return newToken;
             }
             catch (Exception ex)
@@ -746,7 +748,7 @@ namespace Orleans.Streams
                            consumerData.SubscriptionId, streamProviderName, consumerData.StreamId, token));
             }
             // if configured to fault on delivery failure and this is not an implicit subscription, fault and remove the subscription
-            if (streamFailureHandler.ShouldFaultSubsriptionOnError && !SubscriptionMarker.IsImplicitSubscription(consumerData.SubscriptionId.Guid))
+            if (streamFailureHandler.ShouldFaultSubscriptionOnError && !SubscriptionMarker.IsImplicitSubscription(consumerData.SubscriptionId.Guid))
             {
                 try
                 {

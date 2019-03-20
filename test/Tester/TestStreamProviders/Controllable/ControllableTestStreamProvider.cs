@@ -55,11 +55,6 @@ namespace Tester.TestStreamProviders.Controllable
             return new HashRingBasedStreamQueueMapper(options, Name);
         }
 
-        public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
-        {
-            throw new NotImplementedException();
-        }
-
         public Task<object> ExecuteCommand(int command, object arg)
         {
             switch ((ControllableTestStreamProviderCommands) command)

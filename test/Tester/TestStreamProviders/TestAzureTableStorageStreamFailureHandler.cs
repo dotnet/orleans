@@ -1,9 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.Providers.Streams.PersistentStreams;
 using Orleans.Serialization;
@@ -22,11 +23,10 @@ namespace Tester.TestStreamProviders
         {
         }
 
-        public static async Task<IStreamFailureHandler> Create(SerializationManager serializationManager)
+        public static IStreamFailureHandler Create(IServiceProvider services, string name)
         {
-            var failureHandler = new TestAzureTableStorageStreamFailureHandler(serializationManager);
-            await failureHandler.InitAsync();
-            return failureHandler;
+            var serializationManager = services.GetService<SerializationManager>();
+            return new TestAzureTableStorageStreamFailureHandler(serializationManager);
         }
 
         public static async Task<int> GetDeliveryFailureCount(string streamProviderName, ILoggerFactory loggerFactory)

@@ -105,7 +105,9 @@ namespace Orleans.Runtime.Providers
             var managerId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE);
             var pubsubOptions = this.ServiceProvider.GetOptionsByName<StreamPubSubOptions>(streamProviderName);
             var pullingAgentOptions = this.ServiceProvider.GetOptionsByName<StreamPullingAgentOptions>(streamProviderName);
-            var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, this.PubSub(pubsubOptions.PubSubType), adapterFactory, queueBalancer, pullingAgentOptions, this.loggerFactory);
+            var failureHandler = this.ServiceProvider.GetServiceByName<IStreamFailureHandler>(streamProviderName)
+                ?? this.ServiceProvider.GetService<IStreamFailureHandler>();
+            var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, this.PubSub(pubsubOptions.PubSubType), adapterFactory, queueBalancer, pullingAgentOptions, failureHandler, this.loggerFactory);
             this.RegisterSystemTarget(manager);
             // Init the manager only after it was registered locally.
             var pullingAgentManager = manager.AsReference<IPersistentStreamPullingManager>();

@@ -1,5 +1,6 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Configuration;
 using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
@@ -49,6 +50,7 @@ namespace Orleans.Streams
             ConfigureComponent<ILifecycleParticipant<ISiloLifecycle>>(PersistentStreamProvider.ParticipateIn<ISiloLifecycle>);
             ConfigureComponent<IQueueAdapterFactory>(adapterFactory);
             ConfigureComponent<IConfigurationValidator>(PersistentStreamStorageConfigurationValidator.Create);
+            base.configureDelegate(services => services.TryAddSingleton<IStreamFailureHandler>(NoOpStreamDeliveryFailureHandler.Create));
         }
     }
 }

@@ -39,15 +39,5 @@ namespace Orleans.Providers.Streams.AzureQueue
         {
             throw new OrleansException("SimpleAzureQueueAdapter does not support multiple queues, it only writes to one queue.");
         }
-
-        /// <summary>
-        /// Creates a delivery failure handler for the specified queue.
-        /// </summary>
-        /// <param name="queueId"></param>
-        /// <returns></returns>
-        public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
-        {
-            return Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler());
-        }
     }
 }

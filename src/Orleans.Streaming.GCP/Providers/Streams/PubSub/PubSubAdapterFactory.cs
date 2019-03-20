@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -27,11 +27,6 @@ namespace Orleans.Providers.GCP.Streams.PubSub
         /// </summary>
         public SerializationManager SerializationManager { get; private set; }
 
-        /// <summary>
-        /// Application level failure handler override.
-        /// </summary>
-        protected Func<QueueId, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { private get; set; }
-
         public PubSubAdapterFactory(
             string name, 
             PubSubOptions options, 
@@ -52,24 +47,12 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             this._adapterCache = new SimpleQueueAdapterCache(cacheOptions, this._providerName, loggerFactory);
         }
 
-        public virtual void Init()
-        {
-            if (StreamFailureHandlerFactory == null)
-            {
-                StreamFailureHandlerFactory =
-                    qid => Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler());
-            }
-
-        }
-
         public virtual Task<IQueueAdapter> CreateAdapter()
         {
             var adapter = new PubSubAdapter<TDataAdapter>(_adaptorFactory(), SerializationManager, this.loggerFactory, _streamQueueMapper,
                 this.options.ProjectId, this.options.TopicId, this.clusterOptions.ServiceId, this._providerName, this.options.Deadline, this.options.CustomEndpoint);
             return Task.FromResult<IQueueAdapter>(adapter);
         }
-
-        public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId) => StreamFailureHandlerFactory(queueId);
 
         public IQueueAdapterCache GetQueueAdapterCache() => _adapterCache;
 
@@ -82,7 +65,6 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             var queueMapperOptions = services.GetOptionsByName<HashRingStreamQueueMapperOptions>(name);
             IOptions<ClusterOptions> clusterOptions = services.GetProviderClusterOptions(name);
             var factory = ActivatorUtilities.CreateInstance<PubSubAdapterFactory<TDataAdapter>>(services, name, pubsubOptions, queueMapperOptions, cacheOptions, clusterOptions);
-            factory.Init();
             return factory;
         }
     }

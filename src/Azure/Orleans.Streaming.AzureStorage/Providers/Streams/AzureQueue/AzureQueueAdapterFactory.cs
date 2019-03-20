@@ -30,11 +30,6 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         protected SerializationManager SerializationManager { get; }
 
-        /// <summary>
-        /// Application level failure handler override.
-        /// </summary>
-        protected Func<QueueId, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { private get; set; }
-
         public AzureQueueAdapterFactory(
             string name,
             AzureQueueOptions options, 
@@ -53,13 +48,6 @@ namespace Orleans.Providers.Streams.AzureQueue
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
             this.streamQueueMapper = new AzureStreamQueueMapper(options.QueueNames, providerName);
             this.adapterCache = new SimpleQueueAdapterCache(cacheOptions, this.providerName, this.loggerFactory);
-        }
-
-        /// <summary> Init the factory.</summary>
-        public virtual void Init()
-        {
-            this.StreamFailureHandlerFactory = this.StreamFailureHandlerFactory ?? 
-                    ((qid) => Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler()));
         }
 
         /// <summary>Creates the Azure Queue based adapter.</summary>
@@ -88,16 +76,6 @@ namespace Orleans.Providers.Streams.AzureQueue
             return streamQueueMapper;
         }
 
-        /// <summary>
-        /// Creates a delivery failure handler for the specified queue.
-        /// </summary>
-        /// <param name="queueId"></param>
-        /// <returns></returns>
-        public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
-        {
-            return StreamFailureHandlerFactory(queueId);
-        }
-
         public static AzureQueueAdapterFactory Create(IServiceProvider services, string name)
         {
             var azureQueueOptions = services.GetOptionsByName<AzureQueueOptions>(name);
@@ -106,7 +84,6 @@ namespace Orleans.Providers.Streams.AzureQueue
                 ?? services.GetService<IQueueDataAdapter<CloudQueueMessage, IBatchContainer>>();
             IOptions<ClusterOptions> clusterOptions = services.GetProviderClusterOptions(name);
             var factory = ActivatorUtilities.CreateInstance<AzureQueueAdapterFactory>(services, name, azureQueueOptions, cacheOptions, dataAdapter, clusterOptions);
-            factory.Init();
             return factory;
         }
     }

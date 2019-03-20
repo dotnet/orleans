@@ -13,11 +13,13 @@ namespace Orleans.Streams
             configurator.Configure<StreamPubSubOptions>(ob => ob.Configure(options => options.PubSubType = pubsubType));
             return configurator;
         }
+
         public static ISiloPersistentStreamConfigurator ConfigurePullingAgent(this ISiloPersistentStreamConfigurator configurator, Action<OptionsBuilder<StreamPullingAgentOptions>> configureOptions = null)
         {
             configurator.Configure<StreamPullingAgentOptions>(configureOptions);
             return configurator;
         }
+
         public static ISiloPersistentStreamConfigurator ConfigureLifecycle(this ISiloPersistentStreamConfigurator configurator, Action<OptionsBuilder<StreamLifecycleOptions>> configureOptions)
         {
             configurator.Configure<StreamLifecycleOptions>(configureOptions);
@@ -34,6 +36,13 @@ namespace Orleans.Streams
             where TOptions : class, new()
         {
             return configurator.ConfigureComponent<TOptions, IStreamQueueBalancer>(factory, configureOptions);
+        }
+
+        public static TConfigurator ConfigureFaultHandler<TConfigurator>(this TConfigurator configurator, Func<IServiceProvider, string, IStreamFailureHandler> factory)
+            where TConfigurator : ISiloPersistentStreamConfigurator
+        {
+            configurator.ConfigureComponent<IStreamFailureHandler>(factory);
+            return configurator;
         }
     }
 }
