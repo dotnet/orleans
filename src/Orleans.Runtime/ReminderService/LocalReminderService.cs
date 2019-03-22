@@ -526,7 +526,7 @@ namespace Orleans.Runtime.ReminderService
                 StopReminder(Logger); // just to make sure.
                 var dueTimeSpan = CalculateDueTime();
                 Timer = GrainTimer.FromTaskCallback(scheduler, this.timerLogger, asyncCallback, this, dueTimeSpan, period, name: ReminderName);
-                if (Logger.IsEnabled(LogLevel.Debug)) Logger.Debug("Reminder {0}, Due time{1}", this, dueTimeSpan);
+                if (Logger.IsEnabled(LogLevel.Debug)) Logger.Debug("Reminder {0}, Due time: {1}", this, dueTimeSpan);
                 Timer.Start();
             }
 
