@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Hosting;
@@ -9,31 +10,25 @@ namespace Presence.Silo
 {
     public class Program
     {
-        public static async Task Main(string[] args)
+        public static Task Main(string[] args)
         {
             Console.Title = nameof(Silo);
 
-            var host = new SiloHostBuilder()
-                .UseLocalhostClustering()
-                .ConfigureApplicationParts(_ =>
+            return new HostBuilder()
+                .UseOrleans(builder =>
                 {
-                    _.AddApplicationPart(typeof(GameGrain).Assembly).WithReferences();
+                    builder
+                        .UseLocalhostClustering()
+                        .ConfigureApplicationParts(manager =>
+                         {
+                             manager.AddApplicationPart(typeof(GameGrain).Assembly).WithReferences();
+                         });
                 })
-                .ConfigureLogging(_ =>
+                .ConfigureLogging(builder =>
                 {
-                    _.AddConsole();
+                    builder.AddConsole();
                 })
-                .Build();
-
-            await host.StartAsync();
-
-            Console.CancelKeyPress += async (sender, eargs) =>
-            {
-                eargs.Cancel = true;
-                await host.StopAsync();
-            };
-
-            await host.Stopped;
+                .RunConsoleAsync();
         }
     }
 }
