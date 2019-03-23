@@ -26,6 +26,7 @@ namespace Silo
                         {
                             var factory = provider.GetService<IGrainFactory>();
                             await factory.GetGrain<IProducerGrain>("A").StartAsync(1, TimeSpan.FromSeconds(1));
+                            await factory.GetGrain<IProducerGrain>("B").StartAsync(10, TimeSpan.FromSeconds(3));
                         });
                 })
                 .ConfigureLogging(builder =>
