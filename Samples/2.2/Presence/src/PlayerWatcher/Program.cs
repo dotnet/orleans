@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Presence.Grains;
@@ -10,20 +11,27 @@ namespace Presence.PlayerWatcher
 {
     public class Program
     {
-        public static async Task Main()
+        public static Task Main()
         {
             Console.Title = nameof(PlayerWatcher);
 
-            var program = new Program();
+            return new HostBuilder()
+                .ConfigureServices(services =>
+                {
+                    // add regular services
+                    services.AddTransient<IGameObserver, LoggerGameObserver>();
 
-            Console.CancelKeyPress += async (sender, eargs) =>
-            {
-                eargs.Cancel = true;
-                await program.StopAsync();
-            };
-
-            await program.StartAsync();
-            await program.Stopped;
+                    // this hosted service connects and disconnects from the cluster along with the host
+                    // it also provides the cluster client to other services that request it
+                    services.AddSingleton<ClusterClientHostedService>();
+                    services.AddSingleton<IHostedService>(_ => _.GetService<ClusterClientHostedService>());
+                    services.AddSingleton(_ => _.GetService<ClusterClientHostedService>().Client);
+                })
+                .ConfigureLogging(builder =>
+                {
+                    builder.AddConsole();
+                })
+                .RunConsoleAsync();
         }
 
         private readonly IClusterClient client;
@@ -50,42 +58,7 @@ namespace Presence.PlayerWatcher
 
         public async Task StartAsync()
         {
-            var attempt = 0;
-            var maxAttempts = 100;
-            var delay = TimeSpan.FromSeconds(1);
-            await client.Connect(async error =>
-            {
-                if (startCancellation.IsCancellationRequested)
-                {
-                    return false;
-                }
 
-                if (++attempt < maxAttempts)
-                {
-                    logger.LogWarning(error,
-                        "Failed to connect to Orleans cluster on attempt {@Attempt} of {@MaxAttempts}.",
-                        attempt, maxAttempts);
-
-                    try
-                    {
-                        await Task.Delay(delay, startCancellation.Token);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        return false;
-                    }
-
-                    return true;
-                }
-                else
-                {
-                    logger.LogError(error,
-                        "Failed to connect to Orleans cluster on attempt {@Attempt} of {@MaxAttempts}.",
-                        attempt, maxAttempts);
-
-                    return false;
-                }
-            });
 
             await StartWatcherAsync();
         }
