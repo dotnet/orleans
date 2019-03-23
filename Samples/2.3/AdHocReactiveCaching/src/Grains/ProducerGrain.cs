@@ -10,7 +10,6 @@ namespace Grains
     public class ProducerGrain : Grain, IProducerGrain
     {
         private IDisposable _timer;
-        private int _version;
         private VersionedValue<int> _state;
         private TaskCompletionSource<VersionedValue<int>> _wait;
 
@@ -56,7 +55,7 @@ namespace Grains
         /// Otherwise returns the current data immediately.
         /// </summary>
         public Task<VersionedValue<int>> PollAsync(int knownVersion) =>
-            knownVersion == _version
+            knownVersion == _state.Version
             ? _wait.Task
             : Task.FromResult(_state);
     }
