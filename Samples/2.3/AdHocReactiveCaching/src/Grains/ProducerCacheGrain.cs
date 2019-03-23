@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Grains.Models;
@@ -51,7 +52,7 @@ namespace Grains
                 {
                     _cache = await GrainFactory.GetGrain<IProducerGrain>(GrainKey).PollAsync(_cache.Version);
                 }
-                catch (OrleansException error)
+                catch (TimeoutException error)
                 {
                     _logger.LogDebug(error, "{@GrainType} {@GrainKey} long polling broken. Polling again...");
                 }
