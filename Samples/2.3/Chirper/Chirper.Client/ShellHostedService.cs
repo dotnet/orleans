@@ -11,13 +11,15 @@ namespace Chirper.Client
     public class ShellHostedService : IHostedService
     {
         private readonly IClusterClient _client;
+        private readonly IHost _host;
         private IChirperViewer _viewer;
         private IChirperAccount _account;
         private Task _execution;
 
-        public ShellHostedService(IClusterClient client)
+        public ShellHostedService(IClusterClient client, IHost host)
         {
             _client = client;
+            _host = host;
         }
 
         public Task StartAsync(CancellationToken cancellationToken)
@@ -46,7 +48,7 @@ namespace Chirper.Client
                 }
                 else if (command == "/quit")
                 {
-                    return;
+                    await _host.StopAsync();
                 }
                 else if (command.StartsWith("/user "))
                 {
