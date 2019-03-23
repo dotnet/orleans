@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Grains;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,6 +21,11 @@ namespace Silo
                         .ConfigureApplicationParts(manager =>
                         {
                             manager.AddApplicationPart(typeof(ProducerGrain).Assembly).WithReferences();
+                        })
+                        .AddStartupTask(async (provider, token) =>
+                        {
+                            var factory = provider.GetService<IGrainFactory>();
+                            await factory.GetGrain<IProducerGrain>("A").StartAsync(1, TimeSpan.FromSeconds(1));
                         });
                 })
                 .ConfigureLogging(builder =>

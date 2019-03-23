@@ -30,7 +30,6 @@ namespace Grains
 
             // initialize the polling wait handle
             _wait = new TaskCompletionSource<VersionedValue<int>>();
-            _wait.SetResult(_state);
 
             return base.OnActivateAsync();
         }
