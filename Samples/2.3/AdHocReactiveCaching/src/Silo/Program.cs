@@ -19,7 +19,7 @@ namespace Silo
                         .UseLocalhostClustering()
                         .ConfigureApplicationParts(manager =>
                         {
-                            manager.AddApplicationPart(typeof(DummyGrain).Assembly).WithReferences();
+                            manager.AddApplicationPart(typeof(ProducerGrain).Assembly).WithReferences();
                         });
                 })
                 .ConfigureLogging(builder =>
