@@ -45,8 +45,8 @@ namespace Silo
                             // make the first producer grain change every five seconds
                             await factory.GetGrain<IProducerGrain>("A").StartAsync(1, TimeSpan.FromSeconds(5));
 
-                            // make the second producer grain change every ten seconds
-                            await factory.GetGrain<IProducerGrain>("B").StartAsync(10, TimeSpan.FromSeconds(10));
+                            // make the second producer grain change every fifteen seconds
+                            await factory.GetGrain<IProducerGrain>("B").StartAsync(10, TimeSpan.FromSeconds(15));
                         });
                 })
                 .ConfigureLogging(builder =>

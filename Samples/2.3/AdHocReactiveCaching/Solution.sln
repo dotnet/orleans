@@ -17,6 +17,13 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Client.B", "src\Client.B\Cl
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Client.C", "src\Client.C\Client.C.csproj", "{F61BA23D-E4D1-4087-A56C-77B7D26AC0DE}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{DBA55882-D1DA-4BE2-BB34-300FE350AFB8}"
+	ProjectSection(SolutionItems) = preProject
+		BuildAndRun.ps1 = BuildAndRun.ps1
+		BuildAndRun.sh = BuildAndRun.sh
+		readme.md = readme.md
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
