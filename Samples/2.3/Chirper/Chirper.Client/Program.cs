@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Hosting;
@@ -9,50 +10,24 @@ namespace Chirper.Client
 {
     class Program
     {
-        static void Main(string[] args)
+        static Task Main(string[] args)
         {
             Console.Title = nameof(Client);
 
-            var client = new ClientBuilder()
-                .UseLocalhostClustering()
-                .ConfigureLogging(_ =>
-                {
-                    _.AddDebug();
-                })
-                .Build();
+            return new HostBuilder()
 
-            var logger = client.ServiceProvider.GetService<ILoggerProvider>().CreateLogger(typeof(Program).FullName);
+                .ConfigureServices(services => services
 
-            Console.WriteLine("Connecting...");
+                    .AddSingleton<ClusterClientHostedService>()
+                    .AddSingleton<IHostedService>(_ => _.GetService<ClusterClientHostedService>())
+                    .AddSingleton(_ => _.GetService<ClusterClientHostedService>().Client)
+                    .AddSingleton<IHostedService, ShellHostedService>())
 
-            var retries = 100;
-            client.Connect(async error =>
-            {
-                if (--retries < 0)
-                {
-                    logger.LogError("Could not connect to the cluster: {@Message}", error.Message);
-                    return false;
-                }
-                else
-                {
-                    logger.LogWarning(error, "Error Connecting: {@Message}", error.Message);
-                }
-                await Task.Delay(1000);
-                return true;
-            }).Wait();
+                .ConfigureLogging(builder => builder
 
-            Console.WriteLine("Connected.");
+                    .AddDebug())
 
-            Console.CancelKeyPress += (sender, e) =>
-            {
-                e.Cancel = true;
-                client.Close().Wait();
-                Environment.Exit(0);
-            };
-
-            new Shell(client)
-                .RunAsync(client)
-                .Wait();
+                .RunConsoleAsync();
         }
     }
 }

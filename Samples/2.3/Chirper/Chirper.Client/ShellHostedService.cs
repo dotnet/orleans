@@ -1,32 +1,48 @@
 using System;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Chirper.Grains;
+using Microsoft.Extensions.Hosting;
 using Orleans;
 
 namespace Chirper.Client
 {
-    public class Shell
+    public class ShellHostedService : IHostedService
     {
-        public Shell(IClusterClient client)
+        private readonly IClusterClient _client;
+        private IChirperViewer _viewer;
+        private IChirperAccount _account;
+        private Task _execution;
+
+        public ShellHostedService(IClusterClient client)
         {
-            this.client = client ?? throw new ArgumentNullException(nameof(client));
+            _client = client;
         }
 
-        private readonly IClusterClient client;
-        private IChirperViewer viewer;
-        private IChirperAccount account;
-
-        public async Task RunAsync(IClusterClient client)
+        public Task StartAsync(CancellationToken cancellationToken)
         {
-            this.ShowHelp(true);
+            _execution = RunAsync();
+            return Task.CompletedTask;
+        }
+
+        public Task StopAsync(CancellationToken cancellationToken)
+        {
+            // as we cannot stop the console by graceful means, there is nothing to do
+            // the host itself will stop the console when it terminates the application
+            return Task.CompletedTask;
+        }
+
+        public async Task RunAsync()
+        {
+            ShowHelp(true);
 
             while (true)
             {
                 var command = Console.ReadLine();
                 if (command == "/help")
                 {
-                    this.ShowHelp();
+                    ShowHelp();
                 }
                 else if (command == "/quit")
                 {
@@ -37,9 +53,9 @@ namespace Chirper.Client
                     var match = Regex.Match(command, @"/user (?<username>\w{1,100})");
                     if (match.Success)
                     {
-                        await this.Unobserve();
+                        await Unobserve();
                         var username = match.Groups["username"].Value;
-                        this.account = client.GetGrain<IChirperAccount>(username);
+                        _account = _client.GetGrain<IChirperAccount>(username);
 
                         Console.WriteLine($"The current user is now [{username}]");
                     }
@@ -50,15 +66,15 @@ namespace Chirper.Client
                 }
                 else if (command.StartsWith("/follow "))
                 {
-                    if (this.EnsureActiveAccount())
+                    if (EnsureActiveAccount())
                     {
                         var match = Regex.Match(command, @"/follow (?<username>\w{1,100})");
                         if (match.Success)
                         {
                             var targetName = match.Groups["username"].Value;
-                            await this.account.FollowUserIdAsync(targetName);
+                            await _account.FollowUserIdAsync(targetName);
 
-                            Console.WriteLine($"[{this.account.GetPrimaryKeyString()}] is now following [{targetName}]");
+                            Console.WriteLine($"[{_account.GetPrimaryKeyString()}] is now following [{targetName}]");
                         }
                         else
                         {
@@ -68,52 +84,52 @@ namespace Chirper.Client
                 }
                 else if (command == "/following")
                 {
-                    if (this.EnsureActiveAccount())
+                    if (EnsureActiveAccount())
                     {
-                        (await this.account.GetFollowingListAsync())
+                        (await _account.GetFollowingListAsync())
                             .ForEach(_ => Console.WriteLine(_));
                     }
                 }
                 else if (command == "/followers")
                 {
-                    if (this.EnsureActiveAccount())
+                    if (EnsureActiveAccount())
                     {
-                        (await this.account.GetFollowersListAsync())
+                        (await _account.GetFollowersListAsync())
                             .ForEach(_ => Console.WriteLine(_));
                     }
                 }
                 else if (command == "/observe")
                 {
-                    if (this.EnsureActiveAccount())
+                    if (EnsureActiveAccount())
                     {
-                        if (this.viewer == null)
+                        if (_viewer == null)
                         {
-                            this.viewer = await client.CreateObjectReference<IChirperViewer>(new ChirperConsoleViewer(this.account.GetPrimaryKeyString()));
+                            _viewer = await _client.CreateObjectReference<IChirperViewer>(new ChirperConsoleViewer(_account.GetPrimaryKeyString()));
                         }
 
-                        await this.account.SubscribeAsync(this.viewer);
+                        await _account.SubscribeAsync(_viewer);
 
-                        Console.WriteLine($"Now observing [{this.account.GetPrimaryKeyString()}]");
+                        Console.WriteLine($"Now observing [{_account.GetPrimaryKeyString()}]");
                     }
                 }
                 else if (command == "/unobserve")
                 {
-                    if (this.EnsureActiveAccount())
+                    if (EnsureActiveAccount())
                     {
-                        await this.Unobserve();
+                        await Unobserve();
                     }
                 }
                 else if (command.StartsWith("/unfollow "))
                 {
-                    if (this.EnsureActiveAccount())
+                    if (EnsureActiveAccount())
                     {
                         var match = Regex.Match(command, @"/unfollow (?<username>\w{1,100})");
                         if (match.Success)
                         {
                             var targetName = match.Groups["username"].Value;
-                            await this.account.UnfollowUserIdAsync(targetName);
+                            await _account.UnfollowUserIdAsync(targetName);
 
-                            Console.WriteLine($"[{this.account.GetPrimaryKeyString()}] is no longer following [{targetName}]");
+                            Console.WriteLine($"[{_account.GetPrimaryKeyString()}] is no longer following [{targetName}]");
                         }
                         else
                         {
@@ -123,13 +139,13 @@ namespace Chirper.Client
                 }
                 else if (command.StartsWith("/chirp "))
                 {
-                    if (this.EnsureActiveAccount())
+                    if (EnsureActiveAccount())
                     {
                         var match = Regex.Match(command, @"/chirp (?<message>.+)");
                         if (match.Success)
                         {
                             var message = match.Groups["message"].Value;
-                            await this.account.PublishMessageAsync(message);
+                            await _account.PublishMessageAsync(message);
                             Console.WriteLine("Published the new message!");
                         }
                         else
@@ -147,7 +163,7 @@ namespace Chirper.Client
 
         private bool EnsureActiveAccount()
         {
-            if (this.account == null)
+            if (_account == null)
             {
                 Console.WriteLine("This command requires an active user. Try again or type /help for a list of commands.");
                 return false;
@@ -157,13 +173,13 @@ namespace Chirper.Client
 
         private async Task Unobserve()
         {
-            if (this.viewer != null)
+            if (_viewer != null)
             {
-                await this.account.UnsubscribeAsync(this.viewer);
+                await _account.UnsubscribeAsync(_viewer);
 
-                this.viewer = null;
+                _viewer = null;
 
-                Console.WriteLine($"No longer observing [{this.account.GetPrimaryKeyString()}]");
+                Console.WriteLine($"No longer observing [{_account.GetPrimaryKeyString()}]");
             }
         }
 

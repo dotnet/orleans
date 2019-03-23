@@ -15,16 +15,21 @@ namespace Chirper.Silo
             Console.Title = nameof(Silo);
 
             return new HostBuilder()
+
                 .UseOrleans(builder => builder
+
                     .UseLocalhostClustering()
                     .ConfigureApplicationParts(_ => _.AddApplicationPart(typeof(ChirperAccount).Assembly).WithReferences())
                     .AddMemoryGrainStorageAsDefault()
                     .AddMemoryGrainStorage("PubSubStore")
                     .UseDashboard())
+
                 .ConfigureLogging(builder => builder
+
                     .AddFilter("Orleans.Runtime.Management.ManagementGrain", LogLevel.Warning)
                     .AddFilter("Orleans.Runtime.SiloControl", LogLevel.Warning)
                     .AddConsole())
+
                 .RunConsoleAsync();
         }
     }
