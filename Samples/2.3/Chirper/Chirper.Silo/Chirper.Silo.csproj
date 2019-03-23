@@ -8,8 +8,8 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="2.2.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="2.2.0" />
-    <PackageReference Include="Microsoft.Orleans.Server" Version="2.2.4" />
-    <PackageReference Include="OrleansDashboard" Version="2.2.5" />
+    <PackageReference Include="Microsoft.Orleans.Server" Version="2.3.0" />
+    <PackageReference Include="OrleansDashboard" Version="2.3.0" />
   </ItemGroup>
 
   <ItemGroup>
