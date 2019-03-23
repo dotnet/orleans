@@ -45,34 +45,6 @@ namespace Silo
 
                             // make the second producer grain change every ten seconds
                             await factory.GetGrain<IProducerGrain>("B").StartAsync(10, TimeSpan.FromSeconds(10));
-
-                            // output the current value of the first cache grain every second
-                            Task.Run(async () =>
-                            {
-                                while (true)
-                                {
-                                    await Task.Delay(TimeSpan.FromSeconds(1));
-
-                                    var value = await provider.GetService<IGrainFactory>().GetGrain<IProducerCacheGrain>("A").GetAsync();
-                                    provider.GetService<ILogger<Program>>().LogInformation(
-                                        "{@GrainType} {@GrainKey} returned value {@Value}",
-                                        nameof(IProducerCacheGrain), "A", value);
-                                }
-                            }).Ignore();
-
-                            // output the current value of the second cache grain every second
-                            Task.Run(async () =>
-                            {
-                                while (true)
-                                {
-                                    await Task.Delay(TimeSpan.FromSeconds(1));
-
-                                    var value = await provider.GetService<IGrainFactory>().GetGrain<IProducerCacheGrain>("B").GetAsync();
-                                    provider.GetService<ILogger<Program>>().LogInformation(
-                                        "{@GrainType} {@GrainKey} returned value {@Value}",
-                                        nameof(IProducerCacheGrain), "B", value);
-                                }
-                            }).Ignore();
                         });
                 })
                 .ConfigureLogging(builder =>
