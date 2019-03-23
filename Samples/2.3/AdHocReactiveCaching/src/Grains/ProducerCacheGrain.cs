@@ -49,7 +49,7 @@ namespace Grains
             {
                 try
                 {
-                    _cache = await GrainFactory.GetGrain<IProducerGrain>(GrainKey).PollAsync(_cache.Version);
+                    _cache = await GrainFactory.GetGrain<IProducerGrain>(GrainKey).LongPollAsync(_cache.Version);
                 }
                 catch (TimeoutException error)
                 {

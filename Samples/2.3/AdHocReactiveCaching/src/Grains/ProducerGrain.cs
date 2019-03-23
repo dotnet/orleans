@@ -65,7 +65,7 @@ namespace Grains
         /// If the given version is the same as the current version then resolves when a new version of data is available.
         /// Otherwise returns the current data immediately.
         /// </summary>
-        public Task<VersionedValue<int>> PollAsync(int knownVersion) =>
+        public Task<VersionedValue<int>> LongPollAsync(int knownVersion) =>
             knownVersion == _state.Version
             ? _wait.Task
             : Task.FromResult(_state);

@@ -20,6 +20,9 @@ namespace Grains.Models
             {
                 return new VersionedValue<T>(Version + 1, value);
             }
+
         }
+
+        public static VersionedValue<T> Default { get; } = new VersionedValue<T>(0, default);
     }
 }
