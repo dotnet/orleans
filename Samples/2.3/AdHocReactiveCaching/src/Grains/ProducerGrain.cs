@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Grains.Models;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Concurrency;
 
@@ -9,9 +10,18 @@ namespace Grains
     [Reentrant]
     public class ProducerGrain : Grain, IProducerGrain
     {
+        private readonly ILogger<ProducerGrain> _logger;
         private IDisposable _timer;
         private VersionedValue<int> _state;
         private TaskCompletionSource<VersionedValue<int>> _wait;
+
+        public ProducerGrain(ILogger<ProducerGrain> logger)
+        {
+            _logger = logger;
+        }
+
+        private string GrainType => nameof(ProducerGrain);
+        private string GrainKey => this.GetPrimaryKeyString();
 
         public override Task OnActivateAsync()
         {
@@ -37,6 +47,8 @@ namespace Grains
         {
             // update the state
             _state = _state.NextVersion(_state.Value + increment);
+            _logger.LogInformation("{@GrainType} {@GrainKey} updated value to {@Value} with version {@Version}",
+                GrainType, GrainKey, _state.Value, _state.Version);
 
             // fulfill waiting promises
             _wait.SetResult(_state);
