@@ -28,7 +28,7 @@ namespace Client.B
                     // this configures the test running on this particular client
                     services.Configure<CacheTesterOptions>(options =>
                     {
-                        options.CacheGrainKey = "B";
+                        options.PublisherCacheGrainKey = "B";
                     });
 
                     // this tells the generic host to stay quiet

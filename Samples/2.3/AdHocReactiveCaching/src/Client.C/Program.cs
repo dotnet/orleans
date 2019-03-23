@@ -5,13 +5,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace Client.A
+namespace Client.C
 {
     class Program
     {
         public static Task Main()
         {
-            Console.Title = "Client.A";
+            Console.Title = "Client.C";
 
             return new HostBuilder()
                 .ConfigureServices(services =>
@@ -28,7 +28,7 @@ namespace Client.A
                     // this configures the test running on this particular client
                     services.Configure<CacheTesterOptions>(options =>
                     {
-                        options.PublisherCacheGrainKey = "A";
+                        options.AggregatorCacheGrainKey = "A|B";
                     });
 
                     // this tells the generic host to stay quiet

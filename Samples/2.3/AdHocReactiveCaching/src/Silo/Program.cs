@@ -14,6 +14,8 @@ namespace Silo
     {
         static Task Main(string[] args)
         {
+            Console.Title = nameof(Silo);
+
             return new HostBuilder()
                 .UseOrleans(builder =>
                 {

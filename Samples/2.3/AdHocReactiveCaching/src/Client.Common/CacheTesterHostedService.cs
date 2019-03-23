@@ -14,7 +14,7 @@ namespace Client.Common
         private readonly ILogger<CacheTesterHostedService> _logger;
         private readonly IClusterClient _client;
         private readonly CacheTesterOptions _options;
-        private Task _workload;
+        private readonly CancellationTokenSource _workloadCancellation = new CancellationTokenSource();
 
         public CacheTesterHostedService(ILogger<CacheTesterHostedService> logger, IOptions<CacheTesterOptions> options, IClusterClient client)
         {
@@ -25,19 +25,53 @@ namespace Client.Common
 
         public Task StartAsync(CancellationToken cancellationToken)
         {
-            // output the current value of the configured cached grain every second
-            _workload = Task.Run(async () =>
+            // output the current value of the configured publisher cache grain every second
+            if (_options.PublisherCacheGrainKey != null)
             {
-                while (true)
+                Task.Run(async () =>
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(1));
+                    while (!_workloadCancellation.IsCancellationRequested)
+                    {
+                        try
+                        {
+                            await Task.Delay(TimeSpan.FromSeconds(1), _workloadCancellation.Token);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            return;
+                        }
 
-                    var value = await _client.GetGrain<IProducerCacheGrain>(_options.CacheGrainKey).GetAsync();
-                    _logger.LogInformation(
-                        "{@GrainType} {@GrainKey} returned value {@Value}",
-                        nameof(IProducerCacheGrain), _options.CacheGrainKey, value);
-                }
-            });
+                        var value = await _client.GetGrain<IProducerCacheGrain>(_options.PublisherCacheGrainKey).GetAsync();
+                        _logger.LogInformation(
+                            "{@GrainType} {@GrainKey} returned value {@Value}",
+                            nameof(IProducerCacheGrain), _options.PublisherCacheGrainKey, value);
+                    }
+                }).Ignore();
+            }
+
+            // output the current value of the configured aggregator grain every second
+            if (_options.AggregatorCacheGrainKey != null)
+            {
+                Task.Run(async () =>
+                {
+                    while (!_workloadCancellation.IsCancellationRequested)
+                    {
+                        try
+                        {
+                            await Task.Delay(TimeSpan.FromSeconds(1), _workloadCancellation.Token);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            return;
+                        }
+
+                        var value = await _client.GetGrain<IAggregatorCacheGrain>(_options.AggregatorCacheGrainKey).GetAsync();
+                        _logger.LogInformation(
+                            "{@GrainType} {@GrainKey} returned value {@Value}",
+                            nameof(IAggregatorCacheGrain), _options.AggregatorCacheGrainKey, value);
+                    }
+                }).Ignore();
+            }
 
             return Task.CompletedTask;
         }
