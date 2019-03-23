@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans;
+using Orleans.Runtime;
 
 namespace Presence.PlayerWatcher
 {
@@ -63,7 +64,17 @@ namespace Presence.PlayerWatcher
             });
         }
 
-        public Task StopAsync(CancellationToken cancellationToken) => Client.Close();
+        public async Task StopAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                await Client.Close();
+            }
+            catch (OrleansException error)
+            {
+                _logger.LogWarning(error, "Error while gracefully disconnecting from Orleans cluster. Will ignore and continue to shutdown.");
+            }
+        }
 
         public IClusterClient Client { get; }
     }
