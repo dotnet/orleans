@@ -28,7 +28,7 @@ namespace Chirper.Silo
 
                     .AddFilter("Orleans.Runtime.Management.ManagementGrain", LogLevel.Warning)
                     .AddFilter("Orleans.Runtime.SiloControl", LogLevel.Warning)
-                    .AddConsole())
+                    .AddConsole())              
 
                 .RunConsoleAsync();
         }

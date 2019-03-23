@@ -21,7 +21,11 @@ namespace Chirper.Client
                     .AddSingleton<ClusterClientHostedService>()
                     .AddSingleton<IHostedService>(_ => _.GetService<ClusterClientHostedService>())
                     .AddSingleton(_ => _.GetService<ClusterClientHostedService>().Client)
-                    .AddSingleton<IHostedService, ShellHostedService>())
+                    .AddSingleton<IHostedService, ShellHostedService>()
+                    .Configure<ConsoleLifetimeOptions>(_ =>
+                    {
+                        _.SuppressStatusMessages = true;
+                    }))
 
                 .ConfigureLogging(builder => builder
 
