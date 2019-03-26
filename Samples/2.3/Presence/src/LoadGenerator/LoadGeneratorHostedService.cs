@@ -3,7 +3,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Presence.Grains;
@@ -11,70 +11,39 @@ using Presence.Grains.Models;
 
 namespace Presence.LoadGenerator
 {
-    public class Program
+    public class LoadGeneratorHostedService : IHostedService
     {
-        public static async Task Main(string[] args)
+        private readonly ILogger<LoadGeneratorHostedService> _logger;
+        private readonly IClusterClient _client;
+        private readonly CancellationTokenSource _executionCancellation = new CancellationTokenSource();
+
+        private Task _execution;
+
+        public LoadGeneratorHostedService(ILogger<LoadGeneratorHostedService> logger, IClusterClient client)
         {
-            Console.Title = nameof(LoadGenerator);
-
-            // wire-up graceful termination in response to Ctrl+C
-            var cancellation = new CancellationTokenSource();
-            Console.CancelKeyPress += (sender, eargs) =>
-            {
-                eargs.Cancel = true;
-                cancellation.Cancel();
-            };
-
-            try
-            {
-                await RunAsync(args, cancellation.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                // supress any cancellation exceptions
-            }
+            _logger = logger;
+            _client = client;
         }
 
-        private static async Task RunAsync(string[] args, CancellationToken token)
+        public Task StartAsync(CancellationToken cancellationToken)
         {
-            // build the orleans client
-            var client = new ClientBuilder()
-                .UseLocalhostClustering()
-                .ConfigureLogging(_ =>
-                {
-                    _.AddConsole();
-                })
-                .Build();
+            // start the load generation on the background
+            _execution = RunAsync();
+            return Task.CompletedTask;
+        }
 
-            // keep a logger for general use
-            var logger = client.ServiceProvider.GetService<ILogger<Program>>();
+        public Task StopAsync(CancellationToken cancellationToken)
+        {
+            // request cancellation of the background load generation
+            _executionCancellation.Cancel();
 
-            // connect to the orleans cluster
-            var attempt = 0;
-            var maxAttempts = 100;
-            var delay = TimeSpan.FromSeconds(1);
-            await client.Connect(async error =>
-            {
-                if (++attempt < maxAttempts)
-                {
-                    logger.LogWarning(error,
-                        "Failed to connect to Orleans cluster on attempt {@Attempt} of {@MaxAttempts}.",
-                        attempt, maxAttempts);
+            // wait until load generation gracefully completes
+            // or the caller forces shutdown
+            return Task.WhenAny(_execution, cancellationToken.GetCompletionTask());
+        }
 
-                    await Task.Delay(delay, token);
-
-                    return true;
-                }
-                else
-                {
-                    logger.LogError(error,
-                        "Failed to connect to Orleans cluster on attempt {@Attempt} of {@MaxAttempts}.",
-                        attempt, maxAttempts);
-
-                    return false;
-                }
-            });
-
+        private async Task RunAsync()
+        {
             // number of games to simulate
             var nGames = 10;
 
@@ -102,12 +71,12 @@ namespace Presence.LoadGenerator
             var iteration = 0;
 
             // PresenceGrain is a StatelessWorker, so we use a single grain ID for auto-scale
-            var presence = client.GetGrain<IPresenceGrain>(0);
+            var presence = _client.GetGrain<IPresenceGrain>(0);
             var promises = new Task[nGames];
 
             while (++iteration < nIterations)
             {
-                logger.LogInformation("Sending heartbeat series #{@Iteration}", iteration);
+                _logger.LogInformation("Sending heartbeat series #{@Iteration}", iteration);
 
                 try
                 {
@@ -125,13 +94,24 @@ namespace Presence.LoadGenerator
 
                     // Wait for all calls to finish.
                     await Task.WhenAll(promises);
+
+                    // check for cancellation request
+                    if (_executionCancellation.IsCancellationRequested)
+                        return;
                 }
                 catch (Exception error)
                 {
-                    logger.LogError(error, "Error while sending hearbeats to Orleans cluster");
+                    _logger.LogError(error, "Error while sending hearbeats to Orleans cluster");
                 }
 
-                await Task.Delay(sendInterval, token);
+                try
+                {
+                    await Task.Delay(sendInterval, _executionCancellation.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
             }
         }
 
