@@ -26,7 +26,7 @@ Before a grain client can be used for making calls to grains hosted in an Orlean
 
 Configuration is provided via  `ClientBuilder` and a number of supplemental option classes that contain a hierarchy of configuration properties for programmatically configuring a client.
 
-More information can be in the [Client Configuration guide](../clusters_and_clients/configuration_guide/client_configuration.md).
+More information can be in the [Client Configuration guide](configuration_guide/client_configuration.md).
 
 Example of a client configuration:
 
@@ -57,8 +57,8 @@ await client.Connect();
 
 ### Making Calls to Grains
 
-Making calls to grain from a client is really no different from [making such calls from within grain code](/grains/developing_a_grain.md).
-The same `GetGrain<T>(key)` method, where `T` is the target grain interface, is used in both cases [to obtain grain references](/grains/developing_a_grain.md#grain-reference).
+Making calls to grain from a client is really no different from [making such calls from within grain code](../grains/index.md).
+The same `GetGrain<T>(key)` method, where `T` is the target grain interface, is used in both cases [to obtain grain references](../grains/index.md#grain-reference).
 The slight difference is in through what factory object we invoke `GetGrain`.
 In client code we do that through the connected client object.
 
@@ -68,7 +68,7 @@ Task t = player.JoinGame(game)
 await t;
 ```
 
-A call to a grain method returns a `Task` or a`Task<T>` as required by the [grain interface rules](/grains/developing_a_grain.md).
+A call to a grain method returns a `Task` or a`Task<T>` as required by the [grain interface rules](../grains/index.md).
 The client can use the `await` keyword to asynchronously await the returned `Task` without blocking the thread, or in some cases the `Wait()` method to block the current thread of execution.
 
 The major difference between making calls to grains from client code and from within another grain is the single-threaded execution model of grains.
