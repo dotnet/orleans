@@ -43,7 +43,7 @@ A grain can have persistent state in storage, in-memory state, or both.
 Any grain can be called by any other grain or by a frontend (client) by using the target grain's logical identity without the need to ever create or instantiate the target grain.
 The Orleans programming model makes grains appear as if they are in memory the whole time.
 In reality, a grain goes through the lifecycle from existing only as its persisted state in storage, to being instantiated in memory, to being removed from memory.
-See also [Grain Lifecycle](/grains/grain_lifecycle.md).
+See also [Grain Lifecycle](grains/grain_lifecycle.md).
 
 
 ![](./images/grain_lifecycle.png)
