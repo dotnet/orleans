@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 
-namespace Presence.PlayerWatcher
+namespace Presence.Shared
 {
     public class ClusterClientHostedService : IHostedService
     {

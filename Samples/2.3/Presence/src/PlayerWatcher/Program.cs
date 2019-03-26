@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Presence.Grains;
+using Presence.Shared;
 
 namespace Presence.PlayerWatcher
 {
