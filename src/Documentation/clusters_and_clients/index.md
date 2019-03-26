@@ -68,7 +68,7 @@ Task t = player.JoinGame(game)
 await t;
 ```
 
-A call to a grain method returns a `Task` or a`Task<T>` as required by the [grain interface rules](/grains/developing_a_grain.md).
+A call to a grain method returns a `Task` or a`Task<T>` as required by the [grain interface rules](/grains/index.md).
 The client can use the `await` keyword to asynchronously await the returned `Task` without blocking the thread, or in some cases the `Wait()` method to block the current thread of execution.
 
 The major difference between making calls to grains from client code and from within another grain is the single-threaded execution model of grains.
