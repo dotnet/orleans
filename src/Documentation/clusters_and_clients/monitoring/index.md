@@ -26,12 +26,12 @@ To configure your silo and client to use telemetry consumers, silo configuration
 ```c#
 var siloHostBuilder = new SiloHostBuilder();
 //configure the silo with AITelemetryConsumer
-siloHostBuilder.Configure<TelemetryOptions>(options => options.AddConsumer<AITelemetryConsumer>);
+siloHostBuilder.AddApplicationInsightsTelemetryConsumer("INSTRUMENTATION_KEY");
 ```
 
 client configuration code look like this: 
 ```c#
 var clientBuilder = new ClientBuilder();
 //configure the clientBuilder with AITelemetryConsumer
-clientBuilder.Configure<TelemetryOptions>(options => options.AddConsumer<AITelemetryConsumer>);
+clientBuilder.AddApplicationInsightsTelemetryConsumer("INSTRUMENTATION_KEY");
 ```
