@@ -9,7 +9,7 @@ namespace Stocks.Grains
     public class StockGrain : Grain, IStockGrain
     {
         // request api key from here https://www.alphavantage.co/support/#api-key
-        private const string apiKey = "demo";
+        private const string ApiKey = "demo";
         string price;
         string graphData;
 
@@ -44,7 +44,7 @@ namespace Stocks.Grains
 
         async Task<string> GetPriceQuote(string stock)
         {
-            var uri = $"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={stock}&apikey={apiKey}&datatype=csv";
+            var uri = $"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={stock}&apikey={ApiKey}&datatype=csv";
             using (var http = new HttpClient())
             using (var resp = await http.GetAsync(uri))
             {
@@ -54,7 +54,7 @@ namespace Stocks.Grains
 
         async Task<string> GetDailySeries(string stock)
         {
-            var uri = $"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={stock}&apikey={apiKey}&datatype=csv";
+            var uri = $"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={stock}&apikey={ApiKey}&datatype=csv";
             using (var http = new HttpClient())
             using (var resp = await http.GetAsync(uri))
             {
