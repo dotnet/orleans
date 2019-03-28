@@ -23,4 +23,4 @@ title: Load Balancing
 
 Also notice that **balancing, in a broad sense, does not necessarily mean loss of locality**. One can be balanced and still maintain a good locality. For example, when balancing means sharding/partitioning, you can partition responsibility for a certain logical task, while still maintaining  locality within each partition. That applies both for local and distributed balancing.
 
-Refer to this presentation on [Balancing Techniques in Orleans](http://dotnet.github.io/orleans/Presentations/Balancing Techniques in Orleans.pptx) for more details.
+Refer to this presentation on [Balancing Techniques in Orleans](http://dotnet.github.io/orleans/Presentations/Balancing%20Techniques%20in%20Orleans.pptx) for more details.
