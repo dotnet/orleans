@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis;
@@ -45,7 +45,7 @@ namespace Orleans.CodeGenerator.Generators
             foreach (var type in interfaces)
             {
                 var interfaceId = types.GetTypeId(type);
-                var allMethods = new[] {type}.Concat(type.AllInterfaces).SelectMany(i => i.GetMembers().OfType<IMethodSymbol>());
+                var allMethods = new[] {type}.Concat(type.AllInterfaces).SelectMany(i => i.GetDeclaredInstanceMembers<IMethodSymbol>());
 
                 var methodCases = new List<SwitchSectionSyntax>();
 
