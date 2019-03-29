@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using System.Threading.Tasks;
 using Grains.Models;
 using Microsoft.Extensions.Logging;
@@ -14,9 +13,8 @@ namespace Grains
         private readonly ILogger<AggregatorGrain> _logger;
         private IProducerGrain _leftGrain;
         private IProducerGrain _rightGrain;
-        private Task _leftPollTask;
-        private Task _rightPollTask;
-        private CancellationTokenSource _cancellation = new CancellationTokenSource();
+        private IDisposable _leftPollTimer;
+        private IDisposable _rightPollTimer;
         private TaskCompletionSource<VersionedValue<int>> _wait = new TaskCompletionSource<VersionedValue<int>>();
 
         private VersionedValue<int> _leftValue = VersionedValue<int>.Default;
@@ -44,17 +42,10 @@ namespace Grains
             await FulfillAsync();
 
             // start long polling
-            _leftPollTask = LongPollLeftAsync();
-            _rightPollTask = LongPollRightAsync();
+            _leftPollTimer = RegisterTimer(_ => LongPollLeftAsync(), null, TimeSpan.Zero, TimeSpan.FromMilliseconds(1));
+            _rightPollTimer = RegisterTimer(_ => LongPollRightAsync(), null, TimeSpan.Zero, TimeSpan.FromMilliseconds(1));
 
             await base.OnActivateAsync();
-        }
-
-        public override Task OnDeactivateAsync()
-        {
-            _cancellation.Cancel();
-
-            return base.OnDeactivateAsync();
         }
 
         public Task<VersionedValue<int>> GetAsync() => Task.FromResult(_sumValue);
@@ -66,31 +57,25 @@ namespace Grains
 
         private async Task LongPollLeftAsync()
         {
-            while (!_cancellation.IsCancellationRequested)
+            try
             {
-                try
-                {
-                    _leftValue = await _leftGrain.LongPollAsync(_leftValue.Version);
-                    await FulfillAsync();
-                }
-                catch (TimeoutException)
-                {
-                }
+                _leftValue = await _leftGrain.LongPollAsync(_leftValue.Version);
+                await FulfillAsync();
+            }
+            catch (TimeoutException)
+            {
             }
         }
 
         private async Task LongPollRightAsync()
         {
-            while (!_cancellation.IsCancellationRequested)
+            try
             {
-                try
-                {
-                    _rightValue = await _rightGrain.LongPollAsync(_rightValue.Version);
-                    await FulfillAsync();
-                }
-                catch (TimeoutException)
-                {
-                }
+                _rightValue = await _rightGrain.LongPollAsync(_rightValue.Version);
+                await FulfillAsync();
+            }
+            catch (TimeoutException)
+            {
             }
         }
 
