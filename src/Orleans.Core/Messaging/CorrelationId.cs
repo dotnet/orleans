@@ -5,8 +5,6 @@ namespace Orleans.Runtime
     [Serializable]
     internal class CorrelationId : IEquatable<CorrelationId>, IComparable<CorrelationId>
     {
-        public const int SIZE_BYTES = 8;
-
         private readonly long id;
         private static long nextToUse = 1;
 
@@ -15,26 +13,15 @@ namespace Orleans.Runtime
             id = value;
         }
 
-        internal CorrelationId(string s)
+        internal CorrelationId() : this(0)
         {
-            id = Int64.Parse(s);
-        }
-
-        public CorrelationId()
-        {
-            id = 0;
         }
 
         public CorrelationId(CorrelationId other)
         {
             id = other.id;
         }
-
-        internal CorrelationId(byte[] a)
-        {
-            id = BitConverter.ToInt64(a, 0);
-        }
-
+        
         public static CorrelationId GetNext()
         {
             long val = System.Threading.Interlocked.Increment(ref nextToUse);
@@ -78,7 +65,7 @@ namespace Orleans.Runtime
 
         public static bool operator !=(CorrelationId lhs, CorrelationId rhs)
         {
-            return (rhs?.id != lhs?.id);
+            return rhs.id != lhs.id;
         }
 
         public int CompareTo(CorrelationId other)
@@ -91,9 +78,6 @@ namespace Orleans.Runtime
             return id.ToString();
         }
 
-        internal byte[] ToByteArray()
-        {
-            return BitConverter.GetBytes(id);
-        }
+        internal long ToInt64() => this.id;
     }
 }

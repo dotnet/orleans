@@ -2015,8 +2015,8 @@ namespace Orleans.Serialization
 
         internal static object DeserializeCorrelationId(Type expected, IDeserializationContext context)
         {
-            var bytes = context.StreamReader.ReadBytes(CorrelationId.SIZE_BYTES);
-            return new CorrelationId(bytes);
+            var id = context.StreamReader.ReadLong();
+            return new CorrelationId(id);
         }
 
         internal static object CopyCorrelationId(object original, ICopyContext context)
