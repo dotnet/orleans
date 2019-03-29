@@ -8,13 +8,13 @@ using Orleans.Concurrency;
 namespace Grains
 {
     [Reentrant]
-    public class AggregatorGrain : Grain, IAggregatorGrain
+    public class AggregatorGrain : ReactiveGrain, IAggregatorGrain
     {
         private readonly ILogger<AggregatorGrain> _logger;
         private IProducerGrain _leftGrain;
         private IProducerGrain _rightGrain;
-        private IDisposable _leftPollTimer;
-        private IDisposable _rightPollTimer;
+        private IDisposable _leftPoll;
+        private IDisposable _rightPoll;
         private TaskCompletionSource<VersionedValue<int>> _wait = new TaskCompletionSource<VersionedValue<int>>();
 
         private VersionedValue<int> _leftValue = VersionedValue<int>.Default;
@@ -41,9 +41,19 @@ namespace Grains
             _rightValue = await _rightGrain.GetAsync();
             await FulfillAsync();
 
-            // start long polling
-            _leftPollTimer = RegisterTimer(_ => LongPollLeftAsync(), null, TimeSpan.Zero, TimeSpan.FromMilliseconds(1));
-            _rightPollTimer = RegisterTimer(_ => LongPollRightAsync(), null, TimeSpan.Zero, TimeSpan.FromMilliseconds(1));
+            // start long polling the left grain
+            _leftPoll = RegisterReactivePoll(async () =>
+            {
+                _leftValue = await _leftGrain.LongPollAsync(_leftValue.Version);
+                await FulfillAsync();
+            });
+
+            // start long polling the right grain
+            _rightPoll = RegisterReactivePoll(async () =>
+            {
+                _rightValue = await _rightGrain.LongPollAsync(_rightValue.Version);
+                await FulfillAsync();
+            });
 
             await base.OnActivateAsync();
         }
@@ -54,30 +64,6 @@ namespace Grains
             knownVersion == _sumValue.Version
             ? _wait.Task
             : Task.FromResult(_sumValue);
-
-        private async Task LongPollLeftAsync()
-        {
-            try
-            {
-                _leftValue = await _leftGrain.LongPollAsync(_leftValue.Version);
-                await FulfillAsync();
-            }
-            catch (TimeoutException)
-            {
-            }
-        }
-
-        private async Task LongPollRightAsync()
-        {
-            try
-            {
-                _rightValue = await _rightGrain.LongPollAsync(_rightValue.Version);
-                await FulfillAsync();
-            }
-            catch (TimeoutException)
-            {
-            }
-        }
 
         private Task FulfillAsync()
         {
