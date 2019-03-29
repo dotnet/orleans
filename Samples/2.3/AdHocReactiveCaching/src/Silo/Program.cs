@@ -52,6 +52,11 @@ namespace Silo
                 .ConfigureLogging(builder =>
                 {
                     builder.AddConsole();
+
+                    // ignore message timeout errors
+                    // this pattern relies on orleans breaking promises and hence will trigger timeout warnings in the silo
+                    builder.AddFilter("Orleans.Runtime.Scheduler.WorkItemGroup", LogLevel.Error);
+                    builder.AddFilter("Orleans.Runtime.CallbackData", LogLevel.Error);
                 })
                 .ConfigureServices(services =>
                 {
