@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using System.Threading.Tasks;
 using Grains.Models;
 using Microsoft.Extensions.Logging;
@@ -13,9 +12,8 @@ namespace Grains
     public class ProducerCacheGrain : Grain, IProducerCacheGrain
     {
         private readonly ILogger<ProducerCacheGrain> _logger;
-        private readonly CancellationTokenSource _token = new CancellationTokenSource();
         private VersionedValue<int> _cache;
-        private Task _pollTask;
+        private IDisposable _pollTimer;
 
         public ProducerCacheGrain(ILogger<ProducerCacheGrain> logger)
         {
@@ -31,30 +29,20 @@ namespace Grains
             _cache = await GrainFactory.GetGrain<IProducerGrain>(GrainKey).GetAsync();
 
             // start polling
-            _pollTask = PollAsync();
+            _pollTimer = RegisterTimer(_ => PollAsync(), null, TimeSpan.Zero, TimeSpan.FromMilliseconds(1));
 
             await base.OnActivateAsync();
         }
 
-        public override Task OnDeactivateAsync()
-        {
-            _token.Cancel();
-
-            return base.OnDeactivateAsync();
-        }
-
         private async Task PollAsync()
         {
-            while (!_token.IsCancellationRequested)
+            try
             {
-                try
-                {
-                    _cache = await GrainFactory.GetGrain<IProducerGrain>(GrainKey).LongPollAsync(_cache.Version);
-                }
-                catch (TimeoutException error)
-                {
-                    _logger.LogDebug(error, "{@GrainType} {@GrainKey} long polling broken. Polling again...");
-                }
+                _cache = await GrainFactory.GetGrain<IProducerGrain>(GrainKey).LongPollAsync(_cache.Version);
+            }
+            catch (TimeoutException error)
+            {
+                _logger.LogDebug(error, "{@GrainType} {@GrainKey} long polling broken. Polling again...");
             }
         }
 
