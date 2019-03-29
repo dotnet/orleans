@@ -43,8 +43,8 @@ namespace Client.Common
 
                         var value = await _client.GetGrain<IProducerCacheGrain>(_options.PublisherCacheGrainKey).GetAsync();
                         _logger.LogInformation(
-                            "{@GrainType} {@GrainKey} returned value {@Value}",
-                            nameof(IProducerCacheGrain), _options.PublisherCacheGrainKey, value);
+                            "{@Time}: {@GrainType} {@GrainKey} returned value {@Value}",
+                            DateTime.Now.TimeOfDay, nameof(IProducerCacheGrain), _options.PublisherCacheGrainKey, value);
                     }
                 }).Ignore();
             }
@@ -67,8 +67,8 @@ namespace Client.Common
 
                         var value = await _client.GetGrain<IAggregatorCacheGrain>(_options.AggregatorCacheGrainKey).GetAsync();
                         _logger.LogInformation(
-                            "{@GrainType} {@GrainKey} returned value {@Value}",
-                            nameof(IAggregatorCacheGrain), _options.AggregatorCacheGrainKey, value);
+                            "{@Time}: {@GrainType} {@GrainKey} returned value {@Value}",
+                            DateTime.Now.TimeOfDay, nameof(IAggregatorCacheGrain), _options.AggregatorCacheGrainKey, value);
                     }
                 }).Ignore();
             }

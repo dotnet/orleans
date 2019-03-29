@@ -32,6 +32,9 @@ namespace Grains
             _poll = RegisterReactivePoll(async () =>
             {
                 _cache = await GrainFactory.GetGrain<IAggregatorGrain>(GrainKey).LongPollAsync(_cache.Version);
+                _logger.LogInformation(
+                    "{@Time}: {@GrainType} {@GrainKey} updated value to {@Value} with version {@Version}",
+                    DateTime.Now.TimeOfDay, GrainType, GrainKey, _cache.Value, _cache.Version);
             });
 
             await base.OnActivateAsync();

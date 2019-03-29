@@ -45,6 +45,9 @@ namespace Grains
             _leftPoll = RegisterReactivePoll(async () =>
             {
                 _leftValue = await _leftGrain.LongPollAsync(_leftValue.Version);
+                _logger.LogInformation(
+                    "{@Time}: {@GrainType} {@GrainKey} updated left value to {@Value} with version {@Version}",
+                    DateTime.Now.TimeOfDay, GrainType, GrainKey, _leftValue.Value, _leftValue.Version);
                 await FulfillAsync();
             });
 
@@ -52,6 +55,9 @@ namespace Grains
             _rightPoll = RegisterReactivePoll(async () =>
             {
                 _rightValue = await _rightGrain.LongPollAsync(_rightValue.Version);
+                _logger.LogInformation(
+                    "{@Time}: {@GrainType} {@GrainKey} updated right value to {@Value} with version {@Version}",
+                    DateTime.Now.TimeOfDay, GrainType, GrainKey, _rightValue.Value, _rightValue.Version);
                 await FulfillAsync();
             });
 
@@ -68,6 +74,9 @@ namespace Grains
         private Task FulfillAsync()
         {
             _sumValue = _sumValue.NextVersion(_leftValue.Value + _rightValue.Value);
+            _logger.LogInformation(
+                    "{@Time}: {@GrainType} {@GrainKey} updated sum value to {@Value} with version {@Version}",
+                    DateTime.Now.TimeOfDay, GrainType, GrainKey, _sumValue.Value, _sumValue.Version);
             _wait.SetResult(_sumValue);
             _wait = new TaskCompletionSource<VersionedValue<int>>();
             return Task.CompletedTask;
