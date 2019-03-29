@@ -13,6 +13,7 @@ This sample is based upon the reactive polling algorithm as described on [Reacti
 The solution contains these grains:
 
 * `ProducerGrain`: Stores an integer value, which it increments by some quantity at some frequency. The quantity and frequency are configurable.
+* `ReactiveGrain`: A base grain class that provides a `RegisterReactivePoll()` helper method. The grains below derive from this class.
 * `ProducerCacheGrain`: A `[StatelessWorker]` grain that keeps up to date with a `ProducerGrain` of the same key via reactive long polling.
 * `AggregatorGrain`: Adds the values of two arbitrary `ProducerGrain` by using long polling to keep up to date. Makes its aggregation value available via reactive long polling.
 * `AggregatorCacheGrain`: A `[StatelessWorker]` grain that keeps up to date with an `AggregatorGrain` of the same key via reactive long polling.
