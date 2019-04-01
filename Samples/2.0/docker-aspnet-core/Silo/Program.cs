@@ -26,7 +26,7 @@ namespace Silo
                     options.ServiceId = "AspNetSampleApp";
                 })
                 .UseAzureStorageClustering(options => options.ConnectionString = connectionString)
-                .ConfigureEndpoints(siloPort: 11111, gatewayPort: 30000)
+                .ConfigureEndpoints(new Random(Guid.NewGuid().GetHashCode()).Next(30001, 30100), new Random(Guid.NewGuid().GetHashCode()).Next(20001, 20100), listenOnAnyHostAddress: true)
                 .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(ValueGrain).Assembly).WithReferences())
                 .ConfigureLogging(builder => builder.SetMinimumLevel(LogLevel.Warning).AddConsole())
                 .Build();
