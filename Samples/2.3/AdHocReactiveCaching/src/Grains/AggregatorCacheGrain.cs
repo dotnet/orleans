@@ -25,25 +25,25 @@ namespace Grains
 
         public override async Task OnActivateAsync()
         {
-            // hydrate the cache with whatever value is available right now
-            _cache = await GrainFactory.GetGrain<IAggregatorGrain>(GrainKey).GetAsync();
-
             // start polling
-            _poll = RegisterReactivePoll(async () =>
-            {
-                var update = await GrainFactory.GetGrain<IAggregatorGrain>(GrainKey).LongPollAsync(_cache.Version);
-                if (update.IsValid)
+            _poll = await RegisterReactivePollAsync(
+                () => GrainFactory.GetGrain<IAggregatorGrain>(GrainKey).GetAsync(),
+                () => GrainFactory.GetGrain<IAggregatorGrain>(GrainKey).LongPollAsync(_cache.Version),
+                result => result.IsValid,
+                success =>
                 {
-                    _cache = update;
-                }
-                else
+                    _cache = success;
+                    _logger.LogInformation(
+                        "{@Time}: {@GrainType} {@GrainKey} updated value to {@Value} with version {@Version}",
+                        DateTime.Now.TimeOfDay, GrainType, GrainKey, _cache.Value, _cache.Version);
+
+                    return Task.CompletedTask;
+                },
+                failed =>
                 {
                     _logger.LogWarning("The reactive poll timed out by returning a 'none' response before Orleans could break the promise.");
-                }
-                _logger.LogInformation(
-                    "{@Time}: {@GrainType} {@GrainKey} updated value to {@Value} with version {@Version}",
-                    DateTime.Now.TimeOfDay, GrainType, GrainKey, _cache.Value, _cache.Version);
-            });
+                    return Task.CompletedTask;
+                });
 
             await base.OnActivateAsync();
         }

@@ -45,46 +45,49 @@ namespace Grains
             _leftGrain = GrainFactory.GetGrain<IProducerGrain>(parts[0]);
             _rightGrain = GrainFactory.GetGrain<IProducerGrain>(parts[1]);
 
-            // get the starting values as they are now
+            // get the starting values as they are now before starting to long poll
             _leftValue = await _leftGrain.GetAsync();
             _rightValue = await _rightGrain.GetAsync();
             await FulfillAsync();
 
             // start long polling the left grain
-            _leftPoll = RegisterReactivePoll(async () =>
-            {
-                var update = await _leftGrain.LongPollAsync(_leftValue.Version);
-                if (update.IsValid)
+            _leftPoll = await RegisterReactivePollAsync(
+                null, // dont initialize for this one
+                () => _leftGrain.LongPollAsync(_leftValue.Version),
+                result => result.IsValid,
+                apply =>
                 {
-                    _leftValue = update;
-                }
-                else
+                    _leftValue = apply;
+                    _logger.LogInformation(
+                        "{@Time}: {@GrainType} {@GrainKey} updated left value to {@Value} with version {@Version}",
+                        DateTime.Now.TimeOfDay, GrainType, GrainKey, _leftValue.Value, _leftValue.Version);
+
+                    return FulfillAsync();
+                },
+                failed =>
                 {
                     _logger.LogWarning("The reactive poll timed out by returning a 'none' response before Orleans could break the promise.");
-                }
-                _logger.LogInformation(
-                    "{@Time}: {@GrainType} {@GrainKey} updated left value to {@Value} with version {@Version}",
-                    DateTime.Now.TimeOfDay, GrainType, GrainKey, _leftValue.Value, _leftValue.Version);
-                await FulfillAsync();
-            });
+                    return Task.CompletedTask;
+                });
 
             // start long polling the right grain
-            _rightPoll = RegisterReactivePoll(async () =>
-            {
-                var update = await _rightGrain.LongPollAsync(_rightValue.Version);
-                if (update.IsValid)
+            _rightPoll = await RegisterReactivePollAsync(
+                null, // dont initialize for this one
+                () => _rightGrain.LongPollAsync(_rightValue.Version),
+                result => result.IsValid,
+                apply =>
                 {
-                    _rightValue = update;
-                }
-                else
+                    _rightValue = apply;
+                    _logger.LogInformation(
+                        "{@Time}: {@GrainType} {@GrainKey} updated right value to {@Value} with version {@Version}",
+                        DateTime.Now.TimeOfDay, GrainType, GrainKey, _rightValue.Value, _rightValue.Version);
+                    return FulfillAsync();
+                },
+                failed =>
                 {
                     _logger.LogWarning("The reactive poll timed out by returning a 'none' response before Orleans could break the promise.");
-                }
-                _logger.LogInformation(
-                    "{@Time}: {@GrainType} {@GrainKey} updated right value to {@Value} with version {@Version}",
-                    DateTime.Now.TimeOfDay, GrainType, GrainKey, _rightValue.Value, _rightValue.Version);
-                await FulfillAsync();
-            });
+                    return Task.CompletedTask;
+                });
 
             await base.OnActivateAsync();
         }
