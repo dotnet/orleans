@@ -13,7 +13,7 @@ This sample is based upon the reactive polling algorithm as described on [Reacti
 The solution contains these grains:
 
 * `ProducerGrain`: Stores an integer value, which it increments by some quantity at some frequency. The quantity and frequency are configurable.
-* `ReactiveGrain`: A base grain class that provides a `RegisterReactivePoll()` helper method. The grains below derive from this class.
+* `ReactiveGrain`: A base grain class that provides a `RegisterReactivePollAsync()` helper method. The grains below derive from this class.
 * `ProducerCacheGrain`: A `[StatelessWorker]` grain that keeps up to date with a `ProducerGrain` of the same key via reactive long polling.
 * `AggregatorGrain`: Adds the values of two arbitrary `ProducerGrain` by using long polling to keep up to date. Makes its aggregation value available via reactive long polling.
 * `AggregatorCacheGrain`: A `[StatelessWorker]` grain that keeps up to date with an `AggregatorGrain` of the same key via reactive long polling.
@@ -22,7 +22,7 @@ The grains are set up in this way:
 
 * `ProducerGrain (A)` increments its value by `1` every `5` seconds.
 * `ProducerGrain (B)` increments its value by `10` every `15` seconds.
-* `ResponseTimeout` on both client and silo are reduced to `10` seconds for this sample. This helps demonstrate long polling to `ProducerGrain (B)` fail on `TimeoutException` every so often and recover.
+* `ResponseTimeout` on both client and silo are reduced to `10` seconds for this sample. This helps demonstrate long polling to `ProducerGrain (B)` fail every so often and recover.
 * `Aggregator (A|B)` long polls `ProducerGrain (A)` and `ProducerGrain (B)`.
 
 * `ProducerCacheGrain (A)`, `ProducerCacheGrain (B)` and `AggregatorCacheGrain (A|B)` long poll their respective producer grains.
