@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.ApplicationParts;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -35,7 +35,7 @@ namespace Orleans.Providers
         public ClusterClientMemoryStreamConfigurator(string name, IClientBuilder builder)
          : base(name, builder, MemoryAdapterFactory<TSerializer>.Create)
         {
-            this.clientBuilder
+            builder
                 .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(MemoryAdapterFactory<>).Assembly));
         }
 

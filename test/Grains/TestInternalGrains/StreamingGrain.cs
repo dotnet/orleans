@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -145,7 +145,7 @@ namespace UnitTests.Grains
         [NonSerialized]
         private ILogger _logger;
         [NonSerialized]
-        private IAsyncBatchObserver<StreamItem> _observer;
+        private IAsyncObserver<StreamItem> _observer;
         [NonSerialized]
         private Dictionary<IDisposable, TimerState> _timers;
 

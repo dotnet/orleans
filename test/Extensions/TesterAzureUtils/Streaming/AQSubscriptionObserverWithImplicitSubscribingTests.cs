@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -48,13 +48,13 @@ namespace Tester.AzureUtils.Streaming
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
-                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamProviderName, sb=>sb.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
+                    .AddAzureQueueStreams(StreamProviderName, sb=>sb.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.QueueNames = AzureQueueUtilities.GenerateQueueNames($"{dep.Value.ClusterId}{StreamProviderName}", queueCount);
                         })).Configure<StreamPubSubOptions>(ob => ob.Configure(op => op.PubSubType = StreamPubSubType.ImplicitOnly)))
-                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamProviderName2, sb => sb.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
+                    .AddAzureQueueStreams(StreamProviderName2, sb => sb.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;

@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.WindowsAzure.Storage.Queue;
 using Orleans.AzureUtils;
 using Orleans.Configuration;
 using Orleans.Serialization;
@@ -11,8 +12,7 @@ using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.AzureQueue
 {
-    internal class AzureQueueAdapter<TDataAdapter> : IQueueAdapter
-        where TDataAdapter : IAzureQueueDataAdapter
+    internal class AzureQueueAdapter : IQueueAdapter
     {
         protected readonly string ServiceId;
         private readonly SerializationManager serializationManager;
@@ -20,7 +20,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         private readonly IAzureStreamQueueMapper streamQueueMapper;
         private readonly ILoggerFactory loggerFactory;
         protected readonly ConcurrentDictionary<QueueId, AzureQueueDataManager> Queues = new ConcurrentDictionary<QueueId, AzureQueueDataManager>();
-        protected readonly IAzureQueueDataAdapter dataAdapter;
+        protected readonly IQueueDataAdapter<CloudQueueMessage, IBatchContainer> dataAdapter;
 
         public string Name { get ; }
         public bool IsRewindable => false;
@@ -28,7 +28,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         public StreamProviderDirection Direction => StreamProviderDirection.ReadWrite;
 
         public AzureQueueAdapter(
-            TDataAdapter dataAdapter,
+            IQueueDataAdapter<CloudQueueMessage, IBatchContainer> dataAdapter,
             SerializationManager serializationManager,
             IAzureStreamQueueMapper streamQueueMapper,
             ILoggerFactory loggerFactory,
@@ -62,7 +62,7 @@ namespace Orleans.Providers.Streams.AzureQueue
                 await tmpQueue.InitQueueAsync();
                 queue = Queues.GetOrAdd(queueId, tmpQueue);
             }
-            var cloudMsg = this.dataAdapter.ToCloudQueueMessage(streamGuid, streamNamespace, events, requestContext);
+            var cloudMsg = this.dataAdapter.ToQueueMessage(streamGuid, streamNamespace, events, requestContext);
             await queue.AddQueueMessage(cloudMsg);
         }
     }

@@ -171,5 +171,12 @@ namespace Orleans.Providers.Streams.Common
             var initOptions = services.GetRequiredService<IOptionsSnapshot<StreamLifecycleOptions>>().Get(name);
             return ActivatorUtilities.CreateInstance<PersistentStreamProvider>(services, name, pubsubOptions, initOptions);
         }
+
+        public static ILifecycleParticipant<TLifecycle> ParticipateIn<TLifecycle>(IServiceProvider serviceProvider, string name)
+            where TLifecycle : ILifecycleObservable
+        {
+            var provider = (PersistentStreamProvider)serviceProvider.GetRequiredServiceByName<IStreamProvider>(name);
+            return provider.ParticipateIn<TLifecycle>();
+        }
     }
 }

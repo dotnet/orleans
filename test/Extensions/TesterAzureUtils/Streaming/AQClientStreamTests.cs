@@ -53,7 +53,7 @@ namespace Tester.AzureUtils.Streaming
             {
                 clientBuilder
                     .Configure<ClusterOptions>(op => op.ServiceId = serviceId)
-                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AQStreamProviderName, ob=>ob.Configure<IOptions<ClusterOptions>>(
+                    .AddAzureQueueStreams(AQStreamProviderName, ob=>ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
@@ -67,7 +67,7 @@ namespace Tester.AzureUtils.Streaming
             {
                 hostBuilder
                     .Configure<ClusterOptions>(op => op.ServiceId = serviceId)
-                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AQStreamProviderName, ob=>ob.Configure<IOptions<ClusterOptions>>(
+                    .AddAzureQueueStreams(AQStreamProviderName, ob=>ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;

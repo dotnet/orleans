@@ -4,10 +4,8 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting;
-using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Tester;
 using TestExtensions;
@@ -30,7 +28,7 @@ namespace UnitTests.StreamingTests
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME, b=>
+                    .AddAzureQueueStreams(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME, b=>
                         b.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>((options, dep) =>
                            {
                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;

@@ -69,9 +69,7 @@
   -->
   <Target Name="OrleansGenerateInputCache"
           DependsOnTargets="ResolveAssemblyReferences"
-          BeforeTargets="OrleansGenerateCode"
-          Inputs="@(Orleans_CodeGenInputs)"
-          Outputs="$(Orleans_CodeGenInputCache)">
+          BeforeTargets="OrleansGenerateCode">
 
     <Hash ItemsToHash="@(Orleans_CodeGenInputs)">
       <Output TaskParameter="HashResult" PropertyName="Orleans_UpdatedInputCacheContents" />

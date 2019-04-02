@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -10,6 +10,7 @@ using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using TestGrainInterfaces;
+using UnitTests.DtosRefOrleans;
 using Xunit;
 
 namespace NonSilo.Tests
@@ -81,6 +82,18 @@ namespace NonSilo.Tests
             {
                 Assert.NotNull(client);
             }
+        }
+
+        [Fact]
+        public void ClientBuilder_ThrowsDuringStartupIfNoGrainInterfacesAdded()
+        {
+            // Add only an assembly with generated serializers but no grain interfaces
+            var clientBuilder = new ClientBuilder()
+                .UseLocalhostClustering()
+                .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(ClassReferencingOrleansTypeDto).Assembly))
+                .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
+
+            Assert.Throws<OrleansConfigurationException>(() => clientBuilder.Build());
         }
 
         /// <summary>

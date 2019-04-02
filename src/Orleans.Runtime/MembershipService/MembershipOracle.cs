@@ -939,7 +939,7 @@ namespace Orleans.Runtime.MembershipService
                             return true;
                         }).Ignore();
             }
-            catch (Exception ex) when (ex is NotImplementedException || ex is NotImplementedException)
+            catch (Exception ex) when (ex is NotImplementedException || ex is MissingMethodException)
             {
                 this.logger.Error(
                     ErrorCode.MembershipCleanDeadEntriesFailure,

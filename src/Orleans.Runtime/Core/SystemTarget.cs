@@ -39,6 +39,16 @@ namespace Orleans.Runtime
             set { this.runtimeClient = value; }
         }
 
+        private ExtensionInvoker extensionInvoker;
+        internal ExtensionInvoker ExtensionInvoker
+        {
+            get
+            {
+                this.lastInvoker = null;
+                return this.extensionInvoker ?? (this.extensionInvoker = new ExtensionInvoker());
+            }
+        }
+
         IGrainReferenceRuntime ISystemTargetBase.GrainReferenceRuntime => this.RuntimeClient.GrainReferenceRuntime;
 
         /// <summary>Only needed to make Reflection happy.</summary>
@@ -63,12 +73,21 @@ namespace Orleans.Runtime
 
         IGrainMethodInvoker IInvokable.GetInvoker(GrainTypeManager typeManager, int interfaceId, string genericGrainType)
         {
-            if (lastInvoker != null && interfaceId == lastInvoker.InterfaceId)
+            // Return previous cached invoker, if applicable
+            if (lastInvoker != null && interfaceId == lastInvoker.InterfaceId) // extension invoker returns InterfaceId==0, so this condition will never be true if an extension is installed
                 return lastInvoker;
 
-            var invoker = typeManager.GetInvoker(interfaceId);
-            lastInvoker = invoker;
-            
+            if (extensionInvoker != null && extensionInvoker.IsExtensionInstalled(interfaceId))
+            {
+                // Shared invoker for all extensions installed on this target
+                lastInvoker = extensionInvoker;
+            }
+            else
+            {
+                // Find the specific invoker for this interface / grain type
+                lastInvoker = typeManager.GetInvoker(interfaceId, genericGrainType);
+            }
+
             return lastInvoker;
         }
 

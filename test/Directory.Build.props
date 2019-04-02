@@ -14,6 +14,9 @@
     <IsPackable>false</IsPackable>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);1591</NoWarn>
+    <!-- Needed for tests to force the generation of binding redirects -->
+    <RuntimeIdentifier>win10-x64</RuntimeIdentifier>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
   </PropertyGroup>
 
   <!-- For test project we still need to target various desktop .Net versions instead of .Net Standard -->

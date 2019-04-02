@@ -1,20 +1,12 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Orleans.Configuration;
-using Orleans.Providers;
-using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
 using System;
-using System.Collections.Generic;
-using System.Text;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Runtime;
+using Orleans.Providers.Streams.Common;
 
 namespace Orleans.Streams
 {
-    public interface IClusterClientPersistentStreamConfigurator
-    {
-        IClusterClientPersistentStreamConfigurator Configure<TOptions>(Action<OptionsBuilder<TOptions>> configureOptions)
-        where TOptions : class, new();
-    }
+    public interface IClusterClientPersistentStreamConfigurator : IComponentConfigurator<IClusterClientPersistentStreamConfigurator> { }
 
     public static class ClusterClientPersistentStreamConfiguratorExtensions
     {
@@ -31,39 +23,14 @@ namespace Orleans.Streams
         }
     }
 
-    public class ClusterClientPersistentStreamConfigurator : IClusterClientPersistentStreamConfigurator
+    public class ClusterClientPersistentStreamConfigurator : NamedServiceConfigurator<IClusterClientPersistentStreamConfigurator>, IClusterClientPersistentStreamConfigurator
     {
-        protected readonly string name;
-        protected readonly IClientBuilder clientBuilder;
-        private Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory;
         public ClusterClientPersistentStreamConfigurator(string name, IClientBuilder clientBuilder, Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory)
+            : base(name, configureDelegate => clientBuilder.ConfigureServices(configureDelegate))
         {
-            this.name = name;
-            this.clientBuilder = clientBuilder;
-            this.adapterFactory = adapterFactory;
-            //wire stream provider into lifecycle 
-            this.clientBuilder.ConfigureServices(services => this.AddPersistentStream(services));
-        }
-
-        private void AddPersistentStream(IServiceCollection services)
-        {
-            //wire the stream provider into life cycle
-            services.AddSingletonNamedService<IStreamProvider>(name, PersistentStreamProvider.Create)
-                           .AddSingletonNamedService<ILifecycleParticipant<IClusterClientLifecycle>>(name, 
-                           (s, n) => ((PersistentStreamProvider)s.GetRequiredServiceByName<IStreamProvider>(n)).ParticipateIn<IClusterClientLifecycle>())
-                           .AddSingletonNamedService<IQueueAdapterFactory>(name, adapterFactory)
-                           .ConfigureNamedOptionForLogging<StreamLifecycleOptions>(name)
-                           .ConfigureNamedOptionForLogging<StreamPubSubOptions>(name);
-        }
-
-        public IClusterClientPersistentStreamConfigurator Configure<TOptions>(Action<OptionsBuilder<TOptions>> configureOptions) where TOptions : class, new()
-        {
-            clientBuilder.ConfigureServices(services =>
-            {
-                configureOptions?.Invoke(services.AddOptions<TOptions>(this.name));
-                services.ConfigureNamedOptionForLogging<TOptions>(this.name);
-            });
-            return this;
+            ConfigureComponent<IStreamProvider>(PersistentStreamProvider.Create);
+            ConfigureComponent<ILifecycleParticipant<IClusterClientLifecycle>>(PersistentStreamProvider.ParticipateIn<IClusterClientLifecycle>);
+            ConfigureComponent<IQueueAdapterFactory>(adapterFactory);
         }
     }
 }
