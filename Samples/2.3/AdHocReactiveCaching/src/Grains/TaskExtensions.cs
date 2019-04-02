@@ -6,7 +6,7 @@ namespace Grains
     public static class TaskExtensions
     {
         /// <summary>
-        /// Returns a task that completes when the this task completes or when the timeout is reached.
+        /// Returns a task that completes when this task completes or when the timeout is reached.
         /// If the timeout is reached, then the task returns the given default value.
         /// </summary>
         public static async Task<T> WithDefaultOnTimeout<T>(this Task<T> task, TimeSpan timeout, T value)
