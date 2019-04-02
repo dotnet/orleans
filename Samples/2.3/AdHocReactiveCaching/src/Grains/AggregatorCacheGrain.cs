@@ -31,7 +31,15 @@ namespace Grains
             // start polling
             _poll = RegisterReactivePoll(async () =>
             {
-                _cache = await GrainFactory.GetGrain<IAggregatorGrain>(GrainKey).LongPollAsync(_cache.Version);
+                var update = await GrainFactory.GetGrain<IAggregatorGrain>(GrainKey).LongPollAsync(_cache.Version);
+                if (update.IsValid)
+                {
+                    _cache = update;
+                }
+                else
+                {
+                    _logger.LogWarning("The reactive poll timed out by returning a 'none' response before Orleans could break the promise.");
+                }
                 _logger.LogInformation(
                     "{@Time}: {@GrainType} {@GrainKey} updated value to {@Value} with version {@Version}",
                     DateTime.Now.TimeOfDay, GrainType, GrainKey, _cache.Value, _cache.Version);

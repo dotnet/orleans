@@ -5,24 +5,22 @@ namespace Grains.Models
     [Immutable]
     public class VersionedValue<T>
     {
-        public VersionedValue(int version, T value)
+        public VersionedValue(VersionToken version, T value)
         {
             Version = version;
             Value = value;
         }
 
-        public int Version { get; }
+        public VersionToken Version { get; }
         public T Value { get; }
 
-        public VersionedValue<T> NextVersion(T value)
-        {
-            unchecked
-            {
-                return new VersionedValue<T>(Version + 1, value);
-            }
+        /// <summary>
+        /// True if the current version is different from <see cref="VersionToken.None"/>, otherwise false.
+        /// </summary>
+        public bool IsValid => Version != VersionToken.None;
 
-        }
+        public VersionedValue<T> NextVersion(T value) => new VersionedValue<T>(Version.Next(), value);
 
-        public static VersionedValue<T> Default { get; } = new VersionedValue<T>(0, default);
+        public static VersionedValue<T> None { get; } = new VersionedValue<T>(VersionToken.None, default);
     }
 }
