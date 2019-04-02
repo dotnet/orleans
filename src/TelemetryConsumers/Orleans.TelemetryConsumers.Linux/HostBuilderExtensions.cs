@@ -55,6 +55,20 @@ namespace Orleans.Statistics
                 services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LinuxEnvironmentStatistics>();
             });
         }
+
+        /// <summary>
+        /// Use Linux host environment statistics
+        /// </summary>
+        public static ISiloBuilder UseLinuxEnvironmentStatistics(this ISiloBuilder builder)
+        {
+            return builder.ConfigureServices(services =>
+            {
+                services.AddTransient<IConfigurationValidator, LinuxEnvironmentStatisticsValidator>();
+                services.AddSingleton<LinuxEnvironmentStatistics>();
+                services.AddFromExisting<IHostEnvironmentStatistics, LinuxEnvironmentStatistics>();
+                services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LinuxEnvironmentStatistics>();
+            });
+        }
     }
 
     public static class ClientBuilderExtensions
