@@ -9,6 +9,6 @@ namespace Grains
     {
         Task StartAsync(int increment, TimeSpan delay);
         Task<VersionedValue<int>> GetAsync();
-        Task<VersionedValue<int>> LongPollAsync(int knownVersion);
+        Task<VersionedValue<int>> LongPollAsync(VersionToken knownVersion);
     }
 }

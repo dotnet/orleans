@@ -7,6 +7,6 @@ namespace Grains
     public interface IAggregatorGrain : IGrainWithStringKey
     {
         Task<VersionedValue<int>> GetAsync();
-        Task<VersionedValue<int>> LongPollAsync(int knownVersion);
+        Task<VersionedValue<int>> LongPollAsync(VersionToken knownVersion);
     }
 }

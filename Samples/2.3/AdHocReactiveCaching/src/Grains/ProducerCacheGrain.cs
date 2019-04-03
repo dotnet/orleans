@@ -9,11 +9,11 @@ namespace Grains
 {
     [Reentrant]
     [StatelessWorker]
-    public class ProducerCacheGrain : Grain, IProducerCacheGrain
+    public class ProducerCacheGrain : ReactiveGrain, IProducerCacheGrain
     {
         private readonly ILogger<ProducerCacheGrain> _logger;
         private VersionedValue<int> _cache;
-        private IDisposable _pollTimer;
+        private IDisposable _poll;
 
         public ProducerCacheGrain(ILogger<ProducerCacheGrain> logger)
         {
@@ -25,25 +25,26 @@ namespace Grains
 
         public override async Task OnActivateAsync()
         {
-            // hydrate the cache with whatever value is available right now
-            _cache = await GrainFactory.GetGrain<IProducerGrain>(GrainKey).GetAsync();
-
-            // start polling
-            _pollTimer = RegisterTimer(_ => PollAsync(), null, TimeSpan.Zero, TimeSpan.FromMilliseconds(1));
+            // start long polling
+            _poll = await RegisterReactivePollAsync(
+                () => GrainFactory.GetGrain<IProducerGrain>(GrainKey).GetAsync(),
+                () => GrainFactory.GetGrain<IProducerGrain>(GrainKey).LongPollAsync(_cache.Version),
+                result => result.IsValid,
+                apply =>
+                {
+                    _cache = apply;
+                    _logger.LogInformation(
+                        "{@Time}: {@GrainType} {@GrainKey} updated value to {@Value} with version {@Version}",
+                        DateTime.Now.TimeOfDay, GrainType, GrainKey, _cache.Value, _cache.Version);
+                    return Task.CompletedTask;
+                },
+                failed =>
+                {
+                    _logger.LogWarning("The reactive poll timed out by returning a 'none' response before Orleans could break the promise.");
+                    return Task.CompletedTask;
+                });
 
             await base.OnActivateAsync();
-        }
-
-        private async Task PollAsync()
-        {
-            try
-            {
-                _cache = await GrainFactory.GetGrain<IProducerGrain>(GrainKey).LongPollAsync(_cache.Version);
-            }
-            catch (TimeoutException error)
-            {
-                _logger.LogDebug(error, "{@GrainType} {@GrainKey} long polling broken. Polling again...");
-            }
         }
 
         public Task<int> GetAsync() => Task.FromResult(_cache.Value);
