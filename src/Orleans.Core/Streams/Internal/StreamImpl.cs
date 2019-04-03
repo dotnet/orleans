@@ -94,6 +94,11 @@ namespace Orleans.Streams
             return GetProducerInterface().OnNextAsync(item, token);
         }
 
+        public Task OnNextBatchAsync(IEnumerable<T> batch, StreamSequenceToken token)
+        {
+            return GetProducerInterface().OnNextBatchAsync(batch, token);
+        }
+
         public Task OnCompletedAsync()
         {
             IInternalAsyncBatchObserver<T> producerInterface = GetProducerInterface();
