@@ -47,7 +47,7 @@ public override void Participate(IGrainLifecycle lifecycle)
 }
 ```
 
-In the above example, `Grain<T>` overrides the `participate` method to tell the lifecycle to call its OnSetupState method during the SetupState stage of the lifecycle.
+In the above example, `Grain<T>` overrides the `Participate` method to tell the lifecycle to call its OnSetupState method during the SetupState stage of the lifecycle.
 
 Components created during a grain’s construction can take part in the lifecycle as well, without any special grain logic being added.
 Since the grain’s activation context (`IGrainActivationContext`), including the grain’s lifecycle (`IGrainActivationContext.ObservableLifecycle`), is created before the grain is created, any component injected into the grain by the container can participate in the grain’s lifecycle.
@@ -75,7 +75,7 @@ public class MyComponent : ILifecycleParticipant<IGrainLifecycle>
     private Task OnActivate(CancellationToken ct)
     {
         // Do stuff
-     }
+    }
 }
 ```
 
@@ -85,7 +85,7 @@ By registering the above component in the service container using its `Create(..
 
 ```csharp
     services.AddTransient<MyComponent>(sp =>
-        MyComponent.Create(sp.GetRequiredService< IGrainActivationContext>());
+        MyComponent.Create(sp.GetRequiredService<IGrainActivationContext>());
 ```
 
 #### Grain with component as dependency
@@ -97,7 +97,7 @@ public class MyGrain : Grain, IMyGrain
 
     public MyGrain(MyComponent component)
     {
-        this. component = component;
+        this.component = component;
     }
 }
 ```
