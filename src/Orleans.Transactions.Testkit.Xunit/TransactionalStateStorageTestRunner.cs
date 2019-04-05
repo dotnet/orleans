@@ -7,7 +7,7 @@ using Xunit.Abstractions;
 namespace Orleans.Transactions.TestKit.xUnit
 {
     public abstract class TransactionalStateStorageTestRunnerxUnit<TState> : TransactionalStateStorageTestRunner<TState>
-        where TState: class, ITestState, new()
+        where TState: class, IEquatable<TState>, new()
     {
         /// <summary>
         /// Constructor
