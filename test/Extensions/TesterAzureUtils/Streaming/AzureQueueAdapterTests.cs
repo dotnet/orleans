@@ -69,7 +69,6 @@ namespace Tester.AzureUtils.Streaming
                 clusterOptions,
                 serializationManager,
                 loggerFactory);
-            adapterFactory.Init();
             await SendAndReceiveFromQueueAdapter(adapterFactory);
         }
 

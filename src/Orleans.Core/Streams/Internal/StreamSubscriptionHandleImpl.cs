@@ -108,7 +108,7 @@ namespace Orleans.Streams
 
             if (IsRewindable)
             {
-                this.expectedToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken);
+                this.expectedToken = StreamHandshakeToken.CreateDeliveryToken(batch.SequenceToken);
             }
             return null;
         }
@@ -131,7 +131,7 @@ namespace Orleans.Streams
             }
             if (IsRewindable)
             {
-                this.expectedToken = StreamHandshakeToken.CreateDeliveyToken(currentToken);
+                this.expectedToken = StreamHandshakeToken.CreateDeliveryToken(currentToken);
             }
             return null;
         }

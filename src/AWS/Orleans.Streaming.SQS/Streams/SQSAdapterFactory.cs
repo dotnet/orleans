@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -23,11 +23,6 @@ namespace OrleansAWSUtils.Streams
         private HashRingBasedStreamQueueMapper streamQueueMapper;
         private IQueueAdapterCache adapterCache;
 
-        /// <summary>
-        /// Application level failure handler override.
-        /// </summary>
-        protected Func<QueueId, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { private get; set; }
-
         public SQSAdapterFactory(
             string name, 
             SqsOptions sqsOptions,
@@ -45,17 +40,6 @@ namespace OrleansAWSUtils.Streams
             this.loggerFactory = loggerFactory;
             streamQueueMapper = new HashRingBasedStreamQueueMapper(queueMapperOptions, this.providerName);
             adapterCache = new SimpleQueueAdapterCache(cacheOptions, this.providerName, this.loggerFactory);
-        }
-
-
-        /// <summary> Init the factory.</summary>
-        public virtual void Init()
-        {
-            if (StreamFailureHandlerFactory == null)
-            {
-                StreamFailureHandlerFactory =
-                    qid => Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler());
-            }
         }
 
         /// <summary>Creates the Azure Queue based adapter.</summary>
@@ -77,16 +61,6 @@ namespace OrleansAWSUtils.Streams
             return streamQueueMapper;
         }
 
-        /// <summary>
-        /// Creates a delivery failure handler for the specified queue.
-        /// </summary>
-        /// <param name="queueId"></param>
-        /// <returns></returns>
-        public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
-        {
-            return StreamFailureHandlerFactory(queueId);
-        }
-
         public static SQSAdapterFactory Create(IServiceProvider services, string name)
         {
             var sqsOptions = services.GetOptionsByName<SqsOptions>(name);
@@ -94,7 +68,6 @@ namespace OrleansAWSUtils.Streams
             var queueMapperOptions = services.GetOptionsByName<HashRingStreamQueueMapperOptions>(name);
             IOptions<ClusterOptions> clusterOptions = services.GetProviderClusterOptions(name);
             var factory = ActivatorUtilities.CreateInstance<SQSAdapterFactory>(services, name, sqsOptions, cacheOptions, queueMapperOptions, clusterOptions);
-            factory.Init();
             return factory;
         }
     }

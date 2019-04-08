@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
@@ -58,7 +58,6 @@ namespace AWSUtils.Tests.Streaming
                 ConnectionString = AWSTestConstants.DefaultSQSConnectionString,
             };
             var adapterFactory = new SQSAdapterFactory(SQS_STREAM_PROVIDER_NAME, options, new HashRingStreamQueueMapperOptions(), new SimpleQueueCacheOptions(), null, Options.Create(new ClusterOptions()), null, null);
-            adapterFactory.Init();
             await SendAndReceiveFromQueueAdapter(adapterFactory);
         }
 

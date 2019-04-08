@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
@@ -75,18 +75,18 @@ namespace TestGrains
 
         public override async Task OnActivateAsync()
         {
-            logger = this.GetLogger("RecoverableStreamCollectorGrain " + base.IdentityString);
-            logger.Info("OnActivateAsync");
+            this.logger = this.GetLogger("RecoverableStreamCollectorGrain " + base.IdentityString);
+            this.logger.Info("OnActivateAsync");
 
-            Faults.onActivateFault.TryFire(InjectFault);
-            await ReadStateAsync();
+            this.Faults.onActivateFault.TryFire(InjectFault);
 
             Guid streamGuid = this.GetPrimaryKey();
-            if (State.StreamGuid != streamGuid)
+            if (this.State.StreamGuid != streamGuid)
             {
-                State.StreamGuid = streamGuid;
-                State.StreamNamespace = StreamNamespace;
+                this.State.StreamGuid = streamGuid;
+                this.State.StreamNamespace = StreamNamespace;
                 await WriteStateAsync();
+                this.logger.Info("Stored stream info: {StreamGuid}-{StreamNamespace}", this.State.StreamGuid, this.State.StreamNamespace);
             }
 
             var streamProvider = GetStreamProvider(GeneratedStreamTestConstants.StreamProviderName);
@@ -101,24 +101,24 @@ namespace TestGrains
         {
 
             // ignore duplicates
-            if (State.IsDuplicate(sequenceToken))
+            if (this.State.IsDuplicate(sequenceToken))
             {
-                logger.Info("Received duplicate event.  StreamGuid: {0}, SequenceToken: {1}", State.StreamGuid, sequenceToken);
+                logger.Info("Received duplicate event.  StreamGuid: {0}, SequenceToken: {1}", this.State.StreamGuid, sequenceToken);
                 return;
             }
 
-            logger.Info("Received event.  StreamGuid: {0}, SequenceToken: {1}", State.StreamGuid, sequenceToken);
+            logger.Info("Received event.  StreamGuid: {0}, SequenceToken: {1}", this.State.StreamGuid, sequenceToken);
 
-            // We will only update the start token if this is the first event we're processed
+            // We will only update the start token if this is the first event we're processing
             // In that case, we'll want to save the start token in case something goes wrong.
-            if (State.TryUpdateStartToken(sequenceToken))
+            if (this.State.TryUpdateStartToken(sequenceToken))
             {
                 Faults.onFirstMessageFault.TryFire(InjectFault);
                 await WriteStateAsync();
             }
 
-            State.Accumulator++;
-            State.LastProcessedToken = sequenceToken;
+            this.State.Accumulator++;
+            this.State.LastProcessedToken = sequenceToken;
             if (evt.EventType != GeneratedEvent.GeneratedEventType.Report)
             {
                 Faults.onFirstMessageProcessedFault.TryFire(InjectFault);

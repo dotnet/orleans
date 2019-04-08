@@ -1,6 +1,4 @@
-using System;
 using System.Threading.Tasks;
-using Orleans.Providers;
 
 namespace Orleans.Streams
 {
@@ -26,12 +24,5 @@ namespace Orleans.Streams
         /// </summary>
         /// <returns></returns>
         IStreamQueueMapper GetStreamQueueMapper();
-
-        /// <summary>
-        /// Acquire delivery failure handler for a queue
-        /// </summary>
-        /// <param name="queueId"></param>
-        /// <returns></returns>
-        Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId);
     }
 }
