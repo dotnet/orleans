@@ -21,12 +21,11 @@ namespace Orleans.Transactions.Azure.Tests
 {
     public class TestState : IEquatable<TestState>
     {
-        public static Random Seed = new Random();
         public int State { get; set; }
 
         public bool Equals(TestState other)
         {
-            return this.State.Equals(other.State);
+            return other == null?false:this.State.Equals(other.State);
         }
     }
 
@@ -35,7 +34,7 @@ namespace Orleans.Transactions.Azure.Tests
         private const string tableName = "StateStorageTests";
         private const string partition = "testpartition";
         public AzureTransactionalStateStorageTests(TestFixture fixture, ITestOutputHelper testOutput)
-            :base(()=>StateStorageFactory(fixture), ()=>new TestState(){State = TestState.Seed.Next()}, fixture.GrainFactory, testOutput)
+            :base(()=>StateStorageFactory(fixture), (seed)=>new TestState(){State = seed}, fixture.GrainFactory, testOutput)
         {
         }
 
