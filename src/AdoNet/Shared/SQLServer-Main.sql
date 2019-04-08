@@ -30,7 +30,7 @@ Implementation notes:
 DECLARE @current NVARCHAR(256);
 DECLARE @snapshotSettings NVARCHAR(612);
 
-SELECT @current = (SELECT DB_NAME());
+SELECT @current = N'[' + (SELECT DB_NAME()) + N']';
 SET @snapshotSettings = N'ALTER DATABASE ' + @current + N' SET READ_COMMITTED_SNAPSHOT ON; ALTER DATABASE ' + @current + N' SET ALLOW_SNAPSHOT_ISOLATION ON;';
 
 EXECUTE sp_executesql @snapshotSettings;
