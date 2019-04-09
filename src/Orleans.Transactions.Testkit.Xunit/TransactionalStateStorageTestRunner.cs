@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
+using FluentAssertions.Equivalency;
 using Orleans.Transactions.Abstractions;
 using Xunit;
 using Xunit.Abstractions;
@@ -7,7 +8,7 @@ using Xunit.Abstractions;
 namespace Orleans.Transactions.TestKit.xUnit
 {
     public abstract class TransactionalStateStorageTestRunnerxUnit<TState> : TransactionalStateStorageTestRunner<TState>
-        where TState: class, ITestState, new()
+        where TState: class, new()
     {
         /// <summary>
         /// Constructor
@@ -17,9 +18,13 @@ namespace Orleans.Transactions.TestKit.xUnit
         /// <param name="stateFactory">factory to create TState for test</param>
         /// <param name="grainFactory">grain Factory needed for test runner</param>
         /// <param name="testOutput">test output to helpful messages</param>
+        /// <param name="assertConfig">A reference to the FluentAssertions.Equivalency.EquivalencyAssertionOptions`1
+        ///     configuration object that can be used to influence the way the object graphs
+        ///     are compared</param>
         public TransactionalStateStorageTestRunnerxUnit(Func<Task<ITransactionalStateStorage<TState>>> stateStorageFactory,
-            Func<TState> stateFactory, IGrainFactory grainFactory, ITestOutputHelper testOutput)
-            : base(stateStorageFactory, stateFactory, grainFactory, testOutput.WriteLine)
+            Func<int, TState> stateFactory, IGrainFactory grainFactory, ITestOutputHelper testOutput,
+            Func<EquivalencyAssertionOptions<TState>, EquivalencyAssertionOptions<TState>> assertConfig = null)
+            : base(stateStorageFactory, stateFactory, grainFactory, testOutput.WriteLine, assertConfig)
         {
         }
 
