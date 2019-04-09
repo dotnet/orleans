@@ -41,13 +41,13 @@ namespace UnitTests.StreamingTests
                          .AddMemoryGrainStorageAsDefault()
                         .AddMemoryGrainStorage("MemoryStore")
                         .AddPersistentStreams(StreamProviderName,
-                            GeneratorAdapterFactory.Create, b=>
-                            b.Configure<HashRingStreamQueueMapperOptions>(ob=>ob.Configure(options =>
-                                {
-                                    options.TotalQueueCount = TotalQueueCount;
-                                }))
-                            .UseDynamicClusterConfigDeploymentBalancer()
-                            .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
+                            GeneratorAdapterFactory.Create, b => b
+                                .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly)
+                                .Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options =>
+                                    {
+                                        options.TotalQueueCount = TotalQueueCount;
+                                    }))
+                                .UseDynamicClusterConfigDeploymentBalancer());
                 }
             }
         }
