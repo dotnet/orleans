@@ -206,7 +206,7 @@ namespace Orleans
         }
 
         // return a copy of the table removing all dead appereances of dead nodes, except for the last one.
-        public MembershipTableData SupressDuplicateDeads()
+        public MembershipTableData WithoutDuplicateDeads()
         {
             var dead = new Dictionary<IPEndPoint, Tuple<MembershipEntry, string>>();
             // pick only latest Dead for each instance

@@ -323,7 +323,6 @@ namespace Orleans.Runtime
             healthCheckParticipants.Add(membershipOracle);
 
             catalog.SiloStatusOracle = this.membershipOracle;
-            this.membershipOracle.SubscribeToSiloStatusEvents(localGrainDirectory);
             messageCenter.SiloDeadOracle = this.membershipOracle.IsDeadSilo;
 
             // consistentRingProvider is not a system target per say, but it behaves like the localGrainDirectory, so it is here
@@ -406,7 +405,7 @@ namespace Orleans.Runtime
                 incomingAgent.Start();
             } 
 
-            StartTaskWithPerfAnalysis("Start local grain directory", LocalGrainDirectory.Start,stopWatch);
+            StartTaskWithPerfAnalysis("Start local grain directory", LocalGrainDirectory.Start, stopWatch);
 
             StartTaskWithPerfAnalysis("Init implicit stream subscribe table", InitImplicitStreamSubscribeTable, stopWatch);
             void InitImplicitStreamSubscribeTable()
@@ -450,6 +449,8 @@ namespace Orleans.Runtime
                     .WithTimeout(initTimeout, $"Starting MembershipOracle failed due to timeout {initTimeout}");
                 logger.Debug("Local silo status oracle created successfully.");
             }
+
+            StartTaskWithPerfAnalysis("Start local grain directory maintenance", LocalGrainDirectory.OnRuntimeServicesStart, stopWatch);
 
             var versionStore = Services.GetService<IVersionStore>();
             await StartAsyncTaskWithPerfAnalysis("Init type manager", () => scheduler

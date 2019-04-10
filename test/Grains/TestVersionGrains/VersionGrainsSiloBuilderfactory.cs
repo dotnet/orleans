@@ -1,5 +1,6 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
@@ -15,7 +16,8 @@ namespace TestVersionGrains
         public void Configure(ISiloHostBuilder hostBuilder)
         {
             hostBuilder.ConfigureServices(this.ConfigureServices)
-                 .AddMemoryGrainStorageAsDefault();
+                 .AddMemoryGrainStorageAsDefault()
+                 .ConfigureLogging(logging => { logging.AddFilter("Orleans.Runtime.GrainDirectory.LocalGrainDirectory", LogLevel.Trace); });
         }
 
         private void ConfigureServices(IServiceCollection services)

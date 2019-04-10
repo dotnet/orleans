@@ -24,6 +24,8 @@ namespace Orleans.Runtime
         /// </summary>
         SiloAddress SiloAddress { get; }
 
+        ClusterMembershipSnapshot CurrentSnapshot { get; }
+
         /// <summary>
         /// Start this oracle. Will register this silo in the SiloDirectory with SiloStatus.Starting status.
         /// </summary>
@@ -106,5 +108,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <returns>bool value indicating that subscription succeeded or not.</returns>
         bool UnSubscribeFromSiloStatusEvents(ISiloStatusListener observer);
+
+        ChangeFeedEntry<ClusterMembershipUpdate> MembershipUpdates { get; }
     }
 }

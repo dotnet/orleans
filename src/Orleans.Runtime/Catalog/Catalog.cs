@@ -173,7 +173,8 @@ namespace Orleans.Runtime
             });
             maxWarningRequestProcessingTime = this.messagingOptions.Value.ResponseTimeout.Multiply(5);
             maxRequestProcessingTime = this.messagingOptions.Value.MaxRequestProcessingTime;
-            grainDirectory.SetSiloRemovedCatalogCallback(this.OnSiloStatusChange);
+
+            (grainDirectory as LocalGrainDirectory)?.SetSiloRemovedCatalogCallback(this.OnSiloStatusChange);
         }
 
         /// <summary>
@@ -331,7 +332,7 @@ namespace Orleans.Runtime
                 SiloName = localSiloName,
                 LocalCacheActivationAddresses = directory.GetLocalCacheData(grain),
                 LocalDirectoryActivationAddresses = directory.GetLocalDirectoryData(grain).Addresses,
-                PrimaryForGrain = directory.GetPrimaryForGrain(grain)
+                PrimaryForGrain = this.TryGetGrainDirectoryPartitionForDiagnostics(grain)
             };
             try
             {
@@ -604,9 +605,11 @@ namespace Orleans.Runtime
                             CounterStatistic
                                 .FindOrCreate(StatisticNames.CATALOG_ACTIVATION_CONCURRENT_REGISTRATION_ATTEMPTS)
                                 .Increment();
-                            var primary = directory.GetPrimaryForGrain(activation.ForwardingAddress.Grain);
+                            
                             if (logger.IsEnabled(LogLevel.Information))
                             {
+                                var primary = this.TryGetGrainDirectoryPartitionForDiagnostics(activation.ForwardingAddress.Grain);
+                                
                                 // If this was a duplicate, it's not an error, just a race.
                                 // Forward on all of the pending messages, and then forget about this activation.
                                 var logMsg =
@@ -1387,7 +1390,7 @@ namespace Orleans.Runtime
             return datas;
         }
 
-        private void OnSiloStatusChange(SiloAddress updatedSilo, SiloStatus status)
+        private void OnSiloStatusChange(DirectoryMembershipSnapshot previousMembership, SiloAddress updatedSilo, SiloStatus status)
         { 
             // ignore joining events and also events on myself.
             if (updatedSilo.Equals(LocalSilo)) return;
@@ -1414,7 +1417,7 @@ namespace Orleans.Runtime
                         {
                             var activationData = activation.Value;
                             if (!activationData.IsUsingGrainDirectory) continue;
-                            if (!updatedSilo.Equals(directory.GetPrimaryForGrain(activationData.Grain))) continue;
+                            if (!updatedSilo.Equals(previousMembership.CalculateGrainDirectoryPartition(activationData.Grain))) continue;
 
                             lock (activationData)
                             {
@@ -1442,6 +1445,16 @@ namespace Orleans.Runtime
                     DeactivateActivations(activationsToShutdown).Ignore();
                 }
             }
+        }
+
+        private SiloAddress TryGetGrainDirectoryPartitionForDiagnostics(GrainId grainId)
+        {
+            if (this.directory is LocalGrainDirectory localGrainDirectory)
+            {
+                return localGrainDirectory.MembershipSnapshot.CalculateGrainDirectoryPartition(grainId);
+            }
+
+            return null;
         }
     }
 }

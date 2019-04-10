@@ -227,7 +227,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                 // Override the root directory.
                 var sources = new IConfigurationSource[]
                 {
-                    new MemoryConfigurationSource {InitialData = new TestClusterOptions {ApplicationBaseDirectory = rootDir.FullName}.ToDictionary()}
+                    new MemoryConfigurationSource {InitialData = new Dictionary<string, string> { [nameof(TestClusterOptions.ApplicationBaseDirectory)] = rootDir.FullName } }
                 };
 
                 silo = await TestCluster.StartSiloAsync(cluster, siloIdx, testClusterOptions, sources);

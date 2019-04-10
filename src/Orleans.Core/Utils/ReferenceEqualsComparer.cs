@@ -27,4 +27,13 @@ namespace Orleans
             return obj == null ? 0 : RuntimeHelpers.GetHashCode(obj);
         }
     }
+
+    internal class ReferenceEqualsComparer<T> : EqualityComparer<T> where T : class
+    {
+        public static ReferenceEqualsComparer<T> Instance { get; } = new ReferenceEqualsComparer<T>();
+
+        public override bool Equals(T x, T y) => ReferenceEquals(x, y);
+
+        public override int GetHashCode(T obj) => obj is null ? 0 : RuntimeHelpers.GetHashCode(obj);
+    }
 }

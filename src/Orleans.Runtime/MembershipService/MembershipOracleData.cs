@@ -8,6 +8,7 @@ using Orleans.Configuration;
 
 namespace Orleans.Runtime.MembershipService
 {
+
     internal class MembershipOracleData
     {
         private readonly Dictionary<SiloAddress, MembershipEntry> localTable;  // all silos not including current silo
@@ -146,29 +147,7 @@ namespace Orleans.Runtime.MembershipService
         {
             if (CurrentStatus == status) return;
 
-            // make copies
-            var tmpLocalTableCopy = GetSiloStatuses(st => true, true); // all the silos including me.
-            var tmpLocalTableCopyOnlyActive = GetSiloStatuses(st => st == SiloStatus.Active, true);    // only active silos including me.
-            var tmpLocalTableNamesCopy = localTable.ToDictionary(pair => pair.Key, pair => pair.Value.SiloName);   // all the silos excluding me.
-
             CurrentStatus = status;
-
-            tmpLocalTableCopy[MyAddress] = status;
-
-            if (status == SiloStatus.Active)
-            {
-                tmpLocalTableCopyOnlyActive[MyAddress] = status;
-            }
-            else if (tmpLocalTableCopyOnlyActive.ContainsKey(MyAddress))
-            {
-                tmpLocalTableCopyOnlyActive.Remove(MyAddress);
-            }
-            localTableCopy = tmpLocalTableCopy;
-            localTableCopyOnlyActive = tmpLocalTableCopyOnlyActive;
-            localNamesTableCopy = tmpLocalTableNamesCopy;
-
-            if (this.multiClusterActive)
-                localMultiClusterGatewaysCopy = DetermineMultiClusterGateways();
 
             NotifyLocalSubscribers(MyAddress, CurrentStatus);
         }

@@ -41,8 +41,11 @@ namespace Orleans.Runtime.GrainDirectory
 
         protected override void Run()
         {
-            while (router.Running)
+            while (true)
             {
+                var membershipSnapshot = router.MembershipSnapshot;
+                if (!membershipSnapshot.IsLocalDirectoryRunning) break;
+
                 // Run through all cache entries and do the following:
                 // 1. If the entry is not expired, skip it
                 // 2. If the entry is expired and was not accessed in the last time interval -- throw it away
@@ -70,7 +73,7 @@ namespace Orleans.Runtime.GrainDirectory
                     GrainId grain = pair.Key;
                     var entry = pair.Value;
 
-                    SiloAddress owner = router.CalculateGrainDirectoryPartition(grain);
+                    SiloAddress owner = membershipSnapshot.CalculateGrainDirectoryPartition(grain);
                     if (owner == null) // Null means there's no other silo and we're shutting down, so skip this entry
                     {
                         continue;
@@ -118,7 +121,16 @@ namespace Orleans.Runtime.GrainDirectory
                     }
                 }
 
-                if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Silo {0} self-owned (and removed) {1}, kept {2}, removed {3} and tries to refresh {4} grains", router.MyAddress, cnt1, cnt2, cnt3, cnt4);
+                if (Log.IsEnabled(LogLevel.Trace))
+                {
+                    Log.Trace(
+                        "Silo {0} self-owned (and removed) {1}, kept {2}, removed {3} and tries to refresh {4} grains",
+                        router.MyAddress,
+                        cnt1,
+                        cnt2,
+                        cnt3,
+                        cnt4);
+                }
 
                 // send batch requests
                 SendBatchCacheRefreshRequests(fetchInBatchList);
