@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Net;
 using Orleans.Runtime;
@@ -39,7 +39,7 @@ namespace UnitTests.GeoClusterTests
             foreach(var c in candidates)
                 randomized.Add(r.Next(), c);
 
-            var x = MembershipOracleData.DeterministicBalancedChoice(randomized.Values, 10, group);
+            var x = MembershipHelper.DeterministicBalancedChoice(randomized.Values, 10, group);
 
             for (int i = 0; i < 10; i++)
                 Assert.Equal(candidates[i], x[i]);

@@ -29,11 +29,6 @@ namespace Orleans.Runtime.MembershipService
         internal SiloStatus CurrentStatus { get; private set; } // current status of this silo.
         internal string SiloName { get; } // name of this silo.
 
-        private readonly bool multiClusterActive; // set by configuration if multicluster is active
-        private readonly int maxMultiClusterGateways; // set by configuration
-
-        private UpdateFaultCombo myFaultAndUpdateZones;
-        
         internal MembershipOracleData(ILocalSiloDetails siloDetails, ILogger log, MultiClusterOptions multiClusterOptions)
         {
             logger = log;
@@ -49,8 +44,6 @@ namespace Orleans.Runtime.MembershipService
             MyHostname = siloDetails.DnsHostName;
             MyProxyPort = siloDetails.GatewayAddress?.Endpoint?.Port ?? 0;
             SiloName = siloDetails.Name;
-            this.multiClusterActive = multiClusterOptions.HasMultiClusterNetwork;
-            this.maxMultiClusterGateways = multiClusterOptions.MaxMultiClusterGateways;
             CurrentStatus = SiloStatus.Created;
             clusterSizeStatistic = IntValueStatistic.FindOrCreate(StatisticNames.MEMBERSHIP_ACTIVE_CLUSTER_SIZE, () => localTableCopyOnlyActive.Count);
             clusterStatistic = StringValueStatistic.FindOrCreate(StatisticNames.MEMBERSHIP_ACTIVE_CLUSTER,
@@ -166,10 +159,7 @@ namespace Orleans.Runtime.MembershipService
             localTableCopy = tmpLocalTableCopy;
             localTableCopyOnlyActive = tmpLocalTableCopyOnlyActive;
             localNamesTableCopy = tmpLocalTableNamesCopy;
-
-            if (this.multiClusterActive)
-                localMultiClusterGatewaysCopy = DetermineMultiClusterGateways();
-
+            
             NotifyLocalSubscribers(MyAddress, CurrentStatus);
         }
 
@@ -226,17 +216,7 @@ namespace Orleans.Runtime.MembershipService
             };
             return entry;
         }
-
-        internal void UpdateMyFaultAndUpdateZone(MembershipEntry entry)
-        {
-            this.myFaultAndUpdateZones = new UpdateFaultCombo(entry.UpdateZone, entry.FaultZone);
-
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug($"-Updated my FaultZone={entry.FaultZone} UpdateZone={entry.UpdateZone}");
-
-            if (this.multiClusterActive)
-                localMultiClusterGatewaysCopy = DetermineMultiClusterGateways();
-        }
-
+        
         internal bool TryUpdateStatusAndNotify(MembershipEntry entry)
         {
             if (!TryUpdateStatus(entry)) return false;
@@ -244,10 +224,7 @@ namespace Orleans.Runtime.MembershipService
             localTableCopy = GetSiloStatuses(status => true, true); // all the silos including me.
             localTableCopyOnlyActive = GetSiloStatuses(status => status == SiloStatus.Active, true);    // only active silos including me.
             localNamesTableCopy = localTable.ToDictionary(pair => pair.Key, pair => pair.Value.SiloName);   // all the silos excluding me.
-
-            if (this.multiClusterActive)
-                localMultiClusterGatewaysCopy = DetermineMultiClusterGateways();
-
+            
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("-Updated my local view of {0} status. It is now {1}.", entry.SiloAddress.ToLongString(), GetSiloStatus(entry.SiloAddress));
 
             NotifyLocalSubscribers(entry.SiloAddress, entry.Status);
@@ -298,98 +275,6 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        // deterministic function for designating the silos that should act as multi-cluster gateways
-        private List<SiloAddress> DetermineMultiClusterGateways()
-        {
-            // function should never be called if we are not in a multicluster
-            if (! this.multiClusterActive)
-                throw new OrleansException("internal error: should not call this function without multicluster network");
-
-            List<SiloAddress> result;
-
-            // take all the active silos if their count does not exceed the desired number of gateways
-            if (localTableCopyOnlyActive.Count <= this.maxMultiClusterGateways)
-            {
-                result = localTableCopyOnlyActive.Keys.ToList();
-            }
-            else
-            {
-                result = DeterministicBalancedChoice<SiloAddress, UpdateFaultCombo>(
-                    localTableCopyOnlyActive.Keys,
-                    this.maxMultiClusterGateways,
-                   (SiloAddress a) => a.Equals(MyAddress) ? this.myFaultAndUpdateZones : new UpdateFaultCombo(localTable[a]),
-                   logger);
-            }
-
-            if (logger.IsEnabled(LogLevel.Debug))
-            {
-                var gateways = string.Join(", ", result.Select(silo => silo.ToString()));
-                logger.Debug($"-DetermineMultiClusterGateways {gateways}");
-            }
-
-            return result;
-        }
-
-        // pick a specified number of elements from a set of candidates
-        // - in a balanced way (try to pick evenly from groups)
-        // - in a deterministic way (using sorting order on candidates and keys)
-        internal static List<T> DeterministicBalancedChoice<T, K>(IEnumerable<T> candidates, int count, Func<T, K> group, ILogger logger = null)
-            where T:IComparable where K:IComparable
-        {
-            // organize candidates by groups
-            var groups = new Dictionary<K, List<T>>();
-            var keys = new List<K>();
-            int numcandidates = 0;
-            foreach (var c in candidates)
-            {
-                var key = group(c);
-                List<T> list;
-                if (!groups.TryGetValue(key, out list))
-                {
-                    groups[key] = list = new List<T>();
-                    keys.Add(key);
-                }
-                list.Add(c);
-                numcandidates++;
-            }
-
-            if (numcandidates < count)
-                throw new ArgumentException("not enough candidates");
-
-            // sort the keys and the groups to guarantee deterministic result
-            keys.Sort();
-            foreach(var kvp in groups)
-                kvp.Value.Sort();
-
-            // for debugging, trace all the gateway candidates
-            if (logger != null && logger.IsEnabled(LogLevel.Trace))
-            {
-                var b = new StringBuilder();
-                foreach (var k in keys)
-                {
-                    b.Append(k);
-                    b.Append(':');
-                    foreach (var s in groups[k])
-                    {
-                        b.Append(' ');
-                        b.Append(s);
-                    }
-                }
-                logger.Trace($"-DeterministicBalancedChoice candidates {b}");
-            }
-              
-            // pick round-robin from groups
-            var  result = new List<T>();
-            for (int i = 0; result.Count < count; i++)
-            {
-                var list = groups[keys[i % keys.Count]];
-                var col = i / keys.Count;
-                if (col < list.Count)
-                    result.Add(list[col]); 
-            }
-            return result;
-        }
-
         internal struct UpdateFaultCombo : IComparable
         {
             public readonly int UpdateZone;
@@ -428,6 +313,69 @@ namespace Orleans.Runtime.MembershipService
                 localTableCopy.Count,
                 Utils.EnumerableToString(localTableCopy, pair => 
                     String.Format("SiloAddress={0} Status={1}", pair.Key.ToLongString(), pair.Value)));
+        }
+    }
+
+    internal static class MembershipHelper
+    {
+        // pick a specified number of elements from a set of candidates
+        // - in a balanced way (try to pick evenly from groups)
+        // - in a deterministic way (using sorting order on candidates and keys)
+        internal static List<T> DeterministicBalancedChoice<T, K>(IEnumerable<T> candidates, int count, Func<T, K> group, ILogger logger = null)
+            where T : IComparable where K : IComparable
+        {
+            // organize candidates by groups
+            var groups = new Dictionary<K, List<T>>();
+            var keys = new List<K>();
+            int numcandidates = 0;
+            foreach (var c in candidates)
+            {
+                var key = group(c);
+                List<T> list;
+                if (!groups.TryGetValue(key, out list))
+                {
+                    groups[key] = list = new List<T>();
+                    keys.Add(key);
+                }
+                list.Add(c);
+                numcandidates++;
+            }
+
+            if (numcandidates < count)
+                throw new ArgumentException("not enough candidates");
+
+            // sort the keys and the groups to guarantee deterministic result
+            keys.Sort();
+            foreach (var kvp in groups)
+                kvp.Value.Sort();
+
+            // for debugging, trace all the gateway candidates
+            if (logger != null && logger.IsEnabled(LogLevel.Trace))
+            {
+                var b = new StringBuilder();
+                foreach (var k in keys)
+                {
+                    b.Append(k);
+                    b.Append(':');
+                    foreach (var s in groups[k])
+                    {
+                        b.Append(' ');
+                        b.Append(s);
+                    }
+                }
+                logger.Trace($"-DeterministicBalancedChoice candidates {b}");
+            }
+
+            // pick round-robin from groups
+            var result = new List<T>();
+            for (int i = 0; result.Count < count; i++)
+            {
+                var list = groups[keys[i % keys.Count]];
+                var col = i / keys.Count;
+                if (col < list.Count)
+                    result.Add(list[col]);
+            }
+            return result;
         }
     }
 }

@@ -25,7 +25,7 @@ namespace Orleans.Runtime.Configuration
         {
             var clusteringProvider = this.serviceProvider.GetService<IMembershipOracle>();
             var clusteringTableProvider = this.serviceProvider.GetService<IMembershipTable>();
-            var storageBackedWithNoStorage = clusteringProvider is MembershipOracle && clusteringTableProvider == null;
+            var storageBackedWithNoStorage = clusteringProvider is MembershipTableManager && clusteringTableProvider == null;
             if (clusteringProvider == null || storageBackedWithNoStorage)
             {
                 throw new OrleansConfigurationException(ClientClusteringValidator.ClusteringNotConfigured);

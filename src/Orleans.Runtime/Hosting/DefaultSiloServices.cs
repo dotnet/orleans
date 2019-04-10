@@ -125,15 +125,33 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<ISiloRuntimeClient, InsideRuntimeClient>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, InsideRuntimeClient>();
 
+            services.TryAddSingleton<IFatalErrorHandler, FatalErrorHandler>();
+
             services.TryAddSingleton<MultiClusterGossipChannelFactory>();
             services.TryAddSingleton<MultiClusterOracle>();
             services.TryAddSingleton<MultiClusterRegistrationStrategyManager>();
             services.TryAddFromExisting<IMultiClusterOracle, MultiClusterOracle>();
             services.TryAddSingleton<DeploymentLoadPublisher>();
 
-            services.TryAddSingleton<MembershipOracle>();
-            services.TryAddFromExisting<IMembershipOracle, MembershipOracle>();
-            services.TryAddFromExisting<ISiloStatusOracle, MembershipOracle>();
+            services.TryAddSingleton<MembershipTableManager>();
+            services.AddFromExisting<IHealthCheckParticipant, MembershipTableManager>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipTableManager>();
+            services.AddFromExisting<IMembershipService, MembershipTableManager>();
+
+            services.TryAddSingleton<SiloStatusOracleCompatibilityShim>();
+            services.TryAddFromExisting<IMembershipOracle, SiloStatusOracleCompatibilityShim>();
+            services.TryAddFromExisting<ISiloStatusOracle, SiloStatusOracleCompatibilityShim>();
+
+            services.AddSingleton<ClusterHealthMonitor>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClusterHealthMonitor>();
+            services.AddSingleton<MembershipService>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipService>();
+            services.AddSingleton<MembershipAgent>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipAgent>();
+            services.AddSingleton<MembershipTableCleanupAgent>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipTableCleanupAgent>();
+            services.AddSingleton<SiloStatusListenerManager>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloStatusListenerManager>();
 
             services.TryAddSingleton<ClientObserverRegistrar>();
             services.TryAddSingleton<SiloProviderRuntime>();

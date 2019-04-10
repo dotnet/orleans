@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -27,26 +28,31 @@ namespace Orleans.Runtime
         /// <summary>
         /// Start this oracle. Will register this silo in the SiloDirectory with SiloStatus.Starting status.
         /// </summary>
+        [Obsolete("Subscribe to silo lifecycle instead, via ILifecycleParticipant<ISiloLifecycle>")]
         Task Start();
 
         /// <summary>
         /// Turns this oracle into an Active state. Will update this silo in the SiloDirectory with SiloStatus.Active status.
         /// </summary>
+        [Obsolete("Subscribe to silo lifecycle instead, via ILifecycleParticipant<ISiloLifecycle>")]
         Task BecomeActive();
 
         /// <summary>
         /// ShutDown this oracle. Will update this silo in the SiloDirectory with SiloStatus.ShuttingDown status. 
         /// </summary>
+        [Obsolete("Subscribe to silo lifecycle instead, via ILifecycleParticipant<ISiloLifecycle>")]
         Task ShutDown();
 
         /// <summary>
         /// Stop this oracle. Will update this silo in the SiloDirectory with SiloStatus.Stopping status. 
         /// </summary>
+        [Obsolete("Subscribe to silo lifecycle instead, via ILifecycleParticipant<ISiloLifecycle>")]
         Task Stop();
 
         /// <summary>
         /// Completely kill this oracle. Will update this silo in the SiloDirectory with SiloStatus.Dead status. 
         /// </summary>
+        [Obsolete("Subscribe to silo lifecycle instead, via ILifecycleParticipant<ISiloLifecycle>")]
         Task KillMyself();
 
         /// <summary>

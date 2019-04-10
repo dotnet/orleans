@@ -53,7 +53,7 @@ namespace Orleans.Runtime.Management
         {
             // If the status oracle isn't MembershipOracle, then it is assumed that it does not use IMembershipTable.
             // In that event, return the approximate silo statuses from the status oracle.
-            if (!(this.siloStatusOracle is MembershipOracle)) return this.siloStatusOracle.GetApproximateSiloStatuses(onlyActive);
+            if (!(this.siloStatusOracle is MembershipTableManager)) return this.siloStatusOracle.GetApproximateSiloStatuses(onlyActive);
 
             // Explicitly read the membership table and return the results.
             var table = await GetMembershipTable();
@@ -280,7 +280,7 @@ namespace Orleans.Runtime.Management
 
         private Task<IMembershipTable> GetMembershipTable()
         {
-            if (!(this.siloStatusOracle is MembershipOracle)) throw new InvalidOperationException("The current membership oracle does not support detailed silo status reporting.");
+            if (!(this.siloStatusOracle is MembershipTableManager)) throw new InvalidOperationException("The current membership oracle does not support detailed silo status reporting.");
             return Task.FromResult(this.membershipTable);
         }
 
