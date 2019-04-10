@@ -36,10 +36,6 @@ namespace Orleans.Runtime.MembershipService
         {
             ImmutableDictionary<SiloAddress, SiloHealthMonitor> MonitoredSilos { get; set; }
             Func<SiloAddress, SiloHealthMonitor> CreateMonitor { get; set; }
-            ImmutableDictionary<SiloAddress, SiloHealthMonitor> UpdateMonitoredSilos(
-                MembershipTableSnapshot membership,
-                ImmutableDictionary<SiloAddress, SiloHealthMonitor> monitoredSilos,
-                DateTime now);
             MembershipVersion ObservedVersion { get; }
         }
 
@@ -71,6 +67,8 @@ namespace Orleans.Runtime.MembershipService
         /// <returns>A list of silos with which connectivity could not be verified.</returns>
         public async Task<List<SiloAddress>> CheckClusterConnectivity(SiloAddress[] members)
         {
+            if (members.Length == 0) return new List<SiloAddress>();
+
             var tasks = new List<Task<int>>(members.Length);
 
             this.log.LogInformation(
@@ -115,7 +113,17 @@ namespace Orleans.Runtime.MembershipService
                 while (await enumerator.MoveNextAsync())
                 {
                     var current = enumerator.Current;
-                    this.monitoredSilos = this.UpdateMonitoredSilos(current, this.monitoredSilos, DateTime.UtcNow);
+                    var newMonitoredSilos = this.UpdateMonitoredSilos(current, this.monitoredSilos, DateTime.UtcNow);
+
+                    foreach (var pair in this.monitoredSilos)
+                    {
+                        if (!newMonitoredSilos.ContainsKey(pair.Key))
+                        {
+                            pair.Value.Cancel();
+                        }
+                    }
+
+                    this.monitoredSilos = newMonitoredSilos;
                     this.observedMembershipVersion = current.Version;
                 }
             }
@@ -192,11 +200,15 @@ namespace Orleans.Runtime.MembershipService
 
                 if (!this.monitoredSilos.ContainsKey(monitor.SiloAddress))
                 {
-                    this.log.LogInformation(
-                        (int)ErrorCode.MembershipPingedSiloNotInWatchList,
-                        "Ignoring probe failure from silo {Silo} since it is no longer being monitored.",
-                        monitor.SiloAddress,
-                        failedProbes);
+                    if (this.log.IsEnabled(LogLevel.Debug))
+                    {
+                        this.log.LogDebug(
+                            (int)ErrorCode.MembershipPingedSiloNotInWatchList,
+                            "Ignoring probe failure from silo {Silo} since it is no longer being monitored.",
+                            monitor.SiloAddress,
+                            failedProbes);
+                    }
+
                     return;
                 }
 
@@ -212,11 +224,6 @@ namespace Orleans.Runtime.MembershipService
                 }
             }
         }
-
-        ImmutableDictionary<SiloAddress, SiloHealthMonitor> ITestAccessor.UpdateMonitoredSilos(
-            MembershipTableSnapshot membership,
-            ImmutableDictionary<SiloAddress, SiloHealthMonitor> monitoredSilos,
-            DateTime now) => this.UpdateMonitoredSilos(membership, monitoredSilos, now);
 
         [Pure]
         private ImmutableDictionary<SiloAddress, SiloHealthMonitor> UpdateMonitoredSilos(
@@ -325,6 +332,11 @@ namespace Orleans.Runtime.MembershipService
             {
                 this.monitorClusterHealthTimer.Dispose();
                 this.cancellation.Cancel(throwOnFirstException: false);
+
+                foreach (var pair in this.monitoredSilos)
+                {
+                    pair.Value.Cancel();
+                }
 
                 // Stop waiting for graceful shutdown when the provided cancellation token is cancelled
                 return Task.WhenAny(ct.WhenCancelled(), Task.WhenAll(tasks));

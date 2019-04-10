@@ -58,7 +58,9 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ILocalSiloDetails, LocalSiloDetails>();
             services.TryAddSingleton<ISiloHost, SiloWrapper>();
             services.TryAddTransient<ILifecycleSubject, LifecycleSubject>();
-            services.TryAddSingleton<ISiloLifecycleSubject, SiloLifecycleSubject>();
+            services.TryAddSingleton<SiloLifecycleSubject>();
+            services.TryAddFromExisting<ISiloLifecycleSubject, SiloLifecycleSubject>();
+            services.TryAddFromExisting<ISiloLifecycle, SiloLifecycleSubject>();
             services.TryAddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloOptionsLogger>();
             services.PostConfigure<SiloMessagingOptions>(options =>
             {
@@ -113,6 +115,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ActivationCollector>();
             services.TryAddSingleton<LocalGrainDirectory>();
             services.TryAddFromExisting<ILocalGrainDirectory, LocalGrainDirectory>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LocalGrainDirectory>();
             services.TryAddSingleton(sp => sp.GetRequiredService<LocalGrainDirectory>().GsiActivationMaintainer);
             services.TryAddSingleton<GrainTypeManager>();
             services.TryAddSingleton<MessageCenter>();
@@ -197,7 +200,6 @@ namespace Orleans.Hosting
                 services.TryAddSingleton<GrainVersionStore>();
                 services.AddFromExisting<IVersionStore, GrainVersionStore>();
             }
-            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, GrainVersionStore>();
             services.AddSingletonNamedService<VersionSelectorStrategy, AllCompatibleVersions>(nameof(AllCompatibleVersions));
             services.AddSingletonNamedService<VersionSelectorStrategy, LatestVersion>(nameof(LatestVersion));
             services.AddSingletonNamedService<VersionSelectorStrategy, MinimumVersion>(nameof(MinimumVersion));
@@ -301,7 +303,9 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<IHostedClient, HostedClient>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, HostedClient>();
             services.TryAddSingleton<InvokableObjectManager>();
-            services.TryAddSingleton<IClusterClient, ClusterClient>();
+            services.TryAddSingleton<InternalClusterClient>();
+            services.TryAddFromExisting<IInternalClusterClient, InternalClusterClient>();
+            services.TryAddFromExisting<IClusterClient, InternalClusterClient>();
 
             // Enable collection specific Age limits
             services.AddOptions<GrainCollectionOptions>()

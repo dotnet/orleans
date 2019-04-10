@@ -246,7 +246,6 @@ namespace Orleans.Runtime.MembershipService
             {
                 this.CurrentStatus = status;
 
-
                 // SystemTarget-based clustering does not support transitioning to Dead locally since at this point app scheduler turns have been stopped.
                 return;
             }
@@ -704,43 +703,23 @@ namespace Orleans.Runtime.MembershipService
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
+            var tasks = new List<Task>(1);
+            lifecycle.Subscribe(
+                nameof(MembershipTableManager),
+                ServiceLifecycleStage.RuntimeServices,
+                OnRuntimeServicesStart,
+                OnRuntimeServicesStop);
+
+            async Task OnRuntimeServicesStart(CancellationToken ct)
             {
-                lifecycle.Subscribe(
-                    nameof(MembershipTableManager),
-                    ServiceLifecycleStage.RuntimeGrainServices,
-                    OnRuntimeGrainServicesStart,
-                    OnRuntimeGrainServicesStop);
-
-                async Task OnRuntimeGrainServicesStart(CancellationToken ct)
-                {
-                    await Task.Run(() => this.Start());
-                }
-
-                Task OnRuntimeGrainServicesStop(CancellationToken ct)
-                {
-                    return Task.CompletedTask;
-                }
+                await Task.Run(() => this.Start());
+                tasks.Add(Task.Run(() => this.PeriodicallyRefreshMembershipTable()));
             }
 
+            async Task OnRuntimeServicesStop(CancellationToken ct)
             {
-                var tasks = new List<Task>(1);
-                lifecycle.Subscribe(
-                    nameof(MembershipTableManager),
-                    ServiceLifecycleStage.BecomeActive,
-                    OnBecomeActiveStart,
-                    OnBecomeActiveStop);
-
-                Task OnBecomeActiveStart(CancellationToken ct)
-                {
-                    tasks.Add(Task.Run(() => this.PeriodicallyRefreshMembershipTable()));
-                    return Task.CompletedTask;
-                }
-
-                async Task OnBecomeActiveStop(CancellationToken ct)
-                {
-                    this.membershipUpdateTimer.Dispose();
-                    await Task.WhenAny(ct.WhenCancelled(), Task.WhenAll(tasks));
-                }
+                this.membershipUpdateTimer.Dispose();
+                await Task.WhenAny(ct.WhenCancelled(), Task.WhenAll(tasks));
             }
         }
 
