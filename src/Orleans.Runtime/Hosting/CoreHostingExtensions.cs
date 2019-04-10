@@ -66,7 +66,7 @@ namespace Orleans.Hosting
                 options.GatewayPort = gatewayPort;
             });
 
-            builder.UseDevelopmentClustering(primarySiloEndpoint ?? new IPEndPoint(IPAddress.Loopback, siloPort));
+            builder.UseDevelopmentClustering(optionsBuilder => ConfigurePrimarySiloEndpoint(optionsBuilder, primarySiloEndpoint));
             builder.Configure<ClusterMembershipOptions>(options => options.ExpectedClusterSize = 1);
             builder.ConfigureServices(services =>
             {
@@ -102,7 +102,7 @@ namespace Orleans.Hosting
         /// <returns>The silo builder.</returns>
         public static ISiloHostBuilder UseDevelopmentClustering(this ISiloHostBuilder builder, IPEndPoint primarySiloEndpoint)
         {
-            return builder.UseDevelopmentClustering(options => options.PrimarySiloEndpoint = primarySiloEndpoint);
+            return builder.UseDevelopmentClustering(optionsBuilder => ConfigurePrimarySiloEndpoint(optionsBuilder, primarySiloEndpoint));
         }
 
         /// <summary>
@@ -194,7 +194,7 @@ namespace Orleans.Hosting
                 options.GatewayPort = gatewayPort;
             });
 
-            builder.UseDevelopmentClustering(primarySiloEndpoint ?? new IPEndPoint(IPAddress.Loopback, siloPort));
+            builder.UseDevelopmentClustering(optionsBuilder => ConfigurePrimarySiloEndpoint(optionsBuilder, primarySiloEndpoint));
             builder.Configure<ClusterMembershipOptions>(options => options.ExpectedClusterSize = 1);
             builder.ConfigureServices(services =>
             {
@@ -230,7 +230,7 @@ namespace Orleans.Hosting
         /// <returns>The silo builder.</returns>
         public static ISiloBuilder UseDevelopmentClustering(this ISiloBuilder builder, IPEndPoint primarySiloEndpoint)
         {
-            return builder.UseDevelopmentClustering(options => options.PrimarySiloEndpoint = primarySiloEndpoint);
+            return builder.UseDevelopmentClustering(optionsBuilder => ConfigurePrimarySiloEndpoint(optionsBuilder, primarySiloEndpoint));
         }
 
         /// <summary>
@@ -269,6 +269,19 @@ namespace Orleans.Hosting
         {
             // Note that this method was added with [Obsolete] to ease migration from ISiloHostBuilder to ISiloBuilder.
             return builder;
+        }
+
+        private static void ConfigurePrimarySiloEndpoint(OptionsBuilder<DevelopmentClusterMembershipOptions> optionsBuilder, IPEndPoint primarySiloEndpoint)
+        {
+            optionsBuilder.Configure((DevelopmentClusterMembershipOptions options, IOptions<EndpointOptions> endpointOptions) =>
+            {
+                if (primarySiloEndpoint is null)
+                {
+                    primarySiloEndpoint = endpointOptions.Value.GetPublicSiloEndpoint();
+                }
+
+                options.PrimarySiloEndpoint = primarySiloEndpoint;
+            });
         }
     }
 }
