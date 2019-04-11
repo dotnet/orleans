@@ -83,13 +83,17 @@ namespace Orleans.Runtime
             return ctr;
         }
 
-        public void RecordNewTarget(ActivationData target)
+        public bool RecordNewTarget(ActivationData target)
         {
             if (!activations.TryAdd(target.ActivationId, target))
-                return;
+            {
+                return false;
+            }
+
             grainToActivationsMap.AddOrUpdate(target.Grain,
                 g => new List<ActivationData> { target },
                 (g, list) => { lock (list) { list.Add(target); } return list; });
+            return true;
         }
 
         public void RecordNewSystemTarget(SystemTarget target)

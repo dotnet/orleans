@@ -277,7 +277,14 @@ namespace Orleans.Runtime.Scheduler
                 this.cancellationTokenSource.Token,
                 this.schedulerStatistics,
                 this.statisticsOptions);
-            workgroupDirectory.TryAdd(context, wg);
+            if (!workgroupDirectory.TryAdd(context, wg))
+            {
+                // A workgroup for that context has already been added.
+                // Stop the newly created workgroup to ensure tracking statistics are consistent.
+                wg.Stop();
+                return null;
+            }
+
             return wg;
         }
 

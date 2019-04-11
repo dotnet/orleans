@@ -161,13 +161,10 @@ namespace Orleans.Runtime
             inProcessRequests = IntValueStatistic.FindOrCreate(StatisticNames.MESSAGING_PROCESSING_ACTIVATION_DATA_ALL, () =>
             {
                 long counter = 0;
-                lock (activations)
+                foreach (var activation in activations)
                 {
-                    foreach (var activation in activations)
-                    {
-                        ActivationData data = activation.Value;
-                        counter += data.GetRequestCount();
-                    }
+                    ActivationData data = activation.Value;
+                    counter += data.GetRequestCount();
                 }
                 return counter;
             });
@@ -265,27 +262,24 @@ namespace Orleans.Runtime
         public List<Tuple<GrainId, string, int>> GetGrainStatistics()
         {
             var counts = new Dictionary<string, Dictionary<GrainId, int>>();
-            lock (activations)
+            foreach (var activation in activations)
             {
-                foreach (var activation in activations)
-                {
-                    ActivationData data = activation.Value;
-                    if (data == null || data.GrainInstance == null) continue;
+                ActivationData data = activation.Value;
+                if (data == null || data.GrainInstance == null) continue;
 
-                    // TODO: generic type expansion
-                    var grainTypeName = TypeUtils.GetFullName(data.GrainInstanceType);
+                // TODO: generic type expansion
+                var grainTypeName = TypeUtils.GetFullName(data.GrainInstanceType);
                     
-                    Dictionary<GrainId, int> grains;
-                    int n;
-                    if (!counts.TryGetValue(grainTypeName, out grains))
-                    {
-                        counts.Add(grainTypeName, new Dictionary<GrainId, int> { { data.Grain, 1 } });
-                    }
-                    else if (!grains.TryGetValue(data.Grain, out n))
-                        grains[data.Grain] = 1;
-                    else
-                        grains[data.Grain] = n + 1;
+                Dictionary<GrainId, int> grains;
+                int n;
+                if (!counts.TryGetValue(grainTypeName, out grains))
+                {
+                    counts.Add(grainTypeName, new Dictionary<GrainId, int> { { data.Grain, 1 } });
                 }
+                else if (!grains.TryGetValue(data.Grain, out n))
+                    grains[data.Grain] = 1;
+                else
+                    grains[data.Grain] = n + 1;
             }
             return counts
                 .SelectMany(p => p.Value.Select(p2 => Tuple.Create(p2.Key, p.Key, p2.Value)))
@@ -295,23 +289,20 @@ namespace Orleans.Runtime
         public List<DetailedGrainStatistic> GetDetailedGrainStatistics(string[] types=null)
         {
             var stats = new List<DetailedGrainStatistic>();
-            lock (activations)
+            foreach (var activation in activations)
             {
-                foreach (var activation in activations)
-                {
-                    ActivationData data = activation.Value;
-                    if (data == null || data.GrainInstance == null) continue;
+                ActivationData data = activation.Value;
+                if (data == null || data.GrainInstance == null) continue;
 
-                    if (types==null || types.Contains(TypeUtils.GetFullName(data.GrainInstanceType)))
+                if (types==null || types.Contains(TypeUtils.GetFullName(data.GrainInstanceType)))
+                {
+                    stats.Add(new DetailedGrainStatistic()
                     {
-                        stats.Add(new DetailedGrainStatistic()
-                        {
-                            GrainType = TypeUtils.GetFullName(data.GrainInstanceType),
-                            GrainIdentity = data.Grain,
-                            SiloAddress = data.Silo,
-                            Category = data.Grain.Category.ToString()
-                        });
-                    }
+                        GrainType = TypeUtils.GetFullName(data.GrainInstanceType),
+                        GrainIdentity = data.Grain,
+                        SiloAddress = data.Silo,
+                        Category = data.Grain.Category.ToString()
+                    });
                 }
             }
             return stats;
@@ -357,11 +348,16 @@ namespace Orleans.Runtime
         /// Register a new object to which messages can be delivered with the local lookup table and scheduler.
         /// </summary>
         /// <param name="activation"></param>
-        public void RegisterMessageTarget(ActivationData activation)
+        public bool TryRegisterMessageTarget(ActivationData activation)
         {
-            scheduler.RegisterWorkContext(activation.SchedulingContext);
-            activations.RecordNewTarget(activation);
+            lock (activation)
+            {
+                if (scheduler.RegisterWorkContext(activation.SchedulingContext) == null) return false;
+                if (!activations.RecordNewTarget(activation)) return false;
+            }
+
             activationsCreated.Increment();
+            return true;
         }
 
         /// <summary>
@@ -443,20 +439,19 @@ namespace Orleans.Runtime
             activatedPromise = Task.CompletedTask;
             PlacementStrategy placement;
 
-            lock (activations)
+            while (true)
             {
                 if (TryGetActivationData(address.Activation, out result))
                 {
                     return result;
                 }
-                
+
                 int typeCode = address.Grain.TypeCode;
-                string actualGrainType = null;
                 MultiClusterRegistrationStrategy activationStrategy;
 
                 if (typeCode != 0)
                 {
-                    GetGrainTypeInfo(typeCode, out actualGrainType, out placement, out activationStrategy, genericArguments);
+                    GetGrainTypeInfo(typeCode, out var actualGrainType, out placement, out activationStrategy, genericArguments);
                     if (string.IsNullOrEmpty(grainType))
                     {
                         grainType = actualGrainType;
@@ -489,9 +484,13 @@ namespace Orleans.Runtime
                         this.maxRequestProcessingTime,
                         this.RuntimeClient,
                         this.loggerFactory);
-                    RegisterMessageTarget(result);
+
+                    // Loop until an activation has been registered either by this thread or another.
+                    if (!TryRegisterMessageTarget(result)) continue;
                 }
-            } // End lock
+
+                break;
+            }
 
             // Did not find and did not start placing new
             if (result == null)
@@ -1277,29 +1276,23 @@ namespace Orleans.Runtime
             {
                 // Stateless workers are not registered in the directory and can have multiple local activations.
                 int maxNumLocalActivations = stPlacement.MaxLocal;
-                lock (activations)
-                {
-                    List<ActivationData> local;
-                    if (!LocalLookup(address.Grain, out local) || local.Count <= maxNumLocalActivations)
-                        return ActivationRegistrationResult.Success;
+                List<ActivationData> local;
+                if (!LocalLookup(address.Grain, out local) || local.Count <= maxNumLocalActivations)
+                    return ActivationRegistrationResult.Success;
 
-                    var id = StatelessWorkerDirector.PickRandom(local).Address;
-                    return new ActivationRegistrationResult(existingActivationAddress: id);
-                }
+                var id = StatelessWorkerDirector.PickRandom(local).Address;
+                return new ActivationRegistrationResult(existingActivationAddress: id);
             }
             else
             {
                 // Some other non-directory, single-activation placement.
-                lock (activations)
+                var exists = LocalLookup(address.Grain, out var local);
+                if (exists && local.Count == 1 && local[0].ActivationId.Equals(activation.ActivationId))
                 {
-                    var exists = LocalLookup(address.Grain, out var local);
-                    if (exists && local.Count == 1 && local[0].ActivationId.Equals(activation.ActivationId))
-                    {
-                        return ActivationRegistrationResult.Success;
-                    }
-
-                    return new ActivationRegistrationResult(existingActivationAddress: local[0].Address);
+                    return ActivationRegistrationResult.Success;
                 }
+
+                return new ActivationRegistrationResult(existingActivationAddress: local[0].Address);
             }
 
             // We currently don't have any other case for multiple activations except for StatelessWorker. 
@@ -1406,28 +1399,25 @@ namespace Orleans.Runtime
             try
             {
                 // scan all activations in activation directory and deactivate the ones that the removed silo is their primary partition owner.
-                lock (activations)
+                foreach (var activation in activations)
                 {
-                    foreach (var activation in activations)
+                    try
                     {
-                        try
-                        {
-                            var activationData = activation.Value;
-                            if (!activationData.IsUsingGrainDirectory) continue;
-                            if (!updatedSilo.Equals(directory.GetPrimaryForGrain(activationData.Grain))) continue;
+                        var activationData = activation.Value;
+                        if (!activationData.IsUsingGrainDirectory) continue;
+                        if (!updatedSilo.Equals(directory.GetPrimaryForGrain(activationData.Grain))) continue;
 
-                            lock (activationData)
-                            {
-                                // adapted from InsideGrainClient.DeactivateOnIdle().
-                                activationData.ResetKeepAliveRequest();
-                                activationsToShutdown.Add(activationData);
-                            }
-                        }
-                        catch (Exception exc)
+                        lock (activationData)
                         {
-                            logger.Error(ErrorCode.Catalog_SiloStatusChangeNotification_Exception,
-                                String.Format("Catalog has thrown an exception while executing OnSiloStatusChange of silo {0}.", updatedSilo.ToStringWithHashCode()), exc);
+                            // adapted from InsideGrainClient.DeactivateOnIdle().
+                            activationData.ResetKeepAliveRequest();
+                            activationsToShutdown.Add(activationData);
                         }
+                    }
+                    catch (Exception exc)
+                    {
+                        logger.Error(ErrorCode.Catalog_SiloStatusChangeNotification_Exception,
+                            String.Format("Catalog has thrown an exception while executing OnSiloStatusChange of silo {0}.", updatedSilo.ToStringWithHashCode()), exc);
                     }
                 }
                 logger.Info(ErrorCode.Catalog_SiloStatusChangeNotification,

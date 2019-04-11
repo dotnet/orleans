@@ -64,7 +64,11 @@ namespace Orleans.Runtime.Providers
             var systemTarget = target as SystemTarget;
             if (systemTarget == null) throw new ArgumentException($"Parameter must be of type {typeof(SystemTarget)}", nameof(target));
             systemTarget.RuntimeClient = this.runtimeClient;
-            scheduler.RegisterWorkContext(systemTarget.SchedulingContext);
+            if (scheduler.RegisterWorkContext(systemTarget.SchedulingContext) == null)
+            {
+                throw new InvalidOperationException($"Unable to register duplicate work context for SystemTarget {target} (context: {systemTarget.SchedulingContext})");
+            }
+
             activationDirectory.RecordNewSystemTarget(systemTarget);
         }
 
