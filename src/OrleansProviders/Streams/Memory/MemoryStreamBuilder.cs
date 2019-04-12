@@ -1,13 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.ApplicationParts;
 using Orleans.Configuration;
-using Orleans.Hosting;
-using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
 using Orleans.Streams;
 using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Orleans.Providers
 {
@@ -18,13 +13,13 @@ namespace Orleans.Providers
             string name, Action<Action<IServiceCollection>> configureServicesDelegate, Action<Action<IApplicationPartManager>> configureAppPartsDelegate)
             : base(name, configureServicesDelegate, MemoryAdapterFactory<TSerializer>.Create)
         {
-            this.configureDelegate(services => services.ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name));
+            this.ConfigureDelegate(services => services.ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name));
             configureAppPartsDelegate(parts => parts.AddFrameworkPart(typeof(MemoryAdapterFactory<>).Assembly));
         }
 
         public SiloMemoryStreamConfigurator<TSerializer> ConfigurePartitioning(int numOfQueues = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
         {
-            this.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfQueues));
+            this.Configure<SiloMemoryStreamConfigurator<TSerializer>, HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfQueues));
             return this;
         }
     }
@@ -41,8 +36,7 @@ namespace Orleans.Providers
 
         public ClusterClientMemoryStreamConfigurator<TSerializer> ConfigurePartitioning(int numOfQueues = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
         {
-            this.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfQueues));
-            return this;
+            return this.Configure<ClusterClientMemoryStreamConfigurator<TSerializer>, HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfQueues));
         }
     }
 }

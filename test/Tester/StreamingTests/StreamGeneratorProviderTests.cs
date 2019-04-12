@@ -45,7 +45,7 @@ namespace UnitTests.StreamingTests
                         .ConfigureServices(services => services.AddSingletonNamedService<IStreamGeneratorConfig>(StreamProviderName, (s, n) => GeneratorConfig))
                         .AddPersistentStreams(StreamProviderName, GeneratorAdapterFactory.Create, b=>b
                             .ConfigurePullingAgent(ob => ob.Configure(options => { options.BatchContainerBatchSize = 10; }))
-                            .Configure<HashRingStreamQueueMapperOptions>(ob=>ob.Configure(options => options.TotalQueueCount = TotalQueueCount))
+                            .Configure<SiloPersistentStreamConfigurator, HashRingStreamQueueMapperOptions>(ob=>ob.Configure(options => options.TotalQueueCount = TotalQueueCount))
                             .UseDynamicClusterConfigDeploymentBalancer()
                             .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
                 }

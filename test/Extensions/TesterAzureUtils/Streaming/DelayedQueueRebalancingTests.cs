@@ -51,9 +51,8 @@ namespace Tester.AzureUtils.Streaming
             {
                 hostBuilder
                     .AddAzureQueueStreams(adapterName, b => b
-                        .ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
-                            (options, dep) =>
-                            {
+                        .ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>((options, dep) =>
+                        {
                                 options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                                 options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                         }))

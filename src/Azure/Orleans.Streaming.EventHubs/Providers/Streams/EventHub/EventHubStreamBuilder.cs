@@ -8,45 +8,49 @@ using Orleans.ApplicationParts;
 
 namespace Orleans.Streams
 {
-    public interface ISiloEventHubStreamConfigurator : ISiloRecoverableStreamConfigurator
+    public interface IEventHubStreamConfigurator {}
+
+    public static class EventHubStreamConfiguratorExtensions
     {
+        public static TConfigurator ConfigureEventHub<TConfigurator>(this TConfigurator configurator, Action<OptionsBuilder<EventHubOptions>> configureOptions)
+            where TConfigurator : NamedServiceConfigurator, IEventHubStreamConfigurator
+        {
+            configurator.Configure(configureOptions);
+            return configurator;
+        }
     }
+
+    public interface ISiloEventHubStreamConfigurator : IEventHubStreamConfigurator, ISiloRecoverableStreamConfigurator { }
+
 
     public static class SiloEventHubStreamConfiguratorExtensions
     {
         public static TConfigurator ConfigureCheckpointer<TConfigurator,TOptions>(this TConfigurator configurator, Func<IServiceProvider, string, IStreamQueueCheckpointerFactory> checkpointerFactoryBuilder, Action<OptionsBuilder<TOptions>> configureOptions)
-            where TConfigurator : ISiloEventHubStreamConfigurator
+            where TConfigurator : NamedServiceConfigurator, ISiloEventHubStreamConfigurator
             where TOptions : class, new()
         {
-            configurator.ConfigureComponent<TOptions, IStreamQueueCheckpointerFactory>(checkpointerFactoryBuilder, configureOptions);
-            return configurator;
-        }
-
-        public static TConfigurator ConfigureEventHub<TConfigurator>(this TConfigurator configurator, Action<OptionsBuilder<EventHubOptions>> configureOptions)
-            where TConfigurator : ISiloEventHubStreamConfigurator
-        {
-            configurator.Configure<EventHubOptions>(configureOptions);
+            configurator.ConfigureComponent(checkpointerFactoryBuilder, configureOptions);
             return configurator;
         }
 
         public static TConfigurator ConfigurePartitionReceiver<TConfigurator>(this TConfigurator configurator, Action<OptionsBuilder<EventHubReceiverOptions>> configureOptions)
-            where TConfigurator : ISiloEventHubStreamConfigurator
+            where TConfigurator : NamedServiceConfigurator, ISiloEventHubStreamConfigurator
         {
-            configurator.Configure<EventHubReceiverOptions>(configureOptions);
+            configurator.Configure(configureOptions);
             return configurator;
         }
 
         public static TConfigurator ConfigureCachePressuring<TConfigurator>(this TConfigurator configurator, Action<OptionsBuilder<EventHubStreamCachePressureOptions>> configureOptions)
-            where TConfigurator : ISiloEventHubStreamConfigurator
+            where TConfigurator : NamedServiceConfigurator, ISiloEventHubStreamConfigurator
         {
-            configurator.Configure<EventHubStreamCachePressureOptions>(configureOptions);
+            configurator.Configure(configureOptions);
             return configurator;
         }
 
         public static TConfigurator UseAzureTableCheckpointer<TConfigurator>(this TConfigurator configurator, Action<OptionsBuilder<AzureTableStreamCheckpointerOptions>> configureOptions)
-            where TConfigurator : ISiloEventHubStreamConfigurator
+            where TConfigurator : NamedServiceConfigurator, ISiloEventHubStreamConfigurator
         {
-            configurator.ConfigureCheckpointer<TConfigurator,AzureTableStreamCheckpointerOptions>(EventHubCheckpointerFactory.CreateFactory, configureOptions);
+            configurator.ConfigureCheckpointer(EventHubCheckpointerFactory.CreateFactory, configureOptions);
             return configurator;
         }
     }
@@ -62,7 +66,7 @@ namespace Orleans.Streams
                     parts.AddFrameworkPart(typeof(EventHubAdapterFactory).Assembly)
                         .AddFrameworkPart(typeof(EventSequenceTokenV2).Assembly);
                 });
-            this.configureDelegate(services => services.ConfigureNamedOptionForLogging<EventHubOptions>(name)
+            this.ConfigureDelegate(services => services.ConfigureNamedOptionForLogging<EventHubOptions>(name)
                 .ConfigureNamedOptionForLogging<EventHubReceiverOptions>(name)
                 .ConfigureNamedOptionForLogging<EventHubStreamCachePressureOptions>(name)
                 .AddTransient<IConfigurationValidator>(sp => new EventHubOptionsValidator(sp.GetOptionsByName<EventHubOptions>(name), name))
@@ -70,17 +74,7 @@ namespace Orleans.Streams
         }
     }
 
-    public interface IClusterClientEventHubStreamConfigurator : IClusterClientPersistentStreamConfigurator { }
-
-    public static class ClusterClientEventHubStreamConfiguratorExtensions
-    {
-        public static TConfigurator ConfigureEventHub<TConfigurator>(this TConfigurator configurator, Action<OptionsBuilder<EventHubOptions>> configureOptions)
-            where TConfigurator : IClusterClientEventHubStreamConfigurator
-        {
-            configurator.Configure<EventHubOptions>(configureOptions);
-            return configurator;
-        }
-    }
+    public interface IClusterClientEventHubStreamConfigurator : IEventHubStreamConfigurator, IClusterClientPersistentStreamConfigurator { }
 
     public class ClusterClientEventHubStreamConfigurator : ClusterClientPersistentStreamConfigurator, IClusterClientEventHubStreamConfigurator
     {

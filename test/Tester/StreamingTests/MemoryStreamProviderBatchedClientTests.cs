@@ -36,18 +36,14 @@ namespace Tester.StreamingTests
             {
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder
                         .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, b => b
-                    .ConfigurePartitioning(partitionCount)
-                    .Configure<StreamPullingAgentOptions>(ob => ob.Configure(options =>
-                    {
-                        options.BatchContainerBatchSize = 10;
-                    })));
+                            .ConfigurePartitioning(partitionCount));
             }
 
             private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
             {
                 public void Configure(ISiloHostBuilder hostBuilder) => hostBuilder.AddMemoryGrainStorage("PubSubStore")
                         .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, b => b
-                    .ConfigurePartitioning(partitionCount));
+                            .ConfigurePartitioning(partitionCount));
             }
 
             private static void AdjustConfig(ClusterConfiguration config)
