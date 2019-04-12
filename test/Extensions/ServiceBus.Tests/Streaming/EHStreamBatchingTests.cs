@@ -33,23 +33,23 @@ namespace ServiceBus.Tests.Streaming
                 {
                     hostBuilder
                         .AddEventHubStreams(StreamBatchingTestConst.ProviderName, b => b
-                        .ConfigureEventHub(ob => ob.Configure(options =>
-                        {
-                            options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
-                            options.ConsumerGroup = EHConsumerGroup;
-                            options.Path = EHPath;
-                        }))
-                        .UseEventHubCheckpointer(ob => ob.Configure(options =>
-                        {
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            options.PersistInterval = TimeSpan.FromSeconds(1);
-                        }))
-                        .UseDynamicClusterConfigDeploymentBalancer()
-                        .Configure<StreamPullingAgentOptions>(ob => ob.Configure(options =>
-                        {
-                            options.BatchContainerBatchSize = 10;
-                        }))
-                        .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
+                            .ConfigureEventHub(ob => ob.Configure(options =>
+                            {
+                                options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                                options.ConsumerGroup = EHConsumerGroup;
+                                options.Path = EHPath;
+                            }))
+                            .UseAzureTableCheckpointer(ob => ob.Configure(options =>
+                            {
+                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                options.PersistInterval = TimeSpan.FromSeconds(1);
+                            }))
+                            .UseDynamicClusterConfigDeploymentBalancer()
+                            .Configure<StreamPullingAgentOptions>(ob => ob.Configure(options =>
+                            {
+                                options.BatchContainerBatchSize = 10;
+                            }))
+                            .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
                     hostBuilder
                         .AddMemoryGrainStorageAsDefault();
                 }
