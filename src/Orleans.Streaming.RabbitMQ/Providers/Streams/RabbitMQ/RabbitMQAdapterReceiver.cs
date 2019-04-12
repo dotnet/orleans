@@ -9,12 +9,10 @@ namespace Orleans.Providers.RabbitMQ.Streams.RabbitMQ
 {
     public class RabbitMQAdapterReceiver : IQueueAdapterReceiver
     {
-
         private readonly SerializationManager _serializationManager;
         private RabbitMQOptions _rabbitFact;
         private RabbitMQManager _manager;
         private long _lastReadMessage;
-        private Task _outstandingTask;
         private readonly ILogger _logger;
         private readonly IRabbitMQDataAdapter _dataAdapter;
 
@@ -55,19 +53,11 @@ namespace Orleans.Providers.RabbitMQ.Streams.RabbitMQ
             return Task.CompletedTask;
         }
 
-        public async Task Shutdown(TimeSpan timeout)
+        public Task Shutdown(TimeSpan timeout)
         {
-            try
-            {
-                if (_outstandingTask != null)
-                {
-                    await _outstandingTask;
-                }
-            }
-            finally
-            {
-                _manager.Dispose();
-            }
+
+            _manager.Dispose();
+            return Task.CompletedTask;
         }
 
         /// <summary>
