@@ -4,6 +4,8 @@ using Orleans.Runtime;
 using Orleans.Serialization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
+using System.Collections.Generic;
+
 namespace Orleans.Streams
 {
     internal class PersistentStreamProducer<T> : IInternalAsyncBatchObserver<T>
@@ -28,6 +30,11 @@ namespace Orleans.Streams
         public Task OnNextAsync(T item, StreamSequenceToken token)
         {
             return this.queueAdapter.QueueMessageAsync(this.stream.StreamId.Guid, this.stream.StreamId.Namespace, item, token, RequestContextExtensions.Export(this.serializationManager));
+        }
+        
+        public Task OnNextBatchAsync(IEnumerable<T> batch, StreamSequenceToken token)
+        {
+            return this.queueAdapter.QueueMessageBatchAsync(this.stream.StreamId.Guid, this.stream.StreamId.Namespace, batch, token, RequestContextExtensions.Export(this.serializationManager));
         }
 
         public Task OnCompletedAsync()
