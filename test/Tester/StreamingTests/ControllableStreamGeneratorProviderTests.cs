@@ -42,9 +42,9 @@ namespace UnitTests.StreamingTests
                     hostBuilder
                         .AddPersistentStreams(StreamProviderName,
                             GeneratorAdapterFactory.Create, b => b
-                        .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly)
-                        .Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = TotalQueueCount))
-                        .UseDynamicClusterConfigDeploymentBalancer());
+                                .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly)
+                                .Configure<SiloPersistentStreamConfigurator, HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = TotalQueueCount))
+                                .UseDynamicClusterConfigDeploymentBalancer());
                 }
             }
         }

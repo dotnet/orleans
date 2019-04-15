@@ -44,9 +44,9 @@ namespace ServiceBus.Tests.MonitorTests
                 {
                     hostBuilder
                         .AddPersistentStreams(StreamProviderName, EHStreamProviderForMonitorTestsAdapterFactory.Create, b=>b
-                        .ConfigureComponent<IStreamQueueCheckpointerFactory>((s, n) => NoOpCheckpointerFactory.Instance)
-                        .Configure<StreamStatisticOptions>(ob => ob.Configure(options => options.StatisticMonitorWriteInterval = monitorWriteInterval))
-                        .UseDynamicClusterConfigDeploymentBalancer());
+                            .ConfigureComponent<SiloPersistentStreamConfigurator, IStreamQueueCheckpointerFactory>((s, n) => NoOpCheckpointerFactory.Instance)
+                            .Configure<SiloPersistentStreamConfigurator, StreamStatisticOptions>(ob => ob.Configure(options => options.StatisticMonitorWriteInterval = monitorWriteInterval))
+                            .UseDynamicClusterConfigDeploymentBalancer());
                     hostBuilder
                         .ConfigureServices(services =>
                         {

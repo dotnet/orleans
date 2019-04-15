@@ -17,7 +17,7 @@ namespace Orleans.Streams
         /// </summary>
         public static TConfigurator UseDynamicAzureDeploymentBalancer<TConfigurator>(this TConfigurator configurator, 
             TimeSpan? siloMaturityPeriod = null)
-            where TConfigurator : ISiloPersistentStreamConfigurator
+            where TConfigurator : NamedServiceConfigurator, ISiloPersistentStreamConfigurator
         {
             return configurator.ConfigurePartitionBalancing<TConfigurator,DeploymentBasedQueueBalancerOptions>(
                 (s, n) => DeploymentBasedQueueBalancer.Create(s, n, new ServiceRuntimeWrapper(s.GetService<ILoggerFactory>())),
@@ -38,7 +38,7 @@ namespace Orleans.Streams
         /// </summary>
         public static TConfigurator UseStaticAzureDeploymentBalancer<TConfigurator>(this TConfigurator configurator,
            TimeSpan? siloMaturityPeriod = null)
-            where TConfigurator : ISiloPersistentStreamConfigurator
+            where TConfigurator : NamedServiceConfigurator, ISiloPersistentStreamConfigurator
         {
             return configurator.ConfigurePartitionBalancing<TConfigurator,DeploymentBasedQueueBalancerOptions>(
                 (s, n) => DeploymentBasedQueueBalancer.Create(s, n, new ServiceRuntimeWrapper(s.GetService<ILoggerFactory>())),
@@ -57,9 +57,9 @@ namespace Orleans.Streams
         /// </summary>
         public static TConfigurator UseAzureDeploymentLeaseBasedBalancer<TConfigurator>(this TConfigurator configurator,
            Action<OptionsBuilder<LeaseBasedQueueBalancerOptions>> configureOptions = null)
-            where TConfigurator : ISiloPersistentStreamConfigurator
+            where TConfigurator : NamedServiceConfigurator, ISiloPersistentStreamConfigurator
         {
-            return configurator.ConfigurePartitionBalancing<TConfigurator, LeaseBasedQueueBalancerOptions>(
+            return configurator.ConfigurePartitionBalancing(
                 (s,n)=>LeaseBasedQueueBalancer.Create(s,n, new ServiceRuntimeWrapper(s.GetService<ILoggerFactory>())), configureOptions);
         }
     }

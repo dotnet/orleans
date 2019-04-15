@@ -19,7 +19,7 @@ namespace Orleans.Streams
                     .AddFrameworkPart(typeof(EventSequenceTokenV2).Assembly);
             });
 
-            this.configureDelegate(services =>
+            this.ConfigureDelegate(services =>
             {
                 services.ConfigureNamedOptionForLogging<SqsOptions>(name)
                     .ConfigureNamedOptionForLogging<SimpleQueueCacheOptions>(name)
@@ -29,19 +29,17 @@ namespace Orleans.Streams
 
         public SiloSqsStreamConfigurator ConfigureSqs(Action<OptionsBuilder<SqsOptions>> configureOptions)
         {
-            this.Configure<SqsOptions>(configureOptions);
-            return this;
+            return this.Configure(configureOptions);
         }
+
         public SiloSqsStreamConfigurator ConfigureCache(int cacheSize = SimpleQueueCacheOptions.DEFAULT_CACHE_SIZE)
         {
-            this.Configure<SimpleQueueCacheOptions>(ob => ob.Configure(options => options.CacheSize = cacheSize));
-            return this;
+            return this.Configure<SiloSqsStreamConfigurator, SimpleQueueCacheOptions>(ob => ob.Configure(options => options.CacheSize = cacheSize));
         }
 
         public SiloSqsStreamConfigurator ConfigurePartitioning(int numOfparitions = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
         {
-            this.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfparitions));
-            return this;
+            return this.Configure<SiloSqsStreamConfigurator, HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfparitions));
         }
     }
 
@@ -65,14 +63,12 @@ namespace Orleans.Streams
 
         public ClusterClientSqsStreamConfigurator ConfigureSqs(Action<OptionsBuilder<SqsOptions>> configureOptions)
         {
-            this.Configure<SqsOptions>(configureOptions);
-            return this;
+            return this.Configure(configureOptions);
         }
 
         public ClusterClientSqsStreamConfigurator ConfigurePartitioning(int numOfparitions = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
         {
-            this.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfparitions));
-            return this;
+            return this.Configure<ClusterClientSqsStreamConfigurator, HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfparitions));
         }
     }
 }

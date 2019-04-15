@@ -53,13 +53,13 @@ namespace Tester.AzureUtils.Streaming
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.QueueNames = AzureQueueUtilities.GenerateQueueNames($"{dep.Value.ClusterId}{StreamProviderName}", queueCount);
-                        })).Configure<StreamPubSubOptions>(ob => ob.Configure(op => op.PubSubType = StreamPubSubType.ImplicitOnly)))
+                        })).ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly))
                     .AddAzureQueueStreams(StreamProviderName2, sb => sb.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.QueueNames = AzureQueueUtilities.GenerateQueueNames($"{dep.Value.ClusterId}{StreamProviderName2}", queueCount);
-                        })).Configure<StreamPubSubOptions>(ob => ob.Configure(op => op.PubSubType = StreamPubSubType.ImplicitOnly)))
+                        })).ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly))
                     .AddMemoryGrainStorageAsDefault()
                     .AddMemoryGrainStorage("PubSubStore");
             }

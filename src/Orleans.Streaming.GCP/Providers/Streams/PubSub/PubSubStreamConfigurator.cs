@@ -2,8 +2,6 @@ using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers.GCP.Streams.PubSub;
 using System;
-using System.Collections.Generic;
-using System.Text;
 using Orleans.Providers.Streams.Common;
 using Orleans.ApplicationParts;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,7 +20,7 @@ namespace Orleans.Streams
                     parts.AddFrameworkPart(typeof(PubSubAdapterFactory<>).Assembly)
                         .AddFrameworkPart(typeof(EventSequenceTokenV2).Assembly);
                 });
-            this.configureDelegate(services =>
+            this.ConfigureDelegate(services =>
             {
                 services.ConfigureNamedOptionForLogging<PubSubOptions>(name)
                     .ConfigureNamedOptionForLogging<SimpleQueueCacheOptions>(name)
@@ -32,19 +30,17 @@ namespace Orleans.Streams
 
         public SiloPubSubStreamConfigurator<TDataAdapter> ConfigurePubSub(Action<OptionsBuilder<PubSubOptions>> configureOptions)
         {
-            this.Configure<PubSubOptions>(configureOptions);
-            return this;
+            return this.Configure(configureOptions);
         }
+
         public SiloPubSubStreamConfigurator<TDataAdapter> ConfigureCache(int cacheSize = SimpleQueueCacheOptions.DEFAULT_CACHE_SIZE)
         {
-            this.Configure<SimpleQueueCacheOptions>(ob => ob.Configure(options => options.CacheSize = cacheSize));
-            return this;
+            return this.Configure<SiloPubSubStreamConfigurator<TDataAdapter>, SimpleQueueCacheOptions>(ob => ob.Configure(options => options.CacheSize = cacheSize));
         }
 
         public SiloPubSubStreamConfigurator<TDataAdapter> ConfigurePartitioning(int numOfPartitions = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
         {
-            this.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfPartitions));
-            return this;
+            return this.Configure<SiloPubSubStreamConfigurator<TDataAdapter>, HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfPartitions));
         }
     }
 
@@ -65,14 +61,12 @@ namespace Orleans.Streams
 
         public ClusterClientPubSubStreamConfigurator<TDataAdapter> ConfigurePubSub(Action<OptionsBuilder<PubSubOptions>> configureOptions)
         {
-            this.Configure<PubSubOptions>(configureOptions);
-            return this;
+            return this.Configure(configureOptions);
         }
 
         public ClusterClientPubSubStreamConfigurator<TDataAdapter> ConfigurePartitioning(int numOfPartitions = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
         {
-            this.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfPartitions));
-            return this;
+            return this.Configure<ClusterClientPubSubStreamConfigurator<TDataAdapter>, HashRingStreamQueueMapperOptions >(ob => ob.Configure(options => options.TotalQueueCount = numOfPartitions));
         }
     }
 }
