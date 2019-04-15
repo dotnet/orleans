@@ -161,7 +161,7 @@ The below packages include plugins for persisting reminders in various storage t
 PM> Install-Package Microsoft.Orleans.Reminders.AzureStorage
 ```
 
-Includes the plugin for using Azure Tables for storing cluster membership data.
+Includes the plugin for using Azure Tables for storing reminders.
 
 ### [Microsoft Orleans Reminders ADO.NET Providers](https://www.nuget.org/packages/Microsoft.Orleans.reminders.AdoNet/)
 
