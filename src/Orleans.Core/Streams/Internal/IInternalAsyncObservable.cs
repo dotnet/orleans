@@ -23,7 +23,7 @@ namespace Orleans.Streams
     }
 
         
-    internal interface IInternalAsyncBatchObserver<T> : IAsyncObserver<T>
+    internal interface IInternalAsyncBatchObserver<T> : IAsyncBatchProducer<T>
     {
         Task Cleanup();
     }
