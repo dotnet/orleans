@@ -14,7 +14,7 @@ namespace Orleans.Streams
         IStreamIdentity, // identity
         IEquatable<IAsyncStream<T>>, IComparable<IAsyncStream<T>>, // comparison
         IAsyncObservable<T>, IAsyncBatchObservable<T>, // observables
-        IAsyncObserver<T> // observers
+        IAsyncBatchProducer<T> // observers
     {
         /// <summary>
         /// Determines whether this is a rewindable stream - supports subscribing from previous point in time.
