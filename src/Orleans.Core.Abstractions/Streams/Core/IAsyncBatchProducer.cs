@@ -19,7 +19,7 @@ namespace Orleans.Streams
         /// sufficiently processed by the consumer to meet any behavioral guarantees.
         /// </para>
         /// <para>
-        /// That is, the semantics of the returned Task is the same as for <code>OnNextAsync</code>,
+        /// That is, the semantics of the returned Task is the same as for <see cref="OnNextAsync" />,
         /// extended for all items in the batch.
         /// </para>
         /// </summary>
