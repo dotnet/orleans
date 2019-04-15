@@ -38,7 +38,7 @@ namespace UnitTests.StreamingTests
                 public void Configure(ISiloHostBuilder hostBuilder) => hostBuilder.AddMemoryGrainStorage("PubSubStore")
                     .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamBatchingTestConst.ProviderName, b => b
                         .ConfigurePartitioning(partitionCount)
-                        .Configure<StreamPullingAgentOptions>(ob => ob.Configure(options =>
+                        .ConfigurePullingAgent(ob => ob.Configure(options =>
                         {
                             options.BatchContainerBatchSize = 10;
                         }))

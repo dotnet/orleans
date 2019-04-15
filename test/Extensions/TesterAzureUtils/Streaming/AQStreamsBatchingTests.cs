@@ -39,7 +39,7 @@ namespace Tester.AzureUtils.Streaming
                                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                                     options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                                 }))
-                            .Configure<StreamPullingAgentOptions>(ob => ob.Configure(options =>
+                            .ConfigurePullingAgent(ob => ob.Configure(options =>
                             {
                                 options.BatchContainerBatchSize = 10;
                             }))
