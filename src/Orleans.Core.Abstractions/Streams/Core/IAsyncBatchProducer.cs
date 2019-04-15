@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 namespace Orleans.Streams
 {
     /// <summary>
-    /// This interface generalizes the IAsyncObserver interface to allow productionof batches of items.
+    /// This interface generalizes the IAsyncObserver interface to allow production of batches of items.
     /// <para>
     /// Note that this interface is invoked (used) by item producers.
     /// </para>
