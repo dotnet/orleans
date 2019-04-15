@@ -45,7 +45,7 @@ namespace ServiceBus.Tests.Streaming
                                 options.PersistInterval = TimeSpan.FromSeconds(1);
                             }))
                             .UseDynamicClusterConfigDeploymentBalancer()
-                            .Configure<StreamPullingAgentOptions>(ob => ob.Configure(options =>
+                            .ConfigurePullingAgent(ob => ob.Configure(options =>
                             {
                                 options.BatchContainerBatchSize = 10;
                             }))
