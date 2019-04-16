@@ -14,7 +14,7 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloHostBuilder AddPersistentStreams(this ISiloHostBuilder builder, string name,
             Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory,
-            Action<SiloPersistentStreamConfigurator> configureStream)
+            Action<ISiloPersistentStreamConfigurator> configureStream)
         {
             //the constructor wire up DI with all default components of the streams , so need to be called regardless of configureStream null or not
             var streamConfigurator = new SiloPersistentStreamConfigurator(name, configureDelegate => builder.ConfigureServices(configureDelegate), adapterFactory);
@@ -28,7 +28,7 @@ namespace Orleans.Hosting
         public static ISiloHostBuilder AddSimpleMessageStreamProvider(
             this ISiloHostBuilder builder,
             string name,
-            Action<SimpleMessageStreamConfigurator> configureStream)
+            Action<ISimpleMessageStreamConfigurator> configureStream)
         {
             //the constructor wire up DI with all default components of the streams , so need to be called regardless of configureStream null or not
             var streamConfigurator = new SimpleMessageStreamConfigurator(name, configureDelegate => builder.ConfigureServices(configureDelegate));
@@ -44,7 +44,7 @@ namespace Orleans.Hosting
 
         {
             return AddSimpleMessageStreamProvider(builder, name, b => b
-                .Configure<SimpleMessageStreamConfigurator, SimpleMessageStreamProviderOptions>(ob => ob.Configure(configureOptions)));
+                .Configure<SimpleMessageStreamProviderOptions>(ob => ob.Configure(configureOptions)));
         }
 
         /// <summary>
@@ -62,7 +62,7 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloBuilder AddPersistentStreams(this ISiloBuilder builder, string name,
             Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory,
-            Action<SiloPersistentStreamConfigurator> configureStream)
+            Action<ISiloPersistentStreamConfigurator> configureStream)
         {
             //the constructor wire up DI with all default components of the streams , so need to be called regardless of configureStream null or not
             var streamConfigurator = new SiloPersistentStreamConfigurator(name, configureDelegate => builder.ConfigureServices(configureDelegate), adapterFactory);
@@ -76,7 +76,7 @@ namespace Orleans.Hosting
         public static ISiloBuilder AddSimpleMessageStreamProvider(
             this ISiloBuilder builder,
             string name,
-            Action<SimpleMessageStreamConfigurator> configureStream)
+            Action<ISimpleMessageStreamConfigurator> configureStream)
         {
             //the constructor wire up DI with all default components of the streams , so need to be called regardless of configureStream null or not
             var streamConfigurator = new SimpleMessageStreamConfigurator(name, configureDelegate => builder.ConfigureServices(configureDelegate));
@@ -92,7 +92,7 @@ namespace Orleans.Hosting
 
         {
             return AddSimpleMessageStreamProvider(builder, name, b => b
-                .Configure<SimpleMessageStreamConfigurator, SimpleMessageStreamProviderOptions>(ob => ob.Configure(configureOptions)));
+                .Configure<SimpleMessageStreamProviderOptions>(ob => ob.Configure(configureOptions)));
         }
 
         /// <summary>

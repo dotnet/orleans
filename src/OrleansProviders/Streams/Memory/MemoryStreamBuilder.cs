@@ -6,7 +6,19 @@ using System;
 
 namespace Orleans.Providers
 {
-    public class SiloMemoryStreamConfigurator<TSerializer> : SiloRecoverableStreamConfigurator
+    public interface IMemoryStreamConfigurator : INamedServiceConfigurator { }
+
+    public static class SiloRecoverableStreamConfiguratorExtensions
+    {
+        public static void ConfigurePartitioning(this IMemoryStreamConfigurator configurator, int numOfQueues = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
+        {
+            configurator.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfQueues));
+        }
+    }
+
+    public interface ISiloMemoryStreamConfigurator : IMemoryStreamConfigurator, ISiloRecoverableStreamConfigurator { }
+
+    public class SiloMemoryStreamConfigurator<TSerializer> : SiloRecoverableStreamConfigurator, ISiloMemoryStreamConfigurator
           where TSerializer : class, IMemoryMessageBodySerializer
     {
         public SiloMemoryStreamConfigurator(
@@ -16,15 +28,11 @@ namespace Orleans.Providers
             this.ConfigureDelegate(services => services.ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name));
             configureAppPartsDelegate(parts => parts.AddFrameworkPart(typeof(MemoryAdapterFactory<>).Assembly));
         }
-
-        public SiloMemoryStreamConfigurator<TSerializer> ConfigurePartitioning(int numOfQueues = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
-        {
-            this.Configure<SiloMemoryStreamConfigurator<TSerializer>, HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfQueues));
-            return this;
-        }
     }
 
-    public class ClusterClientMemoryStreamConfigurator<TSerializer> : ClusterClientPersistentStreamConfigurator
+    public interface IClusterClientMemoryStreamConfigurator : IMemoryStreamConfigurator, IClusterClientPersistentStreamConfigurator { }
+
+    public class ClusterClientMemoryStreamConfigurator<TSerializer> : ClusterClientPersistentStreamConfigurator, IClusterClientMemoryStreamConfigurator
           where TSerializer : class, IMemoryMessageBodySerializer
     {
         public ClusterClientMemoryStreamConfigurator(string name, IClientBuilder builder)
@@ -32,11 +40,6 @@ namespace Orleans.Providers
         {
             builder
                 .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(MemoryAdapterFactory<>).Assembly));
-        }
-
-        public ClusterClientMemoryStreamConfigurator<TSerializer> ConfigurePartitioning(int numOfQueues = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
-        {
-            return this.Configure<ClusterClientMemoryStreamConfigurator<TSerializer>, HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfQueues));
         }
     }
 }

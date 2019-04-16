@@ -32,18 +32,20 @@ namespace Tester.AzureUtils.Streaming
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddAzureQueueStreams(StreamBatchingTestConst.ProviderName, b => b
-                            .ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
+                        .AddAzureQueueStreams(StreamBatchingTestConst.ProviderName, b =>
+                        {
+                            b.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
                                 (options, dep) =>
                                 {
                                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                                     options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
-                                }))
-                            .ConfigurePullingAgent(ob => ob.Configure(options =>
+                                }));
+                            b.ConfigurePullingAgent(ob => ob.Configure(options =>
                             {
                                 options.BatchContainerBatchSize = 10;
-                            }))
-                            .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
+                            }));
+                            b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                        });
                 }
             }
 
@@ -52,14 +54,16 @@ namespace Tester.AzureUtils.Streaming
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
                 {
                     clientBuilder
-                        .AddAzureQueueStreams(StreamBatchingTestConst.ProviderName, b => b
-                            .ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
-                                    (options, dep) =>
-                                    {
-                                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                                        options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
-                                    }))
-                            .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
+                        .AddAzureQueueStreams(StreamBatchingTestConst.ProviderName, b =>
+                        {
+                            b.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
+                                (options, dep) =>
+                                {
+                                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                    options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
+                                }));
+                            b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                        });
                 }
             }
 

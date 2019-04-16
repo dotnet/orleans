@@ -10,14 +10,24 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Orleans.Configuration
 {
-    public interface IAzureQueueStreamConfigurator { }
+    public interface IAzureQueueStreamConfigurator : INamedServiceConfigurator { }
 
     public static class AzureQueueStreamConfiguratorExtensions
     {
-        public static TConfigurator ConfigureAzureQueue<TConfigurator>(this TConfigurator configurator, Action<OptionsBuilder<AzureQueueOptions>> configureOptions)
-            where TConfigurator : NamedServiceConfigurator, IAzureQueueStreamConfigurator
+        public static void ConfigureAzureQueue(this IAzureQueueStreamConfigurator configurator, Action<OptionsBuilder<AzureQueueOptions>> configureOptions)
         {
-            return configurator.Configure(configureOptions);
+            configurator.Configure(configureOptions);
+        }
+
+        public static void ConfigureQueueDataAdapter(this IAzureQueueStreamConfigurator configurator, Func<IServiceProvider, string, IQueueDataAdapter<CloudQueueMessage, IBatchContainer>> factory)
+        {
+            configurator.ConfigureComponent(factory);
+        }
+
+        public static void ConfigureQueueDataAdapter<TQueueDataAdapter>(this IAzureQueueStreamConfigurator configurator)
+            where TQueueDataAdapter : IQueueDataAdapter<CloudQueueMessage, IBatchContainer>
+        {
+            configurator.ConfigureComponent<IQueueDataAdapter<CloudQueueMessage, IBatchContainer>>((sp, n) => ActivatorUtilities.CreateInstance<TQueueDataAdapter>(sp));
         }
     }
 
@@ -25,24 +35,9 @@ namespace Orleans.Configuration
 
     public static class SiloAzureQueueStreamConfiguratorExtensions
     {
-        public static TConfigurator ConfigureCacheSize<TConfigurator>(this TConfigurator configurator, int cacheSize = SimpleQueueCacheOptions.DEFAULT_CACHE_SIZE)
-            where TConfigurator : NamedServiceConfigurator, ISiloAzureQueueStreamConfigurator
+        public static void ConfigureCacheSize(this ISiloAzureQueueStreamConfigurator configurator, int cacheSize = SimpleQueueCacheOptions.DEFAULT_CACHE_SIZE)
         {
-            return configurator.Configure<TConfigurator, SimpleQueueCacheOptions>(ob => ob.Configure(options => options.CacheSize = cacheSize));
-        }
-
-        public static TConfigurator ConfigureQueueDataAdapter<TConfigurator, TQueueDataAdapter>(this TConfigurator configurator, Func<IServiceProvider, string, IQueueDataAdapter<CloudQueueMessage, IBatchContainer>> factory)
-            where TConfigurator : NamedServiceConfigurator, ISiloAzureQueueStreamConfigurator
-            where TQueueDataAdapter : IQueueDataAdapter<CloudQueueMessage, IBatchContainer>
-        {
-            return configurator.ConfigureComponent(factory);
-        }
-
-        public static TConfigurator ConfigureQueueDataAdapter<TConfigurator, TQueueDataAdapter>(this TConfigurator configurator)
-            where TConfigurator : NamedServiceConfigurator, ISiloAzureQueueStreamConfigurator
-            where TQueueDataAdapter : IQueueDataAdapter<CloudQueueMessage, IBatchContainer>
-        {
-            return configurator.ConfigureComponent<TConfigurator, IQueueDataAdapter<CloudQueueMessage, IBatchContainer>>((sp,n) => ActivatorUtilities.CreateInstance<TQueueDataAdapter>(sp));
+            configurator.Configure<SimpleQueueCacheOptions>(ob => ob.Configure(options => options.CacheSize = cacheSize));
         }
     }
 
@@ -73,19 +68,6 @@ namespace Orleans.Configuration
 
     public static class ClusterClientAzureQueueStreamConfiguratorExtensions
     {
-        public static TConfigurator ConfigureQueueDataAdapter<TConfigurator,TQueueDataAdapter>(this TConfigurator configurator, Func<IServiceProvider, string, IQueueDataAdapter<CloudQueueMessage, IBatchContainer>> factory)
-            where TConfigurator : NamedServiceConfigurator, IClusterClientAzureQueueStreamConfigurator
-            where TQueueDataAdapter : IQueueDataAdapter<CloudQueueMessage, IBatchContainer>
-        {
-            return configurator.ConfigureComponent(factory);
-        }
-
-        public static TConfigurator ConfigureQueueDataAdapter<TConfigurator,TQueueDataAdapter>(this TConfigurator configurator)
-            where TConfigurator : NamedServiceConfigurator, IClusterClientAzureQueueStreamConfigurator
-            where TQueueDataAdapter : IQueueDataAdapter<CloudQueueMessage, IBatchContainer>
-        {
-            return configurator.ConfigureComponent<TConfigurator, IQueueDataAdapter<CloudQueueMessage, IBatchContainer>>((sp, n) => ActivatorUtilities.CreateInstance<TQueueDataAdapter>(sp));
-        }
     }
 
     public class ClusterClientAzureQueueStreamConfigurator : ClusterClientPersistentStreamConfigurator, IClusterClientAzureQueueStreamConfigurator

@@ -29,17 +29,20 @@ namespace Orleans.Streams
 
         public SiloSqsStreamConfigurator ConfigureSqs(Action<OptionsBuilder<SqsOptions>> configureOptions)
         {
-            return this.Configure(configureOptions);
+            this.Configure(configureOptions);
+            return this;
         }
 
         public SiloSqsStreamConfigurator ConfigureCache(int cacheSize = SimpleQueueCacheOptions.DEFAULT_CACHE_SIZE)
         {
-            return this.Configure<SiloSqsStreamConfigurator, SimpleQueueCacheOptions>(ob => ob.Configure(options => options.CacheSize = cacheSize));
+            this.Configure<SimpleQueueCacheOptions>(ob => ob.Configure(options => options.CacheSize = cacheSize));
+            return this;
         }
 
         public SiloSqsStreamConfigurator ConfigurePartitioning(int numOfparitions = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
         {
-            return this.Configure<SiloSqsStreamConfigurator, HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfparitions));
+            this.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfparitions));
+            return this;
         }
     }
 
@@ -63,12 +66,15 @@ namespace Orleans.Streams
 
         public ClusterClientSqsStreamConfigurator ConfigureSqs(Action<OptionsBuilder<SqsOptions>> configureOptions)
         {
-            return this.Configure(configureOptions);
+            this.Configure(configureOptions);
+            return this;
+
         }
 
         public ClusterClientSqsStreamConfigurator ConfigurePartitioning(int numOfparitions = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
         {
-            return this.Configure<ClusterClientSqsStreamConfigurator, HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfparitions));
+            this.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfparitions));
+            return this;
         }
     }
 }

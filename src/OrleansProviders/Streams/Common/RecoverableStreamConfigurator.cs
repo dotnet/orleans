@@ -5,23 +5,17 @@ using Orleans.Configuration;
 
 namespace Orleans.Streams
 {
-    public interface ISiloRecoverableStreamConfigurator : ISiloPersistentStreamConfigurator
-    {
-    }
+    public interface ISiloRecoverableStreamConfigurator : ISiloPersistentStreamConfigurator {}
 
     public static class SiloRecoverableStreamConfiguratorExtensions
     {
-        public static TConfigurator ConfigureStatistics<TConfigurator>(this TConfigurator configurator, Action<OptionsBuilder<StreamStatisticOptions>> configureOptions)
-            where TConfigurator : NamedServiceConfigurator, ISiloRecoverableStreamConfigurator
+        public static void ConfigureStatistics(this ISiloRecoverableStreamConfigurator configurator, Action<OptionsBuilder<StreamStatisticOptions>> configureOptions)
         {
             configurator.Configure(configureOptions);
-            return configurator;
         }
-        public static TConfigurator ConfigureCacheEviction<TConfigurator>(this TConfigurator configurator, Action<OptionsBuilder<StreamCacheEvictionOptions>> configureOptions)
-            where TConfigurator : NamedServiceConfigurator, ISiloRecoverableStreamConfigurator
+        public static void ConfigureCacheEviction(this ISiloRecoverableStreamConfigurator configurator, Action<OptionsBuilder<StreamCacheEvictionOptions>> configureOptions)
         {
             configurator.Configure(configureOptions);
-            return configurator;
         }
     }
 

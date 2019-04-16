@@ -51,18 +51,24 @@ namespace Tester.AzureUtils.Streaming
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
-                    .AddAzureQueueStreams(StreamProviderName, sb=>sb.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
-                        (options, dep) =>
+                    .AddAzureQueueStreams(StreamProviderName, sb=>
+                    {
+                        sb.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>((options, dep) =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.QueueNames = AzureQueueUtilities.GenerateQueueNames($"{dep.Value.ClusterId}{StreamProviderName}", queueCount);
-                        })).ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly))
-                    .AddAzureQueueStreams(StreamProviderName2, sb => sb.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
-                        (options, dep) =>
+                        }));
+                        sb.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                    })
+                    .AddAzureQueueStreams(StreamProviderName2, sb =>
+                    {
+                        sb.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>((options, dep) =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.QueueNames = AzureQueueUtilities.GenerateQueueNames($"{dep.Value.ClusterId}{StreamProviderName2}", queueCount);
-                        })).ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly))
+                        }));
+                        sb.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                    })
                     .AddMemoryGrainStorageAsDefault()
                     .AddMemoryGrainStorage("PubSubStore");
             }

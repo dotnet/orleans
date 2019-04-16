@@ -8,15 +8,13 @@ using Orleans.ApplicationParts;
 
 namespace Orleans.Streams
 {
-    public interface IEventHubStreamConfigurator {}
+    public interface IEventHubStreamConfigurator : INamedServiceConfigurator {}
 
     public static class EventHubStreamConfiguratorExtensions
     {
-        public static TConfigurator ConfigureEventHub<TConfigurator>(this TConfigurator configurator, Action<OptionsBuilder<EventHubOptions>> configureOptions)
-            where TConfigurator : NamedServiceConfigurator, IEventHubStreamConfigurator
+        public static void ConfigureEventHub(this IEventHubStreamConfigurator configurator, Action<OptionsBuilder<EventHubOptions>> configureOptions)
         {
             configurator.Configure(configureOptions);
-            return configurator;
         }
     }
 
@@ -25,33 +23,25 @@ namespace Orleans.Streams
 
     public static class SiloEventHubStreamConfiguratorExtensions
     {
-        public static TConfigurator ConfigureCheckpointer<TConfigurator,TOptions>(this TConfigurator configurator, Func<IServiceProvider, string, IStreamQueueCheckpointerFactory> checkpointerFactoryBuilder, Action<OptionsBuilder<TOptions>> configureOptions)
-            where TConfigurator : NamedServiceConfigurator, ISiloEventHubStreamConfigurator
+        public static void ConfigureCheckpointer<TOptions>(this ISiloEventHubStreamConfigurator configurator, Func<IServiceProvider, string, IStreamQueueCheckpointerFactory> checkpointerFactoryBuilder, Action<OptionsBuilder<TOptions>> configureOptions)
             where TOptions : class, new()
         {
             configurator.ConfigureComponent(checkpointerFactoryBuilder, configureOptions);
-            return configurator;
         }
 
-        public static TConfigurator ConfigurePartitionReceiver<TConfigurator>(this TConfigurator configurator, Action<OptionsBuilder<EventHubReceiverOptions>> configureOptions)
-            where TConfigurator : NamedServiceConfigurator, ISiloEventHubStreamConfigurator
+        public static void ConfigurePartitionReceiver(this ISiloEventHubStreamConfigurator configurator, Action<OptionsBuilder<EventHubReceiverOptions>> configureOptions)
         {
             configurator.Configure(configureOptions);
-            return configurator;
         }
 
-        public static TConfigurator ConfigureCachePressuring<TConfigurator>(this TConfigurator configurator, Action<OptionsBuilder<EventHubStreamCachePressureOptions>> configureOptions)
-            where TConfigurator : NamedServiceConfigurator, ISiloEventHubStreamConfigurator
+        public static void ConfigureCachePressuring(this ISiloEventHubStreamConfigurator configurator, Action<OptionsBuilder<EventHubStreamCachePressureOptions>> configureOptions)
         {
             configurator.Configure(configureOptions);
-            return configurator;
         }
 
-        public static TConfigurator UseAzureTableCheckpointer<TConfigurator>(this TConfigurator configurator, Action<OptionsBuilder<AzureTableStreamCheckpointerOptions>> configureOptions)
-            where TConfigurator : NamedServiceConfigurator, ISiloEventHubStreamConfigurator
+        public static void UseAzureTableCheckpointer(this ISiloEventHubStreamConfigurator configurator, Action<OptionsBuilder<AzureTableStreamCheckpointerOptions>> configureOptions)
         {
             configurator.ConfigureCheckpointer(EventHubCheckpointerFactory.CreateFactory, configureOptions);
-            return configurator;
         }
     }
 

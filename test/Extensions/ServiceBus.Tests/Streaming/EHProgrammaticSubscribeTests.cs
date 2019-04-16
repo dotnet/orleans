@@ -27,32 +27,37 @@ namespace ServiceBus.Tests.Streaming
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddEventHubStreams(StreamProviderName, b=>b
-                        .ConfigureEventHub(ob=>ob.Configure(options =>
+                        .AddEventHubStreams(StreamProviderName, b=>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
-                            options.ConsumerGroup = EHConsumerGroup;
-                            options.Path = EHPath;
-                        }))
-                        .UseAzureTableCheckpointer(ob=>ob.Configure(options =>
-                        {
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            options.PersistInterval = TimeSpan.FromSeconds(10);
-                        })));
+                            b.ConfigureEventHub(ob => ob.Configure(options =>
+                            {
+                                options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                                options.ConsumerGroup = EHConsumerGroup;
+                                options.Path = EHPath;
+                            }));
+                            b.UseAzureTableCheckpointer(ob => ob.Configure(options =>
+                            {
+                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                options.PersistInterval = TimeSpan.FromSeconds(10);
+                            }));
+                        });
 
                     hostBuilder
-                        .AddEventHubStreams(StreamProviderName2, b=>b
-                        .ConfigureEventHub(ob => ob.Configure(options =>
+                        .AddEventHubStreams(StreamProviderName2, b=>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
-                            options.ConsumerGroup = EHConsumerGroup;
-                            options.Path = EHPath2;
-                          
-                        }))
-                        .UseAzureTableCheckpointer(ob => ob.Configure(options => {
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            options.PersistInterval = TimeSpan.FromSeconds(10);
-                        })));
+                            b.ConfigureEventHub(ob => ob.Configure(options =>
+                            {
+                                options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                                options.ConsumerGroup = EHConsumerGroup;
+                                options.Path = EHPath2;
+
+                            }));
+                            b.UseAzureTableCheckpointer(ob => ob.Configure(options =>
+                            {
+                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                options.PersistInterval = TimeSpan.FromSeconds(10);
+                            }));
+                        });
 
                     hostBuilder
                           .AddMemoryGrainStorage("PubSubStore");
