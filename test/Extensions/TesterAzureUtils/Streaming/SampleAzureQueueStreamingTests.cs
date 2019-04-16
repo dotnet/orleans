@@ -47,9 +47,12 @@ namespace Tester.AzureUtils.Streaming
 
         public override void Dispose()
         {
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, 
-                AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount), 
-                TestDefaultConfiguration.DataConnectionString).Wait();
+            if (this.HostedCluster != null)
+            {
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                    AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
+                    TestDefaultConfiguration.DataConnectionString).Wait();
+            }
         }
 
         [SkippableFact, TestCategory("Functional")]

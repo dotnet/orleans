@@ -79,9 +79,12 @@ namespace Tester.AzureUtils.Streaming
         public override void Dispose()
         {
             base.Dispose();
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, AzureQueueStreamProviderUtils.GenerateDefaultAzureQueueNames(serviceId, AQStreamProviderName),
-                TestDefaultConfiguration.DataConnectionString).Wait();
-            TestAzureTableStorageStreamFailureHandler.DeleteAll().Wait();
+            if (this.HostedCluster != null)
+            {
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, AzureQueueStreamProviderUtils.GenerateDefaultAzureQueueNames(serviceId, AQStreamProviderName),
+                    TestDefaultConfiguration.DataConnectionString).Wait();
+                TestAzureTableStorageStreamFailureHandler.DeleteAll().Wait();
+            }
         }
 
         [SkippableFact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]

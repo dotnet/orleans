@@ -52,10 +52,15 @@ namespace Tester.AzureUtils.Streaming
             public override void Dispose()
             {
                 base.Dispose();
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, 
-                    AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount), TestDefaultConfiguration.DataConnectionString).Wait();
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
-                    AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount), TestDefaultConfiguration.DataConnectionString).Wait();
+
+                // Only perform cleanup if this suite was not skipped.
+                if (this.HostedCluster != null)
+                {
+                    AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                        AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount), TestDefaultConfiguration.DataConnectionString).Wait();
+                    AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                        AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount), TestDefaultConfiguration.DataConnectionString).Wait();
+                }
             }
         }
 
