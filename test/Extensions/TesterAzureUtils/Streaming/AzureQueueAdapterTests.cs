@@ -44,7 +44,10 @@ namespace Tester.AzureUtils.Streaming
         
         public void Dispose()
         {
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(this.loggerFactory, azureQueueNames, TestDefaultConfiguration.DataConnectionString).Wait();
+            if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
+            {
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(this.loggerFactory, azureQueueNames, TestDefaultConfiguration.DataConnectionString).Wait();
+            }
         }
 
         [SkippableFact, TestCategory("Functional"), TestCategory("Halo")]
