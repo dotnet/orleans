@@ -76,9 +76,17 @@ If you want to remove remote resources, use:
 make cleandeployremote
 ```
 
+### Using StatefulSets
+
+Some advice (courtesy of [James Sukhabut](https://github.com/jsukhabut)) on using [StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) to run the Silos.
+
+StatefulSets are shutdown, scaled, or upgraded in order (ie.  4,3,2,1,0). When you try to upgrade your silo with a new deployment, if you use stateless deployment you have 5 brand new silos so it will take some time for them to get into a quorum. Using StatefulSets, first instance 4 gets shutdown and upgraded, then instance 3, then 2, 1, and 0. This technique can avoid downtime on upgrades. 
+
+Regarding Orleans clients on Kubernetes, you can set the Silo as a Kubernetes Service with ClusterIP=None.  When this is done the silo DNS name (e.g. mysilo.mynamespace.svc.cluster.local) will have a multi-IP response containing all the IPs of the Silo Pods.  You can use a custom DnsNameGatewayListProvider class at the client that resolves the name to IP.  If the Silo scales up or down the client will easily see the updated list.  This can be much faster compared to the client reading Azure tables because the rows may contain Silos that are gone but not marked as dead yet. Kubernetes will always return the active silo (IP). You can find some code in  [this Pull Request](https://github.com/dotnet/orleans/pull/4301)
+
 ### Additional stuff
 
 - If you have issues with Silos not being able to get activated when you re-deploy/update your Deployments, try deleting all rows from the Azure Table Storage membership table.
 - We're using `imagePullPolicy: Always` so you would not need to increment the `VERSION` variable on the Makefile, but be aware that you may have to, just in case. Oh, and don't use `latest` in Production ([source](https://kubernetes.io/docs/concepts/configuration/overview/#container-images)).
-- We're using `hostNetwork` for the Silo Pods on the `deploy.yaml` file. Silo Pods register their Port/ProxyPort to the Membership table. So, in order to communicate, they lookup this table to find other Silos' Port/ProxyPort. If we did not use `hostNetwork`, Silos would need to be aware of the Hpst port Kubernetes would map for their container Port. By using `hostNetwork` in combination with random port usage on `Silo/Program.cs`, we guarantee that the ports listed on the Membership table are the ones that should be used.
 - If you would like to use Kubernetes to store Membership information (via Custom Resource Definitions), check out [this](https://github.com/OrleansContrib/Orleans.Clustering.Kubernetes) project.
+- We deactivated Server Garbage Collection on the API and Silo containers (check the corresponding .csproj files) because of [this](https://blog.markvincze.com/troubleshooting-high-memory-usage-with-asp-net-core-on-kubernetes/).

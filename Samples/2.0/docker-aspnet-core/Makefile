@@ -7,9 +7,9 @@ REGISTRY ?= docker.io/dgkanatsios
 # the context of your local Kubernetes cluster
 LOCAL_K8S_CLUSTER=docker-for-desktop
 # the contect of your remote Kubernetes cluster
-REMOTE_K8S_CLUSTER=aks
+REMOTE_K8S_CLUSTER=aksorleans
 # version/tag of the images that will be pushed to Docker Hub
-VERSION=0.0.8
+VERSION=0.0.14
 
 API_PROJECT_NAME=orleans-api
 SILO_PROJECT_NAME=orleans-silo

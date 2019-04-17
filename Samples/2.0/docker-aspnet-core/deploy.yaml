@@ -21,6 +21,10 @@ spec:
         imagePullPolicy: Always
         ports:
         - containerPort: 80
+        resources:
+          limits:
+            memory: "256Mi"
+            cpu: "250m"
 ---
 apiVersion: v1
 kind: Service
@@ -58,8 +62,14 @@ spec:
       labels:
         run: orleans-silo
     spec:
-      hostNetwork: true
       containers:
       - image: orleans-silo-image # image name updated by Makefile
         name: orleans-silo
         imagePullPolicy: Always
+        ports:
+        - containerPort: 11111
+        - containerPort: 30000
+        resources:
+          limits:
+            memory: "256Mi"
+            cpu: "250m"

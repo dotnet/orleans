@@ -3,6 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netcoreapp2.0</TargetFramework>
     <DockerComposeProjectPath>..\docker-compose.dcproj</DockerComposeProjectPath>
+    <ServerGarbageCollection>false</ServerGarbageCollection> <!-- https://blog.markvincze.com/troubleshooting-high-memory-usage-with-asp-net-core-on-kubernetes/ -->
   </PropertyGroup>
 
   <ItemGroup>
