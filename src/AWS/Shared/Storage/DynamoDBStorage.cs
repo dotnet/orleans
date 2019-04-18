@@ -1,4 +1,4 @@
-﻿using Amazon.DynamoDBv2;
+using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Amazon.Runtime;
 using Microsoft.Extensions.Logging;
@@ -477,24 +477,47 @@ namespace Orleans.Transactions.DynamoDB
         /// <returns>The collection containing a list of objects translated by the resolver function</returns>
         public async Task<List<TResult>> ScanAsync<TResult>(string tableName, Dictionary<string, AttributeValue> attributes, string expression, Func<Dictionary<string, AttributeValue>, TResult> resolver) where TResult : class
         {
+            // From the Amazon documentation:
+            // "A single Scan operation will read up to the maximum number of items set
+            // (if using the Limit parameter) or a maximum of 1 MB of data and then apply
+            // any filtering to the results using FilterExpression."
+            // https://docs.aws.amazon.com/sdkfornet/v3/apidocs/items/DynamoDBv2/MDynamoDBScanAsyncStringDictionary!String,%20Condition!CancellationToken.html
+
             try
             {
-                var request = new ScanRequest
-                {
-                    TableName = tableName,
-                    ConsistentRead = true,
-                    FilterExpression = expression,
-                    ExpressionAttributeValues = attributes,
-                    Select = Select.ALL_ATTRIBUTES
-                };
-
-                var response = await ddbClient.ScanAsync(request);
-
                 var resultList = new List<TResult>();
-                foreach (var item in response.Items)
+
+                var exclusiveStartKey = new Dictionary<string, AttributeValue>();
+
+                while (true)
                 {
-                    resultList.Add(resolver(item));
+                    var request = new ScanRequest
+                    {
+                        TableName = tableName,
+                        ConsistentRead = true,
+                        FilterExpression = expression,
+                        ExpressionAttributeValues = attributes,
+                        Select = Select.ALL_ATTRIBUTES,
+                        ExclusiveStartKey = exclusiveStartKey
+                    };
+
+                    var response = await ddbClient.ScanAsync(request);
+
+                    foreach (var item in response.Items)
+                    {
+                        resultList.Add(resolver(item));
+                    }
+
+                    if (response.LastEvaluatedKey.Count == 0)
+                    {
+                        break;
+                    }
+                    else
+                    {
+                        exclusiveStartKey = response.LastEvaluatedKey;
+                    }
                 }
+
                 return resultList;
             }
             catch (Exception exc)
