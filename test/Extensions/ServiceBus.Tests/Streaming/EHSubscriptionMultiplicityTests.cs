@@ -34,21 +34,22 @@ namespace ServiceBus.Tests.StreamingTests
                 {
                     hostBuilder
                         .AddMemoryGrainStorage("PubSubStore")
-                        .AddEventHubStreams(StreamProviderName, b=>b
-                        .ConfigureEventHub(ob => ob.Configure(
-                        options =>
+                        .AddEventHubStreams(StreamProviderName, b=>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
-                            options.ConsumerGroup = EHConsumerGroup;
-                            options.Path = EHPath;
-                          
-                        }))
-                        .UseAzureTableCheckpointer(ob=>ob.Configure(options=>
-                        {
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            options.PersistInterval = TimeSpan.FromSeconds(1);
-                        }))
-                        .UseDynamicClusterConfigDeploymentBalancer());
+                            b.ConfigureEventHub(ob => ob.Configure(options =>
+                            {
+                                options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                                options.ConsumerGroup = EHConsumerGroup;
+                                options.Path = EHPath;
+
+                            }));
+                            b.UseAzureTableCheckpointer(ob => ob.Configure(options =>
+                            {
+                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                options.PersistInterval = TimeSpan.FromSeconds(1);
+                            }));
+                            b.UseDynamicClusterConfigDeploymentBalancer();
+                        });
                 }
             }
         }

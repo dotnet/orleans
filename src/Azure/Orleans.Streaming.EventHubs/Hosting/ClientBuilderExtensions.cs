@@ -14,7 +14,7 @@ namespace Orleans.Hosting
         public static IClientBuilder AddEventHubStreams(
            this IClientBuilder builder,
            string name,
-           Action<ClusterClientEventHubStreamConfigurator> configure)
+           Action<IClusterClientEventHubStreamConfigurator> configure)
         {
             var configurator = new ClusterClientEventHubStreamConfigurator(name,builder);
             configure?.Invoke(configurator);

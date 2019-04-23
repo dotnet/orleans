@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Configuration;
 using Orleans;
-using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Streams;
@@ -28,21 +27,22 @@ namespace UnitTests.StreamingTests
             private class MyClientBuilderConfigurator : IClientBuilderConfigurator
             {
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder
-                    .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamBatchingTestConst.ProviderName, b => b
-                        .ConfigurePartitioning(partitionCount)
-                        .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
+                    .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamBatchingTestConst.ProviderName, b =>
+                    {
+                        b.ConfigurePartitioning(partitionCount);
+                        b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                    });
             }
 
             private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
             {
                 public void Configure(ISiloHostBuilder hostBuilder) => hostBuilder.AddMemoryGrainStorage("PubSubStore")
-                    .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamBatchingTestConst.ProviderName, b => b
-                        .ConfigurePartitioning(partitionCount)
-                        .ConfigurePullingAgent(ob => ob.Configure(options =>
-                        {
-                            options.BatchContainerBatchSize = 10;
-                        }))
-                        .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
+                    .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamBatchingTestConst.ProviderName, b =>
+                    {
+                        b.ConfigurePartitioning(partitionCount);
+                        b.ConfigurePullingAgent(ob => ob.Configure(options => options.BatchContainerBatchSize = 10));
+                        b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                    });
             }
         }
 

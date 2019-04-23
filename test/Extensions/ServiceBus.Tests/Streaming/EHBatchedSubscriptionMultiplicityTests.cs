@@ -33,24 +33,27 @@ namespace ServiceBus.Tests.StreamingTests
                 {
                     hostBuilder
                         .AddMemoryGrainStorage("PubSubStore")
-                        .AddEventHubStreams(StreamProviderName, b => b
-                            .ConfigureEventHub(ob => ob.Configure(options =>
+                        .AddEventHubStreams(StreamProviderName,
+                            b =>
                             {
-                                options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
-                                options.ConsumerGroup = EHConsumerGroup;
-                                options.Path = EHPath;
-                            }))
-                            .UseAzureTableCheckpointer(ob => ob.Configure(options =>
-                            {
-                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                                options.PersistInterval = TimeSpan.FromSeconds(10);
-                            }))
-                            .ConfigurePullingAgent(ob => ob.Configure(options =>
-                            {
-                                // sets up batching in the pulling agent
-                                options.BatchContainerBatchSize = 10;
-                            }))
-                            .UseDynamicClusterConfigDeploymentBalancer());
+                                b.ConfigureEventHub(ob => ob.Configure(options =>
+                                {
+                                    options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                                    options.ConsumerGroup = EHConsumerGroup;
+                                    options.Path = EHPath;
+                                }));
+                                b.UseAzureTableCheckpointer(ob => ob.Configure(options =>
+                                 {
+                                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                     options.PersistInterval = TimeSpan.FromSeconds(10);
+                                 }));
+                                b.ConfigurePullingAgent(ob => ob.Configure(options =>
+                                 {
+                                    // sets up batching in the pulling agent
+                                    options.BatchContainerBatchSize = 10;
+                                 }));
+                                b.UseDynamicClusterConfigDeploymentBalancer();
+                            });
                 }
             }
         }

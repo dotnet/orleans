@@ -30,34 +30,39 @@ namespace ServiceBus.Tests.StreamingTests
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
-                    .AddEventHubStreams(StreamProviderName, b => b
-                        .ConfigureEventHub(ob => ob.Configure(options =>
+                    .AddEventHubStreams(StreamProviderName, b =>
+                    {
+                        b.ConfigureEventHub(ob => ob.Configure(options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
                             options.ConsumerGroup = EHConsumerGroup;
                             options.Path = EHPath;
-                        }))
-                        .UseAzureTableCheckpointer(ob => ob.Configure(options =>
+                        }));
+                        b.UseAzureTableCheckpointer(ob => ob.Configure(options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.PersistInterval = TimeSpan.FromSeconds(10);
-                        }))
-                        .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
+                        }));
+                        b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                    });
 
                 hostBuilder
-                    .AddEventHubStreams(StreamProviderName2, b => b
-                        .ConfigureEventHub(ob => ob.Configure(options =>
+                    .AddEventHubStreams(StreamProviderName2, b =>
+                    {
+                        b.ConfigureEventHub(ob => ob.Configure(options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
                             options.ConsumerGroup = EHConsumerGroup;
                             options.Path = EHPath2;
 
-                        }))
-                        .UseAzureTableCheckpointer(ob => ob.Configure(options => {
+                        }));
+                        b.UseAzureTableCheckpointer(ob => ob.Configure(options =>
+                        {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.PersistInterval = TimeSpan.FromSeconds(10);
-                        }))
-                        .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
+                        }));
+                        b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                    });
 
                 hostBuilder
                     .AddMemoryGrainStorage("PubSubStore");

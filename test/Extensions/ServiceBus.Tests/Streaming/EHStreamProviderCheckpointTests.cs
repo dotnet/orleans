@@ -42,26 +42,29 @@ namespace ServiceBus.Tests.StreamingTests
             {
                 hostBuilder
                     .AddAzureBlobGrainStorage(
-                    ImplicitSubscription_RecoverableStream_CollectorGrain.StorageProviderName,
-                    (AzureBlobStorageOptions options) =>
+                        ImplicitSubscription_RecoverableStream_CollectorGrain.StorageProviderName,
+                        (AzureBlobStorageOptions options) =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        })
+                    .AddEventHubStreams(StreamProviderName, b=>
                     {
-                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                    })
-                    .AddEventHubStreams(StreamProviderName, b=>b
-                        .UseDynamicClusterConfigDeploymentBalancer()
-                        .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly)
-                        .ConfigureEventHub(ob=>ob.Configure(
+                        b.UseDynamicClusterConfigDeploymentBalancer();
+                        b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                        b.ConfigureEventHub(ob => ob.Configure(
                             options =>
                             {
                                 options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
                                 options.ConsumerGroup = EHConsumerGroup;
                                 options.Path = EHPath;
-                     
-                            }))
-                        .UseAzureTableCheckpointer(ob=>ob.Configure(options => {
+
+                            }));
+                        b.UseAzureTableCheckpointer(ob => ob.Configure(options =>
+                        {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.PersistInterval = TimeSpan.FromSeconds(1);
-                        })));
+                        }));
+                    });
             }
         }
 
@@ -70,15 +73,16 @@ namespace ServiceBus.Tests.StreamingTests
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddEventHubStreams(StreamProviderName, b=>b
-                    .ConfigureEventHub(ob => ob.Configure(
-                    options =>
+                    .AddEventHubStreams(StreamProviderName, b=>
                     {
-                        options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
-                        options.ConsumerGroup = EHConsumerGroup;
-                        options.Path = EHPath;
-                    }))
-                    .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
+                        b.ConfigureEventHub(ob => ob.Configure(options =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                            options.ConsumerGroup = EHConsumerGroup;
+                            options.Path = EHPath;
+                        }));
+                        b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                    });
             }
         }
 

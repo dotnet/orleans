@@ -5,7 +5,7 @@ using Orleans.Providers.Streams.SimpleMessageStream;
 
 namespace Orleans.Streams
 {
-    public interface ISimpleMessageStreamConfigurator { }
+    public interface ISimpleMessageStreamConfigurator : INamedServiceConfigurator { }
 
     public class SimpleMessageStreamConfigurator : NamedServiceConfigurator, ISimpleMessageStreamConfigurator
     {

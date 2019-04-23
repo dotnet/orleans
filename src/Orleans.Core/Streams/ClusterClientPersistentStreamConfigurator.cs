@@ -5,22 +5,23 @@ using Orleans.Providers.Streams.Common;
 
 namespace Orleans.Streams
 {
-    public interface IClusterClientPersistentStreamConfigurator { }
+    public interface IPersistentStreamConfigurator : INamedServiceConfigurator { }
+
+    public static class PersistentStreamConfiguratorExtensions
+    {
+        public static void ConfigureStreamPubSub(this IPersistentStreamConfigurator configurator, StreamPubSubType pubsubType = StreamPubSubOptions.DEFAULT_STREAM_PUBSUB_TYPE)
+        {
+            configurator.Configure<StreamPubSubOptions>(ob => ob.Configure(options => options.PubSubType = pubsubType));
+        }
+    }
+
+    public interface IClusterClientPersistentStreamConfigurator : IPersistentStreamConfigurator { }
 
     public static class ClusterClientPersistentStreamConfiguratorExtensions
     {
-        public static TConfigurator ConfigureLifecycle<TConfigurator>(this TConfigurator configurator, Action<OptionsBuilder<StreamLifecycleOptions>> configureOptions)
-            where TConfigurator : NamedServiceConfigurator, IClusterClientPersistentStreamConfigurator
+        public static void ConfigureLifecycle(this IClusterClientPersistentStreamConfigurator configurator, Action<OptionsBuilder<StreamLifecycleOptions>> configureOptions)
         {
             configurator.Configure(configureOptions);
-            return configurator;
-        }
-
-        public static TConfigurator ConfigureStreamPubSub<TConfigurator>(this TConfigurator configurator, StreamPubSubType pubsubType = StreamPubSubOptions.DEFAULT_STREAM_PUBSUB_TYPE)
-            where TConfigurator : NamedServiceConfigurator, IClusterClientPersistentStreamConfigurator
-        {
-            configurator.Configure<TConfigurator, StreamPubSubOptions>(ob => ob.Configure(options => options.PubSubType = pubsubType));
-            return configurator;
         }
     }
 

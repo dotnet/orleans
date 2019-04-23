@@ -50,18 +50,19 @@ namespace Tester.AzureUtils.Streaming
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
-                    .AddAzureQueueStreams(adapterName, b => b
-                        .ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>((options, dep) =>
+                    .AddAzureQueueStreams(adapterName, b =>
+                    {
+                        b.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>((options, dep) =>
                         {
-                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                                options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
-                        }))
-                        .UseDynamicClusterConfigDeploymentBalancer(SILO_IMMATURE_PERIOD))
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
+                        }));
+                        b.UseDynamicClusterConfigDeploymentBalancer(SILO_IMMATURE_PERIOD);
+                    })
                     .Configure<StaticClusterDeploymentOptions>(op =>
                     {
                         op.SiloNames = new List<string>() {"Primary", "Secondary_1", "Secondary_2", "Secondary_3"};
                     });
-
                 hostBuilder.AddMemoryGrainStorage("PubSubStore");
             }
         }

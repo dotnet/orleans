@@ -16,7 +16,7 @@ namespace Orleans.Hosting
             this IClientBuilder builder,
             string name,
             Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory,
-            Action<ClusterClientPersistentStreamConfigurator> configureStream)
+            Action<IClusterClientPersistentStreamConfigurator> configureStream)
         {
             //the constructor wire up DI with all default components of the streams , so need to be called regardless of configureStream null or not
             var streamConfigurator = new ClusterClientPersistentStreamConfigurator(name, builder, adapterFactory);
@@ -30,7 +30,7 @@ namespace Orleans.Hosting
         public static IClientBuilder AddSimpleMessageStreamProvider(
             this IClientBuilder builder,
             string name,
-            Action<SimpleMessageStreamConfigurator> configureStream)
+            Action<ISimpleMessageStreamConfigurator> configureStream)
         {
             //the constructor wire up DI with all default components of the streams , so need to be called regardless of configureStream null or not
             var streamConfigurator = new SimpleMessageStreamConfigurator(name, configureDelegate => builder.ConfigureServices(configureDelegate));
@@ -48,7 +48,7 @@ namespace Orleans.Hosting
 
         {
             return AddSimpleMessageStreamProvider(builder, name, b => b
-                .Configure<SimpleMessageStreamConfigurator, SimpleMessageStreamProviderOptions>(ob => ob.Configure(configureOptions)));
+                .Configure<SimpleMessageStreamProviderOptions>(ob => ob.Configure(configureOptions)));
         }
 
         /// <summary>

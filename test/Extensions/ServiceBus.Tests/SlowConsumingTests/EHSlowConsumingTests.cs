@@ -44,15 +44,20 @@ namespace ServiceBus.Tests.SlowConsumingTests
             {
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
-                    hostBuilder.AddPersistentStreams(StreamProviderName, EHStreamProviderWithCreatedCacheListAdapterFactory.Create, b=>b
-                        .Configure<SiloPersistentStreamConfigurator, EventHubStreamCachePressureOptions>(ob => ob.Configure(options =>
+                    hostBuilder.AddPersistentStreams(
+                        StreamProviderName,
+                        EHStreamProviderWithCreatedCacheListAdapterFactory.Create,
+                        b=>
                         {
-                            options.SlowConsumingMonitorPressureWindowSize = monitorPressureWindowSize;
-                            options.SlowConsumingMonitorFlowControlThreshold = flowControlThredhold;
-                            options.AveragingCachePressureMonitorFlowControlThreshold = null;
-                        }))
-                        .ConfigureComponent<SiloPersistentStreamConfigurator, IStreamQueueCheckpointerFactory>((s,n)=>NoOpCheckpointerFactory.Instance)
-                        .UseDynamicClusterConfigDeploymentBalancer());
+                            b.Configure<EventHubStreamCachePressureOptions>(ob => ob.Configure(options =>
+                            {
+                                options.SlowConsumingMonitorPressureWindowSize = monitorPressureWindowSize;
+                                options.SlowConsumingMonitorFlowControlThreshold = flowControlThredhold;
+                                options.AveragingCachePressureMonitorFlowControlThreshold = null;
+                            }));
+                            b.ConfigureComponent<IStreamQueueCheckpointerFactory>((s, n) => NoOpCheckpointerFactory.Instance);
+                            b.UseDynamicClusterConfigDeploymentBalancer();
+                        });
                     hostBuilder.AddMemoryGrainStorage("PubSubStore");
                 }
             }

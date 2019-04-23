@@ -30,17 +30,20 @@ namespace Orleans.Streams
 
         public SiloPubSubStreamConfigurator<TDataAdapter> ConfigurePubSub(Action<OptionsBuilder<PubSubOptions>> configureOptions)
         {
-            return this.Configure(configureOptions);
+            this.Configure(configureOptions);
+            return this;
         }
 
         public SiloPubSubStreamConfigurator<TDataAdapter> ConfigureCache(int cacheSize = SimpleQueueCacheOptions.DEFAULT_CACHE_SIZE)
         {
-            return this.Configure<SiloPubSubStreamConfigurator<TDataAdapter>, SimpleQueueCacheOptions>(ob => ob.Configure(options => options.CacheSize = cacheSize));
+            this.Configure<SimpleQueueCacheOptions>(ob => ob.Configure(options => options.CacheSize = cacheSize));
+            return this;
         }
 
         public SiloPubSubStreamConfigurator<TDataAdapter> ConfigurePartitioning(int numOfPartitions = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
         {
-            return this.Configure<SiloPubSubStreamConfigurator<TDataAdapter>, HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfPartitions));
+            this.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfPartitions));
+            return this;
         }
     }
 
@@ -61,12 +64,14 @@ namespace Orleans.Streams
 
         public ClusterClientPubSubStreamConfigurator<TDataAdapter> ConfigurePubSub(Action<OptionsBuilder<PubSubOptions>> configureOptions)
         {
-            return this.Configure(configureOptions);
+            this.Configure(configureOptions);
+            return this;
         }
 
         public ClusterClientPubSubStreamConfigurator<TDataAdapter> ConfigurePartitioning(int numOfPartitions = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
         {
-            return this.Configure<ClusterClientPubSubStreamConfigurator<TDataAdapter>, HashRingStreamQueueMapperOptions >(ob => ob.Configure(options => options.TotalQueueCount = numOfPartitions));
+            this.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfPartitions));
+            return this;
         }
     }
 }
