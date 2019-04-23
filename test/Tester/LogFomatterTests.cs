@@ -469,15 +469,15 @@ namespace Tester
 
             public class Resolver : IOptionFormatterResolver<TestOptions>
             {
-                private readonly IOptionsSnapshot<TestOptions> optionsSnapshot;
-                public Resolver(IOptionsSnapshot<TestOptions> optionsSnapshot)
+                private readonly IOptionsMonitor<TestOptions> optionsMonitor;
+                public Resolver(IOptionsMonitor<TestOptions> optionsMonitor)
                 {
-                    this.optionsSnapshot = optionsSnapshot;
+                    this.optionsMonitor = optionsMonitor;
                 }
 
                 public IOptionFormatter<TestOptions> Resolve(string name)
                 {
-                    return TestOptionsFormatter2.CreateNamed(name, Options.Create(this.optionsSnapshot.Get(name)));
+                    return TestOptionsFormatter2.CreateNamed(name, Options.Create(this.optionsMonitor.Get(name)));
                 }
             }
         }
@@ -510,15 +510,15 @@ namespace Tester
 
             public class Resolver : IOptionFormatterResolver<TestOptions>
             {
-                private readonly IOptionsSnapshot<TestOptions> optionsSnapshot;
-                public Resolver(IOptionsSnapshot<TestOptions> optionsSnapshot)
+                private readonly IOptionsMonitor<TestOptions> optionsMonitor;
+                public Resolver(IOptionsMonitor<TestOptions> optionsMonitor)
                 {
-                    this.optionsSnapshot = optionsSnapshot;
+                    this.optionsMonitor = optionsMonitor;
                 }
 
                 public IOptionFormatter<TestOptions> Resolve(string name)
                 {
-                    return TestOptionsFormatter.CreateNamed(name, Options.Create(this.optionsSnapshot.Get(name)));
+                    return TestOptionsFormatter.CreateNamed(name, Options.Create(this.optionsMonitor.Get(name)));
                 }
             }
         }

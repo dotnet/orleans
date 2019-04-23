@@ -48,9 +48,9 @@ namespace Orleans.Storage
     {
         public static IGrainStorage Create(IServiceProvider services, string name)
         {
-            IOptionsSnapshot<AdoNetGrainStorageOptions> optionsSnapshot = services.GetRequiredService<IOptionsSnapshot<AdoNetGrainStorageOptions>>();
-            IOptions<ClusterOptions> clusterOptions = services.GetProviderClusterOptions(name);
-            return ActivatorUtilities.CreateInstance<AdoNetGrainStorage>(services, Options.Create(optionsSnapshot.Get(name)), name, clusterOptions);
+            var optionsMonitor = services.GetRequiredService<IOptionsMonitor<AdoNetGrainStorageOptions>>();
+            var clusterOptions = services.GetProviderClusterOptions(name);
+            return ActivatorUtilities.CreateInstance<AdoNetGrainStorage>(services, Options.Create(optionsMonitor.Get(name)), name, clusterOptions);
         }
     }
 

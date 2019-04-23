@@ -366,7 +366,7 @@ namespace Orleans.Runtime
 
             logger.Info(ErrorCode.SiloStarting, "Silo Start()");
 
-            var processExitHandlingOptions = this.Services.GetService<IOptions<ProcessExitHandlingOptions>>().Value;
+            var processExitHandlingOptions = this.Services.GetRequiredService<IOptions<ProcessExitHandlingOptions>>().Value;
             if(processExitHandlingOptions.FastKillOnProcessExit)
                 AppDomain.CurrentDomain.ProcessExit += HandleProcessExit;
             

@@ -114,7 +114,7 @@ namespace Orleans.Streams
 
         public static IStreamQueueBalancer Create(IServiceProvider services, string name, IDeploymentConfiguration deploymentConfiguration)
         {
-            var options = services.GetRequiredService<IOptionsSnapshot<LeaseBasedQueueBalancerOptions>>().Get(name);
+            var options = services.GetRequiredService<IOptionsMonitor<LeaseBasedQueueBalancerOptions>>().Get(name);
             return ActivatorUtilities.CreateInstance<LeaseBasedQueueBalancer>(services, name, options, deploymentConfiguration);
         }
         /// <inheritdoc/>

@@ -377,8 +377,8 @@ namespace Orleans.Storage
     {
         public static IGrainStorage Create(IServiceProvider services, string name)
         {
-            IOptionsSnapshot<DynamoDBStorageOptions> optionsSnapshot = services.GetRequiredService<IOptionsSnapshot<DynamoDBStorageOptions>>();
-            return ActivatorUtilities.CreateInstance<DynamoDBGrainStorage>(services, optionsSnapshot.Get(name), name);
+            var optionsMonitor = services.GetRequiredService<IOptionsMonitor<DynamoDBStorageOptions>>();
+            return ActivatorUtilities.CreateInstance<DynamoDBGrainStorage>(services, optionsMonitor.Get(name), name);
         }
     }
 }

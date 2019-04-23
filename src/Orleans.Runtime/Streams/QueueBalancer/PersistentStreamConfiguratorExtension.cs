@@ -19,7 +19,7 @@ namespace Orleans.Streams
             where TConfigurator : NamedServiceConfigurator, ISiloPersistentStreamConfigurator
         {
             return configurator.ConfigurePartitionBalancing<TConfigurator,DeploymentBasedQueueBalancerOptions>(
-                (s, n) => DeploymentBasedQueueBalancer.Create(s, n, s.GetService<IOptions<StaticClusterDeploymentOptions>>().Value),
+                (s, n) => DeploymentBasedQueueBalancer.Create(s, n, s.GetRequiredService<IOptions<StaticClusterDeploymentOptions>>().Value),
                 options => options.Configure(op =>
             {
                 op.IsFixed = true;
@@ -33,7 +33,7 @@ namespace Orleans.Streams
             where TConfigurator : NamedServiceConfigurator, ISiloPersistentStreamConfigurator
         {
             return configurator.ConfigurePartitionBalancing<TConfigurator,DeploymentBasedQueueBalancerOptions>(
-                (s, n) => DeploymentBasedQueueBalancer.Create(s, n, s.GetService<IOptions<StaticClusterDeploymentOptions>>().Value),
+                (s, n) => DeploymentBasedQueueBalancer.Create(s, n, s.GetRequiredService<IOptions<StaticClusterDeploymentOptions>>().Value),
                 options => options.Configure(op =>
                 {
                     op.IsFixed = false;
@@ -46,7 +46,7 @@ namespace Orleans.Streams
             Action<OptionsBuilder<LeaseBasedQueueBalancerOptions>> configureOptions = null)
             where TConfigurator : NamedServiceConfigurator, ISiloPersistentStreamConfigurator
         {
-            return configurator.ConfigurePartitionBalancing((s, n) => LeaseBasedQueueBalancer.Create(s, n, s.GetService<IOptions<StaticClusterDeploymentOptions>>().Value),
+            return configurator.ConfigurePartitionBalancing((s, n) => LeaseBasedQueueBalancer.Create(s, n, s.GetRequiredService<IOptions<StaticClusterDeploymentOptions>>().Value),
                 configureOptions);
         }
     }
