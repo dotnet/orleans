@@ -107,7 +107,7 @@ namespace Orleans.Hosting
             Action<OptionsBuilder<AzureBlobStorageOptions>> configureOptions = null)
         {
             configureOptions?.Invoke(services.AddOptions<AzureBlobStorageOptions>(name));
-            services.AddTransient<IConfigurationValidator>(sp => new AzureBlobStorageOptionsValidator(sp.GetService<IOptionsSnapshot<AzureBlobStorageOptions>>().Get(name), name));
+            services.AddTransient<IConfigurationValidator>(sp => new AzureBlobStorageOptionsValidator(sp.GetRequiredService<IOptionsMonitor<AzureBlobStorageOptions>>().Get(name), name));
             services.ConfigureNamedOptionForLogging<AzureBlobStorageOptions>(name);
             services.TryAddSingleton<IGrainStorage>(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
             return services.AddSingletonNamedService<IGrainStorage>(name, AzureBlobGrainStorageFactory.Create)
