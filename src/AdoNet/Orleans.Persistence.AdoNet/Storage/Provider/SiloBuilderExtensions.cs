@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
@@ -109,7 +109,7 @@ namespace Orleans.Hosting
             configureOptions?.Invoke(services.AddOptions<AdoNetGrainStorageOptions>(name));
             services.ConfigureNamedOptionForLogging<AdoNetGrainStorageOptions>(name);
             services.TryAddSingleton<IGrainStorage>(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
-            services.AddTransient<IConfigurationValidator>(sp => new AdoNetGrainStorageOptionsValidator(sp.GetService<IOptionsSnapshot<AdoNetGrainStorageOptions>>().Get(name), name));
+            services.AddTransient<IConfigurationValidator>(sp => new AdoNetGrainStorageOptionsValidator(sp.GetRequiredService<IOptionsMonitor<AdoNetGrainStorageOptions>>().Get(name), name));
             return services.AddSingletonNamedService<IGrainStorage>(name, AdoNetGrainStorageFactory.Create)
                            .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainStorage>(n));
         }

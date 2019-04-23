@@ -500,8 +500,8 @@ namespace Orleans.Storage
     {
         public static IGrainStorage Create(IServiceProvider services, string name)
         {
-            IOptionsSnapshot<AzureTableStorageOptions> optionsSnapshot = services.GetRequiredService<IOptionsSnapshot<AzureTableStorageOptions>>();
-            IOptions<ClusterOptions> clusterOptions = services.GetProviderClusterOptions(name);
+            var optionsSnapshot = services.GetRequiredService<IOptionsMonitor<AzureTableStorageOptions>>();
+            var clusterOptions = services.GetProviderClusterOptions(name);
             return ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(services, name, optionsSnapshot.Get(name), clusterOptions);
         }
     }

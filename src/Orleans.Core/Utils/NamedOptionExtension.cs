@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Options;
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Generic;
@@ -11,7 +11,7 @@ namespace Orleans
         public static TOption GetOptionsByName<TOption>(this IServiceProvider services, string name)
             where TOption : class, new()
         {
-            return services.GetService<IOptionsSnapshot<TOption>>().Get(name);
+            return services.GetRequiredService<IOptionsMonitor<TOption>>().Get(name);
         }
     }
 }

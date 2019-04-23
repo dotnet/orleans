@@ -285,8 +285,8 @@ namespace Orleans.Storage
     {
         public static IGrainStorage Create(IServiceProvider services, string name)
         {
-            IOptionsSnapshot<AzureBlobStorageOptions> optionsSnapshot = services.GetRequiredService<IOptionsSnapshot<AzureBlobStorageOptions>>();
-            return ActivatorUtilities.CreateInstance<AzureBlobGrainStorage>(services, name, optionsSnapshot.Get(name));
+            var optionsMonitor = services.GetRequiredService<IOptionsMonitor<AzureBlobStorageOptions>>();
+            return ActivatorUtilities.CreateInstance<AzureBlobGrainStorage>(services, name, optionsMonitor.Get(name));
         }
     }
 }

@@ -246,7 +246,7 @@ namespace Orleans.TestingHost
         /// <param name="didKill">Whether recent membership changes we done by graceful Stop.</param>
         public async Task WaitForLivenessToStabilizeAsync(bool didKill = false)
         {
-            var clusterMembershipOptions = this.ServiceProvider.GetService<IOptions<ClusterMembershipOptions>>().Value;
+            var clusterMembershipOptions = this.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
             TimeSpan stabilizationTime = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
             WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is about to sleep for {0}", stabilizationTime);
             await Task.Delay(stabilizationTime);
