@@ -32,7 +32,7 @@ namespace Tester.AzureUtils.Streaming
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddAzureQueueStreams(StreamBatchingTestConst.ProviderName, b => b
+                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamBatchingTestConst.ProviderName, b => b
                             .ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
                                 (options, dep) =>
                                 {
@@ -52,7 +52,7 @@ namespace Tester.AzureUtils.Streaming
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
                 {
                     clientBuilder
-                        .AddAzureQueueStreams(StreamBatchingTestConst.ProviderName, b => b
+                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamBatchingTestConst.ProviderName, b => b
                             .ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
                                     (options, dep) =>
                                     {
