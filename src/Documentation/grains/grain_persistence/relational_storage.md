@@ -5,7 +5,9 @@ title: Relational Storage
 
 # Relational Storage
 
-Relational storage backend code in Orleans is built on generic ADO.NET functionality and is consequently database vendor agnostic. The Orleans data storage layout has been explained already in Runtime Tables. Setting up the connection strings are done as explained in [Orleans Configuration Guide ](http://dotnet.github.io/orleans/Documentation/Orleans-Configuration-Guide/) and [SQL Tables](http://dotnet.github.io/orleans/Documentation/Advanced-Concepts/Configuring-SQL-Tables).
+Relational storage backend code in Orleans is built on generic ADO.NET functionality and is consequently database vendor agnostic.
+The Orleans data storage layout has been explained already in Runtime Tables.
+Setting up the connection strings are done as explained in [Orleans Configuration Guide ](../../clusters_and_clients/configuration_guide/index.md).
 
 To make Orleans code function with a given relational database backend, the following is required:
 
