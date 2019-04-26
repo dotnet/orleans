@@ -5,6 +5,20 @@ title: What's new in Orleans
 
 # What's new in Orleans?
 
+## [v2.3.1](https://github.com/dotnet/orleans/releases/tag/v2.3.1) April 26th 2019
+
+A few improvements, a bug fix, and batch stream API added back.
+
+## [v2.3.0](https://github.com/dotnet/orleans/releases/tag/v2.3.0) March 20th 2019
+
+- Major improvements
+  - Support for the ASP.NET Core hosting API (Microsoft.Extensions.Hosting). Thanks to @galvesribeiro!
+  - Replacement of the custom implementation of named options with Microsoft.Extensions.Options.
+  - EventHub stream provider got upgrade to EvenHub 2.2.1 and is also compatible with 3.0.0.
+  - Old dead entries in the cluster membership table now get automatically cleaned up, which is helpful for hosting environments that use new IP endpoints for restarted silos.
+  - Hosted client that enables efficient hosting of frontend code within the silo process is now enabled by default.
+  - Support for `IHostEnvironmentStatistics` on Linux, which enables CPU and memory metrics as well as load shedding. Thanks to @martinothamar!
+
 ## [v2.3.0-rc2](https://github.com/dotnet/orleans/releases/tag/v2.3.0-rc2) March 13th 2019
 
 `Refactored stream batch behaviors to support batch consumption.` (#5425) is the only change. While technically it is breaking due to the changes to the batch streaming API, it shouldn't break any working application code because the batching functionality wasn't fully wired previously. No breaking change in the wire protocol or persistence. This release is backward-compatible with 2.x releases.
