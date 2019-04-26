@@ -7,6 +7,19 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [2.3.1] (changes since 2.3.0)
+
+- Non-breaking improvements
+  - Improve serializer performance hygiene (#5409)
+  - Add UseLinuxEnvironmentStatistics method for ISiloBuilder (#5498)
+  - Improve activation & directory convergence (#5424)
+  - Updated stream subscription handle extension functions to handle batch consumption, comparable to what is supported for subscribe. (#5502)
+  - Add square bracket guards (#5521)
+  - Added batch stream production back in. (#5503)
+
+- Non-breaking bug fixes
+  -  Use local silo as default primary silo (#5522)
+
 ### [2.3.0] (changes since 2.2.0)
 
 - Breaking changes
