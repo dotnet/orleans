@@ -280,7 +280,7 @@ namespace Orleans.Messaging
                 }
             }
 
-            this.messageCenter.CleanupGatewayConnections(cachedLiveGateways);
+            this.messageCenter?.CleanupGatewayConnections(cachedLiveGateways);
         }
 
         public void Dispose()
