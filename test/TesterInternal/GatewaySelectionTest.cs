@@ -1,4 +1,4 @@
-﻿//#define USE_SQL_SERVER
+//#define USE_SQL_SERVER
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -90,7 +90,7 @@ namespace UnitTests.MessageCenterTests
                 GatewayListRefreshPeriod = cfg.GatewayListRefreshPeriod,
                 PreferedGatewayIndex = cfg.PreferedGatewayIndex
             };
-            var gatewayManager = new GatewayManager(gatewayOptions, listProvider, NullLoggerFactory.Instance);
+            var gatewayManager = new GatewayManager(null, gatewayOptions, listProvider, NullLoggerFactory.Instance);
 
             var counts = new int[4];
 
