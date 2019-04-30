@@ -53,7 +53,7 @@ Go here to learn more about clusters and clients, specifically.
 A typical Orleans application consists of a cluster of server processes (silos) where grains live, and a set of client processes, usually web servers, that receive external requests, turn them into grain method calls, and return results back. Hence, the first thing one needs to do to run an Orleans application is to start a cluster of silos.
 
 ### [Implementation Details](Documentation/implementation/index.md)
-This section has information about [Orleans Lifecycle](Documentation/implementation/orleans_lifecycle.md), [Messaging Delivery Guarantees]Documentation/implementation/messaging_delivery_guarantees.md), [Scheduler](Documentation/implementation/scheduler.md), [Cluster Management](Documentation/implementation/cluster_management.md),  [Streams Implementation](Documentation/implementation/streams_implementation.md), and [Load Balancing](Documentation/implementation/load_balancing.md).
+This section has information about [Orleans Lifecycle](Documentation/implementation/orleans_lifecycle.md), [Messaging Delivery Guarantees](Documentation/implementation/messaging_delivery_guarantees.md), [Scheduler](Documentation/implementation/scheduler.md), [Cluster Management](Documentation/implementation/cluster_management.md),  [Streams Implementation](Documentation/implementation/streams_implementation.md), and [Load Balancing](Documentation/implementation/load_balancing.md).
 
 ### [Streaming](Documentation/streaming/index.md)
 Streaming extensions provide a set of abstractions and APIs that make thinking about and working with streams simpler and more robust. Streaming extensions allow developers to write reactive applications that operate on a sequence of events in a structured way.
