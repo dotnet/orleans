@@ -23,6 +23,7 @@ All Options classes used to configure Orleans should be in the `Orleans.Configur
 | `ClientMessagingOptions` | Setting the number of connection to keep open, and specify what network interface to use |
 | `ClientStatisticsOption` | Setting various setting related to statistics output |
 | `GatewayOptions` | Setting the refresh period of the list of available gateways |
+| `StaticGatewayListProviderOptions` | Setting URIs a client will use to connect to cluster |
 
 ## ISiloHostBuilder specific options
 
