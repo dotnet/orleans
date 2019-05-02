@@ -135,10 +135,10 @@ namespace Orleans.Storage
         private readonly string name;
 
         public AdoNetGrainStorage(
-            ILogger<AdoNetGrainStorage> logger, 
-            IProviderRuntime providerRuntime, 
-            IOptions<AdoNetGrainStorageOptions> options, 
-            IOptions<ClusterOptions> clusterOptions, 
+            ILogger<AdoNetGrainStorage> logger,
+            IProviderRuntime providerRuntime,
+            IOptions<AdoNetGrainStorageOptions> options,
+            IOptions<ClusterOptions> clusterOptions,
             string name)
         {
             this.options = options.Value;
@@ -229,7 +229,6 @@ namespace Orleans.Storage
                 }
 
                 var commandBehavior = choice.PreferStreaming ? CommandBehavior.SequentialAccess : CommandBehavior.Default;
-                var grainStateType = grainState.State.GetType();
                 var grainIdHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState).Hash(grainId.GetHashBytes());
                 var grainTypeHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState).Hash(Encoding.UTF8.GetBytes(baseGrainType));
                 var readRecords = (await Storage.ReadAsync(CurrentOperationalQueries.ReadFromStorage, (command =>
@@ -257,7 +256,7 @@ namespace Orleans.Storage
                         {
                             using(var downloadStream = streamSelector.GetStream(binaryColumnPositionInSelect, Storage))
                             {
-                                storageState = choice.Deserializer.Deserialize(downloadStream, grainStateType);
+                                storageState = choice.Deserializer.Deserialize(downloadStream, grainState.Type);
                             }
                         }
 
@@ -265,7 +264,7 @@ namespace Orleans.Storage
                         {
                             using(var downloadStream = streamSelector.GetTextReader(xmlColumnPositionInSelect))
                             {
-                                storageState = choice.Deserializer.Deserialize(downloadStream, grainStateType);
+                                storageState = choice.Deserializer.Deserialize(downloadStream, grainState.Type);
                             }
                         }
 
@@ -273,7 +272,7 @@ namespace Orleans.Storage
                         {
                             using(var downloadStream = streamSelector.GetTextReader(jsonColumnPositionInSelect))
                             {
-                                storageState = choice.Deserializer.Deserialize(downloadStream, grainStateType);
+                                storageState = choice.Deserializer.Deserialize(downloadStream, grainState.Type);
                             }
                         }
 
@@ -298,7 +297,7 @@ namespace Orleans.Storage
 
                         if(payload != null)
                         {
-                            storageState = choice.Deserializer.Deserialize(payload, grainStateType);
+                            storageState = choice.Deserializer.Deserialize(payload, grainState.Type);
                         }
 
                         version = selector.GetNullableInt32("Version");
@@ -312,7 +311,7 @@ namespace Orleans.Storage
                 if(state == null)
                 {
                     logger.Info((int)RelationalStorageProviderCodes.RelationalProviderNoStateFound, LogString("Null grain state read (default will be instantiated)", serviceId, this.name, grainState.ETag, baseGrainType, grainId.ToString()));
-                    state = Activator.CreateInstance(grainStateType);
+                    state = Activator.CreateInstance(grainState.Type);
                 }
 
                 grainState.State = state;
@@ -588,7 +587,7 @@ namespace Orleans.Storage
             if(options.UseJsonFormat)
             {
                 var typeResolver = providerRuntime.ServiceProvider.GetRequiredService<ITypeResolver>();
-                var jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(typeResolver, providerRuntime.GrainFactory), 
+                var jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(typeResolver, providerRuntime.GrainFactory),
                     options.UseFullAssemblyNames, options.IndentJson, options.TypeNameHandling);
                 serializers.Add(new OrleansStorageDefaultJsonSerializer(jsonSettings, JsonFormatSerializerTag));
             }
