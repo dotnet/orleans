@@ -41,7 +41,7 @@ namespace UnitTests.StreamingTests
                         op.CollectionAge = CollectionAge;
                         op.ClassSpecificCollectionAge.Add(typeof(MultipleSubscriptionConsumerGrain).FullName, TimeSpan.FromHours(2));
                     })
-                    .Configure<SiloMessagingOptions>(op=>op.ResponseTimeout = TimeSpan.FromMinutes(30));
+                    .Configure<MessagingOptions>(op=>op.ResponseTimeout = TimeSpan.FromMinutes(30));
             }
         }
         public class ClientConfiguretor : IClientBuilderConfigurator

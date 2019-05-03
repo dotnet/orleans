@@ -16,7 +16,7 @@ namespace UnitTests.OrleansRuntime
         public ExceptionsTests(TestEnvironmentFixture fixture)
         {
             this.fixture = fixture;
-            BufferPool.InitGlobalBufferPool(new ClientMessagingOptions());
+            BufferPool.InitGlobalBufferPool(new MessagingOptions());
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]

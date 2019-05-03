@@ -23,7 +23,8 @@ namespace Orleans.Runtime
         private readonly OrleansTaskScheduler scheduler;
         private readonly Catalog catalog;
         private readonly ILogger logger;
-        private readonly SiloMessagingOptions messagingOptions;
+        private readonly MessagingOptions messagingOptions;
+        private readonly SiloMessagingOptions siloMessagingOptions;
         private readonly PlacementDirectorsManager placementDirectorsManager;
         private readonly ILocalGrainDirectory localGrainDirectory;
         private readonly ActivationCollector activationCollector;
@@ -36,7 +37,8 @@ namespace Orleans.Runtime
             OrleansTaskScheduler scheduler, 
             ISiloMessageCenter transport, 
             Catalog catalog,
-            IOptions<SiloMessagingOptions> messagingOptions,
+            IOptions<MessagingOptions> messagingOptions,
+            IOptions<SiloMessagingOptions> siloMessagingOptions,
             PlacementDirectorsManager placementDirectorsManager,
             ILocalGrainDirectory localGrainDirectory,
             ActivationCollector activationCollector,
@@ -50,6 +52,7 @@ namespace Orleans.Runtime
             this.catalog = catalog;
             Transport = transport;
             this.messagingOptions = messagingOptions.Value;
+            this.siloMessagingOptions = siloMessagingOptions.Value;
             this.invokeWorkItemLogger = loggerFactory.CreateLogger<InvokeWorkItem>();
             this.placementDirectorsManager = placementDirectorsManager;
             this.localGrainDirectory = localGrainDirectory;
@@ -613,7 +616,7 @@ namespace Orleans.Runtime
 
         internal bool TryForwardMessage(Message message, ActivationAddress forwardingAddress)
         {
-            if (!MayForward(message, this.messagingOptions)) return false;
+            if (!MayForward(message, this.siloMessagingOptions)) return false;
 
             message.ForwardCount = message.ForwardCount + 1;
             MessagingProcessingStatisticsGroup.OnIgcMessageForwared(message);

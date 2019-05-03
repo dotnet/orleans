@@ -30,7 +30,7 @@ namespace Orleans.Runtime
         private readonly ILogger logger;
         private readonly ILogger invokeExceptionLogger;
         private readonly ILoggerFactory loggerFactory;
-        private readonly SiloMessagingOptions messagingOptions;
+        private readonly MessagingOptions messagingOptions;
         private readonly List<IDisposable> disposables;
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
         private SharedCallbackData sharedCallbackData;
@@ -62,7 +62,7 @@ namespace Orleans.Runtime
             MessageFactory messageFactory,
             ITransactionAgent transactionAgent,
             ILoggerFactory loggerFactory,
-            IOptions<SiloMessagingOptions> messagingOptions,
+            IOptions<MessagingOptions> messagingOptions,
             IGrainCancellationTokenRuntime cancellationTokenRuntime,
             IOptions<SchedulingOptions> schedulerOptions,
             ApplicationRequestsStatisticsGroup appRequestStatistics)

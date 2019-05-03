@@ -24,6 +24,7 @@ namespace Orleans
         internal static bool TestOnlyThrowExceptionDuringInit { get; set; }
 
         private readonly ILogger logger;
+        private readonly MessagingOptions messagingOptions;
         private readonly ClientMessagingOptions clientMessagingOptions;
 
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
@@ -85,7 +86,8 @@ namespace Orleans
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
         public OutsideRuntimeClient(
-            ILoggerFactory loggerFactory, 
+            ILoggerFactory loggerFactory,
+            IOptions<MessagingOptions> messagingOptions,
             IOptions<ClientMessagingOptions> clientMessagingOptions,
             IOptions<TypeManagementOptions> typeManagementOptions,
             IOptions<StatisticsOptions> statisticsOptions,
@@ -101,6 +103,7 @@ namespace Orleans
             this.logger = loggerFactory.CreateLogger<OutsideRuntimeClient>();
             this.handshakeClientId = GrainId.NewClientId();
             callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
+            this.messagingOptions = messagingOptions.Value;
             this.clientMessagingOptions = clientMessagingOptions.Value;
             this.typeMapRefreshInterval = typeManagementOptions.Value.TypeMapRefreshInterval;
         }
@@ -139,17 +142,17 @@ namespace Orleans
                     this.TryResendMessage,
                     msg => this.UnregisterCallback(msg.Id),
                     this.loggerFactory.CreateLogger<CallbackData>(),
-                    this.clientMessagingOptions,
+                    this.messagingOptions,
                     serializationManager,
                     this.appRequestStatistics);
                 var timerLogger = this.loggerFactory.CreateLogger<SafeTimer>();
-                var minTicks = Math.Min(this.clientMessagingOptions.ResponseTimeout.Ticks, TimeSpan.FromSeconds(1).Ticks);
+                var minTicks = Math.Min(this.messagingOptions.ResponseTimeout.Ticks, TimeSpan.FromSeconds(1).Ticks);
                 var period = TimeSpan.FromTicks(minTicks);
                 this.callbackTimer = new SafeTimer(timerLogger, this.OnCallbackExpiryTick, null, period, period);
                 
                 this.GrainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
 
-                BufferPool.InitGlobalBufferPool(this.clientMessagingOptions);
+                BufferPool.InitGlobalBufferPool(this.messagingOptions);
 
                 this.clientProviderRuntime = this.ServiceProvider.GetRequiredService<ClientProviderRuntime>();
 
@@ -410,10 +413,10 @@ namespace Orleans
             {
                 message.DebugContext = debugContext;
             }
-            if (message.IsExpirableMessage(this.clientMessagingOptions.DropExpiredMessages))
+            if (message.IsExpirableMessage(this.messagingOptions.DropExpiredMessages))
             {
                 // don't set expiration for system target messages.
-                message.TimeToLive = this.clientMessagingOptions.ResponseTimeout;
+                message.TimeToLive = this.messagingOptions.ResponseTimeout;
             }
 
             if (!oneWay)
@@ -428,7 +431,7 @@ namespace Orleans
 
         private bool TryResendMessage(Message message)
         {
-            if (!message.MayResend(this.clientMessagingOptions.MaxResendCount))
+            if (!message.MayResend(this.messagingOptions.MaxResendCount))
             {
                 return false;
             }
@@ -709,7 +712,7 @@ namespace Orleans
             {
                 var callback = pair.Value;
                 if (callback.IsCompleted) continue;
-                if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout(this.clientMessagingOptions.ResponseTimeout);
+                if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout(this.messagingOptions.ResponseTimeout);
             }
         }
     }

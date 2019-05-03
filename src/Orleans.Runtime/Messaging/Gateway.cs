@@ -38,7 +38,7 @@ namespace Orleans.Runtime.Messaging
 
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
-        private readonly SiloMessagingOptions messagingOptions;
+        private readonly SiloMessagingOptions siloMessagingOptions;
         
         public Gateway(
             MessageCenter msgCtr, 
@@ -48,11 +48,12 @@ namespace Orleans.Runtime.Messaging
             ExecutorService executorService, 
             ILoggerFactory loggerFactory, 
             IOptions<EndpointOptions> endpointOptions,
-            IOptions<SiloMessagingOptions> options, 
+            IOptions<MessagingOptions> messagingOptions,
+            IOptions<SiloMessagingOptions> siloMessagingOptions,
             IOptions<MultiClusterOptions> multiClusterOptions,
             OverloadDetector overloadDetector)
         {
-            this.messagingOptions = options.Value;
+            this.siloMessagingOptions = siloMessagingOptions.Value;
             this.loggerFactory = loggerFactory;
             messageCenter = msgCtr;
             this.messageFactory = messageFactory;
@@ -70,12 +71,12 @@ namespace Orleans.Runtime.Messaging
                 multiClusterOptions,
                 loggerFactory,
                 overloadDetector);
-            senders = new Lazy<GatewaySender>[messagingOptions.GatewaySenderQueues];
+            senders = new Lazy<GatewaySender>[siloMessagingOptions.Value.GatewaySenderQueues];
             nextGatewaySenderToUseForRoundRobin = 0;
-            dropper = new GatewayClientCleanupAgent(this, executorService, loggerFactory, messagingOptions.ClientDropTimeout);
+            dropper = new GatewayClientCleanupAgent(this, executorService, loggerFactory, siloMessagingOptions.Value.ClientDropTimeout);
             clients = new ConcurrentDictionary<GrainId, ClientState>();
             clientSockets = new ConcurrentDictionary<Socket, ClientState>();
-            clientsReplyRoutingCache = new ClientsReplyRoutingCache(messagingOptions.ResponseTimeout);
+            clientsReplyRoutingCache = new ClientsReplyRoutingCache(messagingOptions.Value.ResponseTimeout);
             this.gatewayAddress = siloDetails.GatewayAddress;
             lockable = new object();
         }
@@ -135,7 +136,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     int gatewayToUse = nextGatewaySenderToUseForRoundRobin % senders.Length;
                     nextGatewaySenderToUseForRoundRobin++; // under Gateway lock
-                    clientState = new ClientState(clientId, gatewayToUse, messagingOptions.ClientDropTimeout);
+                    clientState = new ClientState(clientId, gatewayToUse, siloMessagingOptions.ClientDropTimeout);
                     clients[clientId] = clientState;
                     MessagingStatisticsGroup.ConnectedClientCount.Increment();
                 }

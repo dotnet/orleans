@@ -96,7 +96,8 @@ namespace Orleans.Runtime
         private readonly CachedVersionSelectorManager versionSelectorManager;
         private readonly ILoggerFactory loggerFactory;
         private readonly IOptions<GrainCollectionOptions> collectionOptions;
-        private readonly IOptions<SiloMessagingOptions> messagingOptions;
+        private readonly IOptions<SiloMessagingOptions> siloMessagingOptions;
+        private readonly IOptions<MessagingOptions> messagingOptions;
         public Catalog(
             ILocalSiloDetails localSiloDetails,
             ILocalGrainDirectory grainDirectory,
@@ -115,7 +116,8 @@ namespace Orleans.Runtime
             ILoggerFactory loggerFactory,
             IOptions<SchedulingOptions> schedulingOptions,
             IOptions<GrainCollectionOptions> collectionOptions,
-            IOptions<SiloMessagingOptions> messagingOptions)
+            IOptions<MessagingOptions> messagingOptions,
+            IOptions<SiloMessagingOptions> siloMessagingOptions)
             : base(Constants.CatalogId, messageCenter.MyAddress, loggerFactory)
         {
             this.LocalSilo = localSiloDetails.SiloAddress;
@@ -133,6 +135,7 @@ namespace Orleans.Runtime
             this.providerRuntime = providerRuntime;
             this.serviceProvider = serviceProvider;
             this.collectionOptions = collectionOptions;
+            this.siloMessagingOptions = siloMessagingOptions;
             this.messagingOptions = messagingOptions;
             this.logger = loggerFactory.CreateLogger<Catalog>();
             this.activationCollector = activationCollector;
@@ -141,6 +144,7 @@ namespace Orleans.Runtime
                 messageCenter,
                 this,
                 this.messagingOptions,
+                this.siloMessagingOptions,
                 placementDirectorsManager,
                 grainDirectory,
                 this.activationCollector,
@@ -172,7 +176,7 @@ namespace Orleans.Runtime
                 return counter;
             });
             maxWarningRequestProcessingTime = this.messagingOptions.Value.ResponseTimeout.Multiply(5);
-            maxRequestProcessingTime = this.messagingOptions.Value.MaxRequestProcessingTime;
+            maxRequestProcessingTime = this.siloMessagingOptions.Value.MaxRequestProcessingTime;
             grainDirectory.SetSiloRemovedCatalogCallback(this.OnSiloStatusChange);
         }
 
@@ -185,7 +189,7 @@ namespace Orleans.Runtime
         {
             // For test only: if we have silos that are not yet in the Cluster TypeMap, we assume that they are compatible
             // with the current silo
-            if (this.messagingOptions.Value.AssumeHomogenousSilosForTesting)
+            if (this.siloMessagingOptions.Value.AssumeHomogenousSilosForTesting)
                 return AllActiveSilos;
 
             var typeCode = target.GrainIdentity.TypeCode;
@@ -484,7 +488,7 @@ namespace Orleans.Runtime
                         activationStrategy,
                         this.activationCollector,
                         ageLimit,
-                        this.messagingOptions,
+                        this.siloMessagingOptions,
                         this.maxWarningRequestProcessingTime,
                         this.maxRequestProcessingTime,
                         this.RuntimeClient,

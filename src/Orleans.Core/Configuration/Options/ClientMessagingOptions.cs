@@ -5,7 +5,7 @@ namespace Orleans.Configuration
     /// <summary>
     /// Specifies global messaging options that are client related.
     /// </summary>
-    public class ClientMessagingOptions : MessagingOptions
+    public class ClientMessagingOptions
     {
         /// <summary>
         ///  The ClientSenderBuckets attribute specifies the total number of grain buckets used by the client in client-to-gateway communication

@@ -146,7 +146,7 @@ namespace Orleans.Runtime
             this.Services = services;
             this.Services.InitializeSiloUnobservedExceptionsHandler();
             //set PropagateActivityId flag from node config
-            IOptions<SiloMessagingOptions> messagingOptions = services.GetRequiredService<IOptions<SiloMessagingOptions>>();
+            var messagingOptions = this.Services.GetRequiredService<IOptions<MessagingOptions>>();
             RequestContext.PropagateActivityId = messagingOptions.Value.PropagateActivityId;
             this.loggerFactory = this.Services.GetRequiredService<ILoggerFactory>();
             logger = this.loggerFactory.CreateLogger<Silo>();
@@ -162,8 +162,7 @@ namespace Orleans.Runtime
                 this.siloDetails.DnsHostName, Environment.MachineName, localEndpoint, this.siloDetails.SiloAddress.Generation);
             logger.Info(ErrorCode.SiloInitConfig, "Starting silo {0}", name);
 
-            var siloMessagingOptions = this.Services.GetRequiredService<IOptions<SiloMessagingOptions>>();
-            BufferPool.InitGlobalBufferPool(siloMessagingOptions.Value);
+            BufferPool.InitGlobalBufferPool(messagingOptions.Value);
 
             try
             {

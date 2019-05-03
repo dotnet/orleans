@@ -49,11 +49,15 @@ namespace Orleans.Configuration
             // Translate legacy configuration to new Options
             services.Configure<ClientMessagingOptions>(options =>
             {
-                CopyCommonMessagingOptions(configuration, options);
-                options.PropagateActivityId = configuration.PropagateActivityId;
                 options.ClientSenderBuckets = configuration.ClientSenderBuckets;
                 options.PreferredFamily = configuration.PreferredFamily;
                 options.NetworkInterfaceName = configuration.NetInterface;
+            });
+
+            services.Configure<MessagingOptions>(options =>
+            {
+                CopyCommonMessagingOptions(configuration, options);
+                options.PropagateActivityId = configuration.PropagateActivityId;
             });
 
 

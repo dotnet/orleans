@@ -37,14 +37,14 @@ namespace Orleans
         /// </summary>
         /// <param name="runtimeClient">The runtime client.</param>
         /// <param name="loggerFactory">Logger factory used to create loggers</param>
-        /// <param name="clientMessagingOptions">Messaging parameters</param>
-        public ClusterClient(IRuntimeClient runtimeClient, ILoggerFactory loggerFactory, IOptions<ClientMessagingOptions> clientMessagingOptions)
+        /// <param name="messagingOptions">Messaging parameters</param>
+        public ClusterClient(IRuntimeClient runtimeClient, ILoggerFactory loggerFactory, IOptions<MessagingOptions> messagingOptions)
         {
             this.runtimeClient = runtimeClient;
             this.clusterClientLifecycle = new ClusterClientLifecycle(loggerFactory.CreateLogger<LifecycleSubject>());
 
-            //set PropagateActivityId flag from node cofnig
-            RequestContext.PropagateActivityId = clientMessagingOptions.Value.PropagateActivityId;
+            //set PropagateActivityId flag from node config
+            RequestContext.PropagateActivityId = messagingOptions.Value.PropagateActivityId;
 
             // register all lifecycle participants
             IEnumerable<ILifecycleParticipant<IClusterClientLifecycle>> lifecycleParticipants = this.ServiceProvider.GetServices<ILifecycleParticipant<IClusterClientLifecycle>>();

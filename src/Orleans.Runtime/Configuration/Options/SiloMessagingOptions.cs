@@ -8,7 +8,7 @@ namespace Orleans.Configuration
     /// <summary>
     /// Specifies global messaging options that are silo related.
     /// </summary>
-    public class SiloMessagingOptions : MessagingOptions
+    public class SiloMessagingOptions
     {
         /// <summary>
         /// The SiloSenderQueues attribute specifies the number of parallel queues and attendant threads used by the silo to send outbound

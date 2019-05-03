@@ -7,7 +7,7 @@ namespace Orleans.Configuration
     /// <summary>
     /// Specifies global messaging options that are common to client and silo.
     /// </summary>
-    public abstract class MessagingOptions
+    public class MessagingOptions
     {
         /// <summary>
         /// The ResponseTimeout attribute specifies the default timeout before a request is assumed to have failed.

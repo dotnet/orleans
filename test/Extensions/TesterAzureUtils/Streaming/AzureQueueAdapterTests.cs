@@ -39,7 +39,7 @@ namespace Tester.AzureUtils.Streaming
             this.output = output;
             this.fixture = fixture;
             this.loggerFactory = this.fixture.Services.GetService<ILoggerFactory>();
-            BufferPool.InitGlobalBufferPool(new SiloMessagingOptions());
+            BufferPool.InitGlobalBufferPool(new MessagingOptions());
         }
         
         public void Dispose()

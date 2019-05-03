@@ -16,7 +16,7 @@ namespace UnitTests.StorageTests
         {
             public Fixture()
             {
-                BufferPool.InitGlobalBufferPool(new SiloMessagingOptions());
+                BufferPool.InitGlobalBufferPool(new MessagingOptions());
                 ClientConfiguration cfg = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
             }
         }

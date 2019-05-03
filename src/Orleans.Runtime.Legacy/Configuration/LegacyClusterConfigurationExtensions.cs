@@ -182,7 +182,6 @@ namespace Orleans.Hosting
             services.AddOptions<SiloMessagingOptions>()
                 .Configure<GlobalConfiguration>((options, config) =>
                 {
-                    LegacyConfigurationExtensions.CopyCommonMessagingOptions(config, options);
                     options.SiloSenderQueues = config.SiloSenderQueues;
                     options.GatewaySenderQueues = config.GatewaySenderQueues;
                     options.MaxForwardCount = config.MaxForwardCount;
@@ -193,13 +192,22 @@ namespace Orleans.Hosting
                 })
                 .Configure<NodeConfiguration>((options, config) =>
                 {
-                    options.PropagateActivityId = config.PropagateActivityId;
                     LimitValue requestLimit = config.LimitManager.GetLimit(LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS);
                     options.MaxEnqueuedRequestsSoftLimit = requestLimit.SoftLimitThreshold;
                     options.MaxEnqueuedRequestsHardLimit = requestLimit.HardLimitThreshold;
                     LimitValue statelessWorkerRequestLimit = config.LimitManager.GetLimit(LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER);
                     options.MaxEnqueuedRequestsSoftLimit_StatelessWorker = statelessWorkerRequestLimit.SoftLimitThreshold;
                     options.MaxEnqueuedRequestsHardLimit_StatelessWorker = statelessWorkerRequestLimit.HardLimitThreshold;
+                });
+
+            services.AddOptions<MessagingOptions>()
+                .Configure<GlobalConfiguration>((options, config) =>
+                {
+                    LegacyConfigurationExtensions.CopyCommonMessagingOptions(config, options);
+                })
+                .Configure<NodeConfiguration>((options, config) =>
+                {
+                    options.PropagateActivityId = config.PropagateActivityId;
                 });
 
             services.Configure<NetworkingOptions>(options => LegacyConfigurationExtensions.CopyNetworkingOptions(configuration.Globals, options));

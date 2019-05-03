@@ -158,7 +158,7 @@ namespace Orleans.TestingHost
 
         internal static string Serialize(SerializationManager serializationManager, object config)
         {
-            BufferPool.InitGlobalBufferPool(new SiloMessagingOptions());
+            BufferPool.InitGlobalBufferPool(new MessagingOptions());
             var writer = new BinaryTokenStreamWriter();
             serializationManager.Serialize(config, writer);
             string serialized = Convert.ToBase64String(writer.ToByteArray());
