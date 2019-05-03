@@ -143,7 +143,7 @@ namespace Orleans.Storage
             if (record != null)
             {
                 var loadedState = ConvertFromStorageFormat(record);
-                grainState.State = loadedState ?? Activator.CreateInstance(grainState.State.GetType());
+                grainState.State = loadedState ?? Activator.CreateInstance(grainState.Type);
                 grainState.ETag = record.ETag.ToString();
             }
 

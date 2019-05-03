@@ -19,11 +19,16 @@ namespace Orleans.EventSourcing.LogStorage
         /// Gets and Sets StateAndMetaData
         /// </summary>
         public LogStateWithMetaData<TEntry> StateAndMetaData { get; set; }
-       
+
         /// <summary>
         /// Gets and Sets Etag
         /// </summary>
         public string ETag { get; set; }
+
+        /// <summary>
+        /// Gets Type
+        /// </summary>
+        public Type Type => typeof(LogStateWithMetaData<TEntry>);
 
         object IGrainState.State
         {
@@ -80,7 +85,7 @@ namespace Orleans.EventSourcing.LogStorage
         /// But this map is represented compactly as a simple string to reduce serialization/deserialization overhead
         /// Bits are read by <see cref="GetBit"/> and flipped by  <see cref="FlipBit"/>.
         /// Bits are toggled when writing, so that the retry logic can avoid appending an entry twice
-        /// when retrying a failed append. 
+        /// when retrying a failed append.
         /// </summary>
         public string WriteVector { get; set; }
 
