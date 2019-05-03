@@ -44,7 +44,7 @@ namespace Orleans
             this.clusterClientLifecycle = new ClusterClientLifecycle(loggerFactory.CreateLogger<LifecycleSubject>());
 
             //set PropagateActivityId flag from node cofnig
-            RequestContext.PropagateActivityId = clientMessagingOptions.Value.PropagateActivityId;
+            RequestContext.PropagateActivityId |= clientMessagingOptions.Value.PropagateActivityId;
 
             // register all lifecycle participants
             IEnumerable<ILifecycleParticipant<IClusterClientLifecycle>> lifecycleParticipants = this.ServiceProvider.GetServices<ILifecycleParticipant<IClusterClientLifecycle>>();
