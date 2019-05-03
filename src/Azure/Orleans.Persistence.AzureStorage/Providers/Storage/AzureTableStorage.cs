@@ -38,7 +38,7 @@ namespace Orleans.Storage
 
         private GrainStateTableDataManager tableDataManager;
         private JsonSerializerSettings JsonSettings;
-        
+
         // each property can hold 64KB of data and each entity can take 1MB in total, so 15 full properties take
         // 15 * 64 = 960 KB leaving room for the primary key, timestamp etc
         private const int MAX_DATA_CHUNK_SIZE = 64 * 1024;
@@ -50,7 +50,7 @@ namespace Orleans.Storage
         private string name;
 
         /// <summary> Default constructor </summary>
-        public AzureTableGrainStorage(string name, AzureTableStorageOptions options, IOptions<ClusterOptions> clusterOptions, SerializationManager serializationManager, 
+        public AzureTableGrainStorage(string name, AzureTableStorageOptions options, IOptions<ClusterOptions> clusterOptions, SerializationManager serializationManager,
             IGrainFactory grainFactory, ITypeResolver typeResolver, ILoggerFactory loggerFactory)
         {
             this.options = options;
@@ -80,9 +80,8 @@ namespace Orleans.Storage
                 var entity = record.Entity;
                 if (entity != null)
                 {
-                    var stateType = grainState.State.GetType();
-                    var loadedState = ConvertFromStorageFormat(entity, stateType);
-                    grainState.State = loadedState ?? Activator.CreateInstance(grainState.State.GetType());
+                    var loadedState = ConvertFromStorageFormat(entity, grainState.Type);
+                    grainState.State = loadedState ?? Activator.CreateInstance(grainState.Type);
                     grainState.ETag = record.ETag;
                 }
             }
