@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 
@@ -25,9 +26,12 @@ namespace Silo
                         .AddCheck<GrainHealthCheck>(HealthCheckNames.GrainHealth)
                         .AddCheck<SiloHealthCheck>(HealthCheckNames.SiloHealth);
 
-                    services.AddSingleton(provider.GetRequiredService<IClusterClient>());
+                    services.AddSingleton(_ => provider.GetRequiredService<IClusterClient>());
                     services.AddTransient(_ => provider.GetRequiredService<IEnumerable<IHealthCheckParticipant>>());
-
+                })
+                .ConfigureLogging(builder =>
+                {
+                    builder.AddConsole();
                 })
                 .Configure(app =>
                 {
