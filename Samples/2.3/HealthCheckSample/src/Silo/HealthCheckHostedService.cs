@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
@@ -17,7 +15,7 @@ namespace Silo
     {
         private readonly IWebHost host;
 
-        public HealthCheckHostedService(IServiceProvider provider, IOptions<HealthCheckHostedServiceOptions> myOptions)
+        public HealthCheckHostedService(IClusterClient client, IMembershipOracle oracle, IOptions<HealthCheckHostedServiceOptions> myOptions)
         {
             host = new WebHostBuilder()
                 .UseKestrel(options => options.ListenAnyIP(myOptions.Value.Port))
@@ -28,8 +26,8 @@ namespace Silo
                         .AddCheck<SiloHealthCheck>("SiloHealth")
                         .AddCheck<ClusterHealthCheck>("ClusterHealth");
 
-                    services.AddSingleton(_ => provider.GetRequiredService<IClusterClient>());
-                    services.AddTransient(_ => provider.GetRequiredService<IEnumerable<IHealthCheckParticipant>>());
+                    services.AddSingleton(client);
+                    services.AddSingleton(oracle);
                 })
                 .ConfigureLogging(builder =>
                 {
