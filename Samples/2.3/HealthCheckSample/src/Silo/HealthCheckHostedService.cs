@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Runtime;
 
@@ -16,10 +17,10 @@ namespace Silo
     {
         private readonly IWebHost host;
 
-        public HealthCheckHostedService(IServiceProvider provider)
+        public HealthCheckHostedService(IServiceProvider provider, IOptions<HealthCheckHostedServiceOptions> myOptions)
         {
             host = new WebHostBuilder()
-                .UseKestrel(options => options.ListenAnyIP(8880))
+                .UseKestrel(options => options.ListenAnyIP(myOptions.Value.Port))
                 .ConfigureServices(services =>
                 {
                     services.AddHealthChecks()
@@ -36,7 +37,7 @@ namespace Silo
                 })
                 .Configure(app =>
                 {
-                    app.UseHealthChecks("/health");
+                    app.UseHealthChecks(myOptions.Value.PathString);
                 })
                 .Build();
         }
