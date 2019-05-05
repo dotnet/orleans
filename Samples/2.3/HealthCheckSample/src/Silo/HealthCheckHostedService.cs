@@ -22,7 +22,8 @@ namespace Silo
                 .ConfigureServices(services =>
                 {
                     services.AddHealthChecks()
-                        .AddCheck<GrainHealthCheck>(HealthCheckNames.GrainHealth);
+                        .AddCheck<GrainHealthCheck>(HealthCheckNames.GrainHealth)
+                        .AddCheck<SiloHealthCheck>(HealthCheckNames.SiloHealth);
 
                     services.AddSingleton(provider.GetRequiredService<IClusterClient>());
                     services.AddTransient(_ => provider.GetRequiredService<IEnumerable<IHealthCheckParticipant>>());
