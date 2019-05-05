@@ -11,6 +11,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Grains.Interfaces", "src\Gr
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{A8795944-3AE8-46D9-A592-CFB140ED0AF9}"
 	ProjectSection(SolutionItems) = preProject
+		BuildAndRun.cmd = BuildAndRun.cmd
 		BuildAndRun.ps1 = BuildAndRun.ps1
 		BuildAndRun.sh = BuildAndRun.sh
 	EndProjectSection
