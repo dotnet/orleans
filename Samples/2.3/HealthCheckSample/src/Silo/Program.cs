@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans.Hosting;
+using Microsoft.AspNetCore.Hosting;
 
 namespace Silo
 {
@@ -15,6 +16,7 @@ namespace Silo
                 {
                     builder.UseLocalhostClustering();
                 })
+
                 .ConfigureLogging(builder =>
                 {
                     builder.AddConsole();
@@ -25,6 +27,7 @@ namespace Silo
                     {
                         options.SuppressStatusMessages = true;
                     });
+                    services.AddHostedService<HealthCheckHostedService>();
                 })
                 .RunConsoleAsync();
         }
