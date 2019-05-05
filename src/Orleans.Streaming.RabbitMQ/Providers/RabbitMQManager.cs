@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Exceptions;
 
-namespace Orleans.Providers.RabbitMQ.Streams.RabbitMQ
+namespace Orleans.Streams
 {
     public class RabbitMQManager : IDisposable
     {
@@ -12,8 +12,13 @@ namespace Orleans.Providers.RabbitMQ.Streams.RabbitMQ
         private IConnection _rabbitConn;
         private IModel _model;
         private readonly ILogger _logger;
-        public RabbitMQManager(RabbitMQOptions rabbitMQOptions, ILogger logger)
 
+        /// <summary>
+        /// Internal manager for the RabbitMQ connection.
+        /// </summary>
+        /// <param name="rabbitMQOptions">Options for declaring an exchange, declaring a queue, and then binding to a queue.</param>
+        /// <param name="logger"></param>
+        public RabbitMQManager(RabbitMQOptions rabbitMQOptions, ILogger logger)
         {
             _rabbitFact = rabbitMQOptions ?? throw new ArgumentNullException(nameof(rabbitMQOptions));
             _logger = logger;

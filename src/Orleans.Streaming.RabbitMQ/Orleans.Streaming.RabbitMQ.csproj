@@ -5,12 +5,19 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="2.2.4" />
     <PackageReference Include="RabbitMQ.Client" Version="5.1.0" />
+    <PackageReference Include="System.ComponentModel.Annotations" Version="4.5.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" />
     <ProjectReference Include="..\OrleansProviders\OrleansProviders.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Queue\" />
+    <Folder Include="Storage\" />
   </ItemGroup>
 
 </Project>

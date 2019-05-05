@@ -1,16 +1,13 @@
 using System.Collections.Generic;
 using RabbitMQ.Client;
 
-namespace Orleans.Providers.RabbitMQ.Streams.RabbitMQ
+namespace Orleans.Streams
 {
-    /// <summary>
-    /// Configuration options for listening from a single queue.
-    /// </summary>
     public class RabbitMQOptions : ConnectionFactory
     {
-        public RabbitMQExchangeOptions ExchangeOptions;
-        public RabbitMQQueueOptions QueueOptions;
-        public RabbitMQBindingOptions BindingOptions;
+        //public RabbitMQExchangeOptions ExchangeOptions;
+        //public RabbitMQQueueOptions QueueOptions;
+        //public RabbitMQBindingOptions BindingOptions;
     }
 
     public class RabbitMQExchangeOptions
@@ -40,5 +37,18 @@ namespace Orleans.Providers.RabbitMQ.Streams.RabbitMQ
         public string Exchange;
         public string RoutingKey;
         public IDictionary<string, object> Arguments = null;
+    }
+
+    public class RabbitMQReceiverOptions
+    {
+        /// <summary>
+        /// Optional parameter that configures the receiver prefetch count.
+        /// </summary>
+        public int? PrefetchCount { get; set; }
+        /// <summary>
+        /// In cases where no checkpoint is found, this indicates if service should read from the most recent data, or from the beginning of a partition.
+        /// </summary>
+        public bool StartFromNow { get; set; } = DEFAULT_START_FROM_NOW;
+        public const bool DEFAULT_START_FROM_NOW = true;
     }
 }
