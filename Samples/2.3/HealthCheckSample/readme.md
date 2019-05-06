@@ -1,6 +1,6 @@
 # Orleans Health Checks Sample
 
-Orleans Health Checks sample targeting .NET Core 2.1.
+Orleans Health Checks sample targeting .NET Core 2.2.
 
 This sample demonstrates how to integrate [ASP.NET Core Health Checks](https://docs.microsoft.com/en-us/aspnet/core/host-and-deploy/health-checks) with Orleans for customized health checking.
 
@@ -90,12 +90,19 @@ host = new WebHostBuilder()
         .AddCheck<StorageHealthCheck>("StorageHealth")
         .AddCheck<ClusterHealthCheck>("ClusterHealth");
 
+    services.AddSingleton<IHealthCheckPublisher, LoggingHealthCheckPublisher>()
+        .Configure<HealthCheckPublisherOptions>(options =>
+        {
+            options.Period = TimeSpan.FromSeconds(1);
+        });
+
     /* ... */
 })
 ```
 
-Each health check class must derive from [Microsoft.Extensions.Diagnostics.HealthChecks.IHealthCheck](https://github.com/aspnet/Extensions/blob/master/src/HealthChecks/Abstractions/src/IHealthCheck.cs).
-Health check class instances are transient and run in the order they are added.
+*Health Check* classes derive from [Microsoft.Extensions.Diagnostics.HealthChecks.IHealthCheck](https://github.com/aspnet/Extensions/blob/master/src/HealthChecks/Abstractions/src/IHealthCheck.cs).
+
+*Health Check Publisher* classes derive from [IHealthCheckPublisher](https://github.com/aspnet/Extensions/blob/master/src/HealthChecks/Abstractions/src/IHealthCheckPublisher.cs).
 
 #### GrainHealthCheck
 
@@ -184,6 +191,37 @@ catch (Exception error)
 {
     return HealthCheckResult.Unhealthy("Failed to get cluster status", error);
 }
+```
+
+#### LoggingHealthCheckPublisher
+
+The [LoggingHealthCheckPublisher](./src/Silo/LoggingHealthCheckPublisher.cs) reports on the aggregated information from all the health checks.
+For simplicity, this publisher reports information to the current logging output.
+
+``` csharp
+logger.Log(report.Status == HealthStatus.Healthy ? LogLevel.Information : LogLevel.Warning,
+    "Service is {@ReportStatus} at {@ReportTime} after {@ElapsedTime}ms with CorrelationId {@CorrelationId}",
+    report.Status, now, report.TotalDuration.TotalMilliseconds, id);
+
+foreach (var entry in report.Entries)
+{
+    logger.Log(entry.Value.Status == HealthStatus.Healthy ? LogLevel.Information : LogLevel.Warning,
+        entry.Value.Exception,
+        "{@HealthCheckName} is {@ReportStatus} after {@ElapsedTime}ms with CorrelationId {@CorrelationId}",
+        entry.Key, entry.Value.Status, entry.Value.Duration.TotalMilliseconds, id);
+}
+```
+
+Reporting startup delay and frequency are configured via the [HealthCheckPublisherOptions](https://github.com/aspnet/Extensions/blob/master/src/HealthChecks/HealthChecks/src/HealthCheckPublisherOptions.cs).
+
+However note that due to [this issue](https://github.com/aspnet/Extensions/issues/1041), the value set for *Period* has no effect at the time of writing,
+and the default of 30 seconds will always apply.
+
+``` csharp
+    .Configure<HealthCheckPublisherOptions>(options =>
+    {
+        options.Period = TimeSpan.FromSeconds(1);
+    });
 ```
 
 ## Build & Run
