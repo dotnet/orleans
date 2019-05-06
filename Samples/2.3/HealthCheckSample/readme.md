@@ -105,9 +105,9 @@ host = new WebHostBuilder()
 })
 ```
 
-*Health Check* classes derive from [Microsoft.Extensions.Diagnostics.HealthChecks.IHealthCheck](https://github.com/aspnet/Extensions/blob/master/src/HealthChecks/Abstractions/src/IHealthCheck.cs).
+*Health Check* classes derive from [IHealthCheck](https://docs.microsoft.com/en-us/aspnet/core/host-and-deploy/health-checks#create-health-checks).
 
-*Health Check Publisher* classes derive from [IHealthCheckPublisher](https://github.com/aspnet/Extensions/blob/master/src/HealthChecks/Abstractions/src/IHealthCheckPublisher.cs).
+*Health Check Publisher* classes derive from [IHealthCheckPublisher](https://docs.microsoft.com/en-us/aspnet/core/host-and-deploy/health-checks#health-check-publisher).
 
 #### GrainHealthCheck
 
