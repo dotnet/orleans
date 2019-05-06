@@ -140,7 +140,7 @@ foreach (var participant in this.participants)
 }
 ```
 
-Such services implement the [Orleans.Runtime.IHealthCheckParticipant](../../../src/Orleans.Runtime/Core/IHealthCheckParticipant.cs) interface.
+Such services implement the [IHealthCheckParticipant](../../../src/Orleans.Runtime/Core/IHealthCheckParticipant.cs) interface.
 
 ``` csharp
 public SiloHealthCheck(IEnumerable<IHealthCheckParticipant> participants)
@@ -165,8 +165,14 @@ At the time of writing this, only [IMembershipOracle](../../../src/Orleans.Runti
 #### StorageHealthCheck
 
 The [StorageHealthCheck](./src/Silo/StorageHealthCheck.cs) verifies whether the [StorageHealthCheckGrain](./src/Grains/StorageHealthCheckGrain.cs) can write, read, and clear state using the default storage provider.
-The grain is marked with [PreferLocalPlacement](https://github.com/dotnet/orleans/blob/master/src/Orleans.Core.Abstractions/Placement/PlacementAttribute.cs) and deactivates itself after each check.
-Using a random key grain key therefore ensures this test always happens in silo under test.
+
+This grain:
+
+* Is marked with [PreferLocalPlacement](../../../src/Orleans.Core.Abstractions/Placement/PlacementAttribute.cs);
+* Deactivates itself after each call;
+* Is called with a random key each time;
+
+This ensures this test always happens in the silo under test.
 
 ``` csharp
 try
@@ -217,16 +223,16 @@ foreach (var entry in report.Entries)
 }
 ```
 
-Reporting startup delay and frequency are configured via the [HealthCheckPublisherOptions](https://github.com/aspnet/Extensions/blob/master/src/HealthChecks/HealthChecks/src/HealthCheckPublisherOptions.cs).
+Reporting startup delay and frequency are configured via the [HealthCheckPublisherOptions](https://docs.microsoft.com/en-us/aspnet/core/host-and-deploy/health-checks#health-check-publisher).
 
 However note that due to [this issue](https://github.com/aspnet/Extensions/issues/1041), the value set for *Period* has no effect at the time of writing,
 and the default of 30 seconds will always apply.
 
 ``` csharp
-    .Configure<HealthCheckPublisherOptions>(options =>
-    {
-        options.Period = TimeSpan.FromSeconds(1);
-    });
+.Configure<HealthCheckPublisherOptions>(options =>
+{
+    options.Period = TimeSpan.FromSeconds(1);
+});
 ```
 
 ## Build & Run
