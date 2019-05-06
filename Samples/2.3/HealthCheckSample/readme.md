@@ -104,19 +104,15 @@ The [GrainHealthCheck](./src/Silo/GrainHealthCheck.cs) verifies connectivity to 
 As this grain is a *Stateless Worker*, validation always occurs in the silo where the health check is issued.
 
 ``` csharp
-public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
+try
 {
-    try
-    {
-        await client.GetGrain<ILocalHealthCheckGrain>(Guid.Empty).PingAsync();
-    }
-    catch (Exception error)
-    {
-        return HealthCheckResult.Unhealthy("Failed to ping the local health check grain.", error);
-    }
-
-    return HealthCheckResult.Healthy();
+    await client.GetGrain<ILocalHealthCheckGrain>(Guid.Empty).PingAsync();
 }
+catch (Exception error)
+{
+    return HealthCheckResult.Unhealthy("Failed to ping the local health check grain.", error);
+}
+return HealthCheckResult.Healthy();
 ```
 
 #### SiloHealthCheck

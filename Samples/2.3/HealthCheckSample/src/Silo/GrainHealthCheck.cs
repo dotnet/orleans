@@ -26,7 +26,6 @@ namespace Silo
             {
                 return HealthCheckResult.Unhealthy("Failed to ping the local health check grain.", error);
             }
-
             return HealthCheckResult.Healthy();
         }
     }
