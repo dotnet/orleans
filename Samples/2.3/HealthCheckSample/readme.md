@@ -23,7 +23,7 @@ The Kestrel and Health Check features are implemented as an *IHostedService* in 
 #### Notes
 
 On startup, the silo host selects available ports from a pre-defined range for silo communication, gateway and health checks, in ascending order.
-This allows starting multiple instances of the silo host during development machine to form a multi-silo cluster for testing.
+This allows starting multiple instances of the silo host during development to form a multi-silo cluster for testing.
 Pre-defined port ranges are as follows:
 
 |Service|Start|End|
