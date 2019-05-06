@@ -1,6 +1,10 @@
 # Orleans Health Checks Sample
 
-Orleans Health Checks sample targeting .NET Core 2.2.
+Orleans Health Checks sample targeting:
+
+* .NET Core 2.2
+* Orleans 2.3.1
+* ASP.NET Core 2.2
 
 This sample demonstrates how to integrate [ASP.NET Core Health Checks](https://docs.microsoft.com/en-us/aspnet/core/host-and-deploy/health-checks) with Orleans for customized health checking.
 
