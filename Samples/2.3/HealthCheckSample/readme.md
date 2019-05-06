@@ -32,7 +32,7 @@ Pre-defined port ranges are as follows:
 | Gateway | 30000 | 30009 |
 | Health | 8880 | 8889 |
 
-You can change this port range as appropriate in [Program.cs](./src/Silo/Program.cs) or remove it altogether for a production deployment.
+You can change these port ranges as appropriate in [Program.cs](./src/Silo/Program.cs) or remove the feature altogether for a production deployment.
 
 Please allow the previous silos to come online before starting additional silos.
 This avoids transient conflicts in the bare-bones port detection logic.
