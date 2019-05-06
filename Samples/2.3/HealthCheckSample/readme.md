@@ -85,7 +85,7 @@ host = new WebHostBuilder()
 })
 ```
 
-`.AddHealthChecks()` adds infrastructure services and allows adding application health checks.
+`.AddHealthChecks()` adds infrastructure services and allows adding application health checks:
 
 ``` csharp
 .ConfigureServices(services =>
