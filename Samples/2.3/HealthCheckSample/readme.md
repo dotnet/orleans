@@ -2,9 +2,7 @@
 
 Orleans Health Checks sample targeting .NET Core 2.1.
 
-This sample demonstrates how to integrate the *Microsoft.Extensions.Diagnostics.HealthChecks* and *Microsoft.AspNetCore.Diagnostics.HealthChecks* packages with Orleans for customized health checking.
-
-You can find the source code for the *Health Checks* extension at [Github](https://github.com/aspnet/Extensions).
+This sample demonstrates how to integrate [ASP.NET Core Health Checks](https://docs.microsoft.com/en-us/aspnet/core/host-and-deploy/health-checks) with Orleans for customized health checking.
 
 ## TLDR;
 
