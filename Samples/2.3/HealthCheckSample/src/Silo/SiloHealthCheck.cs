@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -8,21 +9,28 @@ namespace Silo
 {
     public class SiloHealthCheck : IHealthCheck
     {
-        private readonly IMembershipOracle oracle;
+        private readonly IEnumerable<IHealthCheckParticipant> participants;
 
         private static long lastCheckTime = DateTime.UtcNow.ToBinary();
 
-        public SiloHealthCheck(IMembershipOracle oracle)
+        public SiloHealthCheck(IEnumerable<IHealthCheckParticipant> participants)
         {
-            this.oracle = oracle;
+            this.participants = participants;
         }
 
         public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
         {
             var thisLastCheckTime = DateTime.FromBinary(Interlocked.Exchange(ref lastCheckTime, DateTime.UtcNow.ToBinary()));
 
-            var ok = oracle.CheckHealth(thisLastCheckTime);
-            return ok ? Task.FromResult(HealthCheckResult.Healthy()) : Task.FromResult(HealthCheckResult.Degraded());
+            foreach (var participant in this.participants)
+            {
+                if (!participant.CheckHealth(thisLastCheckTime))
+                {
+                    return Task.FromResult(HealthCheckResult.Degraded());
+                }
+            }
+
+            return Task.FromResult(HealthCheckResult.Healthy());
         }
     }
 }

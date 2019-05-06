@@ -20,7 +20,6 @@ namespace Silo
         public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
         {
             var manager = client.GetGrain<IManagementGrain>(0);
-
             try
             {
                 var hosts = await manager.GetHosts();

@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
@@ -27,7 +28,7 @@ namespace Silo
                         .AddCheck<ClusterHealthCheck>("ClusterHealth");
 
                     services.AddSingleton(client);
-                    services.AddSingleton(oracle);
+                    services.AddSingleton(Enumerable.AsEnumerable(new IHealthCheckParticipant[] { oracle }));
                 })
                 .ConfigureLogging(builder =>
                 {
