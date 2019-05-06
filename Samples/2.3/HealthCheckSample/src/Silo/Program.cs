@@ -45,6 +45,7 @@ namespace Silo
                 .UseOrleans(builder =>
                 {
                     builder.UseLocalhostClustering(siloPort, gatewayPort, new IPEndPoint(IPAddress.Loopback, 11111));
+                    builder.AddMemoryGrainStorageAsDefault();
                     builder.ConfigureApplicationParts(manager =>
                     {
                         manager.AddApplicationPart(typeof(LocalHealthCheckGrain).Assembly).WithReferences();

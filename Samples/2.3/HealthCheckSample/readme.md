@@ -87,6 +87,7 @@ host = new WebHostBuilder()
     services.AddHealthChecks()
         .AddCheck<GrainHealthCheck>("GrainHealth")
         .AddCheck<SiloHealthCheck>("SiloHealth")
+        .AddCheck<StorageHealthCheck>("StorageHealth")
         .AddCheck<ClusterHealthCheck>("ClusterHealth");
 
     /* ... */
@@ -147,6 +148,24 @@ At the time of writing this, only [IMembershipOracle](../../../src/Orleans.Runti
     /* ... */
     services.AddSingleton(Enumerable.AsEnumerable(new IHealthCheckParticipant[] { oracle }));
 })
+```
+
+#### StorageHealthCheck
+
+The [StorageHealthCheck](./src/Silo/StorageHealthCheck.cs) verifies whether the [StorageHealthCheckGrain](./src/Grains/StorageHealthCheckGrain.cs) can write, read, and clear state using the default storage provider.
+The grain is marked with [PreferLocalPlacement](https://github.com/dotnet/orleans/blob/master/src/Orleans.Core.Abstractions/Placement/PlacementAttribute.cs) and deactivates itself after each check.
+Using a random key grain key therefore ensures this test always happens in silo under test.
+
+``` csharp
+try
+{
+    await client.GetGrain<IStorageHealthCheckGrain>(Guid.NewGuid()).CheckAsync();
+}
+catch (Exception error)
+{
+    return HealthCheckResult.Unhealthy("Failed to ping the storage health check grain.", error);
+}
+return HealthCheckResult.Healthy();
 ```
 
 #### ClusterHealthCheck

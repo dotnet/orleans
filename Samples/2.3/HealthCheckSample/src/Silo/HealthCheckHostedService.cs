@@ -25,6 +25,7 @@ namespace Silo
                     services.AddHealthChecks()
                         .AddCheck<GrainHealthCheck>("GrainHealth")
                         .AddCheck<SiloHealthCheck>("SiloHealth")
+                        .AddCheck<StorageHealthCheck>("StorageHealth")
                         .AddCheck<ClusterHealthCheck>("ClusterHealth");
 
                     services.AddSingleton(client);
