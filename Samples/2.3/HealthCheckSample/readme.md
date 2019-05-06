@@ -153,7 +153,7 @@ At the time of writing this, only [IMembershipOracle](../../../src/Orleans.Runti
 
 #### ClusterHealthCheck
 
-The [ClusterHealthCheck](./src/Silo/ClusterHealthCheck.cs) checks whether any silos are unavailable by querying the [ManagementGrain](../../../src/Orleans.Runtime/Core/ManagementGrain.cs).
+The [ClusterHealthCheck](./src/Silo/ClusterHealthCheck.cs) verifies whether any silos are unavailable by querying the [ManagementGrain](../../../src/Orleans.Runtime/Core/ManagementGrain.cs).
 
 ``` csharp
 var manager = client.GetGrain<IManagementGrain>(0);
