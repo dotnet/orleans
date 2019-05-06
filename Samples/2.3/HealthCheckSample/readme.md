@@ -53,6 +53,7 @@ Under normal operation, the request will return Http Status Code 200 with one of
 It can also return Http Status Code 500 (Internal Server Error) in case there is an error running the set of health checks.
 
 Any unreasonable delay in the health check response requires treating as Degraded or Unhealthy by the monitoring tool in use.
+The default timeout is 30 seconds.
 
 #### Configuration
 
