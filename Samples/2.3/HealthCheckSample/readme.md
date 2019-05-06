@@ -34,6 +34,9 @@ Pre-defined port ranges are as follows:
 
 You can change this port range as appropriate in [Program.cs](./src/Silo/Program.cs) or remove it altogether for a production deployment.
 
+Please allow the previous silos to come online before starting additional silos.
+This avoids transient conflicts in the bare-bones port detection logic.
+
 ### Health Checks
 
 During development, make a GET request to http://localhost:8880 to query the first silo host. Replace the port number as appropriate for additional silo hosts.
@@ -202,6 +205,3 @@ To build and run the sample step-by-step on the command line, use the following 
 2. `dotnet build --no-restore` to build the solution.
 3. `start dotnet run --project ./src/Silo --no-build` to start the first silo.
 3. `start dotnet run --project ./src/Silo --no-build` again to start additional silos.
-
-Allow the previous silo to start before starting an additional one.
-This avoid conflicts while selecting available ports.
