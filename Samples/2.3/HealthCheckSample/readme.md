@@ -21,7 +21,7 @@ This sample demonstrates how to integrate [ASP.NET Core Health Checks](https://d
 
 The *Silo* project hosts both an Orleans silo and a Kestrel web server that serves up Health Check requests.
 
-The Kestrel and Health Check features are implemented as an *IHostedService* in [HealthCheckHostedService](./src/Silo/HealthCheckHostedService.cs) to facilitate isolation and re-use.
+The Kestrel and Health Check features are implemented as an [IHostedService](https://github.com/aspnet/Extensions/blob/master/src/Hosting/Abstractions/src/IHostedService.cs) in [HealthCheckHostedService](./src/Silo/HealthCheckHostedService.cs) to facilitate isolation and re-use.
 
 #### Notes
 
