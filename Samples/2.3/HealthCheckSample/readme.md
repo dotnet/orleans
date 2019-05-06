@@ -129,7 +129,7 @@ foreach (var participant in this.participants)
 }
 ```
 
-Such services implement the *Orleans.Runtime.IHealthCheckParticipant* interface.
+Such services implement the [Orleans.Runtime.IHealthCheckParticipant](../../../src/Orleans.Runtime/Core/IHealthCheckParticipant.cs) interface.
 
 ``` csharp
 public SiloHealthCheck(IEnumerable<IHealthCheckParticipant> participants)
