@@ -9,6 +9,7 @@ This sample demonstrates how to integrate [ASP.NET Core Health Checks](https://d
 * Start the *Silo* project.
 * Open http://localhost:8880/health in the browser, or issue a GET with a tool such a Fiddler.
 * Check for a response of *Healthy*, *Degraded* or *Unhealthy*.
+* Look at the console log update every 30 seconds.
 
 ## How It Works
 
