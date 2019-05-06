@@ -16,7 +16,7 @@ You can find the source code for the *Health Checks* extension at [Github](https
 
 ### Silo Host
 
-The *Silo* project hosts both an Orleans silo and a Kestrel Web Server that serves up Health Check requests.
+The *Silo* project hosts both an Orleans silo and a Kestrel web server that serves up Health Check requests.
 
 The Kestrel and Health Check features are implemented as an *IHostedService* in [HealthCheckHostedService](./src/Silo/HealthCheckHostedService.cs) to facilitate isolation and re-use.
 
