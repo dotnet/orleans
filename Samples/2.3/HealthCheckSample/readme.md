@@ -21,7 +21,7 @@ This sample demonstrates how to integrate [ASP.NET Core Health Checks](https://d
 
 The *Silo* project hosts both an Orleans silo and a Kestrel web server that serves up Health Check requests.
 
-The Kestrel and Health Check features are implemented as an [IHostedService](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/host/hosted-services) in [HealthCheckHostedService](./src/Silo/HealthCheckHostedService.cs) to facilitate isolation and re-use.
+The Kestrel and Health Check features are implemented as an `[IHostedService](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/host/hosted-services)` in `[HealthCheckHostedService](./src/Silo/HealthCheckHostedService.cs)` to facilitate isolation and re-use.
 
 #### Notes
 
@@ -35,7 +35,7 @@ Pre-defined port ranges are as follows:
 | Gateway | 30000 | 30009 |
 | Health | 8880 | 8889 |
 
-You can change these port ranges in [Program.cs](./src/Silo/Program.cs).
+You can change these port ranges in `[Program.cs](./src/Silo/Program.cs)`.
 
 Please allow the previous silos to come online before starting additional silos.
 This avoids transient conflicts in the bare-bones port detection logic.
@@ -57,9 +57,9 @@ The default timeout is 30 seconds.
 
 #### Configuration
 
-Health Checks are configured in [HealthCheckHostedService](./src/Silo/HealthCheckHostedService.cs) as per the steps below.
+Health Checks are configured in `[HealthCheckHostedService](./src/Silo/HealthCheckHostedService.cs)` as per the steps below.
 
-The hosted service requests an instance of [HealthCheckHostedServiceOptions](./src/Silo/HealthCheckHostedServiceOptions.cs), which holds these settings as default:
+The hosted service requests an instance of `[HealthCheckHostedServiceOptions](./src/Silo/HealthCheckHostedServiceOptions.cs)`, which holds these settings as default:
 
 ```csharp
 public class HealthCheckHostedServiceOptions
@@ -106,13 +106,13 @@ host = new WebHostBuilder()
 })
 ```
 
-*Health Check* classes derive from [IHealthCheck](https://docs.microsoft.com/en-us/aspnet/core/host-and-deploy/health-checks#create-health-checks).
+*Health Check* classes derive from `[IHealthCheck](https://docs.microsoft.com/en-us/aspnet/core/host-and-deploy/health-checks#create-health-checks)`.
 
-*Health Check Publisher* classes derive from [IHealthCheckPublisher](https://docs.microsoft.com/en-us/aspnet/core/host-and-deploy/health-checks#health-check-publisher).
+*Health Check Publisher* classes derive from `[IHealthCheckPublisher](https://docs.microsoft.com/en-us/aspnet/core/host-and-deploy/health-checks#health-check-publisher)`.
 
 #### GrainHealthCheck
 
-The [GrainHealthCheck](./src/Silo/GrainHealthCheck.cs) verifies connectivity to a [LocalHealthCheckGrain](./src/Grains/LocalHealthCheckGrain.cs) activation.
+The `[GrainHealthCheck](./src/Silo/GrainHealthCheck.cs)` verifies connectivity to a `[LocalHealthCheckGrain](./src/Grains/LocalHealthCheckGrain.cs)` activation.
 As this grain is a *Stateless Worker*, validation always occurs in the silo where the health check is issued.
 
 ``` csharp
@@ -129,7 +129,7 @@ return HealthCheckResult.Healthy();
 
 #### SiloHealthCheck
 
-The [SiloHealthCheck](./src/Silo/SiloHealthCheck.cs) verifies if health-checkable Orleans services are healthy.
+The `[SiloHealthCheck](./src/Silo/SiloHealthCheck.cs)` verifies if health-checkable Orleans services are healthy.
 
 ``` csharp
 foreach (var participant in this.participants)
@@ -141,7 +141,7 @@ foreach (var participant in this.participants)
 }
 ```
 
-Such services implement the [IHealthCheckParticipant](../../../src/Orleans.Runtime/Core/IHealthCheckParticipant.cs) interface.
+Such services implement the `[IHealthCheckParticipant](../../../src/Orleans.Runtime/Core/IHealthCheckParticipant.cs)` interface.
 
 ``` csharp
 public SiloHealthCheck(IEnumerable<IHealthCheckParticipant> participants)
@@ -153,7 +153,7 @@ public SiloHealthCheck(IEnumerable<IHealthCheckParticipant> participants)
 For dependency service providers that do not handle discovering services by an arbitrary interface,
 we must collect these services ourselves.
 
-At the time of writing this, only [IMembershipOracle](../../../src/Orleans.Runtime/MembershipService/IMembershipOracle.cs) exists as a public implementation.
+At the time of writing this, only `[IMembershipOracle](../../../src/Orleans.Runtime/MembershipService/IMembershipOracle.cs)` exists as a public implementation.
 
 ``` csharp
 .ConfigureServices(services =>
@@ -165,11 +165,11 @@ At the time of writing this, only [IMembershipOracle](../../../src/Orleans.Runti
 
 #### StorageHealthCheck
 
-The [StorageHealthCheck](./src/Silo/StorageHealthCheck.cs) verifies whether the [StorageHealthCheckGrain](./src/Grains/StorageHealthCheckGrain.cs) can write, read, and clear state using the default storage provider.
+The `[StorageHealthCheck](./src/Silo/StorageHealthCheck.cs)` verifies whether the `[StorageHealthCheckGrain](./src/Grains/StorageHealthCheckGrain.cs)` can write, read, and clear state using the default storage provider.
 
 This grain:
 
-* Is marked with [PreferLocalPlacement](../../../src/Orleans.Core.Abstractions/Placement/PlacementAttribute.cs);
+* Is marked with `[PreferLocalPlacement](../../../src/Orleans.Core.Abstractions/Placement/PlacementAttribute.cs)`;
 * Deactivates itself after each call;
 * Is called with a random key each time;
 
@@ -189,7 +189,7 @@ return HealthCheckResult.Healthy();
 
 #### ClusterHealthCheck
 
-The [ClusterHealthCheck](./src/Silo/ClusterHealthCheck.cs) verifies whether any silos are unavailable by querying the [ManagementGrain](../../../src/Orleans.Runtime/Core/ManagementGrain.cs).
+The `[ClusterHealthCheck](./src/Silo/ClusterHealthCheck.cs)` verifies whether any silos are unavailable by querying the `[ManagementGrain](../../../src/Orleans.Runtime/Core/ManagementGrain.cs)`.
 
 ``` csharp
 var manager = client.GetGrain<IManagementGrain>(0);
@@ -207,7 +207,7 @@ catch (Exception error)
 
 #### LoggingHealthCheckPublisher
 
-The [LoggingHealthCheckPublisher](./src/Silo/LoggingHealthCheckPublisher.cs) reports on the aggregated information from all the health checks.
+The `[LoggingHealthCheckPublisher](./src/Silo/LoggingHealthCheckPublisher.cs)` reports on the aggregated information from all the health checks.
 For simplicity, this publisher reports information to the current logging output.
 
 ``` csharp
@@ -224,7 +224,7 @@ foreach (var entry in report.Entries)
 }
 ```
 
-Reporting startup delay and frequency are configured via the [HealthCheckPublisherOptions](https://docs.microsoft.com/en-us/aspnet/core/host-and-deploy/health-checks#health-check-publisher).
+Reporting startup delay and frequency are configured via the `[HealthCheckPublisherOptions](https://docs.microsoft.com/en-us/aspnet/core/host-and-deploy/health-checks#health-check-publisher)`.
 
 However note that due to [this issue](https://github.com/aspnet/Extensions/issues/1041), the value set for *Period* has no effect at the time of writing,
 and the default of 30 seconds will always apply.
