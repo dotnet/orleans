@@ -213,3 +213,4 @@ src/SetupTestScriptOutput.txt
 
 # VS Code
 .vscode/
+.ionide/
