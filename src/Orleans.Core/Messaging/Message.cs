@@ -484,9 +484,10 @@ namespace Orleans.Runtime
 
         public List<ArraySegment<byte>> Serialize(SerializationManager serializationManager, out int headerLengthOut, out int bodyLengthOut)
         {
+            var headerWriter = new BinaryTokenStreamWriter();
             var context = new SerializationContext(serializationManager)
             {
-                StreamWriter = new BinaryTokenStreamWriter()
+                StreamWriter = headerWriter
             };
             SerializationManager.SerializeMessageHeaders(Headers, context);
 
@@ -505,7 +506,7 @@ namespace Orleans.Runtime
             {
                 BufferPool.GlobalPool.Release(headerBytes);
             }
-            headerBytes = context.StreamWriter.ToBytes();
+            headerBytes = headerWriter.ToBytes();
             int headerLength = context.StreamWriter.CurrentOffset;
             int bodyLength = BufferLength(bodyBytes);
 

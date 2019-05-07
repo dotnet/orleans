@@ -7,40 +7,20 @@ namespace Orleans.Serialization
     {
         public static SerializationManager GetSerializationManager(this ISerializerContext context)
         {
+            if (context is SerializationContextBase common) return common.SerializationManager;
             return (SerializationManager)context.ServiceProvider.GetService(typeof(SerializationManager));
         }
     }
 
     public abstract class SerializationContextBase : ISerializerContext
     {
-        private class StreamlineServiceProvider : IServiceProvider
-        {
-            private SerializationManager serializationManager;
-
-            public StreamlineServiceProvider(SerializationManager serializationManager)
-            {
-                this.serializationManager = serializationManager;
-            }
-
-            public object GetService(Type serviceType)
-            {
-                if (serviceType == typeof(SerializationManager))
-                    return this.serializationManager;
-                if (serviceType == typeof(IGrainReferenceRuntime))
-                    return this.serializationManager.RuntimeClient.GrainReferenceRuntime;
-
-                return this.serializationManager.ServiceProvider.GetService(serviceType);
-            }
-        }
-
         public SerializationManager SerializationManager { get; }
-        public IServiceProvider ServiceProvider { get; }
+        public IServiceProvider ServiceProvider => this.SerializationManager.ServiceProvider;
         public abstract object AdditionalContext { get; }
 
         protected SerializationContextBase(SerializationManager serializationManager)
         {
             this.SerializationManager = serializationManager;
-            this.ServiceProvider = new StreamlineServiceProvider(serializationManager);
         }
     }
 }

@@ -107,19 +107,20 @@ namespace Orleans.Serialization
                 return null;
             }
 
+            var outputWriter = new BinaryTokenStreamWriter();
             var serializationContext = new SerializationContext(context.GetSerializationManager())
             {
-                StreamWriter = new BinaryTokenStreamWriter()
+                StreamWriter = outputWriter
             };
             
             Serialize(source, serializationContext, source.GetType());
             var deserializationContext = new DeserializationContext(context.GetSerializationManager())
             {
-                StreamReader = new BinaryTokenStreamReader(serializationContext.StreamWriter.ToBytes())
+                StreamReader = new BinaryTokenStreamReader(outputWriter.ToBytes())
             };
 
             var retVal = Deserialize(source.GetType(), deserializationContext);
-            serializationContext.StreamWriter.ReleaseBuffers();
+            outputWriter.ReleaseBuffers();
             return retVal;
         }
 

@@ -976,26 +976,5 @@ namespace Orleans.Serialization
             trace.WriteLine(" at offset {0}", CurrentPosition);
             trace.Flush();
         }
-
-        /// <summary>
-        /// Peek at the next token in this input stream.
-        /// </summary>
-        /// <returns>Next token that will be read from the stream.</returns>
-        internal SerializationTokenType PeekToken()
-        {
-            if (currentOffset == currentSegment.Count + currentSegment.Offset)
-                StartNextSegment();
-
-            return (SerializationTokenType)currentBuffer[currentOffset];
-        }
-
-        /// <summary> Read a <c>SerializationTokenType</c> value from the stream. </summary>
-        /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
-        internal SerializationTokenType ReadToken()
-        {
-            int offset;
-            var buff = CheckLength(1, out offset);
-            return (SerializationTokenType)buff[offset];
-        }
     }
 }
