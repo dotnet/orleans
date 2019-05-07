@@ -578,17 +578,17 @@ namespace Orleans.Runtime
         private void ConfigureThreadPoolAndServicePointSettings()
         {
             PerformanceTuningOptions performanceTuningOptions = Services.GetRequiredService<IOptions<PerformanceTuningOptions>>().Value;
-            if (performanceTuningOptions.MinDotNetThreadPoolSize > 0)
+            if (performanceTuningOptions.MinDotNetThreadPoolSize > 0 || performanceTuningOptions.MinIOThreadPoolSize > 0)
             {
                 int workerThreads;
                 int completionPortThreads;
                 ThreadPool.GetMinThreads(out workerThreads, out completionPortThreads);
                 if (performanceTuningOptions.MinDotNetThreadPoolSize > workerThreads ||
-                    performanceTuningOptions.MinDotNetThreadPoolSize > completionPortThreads)
+                    performanceTuningOptions.MinIOThreadPoolSize > completionPortThreads)
                 {
                     // if at least one of the new values is larger, set the new min values to be the larger of the prev. and new config value.
                     int newWorkerThreads = Math.Max(performanceTuningOptions.MinDotNetThreadPoolSize, workerThreads);
-                    int newCompletionPortThreads = Math.Max(performanceTuningOptions.MinDotNetThreadPoolSize, completionPortThreads);
+                    int newCompletionPortThreads = Math.Max(performanceTuningOptions.MinIOThreadPoolSize, completionPortThreads);
                     bool ok = ThreadPool.SetMinThreads(newWorkerThreads, newCompletionPortThreads);
                     if (ok)
                     {
