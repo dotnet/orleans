@@ -9,6 +9,8 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Streams;
+using Microsoft.Extensions.Hosting;
+using Orleans.Hosting;
 
 namespace Orleans
 {
@@ -20,6 +22,7 @@ namespace Orleans
         private readonly IRuntimeClient runtimeClient;
         private readonly ClusterClientLifecycle clusterClientLifecycle;
         private readonly AsyncLock initLock = new AsyncLock();
+        private readonly ClientApplicationLifetime applicationLifetime;
         private LifecycleState state = LifecycleState.Created;
 
         private enum LifecycleState
@@ -61,6 +64,9 @@ namespace Orleans
             {
                 participant?.Participate(clusterClientLifecycle);
             }
+
+            // It is fine for this field to be null in the case that the silo is not the host.
+            this.applicationLifetime = runtimeClient.ServiceProvider.GetService<IApplicationLifetime>() as ClientApplicationLifetime;
         }
 
         /// <inheritdoc />
@@ -120,6 +126,8 @@ namespace Orleans
                 await this.clusterClientLifecycle.OnStart().ConfigureAwait(false);
                 this.state = LifecycleState.Started;
             }
+
+            this.applicationLifetime?.NotifyStarted();
         }
 
         /// <inheritdoc />
@@ -131,6 +139,7 @@ namespace Orleans
         private async Task Stop(bool gracefully)
         {
             if (this.IsDisposing) return;
+            this.applicationLifetime?.StopApplication();
             using (await this.initLock.LockAsync().ConfigureAwait(false))
             {
                 if (this.state == LifecycleState.Disposed) return;
@@ -161,6 +170,8 @@ namespace Orleans
                     if (this.state == LifecycleState.Disposing) this.state = LifecycleState.Invalid;
                 }
             }
+
+            this.applicationLifetime?.NotifyStopped();
         }
 
         /// <inheritdoc />
