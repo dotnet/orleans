@@ -1105,28 +1105,41 @@ namespace Orleans.Serialization
 
         internal static void SerializeImmutableArray<K>(object untypedInput, ISerializationContext context, Type typeExpected)
         {
-            var dict = (ImmutableArray<K>)untypedInput;
+            var array = (ImmutableArray<K>)untypedInput;
 
-            context.StreamWriter.Write(dict.Length);
-            foreach (var pair in dict)
+            if (array == default)
             {
-                SerializationManager.SerializeInner(pair, context, typeof(K));
+                context.StreamWriter.Write(-1);
+                return;
+            }
+
+            context.StreamWriter.Write(array.Length);
+            foreach (var element in array)
+            {
+                SerializationManager.SerializeInner(element, context, typeof(K));
             }
         }
 
         internal static object DeserializeImmutableArray<K>(Type expected, IDeserializationContext context)
         {
             var count = context.StreamReader.ReadInt();
-            var dictBuilder = ImmutableArray.CreateBuilder<K>();
+
+            if (count == -1)
+            {
+                context.RecordObject(default(ImmutableArray<K>));
+                return default(ImmutableArray<K>);
+            }
+
+            var builder = ImmutableArray.CreateBuilder<K>();
             for (var i = 0; i < count; i++)
             {
-                var key = SerializationManager.DeserializeInner<K>(context);
-                dictBuilder.Add(key);
+                var element = SerializationManager.DeserializeInner<K>(context);
+                builder.Add(element);
             }
-            var dict = dictBuilder.ToImmutable();
-            context.RecordObject(dict);
+            var array = builder.ToImmutable();
+            context.RecordObject(array);
 
-            return dict;
+            return array;
         }
         internal static object CopyGenericImmutableQueue(object original, ICopyContext context)
         {
