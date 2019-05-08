@@ -45,7 +45,6 @@ namespace UnitTests.SchedulerTests
     {
         private readonly ITestOutputHelper output;
         private static readonly object Lockable = new object();
-        private readonly IHostEnvironmentStatistics performanceMetrics;
         private readonly UnitTestSchedulingContext rootContext;
         private readonly OrleansTaskScheduler scheduler;
         private readonly ILoggerFactory loggerFactory;
@@ -54,9 +53,8 @@ namespace UnitTests.SchedulerTests
             this.output = output;
             SynchronizationContext.SetSynchronizationContext(null);
             this.loggerFactory = InitSchedulerLogging();
-            this.performanceMetrics = new TestHooksHostEnvironmentStatistics();
             this.rootContext = new UnitTestSchedulingContext();
-            this.scheduler = TestInternalHelper.InitializeSchedulerForTesting(this.rootContext, this.performanceMetrics, this.loggerFactory);
+            this.scheduler = TestInternalHelper.InitializeSchedulerForTesting(this.rootContext, this.loggerFactory);
         }
         
         public void Dispose()
