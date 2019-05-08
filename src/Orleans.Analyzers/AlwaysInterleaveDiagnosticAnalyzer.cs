@@ -9,7 +9,7 @@ namespace Orleans.Analyzers
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class AlwaysInterleaveDiagnosticAnalyzer : DiagnosticAnalyzer
     {
-        private const string AlwaysInterleaveAttributeName = "global::Orleans.Concurrency.AlwaysInterleaveAttribute";
+        private const string AlwaysInterleaveAttributeName = "Orleans.Concurrency.AlwaysInterleaveAttribute";
 
         public const string DiagnosticId = "ORLEANS0001";
         public const string Title = "[AlwaysInterleave] must only be used on the grain interface method and not the grain class method.";
@@ -30,6 +30,8 @@ namespace Orleans.Analyzers
 
         private static void AnalyzeSyntax(SyntaxNodeAnalysisContext context)
         {
+            var alwaysInterleaveAttribute = context.Compilation.GetTypeByMetadataName(AlwaysInterleaveAttributeName);
+
             var syntax = (MethodDeclarationSyntax)context.Node;
             var symbol = context.SemanticModel.GetDeclaredSymbol(syntax);
 
@@ -41,8 +43,7 @@ namespace Orleans.Analyzers
 
             foreach (var attribute in symbol.GetAttributes())
             {
-                if (!attribute.AttributeClass.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
-                    .Equals(AlwaysInterleaveAttributeName))
+                if (!attribute.AttributeClass.Equals(alwaysInterleaveAttribute))
                 {
                     return;
                 }
