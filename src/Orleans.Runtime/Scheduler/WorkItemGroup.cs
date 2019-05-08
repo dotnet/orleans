@@ -43,7 +43,7 @@ namespace Orleans.Runtime.Scheduler
         private readonly CancellationToken cancellationToken;
         private readonly SchedulerStatisticsGroup schedulerStatistics;
 
-        internal ActivationTaskScheduler TaskRunner { get; private set; }
+        internal ActivationTaskScheduler TaskScheduler { get; private set; }
 
         public DateTime TimeQueued { get; set; }
 
@@ -117,10 +117,7 @@ namespace Orleans.Runtime.Scheduler
         // This is the maximum number of work items to be processed in an activation turn. 
         // If this is set to zero or a negative number, then the full work queue is drained (MaxTimePerTurn allowing).
         private const int MaxWorkItemsPerTurn = 0; // Unlimited
-        // This is a soft time limit on the duration of activation macro-turn (a number of micro-turns). 
-        // If a activation was running its micro-turns longer than this, we will give up the thread.
-        // If this is set to zero or a negative number, then the full work queue is drained (MaxWorkItemsPerTurn allowing).
-        public static TimeSpan ActivationSchedulingQuantum { get; set; }
+
         // This is the maximum number of waiting threads (blocked in WaitForResponse) allowed
         // per ActivationWorker. An attempt to wait when there are already too many threads waiting
         // will result in a TooManyWaitersException being thrown.
@@ -145,7 +142,7 @@ namespace Orleans.Runtime.Scheduler
             totalItemsProcessed = 0;
             totalQueuingDelay = TimeSpan.Zero;
             quantumExpirations = 0;
-            TaskRunner = new ActivationTaskScheduler(this, loggerFactory);
+            TaskScheduler = new ActivationTaskScheduler(this, loggerFactory);
             log = IsSystemPriority ? loggerFactory.CreateLogger($"{this.GetType().Namespace} {Name}.{this.GetType().Name}") : loggerFactory.CreateLogger<WorkItemGroup>();
 
             if (schedulerStatistics.CollectShedulerQueuesStats)
@@ -183,11 +180,11 @@ namespace Orleans.Runtime.Scheduler
 #if DEBUG
             if (log.IsEnabled(LogLevel.Trace))
             {
-                log.LogTrace(
+                this.log.LogTrace(
                     "EnqueueWorkItem {Task} into {SchedulingContext} when TaskScheduler.Current={TaskScheduler}",
                     task,
-                    SchedulingContext,
-                    TaskScheduler.Current);
+                    this.SchedulingContext,
+                    System.Threading.Tasks.TaskScheduler.Current);
             }
 #endif
 
@@ -357,7 +354,7 @@ namespace Orleans.Runtime.Scheduler
 
                     try
                     {
-                        TaskRunner.RunTask(task);
+                        TaskScheduler.RunTask(task);
                     }
                     catch (Exception ex)
                     {
@@ -391,7 +388,7 @@ namespace Orleans.Runtime.Scheduler
                     count++;
                 }
                 while (((MaxWorkItemsPerTurn <= 0) || (count <= MaxWorkItemsPerTurn)) &&
-                    ((ActivationSchedulingQuantum <= TimeSpan.Zero) || (stopwatch.Elapsed < ActivationSchedulingQuantum)));
+                    ((masterScheduler.SchedulingOptions.ActivationSchedulingQuantum <= TimeSpan.Zero) || (stopwatch.Elapsed < masterScheduler.SchedulingOptions.ActivationSchedulingQuantum)));
             }
             catch (Exception ex)
             {
@@ -453,7 +450,7 @@ namespace Orleans.Runtime.Scheduler
                     }
                 }
 
-                sb.AppendFormat("TaskRunner={0}; ", TaskRunner);
+                sb.AppendFormat("TaskRunner={0}; ", TaskScheduler);
                 if (SchedulingContext != null)
                 {
                     sb.AppendFormat("Detailed SchedulingContext=<{0}>", SchedulingContext.DetailedStatus());

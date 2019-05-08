@@ -81,7 +81,7 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("AsynchronyPrimitives")]
         public void Async_Task_Start_ActivationTaskScheduler()
         {
-            ActivationTaskScheduler activationScheduler = this.scheduler.GetWorkItemGroup(this.rootContext).TaskRunner;
+            ActivationTaskScheduler activationScheduler = this.scheduler.GetWorkItemGroup(this.rootContext).TaskScheduler;
 
             int expected = 2;
             bool done = false;
@@ -100,7 +100,7 @@ namespace UnitTests.SchedulerTests
         {
             // This is not a great test because there's a 50/50 shot that it will work even if the scheduling
             // is completely and thoroughly broken and both closures are executed "simultaneously"
-            ActivationTaskScheduler activationScheduler = this.scheduler.GetWorkItemGroup(this.rootContext).TaskRunner;
+            ActivationTaskScheduler activationScheduler = this.scheduler.GetWorkItemGroup(this.rootContext).TaskScheduler;
 
             int n = 0;
             // ReSharper disable AccessToModifiedClosure
@@ -124,7 +124,7 @@ namespace UnitTests.SchedulerTests
         {
             // This is not a great test because there's a 50/50 shot that it will work even if the scheduling
             // is completely and thoroughly broken and both closures are executed "simultaneously"
-            ActivationTaskScheduler activationScheduler = this.scheduler.GetWorkItemGroup(this.rootContext).TaskRunner;
+            ActivationTaskScheduler activationScheduler = this.scheduler.GetWorkItemGroup(this.rootContext).TaskScheduler;
 
             int n = 0;
 
@@ -326,7 +326,7 @@ namespace UnitTests.SchedulerTests
         [Fact]
         public async Task Sched_Task_TaskWorkItem_CurrentScheduler()
         {
-            ActivationTaskScheduler activationScheduler = this.scheduler.GetWorkItemGroup(this.rootContext).TaskRunner;
+            ActivationTaskScheduler activationScheduler = this.scheduler.GetWorkItemGroup(this.rootContext).TaskScheduler;
 
             var result0 = new TaskCompletionSource<bool>();
             var result1 = new TaskCompletionSource<bool>();
@@ -374,7 +374,7 @@ namespace UnitTests.SchedulerTests
         [Fact]
         public async Task Sched_Task_ClosureWorkItem_SpecificScheduler()
         {
-            ActivationTaskScheduler activationScheduler = this.scheduler.GetWorkItemGroup(this.rootContext).TaskRunner;
+            ActivationTaskScheduler activationScheduler = this.scheduler.GetWorkItemGroup(this.rootContext).TaskScheduler;
 
             var result0 = new TaskCompletionSource<bool>();
             var result1 = new TaskCompletionSource<bool>();

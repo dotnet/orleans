@@ -50,7 +50,7 @@ namespace Orleans.Runtime.Scheduler
             this.statisticsOptions = statisticsOptions;
             this.logger = loggerFactory.CreateLogger<OrleansTaskScheduler>();
             cancellationTokenSource = new CancellationTokenSource();
-            WorkItemGroup.ActivationSchedulingQuantum = options.Value.ActivationSchedulingQuantum;
+            this.SchedulingOptions = options.Value;
             applicationTurnsStopped = false;
             TurnWarningLengthThreshold = options.Value.TurnWarningLengthThreshold;
             this.MaxPendingItemsSoftLimit = options.Value.MaxPendingWorkItemsSoftLimit;
@@ -94,6 +94,8 @@ namespace Orleans.Runtime.Scheduler
         public int WorkItemGroupCount => workgroupDirectory.Count;
 
         public TimeSpan StoppedWorkItemGroupWarningInterval { get; }
+
+        public SchedulingOptions SchedulingOptions { get; }
 
         private float AverageRunQueueLengthLevelTwo
         {
@@ -263,7 +265,7 @@ namespace Orleans.Runtime.Scheduler
             }
             else
             {
-                t.Start(workItemGroup.TaskRunner);
+                t.Start(workItemGroup.TaskScheduler);
             }
         }
 

@@ -212,16 +212,42 @@ namespace UnitTests.SchedulerTests
             var scheduler = this.orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context, this.loggerFactory);
             WorkItemGroup workItemGroup = this.orleansTaskScheduler.GetWorkItemGroup(context);
 
-            Task ScheduleTask() => Task.Factory.StartNew(_ => { }, "some state", CancellationToken.None, TaskCreationOptions.DenyChildAttach, workItemGroup.TaskRunner);
+            void CheckScheduler(object state)
+            {
+                Assert.IsType<string>(state);
+                Assert.Equal("some state", state as string);
+                Assert.IsType<ActivationTaskScheduler>(TaskScheduler.Current);
+            }
+
+            Task<Task> ScheduleTask() => Task.Factory.StartNew(
+                state =>
+                {
+                    CheckScheduler(state);
+
+                    return Task.Factory.StartNew(
+                        async s =>
+                        {
+                            CheckScheduler(s);
+                            await Task.Delay(50);
+                            CheckScheduler(s);
+                        },
+                        state).Unwrap();
+                },
+                "some state",
+                CancellationToken.None,
+                TaskCreationOptions.DenyChildAttach,
+                workItemGroup.TaskScheduler);
 
             // Check that the WorkItemGroup is functioning.
-            await ScheduleTask();
+            await await ScheduleTask();
 
             workItemGroup.Stop();
 
             var taskAfterStopped = ScheduleTask();
             var resultTask = await Task.WhenAny(taskAfterStopped, Task.Delay(TimeSpan.FromSeconds(10)));
             Assert.Same(taskAfterStopped, resultTask);
+
+            await await taskAfterStopped;
 
             // Wait for the WorkItemGroup to upgrade the warning to an error and try again.
             // This delay is based upon SchedulingOptions.StoppedActivationWarningInterval.
@@ -230,6 +256,8 @@ namespace UnitTests.SchedulerTests
             taskAfterStopped = ScheduleTask();
             resultTask = await Task.WhenAny(taskAfterStopped, Task.Delay(TimeSpan.FromSeconds(10)));
             Assert.Same(taskAfterStopped, resultTask);
+
+            await await taskAfterStopped;
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
@@ -242,7 +270,7 @@ namespace UnitTests.SchedulerTests
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
             OrleansTaskScheduler masterScheduler = this.orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context, this.loggerFactory);
             WorkItemGroup workItemGroup = this.orleansTaskScheduler.GetWorkItemGroup(context);
-            ActivationTaskScheduler activationScheduler = workItemGroup.TaskRunner;
+            ActivationTaskScheduler activationScheduler = workItemGroup.TaskScheduler;
 
             this.mainDone = false;
             this.stageNum1 = this.stageNum2 = 0;
@@ -378,7 +406,7 @@ namespace UnitTests.SchedulerTests
         {
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
             OrleansTaskScheduler orleansTaskScheduler = orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context, this.loggerFactory);
-            ActivationTaskScheduler activationScheduler = orleansTaskScheduler.GetWorkItemGroup(context).TaskRunner;
+            ActivationTaskScheduler activationScheduler = orleansTaskScheduler.GetWorkItemGroup(context).TaskScheduler;
 
             // RuntimeContext.InitializeThread(masterScheduler);
 
@@ -593,7 +621,7 @@ namespace UnitTests.SchedulerTests
         {
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
             this.orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context, this.loggerFactory);
-            ActivationTaskScheduler scheduler = this.orleansTaskScheduler.GetWorkItemGroup(context).TaskRunner;
+            ActivationTaskScheduler scheduler = this.orleansTaskScheduler.GetWorkItemGroup(context).TaskScheduler;
 
             var result = new TaskCompletionSource<bool>();
             Task endOfChain = null;
