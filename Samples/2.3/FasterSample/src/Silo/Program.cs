@@ -12,6 +12,7 @@ using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Serialization.ProtobufNet;
+using Serilog;
 
 namespace Silo
 {
@@ -29,7 +30,9 @@ namespace Silo
                 })
                 .ConfigureLogging(_ =>
                 {
-                    _.AddConsole();
+                    _.AddSerilog(new LoggerConfiguration()
+                        .WriteTo.Console()
+                        .CreateLogger());
                 })
                 .ConfigureServices(_ =>
                 {
@@ -47,6 +50,10 @@ namespace Silo
                     {
                         x.SerializationProviders.Add(typeof(ProtobufNetSerializer));
                     });
+                    _.Configure<SiloMessagingOptions>(options =>
+                    {
+                        options.ResponseTimeout = TimeSpan.FromMinutes(10);
+                    });
                 })
                 .UseConsoleLifetime()
                 .Build();
@@ -54,14 +61,16 @@ namespace Silo
             await host.StartAsync();
 
             // test helpers
-            var count = 100;
+            int count = 10;
             var grain = host.Services.GetService<IGrainFactory>().GetGrain<ILookupGrain>("SomeShardingKey");
             var logger = host.Services.GetService<ILogger<Program>>();
 
             await grain.StartAsync();
 
             // attempt a number of individual inserts
+            /*
             Watch.Restart();
+            count = 10;
             for (var i = 0; i < count; ++i)
             {
                 await grain.SetAsync(new LookupItem(i, i, DateTime.UtcNow));
@@ -69,19 +78,26 @@ namespace Silo
             Watch.Stop();
             logger.LogInformation("Added {@Count} individual items in {@ElapsedMs}ms",
                 count, Watch.ElapsedMilliseconds);
+            */
 
             // perform a single batch of inserts
             Watch.Restart();
+            count = 1000000;
+
+            logger.LogInformation("Creating {@Count} items...", count);
             var builder = ImmutableList.CreateBuilder<LookupItem>();
             for (var i = 0; i < count; ++i)
             {
                 builder.Add(new LookupItem(i, i, DateTime.UtcNow));
             }
-            await grain.SetAsync(builder.ToImmutable());
-            Watch.Stop();
+            var items = builder.ToImmutable();
+            logger.LogInformation("Created {@Count} items in {@ElapsedMs}ms", count, Watch.ElapsedMilliseconds);
+
+            Watch.Restart();
+            logger.LogInformation("Adding {@Count} items as a batch...", count);
+            await grain.SetAsync(items);
             logger.LogInformation("Added {@Count} items as a batch in {@ElapsedMs}ms",
                 count, Watch.ElapsedMilliseconds);
-
 
 
             await host.WaitForShutdownAsync();

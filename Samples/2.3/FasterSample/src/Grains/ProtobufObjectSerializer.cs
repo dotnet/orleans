@@ -18,9 +18,7 @@ namespace Grains
         {
         }
 
-        public void EndSerialize()
-        {
-        }
+        public void EndSerialize() => stream.Flush();
 
         public void Serialize(ref T obj) => Serializer.Serialize(stream, obj);
     }
