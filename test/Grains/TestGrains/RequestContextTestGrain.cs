@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
@@ -45,12 +46,11 @@ namespace UnitTests.Grains
 
     public class RequestContextTaskGrain : Grain, IRequestContextTaskGrain
     {
-        private Logger logger;
+        private ILogger logger;
 
-        public override Task OnActivateAsync()
+        public RequestContextTaskGrain(ILoggerFactory loggerFactory)
         {
-            logger = this.GetLogger();
-            return Task.CompletedTask;
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
         public Task<string> TraceIdEcho()

@@ -155,12 +155,13 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "ErrorInjector")]
     public class PersistenceUserHandledErrorGrain : Grain<PersistenceTestGrainState>, IPersistenceUserHandledErrorGrain
     {
-        private SerializationManager serializationManager;
+        private readonly SerializationManager serializationManager;
+        private readonly ILogger logger;
 
-        public override Task OnActivateAsync()
+        public PersistenceUserHandledErrorGrain(ILoggerFactory loggerFactory, SerializationManager serializationManager)
         {
-            this.serializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
-            return Task.CompletedTask;
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            this.serializationManager = serializationManager;
         }
 
         public Task<int> GetValue()
@@ -180,7 +181,7 @@ namespace UnitTests.Grains
             {
                 if (!recover) throw;
 
-                this.GetLogger().Warn(0, "Grain is handling error in DoWrite - Resetting value to " + original, exc);
+                this.logger.Warn(0, "Grain is handling error in DoWrite - Resetting value to " + original, exc);
                 State = (PersistenceTestGrainState)original;
             }
         }
@@ -196,7 +197,7 @@ namespace UnitTests.Grains
             {
                 if (!recover) throw;
 
-                this.GetLogger().Warn(0, "Grain is handling error in DoRead - Resetting value to " + original, exc);
+                this.logger.Warn(0, "Grain is handling error in DoRead - Resetting value to " + original, exc);
                 State = (PersistenceTestGrainState)original;
             }
             return State.Field1;
@@ -258,15 +259,22 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "MissingProvider")]
     public class BadProviderTestGrain : Grain<PersistenceTestGrainState>, IBadProviderTestGrain
     {
+        private readonly ILogger logger;
+
+        public BadProviderTestGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
+
         public override Task OnActivateAsync()
         {
-            this.GetLogger().Warn(1, "OnActivateAsync");
+            this.logger.Warn(1, "OnActivateAsync");
             return Task.CompletedTask;
         }
 
         public Task DoSomething()
         {
-            this.GetLogger().Warn(1, "DoSomething");
+            this.logger.Warn(1, "DoSomething");
             throw new ApplicationException(
                 "BadProviderTestGrain.DoSomething should never get called when provider is missing");
         }
@@ -275,15 +283,22 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "test1")]
     public class PersistenceNoStateTestGrain : Grain, IPersistenceNoStateTestGrain
     {
+        private readonly ILogger logger;
+
+        public PersistenceNoStateTestGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
+
         public override Task OnActivateAsync()
         {
-            this.GetLogger().Info(1, "OnActivateAsync");
+            this.logger.Info(1, "OnActivateAsync");
             return Task.CompletedTask;
         }
 
         public Task DoSomething()
         {
-            this.GetLogger().Info(1, "DoSomething");
+            this.logger.Info(1, "DoSomething");
             return Task.CompletedTask;
         }
     }
@@ -660,15 +675,19 @@ namespace UnitTests.Grains
         private IReentrentGrainWithState _other;
         private ISchedulingContext _context;
         private TaskScheduler _scheduler;
-        private Logger logger;
+        private ILogger logger;
         private bool executing;
         private Task outstandingWriteStateOperation;
+
+        public ReentrentGrainWithState(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override Task OnActivateAsync()
         {
             _context = RuntimeContext.Current.ActivationContext;
             _scheduler = TaskScheduler.Current;
-            logger = this.GetLogger("ReentrentGrainWithState-" + Identity);
             executing = false;
             return base.OnActivateAsync();
         }
@@ -1009,12 +1028,11 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
     internal class InternalGrainWithState : Grain<InternalGrainStateData>, IInternalGrainWithState
     {
-        private Logger logger;
+        private ILogger logger;
 
-        public override Task OnActivateAsync()
+        public InternalGrainWithState(ILoggerFactory loggerFactory)
         {
-            logger = this.GetLogger("InternalGrainWithState-" + Identity);
-            return base.OnActivateAsync();
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
         public Task SetOne(int val)
@@ -1041,11 +1059,15 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
     public class StateInheritanceTestGrain : Grain<StateInheritanceTestGrainData>, IStateInheritanceTestGrain
     {
-        private Logger logger;
+        private ILogger logger;
+
+        public StateInheritanceTestGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger("StateInheritanceTestGrain-" + Identity);
             logger.Info("OnActivateAsync");
             return base.OnActivateAsync();
         }
@@ -1074,14 +1096,13 @@ namespace UnitTests.Grains
 
         private readonly int _instanceFilterValue2 = _staticFilterValue2;
 
-        private Logger logger;
-        private SerializationManager serializationManager;
+        private readonly ILogger logger;
+        private readonly SerializationManager serializationManager;
 
-        public override Task OnActivateAsync()
+        public SerializationTestGrain(ILoggerFactory loggerFactory, SerializationManager serializationManager)
         {
-            this.serializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
-            logger = this.GetLogger("SerializationTestGrain-" + IdentityString);
-            return base.OnActivateAsync();
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            this.serializationManager = serializationManager;
         }
 
         public Task Test_Serialize_Func()
@@ -1151,7 +1172,7 @@ namespace UnitTests.Grains
             foreach (
                 var val in new[] {_staticFilterValue1, _staticFilterValue2, _staticFilterValue3, _staticFilterValue4})
             {
-                logger.Verbose("{0} -- Compare value={1}", what, val);
+                logger.LogDebug("{0} -- Compare value={1}", what, val);
                 Assert.Equal(func1(val), func2(val));
             }
         }
@@ -1164,7 +1185,7 @@ namespace UnitTests.Grains
             foreach (
                 var val in new[] {_staticFilterValue1, _staticFilterValue2, _staticFilterValue3, _staticFilterValue4})
             {
-                logger.Verbose("{0} -- Compare value={1}", what, val);
+                logger.LogDebug("{0} -- Compare value={1}", what, val);
                 Assert.Equal(pred1(val), pred2(val));
             }
         }

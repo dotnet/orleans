@@ -44,7 +44,6 @@ namespace UnitTests.MembershipTests
         protected IOptions<ClusterOptions> clusterOptions;
         protected const string testDatabaseName = "OrleansMembershipTest";//for relational storage
         protected readonly IOptions<GatewayOptions> gatewayOptions;
-        protected readonly ClientConfiguration clientConfiguration;
 
         protected MembershipTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment, LoggerFilterOptions filters)
         {
@@ -63,13 +62,6 @@ namespace UnitTests.MembershipTests
 
             membershipTable = CreateMembershipTable(logger);
             membershipTable.InitializeMembershipTable(true).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
-
-            clientConfiguration = new ClientConfiguration
-            {
-                ClusterId = this.clusterId,
-                AdoInvariant = adoVariant,
-                DataConnectionString = fixture.ConnectionString
-            };
 
             this.gatewayOptions = Options.Create(new GatewayOptions());
             gatewayListProvider = CreateGatewayListProvider(logger);

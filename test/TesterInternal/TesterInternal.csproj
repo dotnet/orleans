@@ -6,10 +6,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="CounterControlProgTests.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Reference Include="System.Runtime.Serialization" />
     <Reference Include="System.ServiceModel" />
     <Reference Include="System.Web.Extensions" />
@@ -23,7 +19,6 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\Orleans.TestingHost.AppDomain\Orleans.TestingHost.AppDomain.csproj" />
-    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\Orleans.TestingHost.Legacy\Orleans.TestingHost.Legacy.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Tester\Tester.csproj" />
   </ItemGroup>
 

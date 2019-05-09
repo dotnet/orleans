@@ -2,9 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Logging;
@@ -38,11 +40,15 @@ namespace Tester.AzureUtils.Streaming
             // Define a cluster of 4, but 2 will be stopped.
             builder.CreateSiloAsync = AppDomainSiloHandle.Create;
             builder.Options.InitialSilosCount = 2;
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                legacy.ClientConfiguration.Gateways = legacy.ClientConfiguration.Gateways.Take(1).ToList();
-            });
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+        }
+
+        private class ClientConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder.Configure<StaticGatewayListProviderOptions>(options => options.Gateways = options.Gateways.Take(1).ToList());
+            }
         }
 
         private class MySiloBuilderConfigurator : ISiloBuilderConfigurator

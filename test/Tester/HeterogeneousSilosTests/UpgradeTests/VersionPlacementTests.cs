@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
@@ -11,8 +12,8 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
     {
         protected override short SiloCount => 3;
 
-        protected override VersionSelectorStrategy VersionSelectorStrategy => AllCompatibleVersions.Singleton;
-        protected override CompatibilityStrategy CompatibilityStrategy => AllVersionsCompatible.Singleton;
+        protected override Type VersionSelectorStrategy => typeof(AllCompatibleVersions);
+        protected override Type CompatibilityStrategy => typeof(AllVersionsCompatible);
 
         [Fact]
         public async Task ActivateDominantVersion()

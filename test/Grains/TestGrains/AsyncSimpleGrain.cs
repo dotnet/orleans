@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using UnitTests.GrainInterfaces;
 
@@ -10,6 +11,10 @@ namespace UnitTests.Grains
     public class AsyncSimpleGrain : SimpleGrain, ISimpleGrainWithAsyncMethods
     {
         TaskCompletionSource<int> resolver;
+
+        public AsyncSimpleGrain(ILoggerFactory loggerFactory) : base(loggerFactory)
+        {
+        }
 
         public async Task<int> GetAxB_Async()
         {

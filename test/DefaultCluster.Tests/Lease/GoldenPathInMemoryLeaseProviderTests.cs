@@ -17,10 +17,6 @@ namespace DefaultCluster.Tests
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.ConfigureLegacyConfiguration();
-            }
         }
     }
 }

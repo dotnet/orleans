@@ -1,4 +1,4 @@
-﻿using AWSUtils.Tests.StorageTests;
+using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans;
@@ -37,20 +37,20 @@ namespace AWSUtils.Tests.MembershipTests
             if (!AWSTestConstants.IsDynamoDbAvailable)
                 throw new SkipException("Unable to connect to AWS DynamoDB simulator");
             var options = new DynamoDBClusteringOptions();
-            LegacyDynamoDBMembershipConfigurator.ParseDataConnectionString(this.connectionString, options);
+            DynamoDBMembershipHelper.ParseDataConnectionString(this.connectionString, options);
             return new DynamoDBMembershipTable(this.loggerFactory, Options.Create(options), this.clusterOptions);
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
             var options = new DynamoDBGatewayOptions();
-            LegacyDynamoDBGatewayListProviderConfigurator.ParseDataConnectionString(this.connectionString, options);
+            DynamoDBGatewayListProviderHelper.ParseDataConnectionString(this.connectionString, options);
             return new DynamoDBGatewayListProvider(this.loggerFactory, Options.Create(options), this.clusterOptions, this.gatewayOptions);
         }
 
         protected override Task<string> GetConnectionString()
         {
-            return Task.FromResult(AWSTestConstants.IsDynamoDbAvailable ? "Service=http://localhost:8000;" : null);
+            return Task.FromResult(AWSTestConstants.IsDynamoDbAvailable ? "http://localhost:8000" : null);
         }
 
         [SkippableFact, TestCategory("Functional")]

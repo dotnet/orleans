@@ -1,4 +1,4 @@
-﻿//*********************************************************
+//*********************************************************
 //    Copyright (c) Microsoft. All rights reserved.
 //    
 //    Apache 2.0 License
@@ -41,27 +41,18 @@ namespace Samples.StorageProviders
     /// </remarks>
     public class OrleansFileStorage : BaseJSONStorageProvider
     {
+        public OrleansFileStorage(string rootDirectory)
+        {
+            this.RootDirectory = rootDirectory;
+            if (string.IsNullOrWhiteSpace(RootDirectory)) throw new ArgumentException("RootDirectory property not set");
+            DataManager = new GrainStateFileDataManager(RootDirectory);
+        }
+
         /// <summary>
         /// The directory path, relative to the host of the silo. Set from
         /// configuration data during initialization.
         /// </summary>
         public string RootDirectory { get; set; }
-
-        /// <summary>
-        /// Initializes the provider during silo startup.
-        /// </summary>
-        /// <param name="name">The name of this provider instance.</param>
-        /// <param name="providerRuntime">A Orleans runtime object managing all storage providers.</param>
-        /// <param name="config">Configuration info for this provider instance.</param>
-        /// <returns>Completion promise for this operation.</returns>
-        public override Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
-        {
-            this.Name = name;
-            this.RootDirectory = config.Properties["RootDirectory"];
-            if (string.IsNullOrWhiteSpace(RootDirectory)) throw new ArgumentException("RootDirectory property not set");
-            DataManager = new GrainStateFileDataManager(RootDirectory);
-            return base.Init(name, providerRuntime, config);
-        }
     }
 
     /// <summary>

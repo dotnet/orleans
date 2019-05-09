@@ -70,30 +70,6 @@
     <Content Include="DevTestServerConfiguration.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Serialization\ConfigurationTests\ClientConfigurationForSerializer.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Serialization\ConfigurationTests\ClientConfigurationForSerializer2.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Serialization\ConfigurationTests\ClientConfigurationForSerializer3.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Serialization\ConfigurationTests\ClientConfigurationForSerializer4.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Serialization\ConfigurationTests\ClientConfigurationForSerializer5.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Serialization\ConfigurationTests\ClientConfigurationForSerializer6.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Serialization\ConfigurationTests\ClientConfigurationForSerializer7.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Serialization\ConfigurationTests\ClientConfigurationForSerializer8.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <Content Include="$(SourceRoot)src\SDK\OrleansConfiguration.xml">
       <Link>OrleansConfiguration.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

@@ -1,25 +1,30 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 
-
 namespace UnitTests.Grains
 {
+
     public class SimpleObserverableGrain : Grain, ISimpleObserverableGrain
     {
-        private Logger logger;
+        private ILogger logger;
         internal int A { get; set; }
         internal int B { get; set; }
         internal int EventDelay { get; set; }
-        internal ObserverSubscriptionManager<ISimpleGrainObserver> Observers { get; set; }
+        internal ObserverManager<ISimpleGrainObserver> Observers { get; set; }
+
+        public SimpleObserverableGrain(ILoggerFactory loggerFactory)
+        {
+            EventDelay = 1000;
+            logger = loggerFactory.CreateLogger(string.Format("{0}-{1}-{2}", typeof(SimpleObserverableGrain).Name, base.IdentityString, base.RuntimeIdentity));
+            this.Observers = new ObserverManager<ISimpleGrainObserver>(TimeSpan.FromMinutes(5), logger, "observers");
+        }
 
         public override Task OnActivateAsync()
         {
-            EventDelay = 1000;
-            Observers = new ObserverSubscriptionManager<ISimpleGrainObserver>();
-            logger = this.GetLogger(String.Format("{0}-{1}-{2}", typeof(SimpleObserverableGrain).Name, base.IdentityString, base.RuntimeIdentity));
             logger.Info("Activate.");
             return Task.CompletedTask;
         }
@@ -79,7 +84,7 @@ namespace UnitTests.Grains
 
         public Task Subscribe(ISimpleGrainObserver observer)
         {
-            Observers.Subscribe(observer);
+            Observers.Subscribe(observer, observer);
             return Task.CompletedTask;
         }
 

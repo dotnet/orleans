@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;
 using Orleans.Clustering.DynamoDB;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
@@ -61,13 +62,6 @@ namespace AWSUtils.Tests.Liveness
                 throw new SkipException("Unable to connect to DynamoDB simulator");
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
             builder.AddClientBuilderConfigurator<ClientBuilderConfigurator>();
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                legacy.ClusterConfiguration.Globals.DataConnectionString = $"Service={Service}";
-                legacy.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
-                legacy.ClusterConfiguration.PrimaryNode = null;
-                legacy.ClusterConfiguration.Globals.SeedNodes.Clear();
-            });
         }
 
         public class SiloBuilderConfigurator : ISiloBuilderConfigurator
@@ -82,10 +76,10 @@ namespace AWSUtils.Tests.Liveness
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
-                clientBuilder.UseDynamoDBClustering(gatewayOptions =>
+                clientBuilder.UseDynamoDBClustering(ob => ob.Configure(gatewayOptions => 
                 {
-                    LegacyDynamoDBGatewayListProviderConfigurator.ParseDataConnectionString($"Service={Service}", gatewayOptions);
-                });
+                    gatewayOptions.Service = $"Service={Service}";
+                }));
             }
         }
 

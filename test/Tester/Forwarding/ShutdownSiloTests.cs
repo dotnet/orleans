@@ -7,10 +7,11 @@ using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Orleans.TestingHost.Utils;
 using Orleans.Hosting;
 using Orleans.Configuration;
 using System.Diagnostics;
+using Orleans.Runtime;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Tester.Forwarding
 {
@@ -23,10 +24,18 @@ namespace Tester.Forwarding
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
-                hostBuilder.Configure<GrainCollectionOptions>(options =>
-                {
-                    options.DeactivationTimeout = DeactivationTimeout;
-                }).UseAzureStorageClustering(options => options.ConnectionString = TestDefaultConfiguration.DataConnectionString);
+                hostBuilder
+                    .Configure<GrainCollectionOptions>(options =>
+                    {
+                        options.DeactivationTimeout = DeactivationTimeout;
+                    })
+                    .UseAzureStorageClustering(options => options.ConnectionString = TestDefaultConfiguration.DataConnectionString)
+                    .ConfigureServices(services => services.AddSingleton<PlacementStrategy, ActivationCountBasedPlacement>())
+                    .Configure<ClusterMembershipOptions>(options =>
+                    {
+                        options.NumMissedProbesLimit = 1;
+                        options.NumVotesForDeathDeclaration = 1;
+                    });
             }
         }
 
@@ -35,16 +44,11 @@ namespace Tester.Forwarding
             base.CheckPreconditionsOrThrow();
             TestUtils.CheckForAzureStorage();
         }
+
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             builder.Options.InitialSilosCount = NumberOfSilos;
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                legacy.ClusterConfiguration.Globals.DefaultPlacementStrategy = "ActivationCountBasedPlacement";
-                legacy.ClusterConfiguration.Globals.NumMissedProbesLimit = 1;
-                legacy.ClusterConfiguration.Globals.NumVotesForDeathDeclaration = 1;
-            });
         }
 
         public ShutdownSiloTests()

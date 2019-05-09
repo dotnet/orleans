@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.Options;
+using System;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
 
@@ -9,10 +11,10 @@ namespace Orleans.Configuration
         private readonly DevelopmentClusterMembershipOptions options;
         private readonly IMembershipTable membershipTable;
 
-        public DevelopmentClusterMembershipOptionsValidator(IOptions<DevelopmentClusterMembershipOptions> options, IMembershipTable membershipTable)
+        public DevelopmentClusterMembershipOptionsValidator(IOptions<DevelopmentClusterMembershipOptions> options, IServiceProvider serviceProvider)
         {
             this.options = options.Value;
-            this.membershipTable = membershipTable;
+            this.membershipTable = serviceProvider.GetService<IMembershipTable>();
         }
 
         public void ValidateConfiguration()

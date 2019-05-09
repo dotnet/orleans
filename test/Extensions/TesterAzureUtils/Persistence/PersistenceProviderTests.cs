@@ -46,9 +46,7 @@ namespace Tester.AzureUtils.Persistence
         {
             const string testName = nameof(PersistenceProvider_Mock_WriteRead);
 
-            IStorageProvider store = new MockStorageProvider();
-            var cfg = new ProviderConfiguration(this.providerCfgProps);
-            await store.Init(testName, this.providerRuntime, cfg);
+            var store = ActivatorUtilities.CreateInstance<MockStorageProvider>(fixture.Services, testName);
 
             await Test_PersistenceProvider_WriteRead(testName, store);
         }
@@ -58,11 +56,7 @@ namespace Tester.AzureUtils.Persistence
         {
             const string testName = nameof(PersistenceProvider_FileStore_WriteRead);
 
-            IStorageProvider store = new OrleansFileStorage();
-            this.providerCfgProps.Add("RootDirectory", "Data");
-            var cfg = new ProviderConfiguration(this.providerCfgProps);
-            await store.Init(testName, this.providerRuntime, cfg);
-
+            var store = new OrleansFileStorage("Data");
             await Test_PersistenceProvider_WriteRead(testName, store);
         }
 
@@ -285,7 +279,7 @@ namespace Tester.AzureUtils.Persistence
             string className = typeof(MockStorageProvider).FullName;
             Type classType = new CachedTypeResolver().ResolveType(className);
             Assert.NotNull(classType); // Type
-            Assert.True(typeof(IStorageProvider).IsAssignableFrom(classType), $"Is an IStorageProvider : {classType.FullName}");
+            Assert.True(typeof(IGrainStorage).IsAssignableFrom(classType), $"Is an IStorageProvider : {classType.FullName}");
         }
 
         private async Task<AzureTableGrainStorage> InitAzureTableGrainStorage(AzureTableStorageOptions options)

@@ -1,4 +1,5 @@
-﻿using Orleans;
+using Microsoft.Extensions.Logging;
+using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
 using System;
@@ -17,11 +18,16 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
         private IAsyncStream<T> producer;
         protected int numProducedItems;
         private IDisposable producerTimer;
-        internal Logger logger;
+        internal ILogger logger;
         private static readonly TimeSpan defaultFirePeriod = TimeSpan.FromMilliseconds(10);
+
+        public TypedProducerGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
+
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger(this.GetType() + base.IdentityString);
             logger.Info("OnActivateAsync");
             numProducedItems = 0;
             return Task.CompletedTask;
@@ -93,6 +99,10 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
     }
     public class TypedProducerGrainProducingInt : TypedProducerGrain<int>, ITypedProducerGrainProducingInt
     {
+        public TypedProducerGrainProducingInt(ILoggerFactory loggerFactory) : base(loggerFactory)
+        {
+        }
+
         protected override Task ProducerOnNextAsync(IAsyncStream<int> theProducer)
         {
             return theProducer.OnNextAsync(this.numProducedItems);
@@ -101,6 +111,10 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
 
     public class TypedProducerGrainProducingApple : TypedProducerGrain<Apple>, ITypedProducerGrainProducingApple
     {
+        public TypedProducerGrainProducingApple(ILoggerFactory loggerFactory) : base(loggerFactory)
+        {
+        }
+
         protected override Task ProducerOnNextAsync(IAsyncStream<Apple> theProducer)
         {
             return theProducer.OnNextAsync(new Apple(this.numProducedItems));

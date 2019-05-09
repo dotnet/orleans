@@ -1,4 +1,6 @@
-﻿using System.Reflection;
+using System.Reflection;
+using Orleans;
+using Orleans.Configuration;
 using Orleans.Runtime.Configuration;
 using Tester.Serialization;
 using TestExtensions;
@@ -13,14 +15,9 @@ namespace UnitTests.Serialization
 
         public ExternalSerializerTest()
         {
-            var config = new ClientConfiguration
-            {
-                SerializationProviders =
-                {
-                    typeof(FakeSerializer)
-                }
-            };
-            this.environment = SerializationTestEnvironment.InitializeWithDefaults(config);
+            this.environment = SerializationTestEnvironment.InitializeWithDefaults(
+                builder => builder.Configure<SerializationProviderOptions>(
+                    options => options.SerializationProviders.Add(typeof(FakeSerializer))));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional")]

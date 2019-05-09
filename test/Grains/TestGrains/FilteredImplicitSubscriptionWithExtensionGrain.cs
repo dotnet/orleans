@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -10,10 +11,15 @@ namespace UnitTests.Grains
     public class FilteredImplicitSubscriptionWithExtensionGrain : Grain, IFilteredImplicitSubscriptionWithExtensionGrain
     {
         private int counter;
+        private readonly ILogger logger;
+
+        public FilteredImplicitSubscriptionWithExtensionGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{nameof(FilteredImplicitSubscriptionWithExtensionGrain)} {IdentityString}");
+        }
 
         public override async Task OnActivateAsync()
         {
-            var logger = this.GetLogger($"{nameof(FilteredImplicitSubscriptionWithExtensionGrain)} {IdentityString}");
             logger.Info("OnActivateAsync");
             var streamProvider = GetStreamProvider("SMSProvider");
 

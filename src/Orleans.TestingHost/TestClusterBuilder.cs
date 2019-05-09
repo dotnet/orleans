@@ -7,7 +7,9 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
+using Orleans.Runtime;
 using Orleans.Runtime.TestHooks;
 using Orleans.TestingHost.Utils;
 
@@ -46,10 +48,14 @@ namespace Orleans.TestingHost
 
             this.AddClientBuilderConfigurator<AddTestHooksApplicationParts>();
             this.AddSiloBuilderConfigurator<AddTestHooksApplicationParts>();
+            this.AddSiloBuilderConfigurator<ConfigureStaticClusterDeploymentOptions>();
             this.ConfigureBuilder(ConfigureDefaultPorts);
         }
-        
-        public Dictionary<string, object> Properties { get; } = new Dictionary<string, object>();
+
+        /// <summary>
+        /// Configuration values which will be provided to the silos and clients created by this builder.
+        /// </summary>
+        public Dictionary<string, string> Properties { get; } = new Dictionary<string, string>();
 
         public TestClusterOptions Options { get; }
 
@@ -96,6 +102,7 @@ namespace Orleans.TestingHost
                 action();
             }
 
+            configBuilder.AddInMemoryCollection(this.Properties);
             configBuilder.AddInMemoryCollection(this.Options.ToDictionary());
             foreach (var buildAction in this.configureHostConfigActions)
             {
@@ -172,6 +179,24 @@ namespace Orleans.TestingHost
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder.ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(ITestHooksSystemTarget).Assembly));
+            }
+        }
+
+        internal class ConfigureStaticClusterDeploymentOptions : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder.ConfigureServices((context, services) =>
+                {
+                    var initialSilos = int.Parse(context.Configuration[nameof(TestClusterOptions.InitialSilosCount)]);
+                    var siloNames = Enumerable.Range(0, initialSilos).Select(GetSiloName).ToList();
+                    services.Configure<StaticClusterDeploymentOptions>(options => options.SiloNames = siloNames);
+                });
+            }
+
+            private static string GetSiloName(int instanceNumber)
+            {
+                return instanceNumber == 0 ? Silo.PrimarySiloName : $"Secondary_{instanceNumber}";
             }
         }
     }

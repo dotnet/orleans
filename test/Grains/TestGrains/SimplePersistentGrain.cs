@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
@@ -19,12 +20,16 @@ namespace UnitTests.Grains
     /// </summary>
     public class SimplePersistentGrain : Grain<SimplePersistentGrain_State>, ISimplePersistentGrain
     {
-        private Logger logger;
+        private ILogger logger;
         private Guid version;
+        
+        public SimplePersistentGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger(String.Format("{0}-{1}-{2}", typeof(SimplePersistentGrain).Name, base.IdentityString, base.RuntimeIdentity));
             logger.Info("Activate.");
             version = Guid.NewGuid();
             return base.OnActivateAsync();

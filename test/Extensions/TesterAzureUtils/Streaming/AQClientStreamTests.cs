@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using FluentAssertions.Common;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans;
@@ -28,7 +29,6 @@ namespace Tester.AzureUtils.Streaming
 
         private readonly ITestOutputHelper output;
         private readonly ClientStreamTestRunner runner;
-        private static string serviceId = Guid.NewGuid().ToString();
 
         public AQClientStreamTests(ITestOutputHelper output)
         {
@@ -39,10 +39,6 @@ namespace Tester.AzureUtils.Streaming
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             TestUtils.CheckForAzureStorage();
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                legacy.ClusterConfiguration.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
-            });
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
         }
@@ -52,12 +48,12 @@ namespace Tester.AzureUtils.Streaming
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .Configure<ClusterOptions>(op => op.ServiceId = serviceId)
                     .AddAzureQueueStreams(AQStreamProviderName, ob=>ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        }));
+                        }))
+                    .Configure<SiloMessagingOptions>(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5));
             }
         }
 
@@ -66,7 +62,6 @@ namespace Tester.AzureUtils.Streaming
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
-                    .Configure<ClusterOptions>(op => op.ServiceId = serviceId)
                     .AddAzureQueueStreams(AQStreamProviderName, ob=>ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>
                         {
@@ -81,6 +76,7 @@ namespace Tester.AzureUtils.Streaming
             base.Dispose();
             if (this.HostedCluster != null)
             {
+                var serviceId = this.HostedCluster.Client.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId;
                 AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, AzureQueueStreamProviderUtils.GenerateDefaultAzureQueueNames(serviceId, AQStreamProviderName),
                     TestDefaultConfiguration.DataConnectionString).Wait();
                 TestAzureTableStorageStreamFailureHandler.DeleteAll().Wait();

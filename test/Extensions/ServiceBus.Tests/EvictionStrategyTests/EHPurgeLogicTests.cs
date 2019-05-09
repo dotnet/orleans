@@ -247,12 +247,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             eventData.SetEnqueuedTimeUtc(now);
             return eventData;
         }
-
-        private NodeConfiguration GetNodeConfiguration()
-        {
-            return new NodeConfiguration();
-        }
-
+        
         private Task<IStreamQueueCheckpointer<string>> CheckPointerFactory(string partition)
         {
             return Task.FromResult<IStreamQueueCheckpointer<string>>(NoOpCheckpointer.Instance);

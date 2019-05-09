@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans;
 using Orleans.Concurrency;
+using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -75,7 +76,9 @@ namespace UnitTests.Serialization
                     switch (serializerToUse)
                     {
                         case SerializerToUse.IlBasedFallbackSerializer:
+#pragma warning disable CS0618 // Type or member is obsolete
                             fallback = typeof(ILBasedSerializer);
+#pragma warning restore CS0618 // Type or member is obsolete
                             break;
                         case SerializerToUse.BinaryFormatterFallbackSerializer:
                             fallback = typeof(BinaryFormatterSerializer);
@@ -87,12 +90,9 @@ namespace UnitTests.Serialization
                             throw new InvalidOperationException("Invalid Serializer was selected");
                     }
 
-                    var config = new ClientConfiguration
-                    {
-                        FallbackSerializationProvider = fallback
-                    };
-
-                    return SerializationTestEnvironment.InitializeWithDefaults(config);
+                    return SerializationTestEnvironment.InitializeWithDefaults(
+                        builder => builder.Configure<SerializationProviderOptions>(
+                            options => options.FallbackSerializationProvider = fallback));
                 });
         }
 
@@ -599,7 +599,6 @@ namespace UnitTests.Serialization
         {
             // Create an environment which has no keyed serializer. This will cause some exception types to be unserializable.
             var environment = SerializationTestEnvironment.InitializeWithDefaults(
-                null,
                 builder => builder.ConfigureServices(
                     services => services.RemoveAll(typeof(IKeyedSerializer))));
             const string message = "This is a test message";
@@ -811,7 +810,7 @@ namespace UnitTests.Serialization
         public void Serialize_GrainBase_ViaStandardSerializer(SerializerToUse serializerToUse)
         {
             var environment = InitializeSerializer(serializerToUse);
-            Grain input = new EchoTaskGrain(null);
+            Grain input = new EchoTaskGrain(null, null);
 
             // Expected exception:
             // System.Runtime.Serialization.SerializationException: Type 'Echo.Grains.EchoTaskGrain' in Assembly 'UnitTestGrains, Version=1.0.0.0, Culture=neutral, PublicKeyToken=070f47935e3ed133' is not marked as serializable.

@@ -39,38 +39,6 @@ namespace UnitTests.MessageCenterTests
             Test_GatewaySelection(listProvider);
         }
 
-        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Gateway")]
-        public void GatewaySelection_ClientInit_EmptyList()
-        {
-            var cfg = new ClientConfiguration();
-            cfg.Gateways = null;
-            bool failed = false;
-            IDisposable client = null;
-            try
-            {
-                new ClientBuilder().UseConfiguration(cfg).Build();
-            }
-            catch (Exception exc)
-            {
-                output.WriteLine(exc.ToString());
-                failed = true;
-            }
-            finally
-            {
-                client?.Dispose();
-            }
-            Assert.True(failed, "GatewaySelection_EmptyList failed as GatewayManager did not throw on empty Gateway list.");
-
-            // Note: This part of the test case requires a silo local to be running in order to work successfully.
-
-            //var listProvider = new TestListProvider(gatewayAddressUris);
-            //cfg.Gateways = listProvider.GetGateways().Select(uri =>
-            //{
-            //    return new IPEndPoint(IPAddress.Parse(uri.Host), uri.Port);
-            //}).ToList();
-            //Client.Initialize(cfg);
-        }
-
         protected void Test_GatewaySelection(IGatewayListProvider listProvider)
         {
             IList<Uri> gatewayUris = listProvider.GetGateways().GetResult();
@@ -81,15 +49,7 @@ namespace UnitTests.MessageCenterTests
                 return new IPEndPoint(IPAddress.Parse(uri.Host), uri.Port);
             }).ToList();
 
-            var cfg = new ClientConfiguration
-            {
-                Gateways = gatewayEndpoints
-            };
-            var gatewayOptions = new GatewayOptions()
-            {
-                GatewayListRefreshPeriod = cfg.GatewayListRefreshPeriod,
-                PreferedGatewayIndex = cfg.PreferedGatewayIndex
-            };
+            var gatewayOptions = new GatewayOptions();
             var gatewayManager = new GatewayManager(null, gatewayOptions, listProvider, NullLoggerFactory.Instance);
 
             var counts = new int[4];

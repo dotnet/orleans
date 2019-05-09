@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -14,14 +15,18 @@ namespace UnitTests.Grains
         private int eventsConsumedCount;
         private int errorsCount;
         private int eventsFailedCount;
-        private Logger logger;
+        private ILogger logger;
         private StreamSubscriptionHandle<int> consumerHandle;
         private Stopwatch failPeriodTimer;
         private TimeSpan failPeriod;
 
+        public FaultableConsumerGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger("FaultableConsumerGrain " + base.IdentityString);
+        }
+
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger("FaultableConsumerGrain " + base.IdentityString);
             logger.Info("OnActivateAsync");
             eventsConsumedCount = 0;
             errorsCount = 0;

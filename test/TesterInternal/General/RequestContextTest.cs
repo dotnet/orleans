@@ -4,9 +4,12 @@ using System.Diagnostics;
 using System.Runtime.Remoting.Messaging;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.CodeGeneration;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
@@ -29,11 +32,24 @@ namespace UnitTests.General
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.Options.InitialSilosCount = 1;
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.ApplyToAllNodes(n => n.PropagateActivityId = true);
-                    legacy.ClientConfiguration.PropagateActivityId = true;
-                });
+                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+                builder.AddClientBuilderConfigurator<ClientConfigurator>();
+            }
+        }
+
+        public class SiloConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder.Configure<SiloMessagingOptions>(options => options.PropagateActivityId = true);
+            }
+        }
+
+        public class ClientConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder.Configure<SiloMessagingOptions>(options => options.PropagateActivityId = true);
             }
         }
 

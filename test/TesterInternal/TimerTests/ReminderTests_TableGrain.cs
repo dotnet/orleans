@@ -9,6 +9,7 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Tester;
+using Orleans.Hosting;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
@@ -22,7 +23,15 @@ namespace UnitTests.TimerTests
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.ConfigureLegacyConfiguration();
+                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+            }
+
+            private class SiloConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder.UseInMemoryReminderService();
+                }
             }
         }
 

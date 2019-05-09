@@ -19,32 +19,6 @@
   </Choose>
 
   <Choose>
-    <When Condition="$(OrleansCoreLegacyVersion) == $(VersionPrefix)">
-      <ItemGroup>
-        <ProjectReference Include="..\..\..\src\Orleans.Core.Legacy\Orleans.Core.Legacy.csproj" />
-      </ItemGroup>
-    </When>
-    <Otherwise>
-      <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.Core.Legacy" Version="$(OrleansCoreLegacyVersion)"/>
-      </ItemGroup>
-    </Otherwise>
-  </Choose>
-
-  <Choose>
-    <When Condition="$(OrleansRuntimeLegacyVersion) == $(VersionPrefix)">
-      <ItemGroup>
-        <ProjectReference Include="..\..\..\src\Orleans.Runtime.Legacy\Orleans.Runtime.Legacy.csproj" />
-      </ItemGroup>
-    </When>
-    <Otherwise>
-      <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.Runtime.Legacy" Version="$(OrleansRuntimeLegacyVersion)"/>
-      </ItemGroup>
-    </Otherwise>
-  </Choose>
-
-  <Choose>
     <When Condition="$(OrleansTransactionsVersion) == $(VersionPrefix)">
       <ItemGroup>
         <ProjectReference Include="..\..\..\src\Orleans.Transactions\Orleans.Transactions.csproj" />
@@ -82,18 +56,5 @@
       </ItemGroup>
     </Otherwise>
   </Choose>
-
-  <Choose>
-    <When Condition="$(OrleansToolsVersion) == $(VersionPrefix)">
-      <ItemGroup>
-        <ProjectReference Include="..\..\..\src\OrleansCounterControl\OrleansCounterControl.csproj" />
-      </ItemGroup>
-    </When>
-    <Otherwise>
-      <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.CounterControl" Version="$(OrleansToolsVersion)"/>
-      </ItemGroup>
-    </Otherwise>
-  </Choose>
-
+  
 </Project>

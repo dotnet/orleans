@@ -42,16 +42,9 @@ namespace Tester.AzureUtils
             this.siloAddress2 = SiloAddress.New(ep2, 0);
 
             this.logger.Info("Global ServiceId={0}", this.globalServiceId);
-
-            GlobalConfiguration config = new GlobalConfiguration
-            {
-                ServiceId = globalServiceId,
-                ClusterId = "0",
-                DataConnectionString = TestDefaultConfiguration.DataConnectionString
-            };
-
+            
             this.gossipTable = new AzureTableBasedGossipChannel(this.loggerFactory);
-            var done = this.gossipTable.Initialize(config.ServiceId.ToString(), config.DataConnectionString);
+            var done = this.gossipTable.Initialize(globalServiceId.ToString(), TestDefaultConfiguration.DataConnectionString);
             if (!done.Wait(Timeout))
             {
                 throw new TimeoutException("Could not create/read table.");

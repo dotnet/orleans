@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Providers;
@@ -517,7 +518,13 @@ namespace UnitTests.Grains
     [Reentrant]
     public class PingSelfGrain<T> : Grain, IGenericPingSelf<T>
     {
+        private readonly ILogger logger;
         private T _lastValue;
+
+        public PingSelfGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public Task<T> Ping(T t)
         {
@@ -546,7 +553,7 @@ namespace UnitTests.Grains
         {
             RegisterTimer(o =>
             {
-                this.GetLogger().Verbose("***Timer fired for pinging {0}***", target.GetPrimaryKey());
+                this.logger.LogDebug("***Timer fired for pinging {0}***", target.GetPrimaryKey());
                 return target.Ping(t);
             },
                 null,
@@ -569,13 +576,13 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            this.GetLogger().Verbose("***Activating*** {0}", this.GetPrimaryKey());
+            this.logger.LogDebug("***Activating*** {0}", this.GetPrimaryKey());
             return Task.CompletedTask;
         }
 
         public override Task OnDeactivateAsync()
         {
-            this.GetLogger().Verbose("***Deactivating*** {0}", this.GetPrimaryKey());
+            this.logger.LogDebug("***Deactivating*** {0}", this.GetPrimaryKey());
             return Task.CompletedTask;
         }
     }

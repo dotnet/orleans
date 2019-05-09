@@ -49,7 +49,7 @@ namespace Orleans.Configuration
                 throw new OrleansConfigurationException(
                     $"Configuration for {nameof(ClusterOptions)} is invalid. " +
                     $"A non-empty value for {nameof(options.ClusterId)} is required. " +
-                    $"See ${Constants.TroubleshootingHelpLink} for more information.");
+                    $"See {Constants.TroubleshootingHelpLink} for more information.");
             }
 
             if (string.IsNullOrWhiteSpace(this.options.ServiceId))
@@ -57,7 +57,7 @@ namespace Orleans.Configuration
                 throw new OrleansConfigurationException(
                     $"Configuration for {nameof(ClusterOptions)} is invalid. " +
                     $"A non-empty value for {nameof(options.ServiceId)} is required. " +
-                    $"See ${Constants.TroubleshootingHelpLink} for more information.");
+                    $"See {Constants.TroubleshootingHelpLink} for more information.");
             }
         }
     }

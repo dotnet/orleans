@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -27,15 +28,16 @@ namespace UnitTests.Grains
 
         private static long aCCURACY = 50 * TimeSpan.TicksPerMillisecond; // when we use ticks to compute sequence numbers, we might get wrong results as timeouts don't happen with precision of ticks  ... we keep this as a leeway
 
-        private Logger logger;
+        private ILogger logger;
         private string myId; // used to distinguish during debugging between multiple activations of the same grain
 
         private string filePrefix;
 
-        public ReminderTestGrain2(IServiceProvider services, IReminderTable reminderTable)
+        public ReminderTestGrain2(IServiceProvider services, IReminderTable reminderTable, ILoggerFactory loggerFactory)
         {
             this.reminderTable = reminderTable;
             this.unvalidatedReminderRegistry = new UnvalidatedReminderRegistry(services);
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
         public override Task OnActivateAsync()
@@ -43,7 +45,6 @@ namespace UnitTests.Grains
             this.myId = this.Data.ActivationId.ToString();// new Random().Next();
             this.allReminders = new Dictionary<string, IGrainReminder>();
             this.sequence = new Dictionary<string, long>();
-            this.logger = this.GetLogger(string.Format("ReminderTestGrain {0}_{1}", this.RuntimeIdentity.ToString(), this.Identity));
             this.period = GetDefaultPeriod(this.logger);
             this.logger.Info("OnActivateAsync.");
             this.filePrefix = "g" + this.Identity.PrimaryKey + "_";
@@ -194,22 +195,11 @@ namespace UnitTests.Grains
             return string.Format("{0}{1}", this.filePrefix, reminderName);
         }
 
-        public static TimeSpan GetDefaultPeriod(Logger log)
+        public static TimeSpan GetDefaultPeriod(ILogger log)
         {
-            int period = 10; // Seconds
-
-            ClusterConfiguration config = new ClusterConfiguration();
-            config.LoadFromFile("ClientConfigurationForTesting.xml");
-            if (config.Globals.UseAzureSystemStore)
-            {
-                period = 12; // azure operations take more time ... so we use a larger period
-            }
-            else if (config.Globals.UseAdoNetSystemStore)
-            {
-                period = 12; // SQL operations are quite fast ... so we use a shorter period
-            }
+            int period = 12; // Seconds
             var reminderPeriod = TimeSpan.FromSeconds(period);
-            log.Info("Using reminder period of {0} for ReminderServiceType={1} in ReminderTestGrain", reminderPeriod, config.Globals.ReminderServiceType);
+            log.Info("Using reminder period of {0} in ReminderTestGrain", reminderPeriod);
             return reminderPeriod;
         }
 
@@ -232,14 +222,15 @@ namespace UnitTests.Grains
 
         private static long aCCURACY = 50 * TimeSpan.TicksPerMillisecond; // when we use ticks to compute sequence numbers, we might get wrong results as timeouts don't happen with precision of ticks  ... we keep this as a leeway
 
-        private Logger logger;
+        private ILogger logger;
         private long myId; // used to distinguish during debugging between multiple activations of the same grain
 
         private string filePrefix;
 
-        public ReminderTestCopyGrain(IServiceProvider services)
+        public ReminderTestCopyGrain(IServiceProvider services, ILoggerFactory loggerFactory)
         {
             this.unvalidatedReminderRegistry = new UnvalidatedReminderRegistry(services); ;
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
         public override async Task OnActivateAsync()
@@ -247,7 +238,6 @@ namespace UnitTests.Grains
             this.myId = new Random().Next();
             this.allReminders = new Dictionary<string, IGrainReminder>();
             this.sequence = new Dictionary<string, long>();
-            this.logger = this.GetLogger(string.Format("ReminderCopyGrain {0}_{1}", this.myId, this.Identity));
             this.period = ReminderTestGrain2.GetDefaultPeriod(this.logger);
             this.logger.Info("OnActivateAsync.");
             this.filePrefix = "gc" + this.Identity.PrimaryKey + "_";
@@ -394,11 +384,15 @@ namespace UnitTests.Grains
 
     public class WrongReminderGrain : Grain, IReminderGrainWrong
     {
-        private Logger logger;
+        private ILogger logger;
+
+        public WrongReminderGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override Task OnActivateAsync()
         {
-            this.logger = this.GetLogger(string.Format("WrongReminderGrain_{0}", this.Identity));
             this.logger.Info("OnActivateAsync.");
             return Task.CompletedTask;
         }
