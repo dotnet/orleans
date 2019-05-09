@@ -210,7 +210,9 @@ namespace UnitTests.Serialization
 
         private T SerializerLoop<T>(T input)
         {
+#pragma warning disable CS0618 // Type or member is obsolete
             var serializer = new ILBasedSerializer(new CachedTypeResolver());
+#pragma warning restore CS0618 // Type or member is obsolete
             Assert.True(serializer.IsSupportedType(input.GetType()));
 
             var writer = new BinaryTokenStreamWriter();

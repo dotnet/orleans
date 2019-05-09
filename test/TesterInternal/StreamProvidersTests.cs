@@ -13,6 +13,10 @@ using System.Threading.Tasks;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using UnitTests.StorageTests;
+using Orleans.Storage;
+using Orleans.Providers;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace UnitTests.Streaming
 {
@@ -26,13 +30,6 @@ namespace UnitTests.Streaming
             {
                 this.ServiceId = builder.Options.ServiceId;
                 builder.Options.InitialSilosCount = 4;
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test1");
-                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test2");
-                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.ErrorInjectionStorageProvider>("ErrorInjector");
-                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("lowercase");
-                });
                 builder.AddSiloBuilderConfigurator<SiloHostConfigurator>();
             }
 
@@ -40,7 +37,14 @@ namespace UnitTests.Streaming
             {
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
-                    hostBuilder.AddMemoryGrainStorage("MemoryStore");
+                    hostBuilder
+                        .AddMemoryGrainStorage("MemoryStore")
+                        .ConfigureServices(services =>
+                        {
+                            services.AddSingleton<ErrorInjectionStorageProvider>();
+                            services.AddSingletonNamedService<IGrainStorage, ErrorInjectionStorageProvider>("ErrorInjector");
+                            services.AddSingletonNamedService<IControllable, ErrorInjectionStorageProvider>("ErrorInjector");
+                        });
                 }
             }
         }

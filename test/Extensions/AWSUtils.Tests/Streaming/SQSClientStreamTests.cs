@@ -42,16 +42,6 @@ namespace AWSUtils.Tests.Streaming
                 throw new SkipException("Empty connection string");
             }
 
-            var clusterId = Guid.NewGuid().ToString();
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-
-                legacy.ClusterConfiguration.Globals.ClusterId = clusterId;
-                legacy.ClientConfiguration.ClusterId = clusterId;
-                legacy.ClusterConfiguration.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
-                legacy.ClientConfiguration.DataConnectionString = StorageConnectionString;
-                legacy.ClusterConfiguration.Globals.DataConnectionString = StorageConnectionString;
-            });
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
         }
@@ -65,7 +55,8 @@ namespace AWSUtils.Tests.Streaming
                     {
                         options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
                     })
-                    .AddMemoryGrainStorage("PubSubStore");
+                    .AddMemoryGrainStorage("PubSubStore")
+                    .Configure<SiloMessagingOptions>(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5));
             }
         }
 

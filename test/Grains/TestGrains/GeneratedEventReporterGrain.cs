@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using TestGrainInterfaces;
@@ -9,13 +10,17 @@ namespace TestGrains
 {
     class GeneratedEventReporterGrain : Grain, IGeneratedEventReporterGrain
     {
-        private Logger logger;
+        private ILogger logger;
 
         private Dictionary<Tuple<string, string>, Dictionary<Guid, int>> reports;
 
+        public GeneratedEventReporterGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
+
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger("GeneratedEventReporterGrain " + base.IdentityString);
             logger.Info("OnActivateAsync");
 
             reports = new Dictionary<Tuple<string, string>, Dictionary<Guid, int>>();

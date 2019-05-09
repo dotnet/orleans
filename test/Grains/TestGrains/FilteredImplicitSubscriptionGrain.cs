@@ -1,5 +1,6 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -10,11 +11,16 @@ namespace UnitTests.Grains
     [ImplicitStreamSubscription(typeof(RedStreamNamespacePredicate))]
     public class FilteredImplicitSubscriptionGrain : Grain, IFilteredImplicitSubscriptionGrain
     {
+        private readonly ILogger logger;
         private Dictionary<string, int> counters;
+
+        public FilteredImplicitSubscriptionGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{nameof(FilteredImplicitSubscriptionGrain)} {IdentityString}");
+        }
 
         public override async Task OnActivateAsync()
         {
-            var logger = this.GetLogger($"{nameof(FilteredImplicitSubscriptionGrain)} {IdentityString}");
             logger.Info("OnActivateAsync");
             var streamProvider = GetStreamProvider("SMSProvider");
             var streamNamespaces = new[] { "red1", "red2", "blue3", "blue4" };

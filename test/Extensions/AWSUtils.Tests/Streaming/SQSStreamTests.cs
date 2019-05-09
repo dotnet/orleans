@@ -30,19 +30,6 @@ namespace AWSUtils.Tests.Streaming
             {
                 throw new SkipException("Empty connection string");
             }
-
-            builder.ConfigureLegacyConfiguration(options =>
-            {
-                //previous silo creation
-                options.ClusterConfiguration.Globals.DataConnectionString = AWSTestConstants.DefaultSQSConnectionString;
-                options.ClientConfiguration.DataConnectionString = AWSTestConstants.DefaultSQSConnectionString;
-
-                var storageConnectionString = new Dictionary<string, string>
-                {
-                    {"DataConnectionString", $"Service={AWSTestConstants.Service}"},
-                    {"DeleteStateOnClear", "true"}
-                };
-            });
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
         }

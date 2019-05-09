@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.CodeGeneration;
 using Orleans.Concurrency;
@@ -37,11 +38,15 @@ namespace UnitTests.Grains
     {
         private INonReentrantGrain Self { get; set; }
 
-        private Logger logger;
+        private ILogger logger;
+
+        public NonRentrantGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger();
             logger.Info("OnActivateAsync");
             return base.OnActivateAsync();
         }
@@ -74,6 +79,13 @@ namespace UnitTests.Grains
     [MayInterleave(nameof(MayInterleave))]
     public class MayInterleavePredicateGrain : Grain, IMayInterleavePredicateGrain
     {
+        private readonly ILogger logger;
+
+        public MayInterleavePredicateGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
+
         public static bool MayInterleave(InvokeMethodRequest req)
         {
             // not interested
@@ -128,7 +140,6 @@ namespace UnitTests.Grains
 
             await stream.SubscribeAsync((item, _) =>
             {
-                var logger = this.GetLogger();
                 logger.Info("Received stream item:" + item);
                 return Task.CompletedTask;
             });
@@ -173,11 +184,15 @@ namespace UnitTests.Grains
     public class ReentrantSelfManagedGrain1 : Grain, IReentrantSelfManagedGrain
     {
         private long destination;
-        private Logger logger;
+        private ILogger logger;
+
+        public ReentrantSelfManagedGrain1(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger(GetType().Name + "-" + this.GetPrimaryKeyLong());
             return Task.CompletedTask;
         }
 
@@ -216,11 +231,15 @@ namespace UnitTests.Grains
     public class NonReentrantSelfManagedGrain1 : Grain, INonReentrantSelfManagedGrain
     {
         private long destination;
-        private Logger logger;
+        private ILogger logger;
+
+        public NonReentrantSelfManagedGrain1(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger(GetType().Name + "-" + this.GetPrimaryKeyLong());
             return Task.CompletedTask;
         }
 
@@ -259,12 +278,16 @@ namespace UnitTests.Grains
     [Reentrant]
     public class FanOutGrain : Grain, IFanOutGrain
     {
-        private Logger logger;
+        private ILogger logger;
         private static readonly TimeSpan OneSecond = TimeSpan.FromSeconds(1);
+
+        public FanOutGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger(GetType().Name + "-" + this.GetPrimaryKeyLong());
             return Task.CompletedTask;
         }
 
@@ -375,12 +398,16 @@ namespace UnitTests.Grains
     [Reentrant]
     public class FanOutACGrain : Grain, IFanOutACGrain
     {
-        private Logger logger;
+        private ILogger logger;
         private static readonly TimeSpan OneSecond = TimeSpan.FromSeconds(1);
+
+        public FanOutACGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger(GetType().Name + "-" + this.GetPrimaryKeyLong());
             return Task.CompletedTask;
         }
 
@@ -488,13 +515,17 @@ namespace UnitTests.Grains
     [Reentrant]
     public class ReentrantTaskGrain : Grain, IReentrantTaskGrain
     {
-        private Logger logger;
+        private ILogger logger;
         private long otherId;
         private int count;
 
+        public ReentrantTaskGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
+
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger(GetType().Name + "-" + this.GetPrimaryKeyLong());
             return Task.CompletedTask;
         }
 
@@ -522,13 +553,17 @@ namespace UnitTests.Grains
 
     public class NonReentrantTaskGrain : Grain, INonReentrantTaskGrain
     {
-        private Logger logger;
+        private ILogger logger;
         private long otherId;
         private int count;
 
+        public NonReentrantTaskGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
+
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger(GetType().Name + "-" + this.GetPrimaryKeyLong());
             return Task.CompletedTask;
         }
 

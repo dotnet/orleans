@@ -23,15 +23,9 @@ namespace UnitTests.General
         private readonly TimeSpan endWait = TimeSpan.FromMinutes(5);
 
         enum Fail { First, Random, Last }
-
-        public ClusterConfiguration ClusterConfiguration { get; set; }
-
+        
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                this.ClusterConfiguration = legacy.ClusterConfiguration;
-            });
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
         }
 
@@ -40,7 +34,8 @@ namespace UnitTests.General
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder.AddMemoryGrainStorage("MemoryStore")
-                    .AddMemoryGrainStorageAsDefault();
+                    .AddMemoryGrainStorageAsDefault()
+                    .UseInMemoryReminderService();
             }
         }
 
@@ -272,7 +267,6 @@ namespace UnitTests.General
             int count = 0, index = 0;
 
             // Figure out the primary directory partition and the silo hosting the ReminderTableGrain.
-            bool usingReminderGrain = this.ClusterConfiguration.Globals.ReminderServiceType.Equals(GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain);
             var tableGrain = this.GrainFactory.GetGrain<IReminderTableGrain>(Constants.ReminderTableGrainId);
             var tableGrainId = ((GrainReference)tableGrain).GrainId;
             SiloAddress reminderTableGrainPrimaryDirectoryAddress = (await TestUtils.GetDetailedGrainReport(this.HostedCluster.InternalGrainFactory, tableGrainId, this.HostedCluster.Primary)).PrimaryForGrain;
@@ -289,12 +283,9 @@ namespace UnitTests.General
                     continue;
                 }
                 // Don't fail primary directory partition and the silo hosting the ReminderTableGrain.
-                if (usingReminderGrain)
+                if (siloAddress.Equals(reminderTableGrainPrimaryDirectoryAddress) || siloAddress.Equals(reminderGrainActivation.Silo))
                 {
-                    if (siloAddress.Equals(reminderTableGrainPrimaryDirectoryAddress) || siloAddress.Equals(reminderGrainActivation.Silo))
-                    {
-                        continue;
-                    }
+                    continue;
                 }
                 ids.Add(siloHandle.SiloAddress.GetConsistentHashCode(), siloHandle);
             }

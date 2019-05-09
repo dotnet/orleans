@@ -139,8 +139,9 @@ namespace NonSilo.Tests
         [Fact]
         public void SiloHostBuilder_NoSpecifiedConfigurationTest()
         {
-            var builder = new SiloHostBuilder().ConfigureDefaults()
-                .UseConfiguration(new ClusterConfiguration())
+            var builder = new SiloHostBuilder()
+                .ConfigureDefaults()
+                .UseLocalhostClustering()
                 .ConfigureServices(RemoveConfigValidatorsAndSetAddress)
                 .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
             using (var silo = builder.Build())
@@ -156,7 +157,6 @@ namespace NonSilo.Tests
         public void SiloHostBuilder_DoubleBuildTest()
         {
             var builder = new SiloHostBuilder().ConfigureDefaults()
-                .UseConfiguration(new ClusterConfiguration())
                 .ConfigureServices(RemoveConfigValidatorsAndSetAddress)
                 .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
             using (builder.Build())
@@ -166,37 +166,14 @@ namespace NonSilo.Tests
         }
 
         /// <summary>
-        /// Tests that configuration cannot be specified twice.
-        /// </summary>
-        [Fact]
-        public void SiloHostBuilder_DoubleSpecifyConfigurationTest()
-        {
-            var builder = new SiloHostBuilder().ConfigureDefaults()
-                .ConfigureServices(RemoveConfigValidatorsAndSetAddress)
-                .UseConfiguration(new ClusterConfiguration())
-                .UseConfiguration(new ClusterConfiguration());
-            Assert.Throws<InvalidOperationException>(() => builder.Build());
-        }
-
-        /// <summary>
-        /// Tests that a silo can be created without specifying configuration.
-        /// </summary>
-        [Fact]
-        public void SiloHostBuilder_NullConfigurationTest()
-        {
-            var builder = new SiloHostBuilder().ConfigureDefaults()
-                .ConfigureServices(RemoveConfigValidatorsAndSetAddress);
-            Assert.Throws<ArgumentNullException>(() => builder.UseConfiguration(null));
-        }
-
-        /// <summary>
         /// Tests that the <see cref="ISiloHostBuilder.ConfigureServices"/> delegate works as expected.
         /// </summary>
         [Fact]
         public void SiloHostBuilder_ServiceProviderTest()
         {
-            var builder = new SiloHostBuilder().ConfigureDefaults()
-                .UseConfiguration(new ClusterConfiguration())
+            var builder = new SiloHostBuilder()
+                .ConfigureDefaults()
+                .UseLocalhostClustering()
                 .ConfigureServices(RemoveConfigValidatorsAndSetAddress)
                 .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
 
@@ -245,7 +222,7 @@ namespace NonSilo.Tests
         public void SiloHostBuilder_LoadSheddingValidatorPassesWhenLoadSheddingDisabled()
         {
             var builder = new SiloHostBuilder().ConfigureDefaults()
-                    .UseConfiguration(new ClusterConfiguration())
+                    .UseLocalhostClustering()
                     .Configure<ClusterOptions>(options => options.ClusterId = "someClusterId")
                     .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
                     .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>())
@@ -274,8 +251,9 @@ namespace NonSilo.Tests
         public void SiloHostBuilder_LoadSheddingValidatorAbove100ShouldFail()
         {
             Assert.Throws<OrleansConfigurationException>(() =>
-                    new SiloHostBuilder().ConfigureDefaults()
-                        .UseConfiguration(new ClusterConfiguration())
+                    new SiloHostBuilder()
+                        .ConfigureDefaults()
+                        .UseLocalhostClustering()
                         .Configure<ClusterOptions>(options => options.ClusterId = "someClusterId")
                         .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
                         .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>())
@@ -301,8 +279,9 @@ namespace NonSilo.Tests
         public void SiloHostBuilder_LoadSheddingValidatorFailsWithNoRegisteredHostEnvironmentStatistics()
         {
             Assert.Throws<OrleansConfigurationException>(() =>
-                new SiloHostBuilder().ConfigureDefaults()
-                    .UseConfiguration(new ClusterConfiguration())
+                new SiloHostBuilder()
+                    .ConfigureDefaults()
+                    .UseLocalhostClustering()
                     .Configure<ClusterOptions>(options => options.ClusterId = "someClusterId")
                     .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
                     .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>())
@@ -323,8 +302,9 @@ namespace NonSilo.Tests
         [Fact]
         public void SiloHostBuilder_LoadSheddingValidatorPasses()
         {
-            var builder = new SiloHostBuilder().ConfigureDefaults()
-                .UseConfiguration(new ClusterConfiguration())
+            var builder = new SiloHostBuilder()
+                .ConfigureDefaults()
+                .UseLocalhostClustering()
                 .Configure<ClusterOptions>(options => options.ClusterId = "someClusterId")
                 .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
                 .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>())

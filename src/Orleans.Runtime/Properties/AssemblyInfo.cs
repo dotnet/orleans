@@ -3,7 +3,6 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("Orleans.TelemetryConsumers.Counters")]
 [assembly: InternalsVisibleTo("Orleans.TestingHost")]
 [assembly: InternalsVisibleTo("Orleans.TestingHost.AppDomain")]
-[assembly: InternalsVisibleTo("OrleansCounterControl")]
 
 [assembly: InternalsVisibleTo("AWSUtils.Tests")]
 [assembly: InternalsVisibleTo("LoadTestGrains")]
@@ -12,9 +11,6 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("Tester.AdoNet")]
 [assembly: InternalsVisibleTo("TesterInternal")]
 [assembly: InternalsVisibleTo("TestInternalGrains")]
-
-// Legacy provider support
-[assembly: InternalsVisibleTo("Orleans.Runtime.Legacy")]
 
 // Mocking libraries
 [assembly: InternalsVisibleTo("DynamicProxyGenAssembly2")]

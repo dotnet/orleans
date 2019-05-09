@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -12,8 +13,14 @@ namespace UnitTests.Grains
     public class MultipleSubscriptionConsumerGrain : Grain, IMultipleSubscriptionConsumerGrain
     {
         private readonly Dictionary<StreamSubscriptionHandle<int>, Tuple<Counter,Counter>> consumedMessageCounts;
-        private Logger logger;
+        private ILogger logger;
         private int consumerCount = 0;
+
+        public MultipleSubscriptionConsumerGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            consumedMessageCounts = new Dictionary<StreamSubscriptionHandle<int>, Tuple<Counter, Counter>>();
+        }
 
         private class Counter
         {
@@ -30,14 +37,8 @@ namespace UnitTests.Grains
             }
         }
 
-        public MultipleSubscriptionConsumerGrain()
-        {
-            consumedMessageCounts = new Dictionary<StreamSubscriptionHandle<int>, Tuple<Counter, Counter>>();
-        }
-
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger("MultipleSubscriptionConsumerGrain " + base.IdentityString);
             logger.Info("OnActivateAsync");
             return Task.CompletedTask;
         }

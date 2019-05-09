@@ -17,6 +17,7 @@ using Orleans.Runtime.Configuration;
 using TesterInternal;
 using TestExtensions;
 using Orleans.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -35,14 +36,6 @@ namespace UnitTests.StorageTests
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.Options.InitialSilosCount = 1;
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<MockStorageProvider>(MockStorageProviderName1);
-                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<MockStorageProvider>(MockStorageProviderName2,
-                        new Dictionary<string, string> {{"Config1", "1"}, {"Config2", "2"}});
-                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<ErrorInjectionStorageProvider>(ErrorInjectorProviderName);
-                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<MockStorageProvider>(MockStorageProviderNameLowerCase);
-                });
                 builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             }
 
@@ -51,6 +44,10 @@ namespace UnitTests.StorageTests
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder.AddMemoryGrainStorage("MemoryStore");
+                    hostBuilder.AddTestStorageProvider(MockStorageProviderName1, (sp, name) => ActivatorUtilities.CreateInstance<MockStorageProvider>(sp, name));
+                    hostBuilder.AddTestStorageProvider(MockStorageProviderName2, (sp, name) => ActivatorUtilities.CreateInstance<MockStorageProvider>(sp, name));
+                    hostBuilder.AddTestStorageProvider(MockStorageProviderNameLowerCase, (sp, name) => ActivatorUtilities.CreateInstance<MockStorageProvider>(sp, name));
+                    hostBuilder.AddTestStorageProvider(ErrorInjectorProviderName, (sp, name) => ActivatorUtilities.CreateInstance<ErrorInjectionStorageProvider>(sp));
                 }
             }
         }

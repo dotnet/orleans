@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -23,10 +24,6 @@ namespace UnitTests.General
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                legacy.ClusterConfiguration.ApplyToAllNodes(nodeConfig => nodeConfig.LoadSheddingEnabled = true);
-            });
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
         }
 
@@ -35,7 +32,8 @@ namespace UnitTests.General
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder.AddMemoryGrainStorage("MemoryStore")
-                    .AddMemoryGrainStorageAsDefault();
+                    .AddMemoryGrainStorageAsDefault()
+                    .Configure<LoadSheddingOptions>(options => options.LoadSheddingEnabled = true);
             }
         }
 

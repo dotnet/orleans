@@ -3,6 +3,7 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -30,10 +31,6 @@ namespace Tester.StreamingTests
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             builder.Options.InitialSilosCount = 1;
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                legacy.ClusterConfiguration.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
-            });
             builder.AddClientBuilderConfigurator<ClientConfiguretor>();
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
         }
@@ -43,7 +40,8 @@ namespace Tester.StreamingTests
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder.AddSimpleMessageStreamProvider(SMSStreamProviderName)
-                     .AddMemoryGrainStorage("PubSubStore");
+                     .AddMemoryGrainStorage("PubSubStore")
+                     .Configure<SiloMessagingOptions>(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5));
             }
         }
         public class ClientConfiguretor : IClientBuilderConfigurator

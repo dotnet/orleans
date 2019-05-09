@@ -94,7 +94,6 @@ namespace Orleans.TestingHost
             var builder = new ClientBuilder();
             builder.Properties["Configuration"] = configuration;
             builder.Configure<ClusterOptions>(configuration);
-            ConfigureAppServices(configuration, builder);
 
             builder.ConfigureServices(services =>
             {
@@ -102,6 +101,7 @@ namespace Orleans.TestingHost
                 TryConfigureFileLogging(configuration, services, hostName);
             });
 
+            ConfigureAppServices(configuration, builder);
             builder.GetApplicationPartManager().ConfigureDefaults();
             return builder.Build();
         }

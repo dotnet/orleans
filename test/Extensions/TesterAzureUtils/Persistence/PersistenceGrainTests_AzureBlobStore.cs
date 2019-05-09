@@ -10,6 +10,7 @@ using Orleans.Runtime.Configuration;
 using TestExtensions;
 using Orleans.Hosting;
 using Orleans.Configuration;
+using Orleans.Storage;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -57,19 +58,6 @@ namespace Tester.AzureUtils.Persistence
             {
                 builder.Options.InitialSilosCount = 4;
                 builder.Options.UseTestClusterMembership = false;
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.Globals.ServiceId = Guid.NewGuid();
-                    legacy.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
-                    legacy.ClusterConfiguration.Globals.MaxResendCount = 0;
-
-                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test1");
-                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test2",
-                        new Dictionary<string, string> {{"Config1", "1"}, {"Config2", "2"}});
-                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.ErrorInjectionStorageProvider>("ErrorInjector");
-                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("lowercase");
-                    
-                });
                 builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
                 builder.AddSiloBuilderConfigurator<StorageSiloBuilderConfigurator>();
                 builder.AddClientBuilderConfigurator<ClientBuilderConfigurator>();

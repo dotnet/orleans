@@ -1,7 +1,8 @@
-﻿
+
 using System;
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Placement;
 using Orleans.Providers.Streams.Generator;
@@ -19,7 +20,7 @@ namespace TestGrains
         public const string StreamNamespace = "NonTransientError_RecoverableStream";
      
         // grain instance state
-        private Logger logger;
+        private ILogger logger;
         private IAsyncStream<GeneratedEvent> stream;
 
         private class FaultsState
@@ -30,9 +31,13 @@ namespace TestGrains
         private FaultsState myFaults;
         private FaultsState Faults { get { return myFaults ?? (myFaults = FaultInjectionTracker.GetOrAdd(this.GetPrimaryKey(), key => new FaultsState())); } }
 
+        public ImplicitSubscription_NonTransientError_RecoverableStream_CollectorGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger("RecoverableStreamCollectorGrain " + base.IdentityString);
+        }
+
         public override async Task OnActivateAsync()
         {
-            logger = this.GetLogger("RecoverableStreamCollectorGrain " + base.IdentityString);
             logger.Info("OnActivateAsync");
 
             await ReadStateAsync();

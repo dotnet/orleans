@@ -2,8 +2,11 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
@@ -131,18 +134,33 @@ namespace UnitTests.MembershipTests
         {
             var builder = new TestClusterBuilder(3);
 
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                legacy.ClusterConfiguration.Globals.NumMissedProbesLimit = 1;
-                legacy.ClusterConfiguration.Globals.ProbeTimeout = TimeSpan.FromMilliseconds(500);
-                legacy.ClusterConfiguration.Globals.NumVotesForDeathDeclaration = 1;
-                legacy.ClusterConfiguration.Globals.CacheSize = 0;
-
-                // use only Primary as the gateway
-                legacy.ClientConfiguration.Gateways = legacy.ClientConfiguration.Gateways.Take(1).ToList();
-            });
+            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+            builder.AddClientBuilderConfigurator<ClientConfigurator>();
             this.hostedCluster = builder.Build();
             this.hostedCluster.Deploy();
+        }
+
+        public class SiloConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder.Configure<ClusterMembershipOptions>(options =>
+                {
+                    options.NumMissedProbesLimit = 1;
+                    options.ProbeTimeout = TimeSpan.FromMilliseconds(500);
+                    options.NumVotesForDeathDeclaration = 1;
+                });
+
+                hostBuilder.Configure<GrainDirectoryOptions>(options => options.CacheSize = 0);
+            }
+        }
+
+        public class ClientConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder.Configure<GatewayOptions>(options => options.PreferedGatewayIndex = 0);
+            }
         }
 
         public void Dispose()

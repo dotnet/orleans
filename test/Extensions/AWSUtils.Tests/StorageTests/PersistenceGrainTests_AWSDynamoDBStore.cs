@@ -28,33 +28,7 @@ namespace AWSUtils.Tests.StorageTests
             {
                 if (AWSTestConstants.IsDynamoDbAvailable)
                 {
-                    Guid serviceId = Guid.NewGuid();
-                    string dataConnectionString = DataConnectionString;
                     builder.Options.InitialSilosCount = 4;
-
-                    builder.ConfigureLegacyConfiguration(legacy =>
-                    {
-                        legacy.ClusterConfiguration.Globals.ServiceId = serviceId;
-                        legacy.ClusterConfiguration.Globals.DataConnectionString = dataConnectionString;
-
-                        legacy.ClusterConfiguration.Globals.MaxResendCount = 0;
-
-                        legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test1");
-                        legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test2",
-                            new Dictionary<string, string> { { "Config1", "1" }, { "Config2", "2" } });
-                        legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.ErrorInjectionStorageProvider>("ErrorInjector");
-                        legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("lowercase");
-
-                        // FIXME: How to configure the TestClusterBuilder to use the new extensions?
-                        //legacy.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBGrainStorage>("DDBStore",
-                        //    new Dictionary<string, string> {{"DeleteStateOnClear", "true"}, {"DataConnectionString", dataConnectionString}});
-                        //legacy.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBGrainStorage>("DDBStore1",
-                        //    new Dictionary<string, string> {{"DataConnectionString", dataConnectionString}});
-                        //legacy.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBGrainStorage>("DDBStore2",
-                        //    new Dictionary<string, string> {{"DataConnectionString", dataConnectionString}});
-                        //legacy.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBGrainStorage>("DDBStore3",
-                        //    new Dictionary<string, string> {{"DataConnectionString", dataConnectionString}});
-                    });
                     builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
                 }
             }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -10,6 +10,7 @@ using Orleans.Runtime;
 using TestGrainInterfaces;
 using UnitTests.GrainInterfaces;
 using Orleans.Streams;
+using Microsoft.Extensions.Logging;
 
 namespace UnitTests.Grains
 {
@@ -17,14 +18,16 @@ namespace UnitTests.Grains
     public class ClusterTestGrain : Grain, IClusterTestGrain
     {
         int counter = 0;
-        protected Logger logger;
+        protected ILogger logger;
 
+        public ClusterTestGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override async Task OnActivateAsync()
         {
             await base.OnActivateAsync();
-            string id = this.GetPrimaryKeyLong().ToString();
-            logger = this.GetLogger(String.Format("{0}-{1}", GetType().Name, id));
             logger.Info("Activate.");
         }
 
@@ -109,14 +112,18 @@ namespace UnitTests.Grains
     [GlobalSingleInstance]
     public class SimpleGlobalSingleInstanceGrain : Grain, ISimpleGlobalSingleInstanceGrain
     {
-        protected Logger logger;
+        protected ILogger logger;
         protected int A { get; set; }
         protected int B { get; set; }
+
+        public SimpleGlobalSingleInstanceGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override Task OnActivateAsync()
         {
             string id = this.GetPrimaryKeyLong().ToString();
-            logger = this.GetLogger(String.Format("{0}-{1}", GetType().Name, id));
             logger.Info("Activate.");
             return Task.CompletedTask;
         }

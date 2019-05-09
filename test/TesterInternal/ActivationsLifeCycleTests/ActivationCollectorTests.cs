@@ -1,16 +1,15 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using Orleans.Utilities;
 using Tester;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -31,20 +30,37 @@ namespace UnitTests.ActivationsLifeCycleTests
 
         private void Initialize(TimeSpan collectionAgeLimit, TimeSpan quantum)
         {
-            GlobalConfiguration.ENFORCE_MINIMUM_REQUIREMENT_FOR_AGE_LIMIT = false;
             var builder = new TestClusterBuilder(1);
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                var config = legacy.ClusterConfiguration;
-                config.Globals.CollectionQuantum = quantum;
-                config.Globals.Application.SetDefaultCollectionAgeLimit(collectionAgeLimit);
-                config.Globals.Application.SetCollectionAgeLimit(typeof(IdleActivationGcTestGrain2), DEFAULT_IDLE_TIMEOUT);
-                config.Globals.Application.SetCollectionAgeLimit(typeof(BusyActivationGcTestGrain2), DEFAULT_IDLE_TIMEOUT);
-                config.Globals.Application.SetCollectionAgeLimit(typeof(CollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain), TimeSpan.FromSeconds(12));
-            });
+            builder.Properties["CollectionQuantum"] = quantum.ToString();
+            builder.Properties["DefaultCollectionAgeLimit"] = collectionAgeLimit.ToString();
+            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             testCluster = builder.Build();
             testCluster.Deploy();
             this.logger = this.testCluster.Client.ServiceProvider.GetRequiredService<ILogger<ActivationCollectorTests>>();
+        }
+
+        public class SiloConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                var config = hostBuilder.GetConfiguration();
+                var collectionAgeLimit = TimeSpan.Parse(config["DefaultCollectionAgeLimit"]);
+                var quantum = TimeSpan.Parse(config["CollectionQuantum"]);
+                hostBuilder
+                    .ConfigureDefaults()
+                    .ConfigureServices(services => services.Where(s => s.ServiceType == typeof(IConfigurationValidator)).ToList().ForEach(s => services.Remove(s)));
+                hostBuilder.Configure<GrainCollectionOptions>(options =>
+                {
+                    options.CollectionAge = collectionAgeLimit;
+                    options.CollectionQuantum = quantum;
+                    options.ClassSpecificCollectionAge = new Dictionary<string, TimeSpan>
+                    {
+                        [typeof(IdleActivationGcTestGrain2).FullName] = DEFAULT_IDLE_TIMEOUT,
+                        [typeof(BusyActivationGcTestGrain2).FullName] = DEFAULT_IDLE_TIMEOUT,
+                        [typeof(CollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain).FullName] = TimeSpan.FromSeconds(12),
+                    };
+                });
+            }
         }
 
         private void Initialize(TimeSpan collectionAgeLimit)
@@ -59,7 +75,6 @@ namespace UnitTests.ActivationsLifeCycleTests
 
         public void Dispose()
         {
-            GlobalConfiguration.ENFORCE_MINIMUM_REQUIREMENT_FOR_AGE_LIMIT = true;
             testCluster?.StopAllSilos();
             testCluster = null;
         }

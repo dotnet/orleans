@@ -1,4 +1,6 @@
-﻿using FluentAssertions;
+using FluentAssertions;
+using Orleans;
+using Orleans.Configuration;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization.ProtobufNet;
 using System;
@@ -16,13 +18,8 @@ namespace ProtoBuf.Serialization.Tests
     public class ProtoBufNetSerializationTests : SerializationTestsBase
     {
         public ProtoBufNetSerializationTests() : base(SerializationTestEnvironment.InitializeWithDefaults(
-            new ClientConfiguration
-            {
-                SerializationProviders =
-                {
-                    typeof(ProtobufNetSerializer)
-                }
-            }))
+                 builder => builder.Configure<SerializationProviderOptions>(
+                     options => options.SerializationProviders.AddRange(new[] { typeof(ProtobufNetSerializer)}))))
         {
 
         }

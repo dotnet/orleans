@@ -6,19 +6,6 @@
   <Import Project="$(_ParentDirectoryBuildPropsPath)" Condition="Exists('$(_ParentDirectoryBuildPropsPath)')"/>
 
   <Choose>
-    <When Condition="$(OrleansCoreLegacyVersion) == $(VersionPrefix)">
-      <ItemGroup>
-        <ProjectReference Include="..\..\..\src\Orleans.Core.Legacy\Orleans.Core.Legacy.csproj" />
-      </ItemGroup>
-    </When>
-    <Otherwise>
-      <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.Core.Legacy" Version="$(OrleansCoreLegacyVersion)"/>
-      </ItemGroup>
-    </Otherwise>
-  </Choose>
-
-  <Choose>
     <When Condition="$(OrleansProvidersVersion) == $(VersionPrefix)">
       <ItemGroup>
         <ProjectReference Include="..\..\..\src\OrleansProviders\OrleansProviders.csproj" />

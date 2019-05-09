@@ -20,9 +20,6 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("Orleans.TelemetryConsumers.Linux")]
 [assembly: InternalsVisibleTo("Orleans.TestingHost")]
 [assembly: InternalsVisibleTo("Orleans.TestingHost.AppDomain")]
-[assembly: InternalsVisibleTo("Orleans.TestingHost.Legacy")]
-[assembly: InternalsVisibleTo("OrleansCounterControl")]
-[assembly: InternalsVisibleTo("OrleansManager")]
 [assembly: InternalsVisibleTo("OrleansProviders")]
 
 [assembly: InternalsVisibleTo("AWSUtils.Tests")]
@@ -40,9 +37,5 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("TestInternalGrainInterfaces")]
 [assembly: InternalsVisibleTo("TestInternalGrains")]
 [assembly: InternalsVisibleTo("CodeGenerator.Tests")]
-
-// Legacy provider support
-[assembly: InternalsVisibleTo("Orleans.Core.Legacy")]
-[assembly: InternalsVisibleTo("Orleans.Runtime.Legacy")]
 
 [assembly: KnownAssembly(typeof(IGrain))]

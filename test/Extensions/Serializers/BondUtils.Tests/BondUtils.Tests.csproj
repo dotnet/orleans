@@ -28,39 +28,26 @@
 
   <Choose>
     <When Condition="$(OrleansTestingHostVersion) == $(VersionPrefix)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="..\..\..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
       </ItemGroup>
     </When>
     <Otherwise>
       <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.TestingHost" Version="$(OrleansTestingHostVersion)"/>
-      </ItemGroup>
-    </Otherwise>
-  </Choose>
-
-  <Choose>
-    <When Condition="$(OrleansCoreLegacyVersion) == $(VersionPrefix)">
-      <ItemGroup >
-        <ProjectReference Include="..\..\..\..\src\Orleans.Core.Legacy\Orleans.Core.Legacy.csproj" />
-      </ItemGroup>
-    </When>
-    <Otherwise>
-      <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.Core.Legacy" Version="$(OrleansCoreLegacyVersion)"/>
+        <PackageReference Include="Microsoft.Orleans.TestingHost" Version="$(OrleansTestingHostVersion)" />
       </ItemGroup>
     </Otherwise>
   </Choose>
 
   <Choose>
     <When Condition="$(OrleansSerializersVersion) == $(VersionPrefix)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="..\..\..\..\src\Serializers\Orleans.Serialization.Bond\Orleans.Serialization.Bond.csproj" />
       </ItemGroup>
     </When>
     <Otherwise>
       <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.Serialization.Bond" Version="$(OrleansSerializersVersion)"/>
+        <PackageReference Include="Microsoft.Orleans.Serialization.Bond" Version="$(OrleansSerializersVersion)" />
       </ItemGroup>
     </Otherwise>
   </Choose>

@@ -5,6 +5,7 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Runtime.Providers;
 using Orleans.Streams;
@@ -16,10 +17,17 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
     public class StreamLifecycleProducerInternalGrain : StreamLifecycleProducerGrain, IStreamLifecycleProducerInternalGrain
     {
+        public StreamLifecycleProducerInternalGrain(ILoggerFactory loggerFactory) : base(loggerFactory)
+        {
+        }
+
         public async Task TestInternalRemoveProducer(Guid streamId, string providerName)
         {
-            if (logger.IsVerbose)
-                logger.Verbose("RemoveProducer StreamId={0} StreamProvider={1}", streamId, providerName);
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug("RemoveProducer StreamId={0} StreamProvider={1}", streamId, providerName);
+            }
+
             if (!State.IsProducer) throw new InvalidOperationException("Not a Producer");
 
             // Whitebox testing
@@ -34,11 +42,11 @@ namespace UnitTests.Grains
 
         public async Task DoBadDeactivateNoClose()
         {
-            if (logger.IsVerbose)
-                logger.Verbose("DoBadDeactivateNoClose");
+            if (logger.IsEnabled(LogLevel.Debug))
+                logger.LogDebug("DoBadDeactivateNoClose");
 
-            if (logger.IsVerbose)
-                logger.Verbose("Suppressing Cleanup when Deactivate for stream {0}", State.Stream);
+            if (logger.IsEnabled(LogLevel.Debug))
+                logger.LogDebug("Suppressing Cleanup when Deactivate for stream {0}", State.Stream);
             StreamResourceTestControl.TestOnlySuppressStreamCleanupOnDeactivate = true;
 
             State.IsProducer = false;
@@ -47,7 +55,7 @@ namespace UnitTests.Grains
             await WriteStateAsync();
 #endif
 
-            if (logger.IsVerbose) logger.Verbose("Calling DeactivateOnIdle");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Calling DeactivateOnIdle");
             base.DeactivateOnIdle();
         }
     }
@@ -55,8 +63,8 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
     internal class StreamLifecycleConsumerInternalGrain : StreamLifecycleConsumerGrain, IStreamLifecycleConsumerInternalGrain
     {
-        public StreamLifecycleConsumerInternalGrain(ISiloRuntimeClient runtimeClient, IStreamProviderRuntime streamProviderRuntime)
-            : base(runtimeClient, streamProviderRuntime)
+        public StreamLifecycleConsumerInternalGrain(ILoggerFactory loggerFactory, ISiloRuntimeClient runtimeClient, IStreamProviderRuntime streamProviderRuntime)
+            : base(runtimeClient, streamProviderRuntime, loggerFactory)
         {
         }
 

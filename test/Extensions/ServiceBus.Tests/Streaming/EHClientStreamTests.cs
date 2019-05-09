@@ -41,10 +41,6 @@ namespace ServiceBus.Tests.StreamingTests
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             TestUtils.CheckForEventHub();
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                AdjustConfig(legacy.ClusterConfiguration);
-            });
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
         }
@@ -56,6 +52,7 @@ namespace ServiceBus.Tests.StreamingTests
                 hostBuilder
                     .AddPersistentStreams(StreamProviderName, TestEventHubStreamAdapterFactory.Create, b=>
                     {
+                        b.Configure<SiloMessagingOptions>(ob => ob.Configure(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5)));
                         b.Configure<EventHubOptions>(ob => ob.Configure(options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
@@ -103,12 +100,6 @@ namespace ServiceBus.Tests.StreamingTests
             logger.Info("************************ EHStreamConsumerOnDroppedClientTest *********************************");
             await runner.StreamConsumerOnDroppedClientTest(StreamProviderName, StreamNamespace, output,
                     () => TestAzureTableStorageStreamFailureHandler.GetDeliveryFailureCount(StreamProviderName, NullLoggerFactory.Instance), true);
-        }
-
-        private static void AdjustConfig(ClusterConfiguration config)
-        {
-            // register stream provider
-            config.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
         }
     }
 }
