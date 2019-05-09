@@ -6,6 +6,7 @@ using Xunit;
 
 namespace Analyzers.Tests
 {
+    [TestCategory("BVT"), TestCategory("Analyzer")]
     public class AlwaysInterleaveDiagnosticAnalyzerTest : DiagnosticAnalyzerTestBase<AlwaysInterleaveDiagnosticAnalyzer>
     {
         protected override Task<(Diagnostic[], string)> GetDiagnosticsAsync(string source, params string[] extraUsings)
