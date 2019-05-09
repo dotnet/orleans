@@ -5,6 +5,10 @@ title: What's new in Orleans
 
 # What's new in Orleans?
 
+## [v2.3.2](https://github.com/dotnet/orleans/releases/tag/v2.3.2) May 9th 2019
+
+Three bug fixes.
+
 ## [v2.3.1](https://github.com/dotnet/orleans/releases/tag/v2.3.1) April 26th 2019
 
 A few improvements, a bug fix, and batch stream API added back.
