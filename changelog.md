@@ -7,6 +7,13 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [2.3.2] (changes since 2.3.1)
+
+- Non-breaking bug fixes
+  - On the client, close gateway connection to dead silos (#5561)
+  - Prevent NullReferenceException with some storage providers when state is Nullable<T> (#5570)
+  - Accommodate existing RequestContext.PropagateActivityId value in ClusterClient (#5575)
+  
 ### [2.3.1] (changes since 2.3.0)
 
 - Non-breaking improvements
@@ -18,7 +25,7 @@ The idea is to track end-user facing changes as they occur.*
   - Added batch stream production back in. (#5503)
 
 - Non-breaking bug fixes
-  -  Use local silo as default primary silo (#5522)
+  - Use local silo as default primary silo (#5522)
 
 ### [2.3.0] (changes since 2.2.0)
 
