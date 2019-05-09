@@ -100,11 +100,13 @@ namespace Orleans.Providers.Streams.Common
         private async Task Close(CancellationToken token)
         {
             if (!stateManager.PresetState(ProviderState.Closed)) return;
-            var siloRuntime = this.runtime as ISiloSideStreamProviderRuntime;
-            if (siloRuntime != null)
+            
+            var manager = this.pullingAgentManager;
+            if (manager != null)
             {
-                await pullingAgentManager.Stop();
+                await manager.Stop();
             }
+
             stateManager.CommitState();
         }
 
