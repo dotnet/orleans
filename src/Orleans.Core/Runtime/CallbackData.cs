@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Transactions;
@@ -9,6 +10,7 @@ namespace Orleans.Runtime
     {
         private readonly SharedCallbackData shared;
         private readonly TaskCompletionSource<object> context;
+        private int completed;
         private ValueStopwatch stopwatch;
 
         public CallbackData(
@@ -27,7 +29,7 @@ namespace Orleans.Runtime
 
         public Message Message { get; set; } // might hold metadata used by response pipeline
 
-        public bool IsCompleted { get; private set; }
+        public bool IsCompleted => this.completed == 1;
 
         public bool IsExpired(long currentTimestamp)
         {
@@ -67,12 +69,9 @@ namespace Orleans.Runtime
         {
             if (this.IsCompleted)
                 return;
-            var requestStatistics = this.shared.RequestStatistics;
-            lock (this)
+            if (Interlocked.CompareExchange(ref this.completed, 1, 0) == 0)
             {
-                if (this.IsCompleted)
-                    return;
-
+                var requestStatistics = this.shared.RequestStatistics;
                 if (response.Result == Message.ResponseTypes.Rejection && response.RejectionType == Message.RejectionTypes.Transient)
                 {
                     if (this.shared.ShouldResend(this.Message))
@@ -81,55 +80,50 @@ namespace Orleans.Runtime
                     }
                 }
 
-                this.IsCompleted = true;
                 if (requestStatistics.CollectApplicationRequestsStats)
                 {
                     this.stopwatch.Stop();
                 }
-            }
 
-            if (requestStatistics.CollectApplicationRequestsStats)
-            {
-                requestStatistics.OnAppRequestsEnd(this.stopwatch.Elapsed);
-            }
+                if (requestStatistics.CollectApplicationRequestsStats)
+                {
+                    requestStatistics.OnAppRequestsEnd(this.stopwatch.Elapsed);
+                }
 
-            // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
-            this.shared.ResponseCallback(response, this.context);
+                // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
+                this.shared.ResponseCallback(response, this.context);
+            }
         }
 
         private void OnFail(Message msg, Message error, string resendLogMessageFormat, bool isOnTimeout = false)
         {
-            var requestStatistics = this.shared.RequestStatistics;
-            lock (this)
+            if (Interlocked.CompareExchange(ref this.completed, 1, 0) == 0)
             {
-                if (this.IsCompleted)
-                    return;
-
+                var requestStatistics = this.shared.RequestStatistics;
                 if (this.shared.MessagingOptions.ResendOnTimeout && this.shared.ShouldResend(msg))
                 {
                     if (this.shared.Logger.IsEnabled(LogLevel.Debug)) this.shared.Logger.Debug(resendLogMessageFormat, msg.ResendCount, msg);
                     return;
                 }
 
-                this.IsCompleted = true;
                 if (requestStatistics.CollectApplicationRequestsStats)
                 {
                     this.stopwatch.Stop();
                 }
 
                 this.shared.Unregister(this.Message);
-            }
-            
-            if (requestStatistics.CollectApplicationRequestsStats)
-            {
-                requestStatistics.OnAppRequestsEnd(this.stopwatch.Elapsed);
-                if (isOnTimeout)
-                {
-                    requestStatistics.OnAppRequestsTimedOut();
-                }
-            }
 
-            this.shared.ResponseCallback(error, this.context);
+                if (requestStatistics.CollectApplicationRequestsStats)
+                {
+                    requestStatistics.OnAppRequestsEnd(this.stopwatch.Elapsed);
+                    if (isOnTimeout)
+                    {
+                        requestStatistics.OnAppRequestsTimedOut();
+                    }
+                }
+
+                this.shared.ResponseCallback(error, this.context);
+            }
         }
     }
 }
