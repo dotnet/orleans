@@ -140,7 +140,10 @@ namespace Orleans.TestingHost
                 WriteLog(startMsg);
                 await InitializeAsync();
 
-                await WaitForInitialStabilization();
+                if (this.options.InitializeClientOnDeploy)
+                {
+                    await WaitForInitialStabilization();
+                }
             }
             catch (TimeoutException te)
             {
@@ -350,7 +353,10 @@ namespace Orleans.TestingHost
         {
             try
             {
-                await this.InternalClient?.Close();
+                if (InternalClient != null)
+                {
+                    await this.InternalClient.Close();
+                }                
             }
             catch (Exception exc)
             {
@@ -423,8 +429,11 @@ namespace Orleans.TestingHost
         /// </summary>
         public async Task KillClientAsync()
         {
-            await this.InternalClient?.AbortAsync();
-            this.InternalClient = null;
+            if (InternalClient != null)
+            {
+                await this.InternalClient.AbortAsync();
+                this.InternalClient = null;
+            }
         }
 
         /// <summary>
