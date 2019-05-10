@@ -3,6 +3,7 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Running;
 using Grains;
 using Grains.Models;
@@ -68,7 +69,7 @@ namespace Silo
 
         public static void Main()
         {
-            BenchmarkRunner.Run<SequentialBenchmarks>();
+            BenchmarkRunner.Run<Benchmarks>(new DebugBuildConfig());
         }
 
         public static async Task TestSequentialUpsertsOnDictionaryGrainAsync()

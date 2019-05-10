@@ -3,6 +3,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Configs;
 using Grains;
 using Grains.Models;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,12 +12,26 @@ using Orleans;
 
 namespace Silo
 {
+    [Config(typeof(Config))]
     [MarkdownExporter]
-    public class SequentialBenchmarks
+    public class Benchmarks
     {
         private IHost host;
         private IDictionaryLookupGrain dictionary;
         private ImmutableList<LookupItem> items;
+
+        
+        public Benchmarks()
+        {
+        }
+
+        public class Config: ManualConfig
+        {
+            public Config()
+            {
+                Add(new ThroughputColumn("Throughput", nameof(ItemCount)));
+            }
+        }
 
         [GlobalSetup]
         public void GlobalSetup()
