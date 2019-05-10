@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -73,7 +73,7 @@ namespace Orleans.CodeGenerator.Compatibility
             {
                 return (int)attr.ConstructorArguments.First().Value;
             }
-            
+
             var fullName = FormatTypeForIdComputation(type);
             return CalculateIdHash(fullName);
         }
@@ -182,36 +182,42 @@ namespace Orleans.CodeGenerator.Compatibility
         public static string OrleansTypeKeyString(this ITypeSymbol t)
         {
             var sb = new StringBuilder();
+            OrleansTypeKeyString(t, sb);
 
+            return sb.ToString();
+        }
+
+        private static void OrleansTypeKeyString(ITypeSymbol t, StringBuilder sb)
+        {
             var namedType = t as INamedTypeSymbol;
 
             // Check if the type is a non-constructed generic type.
-            if (namedType != null && namedType.IsGenericType && namedType.ConstructedFrom.Equals(t))
+            if (namedType != null && IsGenericTypeDefinition(namedType, out var typeParamsLength))
             {
-                sb.Append(GetBaseTypeKey(t));
+                GetBaseTypeKey(t, sb);
                 sb.Append('\'');
-                sb.Append(namedType.TypeParameters.Length);
+                sb.Append(typeParamsLength);
             }
             else if (namedType != null && namedType.IsGenericType)
             {
-                sb.Append(GetBaseTypeKey(t));
+                GetBaseTypeKey(t, sb);
                 sb.Append('<');
                 var first = true;
-                foreach (var genericArgument in namedType.TypeArguments)
+                foreach (var genericArgument in namedType.GetHierarchyTypeArguments())
                 {
                     if (!first)
                     {
                         sb.Append(',');
                     }
                     first = false;
-                    sb.Append(OrleansTypeKeyString(genericArgument));
+                    OrleansTypeKeyString(genericArgument, sb);
                 }
 
                 sb.Append('>');
             }
             else if (t is IArrayTypeSymbol arrayType)
             {
-                sb.Append(OrleansTypeKeyString(arrayType.ElementType));
+                OrleansTypeKeyString(arrayType.ElementType, sb);
 
                 sb.Append('[');
                 if (arrayType.Rank > 1)
@@ -220,15 +226,19 @@ namespace Orleans.CodeGenerator.Compatibility
                 }
                 sb.Append(']');
             }
+            else if (t is IPointerTypeSymbol pointerType)
+            {
+                OrleansTypeKeyString(pointerType.PointedAtType, sb);
+
+                sb.Append("*");
+            }
             else
             {
-                sb.Append(GetBaseTypeKey(t));
+                GetBaseTypeKey(t, sb);
             }
-
-            return sb.ToString();
         }
 
-        private static string GetBaseTypeKey(ITypeSymbol type)
+        private static void GetBaseTypeKey(ITypeSymbol type, StringBuilder sb)
         {
             var namespacePrefix = "";
             var ns = type.ContainingNamespace?.ToString();
@@ -239,10 +249,19 @@ namespace Orleans.CodeGenerator.Compatibility
 
             if (type.DeclaredAccessibility == Accessibility.Public && type.ContainingType != null)
             {
-                return namespacePrefix + OrleansTypeKeyString(type.ContainingType) + "." + type.Name;
+                sb.Append(namespacePrefix);
+                OrleansTypeKeyString(type.OriginalDefinition?.ContainingType ?? type.ContainingType, sb);
+                sb.Append('.').Append(type.Name);
+            }
+            else
+            {
+                sb.Append(namespacePrefix).Append(type.Name);
             }
 
-            return namespacePrefix + type.Name;
+            if (type is INamedTypeSymbol namedType && namedType.IsGenericType && namedType.TypeArguments.Length > 0)
+            {
+                sb.Append('`').Append(namedType.TypeArguments.Length);
+            }
         }
 
         public static string GetTemplatedName(ITypeSymbol type, Func<ITypeSymbol, bool> fullName = null)
@@ -385,6 +404,24 @@ namespace Orleans.CodeGenerator.Compatibility
                 if (named.TypeArguments.Length > 0) return $"`{named.TypeArguments.Length}";
                 return string.Empty;
             }
+        }
+
+        static bool IsGenericTypeDefinition(INamedTypeSymbol type, out int typeParamsLength)
+        {
+            if (type.IsUnboundGenericType)
+            {
+                typeParamsLength = type.GetHierarchyTypeArguments().Count();
+                return true;
+            }
+
+            if (type.IsGenericType && type.GetNestedHierarchy().All(t => t.ConstructedFrom == t))
+            {
+                typeParamsLength = type.GetHierarchyTypeArguments().Count();
+                return true;
+            }
+
+            typeParamsLength = 0;
+            return false;
         }
     }
 }
