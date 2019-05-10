@@ -20,16 +20,11 @@ namespace Silo
         private IDictionaryLookupGrain dictionary;
         private ImmutableList<LookupItem> items;
 
-        
-        public Benchmarks()
-        {
-        }
-
-        public class Config: ManualConfig
+        public class Config : ManualConfig
         {
             public Config()
             {
-                Add(new ThroughputColumn("Throughput", nameof(ItemCount)));
+                Add(new ParameterOperationsPerSecondColumn(nameof(ItemCount), "Items/s"));
             }
         }
 
@@ -59,10 +54,10 @@ namespace Silo
         [GlobalCleanup]
         public void GlobalCleanup() => host.StopAsync().Wait();
 
-        [Params(10000)]
+        [Params(1000, 10000, 100000)]
         public int ItemCount { get; set; }
 
-        [Benchmark(OperationsPerInvoke = 10000)]
+        [Benchmark]
         public async Task SequentialDictionaryUpsert()
         {
             foreach (var item in items)
