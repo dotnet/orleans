@@ -1,5 +1,6 @@
 using System;
 using BenchmarkDotNet.Configs;
+using BenchmarkDotNet.Reports;
 using BenchmarkDotNet.Running;
 using Grains;
 using Microsoft.Extensions.DependencyInjection;
@@ -59,6 +60,6 @@ namespace Silo
                 .Build();
         }
 
-        public static void Main() => BenchmarkRunner.Run<Benchmarks>();
+        public static void Main() => BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run();
     }
 }
