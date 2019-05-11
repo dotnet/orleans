@@ -42,5 +42,18 @@ namespace Grains
             DeactivateOnIdle();
             return Task.CompletedTask;
         }
+
+        public Task<ImmutableList<LookupItem>> TryGetRangeAsync(ImmutableList<int> keys)
+        {
+            var results = ImmutableList.CreateBuilder<LookupItem>();
+            foreach (var key in keys)
+            {
+                if (lookup.TryGetValue(key, out var value))
+                {
+                    results.Add(value);
+                }
+            }
+            return Task.FromResult(results.ToImmutable());
+        }
     }
 }
