@@ -24,13 +24,15 @@ namespace Grains
             return Task.CompletedTask;
         }
 
-        public Task SetAsync(ImmutableList<LookupItem> items)
+        public Task SetRangeAsync(ImmutableList<LookupItem> items)
         {
-            foreach (var item in items)
+            return Task.Run(() =>
             {
-                lookup[item.Key] = item;
-            }
-            return Task.CompletedTask;
+                foreach (var item in items)
+                {
+                    lookup[item.Key] = item;
+                }
+            });
         }
 
         public Task StartAsync() => Task.CompletedTask;

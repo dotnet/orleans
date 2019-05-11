@@ -24,7 +24,7 @@ namespace Grains
             return Task.CompletedTask;
         }
 
-        public Task SetAsync(ImmutableList<LookupItem> items)
+        public Task SetRangeAsync(ImmutableList<LookupItem> items)
         {
             foreach (var item in items)
             {
