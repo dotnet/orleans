@@ -11,7 +11,7 @@ using Orleans.Runtime;
 
 namespace Silo
 {
-    [ShortRunJob, EvaluateOverhead(false), AllStatisticsColumn, MarkdownExporter]
+    [ShortRunJob, EvaluateOverhead(false), AllStatisticsColumn, MarkdownExporter, RunOncePerIteration]
     [GcServer(true), GcConcurrent(true)]
     public class RangeSetBenchmarks
     {
@@ -24,6 +24,7 @@ namespace Silo
         [GlobalSetup]
         public void GlobalSetup()
         {
+            // prepare workload
             data = Enumerable.Range(0, Items)
                 .Select(i => new LookupItem(i, i, DateTime.UtcNow))
                 .BatchIEnumerable(BatchSize)
@@ -71,11 +72,11 @@ namespace Silo
         [Params(1, 2, 4)]
         public int Concurrency { get; set; }
 
-        [Params(1 << 19, 1 << 18, 1 << 17)]
+        [Params(1 << 18, 1 << 17, 1 << 16)]
         public int BatchSize { get; set; }
 
         [Benchmark(OperationsPerInvoke = ItemCount)]
-        public void DictionaryGrainSet()
+        public void DictionaryGrainRangeSet()
         {
             var pipeline = new AsyncPipeline(Concurrency);
             pipeline.AddRange(data.Select(_ => dictionaryGrain.SetRangeAsync(_)));
@@ -83,7 +84,7 @@ namespace Silo
         }
 
         [Benchmark(OperationsPerInvoke = ItemCount)]
-        public void ConcurrentDictionarySet()
+        public void ConcurrentDictionaryRangeSet()
         {
             var pipeline = new AsyncPipeline(Concurrency);
             pipeline.AddRange(data.Select(_ => concurrentDictionaryGrain.SetRangeAsync(_)));

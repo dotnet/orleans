@@ -11,31 +11,42 @@ using Orleans.Runtime;
 
 namespace Silo
 {
-    [ShortRunJob, MarkdownExporter, AllStatisticsColumn]
+    [ShortRunJob, EvaluateOverhead(false), AllStatisticsColumn, MarkdownExporter, RunOncePerIteration]
     [GcServer(true), GcConcurrent(true)]
     public class GetBenchmarks
     {
-        private IHost host;
+        private readonly IHost host = Program.BuildHost();
         private IDictionaryLookupGrain dictionaryGrain;
         private IConcurrentDictionaryLookupGrain concurrentDictionaryGrain;
         private int[] data;
-        private const int Items = 1 << 14;
+        private const int Items = 1 << 13;
 
         [GlobalSetup]
         public void GlobalSetup()
         {
-            host = Program.BuildHost();
+            // prepare the lookup workload
+            data = Enumerable.Range(0, Items).ToArray();
+
+            // prepare preloaded data
+            var values = Enumerable.Range(0, Items)
+                .Select(x => new LookupItem(x, x, DateTime.UtcNow))
+                .ToImmutableList();
+
+            // startup orleans
             host.StartAsync().Wait();
 
-            var values = Enumerable.Range(0, Items).Select(x => new LookupItem(x, x, DateTime.UtcNow)).ToImmutableList();
+            // grab a proxy to the dictionary grain
+            dictionaryGrain = host.Services.GetService<IGrainFactory>()
+                .GetGrain<IDictionaryLookupGrain>(Guid.Empty);
 
-            dictionaryGrain = host.Services.GetService<IGrainFactory>().GetGrain<IDictionaryLookupGrain>(Guid.Empty);
+            // preload the dictionary grain
             dictionaryGrain.SetRangeAsync(values).Wait();
 
+            // grab a proxy to the concurrent dictionary grain
             concurrentDictionaryGrain = host.Services.GetService<IGrainFactory>().GetGrain<IConcurrentDictionaryLookupGrain>(Guid.Empty);
-            concurrentDictionaryGrain.SetRangeAsync(values).Wait();
 
-            data = Enumerable.Range(0, Items).ToArray();
+            // preload the dictionary grain
+            concurrentDictionaryGrain.SetRangeAsync(values).Wait();
         }
 
         [GlobalCleanup]
