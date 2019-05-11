@@ -28,6 +28,10 @@ namespace Silo
                         category.StartsWith("Orleans.") || category.StartsWith("Runtime.")
                         ? level >= LogLevel.Warning
                         : level >= LogLevel.Information);
+                    _.AddFilter("Orleans.Runtime.Catalog", LogLevel.None);
+                    _.AddFilter("Orleans.Runtime.HostedClient", LogLevel.None);
+                    _.AddFilter("Orleans.Runtime.Silo", LogLevel.None);
+                    _.AddFilter("Orleans.Runtime.ClientObserverRegistrar", LogLevel.None);
                     _.SetMinimumLevel(LogLevel.Information);
                 })
                 .ConfigureServices(_ =>

@@ -11,23 +11,27 @@ using Orleans.Runtime;
 
 namespace Silo
 {
-    [ShortRunJob, EvaluateOverhead(false), AllStatisticsColumn, MarkdownExporter, RunOncePerIteration]
+    [ShortRunJob, EvaluateOverhead(false), AllStatisticsColumn, MarkdownExporter]
     [GcServer(true), GcConcurrent(true)]
-    public class DictionaryGetBenchmarks
+    public class DictionaryRangeGetBenchmarks
     {
         private readonly IHost host = Program.BuildHost();
         private IDictionaryGrain grain;
-        private int[] data;
-        private const int Items = 1 << 13;
+        private ImmutableList<int>[] input;
+        private ImmutableList<LookupItem> output;
+        private const int Items = 1 << 20;
 
         [GlobalSetup]
         public void GlobalSetup()
         {
             // prepare the lookup workload
-            data = Enumerable.Range(0, Items).ToArray();
+            input = Enumerable.Range(0, Items)
+                .BatchIEnumerable(BatchSize)
+                .Select(x => x.ToImmutableList())
+                .ToArray();
 
             // prepare preloaded data
-            var values = Enumerable.Range(0, Items)
+            output = Enumerable.Range(0, Items)
                 .Select(x => new LookupItem(x, x, DateTime.UtcNow))
                 .ToImmutableList();
 
@@ -39,7 +43,7 @@ namespace Silo
                 .GetGrain<IDictionaryGrain>(Guid.Empty);
 
             // preload the dictionary grain
-            grain.SetRangeAsync(values).Wait();
+            grain.SetRangeAsync(output).Wait();
         }
 
         [GlobalCleanup]
@@ -48,11 +52,14 @@ namespace Silo
         [Params(1, 2, 4)]
         public int Concurrency { get; set; }
 
+        [Params(1 << 17, 1 << 16, 1 << 15)]
+        public int BatchSize { get; set; }
+
         [Benchmark(OperationsPerInvoke = Items)]
         public void Benchmark()
         {
             var pipeline = new AsyncPipeline(Concurrency);
-            pipeline.AddRange(data.Select(x => grain.TryGetAsync(x)));
+            pipeline.AddRange(input.Select(x => grain.TryGetRangeAsync(x)));
             pipeline.Wait();
         }
     }
