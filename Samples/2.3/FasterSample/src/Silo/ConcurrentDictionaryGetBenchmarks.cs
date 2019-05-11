@@ -13,11 +13,10 @@ namespace Silo
 {
     [ShortRunJob, EvaluateOverhead(false), AllStatisticsColumn, MarkdownExporter, RunOncePerIteration]
     [GcServer(true), GcConcurrent(true)]
-    public class GetBenchmarks
+    public class ConcurrentDictionaryGetBenchmarks
     {
         private readonly IHost host = Program.BuildHost();
-        private IDictionaryGrain dictionaryGrain;
-        private IConcurrentDictionaryGrain concurrentDictionaryGrain;
+        private IConcurrentDictionaryGrain grain;
         private int[] data;
         private const int Items = 1 << 13;
 
@@ -35,18 +34,11 @@ namespace Silo
             // startup orleans
             host.StartAsync().Wait();
 
-            // grab a proxy to the dictionary grain
-            dictionaryGrain = host.Services.GetService<IGrainFactory>()
-                .GetGrain<IDictionaryGrain>(Guid.Empty);
-
-            // preload the dictionary grain
-            dictionaryGrain.SetRangeAsync(values).Wait();
-
             // grab a proxy to the concurrent dictionary grain
-            concurrentDictionaryGrain = host.Services.GetService<IGrainFactory>().GetGrain<IConcurrentDictionaryGrain>(Guid.Empty);
+            grain = host.Services.GetService<IGrainFactory>().GetGrain<IConcurrentDictionaryGrain>(Guid.Empty);
 
             // preload the dictionary grain
-            concurrentDictionaryGrain.SetRangeAsync(values).Wait();
+            grain.SetRangeAsync(values).Wait();
         }
 
         [GlobalCleanup]
@@ -56,18 +48,10 @@ namespace Silo
         public int Concurrency { get; set; }
 
         [Benchmark(OperationsPerInvoke = Items)]
-        public void DictionaryGrainGet()
+        public void Benchmarks()
         {
             var pipeline = new AsyncPipeline(Concurrency);
-            pipeline.AddRange(data.Select(x => dictionaryGrain.TryGetAsync(x)));
-            pipeline.Wait();
-        }
-
-        [Benchmark(OperationsPerInvoke = Items)]
-        public void ConcurrentDictionaryGrainGet()
-        {
-            var pipeline = new AsyncPipeline(Concurrency);
-            pipeline.AddRange(data.Select(x => concurrentDictionaryGrain.TryGetAsync(x)));
+            pipeline.AddRange(data.Select(x => grain.TryGetAsync(x)));
             pipeline.Wait();
         }
     }

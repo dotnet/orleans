@@ -79,9 +79,51 @@ namespace Grains
             return Task.CompletedTask;
         }
 
-        public Task SetAsync(ImmutableList<LookupItem> items) => Task.CompletedTask;
+        public Task SetRangeAsync(ImmutableList<LookupItem> items)
+        {
+            var session = Guid.Empty;
+            try
+            {
+                session = lookup.StartSession();
+                foreach (var item in items)
+                {
+                    var key = item.Key;
+                    var ritem = item;
+                    lookup.Upsert(ref key, ref ritem, Empty.Default, 0);
+                }
+                lookup.Refresh();
+            }
+            finally
+            {
+                if (session != Guid.Empty)
+                {
+                    lookup.StopSession();
+                }
+            }
+            return Task.CompletedTask;
+        }
 
-        public Task<LookupItem> GetAsync(int key) => Task.FromResult<LookupItem>(null);
+        public Task<LookupItem> TryGetAsync(int key)
+        {
+            var session = Guid.Empty;
+            try
+            {
+                session = lookup.StartSession();
+                LookupItem result = null;
+                if (lookup.Read(ref key, ref result, ref result, Empty.Default, 0) == Status.ERROR)
+                {
+                    throw new ApplicationException();
+                }
+                return Task.FromResult(result);
+            }
+            finally
+            {
+                if (session != Guid.Empty)
+                {
+                    lookup.StopSession();
+                }
+            }
+        }
 
         public Task StartAsync() => Task.CompletedTask;
 
