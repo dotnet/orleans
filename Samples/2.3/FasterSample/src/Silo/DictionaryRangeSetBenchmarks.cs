@@ -13,11 +13,10 @@ namespace Silo
 {
     [ShortRunJob, EvaluateOverhead(false), AllStatisticsColumn, MarkdownExporter, RunOncePerIteration]
     [GcServer(true), GcConcurrent(true)]
-    public class RangeSetBenchmarks
+    public class DictionaryRangeSetBenchmarks
     {
         private readonly IHost host = Program.BuildHost();
-        private IDictionaryGrain dictionaryGrain;
-        private IConcurrentDictionaryGrain concurrentDictionaryGrain;
+        private IDictionaryGrain grain;
         private ImmutableList<LookupItem>[] data;
         private const int ItemCount = 1 << 20;
 
@@ -35,33 +34,15 @@ namespace Silo
             host.StartAsync().Wait();
 
             // grab a proxy to the dictionary grain
-            dictionaryGrain = host.Services.GetService<IGrainFactory>()
+            grain = host.Services.GetService<IGrainFactory>()
                 .GetGrain<IDictionaryGrain>(Guid.Empty);
-
-            // grab a proxy to the concurrent dictionary
-            concurrentDictionaryGrain = host.Services.GetService<IGrainFactory>()
-                .GetGrain<IConcurrentDictionaryGrain>(Guid.Empty);
         }
 
         [IterationSetup]
-        public void IterationSetup()
-        {
-            // warm up the dictionary grain
-            dictionaryGrain.StartAsync().Wait();
-
-            // warm up the concurrent dictionary grain
-            concurrentDictionaryGrain.StartAsync().Wait();
-        }
+        public void IterationSetup() => grain.StartAsync().Wait();
 
         [IterationCleanup]
-        public void IterationCleanup()
-        {
-            // deactivate the dictionary grain
-            dictionaryGrain.StopAsync().Wait();
-
-            // deactivate the concurrent dictionary grain
-            concurrentDictionaryGrain.StopAsync().Wait();
-        }
+        public void IterationCleanup() => grain.StopAsync().Wait();
 
         [GlobalCleanup]
         public void GlobalCleanup() => host.StopAsync().Wait();
@@ -76,18 +57,10 @@ namespace Silo
         public int BatchSize { get; set; }
 
         [Benchmark(OperationsPerInvoke = ItemCount)]
-        public void DictionaryGrainRangeSet()
+        public void Benchmark()
         {
             var pipeline = new AsyncPipeline(Concurrency);
-            pipeline.AddRange(data.Select(_ => dictionaryGrain.SetRangeAsync(_)));
-            pipeline.Wait();
-        }
-
-        [Benchmark(OperationsPerInvoke = ItemCount)]
-        public void ConcurrentDictionaryRangeSet()
-        {
-            var pipeline = new AsyncPipeline(Concurrency);
-            pipeline.AddRange(data.Select(_ => concurrentDictionaryGrain.SetRangeAsync(_)));
+            pipeline.AddRange(data.Select(_ => grain.SetRangeAsync(_)));
             pipeline.Wait();
         }
     }
