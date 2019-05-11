@@ -15,8 +15,9 @@ namespace Silo
     public class SetBenchmarks
     {
         private readonly IHost host = Program.BuildHost();
-        private IDictionaryLookupGrain dictionaryGrain;
-        private IConcurrentDictionaryLookupGrain concurrentDictionaryGrain;
+        private IDictionaryGrain dictionaryGrain;
+        private IConcurrentDictionaryGrain concurrentDictionaryGrain;
+        private IFasterSimpleGrain fasterSimpleGrain;
         private LookupItem[] data;
         private const int Items = 1 << 13;
 
@@ -33,11 +34,15 @@ namespace Silo
 
             // grab a proxy to the dictionary grain
             dictionaryGrain = host.Services.GetService<IGrainFactory>()
-                .GetGrain<IDictionaryLookupGrain>(Guid.Empty);
+                .GetGrain<IDictionaryGrain>(Guid.Empty);
 
             // grab a proxy to the concurrent dictionary
             concurrentDictionaryGrain = host.Services.GetService<IGrainFactory>()
-                .GetGrain<IConcurrentDictionaryLookupGrain>(Guid.Empty);
+                .GetGrain<IConcurrentDictionaryGrain>(Guid.Empty);
+
+            // grab a proxy to the faster simple grain
+            fasterSimpleGrain = host.Services.GetService<IGrainFactory>()
+                .GetGrain<IFasterSimpleGrain>(Guid.Empty);
         }
 
         [IterationSetup]
@@ -48,6 +53,9 @@ namespace Silo
 
             // warm up the concurrent dictionary grain
             concurrentDictionaryGrain.StartAsync().Wait();
+
+            // warm up the faster simple grain
+            fasterSimpleGrain.StartAsync().Wait();
         }
 
         [IterationCleanup]
@@ -58,6 +66,9 @@ namespace Silo
 
             // deactivate the concurrent dictionary grain
             concurrentDictionaryGrain.StopAsync().Wait();
+
+            // deactivate the faster simple grain
+            fasterSimpleGrain.StopAsync().Wait();
         }
 
         [GlobalCleanup]
@@ -79,6 +90,14 @@ namespace Silo
         {
             var pipeline = new AsyncPipeline(Concurrency);
             pipeline.AddRange(data.Select(_ => concurrentDictionaryGrain.SetAsync(_)));
+            pipeline.Wait();
+        }
+
+        [Benchmark(OperationsPerInvoke = Items)]
+        public void FasterSimpleSet()
+        {
+            var pipeline = new AsyncPipeline(Concurrency);
+            pipeline.AddRange(data.Select(_ => fasterSimpleGrain.SetAsync(_)));
             pipeline.Wait();
         }
     }

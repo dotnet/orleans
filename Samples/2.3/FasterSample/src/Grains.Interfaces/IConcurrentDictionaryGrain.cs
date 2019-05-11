@@ -5,7 +5,7 @@ using Orleans;
 
 namespace Grains
 {
-    public interface IDictionaryLookupGrain : IGrainWithGuidKey
+    public interface IConcurrentDictionaryGrain : IGrainWithGuidKey
     {
         Task StartAsync();
 

@@ -16,8 +16,8 @@ namespace Silo
     public class RangeSetBenchmarks
     {
         private readonly IHost host = Program.BuildHost();
-        private IDictionaryLookupGrain dictionaryGrain;
-        private IConcurrentDictionaryLookupGrain concurrentDictionaryGrain;
+        private IDictionaryGrain dictionaryGrain;
+        private IConcurrentDictionaryGrain concurrentDictionaryGrain;
         private ImmutableList<LookupItem>[] data;
         private const int ItemCount = 1 << 20;
 
@@ -36,11 +36,11 @@ namespace Silo
 
             // grab a proxy to the dictionary grain
             dictionaryGrain = host.Services.GetService<IGrainFactory>()
-                .GetGrain<IDictionaryLookupGrain>(Guid.Empty);
+                .GetGrain<IDictionaryGrain>(Guid.Empty);
 
             // grab a proxy to the concurrent dictionary
             concurrentDictionaryGrain = host.Services.GetService<IGrainFactory>()
-                .GetGrain<IConcurrentDictionaryLookupGrain>(Guid.Empty);
+                .GetGrain<IConcurrentDictionaryGrain>(Guid.Empty);
         }
 
         [IterationSetup]

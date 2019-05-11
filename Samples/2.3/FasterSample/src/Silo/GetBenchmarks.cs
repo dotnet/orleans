@@ -16,8 +16,8 @@ namespace Silo
     public class GetBenchmarks
     {
         private readonly IHost host = Program.BuildHost();
-        private IDictionaryLookupGrain dictionaryGrain;
-        private IConcurrentDictionaryLookupGrain concurrentDictionaryGrain;
+        private IDictionaryGrain dictionaryGrain;
+        private IConcurrentDictionaryGrain concurrentDictionaryGrain;
         private int[] data;
         private const int Items = 1 << 13;
 
@@ -37,13 +37,13 @@ namespace Silo
 
             // grab a proxy to the dictionary grain
             dictionaryGrain = host.Services.GetService<IGrainFactory>()
-                .GetGrain<IDictionaryLookupGrain>(Guid.Empty);
+                .GetGrain<IDictionaryGrain>(Guid.Empty);
 
             // preload the dictionary grain
             dictionaryGrain.SetRangeAsync(values).Wait();
 
             // grab a proxy to the concurrent dictionary grain
-            concurrentDictionaryGrain = host.Services.GetService<IGrainFactory>().GetGrain<IConcurrentDictionaryLookupGrain>(Guid.Empty);
+            concurrentDictionaryGrain = host.Services.GetService<IGrainFactory>().GetGrain<IConcurrentDictionaryGrain>(Guid.Empty);
 
             // preload the dictionary grain
             concurrentDictionaryGrain.SetRangeAsync(values).Wait();

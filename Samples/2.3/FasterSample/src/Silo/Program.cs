@@ -1,6 +1,4 @@
 using System;
-using BenchmarkDotNet.Configs;
-using BenchmarkDotNet.Reports;
 using BenchmarkDotNet.Running;
 using Grains;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,13 +13,13 @@ namespace Silo
 {
     public class Program
     {
-        public static IHost BuildHost()
-        {
-            return new HostBuilder()
+        public static IHost BuildHost() =>
+
+            new HostBuilder()
                 .UseOrleans(_ =>
                 {
                     _.UseLocalhostClustering();
-                    _.ConfigureApplicationParts(m => m.AddApplicationPart(typeof(VolatileLookupGrain).Assembly).WithReferences());
+                    _.ConfigureApplicationParts(m => m.AddApplicationPart(typeof(DictionaryGrain).Assembly).WithReferences());
                 })
                 .ConfigureLogging(_ =>
                 {
@@ -40,12 +38,10 @@ namespace Silo
                     });
                     _.Configure<FasterOptions>(x =>
                     {
-                        x.HybridLogDeviceBaseDirectory = @"C:\Temp\Faster";
-                        x.HybridLogDeviceFileTitle = @"hybrid.log";
-                        x.ObjectLogDeviceBaseDirectory = @"C:\Temp\Faster";
-                        x.ObjectLogDeviceFileTitle = @"object.log";
-                        x.CheckpointBaseDirectory = @"C:\Temp\faster-checkpoints";
-                        x.CheckpointContainerDirectory = @"checkpoints";
+                        x.BaseDirectory = @"D:\Temp\Faster";
+                        x.HybridLogDeviceFileTitle = "hybrid.log";
+                        x.ObjectLogDeviceFileTitle = "object.log";
+                        x.CheckpointsSubDirectory = "checkpoints";
                     });
                     _.Configure<SerializationProviderOptions>(x =>
                     {
@@ -58,7 +54,6 @@ namespace Silo
                 })
                 .UseConsoleLifetime()
                 .Build();
-        }
 
         public static void Main() => BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run();
     }

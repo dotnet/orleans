@@ -5,7 +5,7 @@ using Orleans;
 
 namespace Grains
 {
-    public interface IConcurrentDictionaryLookupGrain : IGrainWithGuidKey
+    public interface IFasterSimpleGrain : IGrainWithGuidKey
     {
         Task StartAsync();
 
@@ -13,8 +13,8 @@ namespace Grains
 
         Task SetAsync(LookupItem item);
 
-        Task SetRangeAsync(ImmutableList<LookupItem> items);
+        Task SetAsync(ImmutableList<LookupItem> items);
 
-        Task<LookupItem> TryGetAsync(int key);
+        Task<LookupItem> GetAsync(int key);
     }
 }

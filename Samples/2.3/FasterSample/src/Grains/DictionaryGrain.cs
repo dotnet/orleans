@@ -8,7 +8,7 @@ using Orleans.Concurrency;
 namespace Grains
 {
     [Reentrant]
-    public class DictionaryLookupGrain : Grain, IDictionaryLookupGrain
+    public class DictionaryGrain : Grain, IDictionaryGrain
     {
         private readonly Dictionary<int, LookupItem> lookup = new Dictionary<int, LookupItem>();
 
