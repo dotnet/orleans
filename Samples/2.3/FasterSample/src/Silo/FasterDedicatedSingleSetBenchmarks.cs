@@ -12,10 +12,10 @@ namespace Silo
 {
     [ShortRunJob, EvaluateOverhead(false), AllStatisticsColumn, MarkdownExporter, RunOncePerIteration]
     [GcServer(true), GcConcurrent(true)]
-    public class FasterSimpleSingleSetBenchmarks
+    public class FasterDedicatedSingleSetBenchmarks
     {
         private IHost host;
-        private IFasterSimpleGrain grain;
+        private IFasterDedicatedGrain grain;
         private LookupItem[] data;
         private const int Items = 1 << 13;
 
@@ -29,7 +29,7 @@ namespace Silo
             host = Program.StartNewHost();
 
             grain = host.Services.GetService<IGrainFactory>()
-                .GetGrain<IFasterSimpleGrain>(Guid.Empty);
+                .GetGrain<IFasterDedicatedGrain>(Guid.Empty);
         }
 
         [IterationSetup]

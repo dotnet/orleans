@@ -14,7 +14,7 @@ namespace Silo
     [GcServer(true), GcConcurrent(true)]
     public class DictionarySingleSetBenchmarks
     {
-        private readonly IHost host = Program.BuildHost();
+        private IHost host;
         private IDictionaryGrain grain;
         private LookupItem[] data;
         private const int Items = 1 << 13;
@@ -28,7 +28,7 @@ namespace Silo
                 .ToArray();
 
             // start orleans
-            host.StartAsync().Wait();
+            host = Program.StartNewHost();
 
             // grab a proxy to the dictionary grain
             grain = host.Services.GetService<IGrainFactory>()

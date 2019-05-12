@@ -43,17 +43,20 @@ namespace Grains
             return Task.CompletedTask;
         }
 
-        public Task<ImmutableList<LookupItem>> TryGetRangeAsync(ImmutableList<int> keys)
+        public async Task<ImmutableList<LookupItem>> TryGetRangeAsync(ImmutableList<int> keys)
         {
             var results = ImmutableList.CreateBuilder<LookupItem>();
-            foreach (var key in keys)
+            await Task.Run(() =>
             {
-                if (lookup.TryGetValue(key, out var value))
+                foreach (var key in keys)
                 {
-                    results.Add(value);
+                    if (lookup.TryGetValue(key, out var value))
+                    {
+                        results.Add(value);
+                    }
                 }
-            }
-            return Task.FromResult(results.ToImmutable());
+            });
+            return results.ToImmutable();
         }
     }
 }

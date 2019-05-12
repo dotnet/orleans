@@ -1,20 +1,24 @@
 using System;
 using System.Collections.Immutable;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using FASTER.core;
 using Grains.Models;
 using Microsoft.Extensions.Options;
 using Orleans;
+using Orleans.Concurrency;
 
 namespace Grains
 {
+    [Reentrant]
     public class FasterSimpleGrain : Grain, IFasterSimpleGrain
     {
         private readonly FasterOptions options;
         private IDevice logDevice;
         private IDevice objectLogDevice;
         private FasterKV<int, LookupItem, LookupItem, LookupItem, Empty, LookupItemFunctions> lookup;
+        private SemaphoreSlim semaphore = new SemaphoreSlim(Environment.ProcessorCount, Environment.ProcessorCount);
 
         public FasterSimpleGrain(IOptions<FasterOptions> options)
         {
@@ -33,7 +37,7 @@ namespace Grains
 
             // create the faster lookup
             lookup = new FasterKV<int, LookupItem, LookupItem, LookupItem, Empty, LookupItemFunctions>(
-                1L << 20,
+                1L << 21,
                 new LookupItemFunctions(),
                 new LogSettings()
                 {
@@ -58,49 +62,59 @@ namespace Grains
             return base.OnDeactivateAsync();
         }
 
-        public Task SetAsync(LookupItem item)
+        public async Task SetAsync(LookupItem item)
         {
-            var session = Guid.Empty;
+            await semaphore.WaitAsync();
+
             try
             {
-                session = lookup.StartSession();
+                lookup.StartSession();
 
                 var key = item.Key;
                 lookup.Upsert(ref key, ref item, Empty.Default, 0);
-                lookup.Refresh();
             }
             finally
             {
-                if (session != Guid.Empty)
+                try
                 {
                     lookup.StopSession();
                 }
+                finally
+                {
+                    semaphore.Release();
+                }
             }
-            return Task.CompletedTask;
         }
 
         public Task SetRangeAsync(ImmutableList<LookupItem> items)
         {
-            var session = Guid.Empty;
-            try
+            return Task.Run(async () =>
             {
-                session = lookup.StartSession();
-                foreach (var item in items)
+                await semaphore.WaitAsync();
+
+                try
                 {
-                    var key = item.Key;
-                    var ritem = item;
-                    lookup.Upsert(ref key, ref ritem, Empty.Default, 0);
+                    lookup.StartSession();
+                    for (var i = 0; i < items.Count; ++i)
+                    {
+                        var item = items[i];
+                        var key = item.Key;
+                        lookup.Upsert(ref key, ref item, Empty.Default, i);
+                    }
                 }
-                lookup.Refresh();
-            }
-            finally
-            {
-                if (session != Guid.Empty)
+                finally
                 {
-                    lookup.StopSession();
+                    try
+                    {
+                        lookup.StopSession();
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
                 }
-            }
-            return Task.CompletedTask;
+                return Task.CompletedTask;
+            });
         }
 
         public Task<LookupItem> TryGetAsync(int key)
@@ -131,6 +145,45 @@ namespace Grains
         {
             DeactivateOnIdle();
             return Task.CompletedTask;
+        }
+
+        public Task<ImmutableList<LookupItem>> TryGetRangeAsync(ImmutableList<int> keys)
+        {
+            return Task.Run(() =>
+            {
+                var results = ImmutableList.CreateBuilder<LookupItem>();
+                var session = Guid.Empty;
+                try
+                {
+                    session = lookup.StartSession();
+                    for (var i = 0; i < keys.Count; ++i)
+                    {
+                        var key = keys[i];
+                        LookupItem result = null;
+                        var status = lookup.Read(ref key, ref result, ref result, Empty.Default, 0);
+                        switch (status)
+                        {
+                            case Status.OK:
+                                results.Add(result);
+                                break;
+
+                            case Status.NOTFOUND:
+                                break;
+
+                            default:
+                                throw new ApplicationException();
+                        }
+                    }
+                    return Task.FromResult(results.ToImmutable());
+                }
+                finally
+                {
+                    if (session != Guid.Empty)
+                    {
+                        lookup.StopSession();
+                    }
+                }
+            });
         }
     }
 }

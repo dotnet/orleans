@@ -15,7 +15,7 @@ namespace Silo
     [GcServer(true), GcConcurrent(true)]
     public class FasterSimpleRangeSetBenchmarks
     {
-        private readonly IHost host = Program.BuildHost();
+        private IHost host;
         private IFasterSimpleGrain grain;
         private ImmutableList<LookupItem>[] data;
         private const int ItemCount = 1 << 20;
@@ -31,18 +31,15 @@ namespace Silo
                 .ToArray();
 
             // start orleans
-            host.StartAsync().Wait();
+            host = Program.StartNewHost();
 
-            // grab a proxy to the concurrent dictionary grain
+            // grab a proxy to the grain
             grain = host.Services.GetService<IGrainFactory>()
                 .GetGrain<IFasterSimpleGrain>(Guid.Empty);
+
+            // activate the grain
+            grain.StartAsync().Wait();
         }
-
-        [IterationSetup]
-        public void IterationSetup() => grain.StartAsync().Wait();
-
-        [IterationCleanup]
-        public void IterationCleanup() => grain.StopAsync().Wait();
 
         [GlobalCleanup]
         public void GlobalCleanup() => host.StopAsync().Wait();
@@ -50,10 +47,10 @@ namespace Silo
         [Params(ItemCount)]
         public int Items { get; set; }
 
-        [Params(1, 2, 4)]
+        [Params(1, 2, 4, 8)]
         public int Concurrency { get; set; }
 
-        [Params(1 << 18, 1 << 17, 1 << 16)]
+        [Params(1 << 10, 1 << 11, 1 << 12)]
         public int BatchSize { get; set; }
 
         [Benchmark(OperationsPerInvoke = ItemCount)]

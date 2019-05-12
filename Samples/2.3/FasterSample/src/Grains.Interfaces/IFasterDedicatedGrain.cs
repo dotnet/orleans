@@ -5,7 +5,7 @@ using Orleans;
 
 namespace Grains
 {
-    public interface IFasterSimpleGrain : IGrainWithGuidKey
+    public interface IFasterDedicatedGrain : IGrainWithGuidKey
     {
         Task StartAsync();
 

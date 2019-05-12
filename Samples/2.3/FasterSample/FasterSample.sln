@@ -3,11 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.28803.352
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Silo", "src\Silo\Silo.csproj", "{B611C1AA-A7DC-47B1-9614-F671283FD1CB}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Silo", "src\Silo\Silo.csproj", "{B611C1AA-A7DC-47B1-9614-F671283FD1CB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Grains", "src\Grains\Grains.csproj", "{7BCEDA85-B7E5-4930-9339-7657EAE9C9B3}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Grains", "src\Grains\Grains.csproj", "{7BCEDA85-B7E5-4930-9339-7657EAE9C9B3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Grains.Interfaces", "src\Grains.Interfaces\Grains.Interfaces.csproj", "{A780BFB6-12EF-4999-BEC5-FE565DE940D8}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Grains.Interfaces", "src\Grains.Interfaces\Grains.Interfaces.csproj", "{A780BFB6-12EF-4999-BEC5-FE565DE940D8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

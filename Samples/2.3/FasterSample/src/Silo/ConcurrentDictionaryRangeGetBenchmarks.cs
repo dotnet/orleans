@@ -15,7 +15,7 @@ namespace Silo
     [GcServer(true), GcConcurrent(true)]
     public class ConcurrentDictionaryRangeGetBenchmarks
     {
-        private readonly IHost host = Program.BuildHost();
+        private IHost host;
         private IConcurrentDictionaryGrain grain;
         private ImmutableList<int>[] input;
         private ImmutableList<LookupItem> output;
@@ -36,7 +36,7 @@ namespace Silo
                 .ToImmutableList();
 
             // startup orleans
-            host.StartAsync().Wait();
+            host = Program.StartNewHost();
 
             // grab a proxy to the dictionary grain
             grain = host.Services.GetService<IGrainFactory>()

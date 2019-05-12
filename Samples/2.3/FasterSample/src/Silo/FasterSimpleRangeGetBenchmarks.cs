@@ -11,56 +11,55 @@ using Orleans.Runtime;
 
 namespace Silo
 {
-    [ShortRunJob, EvaluateOverhead(false), AllStatisticsColumn, MarkdownExporter, RunOncePerIteration]
+    [ShortRunJob, EvaluateOverhead(false), AllStatisticsColumn, MarkdownExporter]
     [GcServer(true), GcConcurrent(true)]
-    public class DictionaryRangeSetBenchmarks
+    public class FasterSimpleRangeGetBenchmarks
     {
         private IHost host;
-        private IDictionaryGrain grain;
-        private ImmutableList<LookupItem>[] data;
-        private const int ItemCount = 1 << 20;
+        private IFasterSimpleGrain grain;
+        private ImmutableList<int>[] input;
+        private ImmutableList<LookupItem> output;
+        private const int Items = 1 << 20;
 
         [GlobalSetup]
         public void GlobalSetup()
         {
-            // prepare workload
-            data = Enumerable.Range(0, Items)
-                .Select(i => new LookupItem(i, i, DateTime.UtcNow))
+            // prepare the lookup workload
+            input = Enumerable.Range(0, Items)
                 .BatchIEnumerable(BatchSize)
-                .Select(_ => _.ToImmutableList())
+                .Select(x => x.ToImmutableList())
                 .ToArray();
 
-            // start orleans
+            // prepare preloaded data
+            output = Enumerable.Range(0, Items)
+                .Select(x => new LookupItem(x, x, DateTime.UtcNow))
+                .ToImmutableList();
+
+            // startup orleans
             host = Program.StartNewHost();
 
             // grab a proxy to the dictionary grain
             grain = host.Services.GetService<IGrainFactory>()
-                .GetGrain<IDictionaryGrain>(Guid.Empty);
+                .GetGrain<IFasterSimpleGrain>(Guid.Empty);
+
+            // preload the dictionary grain
+            grain.SetRangeAsync(output).Wait();
         }
-
-        [IterationSetup]
-        public void IterationSetup() => grain.StartAsync().Wait();
-
-        [IterationCleanup]
-        public void IterationCleanup() => grain.StopAsync().Wait();
 
         [GlobalCleanup]
         public void GlobalCleanup() => host.StopAsync().Wait();
 
-        [Params(ItemCount)]
-        public int Items { get; set; }
-
         [Params(1, 2, 4)]
         public int Concurrency { get; set; }
 
-        [Params(1 << 18, 1 << 17, 1 << 16)]
+        [Params(1 << 20, 1 << 19, 1 << 18)]
         public int BatchSize { get; set; }
 
-        [Benchmark(OperationsPerInvoke = ItemCount)]
+        [Benchmark(OperationsPerInvoke = Items)]
         public void Benchmark()
         {
             var pipeline = new AsyncPipeline(Concurrency);
-            pipeline.AddRange(data.Select(_ => grain.SetRangeAsync(_)));
+            pipeline.AddRange(input.Select(x => grain.TryGetRangeAsync(x)));
             pipeline.Wait();
         }
     }
