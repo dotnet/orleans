@@ -53,5 +53,21 @@ namespace Grains
             }
             return Task.FromResult(results.ToImmutable());
         }
+
+        public Task SetRangeDeltaAsync(ImmutableList<LookupItem> items)
+        {
+            foreach (var item in items)
+            {
+                if (lookup.TryGetValue(item.Key, out var existing))
+                {
+                    lookup[item.Key] = new LookupItem(item.Key, existing.Value + item.Value, item.Timestamp);
+                }
+                else
+                {
+                    lookup[item.Key] = item;
+                }
+            }
+            return Task.CompletedTask;
+        }
     }
 }

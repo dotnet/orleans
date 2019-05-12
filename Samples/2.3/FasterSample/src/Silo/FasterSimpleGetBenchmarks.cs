@@ -16,7 +16,7 @@ namespace Silo
     public class FasterSimpleGetBenchmarks
     {
         private IHost host;
-        private IFasterSimpleGrain grain;
+        private IFasterGrain grain;
         private int[] data;
         private const int Items = 1 << 13;
 
@@ -36,7 +36,7 @@ namespace Silo
 
             // grab a proxy to the dictionary grain
             grain = host.Services.GetService<IGrainFactory>()
-                .GetGrain<IFasterSimpleGrain>(Guid.Empty);
+                .GetGrain<IFasterGrain>(Guid.Empty);
 
             // preload the dictionary grain
             grain.SetRangeAsync(values).Wait();

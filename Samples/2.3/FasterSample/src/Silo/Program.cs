@@ -67,7 +67,7 @@ namespace Silo
 
         public static void Main()
         {
-            BenchmarkRunner.Run<FasterDedicatedRangeSetBenchmarks>();
+            BenchmarkRunner.Run<RangeDeltaBenchmarks>();
             //BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(config: new DebugInProcessConfig());
             //BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run();
         }

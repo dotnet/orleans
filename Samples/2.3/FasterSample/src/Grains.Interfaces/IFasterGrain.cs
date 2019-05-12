@@ -5,7 +5,7 @@ using Orleans;
 
 namespace Grains
 {
-    public interface IFasterSimpleGrain : IGrainWithGuidKey
+    public interface IFasterGrain : IGrainWithGuidKey
     {
         Task StartAsync();
 
@@ -14,6 +14,8 @@ namespace Grains
         Task SetAsync(LookupItem item);
 
         Task SetRangeAsync(ImmutableList<LookupItem> items);
+
+        Task SetRangeDeltaAsync(ImmutableList<LookupItem> items);
 
         Task<LookupItem> TryGetAsync(int key);
 

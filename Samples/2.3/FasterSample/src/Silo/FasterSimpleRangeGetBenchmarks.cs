@@ -16,7 +16,7 @@ namespace Silo
     public class FasterSimpleRangeGetBenchmarks
     {
         private IHost host;
-        private IFasterSimpleGrain grain;
+        private IFasterGrain grain;
         private ImmutableList<int>[] input;
         private ImmutableList<LookupItem> output;
         private const int Items = 1 << 20;
@@ -40,7 +40,7 @@ namespace Silo
 
             // grab a proxy to the dictionary grain
             grain = host.Services.GetService<IGrainFactory>()
-                .GetGrain<IFasterSimpleGrain>(Guid.Empty);
+                .GetGrain<IFasterGrain>(Guid.Empty);
 
             // preload the dictionary grain
             grain.SetRangeAsync(output).Wait();

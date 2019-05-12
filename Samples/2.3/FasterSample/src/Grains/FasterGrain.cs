@@ -12,7 +12,7 @@ using Orleans.Concurrency;
 namespace Grains
 {
     [Reentrant]
-    public class FasterSimpleGrain : Grain, IFasterSimpleGrain
+    public class FasterGrain : Grain, IFasterGrain
     {
         private readonly FasterOptions options;
         private IDevice logDevice;
@@ -20,7 +20,7 @@ namespace Grains
         private FasterKV<int, LookupItem, LookupItem, LookupItem, Empty, LookupItemFunctions> lookup;
         private SemaphoreSlim semaphore = new SemaphoreSlim(Environment.ProcessorCount, Environment.ProcessorCount);
 
-        public FasterSimpleGrain(IOptions<FasterOptions> options)
+        public FasterGrain(IOptions<FasterOptions> options)
         {
             this.options = options.Value;
         }
@@ -183,6 +183,37 @@ namespace Grains
                         lookup.StopSession();
                     }
                 }
+            });
+        }
+
+        public Task SetRangeDeltaAsync(ImmutableList<LookupItem> items)
+        {
+            return Task.Run(async () =>
+            {
+                await semaphore.WaitAsync();
+
+                try
+                {
+                    lookup.StartSession();
+                    for (var i = 0; i < items.Count; ++i)
+                    {
+                        var item = items[i];
+                        var key = item.Key;
+                        lookup.RMW(ref key, ref item, Empty.Default, i);
+                    }
+                }
+                finally
+                {
+                    try
+                    {
+                        lookup.StopSession();
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                }
+                return Task.CompletedTask;
             });
         }
     }

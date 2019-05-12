@@ -15,7 +15,7 @@ namespace Silo
     public class FasterSimpleSingleSetBenchmarks
     {
         private IHost host;
-        private IFasterSimpleGrain grain;
+        private IFasterGrain grain;
         private LookupItem[] data;
         private const int Items = 1 << 13;
 
@@ -29,7 +29,7 @@ namespace Silo
             host = Program.StartNewHost();
 
             grain = host.Services.GetService<IGrainFactory>()
-                .GetGrain<IFasterSimpleGrain>(Guid.Empty);
+                .GetGrain<IFasterGrain>(Guid.Empty);
         }
 
         [IterationSetup]

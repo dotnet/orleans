@@ -1,8 +1,6 @@
 using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using Grains;
@@ -14,16 +12,16 @@ using Orleans.Runtime;
 
 namespace Silo
 {
-    [ShortRunJob, EvaluateOverhead(false), AllStatisticsColumn, MarkdownExporter, RunOncePerIteration]
+    [ShortRunJob]
+    [EvaluateOverhead(false), AllStatisticsColumn, MarkdownExporter, RunOncePerIteration]
     [GcServer(true), GcConcurrent(true)]
-    public class FasterDedicatedRangeSetBenchmarks
+    public class RangeDeltaBenchmarks
     {
-        private const int ItemCount = 1 << 20;
+        private const int ItemCount = 1 << 21;
 
         private IHost host;
-        private IDictionaryGrain dictionaryGrain;
         private IConcurrentDictionaryGrain concurrentGrain;
-        private IFasterSimpleGrain fasterGrain;
+        private IFasterGrain fasterGrain;
         private ImmutableList<LookupItem>[] batches;
         private Task[] tasks;
 
@@ -31,16 +29,12 @@ namespace Silo
         public void GlobalSetup()
         {
             batches = Enumerable.Range(0, Items)
-                .Select(i => new LookupItem(i, i, DateTime.UtcNow))
+                .Select(i => new LookupItem(i % (1 << 10), i % (1 << 10), DateTime.UtcNow))
                 .BatchIEnumerable(BatchSize)
                 .Select(_ => _.ToImmutableList())
                 .ToArray();
 
             host = Program.StartNewHost();
-
-            dictionaryGrain = host.Services
-                .GetService<IGrainFactory>()
-                .GetGrain<IDictionaryGrain>(Guid.Empty);
 
             concurrentGrain = host.Services
                 .GetService<IGrainFactory>()
@@ -48,7 +42,7 @@ namespace Silo
 
             fasterGrain = host.Services
                 .GetService<IGrainFactory>()
-                .GetGrain<IFasterSimpleGrain>(Guid.Empty);
+                .GetGrain<IFasterGrain>(Guid.Empty);
 
             tasks = new Task[batches.Length];
         }
@@ -56,7 +50,6 @@ namespace Silo
         [IterationSetup]
         public void IterationSetup()
         {
-            dictionaryGrain.StartAsync().Wait();
             concurrentGrain.StartAsync().Wait();
             fasterGrain.StartAsync().Wait();
         }
@@ -64,7 +57,6 @@ namespace Silo
         [IterationCleanup]
         public void IterationCleanup()
         {
-            dictionaryGrain.StopAsync().Wait();
             concurrentGrain.StopAsync().Wait();
             fasterGrain.StopAsync().Wait();
         }
@@ -75,7 +67,7 @@ namespace Silo
         [Params(ItemCount)]
         public int Items { get; set; }
 
-        [Params(1 << 10, 1 << 11, 1 << 12)]
+        [Params(1 << 10, 1 << 9, 1 << 8)]
         public int BatchSize { get; set; }
 
         [Benchmark(OperationsPerInvoke = ItemCount)]
@@ -83,7 +75,7 @@ namespace Silo
         {
             for (var i = 0; i < batches.Length; ++i)
             {
-                tasks[i] = fasterGrain.SetRangeAsync(batches[i]);
+                tasks[i] = fasterGrain.SetRangeDeltaAsync(batches[i]);
             }
             Task.WaitAll(tasks);
         }
@@ -93,17 +85,7 @@ namespace Silo
         {
             for (var i = 0; i < batches.Length; ++i)
             {
-                tasks[i] = concurrentGrain.SetRangeAsync(batches[i]);
-            }
-            Task.WaitAll(tasks);
-        }
-
-        [Benchmark(OperationsPerInvoke = ItemCount)]
-        public void Dictionary()
-        {
-            for (var i = 0; i < batches.Length; ++i)
-            {
-                tasks[i] = dictionaryGrain.SetRangeAsync(batches[i]);
+                tasks[i] = concurrentGrain.SetRangeDeltaAsync(batches[i]);
             }
             Task.WaitAll(tasks);
         }
